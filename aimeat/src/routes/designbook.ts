@@ -9,10 +9,12 @@
  *   proxy these routes.
  *
  *   AUTHORITY IS DECIDED IN THE SERVICE against the resolved caller; these handlers only carry
- *   the operator bit in (read from the normalized req.auth roles, never from the request body).
+ *   the operator bit in (asked with isOperatorCaller on the normalized req.auth, never read from the
+ *   request body).
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-09-26 — GET /v1/designbook/:id names its reader to the service, which answers a
  *     component's `bench` and gives the markup and stylesheet of one that no longer passes only to
  *     its proposer. The preview reads the part as stored (storedPart) and benches it itself.
@@ -53,6 +55,7 @@ import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { getAppTemplates } from '../data/app-templates.js';
 import { grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
 import { resolveAppUrls } from './apps/helpers.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 
 export function designbookRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -263,8 +266,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       const { part } = await book.get(id);
       const who = caller(req);
       const ownerGhii = who.includes('#') ? who.slice(who.indexOf('#') + 1) : who;
-      const isOperator = req.auth!.roles.includes('operator');
-      if (!isOperator && part.proposed_by_owner !== ownerGhii) {
+      if (part.proposed_by_owner !== ownerGhii && !(await isOperatorCaller(storage, req.auth))) {
         return res.status(403).json(error(config.nodeId, 'NOT_ALLOWED',
           'The bench is run by the node operator or the part\'s own proposer — its result changes what the gallery says about the part.'));
       }
@@ -280,7 +282,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
     try {
       const status = typeof (req.body as Record<string, unknown>).status === 'string'
         ? (req.body as Record<string, string>).status : '';
-      const isOperator = req.auth!.roles.includes('operator');
+      const isOperator = await isOperatorCaller(storage, req.auth);
       const out = await book.setStatus(caller(req), isOperator, req.params.id as string, status);
       res.json(success(config.nodeId, out));
     } catch (err) { refuse(res, err); }
@@ -290,7 +292,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   // history included; an adopted part answers PART_IN_USE and points at retire instead.
   router.delete('/v1/designbook/:id', requireAuth(), requireScope('memory:delete'), async (req: Request, res: Response) => {
     try {
-      const isOperator = req.auth!.roles.includes('operator');
+      const isOperator = await isOperatorCaller(storage, req.auth);
       const out = await book.delete(caller(req), isOperator, req.params.id as string);
       res.json(success(config.nodeId, out));
     } catch (err) { refuse(res, err); }

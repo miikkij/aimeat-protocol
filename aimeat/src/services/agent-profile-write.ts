@@ -33,6 +33,7 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   v1.5.1 -- 2026-10-05 -- The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.5.0 -- 2026-10-02 -- setAgentRuntimeSource takes `llm` ('node' | 'machine'): where the crew's
  *     model calls go, which the own-key answer reads per agent (services/own-key-coverage.ts).
  *   v1.4.0 -- 2026-09-06 -- A scope change here also pushes scopes_changed to a live tunnel. The MCP
@@ -69,6 +70,7 @@ import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-sche
 import { inferModeFromPlatform } from './platform-detector.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { logger } from '../utils/logger.js';
+import { exceedsCeiling } from '../utils/scope-coverage.js';
 
 export interface AgentWriteDeps {
     storage: Storage;
@@ -180,15 +182,9 @@ function normaliseScopes(config: AimeatConfig, raw: unknown): { ok: true; scopes
             message: `Each scope must be a non-empty string of at most ${MAX_SCOPE_LENGTH} characters`,
         };
     }
-    if (!config.maxAgentScopes.includes('*')) {
-        const invalid = raw.filter(s => {
-            if (s === '*') return true;
-            const [domain] = s.split(':');
-            return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
-        });
-        if (invalid.length > 0) {
-            return { ok: false, code: 'INVALID_INPUT', message: `Scopes exceed node maximum: ${invalid.join(', ')}` };
-        }
+    const invalid = exceedsCeiling(config.maxAgentScopes, raw);
+    if (invalid.length > 0) {
+        return { ok: false, code: 'INVALID_INPUT', message: `Scopes exceed node maximum: ${invalid.join(', ')}` };
     }
     return { ok: true, scopes: [...raw] };
 }

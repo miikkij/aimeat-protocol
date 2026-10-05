@@ -28,6 +28,7 @@
  *   const t = resolveWriteTarget(req, config, body.owner_scope === true);
  *   if ('deny' in t) { res.status(403).json(error(...t.deny)); return; }
  * @version-history
+ *   v1.0.1 — 2026-10-05 — hasWriteAsOwner is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.0.0 — 2026-08-08 — Initial.
  */
 import type { Request } from 'express';
@@ -48,7 +49,7 @@ import { appMayWriteKey } from '../../utils/reserved-keys.js';
  * became a way for an agent to grant itself this scope with no owner involved.
  */
 export { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
-import { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
+import { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
 
 export interface WriteTarget {
     /** The namespace the record will be written under. */
@@ -72,8 +73,7 @@ export interface WriteTargetDenied {
  * global wildcard, the domain wildcard, or the exact string.
  */
 export function hasWriteAsOwner(scopes: string[] | undefined): boolean {
-    const s = scopes ?? [];
-    return s.includes('*') || s.includes('memory:*') || s.includes(WRITE_AS_OWNER_SCOPE);
+    return scopeIsCovered(scopes ?? [], WRITE_AS_OWNER_SCOPE);
 }
 
 /**

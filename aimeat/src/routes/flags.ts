@@ -11,6 +11,7 @@
  *   - flagsRouter(config, storage): POST /v1/flags plus flag listing/review routes
  *
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.2.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-14 — The organism-admin path asks which PRINCIPAL is calling, not whose name
  *     the call carries: it read the admin's GHII from `req.auth.owner`, so the admin's own agent
@@ -23,7 +24,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope, isOwnerPrincipal } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireScope, isOwnerPrincipal } from '../auth/middleware.js';
 import { isForeignPrincipal } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -33,6 +34,7 @@ import {
     createModerationFlag,
     resolveOrganismForFlag,
 } from '../services/moderation-flags.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 
 const VALID_REVIEW_STATUSES = ['dismissed', 'actioned'] as const;
 
@@ -102,7 +104,7 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // ── GET /v1/flags — List flags (operator only) ──
-    router.get('/v1/flags', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/flags', requireAuth(), requireOperator(storage), async (req, res) => {
         const status = req.query.status as string | undefined;
         const targetType = req.query.targetType as string | undefined;
         const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
@@ -140,7 +142,9 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         // visitor signed in from another node under the same name did too, on a door whose only
         // gate is requireAuth(). The owner name is not a principal (invariant 11). Found by the AI
         // triage of 2026-09-13.
-        const isOperator = req.auth!.roles.includes('operator');
+        // Moderating a flag is the node's moderation work, not an act in one person's account, so
+        // the operator check writes no trail.
+        const isOperator = await isOperatorCaller(storage, req.auth);
         let isOrganismAdmin = false;
         if (!isOperator && isOwnerPrincipal(req.auth) && !isForeignPrincipal(req.auth)) {
             const organism = await resolveOrganismForFlag(storage, existing.targetType, existing.targetId);

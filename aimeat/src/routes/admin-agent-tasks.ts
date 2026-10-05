@@ -5,18 +5,19 @@
  * @description Admin endpoints for cross-owner agent task overview.
  *   Lists all agent tasks on the node for operator dashboards.
  * @version-history
+ *   v1.1.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 
 export function adminAgentTasksRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  router.get('/v1/admin/agent-tasks', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/agent-tasks', requireAuth(), requireOperator(storage), async (req, res) => {
     const status = req.query.status as string | undefined;
     const agentGaii = req.query.agent as string | undefined;
     const page = parseInt(req.query.page as string || '1', 10);

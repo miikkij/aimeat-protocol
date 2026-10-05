@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.14.0 (2026-10-05): check:single-entry, a password check, an account deletion and an operator check each through their one function.
  *  - 1.13.0 (2026-10-01): check:peer-paths, every federation peer writer and reader says on what proof.
  *  - 1.12.0 (2026-09-29): check:classification-reach, stored content reaches a caller through the classification reader.
  *  - 1.11.0 (2026-09-28): check:skill-evals, a changed skill with an eval suite waits for the developer's run-or-skip.
@@ -64,6 +65,9 @@ export const FAST_CHECKS = [
     // From the September 2026 audit's check of the fixes: a visitor from another node is named
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.
     { script: 'check:identity-shortening', label: 'An identity is cut to an account name only by localAccountName or localAccountOf' },
+    // Secaudit 2026-10, C1, C2 and C7: a security decision with a function of its own is made only
+    // through it; the hand copies left are counted per file and may only fall.
+    { script: 'check:single-entry', label: 'A password check, an account deletion and an operator check each go through their one function' },
     // TARGET-082: stored content reaches a caller only through a loader that takes a classification
     // reader, or through a listed read that says why it is the node's own.
     { script: 'check:classification-reach', label: 'Every content read passes the classification reader or is listed with its reason' },

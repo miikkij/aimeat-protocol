@@ -6,6 +6,7 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.7.0 — 2026-10-05 — PATCH turns automatic updates on only for the owner in person or an agent
  *     holding packages:install-code (secaudit 2026-10, PKG-12).
  *   v1.6.0 — 2026-10-02 — GET /v1/instances/:id carries `approval`: what the install was approved to do
@@ -49,6 +50,7 @@ import { listInstancesFor } from '../../services/package-read.js';
 import { approvalOf, forgetApproval, INSTALL_CODE_SCOPE } from '../../services/package-approvals.js';
 import { isOwnerInPerson } from '../../auth/effective-scopes.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { operatorOverride } from '../../services/operator-override.js';
 
 // ── Register instance management routes ───────────────────────────────
 
@@ -158,7 +160,6 @@ export function registerManageRoutes(
   router.get('/v1/instances/:id', requireAuth(), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const roles = req.auth!.roles;
 
     const instance = await storage.getInstance(id);
     if (!instance) {
@@ -166,8 +167,9 @@ export function registerManageRoutes(
       return;
     }
 
-    // Must be owner or operator
-    if (instance.owner !== owner && !roles.includes('operator')) {
+    // Must be owner or operator; the operator reading another person's install writes the operator trail.
+    if (instance.owner !== owner
+      && !(await operatorOverride(storage, config, req.auth, { ownerOf: instance.owner, area: 'instance', action: 'read', subject: id }))) {
       res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }

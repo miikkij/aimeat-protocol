@@ -13,6 +13,7 @@
  *   - /scaffold, /:name/actions, GET|PUT /:name/scripts/:actionId: authoring endpoints
  *
  * @version-history
+ *   v1.4.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.0 -- 2026-09-26 -- The bundled install and the reinstall keep the version they deploy
  *     (services/component-versions.ts), and the reinstall refuses other code under a version already
  *     kept with 409 VERSION_EXISTS before it writes (secaudit 2026-09, A6-7).
@@ -32,7 +33,7 @@ import { parse as parseYaml } from 'yaml';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { registerExtensionSchedules } from '../services/extension-schedules.js';
@@ -172,7 +173,7 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
   const router = Router();
 
   // ── GET /v1/admin/extensions/available — List bundled extensions ──
-  router.get('/v1/admin/extensions/available', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/extensions/available', requireAuth(), requireOperator(storage), async (_req, res) => {
     try {
       const bundled = readBundledExtensions();
 
@@ -196,7 +197,7 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
   });
 
   // ── POST /v1/admin/extensions/available/:name/install — One-click install bundled extension ──
-  router.post('/v1/admin/extensions/available/:name/install', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/extensions/available/:name/install', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const name = req.params.name as string;
       if (!isSafeSegment(name)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name')); return; }
@@ -348,7 +349,7 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
   });
 
   // ── POST /v1/admin/extensions/scaffold — Create extension files on disk ──
-  router.post('/v1/admin/extensions/scaffold', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/extensions/scaffold', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const body = req.body as Record<string, unknown>;
       const name = body.name as string;
@@ -508,7 +509,7 @@ actions:
   });
 
   // ── GET /v1/admin/extensions/available/:name/scripts/:actionId — Read action script from disk ──
-  router.get('/v1/admin/extensions/available/:name/scripts/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/extensions/available/:name/scripts/:actionId', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
@@ -530,7 +531,7 @@ actions:
   });
 
   // ── PUT /v1/admin/extensions/available/:name/scripts/:actionId — Write action script to disk ──
-  router.put('/v1/admin/extensions/available/:name/scripts/:actionId', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.put('/v1/admin/extensions/available/:name/scripts/:actionId', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
@@ -569,7 +570,7 @@ actions:
   });
 
   // ── POST /v1/admin/extensions/available/:name/actions — Add new action to disk extension ──
-  router.post('/v1/admin/extensions/available/:name/actions', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/extensions/available/:name/actions', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const name = req.params.name as string;
       if (!isSafeSegment(name)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name')); return; }
@@ -653,7 +654,7 @@ return { ok: true };
   });
 
   // ── POST /v1/admin/extensions/available/:name/reinstall — Reinstall from disk (update) ──
-  router.post('/v1/admin/extensions/available/:name/reinstall', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/extensions/available/:name/reinstall', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const name = req.params.name as string;
       if (!isSafeSegment(name)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name')); return; }

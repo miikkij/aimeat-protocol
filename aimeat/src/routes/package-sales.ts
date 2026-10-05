@@ -18,6 +18,7 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-10-05 — A signed sale or claim must name this node as its audience and carry a nonce
  *     not seen before; a grant passes the repository role to grantEntitlement (secaudit 2026-10,
  *     PKG-8 and PKG-10).
@@ -41,6 +42,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireScope, requireLocalSession, requireOperatorPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import { verifySaleRequest, verifyRequestWithKey, CLAIM_PURPOSE } from '../services/package-sale-auth.js';
 import { listSellers, addSeller, removeSeller, isSellerFor } from '../services/package-sellers.js';
 import { grantEntitlement, revokeEntitlement, type PackageEntitlement } from '../services/package-entitlements.js';
@@ -80,8 +82,10 @@ export function registerPackageSaleRoutes(
     // a stranger that the package exists and who wrote it; a seller reads it signed, a buyer through
     // the selling node. Anyone else gets the answer a package with no offer gets.
     router.get('/v1/packages/:groupId/offer', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
-        const offer = await readOffer(storage, decodeURIComponent(req.params.groupId as string));
-        if (!offer || (offer.author !== req.auth!.owner && !req.auth!.roles.includes('operator'))) {
+        const groupId = decodeURIComponent(req.params.groupId as string);
+        const offer = await readOffer(storage, groupId);
+        if (!offer || (offer.author !== req.auth!.owner && !(await operatorOverride(storage, config, req.auth,
+            { ownerOf: offer.author, area: 'package', action: 'read-offer', subject: groupId })))) {
             res.status(404).json(error(config.nodeId, 'NO_OFFER', 'This package has no offer. Ask its author to set the terms it is sold on.'));
             return;
         }
@@ -90,7 +94,7 @@ export function registerPackageSaleRoutes(
 
     router.put('/v1/packages/:groupId/offer', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
-        const out = await setOffer(storage, { owner: req.auth!.owner, isOperator: req.auth!.roles.includes('operator') },
+        const out = await setOffer(storage, { owner: req.auth!.owner, isOperator: await isOperatorCaller(storage, req.auth) },
             decodeURIComponent(req.params.groupId as string), { terms: body.terms, state: body.state });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { ...publicOffer(out.offer), all_terms: out.offer.terms }));

@@ -16,6 +16,7 @@
  *   - POST /v1/admin/agents/:gaii/remind    -- Send reminder to stuck agent
  *   - POST /v1/admin/agents/:gaii/onboarding/skip -- Skip onboarding step
  * @version-history
+ *   v1.3.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.0 -- 2026-09-12 -- The registry emits a row for every platform value that has agents, not
  *     only the ones it knows, and returns total_agents: the page used to add up the rows it drew
  *     and call that the agent count, which silently dropped every self-reported platform id. A
@@ -30,7 +31,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { getKnownPlatforms } from '../services/platform-detector.js';
 import { emitChange } from '../services/event-bus.js';
 
@@ -58,7 +59,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   const router = Router();
 
   /* ── GET /v1/admin/platforms ── */
-  router.get('/v1/admin/platforms', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/platforms', requireAuth(), requireOperator(storage), async (_req, res) => {
     const platforms = getKnownPlatforms();
     const agents = await storage.listAgents();
 
@@ -113,7 +114,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   });
 
   /* ── GET /v1/admin/agents/onboarding ── */
-  router.get('/v1/admin/agents/onboarding', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/agents/onboarding', requireAuth(), requireOperator(storage), async (_req, res) => {
     const inProgress = await storage.listOnboardingByStatus('in_progress');
     const completed = await storage.listOnboardingByStatus('completed');
     const pending = await storage.listOnboardingByStatus('pending');
@@ -153,7 +154,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   });
 
   /* ── GET /v1/admin/agents/readiness ── */
-  router.get('/v1/admin/agents/readiness', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/agents/readiness', requireAuth(), requireOperator(storage), async (_req, res) => {
     const completed = await storage.listOnboardingByStatus('completed');
     const distribution = { expert: 0, full: 0, standard: 0, basic: 0 };
 
@@ -166,7 +167,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   });
 
   /* ── GET /v1/admin/skill-bundles ── */
-  router.get('/v1/admin/skill-bundles', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/skill-bundles', requireAuth(), requireOperator(storage), async (_req, res) => {
     const agents = await storage.listAgents();
 
     const platformBundles: Record<string, { agents: number; outdated: number }> = {};
@@ -180,12 +181,12 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   });
 
   /* ── POST /v1/admin/skill-bundles/regenerate ── */
-  router.post('/v1/admin/skill-bundles/regenerate', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.post('/v1/admin/skill-bundles/regenerate', requireAuth(), requireOperator(storage), async (_req, res) => {
     res.json(success(config.nodeId, { regenerated: true, message: 'Bundle regeneration queued' }));
   });
 
   /* ── POST /v1/admin/platforms ── */
-  router.post('/v1/admin/platforms', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/platforms', requireAuth(), requireOperator(storage), async (req, res) => {
     const { id, display_name, bundle_name, detect_pattern } = req.body ?? {};
     if (!id || !display_name) {
       res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'id and display_name are required'));
@@ -207,7 +208,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   });
 
   /* ── POST /v1/admin/agents/:gaii/remind ── */
-  router.post('/v1/admin/agents/:gaii/remind', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/agents/:gaii/remind', requireAuth(), requireOperator(storage), async (req, res) => {
     const agentGaii = req.params.gaii as string;
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
@@ -229,7 +230,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   });
 
   /* ── POST /v1/admin/agents/:gaii/onboarding/skip ── */
-  router.post('/v1/admin/agents/:gaii/onboarding/skip', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/agents/:gaii/onboarding/skip', requireAuth(), requireOperator(storage), async (req, res) => {
     const agentGaii = req.params.gaii as string;
     const { step_id } = req.body ?? {};
     if (!step_id) {
@@ -254,7 +255,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   });
 
   /* ── POST /v1/admin/skill-bundles/:platform/notify ── */
-  router.post('/v1/admin/skill-bundles/:platform/notify', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/skill-bundles/:platform/notify', requireAuth(), requireOperator(storage), async (req, res) => {
     const platform = req.params.platform as string;
     res.json(success(config.nodeId, { notified: true, platform }));
   });

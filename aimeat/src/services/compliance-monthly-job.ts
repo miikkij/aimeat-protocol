@@ -27,6 +27,7 @@
  *   - saveComplianceSnapshot(config, storage, opts) — keep the report as it stands right now
  * @usage registered as the core handler `compliance-report-monthly` in services/core-jobs.ts
  * @version-history
+ *   v1.1.2 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.1.1 — 2026-10-02 — The notification linked to /admin, which the SPA has no route for, so it
  *     opened the front page. It links to /v1/admin now.
  *   v1.1.0 — 2026-08-23 — saveComplianceSnapshot: the schedule was the only thing that could keep a
@@ -39,6 +40,7 @@ import { buildComplianceReport } from './compliance-report.js';
 import { writeStoredReport, snapshotIdFor } from './compliance-register.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 
 /** `YYYY-MM` of the calendar month before `now`, in UTC. */
 export function previousMonth(now: Date): string {
@@ -69,7 +71,7 @@ export async function runComplianceMonthlyReport(
   await writeStoredReport(storage, config.nodeId, month, report);
 
   const owners = await storage.listOwners();
-  const operators = owners.filter(o => o.roles.includes('operator'));
+  const operators = owners.filter(isOperatorAccount);
   for (const op of operators) {
     await notify(storage, `${op.name}@${config.nodeId}`, {
       type: 'compliance_report',

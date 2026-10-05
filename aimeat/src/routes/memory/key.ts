@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). DELETE ?owner= computes its roles with rolesWithOperator and writes recordOperatorAccess, the trail the admin memory route writes.
  *   v1.10.0 — 2026-09-29 — TARGET-082 review: GET /v1/memory/:key answers `classificationWarning`
  *     when an AI is shown a warning-classified record. GET /v1/memory/:gaii/:key moved to
  *     routes/memory/public-read.ts (max-file-lines), where its visibility gate now runs before the
@@ -71,6 +72,8 @@ import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 import { logger } from '../../utils/logger.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
+import { rolesWithOperator } from '../../services/operator-override.js';
+import { recordOperatorAccess } from '../../services/operator-access-audit.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
@@ -235,13 +238,17 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // roles are the door's business), the owner-scope opt-in, and the workspace guard below.
     const ownerOverride = req.query.owner as string | undefined;
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    // The operator half of ?owner= asks isOperatorCaller through rolesWithOperator, as the MCP tools
+    // ask askOperator: the operator's agent holding operator:admin passes too, and the service
+    // (memory-bin.ts binRefusal) reads 'operator' from the same computed list.
+    const roles = ownerOverride ? await rolesWithOperator(storage, req.auth) : req.auth!.roles;
     const binReq = {
       caller: gaii,
       ownerName: req.auth!.owner as string,
       key,
       ownerScope: isOwnerSession || req.query.owner_scope === 'true',
-      ownerOverride: (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : null,
-      roles: req.auth!.roles,
+      ownerOverride: (ownerOverride && roles.includes('operator')) ? ownerOverride : null,
+      roles,
     };
 
     // Who to ask, if somebody later wonders where it went. The principal, not the owner name:
@@ -257,6 +264,13 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(outcome.status ?? 404).json(error(config.nodeId, outcome.code, outcome.message,
         outcome.status ?? 404, outcome.violations ? { violations: outcome.violations } : undefined));
       return;
+    }
+    // The operator's ?owner= delete writes the operator-access trail, the same one
+    // DELETE /v1/admin/memory/:owner/:key writes (recordOperatorAccess skips the operator's own account).
+    if (binReq.ownerOverride) {
+      await recordOperatorAccess(storage, config, {
+        operatorGhii: ownerGhiiOf(gaii), actorGaii: gaii, ownerOf: outcome.ownerGaii, action: 'delete', key: outcome.key,
+      });
     }
 
     emitResourceUpdated(outcome.ownerGaii, `aimeat://memory/${encodeURIComponent(key)}`);

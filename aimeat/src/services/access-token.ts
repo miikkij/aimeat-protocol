@@ -9,6 +9,7 @@
  * @structure PAT_PREFIX; ResolvedPat; resolvePat(storage, rawToken).
  * @usage import { resolvePat, PAT_PREFIX } from '../services/access-token.js'
  * @version-history
+ * v1.2.1 - 2026-10-05 - The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  * v1.2.0 - 2026-09-26 - A PAT made before the account that now holds its owner name resolves to null,
  *   as one of a deleted or deactivated account does (auth/credential-age.ts ownerRefuses).
  * v1.1.0 - 2026-08-23 - A deactivated owner's PATs resolve to null (BR-04); the owner record was
@@ -17,6 +18,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { hashToken } from './owner-session.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 
 /** Raw PATs carry this prefix so they're distinguishable from JWTs / session tokens. */
@@ -51,7 +53,7 @@ export async function resolvePat(storage: Storage, rawToken: string): Promise<Re
   let scopes: string[];
   if (pat.grantOperator) {
     sub = pat.owner;
-    roles = ownerRecord.roles.includes('operator') ? ['owner', 'operator'] : ['owner'];
+    roles = isOperatorAccount(ownerRecord) ? ['owner', 'operator'] : ['owner'];
     scopes = [];
   } else if (pat.grantOwner) {
     sub = pat.owner;

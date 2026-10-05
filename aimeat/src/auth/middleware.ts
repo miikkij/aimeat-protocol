@@ -16,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-05 — requireOperator(storage): the operator's routes ask askOperator with operator:admin,
+ *     in place of requireRole('operator') (secaudit 2026-10, C2). It and requireOperatorPrincipal move
+ *     to ./operator-gate.ts, re-exported here (max-file-lines).
  *   2026-10-02 — requireScope notes the words it admitted a `*` agent for (services/scope-use.ts).
  *   2026-09-30 — requireAnyScope tells denyScope403 that any one scope would do (the agent refusal note).
  *   2026-09-29 — resolvePatToken marks the identity `via: 'pat'`, so classification reads it as an AI
@@ -105,7 +108,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
-import { OPERATOR_ORGANISM_REPAIR_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isForeignPrincipal, setThisNodeId } from '../utils/gaii.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
@@ -115,7 +118,6 @@ import { logger } from '../utils/logger.js';
 import { deny401, deny403, denyScope403 } from './deny.js';
 import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
 import { withCurrentScopes } from './effective-scopes.js';
-import { askOperator } from '../services/operator-principal.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 
@@ -501,66 +503,9 @@ export function requireRole(role: string) {
 // when this file passed 800 lines. Re-exported so every existing import of it still resolves here.
 export { isOwnerPrincipal, isThirdPartyPrincipal, isSignedInCaller, requireOwnerPrincipal } from './account-security.js';
 
-/**
- * Require the NODE OPERATOR, or something the operator explicitly sent. For the break-glass doors
- * that reach across accounts: repairing an organism whose owner is unreachable is the first of them.
- *
- * WHY NOT requireRole('operator'). That tests the token's own role list, so it admits the operator's
- * browser session and refuses the operator's AGENTS — and an agent should be able to do what a
- * person can. This gate asks the question one level up: is the ACCOUNT behind this principal an
- * operator account? The four `aimeat_admin_*` MCP tools already resolve the operator that way
- * (mcp/core-admin.ts), so the two surfaces now agree instead of disagreeing by accident.
- *
- * WHY A SCOPE ON TOP. The role alone would hand every one of the operator's agents a node-wide
- * capability the moment it exists, and that is the shape of the incident this door was built for: an
- * agent with no scope limit called the ownership transfer during a test run and gave away the node's
- * own development organism. The word is tested as the EXACT string — no wildcard carries it
- * (SCOPES_OUTSIDE_WILDCARD), nobody was grandfathered onto it, and `app` principals are refused
- * outright, because an app grant is consent to use the account and never consent to act as the node.
- *
- * WHY THE WORD IS A PARAMETER. Organism repair was the first door of this shape and is the default,
- * so its two call sites read exactly as before. The compliance report (BR-02) is the second, and it
- * needs two different words for reading and writing. A near-copy of this function per door is how
- * three copies of the scope test came to live in this file, none of them knowing about the exception
- * the vocabulary module was written to hold — so the door varies by its word, not by its code.
- *
- * Federated sessions are refused for the same reason requireRole('operator') refuses them: operator
- * power stops at this node's own front door.
- *
- * THE DECISION IS askOperator() (services/operator-principal.ts), the one operator question every door
- * asks, tool surface included; this gate keeps its own refusals and their codes.
- */
-export function requireOperatorPrincipal(storage: Storage, scope: string = OPERATOR_ORGANISM_REPAIR_SCOPE) {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth) {
-      deny401(req, res, 'Authentication required');
-      return;
-    }
-    if (isForeignPrincipal(req.auth)) {
-      deny403(req, res, 'FORBIDDEN', 'Federated sessions cannot access operator functions');
-      return;
-    }
-    if (req.auth.roles.includes('app')) {
-      deny403(req, res, 'ACCESS_DENIED', 'An app grant cannot carry operator functions');
-      return;
-    }
-    // The operator in person passes; anything acting for an operator account passes on the exact word.
-    const answer = await askOperator(storage, {
-      sub: req.auth.sub, owner: req.auth.owner, roles: req.auth.roles, scopes: req.auth.scopes,
-    }, scope);
-    if (!answer.ok && answer.why !== 'needs-word') {
-      deny403(req, res, 'ACCESS_DENIED', 'Node operator required');
-      return;
-    }
-    if (!answer.ok) {
-      logger.warn(`[operator-scope-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
-      denyScope403(req, res, [scope], `Scope "${scope}" required. The node operator grants it per agent, `
-        + 'and no wildcard carries it.');
-      return;
-    }
-    next();
-  };
-}
+// The operator gates (requireOperatorPrincipal, requireOperator) live in ./operator-gate.ts, moved
+// there unchanged when this file passed 800 lines. Re-exported so every existing import resolves here.
+export { requireOperatorPrincipal, requireOperator } from './operator-gate.js';
 
 /**
  * Require a scoped EXTERNAL principal — an agent (GAII) OR an ecosystem app (GEAI). Owner/operator

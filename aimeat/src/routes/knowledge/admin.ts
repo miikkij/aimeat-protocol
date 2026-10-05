@@ -6,6 +6,7 @@
  *   system knowledge, delete a package, submit an operator review, plus the per-package reviews
  *   list. Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — review-list / delete / find batch the per-agent scans (listMemoryForOwners)
  *   v1.2.0 — 2026-09-04 — GET /v1/knowledge/:id/reviews answers about the caller's OWN packages, or
@@ -32,13 +33,14 @@ import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, KnowledgeManifest, MemoryRecord, OperatorReviewRecord, OperatorReviewAction } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
 import { validateManifest } from './manifest-validator.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge-overview.js';
 import { readerFor } from '../../services/classification/reader.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerAdminRoutes(
   router: Router,
@@ -60,7 +62,7 @@ export function registerAdminRoutes(
    * person stored under two spellings, and a maturity word this node does not define.
    * → services/knowledge-overview.ts
    */
-  router.get('/v1/admin/knowledge', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/knowledge', requireAuth(), requireOperator(storage), async (req, res) => {
     const str = (k: string) => (typeof req.query[k] === 'string' ? req.query[k] as string : undefined);
     const data = await buildKnowledgeOverview(config, storage, resolve(req), readerFor({ storage, config }, req.auth), {
       page: parseInt(str('page') || '1'),
@@ -83,7 +85,7 @@ export function registerAdminRoutes(
   });
 
   /* ── POST /v1/admin/knowledge/import — Operator creates system knowledge ── */
-  router.post('/v1/admin/knowledge/import', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/knowledge/import', requireAuth(), requireOperator(storage), async (req, res) => {
     const operatorGaii = resolve(req);
     const ownerName = req.auth!.owner as string;
     const { name, content_type, tags, maturity, visibility, catalog_listed, entries } = req.body;
@@ -190,7 +192,7 @@ export function registerAdminRoutes(
   });
 
   /* ── DELETE /v1/admin/knowledge/:id — Operator deletes a package ── */
-  router.delete('/v1/admin/knowledge/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.delete('/v1/admin/knowledge/:id', requireAuth(), requireOperator(storage), async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
@@ -236,7 +238,7 @@ export function registerAdminRoutes(
   });
 
   /* ── POST /v1/admin/knowledge/:id/review — Operator reviews a package ── */
-  router.post('/v1/admin/knowledge/:id/review', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/knowledge/:id/review', requireAuth(), requireOperator(storage), async (req, res) => {
     const operatorGaii = resolve(req);
     const packageId = req.params.id as string;
     const { reason, custom_text, action: reviewAction } = req.body;
@@ -347,7 +349,7 @@ export function registerAdminRoutes(
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    if (!req.auth!.roles.includes('operator')) {
+    if (!(await isOperatorCaller(storage, req.auth))) {
       const owner = req.auth!.owner;
       const identities = [`${owner}@${config.nodeId}`, ...(await storage.getAgentsByOwner(owner)).map(a => a.gaii)];
       const mine = (await storage.listMemoryForOwners(identities, { prefix: manifestKey }))

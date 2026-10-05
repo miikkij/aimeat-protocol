@@ -9,12 +9,13 @@
  *   is three places for the gate, the validation and the changelog to drift apart, and this repo has
  *   already paid for exactly that when one tool name meant two different backends for months.
  *
- *   THE GATE IS NOT requireRole('operator'). Every older site route uses it, and it is right for
- *   them: it reads the TOKEN's roles, so it admits the operator's browser. It also refuses the
- *   operator's AGENT, which is the wrong answer for a capability whose whole point is "ask your own
- *   AI to take the shop off our home page". requireOperatorPrincipal admits the operator in person,
- *   refuses an app grant outright, and otherwise requires that the ACCOUNT is an operator and the
- *   principal carries the exact word — a word no wildcard hands out.
+ *   THE GATE ASKS ITS OWN WORD. The older site routes ask requireOperator (operator:admin; until
+ *   2026-10-05 they asked requireRole('operator'), which reads the TOKEN's roles and so refused the
+ *   operator's AGENT, the wrong answer for a capability whose whole point is "ask your own AI to take
+ *   the shop off our home page"). The layout routes ask requireOperatorPrincipal with the narrower
+ *   surface-layout word: it admits the operator in person, refuses an app grant outright, and
+ *   otherwise requires that the ACCOUNT is an operator and the principal carries the exact word — a
+ *   word no wildcard hands out.
  *
  *   READING THE PORTAL LAYOUT NEEDS NO SESSION, reading a member surface does. The portal's layout
  *   describes a page anyone can already look at, and the SPA fetches it before anybody has signed
@@ -24,6 +25,7 @@
  * @structure siteLayoutRouter(config, storage)
  * @usage Mounted from siteRouter() so it inherits the site family's LB guard.
  * @version-history
+ *   v1.0.1 — 2026-10-05 — Comments only: the older site routes ask requireOperator (askOperator with operator:admin) now, so the operator's agent holding operator:admin passes there as on MCP; the layout routes keep their own word (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { Router, type RequestHandler } from 'express';
@@ -45,8 +47,8 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
     const svc = new SurfaceLayoutService(config, storage);
     /**
      * The gate, as one array so every door carries the identical pair and none can be given the
-     * weaker half by accident. requireOperatorPrincipal, not requireRole('operator'): the latter
-     * reads the TOKEN's roles, which admits the operator's browser and refuses the operator's agent.
+     * weaker half by accident. requireOperatorPrincipal with the surface-layout word, so an agent
+     * can be given the layout without operator:admin.
      */
     const operator: RequestHandler[] = [requireAuth(), requireOperatorPrincipal(storage, SURFACE_LAYOUT_WRITE_SCOPE)];
 
@@ -203,9 +205,9 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
     //
     // Its own route rather than a branch of /v1/site/import, and the reason is a rule this repo had
     // to be audited to discover: a permission word is enforced on every door or it does not exist.
-    // The older bundle is gated by requireRole('operator'), which reads the token's roles; routing a
-    // layout through it would mean one capability with two doors, only one of which asks for the
-    // word. So the bundle keeps template, memory and kv, and layouts come here.
+    // The older bundle is gated by requireOperator, which asks operator:admin; routing a layout
+    // through it would mean one capability with two routes, only one of which asks for the
+    // surface-layout word. So the bundle keeps template, memory and kv, and layouts come here.
     //
     // Every surface is validated before ANY of them is written: half a paste applied is a page in a
     // state nobody designed.

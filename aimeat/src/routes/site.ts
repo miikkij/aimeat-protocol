@@ -7,6 +7,7 @@
  *              the operator-authored portal template).
  * @usage Mounted in server.ts via siteRouter(config, storage).
  * @version-history
+ *   v1.8.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.7.0 — 2026-09-24 — Mounts themesRouter (/v1/themes*, Themes & Styles) behind the same LB guard,
  *            with the config provenance (who chooses is saved like any setting).
  *   v1.6.0 — 2026-08-28 — GET /v1/site/store-tiers: the store's public price record (ext:shop /
@@ -26,7 +27,7 @@
 import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { SiteService, SiteError } from '../services/site.js';
@@ -75,7 +76,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     // GET /v1/site/template — Download current template (operator)
     // No custom template is a normal state (default portal active), NOT an error:
     // return 200 with template:null so clients don't log a spurious 404 on every poll.
-    router.get('/v1/site/template', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/site/template', requireAuth(), requireOperator(storage), async (_req, res) => {
         const result = await site.getTemplate();
         if (!result) {
             res.json(success(config.nodeId, {
@@ -95,7 +96,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // POST /v1/site/template — Upload new template (operator)
-    router.post('/v1/site/template', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+    router.post('/v1/site/template', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         const { template } = req.body ?? {};
         if (!template || typeof template !== 'string') {
             res.status(422).json(error(config.nodeId, 'TEMPLATE_INVALID', 'Name the template you want to use, then send it again.'));
@@ -120,14 +121,14 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // DELETE /v1/site/template — Revert to default (operator)
-    router.delete('/v1/site/template', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+    router.delete('/v1/site/template', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         await site.deleteTemplate(req.auth!.sub);
         res.json(success(config.nodeId, { deleted: true, reverted_to: 'default' }));
         emitChange('site');
     });
 
     // POST /v1/site/import — Import portal bundle (operator)
-    router.post('/v1/site/import', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+    router.post('/v1/site/import', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         const body = req.body ?? {};
         if (!body.template && !body.memory && !body.kv) {
             res.status(422).json(error(config.nodeId, 'IMPORT_INVALID', 'Bundle must include at least one of: template, memory, kv'));
@@ -186,7 +187,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // GET /v1/site/changelog — View change log (operator)
-    router.get('/v1/site/changelog', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/site/changelog', requireAuth(), requireOperator(storage), async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit as string ?? '20', 10) || 20, 100);
         const cursor = req.query.cursor as string | undefined;
         const entries = await storage.listSiteChangeLog(limit, cursor);
@@ -194,7 +195,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // POST /v1/site/cache-invalidate — Force cache refresh (operator)
-    router.post('/v1/site/cache-invalidate', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/site/cache-invalidate', requireAuth(), requireOperator(storage), async (req, res) => {
         await site.invalidateCacheAction(req.auth!.sub);
         res.json(success(config.nodeId, { cache_cleared: true }));
         emitChange('site');
@@ -257,7 +258,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // PUT /v1/site/header-nav — Update header navigation config (operator)
-    router.put('/v1/site/header-nav', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+    router.put('/v1/site/header-nav', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         const { order, hidden } = req.body ?? {};
         try {
             const data = await site.setHeaderNav({ order, hidden }, req.auth!.sub);
@@ -279,14 +280,14 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // GET /v1/site/memory-keys — List portal memory keys with values (operator)
-    router.get('/v1/site/memory-keys', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/site/memory-keys', requireAuth(), requireOperator(storage), async (_req, res) => {
         const keys = await site.getPortalMemoryEntries();
         res.json(success(config.nodeId, { keys }));
     });
 
     // POST /v1/site/memory — Set a single portal memory key (operator)
     // Writes to the site (__site__) namespace so {{memory:portal/*}} tags resolve.
-    router.post('/v1/site/memory', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+    router.post('/v1/site/memory', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         const { key, value } = req.body ?? {};
         if (!key || typeof key !== 'string') {
             res.status(422).json(error(config.nodeId, 'MEMORY_INVALID', 'Name the key you want to write to, then send it again.'));
@@ -310,7 +311,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     });
 
     // DELETE /v1/site/memory/:key — Delete a single portal memory key (operator)
-    router.delete('/v1/site/memory/:key', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+    router.delete('/v1/site/memory/:key', requireAuth(), requireOperator(storage), requireNotLb, async (req, res) => {
         const key = req.params.key as string;
         let deleted: boolean;
         try {

@@ -5,6 +5,7 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-10-01 — GET /peers says how each peer arrived (`origin`, services/peer-origin-view.ts)
  *     and lists the package registrations still waiting for their node (`pending_registrations`), so
  *     an operator can find a peer no operator added (the peer-registration incident, finding F).
@@ -35,7 +36,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { PeeringDecisionSchema, validateBody } from '../../models/schemas.js';
@@ -54,7 +55,7 @@ import { pendingRegistrationView } from '../../services/peer-origin.js';
 
 export function registerPeersRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/admin/peering/requests — list pending peering requests (operator)
-    router.get('/v1/admin/peering/requests', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/peering/requests', requireAuth(), requireOperator(storage), async (_req, res) => {
         const requests = await storage.listPeeringRequests();
 
         res.json(success(config.nodeId, {
@@ -72,7 +73,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     });
 
     // PUT /v1/admin/peering/requests/:id — approve/reject peering request (operator)
-    router.put('/v1/admin/peering/requests/:id', requireAuth(), requireRole('operator'), validateBody(PeeringDecisionSchema, config.nodeId), async (req, res) => {
+    router.put('/v1/admin/peering/requests/:id', requireAuth(), requireOperator(storage), validateBody(PeeringDecisionSchema, config.nodeId), async (req, res) => {
         const id = req.params.id as string;
         const { decision, reason } = req.body ?? {};
 
@@ -135,7 +136,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     });
 
     // DELETE /v1/admin/peering/requests/:id — delete a peering request (operator)
-    router.delete('/v1/admin/peering/requests/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.delete('/v1/admin/peering/requests/:id', requireAuth(), requireOperator(storage), async (req, res) => {
         const id = req.params.id as string;
         const deleted = await storage.deletePeeringRequest(id);
         if (!deleted) {
@@ -147,7 +148,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     });
 
     // POST /v1/federation/peer/activate — activate approved peering
-    router.post('/v1/federation/peer/activate', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/peer/activate', requireAuth(), requireOperator(storage), async (req, res) => {
         const { peer_node_id } = req.body ?? {};
         if (!peer_node_id) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'peer_node_id is required'));
@@ -312,7 +313,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     });
 
     // GET /v1/federation/peers — list active peers (operator auth)
-    router.get('/v1/federation/peers', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/federation/peers', requireAuth(), requireOperator(storage), async (_req, res) => {
         // Compute promotion eligibility for visiting peers (one work scan + policy fetch reused).
         const policy = await getActivePolicy(storage);
         const allWork = await storage.listAllWork().catch(err => { logger.warn('GET /v1/federation/peers: continuing after a suppressed failure', { error: String(err) }); return []; }) as unknown as { status: string; providerGaii: string; requesterGaii: string }[];
@@ -364,7 +365,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     });
 
     // POST /v1/federation/peers — add a peer directly (operator only)
-    router.post('/v1/federation/peers', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/peers', requireAuth(), requireOperator(storage), async (req, res) => {
         const { node_id, url, public_key } = req.body ?? {};
 
         if (!node_id || !url) {
@@ -417,7 +418,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     });
 
     // PUT /v1/federation/peers/:nodeId — update peer config (operator only)
-    router.put('/v1/federation/peers/:nodeId', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/federation/peers/:nodeId', requireAuth(), requireOperator(storage), async (req, res) => {
         const nodeId = req.params.nodeId as string;
         const peer = peers.get(nodeId);
         if (!peer) {
@@ -541,7 +542,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     // PUT /v1/federation/peers/:nodeId/relay-claim — keep one peer on its own answer to
     // federation.relay_claim (operator only). The door aimeat_admin_federation_relay_claim_set calls,
     // so an operator's AI can do it too; services/relay-claim-policy.ts does the work for both.
-    router.put('/v1/federation/peers/:nodeId/relay-claim', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/federation/peers/:nodeId/relay-claim', requireAuth(), requireOperator(storage), async (req, res) => {
         const out = await setPeerRelayClaim(storage, peers, req.params.nodeId as string, req.body?.relay_claim);
         if (!out.ok) {
             res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -557,7 +558,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     // This is the local operator's deliberate "vouch" (100% trust in the person who brought the
     // node). Eligibility is measured against the active network policy; an operator may override a
     // not-yet-eligible peer with { force: true } (audited) — the human vouch is itself the trust source.
-    router.post('/v1/federation/peers/:nodeId/promote', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/peers/:nodeId/promote', requireAuth(), requireOperator(storage), async (req, res) => {
         const nodeId = req.params.nodeId as string;
         const peer = peers.get(nodeId) ?? [...peers.values()].find(p => p.nodeId === nodeId);
         if (!peer) {

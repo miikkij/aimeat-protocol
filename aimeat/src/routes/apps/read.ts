@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.16.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.15.0 — 2026-10-04 — The frame decision names the app, so an app a package installed takes the
  *     isolated frame on a node one person uses too (inline-frame.ts v1.1.0).
  *   v1.14.0 — 2026-09-29 — The badge reads the node's AIMEAT_APP_BADGE switch too (servedBadgeOn).
@@ -96,6 +97,7 @@ import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
 import { countPageView } from '../../services/signals/page-views.js';
 import { geoFromHeaders } from '../../utils/geo-headers.js';
+import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
@@ -177,7 +179,7 @@ export function registerReadRoutes(
     // app's own owner, or somebody they gave a rung that carries `presentation`. The resolver reads
     // the SAME `:owner` segment the service used to find the app. Asked after the lookup, as before.
     const screenshotGate = (req: Request): AppScreenshotGate => async () => {
-        if (req.auth!.roles?.includes('operator') ?? false) return null;
+        if (await isOperatorCaller(storage, req.auth)) return null;
         const t = await appTarget(req, 'presentation');
         return t.ok ? null : t;
     };
@@ -308,7 +310,11 @@ export function registerReadRoutes(
             return;
         }
 
-        const isOperator = req.auth!.roles?.includes('operator') ?? false;
+        // The operator renders any app; a render of another person's app writes the operator trail
+        // (an app of the operator's own account writes nothing).
+        const isOperator = await operatorOverride(storage, config, req.auth, {
+            ownerOf: app.ownerName, area: 'app', action: 'screenshot', subject: filename,
+        });
         // The app's own owner, or somebody they gave a rung that carries `presentation`. The
         // resolver reads the SAME `:owner` segment this handler already used to find the app, so
         // there is no second spelling of "whose app is this" to keep in step.
@@ -454,14 +460,21 @@ export function registerReadRoutes(
         // else gets the same 404 as a non-existent app — the moderated app must
         // not be reachable by direct link either. Mirror the not-found message so
         // moderation status isn't leaked.
+        // The operator's pass to another person's hidden, access-coded or download-protected app.
+        // Asked only after the ownership test failed, and at most once per request, so one read
+        // writes one line of operator trail however many of the three gates it passes.
+        const appOwnerName = app.ownerName;
+        let operatorRead: boolean | undefined;
+        const operatorReads = async (): Promise<boolean> => (operatorRead ??= await operatorOverride(
+            storage, config, req.auth, { ownerOf: appOwnerName, area: 'app', action: 'read', subject: filename }));
+
         if (app.operatorHidden) {
-            const isOperator = !!req.auth?.roles?.includes('operator');
             let isOwner = false;
             if (req.auth) {
                 const { owner: viewerOwner } = await canonicalOwner(req);
                 isOwner = viewerOwner === app.ownerName;
             }
-            if (!isOperator && !isOwner) {
+            if (!isOwner && !(await operatorReads())) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
                 return;
             }
@@ -474,11 +487,8 @@ export function registerReadRoutes(
             // (UX-remake v3, P6, measured).
             let codeExempt = false;
             if (req.auth) {
-                if (req.auth.roles?.includes('operator')) codeExempt = true;
-                else {
-                    const { owner: viewerOwner } = await canonicalOwner(req);
-                    codeExempt = viewerOwner === app.ownerName;
-                }
+                const { owner: viewerOwner } = await canonicalOwner(req);
+                codeExempt = viewerOwner === app.ownerName || await operatorReads();
             }
             if (!codeExempt) {
                 // A browser NAVIGATION gets a human page with a code field instead of raw JSON
@@ -588,10 +598,9 @@ export function registerReadRoutes(
         // source download so the app is only delivered in runnable inline form. The
         // owner + operators may still download their own source (backup/management).
         if (!runnable && app.manifest.protection?.noRawDownload) {
-            const isOperator = !!req.auth?.roles?.includes('operator');
             let isOwner = false;
             if (req.auth) { const { owner: viewerOwner } = await canonicalOwner(req); isOwner = viewerOwner === app.ownerName; }
-            if (!isOperator && !isOwner) {
+            if (!isOwner && !(await operatorReads())) {
                 res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This app is not available as a raw download. Open it inline (runnable) instead.'));
                 return;
             }

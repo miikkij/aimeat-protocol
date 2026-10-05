@@ -153,8 +153,10 @@ export async function joinMember(
                 });
                 out.joined.push(m.organism);
             } else {
+                // The node sends these for the install set: not the owner's own sending (C5).
                 await createEmailInvitation(storage, config, {
                     organism: record, inviterGhii: ownerName, email: user.email, orgRole: m.role, workspaces: grants,
+                    sendLimit: 'exempt',
                 });
                 out.invited.push(m.organism);
             }

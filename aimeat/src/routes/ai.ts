@@ -21,6 +21,7 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.x — 2026-10-03 — GET /v1/ai/usage answers `per_agent`: each agent's spend today, split by app,
  *     or by endpoint for a call that named no app (services/ai-usage-record.ts).
  *   v1.x — 2026-09-30 — /complete and /transcribe answer `classification_warnings` when a file or the
@@ -106,6 +107,7 @@ import { upsertPrivateRecord } from '../services/private-record.js';
 import { legacyAiSettingsRoute } from './openrouter.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
  *  JSON body limit; anything real goes through storage. */
@@ -484,7 +486,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/admin/ai-usage',
     requireAuth(),
     async (req: Request, res: Response) => {
-      if (!req.auth?.roles?.includes('operator')) {
+      if (!(await isOperatorCaller(storage, req.auth))) {
         return res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Operator role required.'));
       }
       const from = typeof req.query.from === 'string' ? req.query.from : undefined;

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.5.0 — 2026-09-09 — The mode refusal behind the schema's enum is gone; it could not fire.
  *   v1.4.0 — 2026-08-29 — The pending listing carries `requested_scopes`: what the agent asked for,
  *     beside `current_scopes`, which is what it already holds. The request was dropped at authorize
@@ -39,6 +40,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
+import { exceedsCeiling } from '../../utils/scope-coverage.js';
 
 export function registerRegistrationRoutes(
   router: Router, config: AimeatConfig, storage: Storage, dirnameAgents: string,
@@ -208,16 +210,9 @@ export function registerRegistrationRoutes(
     const requestedScopes: string[] = Array.isArray(scopes) ? scopes : config.defaultAgentScopes;
 
     // Validate scopes against node maximum
-    if (!config.maxAgentScopes.includes('*')) {
-      const invalid = requestedScopes.filter(s => {
-        if (s === '*') return true; // only operator can have global wildcard
-        const [domain] = s.split(':');
-        return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
-      });
-      if (invalid.length > 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
-        return;
-      }
+    if (exceedsCeiling(config.maxAgentScopes, requestedScopes).length > 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
+      return;
     }
 
     const keyPair = await generateKeyPair();

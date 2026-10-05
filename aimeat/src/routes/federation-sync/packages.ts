@@ -12,6 +12,7 @@
  * @structure registerFederationPackageRoutes(router, config, storage, peers)
  * @usage import { registerFederationPackageRoutes } from './federation-sync/packages.js';
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-28 — The attestation serves an entitled peer node's signed read of a private
  *     package on a node in the repository role (services/package-entitlements.ts).
  *     GET /v1/federation/peers/:nodeId/packages reads what a repository peer serves this node.
@@ -28,6 +29,7 @@ import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.j
 import { success, error } from '../../middleware/envelope.js';
 import { pullPackage, listRepositoryPackages } from '../../services/package-pull.js';
 import { getPackageFor, getPackageVersionFor } from '../../services/package-read.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 import { attestationFor } from '../../services/package-attest-serve.js';
 import { resolveNodeRead } from '../../services/package-entitlements.js';
 
@@ -97,7 +99,7 @@ export function registerFederationPackageRoutes(
 
         const out = await pullPackage({ storage, config, peers }, {
             owner: req.auth!.owner,
-            isOperator: req.auth!.roles.includes('operator'),
+            isOperator: await isOperatorCaller(storage, req.auth),
         }, { groupId, nodeId, sourceUrl, trust, version });
 
         if (!out.ok) {

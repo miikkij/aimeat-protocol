@@ -10,20 +10,21 @@
  * @structure adminCorsRouter(config, storage)
  *   - GET /v1/admin/cors/overview
  * @version-history
+ *   v1.1.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 -- 2026-09-08 -- Initial: the CORS page in the poster face.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { buildCorsOverview } from '../services/cors-overview.js';
 
 export function adminCorsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   /* ── GET /v1/admin/cors/overview — the CORS page in one read ── */
-  router.get('/v1/admin/cors/overview', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/cors/overview', requireAuth(), requireOperator(storage), async (_req, res) => {
     res.json(success(config.nodeId, await buildCorsOverview(config, storage)));
   });
 

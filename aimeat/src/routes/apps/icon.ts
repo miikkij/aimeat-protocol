@@ -20,6 +20,7 @@
  * @structure registerAppIconRoutes() — GET and POST /v1/apps/:owner/:filename/icon
  * @usage registerAppIconRoutes(router, config, storage, appTarget); // from appsRouter
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.2 — 2026-09-26 — The owner segment is read with localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -40,6 +41,7 @@ import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
 import { appIconKey } from '../../services/app-seo.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
+import { operatorOverride } from '../../services/operator-override.js';
 
 /** Defence in depth against a traversal in the filename segment, as every app route applies it. */
 function badFilename(filename: string): boolean {
@@ -113,8 +115,12 @@ export function registerAppIconRoutes(
         }
 
         // The app's own owner, or somebody they gave a rung that carries `presentation` — the same
-        // test the screenshot uses, because this is the same kind of change to the same app.
-        const isOperator = req.auth!.roles?.includes('operator') ?? false;
+        // test the screenshot uses, because this is the same kind of change to the same app. The
+        // operator passes too, and a change to another person's app writes the operator trail (an
+        // app of the operator's own account writes nothing).
+        const isOperator = await operatorOverride(storage, config, req.auth, {
+            ownerOf: app.ownerName, area: 'app', action: 'icon', subject: filename,
+        });
         if (!isOperator && !(await appTargetOr(appTarget, config, req, res, 'presentation'))) return;
 
         const { icon } = req.body ?? {};

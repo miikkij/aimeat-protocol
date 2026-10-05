@@ -34,12 +34,14 @@
  *   const name = await operatorName(storage, { sub: agentGaii, roles: ['agent'], scopes });
  *   if (!name) return refuse(OPERATOR_AGENT_REFUSAL);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-24 — Initial (security audit A8-1): one question for every operator check.
  *     resolveOperatorAgentName and OPERATOR_AGENT_REFUSAL moved here from owner-lifecycle.ts, which
  *     re-exports them, and resolveOperatorName, which asked the account alone, is gone.
  */
 import type { Storage } from '../storage/interface.js';
 import { ECO_PREFIX, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { OPERATOR_ADMIN_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** A principal as any door can describe it. */
@@ -91,7 +93,7 @@ export async function askOperator(
   }
 
   const record = await storage.getOwner(name);
-  if (!record?.roles.includes('operator')) return { ok: false, why: 'not-operator' };
+  if (!record || !isOperatorAccount(record)) return { ok: false, why: 'not-operator' };
   if (!delegated) return { ok: true, name: record.name, inPerson: true };
   // scopeIsCovered() rather than includes(): it is the one place that knows these words sit outside
   // every wildcard, so '*' and 'operator:*' never pass here.

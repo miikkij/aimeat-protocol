@@ -17,12 +17,14 @@
  * @structure completeOwnerLogin(config, storage, req, res, args) -> writes the response itself
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-04 — Extracted verbatim from routes/ghii/register-login.ts.
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { establishOwnerSession } from '../../services/owner-session.js';
@@ -89,12 +91,12 @@ export async function completeOwnerLogin(
 
   const roles: string[] = [];
   if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-  if (ownerRecord?.roles.includes('operator')) roles.push('operator');
+  if (isOperatorAccount(ownerRecord)) roles.push('operator');
 
   // Self-heal: if no operator exists anywhere, promote this user
-  if (ownerRecord && !roles.includes('operator')) {
+  if (ownerRecord && !isOperatorAccount(ownerRecord)) {
     const allOwners = await storage.listOwners();
-    const hasOperator = allOwners.some(o => o.roles.includes('operator'));
+    const hasOperator = allOwners.some(isOperatorAccount);
     if (!hasOperator) {
       roles.push('operator');
       await storage.updateOwner(loginName, { roles: [...ownerRecord.roles, 'operator'] });

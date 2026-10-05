@@ -11,6 +11,7 @@
  *   - PUT /v1/admin/agents/:gaii/cors: refuse a missing agent, then services/cors-overview.ts setCorsList
  *
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.1 — 2026-09-26 — The app owner behind a grant comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -27,7 +28,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { setCorsList } from '../services/cors-overview.js';
 import { parseAppScopes } from '../services/protected-resource.js';
@@ -66,7 +67,7 @@ export function adminAgentsRouter(
     const router = Router();
 
     // GET /v1/admin/agents — list all agents with full details (operator only)
-    router.get('/v1/admin/agents', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/agents', requireAuth(), requireOperator(storage), async (_req, res) => {
         const agents = await storage.listAgents();
 
         res.json(success(config.nodeId, {
@@ -100,7 +101,7 @@ export function adminAgentsRouter(
      *
      * `extra` is the answer: the scopes this grant carries that the app no longer declares.
      */
-    router.get('/v1/admin/app-grants', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/app-grants', requireAuth(), requireOperator(storage), async (_req, res) => {
         const grants = await storage.listAppGrants();
 
         // One read per distinct app, not per grant: an app with sixty grants is one lookup.
@@ -140,7 +141,7 @@ export function adminAgentsRouter(
     // PUT /v1/admin/agents/:gaii/cors — Operator sets/clears CORS for any agent. The check, the
     // write and the change event live in services/cors-overview.ts, which aimeat_admin_cors_set
     // calls too; the door here refuses a missing agent before anything is checked, as it always has.
-    router.put('/v1/admin/agents/:gaii/cors', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/admin/agents/:gaii/cors', requireAuth(), requireOperator(storage), async (req, res) => {
         const gaii = req.params.gaii as string;
         const agent = await storage.getAgent(gaii);
         if (!agent) {

@@ -9,9 +9,10 @@
  *   the human inbox uses (`sendDirectMessage`). Files travel out-of-band: upload via aimeat_storage_upload
  *   (presigned), then pass the returned storage keys as `attachments` here. Phase A of the federated-inbox
  *   plan (docs/internal/2026-06-22-agent-federated-inbox-messaging-design.md); read tools land in Phase B.
- * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
+ * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-05 -- aimeat_dm_broadcast asks isOperatorCaller with the session (the caller's GAII, roles ['agent'], its scopes), as POST /v1/messages/broadcast now does: the operator's agent holding operator:admin may send to a node-wide audience (secaudit 2026-10, C2). The register function takes the session's scopes.
  *   v1.11.2 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.11.1 -- 2026-09-25 -- The comment on aimeat_dm_broadcast's isOperator: false states the rule the
@@ -87,6 +88,7 @@ import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 
 /**
  * How ONE attachment is shown to the agent reading its inbox. `ref` is the point: the descriptor used
@@ -130,6 +132,8 @@ export function registerDmMessageTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     peers: Map<string, PeerInfo>,
+    /** This session's granted scopes: the broadcast's operator check asks operator:admin of them. */
+    scopes: readonly string[] = [],
 ): void {
     const ctx: DeliveryCtx = { config, storage, peers };
 
@@ -290,7 +294,7 @@ export function registerDmMessageTools(
                 .describe('Recipient identities: owner@node, agent#owner@node, eco:app#owner@node. Up to 500.'),
             group_id: z.string().min(1).max(64).optional().describe('A Share Group whose members are the audience.'),
             audience: z.enum(['node-users', 'federation-users']).optional()
-                .describe('Every human on this node, or across the federation. OPERATOR-ONLY, and an agent is not an operator — use `to` or `group_id`.'),
+                .describe('Every human on this node, or across the federation. OPERATOR-ONLY: the node operator\'s own agent holding operator:admin may use it; any other agent uses `to` or `group_id`.'),
             mode: z.enum(['broadcast', 'announcement']).optional()
                 .describe('"broadcast" (default) lets each recipient reply in their own thread; "announcement" disables replies.'),
             subject: z.string().min(1).max(200).optional()
@@ -312,15 +316,14 @@ export function registerDmMessageTools(
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A broadcast must have a body, an attachment, or questions.' }) }] };
             }
             const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
-            // isOperator: false, deliberately. Other tools on this surface treat an operator's agent as
-            // the operator when it holds operator:admin (services/operator-principal.ts). A node-wide
-            // announcement is not the place for that even then: it reaches every human here and
-            // auto-accepts the contact for each of them, and the REST door refuses the very same agent
-            // token, which carries no operator role. A tool that grants more than the route for one
-            // principal is the drift check:mcp-tools exists to catch, and it would be granting it in the
-            // dangerous direction.
+            // The operator's agent holding operator:admin may send to a node-wide audience, as on REST:
+            // POST /v1/messages/broadcast asks isOperatorCaller() of the same session, so both surfaces
+            // give the same principal the same answer (secaudit 2026-10, C2; Jouni 2026-10-05: "Agent
+            // must be capable of maintaining the system fully when using operator:admin rights").
+            // Any other agent is refused the audience by the service, as before.
+            const isOperator = await isOperatorCaller(storage, { sub: senderGhii, roles: ['agent'], scopes });
             const result = await broadcastFromPrincipal(ctx, {
-                senderGhii, isOperator: false,
+                senderGhii, isOperator,
                 to, groupId: group_id, audience,
                 mode: mode ?? 'broadcast', body: body ?? '', subject, attachments: mapped, interactive,
                 // A FUNCTION, so the service stamps it after its own refusals: stamping writes a

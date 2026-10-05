@@ -13,6 +13,7 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v2.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v2.0.0 — 2026-09-30 — Decided by Jouni 2026-09-30: this GDPR export takes the person's own
  *     organism records again (no leave(): the legal right to their own data), and names them in
  *     `classified_organism_content` { count, keys, note }. `left_out` is gone from this route; the
@@ -65,6 +66,7 @@ import { presentMemories } from '../../services/classification/present-memory.js
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { scopeOrganism } from '../../services/classification/policy.js';
+import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 
 /** One work item this identity was to do, as the export shows it: the other side is the requester. */
 function workProvidedView(w: WorkRecord) {
@@ -94,7 +96,12 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
   // Found by the AI triage of 2026-09-13.
   router.get('/v1/owners/:name/export', requireAuth(), requireLocalSession(), requireOwnerPrincipal(), async (req, res) => {
     const name = req.params.name as string;
-    if (req.auth!.owner !== name && !req.auth!.roles.includes('operator')) {
+    // The operator half asks isOperatorCaller, as the MCP tools do. The operator trail
+    // (operatorOverride: the operator's usage row and a line in the person's feed) is written once
+    // the account is known to exist, so a mistyped name leaves no row in a feed that a later
+    // account of that name would inherit.
+    const own = req.auth!.owner === name;
+    if (!own && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only export your own data'));
       return;
     }
@@ -102,6 +109,10 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     const owner = await storage.getOwner(name);
     if (!owner) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${name}`));
+      return;
+    }
+    if (!own && !(await operatorOverride(storage, config, req.auth, { ownerOf: name, area: 'account', action: 'export', subject: name }))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only export your own data'));
       return;
     }
 

@@ -24,6 +24,8 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-10-05 — sendOutbound counts the account's send allowance itself (takeMailSend), so every
+ *     surface shares one count per owner (secaudit 2026-10, C5).
  *   2026-09-28 — SendInput.principal: the company check knows which agent is sending.
  *   v1.6.1 — 2026-09-26 — openPixelUrl takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-24 — The inbox channel's message does not count against the account's message
@@ -79,6 +81,7 @@ import { getStream } from '../signals/signal-service.js';
 import { renderCampaignEmail } from './campaign-email.js';
 import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
 import { disclosureHeaders, type AiDisclosure } from './ai-disclosure.js';
+import { takeMailSend } from '../account-limits.js';
 
 /**
  * Where a refused or failed attempt was recorded, so a caller can find it again.
@@ -450,6 +453,12 @@ async function resolveMailbox(
  * is returned. A refusal or a failure throws OutboundError, and one that wrote a row names it.
  */
 export async function sendOutbound(config: AimeatConfig, storage: Storage, ownerGhii: string, input: SendInput): Promise<SendResult> {
+  // The account's send allowance, here rather than on a route, so POST /v1/outbound/send, the MCP
+  // tool aimeat_mail_send and a contact message draw on one count for the owner and all their agents
+  // (services/account-limits.ts; secaudit 2026-10, C5). Asked before anything is written.
+  const turn = takeMailSend(input.principal ?? ownerGhii);
+  if (!turn.ok) throw new OutboundError(turn.code, 429, turn.message);
+
   // WHICH COMPANY IS SPEAKING, resolved before anything else, because it decides WHOSE BOOK this
   // send belongs to and every gate below reads that book.
   //

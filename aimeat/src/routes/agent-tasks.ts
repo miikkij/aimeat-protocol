@@ -22,6 +22,7 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.10.2 -- 2026-10-05 -- tokenHasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.10.1 -- 2026-10-04 -- A declined task archives by age like a done or failed one (isTerminalTaskStatus).
  *   v1.10.0 -- 2026-07-12 -- /start now emitDelivery's a `task_assigned` wake on owner approval
  *     (queued -> active), matching create-time auto-activation. Closes the "waits for polling" gap where
@@ -56,6 +57,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { isTerminalTaskStatus } from '../storage/interface.js';
 import { resolveIdentity, agentGaiiFromIdentifier } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import type { WebhookDispatcher, TaskBucket, TaskRouteHelpers } from './agent-tasks/helpers.js';
 import { registerTaskCreateReadRoutes } from './agent-tasks/create-read.js';
 import { registerTaskLifecycleRoutes } from './agent-tasks/lifecycle.js';
@@ -91,11 +93,9 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     return agentGaiiFromIdentifier(agentName, owner, config.nodeId);
   }
 
-  /** Wildcard-aware scope check for the current token (mirrors auth/middleware.ts requireScope). */
+  /** The current token's scope check: scopeIsCovered, the rule requireScope applies (C3). */
   function tokenHasScope(req: Express.Request, scope: string): boolean {
-    const scopes = (req.auth!.scopes as string[] | undefined) ?? [];
-    if (scopes.includes('*') || scopes.includes(scope)) return true;
-    return scopes.includes(`${scope.split(':')[0]}:*`);
+    return scopeIsCovered((req.auth!.scopes as string[] | undefined) ?? [], scope);
   }
 
   /**

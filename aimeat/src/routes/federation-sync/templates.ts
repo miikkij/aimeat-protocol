@@ -5,6 +5,7 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-08-10 — Security audit H-15 (the July F2): POST /v1/federation/memory/list requires an
  *     Ed25519 peer signature and a fresh timestamp. Its only gate was a node id, which the public
  *     directory publishes, so anyone could read anyone's whole memory key inventory. BREAKING for a
@@ -15,7 +16,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
@@ -124,7 +125,7 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
     });
 
     // POST /v1/federation/templates/sync — Pull templates from all active peers
-    router.post('/v1/federation/templates/sync', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/templates/sync', requireAuth(), requireOperator(storage), async (req, res) => {
         if (!config.packageFederationEnabled) {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Package federation is not enabled on this node'));
             return;

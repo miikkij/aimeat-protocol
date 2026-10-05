@@ -7,12 +7,13 @@
  *   (single / group / all), and version history browse + restore.
  *
  * @structure
- *   - adminPromptsRouter(config, storage): mounts /v1/admin/prompts* endpoints (all requireRole('operator'))
+ *   - adminPromptsRouter(config, storage): mounts /v1/admin/prompts* endpoints (all requireOperator(storage))
  *   - reset-group / reset-all: re-seed prompts from PROMPT_SEEDS / seedSystemPrompts
  *   - PATCH :id: validates 64 KB content + ≤10 locale overrides, bumps version via stableStringify diff
  *   - versions + restore: append version records, prune to 50
  *
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-12 — Every row carries `source_kind` and `differs_from_default`, read from
  *     prompt-ownership.ts (the rule the seeder follows), because the page cannot work either out
  *     and the version number answers neither. The group reset also reports what else it did:
@@ -22,7 +23,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
@@ -48,7 +49,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // POST /v1/admin/prompts/reset-group/:group — reset all prompts in a group to factory defaults
-  router.post('/v1/admin/prompts/reset-group/:group', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/prompts/reset-group/:group', requireAuth(), requireOperator(storage), async (req, res) => {
     const group = req.params['group'] as string;
     const seeds = PROMPT_SEEDS.filter(s => s.group === group);
     if (seeds.length === 0) {
@@ -87,7 +88,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // POST /v1/admin/prompts/reset-all — reset ALL prompts to factory defaults, clear version histories
-  router.post('/v1/admin/prompts/reset-all', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/prompts/reset-all', requireAuth(), requireOperator(storage), async (req, res) => {
     await storage.deleteAllSystemPrompts();
     await seedSystemPrompts(storage);
     const prompts = await storage.listSystemPrompts();
@@ -95,14 +96,14 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // GET /v1/admin/prompts — list all prompts
-  router.get('/v1/admin/prompts', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/prompts', requireAuth(), requireOperator(storage), async (req, res) => {
     const group = req.query.group as string | undefined;
     const prompts = await storage.listSystemPrompts(group ? { group } : undefined);
     res.json(success(config.nodeId, { prompts: prompts.map(withOwnership) }));
   });
 
   // GET /v1/admin/prompts/:id — get single prompt
-  router.get('/v1/admin/prompts/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/prompts/:id', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const prompt = await storage.getSystemPrompt(id);
     if (!prompt) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not found'));
@@ -110,7 +111,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // PATCH /v1/admin/prompts/:id — update prompt
-  router.patch('/v1/admin/prompts/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.patch('/v1/admin/prompts/:id', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const existing = await storage.getSystemPrompt(id);
     if (!existing) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not found'));
@@ -176,7 +177,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // POST /v1/admin/prompts/:id/reset — reset to factory default
-  router.post('/v1/admin/prompts/:id/reset', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/prompts/:id/reset', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const existing = await storage.getSystemPrompt(id);
     if (!existing) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not found'));
@@ -211,7 +212,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // GET /v1/admin/prompts/:id/versions — version history
-  router.get('/v1/admin/prompts/:id/versions', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/prompts/:id/versions', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const prompt = await storage.getSystemPrompt(id);
     if (!prompt) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not found'));
@@ -220,7 +221,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // GET /v1/admin/prompts/:id/versions/:version — specific version
-  router.get('/v1/admin/prompts/:id/versions/:version', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/prompts/:id/versions/:version', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const version = parseInt(req.params.version as string, 10);
     const record = await storage.getSystemPromptVersion(id, version);
@@ -229,7 +230,7 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // POST /v1/admin/prompts/:id/versions/:version/restore — restore version
-  router.post('/v1/admin/prompts/:id/versions/:version/restore', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/prompts/:id/versions/:version/restore', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const version = parseInt(req.params.version as string, 10);
     const existing = await storage.getSystemPrompt(id);

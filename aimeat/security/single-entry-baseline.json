@@ -1,0 +1,299 @@
+{
+  "note": "scripts/check-single-entry.ts: per rule, the files where the pattern may appear, the count each may hold, and why the file is right. A count only goes down; UNREVIEWED is the seeding's placeholder for a file nobody has read yet.",
+  "rules": {
+    "password-verify": {
+      "src/routes/organisms/workspace-ops.ts": {
+        "count": 1,
+        "why": "A shared workspace link's own password, not an account's: there is no account to lock, and the unlock route limits attempts to 10 per 15 minutes per address."
+      },
+      "src/services/password-check.ts": {
+        "count": 1,
+        "why": "The one check: checkPassword applies the account lock and the attempt count around it."
+      },
+      "src/services/password.ts": {
+        "count": 1,
+        "why": "The definition of verifyPassword."
+      }
+    },
+    "delete-owner": {
+      "src/services/owner-erasure.ts": {
+        "count": 1,
+        "why": "eraseOwner, the one account deletion: it clears what the storage cascade does not reach, then runs the cascade."
+      }
+    },
+    "scope-test": {},
+    "uncapped-read": {
+      "src/cli/connect/agent-key.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/cli/connect/mcp/local-server.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/cli/connect/skill-bundle.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/cli/connect/tui/index.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/cli/federation-join.ts": {
+        "count": 4,
+        "why": "UNREVIEWED"
+      },
+      "src/cli/screenshot-worker.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/commerce/evm-address.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/commerce/stripe-handler.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/commerce/x402-facilitator.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/index.ts": {
+        "count": 3,
+        "why": "The command line's backup, restore and seed commands read this node's own admin answers over localhost."
+      },
+      "src/routes/admin-monitoring.ts": {
+        "count": 3,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/admin-seo.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/admin/setup-html.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/apps/catalogue-admin.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/bootstrap.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/commerce-ucp.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/federation-genesis.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/federation-peer/introduce.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/federation-peer/policy-book.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/federation-settlements.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/federation-sync/routing.ts": {
+        "count": 3,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/federation-sync/templates.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/llm-proxy.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/federation.ts": {
+        "count": 9,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/portal-spa.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/site.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/work.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/a2a-foreign.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/ai/fetch.ts": {
+        "count": 1,
+        "why": "request.arrayBuffer() reads the outgoing request this node built, not an answer."
+      },
+      "src/services/app-playtest.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/build-app-prompt-session.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/capability-invoke.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/catalogue-sync.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connect-tunnel-forward.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connections/attach.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connections/instance.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connections/metrics.ts": {
+        "count": 5,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connections/publish.ts": {
+        "count": 9,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connections/refresh.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connections/send-mail.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/consul-config.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/federation-book.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/federation-helpers.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/federation.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/finance/finvoice-operator.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/genesis-sync.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/memory-replication.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/message-delivery.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/prompt-defaults/platform.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/realtime-manager.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/site-sync.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/sso-connections.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/tool-dispatch/api-client.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/utils/logger.ts": {
+        "count": 1,
+        "why": "winston.format.json() is a log format, not a body read."
+      }
+    },
+    "operator-role": {
+      "src/middleware/rate-limit.ts": {
+        "count": 1,
+        "why": "The rate multiplier of the operator's own session. The operator's agent keeps an agent's rate."
+      },
+      "src/routes/access-tokens.ts": {
+        "count": 1,
+        "why": "Whether a new personal token may carry the operator role: a role is granted, never inherited at mint time, so only the operator in person may mint one."
+      },
+      "src/routes/agents/management.ts": {
+        "count": 1,
+        "why": "C4: asks whether the session is the account holder in person, not whether it is the operator. Moves to isOwnerInPerson."
+      },
+      "src/routes/memory/key.ts": {
+        "count": 1,
+        "why": "Reads the role list the route built with rolesWithOperator, which asked askOperator."
+      },
+      "src/services/agent-proposals.ts": {
+        "count": 1,
+        "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
+      },
+      "src/services/board-post.ts": {
+        "count": 2,
+        "why": "Reads the caller's role list, which both surfaces build from askOperator (rolesWithOperator on REST, boardCaller on MCP)."
+      },
+      "src/services/board-write.ts": {
+        "count": 3,
+        "why": "Reads the caller's role list, which both surfaces build from askOperator (rolesWithOperator on REST, boardCaller on MCP)."
+      },
+      "src/services/classification/reader-kind.ts": {
+        "count": 1,
+        "why": "C4: tells a person from an AI by the session's roles. Moves to isOwnerInPerson."
+      },
+      "src/services/consent-write.ts": {
+        "count": 1,
+        "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
+      },
+      "src/services/group-shares.ts": {
+        "count": 1,
+        "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
+      },
+      "src/services/memory-write.ts": {
+        "count": 1,
+        "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
+      },
+      "src/services/operator-principal.ts": {
+        "count": 2,
+        "why": "askOperator itself: the operator in person is read off the session's roles."
+      },
+      "src/services/owner-mailbox-reads.ts": {
+        "count": 1,
+        "why": "C4: asks whether the session is the account holder in person. Moves to isOwnerInPerson."
+      }
+    },
+    "operator-route": {}
+  }
+}

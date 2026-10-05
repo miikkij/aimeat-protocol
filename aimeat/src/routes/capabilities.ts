@@ -10,6 +10,7 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 - 2026-09-03 - The list's policy carries call_counting (whether direct extension calls
  *     are counted into stats); source_type filter accepts app-tool and offering.
  *   v1.0.0 - 2026-05-02 - Initial capability layer endpoints
@@ -54,6 +55,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 
 /**
  * What a capability's owner may NOT put in a PUT body. Each of these is written by the node about
@@ -188,7 +190,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   const router = Router();
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
   /** Who is asking, in the shape the shared write expects. */
-  const caller = (req: Request) => ({ gaii: resolve(req), isOperator: req.auth!.roles.includes('operator') });
+  const caller = async (req: Request) => ({ gaii: resolve(req), isOperator: await isOperatorCaller(storage, req.auth) });
 
   // ── Discovery (Tier 0 for public, Tier 1 for private) ──
 
@@ -210,7 +212,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     if (!req.auth || req.auth.anonymous) {
       filters.visibility = 'public';
       if (!filters.status) filters.status = 'active';
-    } else if (!(req.auth.roles ?? []).includes('operator')) {
+    } else if (!(await isOperatorCaller(storage, req.auth))) {
       // Registered non-operator: PUBLIC capabilities + your OWN (any visibility). Never another owner's
       // private rows (which carry webhookUrl / ownerGhii). Mirrors the anonymous restriction above — the
       // anon path was gated, but registered users previously saw every owner's private capabilities.
@@ -245,7 +247,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
 
   router.post('/v1/capabilities', requireAuth(), requireRole('owner'), async (req, res) => {
     const body = req.body;
-    const created = await createCapability({ storage, config }, caller(req), {
+    const created = await createCapability({ storage, config }, await caller(req), {
       id: body.id, name: body.name, summary: body.summary, visibility: body.visibility,
       source: body.source, status: body.status,
       authRequired: body.authRequired, callable: body.callable,
@@ -272,8 +274,8 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     // fields the answer depends on. NOT_FOUND and FORBIDDEN stay updateCapability's to give, and this
     // gate stands aside for both: answering them here would make the refusal an oracle, telling a
     // stranger whether some other owner's capability already carries the URL they just sent.
+    const who = await caller(req);
     if ('webhookUrl' in patch || 'source' in patch) {
-      const who = caller(req);
       const cap = await storage.getCapability(req.params.id as string);
       if (cap && (cap.ownerGhii === who.gaii || who.isOperator)) {
         const proposed = proposedWebhook(cap, patch);
@@ -282,13 +284,13 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       }
     }
 
-    const updated = await updateCapability({ storage, config }, caller(req), req.params.id as string, patch);
+    const updated = await updateCapability({ storage, config }, who, req.params.id as string, patch);
     if (!updated.ok) return res.status(updated.status).json(error(config.nodeId, updated.code, updated.message));
     res.json(success(config.nodeId, updated.value));
   });
 
   router.delete('/v1/capabilities/:id', requireAuth(), requireRole('owner'), async (req, res) => {
-    const removed = await deleteCapability({ storage, config }, caller(req), req.params.id as string);
+    const removed = await deleteCapability({ storage, config }, await caller(req), req.params.id as string);
     if (!removed.ok) return res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
     res.json(success(config.nodeId, { deleted: true }));
   });
@@ -302,7 +304,8 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     const callerGhii = resolve(req);
     // Ownership (SECURITY): a PRIVATE capability may only be invoked by its owner (or an operator) — the
     // read route hides private caps from non-owners, so invoke must too (404, don't confirm existence).
-    if (cap.visibility === 'private' && callerGhii !== cap.ownerGhii && !req.auth!.roles.includes('operator')) {
+    if (cap.visibility === 'private' && callerGhii !== cap.ownerGhii && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: cap.ownerGhii, area: 'capability', action: 'invoke', subject: cap.name }))) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
     }
     const jwt = (req.headers.authorization || '').replace('Bearer ', '');
@@ -369,7 +372,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   router.post('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
     const comment = typeof (req.body as Record<string, unknown> | undefined)?.comment === 'string'
       ? (req.body as Record<string, string>).comment : undefined;
-    const vouched = await vouchCapability({ storage, config }, caller(req), req.params.id as string, comment);
+    const vouched = await vouchCapability({ storage, config }, await caller(req), req.params.id as string, comment);
     if (!vouched.ok) return res.status(vouched.status).json(error(config.nodeId, vouched.code, vouched.message));
     res.json(success(config.nodeId, vouched.value));
   });
@@ -377,7 +380,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   // Removes the CALLER'S vouch only — whose vouch goes is decided by who is asking, in the
   // service, never by the route decrementing a number.
   router.delete('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
-    const out = await unvouchCapability({ storage, config }, caller(req), req.params.id as string);
+    const out = await unvouchCapability({ storage, config }, await caller(req), req.params.id as string);
     if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
     res.json(success(config.nodeId, out.value));
   });
@@ -387,7 +390,8 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   router.post('/v1/capabilities/:id/test', requireAuth(), requireRole('owner'), async (req, res) => {
     const cap = await storage.getCapability(req.params.id as string);
     if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
-    if (cap.ownerGhii !== resolve(req) && !req.auth!.roles.includes('operator')) {
+    if (cap.ownerGhii !== resolve(req) && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: cap.ownerGhii, area: 'capability', action: 'test', subject: cap.name }))) {
       return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not the owner'));
     }
     if (!cap.callable || cap.source.type !== 'manual') {

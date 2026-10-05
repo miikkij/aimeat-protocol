@@ -15,6 +15,7 @@
  *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one name)
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.4.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.1 -- 2026-09-26 -- The resolve endpoint's comment names the app grants and access tokens a
  *     decision on a name covers.
  *   v1.3.0 -- 2026-09-26 -- The resolve endpoint takes { name, resolution } to decide one name of the
@@ -30,7 +31,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import {
   listSecurityIncidents, findSecurityIncident, resolveSecurityIncident, deleteSecurityIncident,
   type SecurityIncidentValue,
@@ -49,12 +50,12 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
   const router = Router();
 
   /* ── GET /v1/admin/security/overview — the Security page in one read ── */
-  router.get('/v1/admin/security/overview', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/security/overview', requireAuth(), requireOperator(storage), async (_req, res) => {
     res.json(success(config.nodeId, await buildSecurityOverview(config, storage)));
   });
 
   /* ── GET /v1/admin/auth-refusals — the refusal log's tail, newest first ── */
-  router.get('/v1/admin/auth-refusals', requireAuth(), requireRole('operator'), (req, res) => {
+  router.get('/v1/admin/auth-refusals', requireAuth(), requireOperator(storage), (req, res) => {
     const raw = parseInt(String(req.query.limit ?? '200'), 10);
     const limit = Math.min(Math.max(Number.isFinite(raw) ? raw : 200, 1), 1000);
     const { enabled, items } = readRecentAuthFailures(limit);
@@ -62,13 +63,13 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── GET /v1/admin/security/incidents — newest first + open count ── */
-  router.get('/v1/admin/security/incidents', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/security/incidents', requireAuth(), requireOperator(storage), async (_req, res) => {
     const { items, open, total } = await listSecurityIncidents(storage, config);
     res.json(success(config.nodeId, { incidents: items, open, total }));
   });
 
   /* ── GET /v1/admin/security/incidents/:id/quarantine — download the quarantined payload ── */
-  router.get('/v1/admin/security/incidents/:id/quarantine', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/security/incidents/:id/quarantine', requireAuth(), requireOperator(storage), async (req, res) => {
     const rec = await findSecurityIncident(storage, config, req.params.id as string);
     const qk = rec && (rec.value as SecurityIncidentValue).quarantine_key;
     if (!rec || !qk) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No quarantined payload for this incident')); return; }
@@ -85,7 +86,7 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
    * that holds the name and keeps its cortexes, ecosystem apps, app grants and access tokens,
    * 'previous' settles them as a previous holder's (the older app grants and access tokens deleted).
    * That incident closes with its last name. */
-  router.post('/v1/admin/security/incidents/:id/resolve', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/security/incidents/:id/resolve', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const body = (req.body ?? {}) as { name?: unknown; resolution?: unknown };
     if (body.name !== undefined || body.resolution !== undefined) {
@@ -110,7 +111,7 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── DELETE /v1/admin/security/incidents/:id — remove the incident + its quarantined blob ── */
-  router.delete('/v1/admin/security/incidents/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.delete('/v1/admin/security/incidents/:id', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const r = await deleteSecurityIncident(storage, config, id);
     if (!r.ok) {

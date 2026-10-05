@@ -28,6 +28,7 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-08-08 — The AI Office confirmed Overscale Solutions Oy's signature of Section 2
  *     (deployer; Section 1 deliberately not signed), so `code_of_practice` needed a way to say yes.
  *     It reads AIMEAT_AI_COP_SECTIONS / _SIGNED_ON rather than a constant: the signature is the
@@ -50,7 +51,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
 import { sendMarkdown, prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
@@ -359,7 +360,7 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
   // marks and how. This answers it from the records the node already holds rather than from a
   // spreadsheet somebody maintains, which means it cannot go stale.
   router.get('/v1/admin/ai-transparency-report',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
       const report = await buildAiTransparencyReport(storage, {

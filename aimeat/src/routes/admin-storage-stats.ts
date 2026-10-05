@@ -8,6 +8,7 @@
  *   per-table count is backend-specific (pg_stat estimate on Postgres, count(*) on SQLite, collection
  *   counts on Mongo) — this route only reads the generic Storage surface. Operator-only.
  * @version-history
+ *   v1.2.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.1.0 -- 2026-07-16 -- current gains memoryVersionRows + memoryArchivedRows (memory-table
  *     composition: workspace `.version.N` history + archived rows — the invisible inflators).
  *   v1.0.0 -- 2026-07-16 -- Initial: GET /v1/admin/storage-stats (live counts + snapshot timeline).
@@ -16,13 +17,13 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 
 export function adminStorageStatsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // GET /v1/admin/storage-stats?limit=168 — live counts + recent snapshots (newest first).
-  router.get('/v1/admin/storage-stats', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/storage-stats', requireAuth(), requireOperator(storage), async (req, res) => {
     const limit = Math.min(Math.max(parseInt((req.query.limit as string) || '168', 10) || 168, 1), 1000);
     try {
       const [counts, snapshots, memory] = await Promise.all([
@@ -46,7 +47,7 @@ export function adminStorageStatsRouter(config: AimeatConfig, storage: Storage):
   });
 
   // POST /v1/admin/storage-stats/snapshot — capture one snapshot now (the hourly job also does this).
-  router.post('/v1/admin/storage-stats/snapshot', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.post('/v1/admin/storage-stats/snapshot', requireAuth(), requireOperator(storage), async (_req, res) => {
     try {
       const { runStorageStatsSnapshotJob } = await import('../services/core-jobs.js');
       await runStorageStatsSnapshotJob(storage);

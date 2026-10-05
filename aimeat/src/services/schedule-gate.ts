@@ -28,12 +28,14 @@
  *   const bad = checkScheduleGate({ kind, cron, timezone }, caller);
  *   if (bad) return renderRefusal(bad);   // each door renders its own way
  * @version-history
+ *   v1.1.1 — 2026-10-05 — hasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.1.0 — 2026-09-29 — The `refinery` kind, which needs all four words a refinery batch spends; a
  *     kind's entry may name several words, and the caller holds every one.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared gate, both doors).
  */
 import { Cron } from 'croner';
 import { logger } from '../utils/logger.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** Every schedule kind this node knows. */
 export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish' | 'refinery';
@@ -88,11 +90,8 @@ export function isValidCron(cron: string, timezone?: string): boolean {
     }
 }
 
-/** Does this session carry the scope, allowing for the wildcard forms the middleware accepts? */
-function hasScope(scopes: string[], needed: string): boolean {
-    if (scopes.includes('*') || scopes.includes(needed)) return true;
-    return scopes.includes(`${needed.split(':')[0]}:*`);
-}
+/** Does this session carry the scope? scopeIsCovered, the rule requireScope applies (C3). */
+const hasScope = (scopes: string[], needed: string): boolean => scopeIsCovered(scopes, needed);
 
 /**
  * The three refusals, in the order the route has always applied them. Returns null when the caller

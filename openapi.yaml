@@ -7487,6 +7487,8 @@ paths:
               schema: { type: string, format: binary }
         '400':
           description: Missing or non-http(s) url parameter
+        '413':
+          description: The image is larger than this node serves as a preview (4 MB); IMAGE_TOO_LARGE
         '415':
           description: The URL did not resolve to an image
         '422':

@@ -5,11 +5,12 @@
  * @description Who is asking, as services/cortex-lifecycle.ts wants the question put. Extracted
  *   from routes/cortex.ts (max-file-lines) when the federated-session answer below was written;
  *   the body moved unchanged and the route imports it.
- * @structure cortexCallerOf(req, nodeId) → CortexCaller
+ * @structure cortexCallerOf(req, nodeId, storage) → Promise<CortexCaller>
  * @usage
  *   import { cortexCallerOf } from './cortex/caller.js';
- *   const out = await installCortex({ storage, config }, cortexCallerOf(req, config.nodeId), { manifest, libs });
+ *   const out = await installCortex({ storage, config }, await cortexCallerOf(req, config.nodeId, storage), { manifest, libs });
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). cortexCallerOf is async and takes storage.
  *   v1.2.0 — 2026-09-26 — The caller carries `identity`, resolveIdentity's answer (a person's GHII),
  *     and an activation publishes the cortex's actions under it (secaudit 2026-09, R3 7c).
  *   v1.1.0 — 2026-09-24 — The visitor's name is homeIdentityOf's: verifyJWT hands a visitor its home
@@ -19,7 +20,9 @@
  */
 import type { Request } from 'express';
 import type { CortexCaller } from '../../services/cortex-lifecycle.js';
+import type { Storage } from '../../storage/interface.js';
 import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 /**
  * `req.auth!.owner` is the bare owner name for an owner session and for that owner's agents alike,
@@ -44,11 +47,13 @@ import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils
  * requireLocalSession() was considered and not taken here: it would also shut the public catalogue
  * read, which a visitor is entitled to.
  */
-export function cortexCallerOf(req: Request, nodeId: string): CortexCaller {
+export async function cortexCallerOf(req: Request, nodeId: string, storage: Storage): Promise<CortexCaller> {
   return {
     ownerName: isForeignPrincipal(req.auth) ? homeIdentityOf(req.auth!) : req.auth!.owner,
     gaii: req.auth!.sub,
     identity: resolveIdentity(req.auth!, nodeId),
-    isOperator: req.auth!.roles.includes('operator'),
+    // The operator in person, or the operator's agent holding operator:admin: the answer the MCP
+    // tools give (services/operator-override.ts).
+    isOperator: await isOperatorCaller(storage, req.auth),
   };
 }

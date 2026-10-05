@@ -20,6 +20,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-operator-admin-migration
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-operator-admin-migration
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The migrated agent's token passes the HTTP admin routes too (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-25 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -339,9 +340,10 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
         // This suite's five agents at least; a Postgres run may hold older rows.
         assert(stats?.node_id === NODE_ID && stats?.counts?.agents >= 5,
             `aimeat_admin_stats answered the migrated agent with ${JSON.stringify(body).slice(0, 200)}`);
-        // The word opens the tools and nothing more: the HTTP admin doors stay the operator's in person.
+        // The word opens the HTTP admin routes as it opens the tools (secaudit 2026-10, C2: one
+        // operator check on both surfaces).
         const door = await json('/v1/admin/security/overview', { headers: auth(token) });
-        assert(door.status === 403, `the HTTP admin door answered the migrated agent's token with ${door.status}`);
+        assert(door.status === 200, `the HTTP admin route answered the migrated agent's token with ${door.status}`);
     });
 
     await test('2c. the connector gains the admin tools after refreshing its credential', async () => {

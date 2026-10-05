@@ -16,6 +16,7 @@
  *   it (plan 06, section 6); the node never changes anybody's model itself.
  * @structure parsePriceOverrides · refreshDue · refreshCatalog · keepPaidPrices · buildCatalog
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-10-05 — keepPaidPrices: a refresh never makes a paid model free; the operator's
  *     override still can (secaudit 2026-10, AI-5).
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
@@ -23,6 +24,7 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
 import { logger } from '../../../utils/logger.js';
+import { isOperatorAccount } from '../../../utils/operator-account.js';
 import { notify } from '../../notify.js';
 import { recommendedModelsOf } from '../policy-store.js';
 import { fetchSource, sourceUrls, type SourceName } from './sources.js';
@@ -137,7 +139,7 @@ async function tellOperatorsOfRetired(storage: Storage, config: AimeatConfig, pr
   if (!newly.length) return;
   const refs = newly.map(m => `${m.type}:${m.id}`).join(', ');
   logger.warn(`[ai-catalog] a recommended model is retired: ${refs}`);
-  const operators = (await storage.listOwners()).filter(o => o.roles?.includes('operator'));
+  const operators = (await storage.listOwners()).filter(isOperatorAccount);
   for (const o of operators) {
     await notify(storage, `${o.name}@${config.nodeId}`, {
       type: 'ai_model_retired',

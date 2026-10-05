@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.1 -- 2026-10-05 -- The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.12.0 -- 2026-10-02 -- POST /v1/agents/:name/scope-narrowing: replace an agent's `*` with the
  *     permissions it used, with one press (services/scope-use.ts, ruling C).
  *   v1.11.0 -- 2026-09-30 -- POST /v1/agents/:gaii/export: memory passes the classification reader
@@ -48,7 +49,7 @@ import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requ
 import { narrowAgent } from '../../services/scope-narrowing.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
-import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { forgetAgentAccess } from '../../services/agent-refusals.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
@@ -399,16 +400,9 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }
 
     // Validate scopes against node maximum
-    if (!config.maxAgentScopes.includes('*')) {
-      const invalid = scopes.filter((s: string) => {
-        if (s === '*') return true;
-        const [domain] = s.split(':');
-        return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
-      });
-      if (invalid.length > 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
-        return;
-      }
+    if (exceedsCeiling(config.maxAgentScopes, scopes).length > 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
+      return;
     }
 
     // Find the agent by name under this owner

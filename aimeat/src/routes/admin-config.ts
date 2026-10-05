@@ -18,6 +18,7 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.7.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.6.0 -- 2026-09-29 -- PUT and the classification switch (classification.mode): an AI
  *     credential (a personal access token) is refused a change that turns classification off or
  *     from all to owner, before anything in the request is applied, and every applied change of the
@@ -46,7 +47,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue, readConfigField } from '../services/config-schema.js';
 import { applyConfigChanges, type ConfigChange } from '../services/config-apply.js';
@@ -68,7 +69,7 @@ export function adminConfigRouter(
 
     // GET /v1/admin/config — full config schema with types, ranges, descriptions (§14.2)
     // Schema is built dynamically from the shared CONFIG_FIELDS definitions
-    router.get('/v1/admin/config', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/config', requireAuth(), requireOperator(storage), async (_req, res) => {
         const editable = storage.supportsConfigPersistence();
         type SchemaEntry = {
             value: unknown; type: string; description: string; range?: string; choices?: readonly string[];
@@ -148,7 +149,7 @@ export function adminConfigRouter(
     // PUT /v1/admin/config — atomic config update with dot-path addressing (§14.2, Appendix B)
     // Body format: {"changes": [{"path": "morsel_policy.daily_allowance", "value": 75}, ...]}
     // Mutable field lookup comes from the shared config-schema module (single source of truth)
-    router.put('/v1/admin/config', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/admin/config', requireAuth(), requireOperator(storage), async (req, res) => {
         // In-memory guard — config editing requires persistent storage
         if (!storage.supportsConfigPersistence()) {
             res.status(403).json(error(config.nodeId, 'READONLY_CONFIG',
@@ -217,7 +218,7 @@ export function adminConfigRouter(
     });
 
     // DELETE /v1/admin/config/:path — remove a DB override (revert to file/env/default)
-    router.delete('/v1/admin/config/:path', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.delete('/v1/admin/config/:path', requireAuth(), requireOperator(storage), async (req, res) => {
         if (!storage.supportsConfigPersistence()) {
             res.status(403).json(error(config.nodeId, 'READONLY_CONFIG',
                 'Config persistence not available with in-memory storage.'));
@@ -261,7 +262,7 @@ export function adminConfigRouter(
     // ── Consul Integration Endpoints ──
 
     // GET /v1/admin/consul — Consul connection status and key listing
-    router.get('/v1/admin/consul', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/consul', requireAuth(), requireOperator(storage), async (_req, res) => {
         if (!consulService) {
             res.json(success(config.nodeId, {
                 enabled: false,
@@ -285,7 +286,7 @@ export function adminConfigRouter(
     });
 
     // POST /v1/admin/consul/export — push current mutable config to Consul KV
-    router.post('/v1/admin/consul/export', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.post('/v1/admin/consul/export', requireAuth(), requireOperator(storage), async (_req, res) => {
         if (!consulService) {
             res.status(400).json(error(config.nodeId, 'CONSUL_DISABLED', 'Consul is not enabled'));
             return;
@@ -312,7 +313,7 @@ export function adminConfigRouter(
     });
 
     // POST /v1/admin/consul/import — pull config from Consul KV and apply to runtime + DB
-    router.post('/v1/admin/consul/import', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.post('/v1/admin/consul/import', requireAuth(), requireOperator(storage), async (_req, res) => {
         if (!consulService) {
             res.status(400).json(error(config.nodeId, 'CONSUL_DISABLED', 'Consul is not enabled'));
             return;

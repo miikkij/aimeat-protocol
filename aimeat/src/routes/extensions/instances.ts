@@ -8,6 +8,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  *   v1.1.0 — 2026-08-10 — Instance config is stripped of client-supplied ciphertext before the
  *                         merge with stored secrets.
+ *   v1.2.0 — 2026-10-05 — The write routes ask mayManageInstalledExt and the read routes ask isOperatorCaller once per request, so the operator's agent holding operator:admin passes as on MCP, and an operator's write in another person's extension writes the operator trail (secaudit 2026-10, C2).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -20,7 +21,8 @@ import { getEncryptionKey } from '../../services/encryption.js';
 import {
   getInstanceSecretKeys, encryptSecretFields, maskSecretFields, preserveMaskedSecrets, stripClientEncryptedValues,
 } from '../../services/extension-secrets.js';
-import { canManageInstalledExt, canSeeExtensionInstance } from './permissions.js';
+import { mayManageInstalledExt, canSeeExtensionInstanceAs } from './permissions.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerExtensionInstanceRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── POST /v1/extensions/:name/instances — Create instance ──────────
@@ -35,7 +37,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
 
       // Allow operator always; the original owner (or one of their agents
       // carrying ext:write) only on their own installed extensions.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'create-instance', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
@@ -127,8 +129,10 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       // the answer to "list the instances" is "the ones that are yours" rather than 403 — an owner
       // with no instance of a shared extension gets an empty list, which is the truth. Until
       // 2026-09-04 this returned everyone's, including another owner's name in createdBy.
+      // The operator check is asked once, before the filter, not once per instance.
+      const isOperator = await isOperatorCaller(storage, req.auth);
       const mine = (await storage.listExtensionInstances(name))
-        .filter(i => canSeeExtensionInstance(req, i.createdBy));
+        .filter(i => canSeeExtensionInstanceAs(req.auth!, i.createdBy, isOperator));
       const instSecretKeys = getInstanceSecretKeys(ext);
       res.json(success(config.nodeId, {
         instances: mine.map(i => ({ ...i, config: maskSecretFields(i.config, instSecretKeys) })),
@@ -159,7 +163,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       // caller's guess and confirming that somebody else's instance exists answers a question they
       // did not get to ask. The write doors below say 403 because the caller already had to name a
       // row they could see. Open until 2026-09-04, when requireAuth() was the whole gate here.
-      if (!instance || !canSeeExtensionInstance(req, instance.createdBy)) {
+      if (!instance || !canSeeExtensionInstanceAs(req.auth!, instance.createdBy, await isOperatorCaller(storage, req.auth))) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND',
           `Instance "${instanceId}" not found for extension "${name}"`));
         return;
@@ -191,7 +195,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
 
       // Allow operator always; the original owner (or one of their agents
       // carrying ext:write) only on their own installed extensions.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'update-instance', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
@@ -273,7 +277,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
 
       // Allow operator always; the original owner (or one of their agents
       // carrying ext:write) only on their own installed extensions.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'delete-instance', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }

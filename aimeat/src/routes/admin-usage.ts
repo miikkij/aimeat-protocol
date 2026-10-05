@@ -28,6 +28,7 @@
  *   import { adminUsageRouter } from './routes/admin-usage.js';
  *   app.use(adminUsageRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2). The raw-calls audit row names the calling agent as the actor when an agent reads.
  *   v1.2.0 — 2026-10-02 — chat_agent.metered_here is true on the node route (no shared chat key).
  *   v1.1.0 — 2026-09-12 — The Usage page's own read, and the one route that asks the provider what
  *     the operator's own keys have spent. The chat agent's key is spent by a child process and no
@@ -38,7 +39,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, UsageSurface, UsageOutcome } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
@@ -63,7 +64,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   // it reads the owner-scoped cut for that person. The operator role is the gate on BOTH — there is
   // no shape of this request a non-operator can reach.
   router.get('/v1/admin/usage/summary',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const report = typeof req.query.report === 'string' ? req.query.report : 'day';
       const owner = typeof req.query.owner === 'string' && req.query.owner ? req.query.owner : null;
@@ -98,7 +99,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── GET /v1/admin/usage/reports ── what may be asked for, in both scopes.
   router.get('/v1/admin/usage/reports',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     (_req: Request, res: Response) => {
       res.json(success(config.nodeId, {
         node: Object.keys(NODE_REPORTS),
@@ -110,7 +111,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   // ── GET /v1/admin/usage/calls ── the raw drill. Audited, because this is where an operator reads
   // one identifiable person's activity.
   router.get('/v1/admin/usage/calls',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const ownerParam = typeof req.query.owner === 'string' && req.query.owner ? req.query.owner : '';
       const ownerGhii = ownerParam
@@ -138,10 +139,12 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
 
       // The audit row. Written BEFORE the response is sent, so an inspection cannot be performed
       // and then have its record fail to exist because the operator disconnected.
-      const operatorGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+      // The actor is the caller itself: the operator's GHII in person, or the operator's agent's GAII.
+      const actorIdentity = resolveIdentity(req.auth!, config.nodeId);
+      const operatorGhii = ownerGhiiOf(actorIdentity);
       recordUsageCall({
         ownerGhii: operatorGhii,
-        actorGaii: operatorGhii,
+        actorGaii: actorIdentity,
         actorKind: 'operator',
         surface: 'operator',
         coordinate: 'usage.calls',
@@ -164,7 +167,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── GET /v1/admin/usage/status ── how fresh the serving layer is, and what the windows are.
   router.get('/v1/admin/usage/status',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (_req: Request, res: Response) => {
       const [llm, call, computedThrough] = await Promise.all([
         storage.getUsageCursor('llm'),
@@ -196,7 +199,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   // difference between an operator who knows their exposure is bounded by the key's own cap and one
   // who thinks these totals are the whole bill.
   router.get('/v1/admin/usage/house',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const to = typeof req.query.to === 'string' ? req.query.to : dayNDaysAgo(0);
       const from = typeof req.query.from === 'string' ? req.query.from : dayNDaysAgo(29);
@@ -255,7 +258,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   // explicit press, because a page that reaches a third party on every render stops loading when
   // that third party is slow.
   router.get('/v1/admin/usage/page',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const rawFrom = typeof req.query.from === 'string' ? req.query.from : undefined;
       const rawTo = typeof req.query.to === 'string' ? req.query.to : undefined;
@@ -290,7 +293,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   // Its own route rather than a flag on the one above, because it costs a round trip to a third
   // party and the page must load without one.
   router.get('/v1/admin/usage/keys',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (_req: Request, res: Response) => {
       const page = await buildUsagePage(config, storage, {
         from: dayNDaysAgo(0), to: dayNDaysAgo(0), includeKeySpend: true,
@@ -303,7 +306,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   // Needed after a new cut is declared (its history is otherwise empty, which on a chart is
   // indistinguishable from "this was never used"). Clears the range first, because the fold ADDS.
   router.post('/v1/admin/usage/rollup/rebuild',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const from = typeof req.body?.from === 'string' ? req.body.from : '';
       if (!ISO_DAY.test(from)) {
@@ -335,7 +338,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
   // question months later, and a cron that quietly destroys them is a cron nobody remembers
   // approving. The date is required and is never defaulted.
   router.post('/v1/admin/usage/archive/prune',
-    requireAuth(), requireRole('operator'),
+    requireAuth(), requireOperator(storage),
     async (req: Request, res: Response) => {
       const before = typeof req.body?.before === 'string' ? req.body.before : '';
       if (!ISO_DAY.test(before)) {

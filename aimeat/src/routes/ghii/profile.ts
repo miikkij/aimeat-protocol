@@ -6,6 +6,7 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.4.0 — 2026-09-12 — GET /v1/ghii/me splits its response instead of taking a gate, which closes
  *     the last DEBT line in the route-scope ratchet. The door is open to everything acting in the
@@ -42,6 +43,7 @@ import { isForeignPrincipal } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isValidRegion, isValidTimeZone } from '../../services/display-prefs.js';
 import { emitChange } from '../../services/event-bus.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerProfileRoutes(
     router: Router,
@@ -260,8 +262,9 @@ export function registerProfileRoutes(
         // roster. Only the profile's OWNER (a real signed-in principal) or an operator gets it; the
         // shared anonymous identity and other users get the profile without the agent list.
         const isOwner = !!req.auth && !req.auth.anonymous && req.auth.owner === record.ownerName;
-        const isOperator = !!req.auth && !req.auth.anonymous && req.auth.roles?.includes('operator');
-        const includeAgents = isOwner || isOperator;
+        // The operator half asks isOperatorCaller, as the MCP tools do: the operator's agent holding
+        // operator:admin passes too. A profile read writes no operator trail; asked only when not owner.
+        const includeAgents = isOwner || await isOperatorCaller(storage, req.auth);
         const agents = includeAgents ? await storage.getAgentsByOwner(record.ownerName) : [];
 
         res.json(success(config.nodeId, {

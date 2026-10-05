@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Operator-only admin API surface — GHII user administration, email/notification
  *   templates and sending, directory rebuild, push config, and genesis
- *   peering management. All routes gated by requireAuth() + requireRole('operator').
+ *   peering management. All routes gated by requireAuth() + requireOperator(storage).
  *
  * @structure
  *   - adminFeaturesRouter(config, storage, services): mounts /v1/admin/* routes
@@ -12,6 +12,7 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.4.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.0 — 2026-09-12 — GET /v1/admin/csm carries each CSM's description, schema mode and field
  *     counts. They sit in the definition the record already holds, and without them a list row
  *     could not say how hard a CSM bites or over how many fields.
@@ -24,7 +25,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { setCorsList } from '../services/cors-overview.js';
@@ -55,7 +56,7 @@ export function adminFeaturesRouter(
     },
 ): Router {
     const router = Router();
-    const auth = [requireAuth(), requireRole('operator')] as const;
+    const auth = [requireAuth(), requireOperator(storage)] as const;
 
     /** DRY wrapper – catches errors and returns a standard 500 envelope. */
     const handle = (handler: (req: Request, res: Response) => Promise<void>) =>

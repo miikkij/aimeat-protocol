@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.7.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.6.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-14 — DELETE /v1/owners/:name is behind requireLocalSession as well.
  *     requireOwnerPrincipal admits a federated login — roles ['owner'], the local part of the
@@ -38,7 +39,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { requireAuth, requireOwnerPrincipal, requireRole, requireLocalSession } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireOperator, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, isForeignPrincipal } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
@@ -50,6 +51,7 @@ import { emitChange } from '../services/event-bus.js';
 import { eraseOwner } from '../services/owner-erasure.js';
 import { logger } from '../utils/logger.js';
 import { registerOwnerExportRoute } from './owners/export.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 
 export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -213,8 +215,9 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // never this account and never this node's operator.
     const local = !!req.auth && !req.auth.anonymous && !isForeignPrincipal(req.auth);
     const isSelf = local && req.auth!.owner === owner.name;
-    const isOperator = local && req.auth!.roles?.includes('operator');
-    const privileged = isSelf || isOperator;
+    // isOperatorCaller, the question the MCP tools ask: the operator's agent holding operator:admin
+    // passes too. A read of the profile card writes no operator trail; asked only when not self.
+    const privileged = isSelf || (local && await isOperatorCaller(storage, req.auth));
     const agents = privileged ? await storage.getAgentsByOwner(owner.name) : [];
 
     res.json(success(config.nodeId, {
@@ -283,7 +286,11 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   // 2026-09-13; the same question is answered the same way in routes/contacts.ts.
   router.delete('/v1/owners/:name', requireAuth(), requireLocalSession(), requireOwnerPrincipal(), async (req, res) => {
     const name = req.params.name as string;
-    if (req.auth!.owner !== name && !req.auth!.roles.includes('operator')) {
+    // The operator half asks isOperatorCaller, as the MCP tools do. The operator trail
+    // (operatorOverride) is written once the account is known to exist, so a mistyped name leaves
+    // no row in a feed that a later account of that name would inherit.
+    const own = req.auth!.owner === name;
+    if (!own && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own account'));
       return;
     }
@@ -291,6 +298,10 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     const owner = await storage.getOwner(name);
     if (!owner) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${name}`));
+      return;
+    }
+    if (!own && !(await operatorOverride(storage, config, req.auth, { ownerOf: name, area: 'account', action: 'delete', subject: name }))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own account'));
       return;
     }
 
@@ -308,11 +319,19 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/owners/:name/recover — Owner key recovery (operator-assisted)
-  router.post('/v1/owners/:name/recover', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/owners/:name/recover', requireAuth(), requireOperator(storage), async (req, res) => {
     const name = req.params.name as string;
     const owner = await storage.getOwner(name);
     if (!owner) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${name}`));
+      return;
+    }
+
+    // The operator replaces another person's sign-in key: the act goes to the operator trail and the
+    // person's account feed before anything changes (secaudit 2026-10, C2). requireOperator already
+    // admitted the caller, so this asks the same question again and writes the record.
+    if (!(await operatorOverride(storage, config, req.auth, { ownerOf: name, area: 'account', action: 'recover', subject: name }))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Node operator required'));
       return;
     }
 

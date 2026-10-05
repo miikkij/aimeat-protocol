@@ -7,6 +7,7 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-09-28 — The member list names only the agents the organism admits (agentAccess), and says which
  *     setting is in force; an owner or admin can attach any active member's agent, and where only listed
  *     agents are admitted, only a person signed in can attach one.
@@ -69,7 +70,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     // Roster privacy (memberVisibility): below the tier the listing shrinks to the accountability
     // rows — creator/admins + the caller's own row — while the TRUE total stays (count ≠ identity).
     // The shared anonymous identity is treated as unauthenticated (rosterCallerFromAuth).
-    const rosterCaller = rosterCallerFromAuth(req.auth);
+    const rosterCaller = await rosterCallerFromAuth(storage, req.auth);
     const canSeeRoster = await canSeeMembers(storage, organism, rosterCaller);
     if (!canSeeRoster) {
       const visible = members.filter(m => m.role === 'creator' || m.role === 'admin'
@@ -85,7 +86,9 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     // only; outsiders/public callers get the legacy shape (agent rosters are not public data).
     const callerOwner = req.auth?.owner;
     const callerMembership = callerOwner ? await storage.getMembership(id, callerOwner) : null;
-    const canSeeAgents = (callerMembership?.status === 'active') || !!req.auth?.roles.includes('operator');
+    // rosterCaller.isOperator is isOperatorCaller's answer (the operator, or the operator's agent
+    // holding operator:admin), the same question the MCP tools ask.
+    const canSeeAgents = (callerMembership?.status === 'active') || !!rosterCaller.isOperator;
     if (canSeeAgents) {
       // ONE `owner IN (…)` query for every member's agents, not one getAgentsByOwner per member.
       const ownerNames = members.map(m => localAccountName(m.ghii));

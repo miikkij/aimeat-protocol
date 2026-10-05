@@ -13,10 +13,12 @@
  *   - emailReach(storage): one pass over the GHII records and the owner roles
  *
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-12 — Extracted from routes/admin-features.ts, where the group send counted
  *     recipients inline and no other surface could see the number until after it had sent.
  */
 import type { Storage } from '../storage/interface.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 
 export interface EmailReach {
     /** GHII records on the node, whether or not they carry an address. */
@@ -39,7 +41,7 @@ export interface EmailReach {
 export async function emailReach(storage: Storage): Promise<EmailReach> {
     const ghiis = await storage.listGHIIs();
     const owners = await storage.listOwners();
-    const operatorNames = new Set(owners.filter(o => o.roles.includes('operator')).map(o => o.name));
+    const operatorNames = new Set(owners.filter(isOperatorAccount).map(o => o.name));
 
     const all: string[] = [];
     const operators: string[] = [];

@@ -31,6 +31,7 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The single-entry ceilings join the report (secaudit 2026-10, C1, C2, C7).
  *   v1.2.0 — 2026-09-13 — The substitute-answering catches join the report. Their file is keyed by
  *     file with a per-file ceiling rather than one key per site, so the count is the sum of the
  *     ceilings and falls only when a handler is fixed AND its ceiling lowered.
@@ -86,6 +87,14 @@ const RATCHETS: Ratchet[] = [
         // count is lowered.
         count: raw => Object.values((JSON.parse(raw) as { files?: Record<string, { count: number }> }).files ?? {})
             .reduce((n, e) => n + e.count, 0),
+    },
+    {
+        file: 'aimeat/security/single-entry-baseline.json',
+        label: 'Hand copies of a single-entry decision',
+        check: 'check:single-entry',
+        // Per rule, per file, a ceiling: the backlog is the sum of the ceilings.
+        count: raw => Object.values((JSON.parse(raw) as { rules?: Record<string, Record<string, { count: number }>> }).rules ?? {})
+            .reduce((n, files) => n + Object.values(files).reduce((m, e) => m + e.count, 0), 0),
     },
     {
         file: 'aimeat/eslint-rules/no-storage-in-mcp.js',

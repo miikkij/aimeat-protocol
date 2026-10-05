@@ -523,6 +523,24 @@ await test('POST /v1/ghii/password/change — wrong current_password is rejected
     assert(data.error?.code === 'WRONG_PASSWORD', `expected WRONG_PASSWORD, got ${data.error?.code}`);
 });
 
+// Secaudit 2026-10, C1: the password change checks the current password with the account's lock, as
+// the sign-in does, so a held session cannot guess it without limit. The wrong guess above counted
+// toward the lock; four wrong sign-ins reach it (the change route's own limit allows 5 calls in ten
+// minutes, fewer than the lock needs), and then the change refuses even the right password.
+await test('POST /v1/ghii/password/change — the account lock applies: once locked, the right password waits too', async () => {
+    for (let i = 0; i < 4; i++) {
+        await api('/v1/ghii/login', {
+            method: 'POST',
+            body: JSON.stringify({ username: noPwUsername, password: `WrongPass12${i}` }),
+        });
+    }
+    const right = await authApi('/v1/ghii/password/change', noPwOwnerJwt, {
+        method: 'POST',
+        body: JSON.stringify({ current_password: noPwNewPassword, new_password: 'AnotherPass123' }),
+    });
+    assert(right._status === 429 && right.error?.code === 'PASSWORD_LOCKED', `a locked account changed its password: ${right._status} ${right.error?.code}`);
+});
+
 // ─── Phase 8: Dev Mode Re-registration ───
 console.log('\nPhase 8 — Dev Mode Re-registration');
 

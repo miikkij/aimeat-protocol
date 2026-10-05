@@ -21,6 +21,9 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-10-05 — createEmailInvitation counts the inviter's account allowance (takeInviteEmail), so
+ *     the REST route and the MCP tool share one count; an install set's invitations are exempt
+ *     (secaudit 2026-10, C5).
  *   2026-10-02 — cancelEmailInvitation refuses a provisioned-code key (404), which has its own cancel
  *     route: cancelled here, the key read cancelled while the account it provisioned stayed a member.
  *   2026-09-30 — The invitation email is written in the language the inviter asks for (`locale`),
@@ -71,6 +74,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { isValidEmail } from '../utils/email-validator.js';
 import { LOCALES } from '../i18n.js';
 import { emailTemplateLang } from './email-templates.js';
+import { takeInviteEmail } from './account-limits.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
@@ -206,6 +210,9 @@ export interface CreateEmailInvitationInput {
   organism: OrganismRecord;
   inviterGhii: string; // bare owner name of the creator/admin
   email: string;
+  /** 'exempt' for an invitation the node sends itself (an install set naming its people), which does
+   *  not count against the inviter's allowance. */
+  sendLimit?: 'exempt';
   orgRole: 'member' | 'admin';
   workspaces: InvitationWorkspaceGrant[]; // caller has authorized these (org creator/admin can grant any)
   message?: string | null;
@@ -261,6 +268,13 @@ export async function createEmailInvitation(
   }
   const id = input.organism.id;
   const emailHash = inviteEmailHash(cleanEmail);
+
+  // The account's invitation allowance, counted here so the REST route and the MCP tool share one
+  // count for the owner and all their agents (services/account-limits.ts; secaudit 2026-10, C5).
+  if (input.sendLimit !== 'exempt') {
+    const turn = takeInviteEmail(input.inviterGhii.includes('@') ? input.inviterGhii : `${input.inviterGhii}@${config.nodeId}`);
+    if (!turn.ok) throw new InvitationError(429, turn.code, turn.message);
+  }
 
   // Read before anything is written: the language is validated here, so a refused locale leaves no
   // invitation behind. `existing` is the recipient's account when the address already has one.

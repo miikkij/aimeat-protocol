@@ -15,6 +15,7 @@
  *   import { statsRouter } from '../routes/stats.js';
  *   app.use(statsRouter(config, storage, stats, metricsRegistry));
  * @version-history
+ *   v1.4.0 -- 2026-10-05 -- Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.3.0 -- 2026-09-14 -- `authenticated` means a signed-in caller on both doors, not merely a
  *     `req.auth`: in anonymous mode this node hands every passer-by one, so the setting showed the
  *     figures to anybody who asked. isSignedInCaller(), auth/account-security.ts.
@@ -33,6 +34,7 @@ import type { StatsCollector } from '../services/stats.js';
 import { success, error } from '../middleware/envelope.js';
 import { isSignedInCaller } from '../auth/middleware.js';
 import { buildStatsSnapshot } from '../services/stats-page.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 
 export function statsRouter(
   config: AimeatConfig,
@@ -50,7 +52,7 @@ export function statsRouter(
 
     // Access control based on config
     if (config.statsAccess === 'operator') {
-      if (!req.auth?.roles?.includes('operator')) {
+      if (!(await isOperatorCaller(storage, req.auth))) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Operator role required'));
         return;
       }
@@ -83,7 +85,7 @@ export function statsRouter(
 
     // Access control (same pattern as /v1/stats)
     if (config.metricsAccess === 'operator') {
-      if (!req.auth?.roles?.includes('operator')) {
+      if (!(await isOperatorCaller(storage, req.auth))) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Operator role required'));
         return;
       }

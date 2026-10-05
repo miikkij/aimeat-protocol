@@ -37,11 +37,13 @@
  *   const r = await migrateOperatorAdminOnce(storage, config);
  *   if (r.ran) logger.info(`${r.granted.length} operator account(s) changed`);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-25 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
 
@@ -82,7 +84,7 @@ export async function migrateOperatorAdminOnce(
   const granted: OperatorAdminMigration['granted'] = [];
   for (const [owner, listed] of byOwner) {
     // The account first: the word means nothing on an account that does not run the node.
-    if (!(await storage.getOwner(owner))?.roles.includes('operator')) continue;
+    if (!isOperatorAccount(await storage.getOwner(owner))) continue;
     const names: string[] = [];
     for (const { gaii } of listed) {
       // Read again just before the write, because the write replaces the whole list.

@@ -44,6 +44,9 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.3.6 — 2026-10-05 — A declaration's word is asked with scopeIsCovered, of the grant and, when the
+ *     caller passes `scopes`, of the session too, so a narrower session does not gain the word from
+ *     the stored grant (secaudit 2026-10, C3).
  *   v1.3.5 — 2026-09-26 — storeHeldProvenance(): the held rows stored once a write has landed, one
  *     call for every compare-and-swap door (secaudit 2026-09, N2).
  *   v1.3.4 — 2026-09-26 — declarationLacksModel(): the app publish warns a declarer that named no
@@ -80,6 +83,7 @@ import {
 } from '../models/ai-provenance-schemas.js';
 import { disclosureFor, type SurfaceContext, type DisclosureLabelPolicy } from './ai-disclosure.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { createT, LOCALES } from '../i18n.js';
 import { logger } from '../utils/logger.js';
 
@@ -450,16 +454,20 @@ export const PROVENANCE_WRITE_SCOPE = 'provenance:write';
  * declaration performs the identical act; leaving it ungated here would make MCP a way around the
  * REST gate — the same class of hole the memory schema-lock bypass was.
  */
-async function mayDeclareProvenance(storage: Storage, principal: string): Promise<{ ok: true } | { ok: false; scopes: string[] }> {
+async function mayDeclareProvenance(
+  storage: Storage, principal: string, sessionScopes?: readonly string[],
+): Promise<{ ok: true } | { ok: false; scopes: string[] }> {
   // An owner writing through their own token is a person acting for themselves — the owner bypass.
   if (!isGEAI(principal) && parseGAII(principal) === null) return { ok: true };
   const scopes = isGEAI(principal)
     ? (await storage.getEcosystemApp(principal))?.scopes ?? []
     : (await storage.getAgent(principal))?.defaultScopes ?? [];
-  if (scopes.includes('*') || scopes.includes(PROVENANCE_WRITE_SCOPE)) return { ok: true };
-  const domain = PROVENANCE_WRITE_SCOPE.split(':')[0];
-  if (scopes.includes(`${domain}:*`)) return { ok: true };
-  return { ok: false, scopes };
+  // The word is asked of the grant as it stands AND, when the caller has it, of the session's own
+  // words: a session narrower than its grant does not gain the word from the record (secaudit
+  // 2026-10, C3). scopeIsCovered is the rule requireScope applies.
+  const held = sessionScopes ? [...sessionScopes] : scopes;
+  if (scopeIsCovered(scopes, PROVENANCE_WRITE_SCOPE) && scopeIsCovered(held, PROVENANCE_WRITE_SCOPE)) return { ok: true };
+  return { ok: false, scopes: held };
 }
 
 export async function provenanceForWrite(
@@ -467,6 +475,8 @@ export async function provenanceForWrite(
   input: {
     /** The resolved identity of the writer — GHII, GAII or GEAI. Never `req.auth!.sub`. */
     principal: string;
+    /** The session's own words, when the caller has them: a declaration needs the word there too. */
+    scopes?: readonly string[];
     /** The exact bytes written, hashed so a detection query can find them later. */
     content: string | Uint8Array;
     /** A record id the caller asked to attach. Checked against the caller's own account. */
@@ -498,7 +508,7 @@ export async function provenanceForWrite(
   if (input.declared) {
     // Refused, not silently downgraded to Mint-3: a caller that thinks it declared something and
     // finds the opposite recorded has been lied to by its own tool call.
-    const may = await mayDeclareProvenance(storage, input.principal);
+    const may = await mayDeclareProvenance(storage, input.principal, input.scopes);
     if (!may.ok) throw new ProvenanceScopeError(may.scopes);
     const row = await mintProvenance(storage, {
       stampedBy: 'principal',
@@ -550,11 +560,11 @@ export async function provenanceForWrite(
  */
 export async function provenanceDeclarationRefusal(
   storage: Storage,
-  input: { principal: string; declaredId?: string; declared?: DeclaredProvenance; enabled?: boolean },
+  input: { principal: string; declaredId?: string; declared?: DeclaredProvenance; enabled?: boolean; scopes?: readonly string[] },
 ): Promise<ProvenanceScopeError | null> {
   if (input.enabled === false || !input.declared) return null;
   if (await resolveAttachableProvenanceId(storage, ownerGhiiOf(input.principal), input.declaredId)) return null;
-  const may = await mayDeclareProvenance(storage, input.principal);
+  const may = await mayDeclareProvenance(storage, input.principal, input.scopes);
   return may.ok ? null : new ProvenanceScopeError(may.scopes);
 }
 

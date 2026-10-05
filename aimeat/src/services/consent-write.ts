@@ -27,6 +27,7 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.1 — 2026-10-05 — hasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.1.0 — 2026-08-11 — Security audit H-2: the owner/operator bypass in gate() now excludes agent
  *     and ecosystem sessions, matching requireScope. Agent tokens carried the owner's roles until
  *     today, so the bypass applied to principals whose consent:manage the owner had withheld.
@@ -39,6 +40,7 @@ import { auditDataAccess } from './consent.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -78,11 +80,8 @@ export type ConsentResult<T> =
     | { ok: true; value: T }
     | { ok: false; status: number; code: string; message: string };
 
-/** Does this session carry the scope, allowing for the wildcard forms the middleware accepts? */
-function hasScope(scopes: string[], needed: string): boolean {
-    if (scopes.includes('*') || scopes.includes(needed)) return true;
-    return scopes.includes(`${needed.split(':')[0]}:*`);
-}
+/** Does this session carry the scope? scopeIsCovered, the rule requireScope applies (C3). */
+const hasScope = (scopes: string[], needed: string): boolean => scopeIsCovered(scopes, needed);
 
 type ConsentRefusal = Extract<ConsentResult<never>, { ok: false }>;
 

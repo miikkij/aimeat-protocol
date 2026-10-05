@@ -13,12 +13,13 @@
  *   - DELETE /v1/federation/link-invites/:id  — revoke one
  * @usage registerLinkInviteRoutes(router, config, storage) from ../federation-peer.js
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-23 — Initial, for the contact tier.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { coerceTier, type PeerTier } from '../../services/federation-tiers.js';
@@ -31,7 +32,7 @@ const INVITABLE: PeerTier[] = ['contact', 'visiting'];
 
 export function registerLinkInviteRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
     // POST /v1/federation/link-invites — mint a one-time invitation (operator)
-    router.post('/v1/federation/link-invites', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/link-invites', requireAuth(), requireOperator(storage), async (req, res) => {
         const { tier, ttl_hours, label } = req.body ?? {};
         const wanted = coerceTier(tier ?? 'contact');
         if (!INVITABLE.includes(wanted)) {
@@ -65,7 +66,7 @@ export function registerLinkInviteRoutes(router: Router, config: AimeatConfig, s
     });
 
     // GET /v1/federation/link-invites — list (operator). Never includes a token.
-    router.get('/v1/federation/link-invites', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/federation/link-invites', requireAuth(), requireOperator(storage), async (_req, res) => {
         const invites = await listLinkInvites(storage);
         res.json(success(config.nodeId, {
             invites: invites.map(i => ({
@@ -85,7 +86,7 @@ export function registerLinkInviteRoutes(router: Router, config: AimeatConfig, s
     });
 
     // DELETE /v1/federation/link-invites/:id — revoke (operator)
-    router.delete('/v1/federation/link-invites/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.delete('/v1/federation/link-invites/:id', requireAuth(), requireOperator(storage), async (req, res) => {
         const id = req.params.id as string;
         const removed = await revokeLinkInvite(storage, id);
         if (!removed) {

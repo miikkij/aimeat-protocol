@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.12.0 — 2026-10-05 — exceedsCeiling(ceiling, requested): the node's scope ceiling, which five
+ *     grant paths wrote out by hand (secaudit 2026-10, C3).
  *   v1.11.1 — 2026-09-25 — The OPERATOR_ADMIN_SCOPE note says the operator's full-access agents got
  *     the word once per node (services/operator-admin-migration.ts). Nothing executable changed.
  *   v1.11.0 — 2026-09-24 — OPERATOR_ADMIN_SCOPE, node administration through an agent (security audit
@@ -325,6 +327,21 @@ export function scopeIsCovered(held: readonly string[], scope: string): boolean 
  */
 export function uncoveredScopes(held: readonly string[], wanted: readonly string[]): string[] {
     return wanted.filter(s => !scopeIsCovered(held, s));
+}
+
+/**
+ * The requested words the node's ceiling (config.maxAgentScopes) does not allow: none when the
+ * ceiling holds `*`; otherwise `*` itself, and every word the ceiling holds neither exactly nor by
+ * its domain wildcard. Five places that grant an agent or a token its words wrote this out by hand
+ * (secaudit 2026-10, C3); this is their one copy, with the rule they had.
+ */
+export function exceedsCeiling(ceiling: readonly string[], requested: readonly string[]): string[] {
+    if (ceiling.includes('*')) return [];
+    return requested.filter((s) => {
+        if (s === '*') return true;
+        const [domain] = s.split(':');
+        return !ceiling.includes(s) && !ceiling.includes(`${domain}:*`);
+    });
 }
 
 /**

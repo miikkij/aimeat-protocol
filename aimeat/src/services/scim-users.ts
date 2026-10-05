@@ -24,6 +24,7 @@
  *   normalizeEntraPatchBody() (the string-boolean shim, unit-tested in scim-entra-compat).
  * @usage declareScimResources(); // once, from routes/scim.ts
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-24 — Initial (BR-04 phase 3), after the SCIMMY spike: Express 5 works,
  *     context flows per request, capitalised op verbs parse, string booleans need the shim.
  */
@@ -36,6 +37,7 @@ import { deactivateOwner, reactivateOwner } from './owner-lifecycle.js';
 import { deriveUniqueUsername, emailHashOf } from './external-login.js';
 import { ensureSsoMembership } from './sso-membership.js';
 import { logger } from '../utils/logger.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 
 /** What every handler receives — resolved by the route's auth middleware, never from the URL. */
 export interface ScimContext {
@@ -121,7 +123,7 @@ async function applyActive(ctx: ScimContext, owner: OwnerRecord, active: boolean
   if (active && owner.disabledAt) {
     await reactivateOwner(ctx.storage, owner.name);
   } else if (!active && !owner.disabledAt) {
-    if (owner.roles.includes('operator')) {
+    if (isOperatorAccount(owner)) {
       throw scimError(403, null, 'This account operates the node and cannot be deactivated through provisioning');
     }
     await deactivateOwner(ctx.storage, owner.name, `sso:${ctx.conn.id}`);
@@ -238,7 +240,7 @@ export function declareScimResources(): void {
         const owner = resource.id ? await managedOwner(context, resource.id) : null;
         if (!owner) throw scimError(404, null, `User ${resource.id} not found`);
         // DELETE is deactivation (R3): the directory said "gone", the knowledge stays.
-        if (owner.roles.includes('operator')) {
+        if (isOperatorAccount(owner)) {
           throw scimError(403, null, 'This account operates the node and cannot be deactivated through provisioning');
         }
         if (!owner.disabledAt) {

@@ -13,6 +13,7 @@
  *   - POST /v1/csm: parse (YAML or JSON), validate, and register a CSM service
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -27,6 +28,7 @@ import { parseCsm, validateCsm, csmToJsonSchema } from '../services/csm-parser.j
 import { emitChange } from '../services/event-bus.js';
 import type { CsmDefinition } from '../services/csm-parser.js';
 import { logger } from '../utils/logger.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 // Load CSM templates at startup
 interface CsmTemplateMeta {
@@ -291,9 +293,10 @@ export function csmRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Only the registerer or an operator can delete
-    const isOperator = req.auth!.roles.includes('operator');
-    if (csm.registeredBy !== ownerName && !isOperator) {
+    // Only the registerer or an operator can delete; the operator deleting another person's CSM
+    // service writes the operator trail.
+    if (csm.registeredBy !== ownerName
+      && !(await operatorOverride(storage, config, req.auth, { ownerOf: csm.registeredBy, area: 'csm', action: 'delete', subject: name }))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only delete CSM services you registered'));
       return;
     }

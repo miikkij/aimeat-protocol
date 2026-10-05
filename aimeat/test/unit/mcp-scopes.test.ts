@@ -4,6 +4,8 @@
  *   wildcard-matching semantics (exact / domain:* / global *) that decide which tools the
  *   /v1/mcp surface registers per agent (F1), and the role->scope profile bundles.
  * @version-history
+ *   v1.3.0 -- 2026-10-05 -- A tool may need several words (requiredScopesForTool); the refinery run
+ *     needs the four its route asks (secaudit 2026-10, C3).
  *   v1.2.0 -- 2026-09-24 -- Reading a connected mailbox is connections:read-through; connections:use,
  *     the publish-and-send word, no longer offers the three mail read tools (security audit A5-1).
  *   v1.1.0 -- 2026-09-24 -- The operator's tools: every tool the catalog names as the operator's is
@@ -12,7 +14,10 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1)
  */
 import { describe, it, expect } from 'vitest';
-import { scopeAllowsTool, requiredScopeForTool, scopesForProfile, MCP_SCOPE_PROFILES } from '../../src/mcp/catalog/scopes.js';
+import { scopeAllowsTool, requiredScopesForTool, scopesForProfile, MCP_SCOPE_PROFILES } from '../../src/mcp/catalog/scopes.js';
+
+/** The one word a single-word tool needs; undefined for an ungated tool, the words joined with + otherwise. */
+const requiredScopeForTool = (tool: string): string | undefined => requiredScopesForTool(tool).join('+') || undefined;
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/mcp/catalog/definitions.js';
 import { isOutsideWildcard } from '../../src/utils/scope-coverage.js';
 
@@ -102,6 +107,17 @@ describe('reading a connected mailbox is its own word', () => {
             expect(scopeAllowsTool(['*'], t)).toBe(true);
         }
         expect(requiredScopeForTool('aimeat_mail_send')).toBe('connections:use');
+    });
+});
+
+// Secaudit 2026-10, C3: POST /v1/refinery/runs asks four words, and the tool was offered on one, so an
+// agent was shown a tool every call of which failed.
+describe('a tool whose route asks several words asks all of them', () => {
+    it('aimeat_refinery_run needs the four words of its route', () => {
+        expect(requiredScopesForTool('aimeat_refinery_run')).toEqual(['connections:read-through', 'ai:use', 'organism:rows', 'memory:write']);
+        expect(scopeAllowsTool(['connections:read-through'], 'aimeat_refinery_run')).toBe(false);
+        expect(scopeAllowsTool(['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'], 'aimeat_refinery_run')).toBe(true);
+        expect(scopeAllowsTool(['connections:read-through', 'ai:*', 'organism:*', 'memory:*'], 'aimeat_refinery_run')).toBe(true);
     });
 });
 

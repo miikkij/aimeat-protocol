@@ -25,6 +25,7 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.1.2 — 2026-10-05 — The app's spend word is asked with scopeIsCovered (secaudit 2026-10, C3).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-07-30 — A settled outcome now also carries `accrue()`, the other half of `refund()`:
  *     the door calls it after a successful invoke so the provider's beneficiaries are booked. Kept on
@@ -37,6 +38,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import {
   readEntitlementForCall, budgetAllows, computeCharge,
   type MeteredEntitlement,
@@ -219,10 +221,7 @@ export async function appSpendRefusal(
 ): Promise<{ kind: 'scope_required'; scope: string } | { kind: 'app_cap_reached'; capMorsels: number; spentMorsels: number } | null> {
   if (!session?.roles.includes('app')) return null;
   const appGrant = session.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
-  if (!session.scopes.includes('*')
-      && !session.scopes.includes(SPEND_SCOPE)
-      && !session.scopes.includes('contract:*')
-      && !grandfathered(appGrant)) {
+  if (!scopeIsCovered(session.scopes, SPEND_SCOPE) && !grandfathered(appGrant)) {
     return { kind: 'scope_required', scope: SPEND_SCOPE };
   }
   // The permission answers WHETHER; the ceiling answers HOW MUCH. Read before the call rather than
