@@ -19,6 +19,7 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.5.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-09-25 — POST /v1/ai/decisions/:id/review hands the service the reviewer as the
  *     principal that acted (callerPrincipal, so an app is its GEAI) and whether it is the owner in
  *     person; the service refuses the principal that asked for the decision (403 OWN_DECISION).
@@ -40,7 +41,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { testDecideKey } from '../services/decide/key-test.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { requireOwnerPrincipal, isOwnerPrincipal } from '../auth/account-security.js';
@@ -276,7 +277,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/admin/decide/test ── the operator tests the node's own key
-  router.post('/v1/admin/decide/test', requireAuth(), requireRole('operator'), aiRateLimit, async (req: Request, res: Response) => {
+  router.post('/v1/admin/decide/test', requireAuth(), requireOperator(storage), aiRateLimit, async (req: Request, res: Response) => {
     try {
       res.json(success(config.nodeId, await testDecideKey(storage, config, { gaii: decideOwnerOf(req.auth!, config.nodeId), which: 'node' })));
     } catch (e) { fail(res, e); }

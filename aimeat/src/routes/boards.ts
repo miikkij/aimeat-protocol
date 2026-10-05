@@ -13,6 +13,7 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.2 — 2026-09-26 — The board's owner in the members door comes from localAccountName, so a board
  *     a visitor from another node owns is never the local namesake's (secaudit 2026-09, F-1).
  *   v1.8.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -83,6 +84,7 @@ import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
   publicBoardCeiling,
 } from '../services/board-write.js';
+import { operatorOverride, rolesWithOperator } from '../services/operator-override.js';
 import { resolveIdentity, isSameOwner, localAccountName, isForeignPrincipal } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
@@ -102,7 +104,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const { name, visibility, allowed_gaiis, description, federate, rules } = req.body ?? {};
     const out = await createBoard({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, { name, visibility, description, allowedGaiis: allowed_gaiis, federate, rules });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -171,7 +173,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
       return;
     }
-    if (board.ownerGaii !== gaii && !(req.auth!.roles ?? []).includes('operator')) {
+    if (board.ownerGaii !== gaii && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: board.ownerGaii, area: 'board', action: 'rules', subject: board.name }))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the keeper of this board sets its rules. Ask them, or open a board of your own.'));
       return;
     }
@@ -188,7 +191,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const { ttl_hours, resolved } = req.body ?? {};
     const out = await updateBoardPost({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, { boardId: req.params.boardId as string, postId: req.params.postId as string, ttlHours: ttl_hours, resolved });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -230,7 +233,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // Only when this flip is INTO public and the board is not already there — re-saving a board that
     // is public counts itself and would refuse an edit that changes nothing.
     if (visibility === 'public' && board.visibility !== 'public') {
-      const ceiling = await publicBoardCeiling({ storage, config }, { gaii, roles: req.auth!.roles ?? [] }, 'public');
+      const ceiling = await publicBoardCeiling({ storage, config }, { gaii, roles: await rolesWithOperator(storage, req.auth) }, 'public');
       if (ceiling) {
         res.status(ceiling.status).json(error(config.nodeId, ceiling.code, ceiling.message));
         return;
@@ -261,19 +264,19 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // account that shares it. Their boards are on their home node.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent')
       && !isForeignPrincipal(req.auth);
-    const isOperatorOwner = isOwnerSession && req.auth!.roles.includes('operator');
     if (!isOwnerSession) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner (owner session) or operator can manage members'));
       return;
     }
-    // Non-operator owner sessions must own the board. The board's owner comes from localAccountName,
-    // which keeps an owner of another node whole, so a visitor's board is never the namesake's.
-    if (!isOperatorOwner) {
-      const boardOwner = localAccountName(board.ownerGaii);
-      if (req.auth!.owner !== boardOwner) {
-        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this board'));
-        return;
-      }
+    // An owner session must own the board, or be the operator in person (agents were refused above,
+    // so operatorOverride here admits only the operator's own owner session and writes the trail).
+    // The board's owner comes from localAccountName, which keeps an owner of another node whole, so
+    // a visitor's board is never the namesake's.
+    const boardOwner = localAccountName(board.ownerGaii);
+    if (req.auth!.owner !== boardOwner && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: board.ownerGaii, area: 'board', action: 'members', subject: board.name }))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this board'));
+      return;
     }
 
     // The roster arithmetic, the write and the change event are services/board-write.ts, which
@@ -328,7 +331,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const { title, body, category, tags, ttl_hours } = req.body ?? {};
     const out = await createBoardPost({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, {
       boardId: req.params.boardId as string,
       title, body, category, tags, ttlHours: ttl_hours,
@@ -534,7 +537,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const boardId = req.params.boardId as string;
     const out = await deleteBoardById({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, boardId);
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -581,7 +584,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const { reaction } = req.body ?? {};
     const out = await reactToBoardPost({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, {
       boardId: req.params.boardId as string,
       postId: req.params.postId as string,
@@ -609,7 +612,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const out = await unreactToBoardPost({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, {
       boardId: req.params.boardId as string,
       postId: req.params.postId as string,
@@ -630,7 +633,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // existed, so a reply could land on a board the replier may not post to.
     const out = await createBoardReply({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, {
       boardId: req.params.boardId as string,
       postId: req.params.postId as string,
@@ -662,7 +665,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const { callback_url, filters } = req.body ?? {};
     const out = await subscribeToBoard({ storage, config }, {
       gaii: resolve(req),
-      roles: req.auth!.roles ?? [],
+      roles: await rolesWithOperator(storage, req.auth),
     }, { boardId, callbackUrl: callback_url, filters });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -706,7 +709,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    if (board.ownerGaii !== resolve(req) && !req.auth!.roles.includes('operator')) {
+    if (board.ownerGaii !== resolve(req) && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: board.ownerGaii, area: 'board', action: 'read', subject: board.name }))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner or operator can list subscribers'));
       return;
     }

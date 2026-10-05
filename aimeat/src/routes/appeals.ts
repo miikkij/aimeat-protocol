@@ -11,6 +11,7 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-09-08 — Two identities read in the wrong alphabet: the organism-admin arms compared
  *     admins[] (bare owner names) to a GHII and never matched, and a memory flag's `gaii::key`
  *     target was looked up whole as a key, so the record's owner could not appeal. Both found by
@@ -27,6 +28,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -130,8 +132,12 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             }
         }
 
-        // Operators can also appeal on behalf of content owners
-        if (!isOwner && !req.auth!.roles.includes('operator')) {
+        // Operators can also appeal on behalf of content owners. An appeal for content whose owner is
+        // known writes the operator trail in that owner's account; with no owner found, there is no
+        // account to write it in.
+        if (!isOwner && !(contentOwner
+            ? await operatorOverride(storage, config, req.auth, { ownerOf: contentOwner, area: 'appeal', action: 'create', subject: flagId })
+            : await isOperatorCaller(storage, req.auth))) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
                 'Only the content owner can appeal a flag'));
             return;
@@ -169,7 +175,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
         const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
         const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string, 10) || 20));
 
-        const isOperator = req.auth!.roles.includes('operator');
+        const isOperator = await isOperatorCaller(storage, req.auth);
 
         // Resolve caller's GHII for organism admin check
         let callerGhii: string | null = null;
@@ -253,7 +259,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         // Phase 2.4 — Allow organism admins to review appeals for their organism's content
-        const isOperator = req.auth!.roles.includes('operator');
+        const isOperator = await isOperatorCaller(storage, req.auth);
         let isOrganismAdmin = false;
         if (!isOperator) {
             const flag = await storage.getFlag(appeal.flagId);

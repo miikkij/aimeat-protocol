@@ -5,6 +5,8 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   v1.6.0 — 2026-10-05 — The HTTP admin routes admit the agent holding operator:admin and refuse the
+ *     one without it, as the tools do (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-10-02 — aimeat_agent_runtime_report: an agent's own report (with `llm`) without
  *     agent:write, a sibling's refused without it.
  *   v1.4.0 — 2026-10-02 — aimeat_agent_tags_set: an agent's own tags without agent:write, a
@@ -270,7 +272,7 @@ await test('Broad agent (*) sees the full tool surface', async () => {
 // remembers this file. A hand-written list is how the rule got lost the first time.
 await test("Broad agent (*) does NOT see the tools riding a word no wildcard carries", async () => {
     const reserved = Object.entries(TOOL_SCOPES)
-        .filter(([, scope]) => SCOPES_OUTSIDE_WILDCARD.includes(scope))
+        .filter(([, scope]) => typeof scope === 'string' && SCOPES_OUTSIDE_WILDCARD.includes(scope))
         .map(([tool]) => tool);
     assert(reserved.length > 0, 'the vocabulary names at least one such tool, or this test proves nothing');
 
@@ -290,8 +292,8 @@ await test("Broad agent (*) does NOT see the tools riding a word no wildcard car
 // The other half of the same rule: the word is not withheld from an agent that WAS given it. Without
 // this, deleting every one of those tools from the surface would also pass the test above.
 await test('An agent granted the exact word DOES see the tool it names', async () => {
-    const [probeTool, probeScope] = Object.entries(TOOL_SCOPES)
-        .find(([, scope]) => SCOPES_OUTSIDE_WILDCARD.includes(scope)) ?? [];
+    const [probeTool, probeScope] = (Object.entries(TOOL_SCOPES)
+        .find(([, scope]) => typeof scope === 'string' && SCOPES_OUTSIDE_WILDCARD.includes(scope)) ?? []) as [string?, string?];
     assert(!!probeTool && !!probeScope, 'no reserved tool to probe with');
 
     const ticked = await json('/v1/agents', {
@@ -388,17 +390,25 @@ await test("An agent the operator ticked operator:admin for is offered them, and
         `the overview came back without its reading: ${JSON.stringify(overview).slice(0, 200)}`);
 });
 
-await test('The HTTP admin doors answer as they did: the operator in person passes, an agent token does not', async () => {
+// Secaudit 2026-10, C2 (Jouni, 2026-10-05: "everything had to go through same logics when using mcp or
+// rest"): the HTTP admin routes ask askOperator as the tools do, so the agent holding operator:admin
+// passes them and the one without the word does not.
+await test('The HTTP admin routes answer as the tools do: the operator in person and the agent with operator:admin pass, the agent without it does not', async () => {
     const inPerson = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${opToken}` } });
     assert(inPerson.status === 200, `the operator in person: ${inPerson.status}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ gaii: opAdmin.gaii, timestamp: ts, signature: await signMsg(opAdmin.key, opAdmin.gaii + ts) }),
-    });
-    assert(tk.body.ok === true, `agent token: ${JSON.stringify(tk.body.error)}`);
-    const asAgent = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${tk.body.data.token}` } });
-    assert(asAgent.status === 403, `an agent token on the HTTP admin door: expected 403, got ${asAgent.status}`);
+    const tokenOf = async (a: { gaii: string; key: string }) => {
+        const ts = new Date().toISOString();
+        const tk = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ gaii: a.gaii, timestamp: ts, signature: await signMsg(a.key, a.gaii + ts) }),
+        });
+        assert(tk.body.ok === true, `agent token: ${JSON.stringify(tk.body.error)}`);
+        return tk.body.data.token as string;
+    };
+    const withWord = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${await tokenOf(opAdmin)}` } });
+    assert(withWord.status === 200, `the agent holding operator:admin on the HTTP admin route: expected 200, got ${withWord.status}`);
+    const withoutWord = await json('/v1/admin/security/overview', { headers: { Authorization: `Bearer ${await tokenOf(opReader)}` } });
+    assert(withoutWord.status === 403, `the agent without operator:admin on the HTTP admin route: expected 403, got ${withoutWord.status}`);
 });
 
 // ─── The operator's reach inside ordinary tools (security audit A8-1, second half) ───

@@ -19,6 +19,7 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.4.0 -- 2026-10-05 -- Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: the skill accessor carries the caller's ContentReader, so
  *     the registry filters user and workspace skills through it; GET /v1/agents/:name/skills passes
  *     one too.
@@ -43,6 +44,7 @@ import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SkillValidationError } from '../services/skill-md.js';
 import { readerFor } from '../services/classification/reader.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 import {
   publishSkill, deleteSkill, listSkills, listSkillLibrary, resolveSkillRef,
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills,
@@ -54,12 +56,13 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /** Caller identity for the read gate — anonymous sessions carry no owner. sub/gaii feed
    *  the workspace membership gate (canReadWorkspace). */
-  function accessorOf(req: Express.Request): SkillAccessor {
+  async function accessorOf(req: Express.Request): Promise<SkillAccessor> {
     const auth = req.auth as (typeof req.auth & { anonymous?: boolean }) | undefined;
     if (!auth || auth.anonymous === true) return { ownerName: null, reader: readerFor({ storage, config }, null) };
     return {
       ownerName: (auth.owner as string) ?? null,
-      isOperator: (auth.roles as string[]).includes('operator'),
+      // The operator in person, or the operator's agent holding operator:admin (the MCP answer).
+      isOperator: await isOperatorCaller(storage, auth),
       sub: auth.sub as string,
       gaii: resolveIdentity(req.auth!, config.nodeId),
       reader: readerFor({ storage, config }, req.auth),
@@ -88,7 +91,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── GET /v1/skills — list the library (default) or one scope. Manifests only, no bodies. ── */
   router.get('/v1/skills', requireAuth(), async (req, res) => {
     try {
-      const accessor = accessorOf(req);
+      const accessor = await accessorOf(req);
       // 2d: ?binding=app:{owner}/{filename} — skills bound to one app, across scopes.
       if (typeof req.query.binding === 'string') {
         const skills = await listSkillsByBinding(storage, config, req.query.binding, accessor);
@@ -124,7 +127,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── POST /v1/skills — publish or update. Body: { skill_md, files?, scope?, visibility? } ── */
   router.post('/v1/skills', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
-      const accessor = accessorOf(req);
+      const accessor = await accessorOf(req);
       if (!accessor.ownerName) {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
         return;
@@ -178,7 +181,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/skills/:name', requireAuth(), async (req, res) => {
     try {
       const name = req.params.name as string;
-      const accessor = accessorOf(req);
+      const accessor = await accessorOf(req);
       const manifestOnly = req.query.manifest_only === 'true';
       const scopeQ = req.query.scope as string | undefined;
       const ownerQ = (req.query.owner as string | undefined) ?? accessor.ownerName ?? undefined;
@@ -223,7 +226,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/skills/:name/zip', requireAuth(), async (req, res) => {
     try {
       const nameParam = req.params.name as string;
-      const accessor = accessorOf(req);
+      const accessor = await accessorOf(req);
       const scopeQ = req.query.scope as string | undefined;
       const ownerQ = (req.query.owner as string | undefined) ?? accessor.ownerName ?? undefined;
 
@@ -283,7 +286,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   router.patch('/v1/skills/:name', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
-      const accessor = accessorOf(req);
+      const accessor = await accessorOf(req);
       if (!accessor.ownerName) {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
         return;
@@ -321,7 +324,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   router.delete('/v1/skills/:name', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
-      const accessor = accessorOf(req);
+      const accessor = await accessorOf(req);
       if (!accessor.ownerName) {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
         return;
@@ -427,7 +430,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       const owner = localAccountName(ownerParam);
       const filename = req.params.filename as string;
       const binding = `app:${owner}/${filename}`;
-      const skills = await listSkillsByBinding(storage, config, binding, accessorOf(req));
+      const skills = await listSkillsByBinding(storage, config, binding, await accessorOf(req));
       res.json(success(config.nodeId, { binding, skills }));
     } catch (err) {
       sendSkillError(res, err);

@@ -21,6 +21,8 @@
  *   import { templatesRouter } from '../routes/templates.js';
  *   app.use(templatesRouter(config, storage));
  * @version-history
+ *   v1.8.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
+ *   v1.7.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-10-02 — POST /v1/templates asks packages:write, lists only the caller's own package
  *     (an operator any), and a listing by anyone but an operator starts at pending_review. The suspend
  *     route also reads `reason`, the field the admin page sends.
@@ -47,10 +49,11 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, TemplateListingRecord, TemplateReview, TemplateDiscussion } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 
 const VALID_SORTS = ['rating', 'installs', 'newest'] as const;
 
@@ -68,11 +71,12 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   // and appear at once (package sale design, T8).
   router.post('/v1/templates', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
-    const roles = req.auth!.roles;
+    // The operator in person, or the operator's agent holding operator:admin (the MCP answer).
+    const isOperator = await isOperatorCaller(storage, req.auth);
 
     // Role check: operator always allowed, owner only if configured
     const createRole = config.packageCreateRole ?? 'owner';
-    if (!roles.includes('operator') && createRole === 'operator') {
+    if (!isOperator && createRole === 'operator') {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create template listings'));
       return;
     }
@@ -99,8 +103,8 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package group not found or has no published version'));
         return;
       }
-      const isOperator = roles.includes('operator');
-      if (pkg.author !== owner && !isOperator) {
+      if (pkg.author !== owner && !(await operatorOverride(storage, config, req.auth,
+        { ownerOf: pkg.author, area: 'template', action: 'list', subject: pkg.name }))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the package\'s author lists it in the gallery.'));
         return;
       }
@@ -171,7 +175,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `status must be one of ${VALID_STATUSES.join(', ')}`));
         return;
       }
-      if (statusParam !== undefined && statusParam !== 'listed' && !req.auth?.roles?.includes('operator')) {
+      if (statusParam !== undefined && statusParam !== 'listed' && !(await isOperatorCaller(storage, req.auth))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only an operator can list templates that are not listed'));
         return;
       }
@@ -194,7 +198,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── GET /v1/templates/pending — List pending templates (operator) ──
-  router.get('/v1/templates/pending', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/templates/pending', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 20, 1), 100);
       const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
@@ -207,7 +211,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── GET /v1/templates/:id/review — Review details for moderation (operator) ──
-  router.get('/v1/templates/:id/review', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/templates/:id/review', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
 
     try {
@@ -243,7 +247,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── POST /v1/templates/:id/approve — Approve listing (operator) ──
-  router.post('/v1/templates/:id/approve', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/templates/:id/approve', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
 
     try {
@@ -277,7 +281,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── POST /v1/templates/:id/reject — Reject listing (operator) ──
-  router.post('/v1/templates/:id/reject', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/templates/:id/reject', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const { reason } = req.body ?? {};
 
@@ -316,7 +320,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── POST /v1/templates/:id/suspend — Suspend listed template (operator) ──
-  router.post('/v1/templates/:id/suspend', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/templates/:id/suspend', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
 
     try {
@@ -357,7 +361,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   // Suspending was one-way: nothing set a listing back to `listed`, and `approve` takes only
   // pending_review, so an operator who suspended something by mistake had no way back and the
   // listing's owner had to publish a new one, losing its reviews and its install count with it.
-  router.post('/v1/templates/:id/relist', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/templates/:id/relist', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
 
     try {
@@ -420,7 +424,6 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   router.patch('/v1/templates/:id', requireAuth(), requireScope('app:write'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const roles = req.auth!.roles;
 
     try {
       const listing = await storage.getTemplateListing(id);
@@ -430,7 +433,8 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
       }
 
       // Must be the publisher or an operator
-      if (listing.publishedBy !== owner && !roles.includes('operator')) {
+      if (listing.publishedBy !== owner && !(await operatorOverride(storage, config, req.auth,
+        { ownerOf: listing.publishedBy, area: 'template', action: 'update', subject: listing.title }))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the publisher or an operator can update this listing'));
         return;
       }
@@ -456,7 +460,6 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   router.delete('/v1/templates/:id', requireAuth(), requireScope('app:manage'), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const roles = req.auth!.roles;
 
     try {
       const listing = await storage.getTemplateListing(id);
@@ -466,7 +469,8 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
       }
 
       // Must be the publisher or an operator
-      if (listing.publishedBy !== owner && !roles.includes('operator')) {
+      if (listing.publishedBy !== owner && !(await operatorOverride(storage, config, req.auth,
+        { ownerOf: listing.publishedBy, area: 'template', action: 'delete', subject: listing.title }))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the publisher or an operator can delete this listing'));
         return;
       }
@@ -632,7 +636,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── PATCH /v1/templates/:id/featured — Toggle featured (operator) ──
-  router.patch('/v1/templates/:id/featured', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.patch('/v1/templates/:id/featured', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const { featured } = req.body ?? {};
 

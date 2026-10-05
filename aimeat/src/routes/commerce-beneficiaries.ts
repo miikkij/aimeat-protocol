@@ -21,13 +21,14 @@
  *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals
  * @usage app.use(commerceBeneficiariesRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-30 — Initial: declare / read / release / approve for the second rake.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
@@ -42,6 +43,7 @@ import {
 } from '../commerce/beneficiary-release.js';
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 /** What a split looks like on the wire. Snake-case, like every other commerce surface. */
 function splitView(s: BeneficiarySplit): Record<string, unknown> {
@@ -338,7 +340,7 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
    * point of the gate is that paying a party nobody has checked is how a self-declared claimant
    * collects on someone else's identity.
    */
-  router.post('/v1/commerce/beneficiary/approvals', requireAuth(), requireRole('operator'), async (req: Request, res: Response) => {
+  router.post('/v1/commerce/beneficiary/approvals', requireAuth(), requireOperator(storage), async (req: Request, res: Response) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const ghii = typeof body.ghii === 'string' ? body.ghii.trim() : '';
     const state = body.state;
@@ -366,8 +368,11 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
   router.get('/v1/commerce/beneficiary/approvals', requireAuth(), async (req: Request, res: Response) => {
     const self = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const asked = typeof req.query.ghii === 'string' ? req.query.ghii : '';
-    // Anyone may read their own; reading someone else's verification state is an operator question.
-    if (asked && asked !== self && !req.auth!.roles.includes('operator')) {
+    // Anyone may read their own; reading someone else's verification state is an operator question,
+    // asked through operatorOverride (the operator, or the operator's agent holding operator:admin,
+    // as on MCP), which writes the operator trail.
+    if (asked && asked !== self && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: asked, area: 'beneficiary', action: 'read', subject: 'approval' }))) {
       return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You may read your own approval state only'));
     }
     const ghii = asked || self;

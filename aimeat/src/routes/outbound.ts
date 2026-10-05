@@ -13,6 +13,8 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-05 — The per-minute send limit moves from this route into sendOutbound, counted per
+ *     account, so the MCP tool shares it (secaudit 2026-10, C5).
  *   2026-09-28 — The send names its principal, so an organism's company refuses an agent the organism does not admit.
  *   v1.4.0 — 2026-09-25 — Whether an address has an account here reaches the owner in person only:
  *     a contact's `ghii` on the save, the list, the opt-out and the bounce answers, and the `channel`
@@ -177,8 +179,8 @@ function sendErr(res: Response, config: AimeatConfig, e: unknown, sees = true): 
 export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
-  // The send is an amplification surface: per-principal limiter on top of the daily limit.
-  const sendLimit = rateLimit({ windowMs: 60_000, max: 30 });
+  // The send's per-minute allowance is counted per account in sendOutbound (services/account-limits.ts),
+  // so this route and the MCP tool share it (secaudit 2026-10, C5).
 
   // ── Contacts ──────────────────────────────────────────────────────────────
 
@@ -285,7 +287,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
     return scopeIsCovered(auth.scopes, 'connections:use');
   }
 
-  router.post('/v1/outbound/send', requireAuth(), requireScope('outbound:send'), sendLimit, async (req, res) => {
+  router.post('/v1/outbound/send', requireAuth(), requireScope('outbound:send'), async (req, res) => {
     try {
       const parsed = SendSchema.safeParse(req.body);
       if (!parsed.success) {

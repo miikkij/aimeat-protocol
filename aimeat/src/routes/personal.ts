@@ -13,6 +13,7 @@
  *   - notifications: GET/PATCH preferences with channel/cooldown/quiet-hours/type validation
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -25,11 +26,12 @@ import type { TunnelManager } from '../services/personal-tunnel.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { isAllowedPushEndpoint } from '../services/mailbox-notification.js';
 import { MailboxService } from '../services/mailbox.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 export function personalRouter(
   config: AimeatConfig,
@@ -39,6 +41,14 @@ export function personalRouter(
 ): Router {
   const router = Router();
   const mailboxService = new MailboxService(config, storage);
+
+  /**
+   * The operator's pass to another person's personal node, asked only after the ownership test
+   * failed: the operator in person or the operator's agent holding operator:admin, and a pass
+   * writes the operator trail.
+   */
+  const operatorActsOn = (req: Request, ownerOf: string, action: string, subject: string): Promise<boolean> =>
+    operatorOverride(storage, config, req.auth, { ownerOf, area: 'personal-node', action, subject });
 
   // POST /v1/personal/anchor — Register a personal node with this operator
   router.post('/v1/personal/anchor', requireAuth(), requireRole('owner'), requireScope('tunnel:connect'), validateBody(AnchorRequestSchema, config.nodeId), async (req, res) => {
@@ -164,7 +174,7 @@ export function personalRouter(
   });
 
   // GET /v1/personal/nodes — List all anchored personal nodes (operator only)
-  router.get('/v1/personal/nodes', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/personal/nodes', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const statusFilter = req.query.status as string | undefined;
       const nodes = await storage.listPersonalNodes(statusFilter ? { status: statusFilter } : undefined);
@@ -210,7 +220,7 @@ export function personalRouter(
         return;
       }
 
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'update', nodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only update your own personal nodes'));
         return;
       }
@@ -244,7 +254,7 @@ export function personalRouter(
       }
 
       // Verify ownership (unless operator)
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'delete', nodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only deregister your own personal nodes'));
         return;
       }
@@ -293,7 +303,7 @@ export function personalRouter(
         return;
       }
 
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'read-mailbox', nodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only view mailbox for your own personal nodes'));
         return;
       }
@@ -346,7 +356,7 @@ export function personalRouter(
 
       // Verify ownership (or operator)
       const ownerName = req.auth!.owner;
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'push-subscribe', personalNodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only manage push subscriptions for your own personal nodes'));
         return;
       }
@@ -415,7 +425,8 @@ export function personalRouter(
       }
 
       // Verify ownership (or operator)
-      if (subscription.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (subscription.ownerName !== ownerName
+        && !(await operatorActsOn(req, subscription.ownerName, 'push-unsubscribe', subscription.personalNodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only delete your own push subscriptions'));
         return;
       }
@@ -446,7 +457,7 @@ export function personalRouter(
         return;
       }
 
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'read-push-subscriptions', nodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only view push subscriptions for your own personal nodes'));
         return;
       }
@@ -484,7 +495,7 @@ export function personalRouter(
         return;
       }
 
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'push-test', nodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only test push notifications for your own personal nodes'));
         return;
       }
@@ -538,7 +549,7 @@ export function personalRouter(
         return;
       }
 
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'read-notifications', nodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only view notification preferences for your own personal nodes'));
         return;
       }
@@ -590,7 +601,7 @@ export function personalRouter(
         return;
       }
 
-      if (node.ownerName !== ownerName && !req.auth!.roles.includes('operator')) {
+      if (node.ownerName !== ownerName && !(await operatorActsOn(req, node.ownerName, 'update-notifications', nodeId))) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only update notification preferences for your own personal nodes'));
         return;
       }

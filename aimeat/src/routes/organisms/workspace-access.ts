@@ -6,6 +6,8 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-10-05 — Cancelling a provisioned-code key erases the account it made with
+ *     eraseOwner, the one account deletion (secaudit 2026-10, C7).
  *   v1.14.1 — 2026-10-02 — PATCH and cancel on /:id/invitations/email/:invId answer 404 for a
  *     provisioned-code key, which has its own cancel that also deletes the account it provisioned.
  *   v1.14.0 — 2026-10-02 — POST /:id/workspace-access/decision moves from requireRole('agent') to
@@ -85,6 +87,7 @@ import { decideAccessRequest, requestStatus } from '../../services/workspace-acc
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
+import { eraseOwner } from '../../services/owner-erasure.js';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -414,9 +417,10 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
    * side stays here — it is session-bound and reuses this router's workspace-role helpers. */
 
   /* POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin only).
-   * Throttle a single inviter to bound outbound email; the per-organism pending cap in
-   * createEmailInvitation() is the harder backstop against accumulating spam invites. */
-  router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireScope('organism:invite'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+   * createEmailInvitation() counts the inviter's account allowance, which the MCP tool shares
+   * (services/account-limits.ts; C5), and holds the per-organism pending cap against accumulating
+   * spam invites. */
+  router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const organism = await requireOrgAdmin(req, res, id);
@@ -700,7 +704,10 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         admins: gate.organism.admins.filter(x => x !== inv.provisionedOwner),
         updatedAt: new Date().toISOString(),
       });
-      await storage.deleteOwner(inv.provisionedOwner);
+      // The one way an account is deleted (services/owner-erasure.ts): its memory, consents, sessions,
+      // grants and audit rows go with it, which the storage cascade alone does not reach (secaudit
+      // 2026-10, C7).
+      await eraseOwner(storage, config.nodeId, inv.provisionedOwner);
       emitChange('ghii');
     }
     await storage.updateInvitation(invId, { status: 'cancelled' });

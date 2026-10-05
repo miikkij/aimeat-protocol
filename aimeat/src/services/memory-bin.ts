@@ -20,6 +20,7 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). The service still reads 'operator' from `roles`; the REST caller computes that list with rolesWithOperator.
  *   v1.2.0 — 2026-09-29 — Delete and restore refuse a service-owned key (utils/reserved-keys.ts
  *     SERVICE_OWNED_KEY_PREFIXES, the classification policy) for every caller, the owner and an
  *     operator included: 403 RESERVED_KEY (TARGET-082 review finding 2).
@@ -69,9 +70,12 @@ export interface MemoryBinRequest {
   /** An operator naming somebody else's namespace outright. Callers gate the role themselves. */
   ownerOverride?: string | null;
   /**
-   * The caller's roles as the token carries them. The organism namespace check below reads them,
-   * and an operator who named `ownerOverride` skips that check the way the admin door always has.
-   * Absent means "no roles", which is the safe reading: an unnamed caller is not an operator.
+   * The caller's roles. The organism namespace check below reads them, and an operator who named
+   * `ownerOverride` skips that check the way the admin route always has. A caller that passes
+   * `ownerOverride` computes this list with rolesWithOperator (services/operator-override.ts), so
+   * 'operator' in it is isOperatorCaller's answer: the operator, or the operator's agent holding
+   * operator:admin, as on MCP. Absent means "no roles", which is the safe reading: an unnamed caller
+   * is not an operator.
    */
   roles?: string[];
 }

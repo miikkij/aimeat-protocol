@@ -10,6 +10,7 @@
  * @structure emailHashOf; ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.6.1 — 2026-10-05 — Whether an operator exists is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-10-01 — An account created with an already-proven address takes up the open app
  *     roster invitations of that address (services/app-member-invites.ts), beside the contact promotion.
  *   v1.5.0 — 2026-09-14 — creditWelcomeBonus() is exported, and the two registration routes that
@@ -36,6 +37,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { promoteContactsForVerifiedEmail } from './contacts.js';
 import { applyAppInvitesForVerifiedEmail } from './app-member-invites.js';
 
@@ -184,7 +186,7 @@ export async function provisionOwner(
   // node, so the first Entra-provisioned user on a fresh node must not be crowned its operator.
   const allOwners = await storage.listOwners();
   const realOwners = allOwners.filter(o => o.name !== 'anonymous');
-  const hasOperator = allOwners.some(o => o.roles.includes('operator'));
+  const hasOperator = allOwners.some(isOperatorAccount);
   const roles: string[] = ['owner'];
   if (opts.via !== 'provisioning' && (realOwners.length === 0 || !hasOperator)) roles.push('operator');
 

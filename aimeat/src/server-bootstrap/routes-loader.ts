@@ -66,7 +66,7 @@ import type { RealtimeManager } from '../services/realtime-manager.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
@@ -613,7 +613,7 @@ export async function mountRoutes(
 
   // Site LB sync — manual trigger endpoint + background job
   if (config.siteLbEnabled && config.siteLbOriginUrl) {
-    app.post('/v1/admin/site/sync', requireAuth(), requireRole('operator'), async (_req, res) => {
+    app.post('/v1/admin/site/sync', requireAuth(), requireOperator(storage), async (_req, res) => {
       try {
         const result = await triggerSiteSync(config, storage, siteService);
         res.json(success(config.nodeId, { synced: true, template_updated: result.templateUpdated, memory_keys_synced: result.memoryKeysSynced }));
@@ -786,7 +786,7 @@ export async function mountRoutes(
 
   // Connector forward tunnel — operator-only stats route (WS upgrade is in index.ts)
   if (config.connectTunnelEnabled) {
-    app.use(connectTunnelRouter(config));
+    app.use(connectTunnelRouter(config, storage));
   }
 
   // Personal node management routes

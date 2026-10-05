@@ -11,6 +11,7 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.7.0 — 2026-09-27 — GET /v1/cortex/:name and its /export call services/cortex-read.ts, which
  *     aimeat_cortex_list calls too for `name` and `include_source`. The answers are unchanged.
  *   v1.6.3 — 2026-09-26 — The caller is built with this node's id, so it carries the resolved
@@ -54,6 +55,7 @@ import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.j
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { cortexCallerOf } from './cortex/caller.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes,
 } from '../services/cortex-lifecycle.js';
@@ -94,7 +96,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   /** Who is asking. In ./cortex/caller.ts, which says why a federated session is not the namesake. */
-  const callerOf = (req: Parameters<typeof cortexCallerOf>[0]) => cortexCallerOf(req, config.nodeId);
+  const callerOf = (req: Parameters<typeof cortexCallerOf>[0]) => cortexCallerOf(req, config.nodeId, storage);
 
   // ── GET /v1/cortex — list installed cortex extensions ──
   router.get('/v1/cortex', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
@@ -105,7 +107,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     // return every owner's private cortexes, because nothing between the query string and storage
     // asked whose they were. The filter still narrows; canSeeCortex decides what it may narrow
     // over — public, the node's own bundled ones, the caller's own, and everything for an operator.
-    const extensions = visibleCortexes(callerOf(req), await storage.listCortexExtensions({
+    const extensions = visibleCortexes(await callerOf(req), await storage.listCortexExtensions({
       status: status || undefined,
       namespace: namespace || undefined,
       visibility: visibility || undefined,
@@ -141,7 +143,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // Owner role bypasses scope checks; agents need 'cortex:write' (or 'cortex:*' / '*').
   router.post('/v1/cortex', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const { manifest, libs } = req.body ?? {};
-    const out = await installCortex({ storage, config }, callerOf(req), { manifest, libs });
+    const out = await installCortex({ storage, config }, await callerOf(req), { manifest, libs });
     if (!out.ok) {
       res.status(out.refusal.status).json(
         error(config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
@@ -172,7 +174,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   router.put('/v1/cortex/:name', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const { manifest, libs } = req.body ?? {};
-    const out = await upsertCortex({ storage, config }, callerOf(req), { name, manifest, libs });
+    const out = await upsertCortex({ storage, config }, await callerOf(req), { name, manifest, libs });
     if (!out.ok) {
       res.status(out.refusal.status).json(
         error(config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
@@ -235,7 +237,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     // One 404 for "no such cortex" and "not yours to see" (services/cortex-read.ts), which
     // aimeat_cortex_list answers with too.
-    const out = await cortexDetail(storage, config, callerOf(req), name);
+    const out = await cortexDetail(storage, config, await callerOf(req), name);
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
@@ -252,7 +254,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── DELETE /v1/cortex/:name — uninstall extension ──
   router.delete('/v1/cortex/:name', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const out = await deleteCortex({ storage, config }, callerOf(req), name);
+    const out = await deleteCortex({ storage, config }, await callerOf(req), name);
     if (!out.ok) {
       res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
       return;
@@ -269,7 +271,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── POST /v1/cortex/:name/activate — activate extension ──
   router.post('/v1/cortex/:name/activate', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const out = await activateCortex({ storage, config }, callerOf(req), name);
+    const out = await activateCortex({ storage, config }, await callerOf(req), name);
     if (!out.ok) {
       res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
       return;
@@ -302,7 +304,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── POST /v1/cortex/:name/deactivate — deactivate extension ──
   router.post('/v1/cortex/:name/deactivate', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const out = await deactivateCortex({ storage, config }, callerOf(req), name);
+    const out = await deactivateCortex({ storage, config }, await callerOf(req), name);
     if (!out.ok) {
       res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
       return;
@@ -339,7 +341,8 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     // the caller's owner name (so cross-owner cortexes are protected) — both
     // the owner and any of their agents with cortex:write satisfy this
     // because `req.auth!.owner` is the owner's bare name for both.
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+    if (ext.installedBy !== req.auth!.owner && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: ext.installedBy, area: 'cortex', action: 'visibility', subject: name }))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
       return;
     }
@@ -358,7 +361,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
-    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
+    if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
@@ -382,7 +385,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const promptName = decodeURIComponent(req.params.promptName as string);
     const ext = await storage.getCortexExtension(name);
 
-    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
+    if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
@@ -412,7 +415,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
-    if (!ext || !canSeeCortex(callerOf(req), ext, config.nodeId)) {
+    if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
@@ -440,7 +443,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     const name = decodeURIComponent(req.params.name as string);
     // Only the installing owner (or an operator) reads the source, so a non-owner cannot load
     // someone else's extension into the editor to overwrite it (services/cortex-read.ts).
-    const out = await cortexSource(storage, { ownerName: req.auth!.owner as string, isOperator: req.auth!.roles.includes('operator') }, name);
+    const out = await cortexSource(storage, { ownerName: req.auth!.owner as string, isOperator: await isOperatorCaller(storage, req.auth) }, name);
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;

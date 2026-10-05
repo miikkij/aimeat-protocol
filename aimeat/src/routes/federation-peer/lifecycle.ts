@@ -5,6 +5,7 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-10-01 — key-exchange takes a key it cannot check against an established one only from
  *     the card at the address the operator approved: for an approval this node's own join wrote (it
  *     carries no key) and for a peer with no key. Until then the first unauthenticated caller set the
@@ -26,7 +27,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { LIVENESS_RECOVERABLE, OPERATOR_PARKED, type PeerInfo } from '../../services/federation.js';
@@ -52,7 +53,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
     // DELETE /v1/federation/peers/:nodeId — de-peer (operator only)
     // Normal: grace period (configurable, default 72h) — in-flight work completes, new requests blocked
     // Emergency (?emergency=true): immediate disconnect, cancel in-flight work, return escrow
-    router.delete('/v1/federation/peers/:nodeId', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.delete('/v1/federation/peers/:nodeId', requireAuth(), requireOperator(storage), async (req, res) => {
         const out = await removePeer({ config, storage, peers }, req.params.nodeId as string, {
             emergency: req.query.emergency === 'true',
             notifyNetwork: req.body?.notify_network === true,

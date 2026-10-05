@@ -22,6 +22,7 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.7.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.7.0 — 2026-09-29 — GET /:app/data shows the app's records through presentMemories, the
  *     classification check and the credential mask in one call (TARGET-082 V4).
  *   v1.3.0 — 2026-08-15 — Delete ends the app's credentials, and approve writes the row that makes
@@ -63,6 +64,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAppName, validateOwnerName, buildGEAI, generateUserCode } from '../utils/gaii.js';
+import { exceedsCeiling } from '../utils/scope-coverage.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
 import { validateEcoManifest } from '../models/ecosystem-manifest.js';
 import { emitChange } from '../services/event-bus.js';
@@ -78,12 +80,7 @@ const ECO_AUTH_EXPIRY_MS = 1_800_000;
 
 /** Validate a list of requested scopes against the node's ceiling (mirror of agents.ts:318-330). */
 function scopesWithinCeiling(requested: string[], ceiling: string[]): string[] {
-  if (ceiling.includes('*')) return [];
-  return requested.filter((s) => {
-    if (s === '*') return true; // only operator may hold the global wildcard
-    const [domain] = s.split(':');
-    return !ceiling.includes(s) && !ceiling.includes(`${domain}:*`);
-  });
+  return exceedsCeiling(ceiling, requested);
 }
 
 export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {

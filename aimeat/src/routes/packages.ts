@@ -21,6 +21,7 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-10-02 — POST /v1/packages/:groupId/versions/:version/withdraw (package sale design, phase 5: T6).
  *   2026-10-02 — POST /v1/packages/compose under a name the caller already has publishes the next
  *     version (`new_version` true) instead of 409; POST /v1/packages/compose-set (package sale design, phase 4).
@@ -81,6 +82,7 @@ import { checkUpstream } from '../services/package-pull.js';
 import { resolveNodeRead } from '../services/package-entitlements.js';
 import { registerPackageEntitlementRoutes } from './package-entitlements.js';
 import { registerPackageSaleRoutes } from './package-sales.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy
 // per road. They are in services/package-create.ts now, which is the one place a package version is
@@ -117,10 +119,9 @@ export function packagesRouter(
   // source at publish time), so the caller names apps and nothing else.
   router.post('/v1/packages/compose', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
-    const roles = req.auth!.roles;
 
     const createRole = config.packageCreateRole ?? 'owner';
-    if (!roles.includes('operator') && createRole === 'operator') {
+    if (createRole === 'operator' && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));
       return;
     }
@@ -153,7 +154,7 @@ export function packagesRouter(
   // lists them (services/package-compose-set.ts). With dry_run nothing is written.
   router.post('/v1/packages/compose-set', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
-    if (!req.auth!.roles.includes('operator') && (config.packageCreateRole ?? 'owner') === 'operator') {
+    if ((config.packageCreateRole ?? 'owner') === 'operator' && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));
       return;
     }
@@ -186,11 +187,10 @@ export function packagesRouter(
   // caller. Same word as its siblings.
   router.post('/v1/packages/import', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
-    const roles = req.auth!.roles;
 
     // The second, narrower question: an operator-only node restricts import further.
     const createRole = config.packageCreateRole ?? 'owner';
-    if (!roles.includes('operator') && createRole === 'operator') {
+    if (createRole === 'operator' && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can import packages'));
       return;
     }
@@ -321,12 +321,11 @@ export function packagesRouter(
   // clock in scripts/inventory/triage-clock.ts now exists to catch.
   router.post('/v1/packages', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
-    const roles = req.auth!.roles;
 
     // The second, narrower question: an operator-only node restricts creation further. Left as
     // written — it is a deployment choice, and it is no longer the only thing on this door.
     const createRole = config.packageCreateRole ?? 'owner';
-    if (!roles.includes('operator') && createRole === 'operator') {
+    if (createRole === 'operator' && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can create packages'));
       return;
     }
@@ -424,7 +423,7 @@ export function packagesRouter(
   router.post('/v1/packages/:groupId/versions', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
-    if (!req.auth!.roles.includes('operator') && (config.packageCreateRole ?? 'owner') === 'operator') {
+    if ((config.packageCreateRole ?? 'owner') === 'operator' && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only operators can publish package versions'));
       return;
     }
@@ -605,7 +604,7 @@ export function packagesRouter(
   router.post('/v1/packages/:groupId/versions/:version/withdraw', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() },
-      { owner: req.auth!.owner, isOperator: req.auth!.roles.includes('operator') },
+      { owner: req.auth!.owner, isOperator: await isOperatorCaller(storage, req.auth) },
       { groupId, version: req.params.version as string, reason: (req.body ?? {}).reason });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));

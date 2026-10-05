@@ -12,6 +12,7 @@
  *   - additional room listing/lookup routes over realtimeManager
  *
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-12 — GET /v1/admin/realtime answers 200 with `enabled: false` when realtime is
  *     switched off, instead of refusing with 503 (the admin page could not tell "off" from "quiet"),
  *     and carries the three readings its numbers need: uptime_seconds (the window the in-memory
@@ -21,11 +22,12 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import type { RealtimeManager } from '../services/realtime-manager.js';
 import type { PeerInfo } from '../services/federation.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeManager: RealtimeManager, peers?: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -165,10 +167,12 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
       return;
     }
 
-    // Only room creator or operator can close
+    // Only room creator or operator can close; the operator closing another person's room writes
+    // the operator trail.
     const isCreator = room.createdBy === req.auth!.sub;
-    const isOperator = req.auth!.roles?.includes('operator');
-    if (!isCreator && !isOperator) {
+    if (!isCreator && !(await operatorOverride(storage, config, req.auth, {
+      ownerOf: room.createdBy, area: 'realtime-room', action: 'close', subject: roomId,
+    }))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the room creator or an operator can close this room'));
       return;
     }
@@ -214,7 +218,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   });
 
   // GET /v1/realtime/stats — realtime subsystem metrics (operator only)
-  router.get('/v1/realtime/stats', requireAuth(), requireRole('operator'), (_req, res) => {
+  router.get('/v1/realtime/stats', requireAuth(), requireOperator(storage), (_req, res) => {
     if (!config.realtimeEnabled) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
       return;
@@ -265,7 +269,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   });
 
   // POST /v1/realtime/relay — connect a federation relay between local and remote rooms (operator only)
-  router.post('/v1/realtime/relay', requireAuth(), requireRole('operator'), (req, res) => {
+  router.post('/v1/realtime/relay', requireAuth(), requireOperator(storage), (req, res) => {
     if (!config.realtimeEnabled) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
       return;
@@ -299,7 +303,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   });
 
   // DELETE /v1/realtime/relay — disconnect a federation relay (operator only)
-  router.delete('/v1/realtime/relay', requireAuth(), requireRole('operator'), (req, res) => {
+  router.delete('/v1/realtime/relay', requireAuth(), requireOperator(storage), (req, res) => {
     if (!config.realtimeEnabled) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
       return;
@@ -328,7 +332,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   // it draws when nobody happens to be connected. An operator could not tell a node with the
   // feature turned off from a quiet one, so the switch is reported as a fact instead. Every
   // WRITE route in this file keeps its 503: refusing to act is not the same as refusing to say.
-  router.get('/v1/admin/realtime', requireAuth(), requireRole('operator'), (_req, res) => {
+  router.get('/v1/admin/realtime', requireAuth(), requireOperator(storage), (_req, res) => {
     if (!config.realtimeEnabled) {
       res.json(success(config.nodeId, {
         enabled: false,

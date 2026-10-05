@@ -11,6 +11,7 @@
  *   POST/GET/DELETE /v1/access/tokens (owner) + POST /v1/auth/token/exchange (token is the auth).
  * @usage app.use(accessTokensRouter(config, storage));
  * @version-history
+ * v1.3.1 - 2026-10-05 - The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  * v1.3.0 - 2026-09-29 - The exchanged JWT carries the `via: 'pat'` claim, so classification reads it as
  *   an AI (TARGET-082 V4). Roles and scopes are unchanged.
  * v1.2.0 - 2026-09-05 - The overview carries the sign-in state, the open sessions grouped, the
@@ -33,7 +34,7 @@ import { buildGAII } from '../utils/gaii.js';
 import { hashToken } from '../services/owner-session.js';
 import { resolvePat } from '../services/access-token.js';
 import { createAccessTabService } from '../services/db/access-tab-db-service.js';
-import { ACCOUNT_SECURITY_SCOPE } from '../utils/scope-coverage.js';
+import { ACCOUNT_SECURITY_SCOPE, exceedsCeiling } from '../utils/scope-coverage.js';
 
 export function accessTokensRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -87,16 +88,9 @@ export function accessTokensRouter(config: AimeatConfig, storage: Storage): Rout
         return;
       }
       // Validate against the node maximum — same rule as agent provisioning.
-      if (!config.maxAgentScopes.includes('*')) {
-        const invalid = tokenScopes.filter((s) => {
-          if (s === '*') return true; // global wildcard is operator-only
-          const [domain] = s.split(':');
-          return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
-        });
-        if (invalid.length > 0) {
-          res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
-          return;
-        }
+      if (exceedsCeiling(config.maxAgentScopes, tokenScopes).length > 0) {
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
+        return;
       }
     }
 

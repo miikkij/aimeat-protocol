@@ -9,9 +9,14 @@
  *   - registerOrganismsTools() — registers all organism tools and resources on an McpServer instance
  * @usage
  *   import { registerOrganismsTools } from './organisms.js';
- *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
- *   2026-09-30 — aimeat_workspace_comment_delete: the comment's author or the organism's creator or an
+ *   2026-10-05 — The roster checks (the organism resource, aimeat_organism_get, aimeat_organism_members)
+ *     pass isOperatorCaller's answer for the session (the caller's GAII, roles ['agent'], its scopes) to
+ *     canSeeMembers, and aimeat_organism_members lists the agents for the operator, as the REST members
+ *     route does: the operator's agent holding operator:admin sees a hidden roster on both surfaces
+ *     (secaudit 2026-10, C2). The register function takes the session's scopes.
+ *   2026-09-30 —aimeat_workspace_comment_delete: the comment's author or the organism's creator or an
  *     admin removes a comment, through deleteComment() as the REST route does. There was no MCP tool
  *     for it, so an agent could write a comment it had no way to take back.
  *   2026-09-29 — aimeat_organism_export answers `left_out`, what the classification kept out of the
@@ -69,7 +74,8 @@ import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../services/organism-lifecycle.js';
-import { canSeeMembers } from '../services/organism-privacy.js';
+import { canSeeMembers, type RosterCaller } from '../services/organism-privacy.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
@@ -84,6 +90,8 @@ export function registerOrganismsTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** This session's granted scopes: the roster's operator check asks operator:admin of them. */
+    scopes: readonly string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -92,6 +100,15 @@ export function registerOrganismsTools(
      *  list-by-member, and join/leave checks must compare against the bare name. */
     function getOwnerName(): string {
         return localAccountName(agentGaii);
+    }
+
+    /** The roster caller as routes/organisms/membership.ts builds it from req.auth: the account name,
+     *  and isOperatorCaller's answer for this session (the operator's agent holding operator:admin). */
+    async function rosterCaller(): Promise<RosterCaller> {
+        return {
+            ownerName: getOwnerName(),
+            isOperator: await isOperatorCaller(storage, { sub: agentGaii, roles: ['agent'], scopes }),
+        };
     }
 
     /** Check if an organism is visible to the current agent. */
@@ -125,7 +142,7 @@ export function registerOrganismsTools(
             if (!(await canSeeOrganism(organism))) return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
             const allMembers = await storage.listMembers(id, { status: 'active' });
             // Roster privacy (memberVisibility): below the tier only creator/admin rows + own row.
-            const canSeeRoster = await canSeeMembers(storage, organism, { ownerName: getOwnerName() });
+            const canSeeRoster = await canSeeMembers(storage, organism, await rosterCaller());
             const members = canSeeRoster ? allMembers
                 : allMembers.filter(m => m.role === 'creator' || m.role === 'admin' || m.ghii === getOwnerName());
             return {
@@ -221,7 +238,7 @@ export function registerOrganismsTools(
 
             const allMembers = await storage.listMembers(organism_id, { status: 'active' });
             // Roster privacy (memberVisibility): below the tier only creator/admin rows + own row.
-            const canSeeRoster = await canSeeMembers(storage, organism, { ownerName: getOwnerName() });
+            const canSeeRoster = await canSeeMembers(storage, organism, await rosterCaller());
             const members = canSeeRoster ? allMembers
                 : allMembers.filter(m => m.role === 'creator' || m.role === 'admin' || m.ghii === getOwnerName());
 
@@ -342,15 +359,17 @@ export function registerOrganismsTools(
 
             // Roster privacy (memberVisibility): below the tier the listing shrinks to the
             // accountability rows — creator/admins + the caller's own row (matches REST /members).
-            const canSeeRoster = await canSeeMembers(storage, organism, { ownerName: getOwnerName() });
+            const caller = await rosterCaller();
+            const canSeeRoster = await canSeeMembers(storage, organism, caller);
             const members = canSeeRoster ? allMembers
                 : allMembers.filter(m => m.role === 'creator' || m.role === 'admin' || m.ghii === getOwnerName());
 
             // Same-owner agents inherit a member's access implicitly — list them per member so
             // "who can touch this organism" is enumerable (matches the REST members route). Only
-            // an ACTIVE member's agent sees the agent rosters; public visibility alone does not.
+            // an ACTIVE member's agent sees the agent rosters; public visibility alone does not. The
+            // operator (isOperatorCaller) sees them too, as on the REST members route.
             const callerMembership = await storage.getMembership(organism_id, getOwnerName());
-            const canSeeAgents = callerMembership?.status === 'active';
+            const canSeeAgents = callerMembership?.status === 'active' || !!caller.isOperator;
             const agentsByOwner = new Map<string, { gaii: string; name: string }[]>();
             if (canSeeAgents) {
                 const ownerNames = [...new Set(members.map(m => localAccountName(m.ghii)))];

@@ -38,7 +38,7 @@ import { collectDoors, toRows, type Row } from './doors.js';
 import { scopeMentions } from './scope-mentions.js';
 import { readVocabulary } from './scope-vocabulary.js';
 import { srcProgram } from './program.js';
-import { TOOL_SCOPES } from '../../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, toolScopeWords } from '../../src/mcp/catalog/scopes.js';
 
 // readVocabulary moved to ./scope-vocabulary.ts by pure extraction on 2026-09-04: check:scope-parity
 // needs the identical answer, and a second copy would drift the day one of them learned a new shape.
@@ -111,7 +111,7 @@ function report(rows: Row[], mentions: Map<string, Array<{ file: string; line: n
     say('| scope | REST-ovia | MCP-työkaluja |');
     say('|---|---|---|');
     const restCount = new Map(tally(rest.flatMap(r => r.scopes)));
-    const mcpCount = new Map(tally(Object.values(TOOL_SCOPES)));
+    const mcpCount = new Map(tally(Object.values(TOOL_SCOPES).flatMap(toolScopeWords)));
     for (const word of [...VOCABULARY].sort()) {
         say(`| ${word} | ${restCount.get(word) ?? 0} | ${mcpCount.get(word) ?? 0} |`);
     }

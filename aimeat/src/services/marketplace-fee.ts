@@ -15,10 +15,12 @@
  *   const fee = percentFee(price, commerceFeePercent(config)); // from ../commerce/money.js
  *   await settleMarketplaceFee(storage, config, { fee, payerGhii, trackingCode, source: 'commerce' });
  * @version-history
+ *   v1.0.2 — 2026-10-05 — The operator account is found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.1 — 2026-07-14 — Usage example points at the money.ts chokepoint (percentFee), not an inline formula
  *   v1.0.0 — 2026-07-13 — Initial fee policy service (TARGET-033 phase 2)
  */
 import { randomUUID } from 'node:crypto';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 
@@ -45,7 +47,7 @@ export async function resolveOperatorFeeGhii(storage: Storage, config: AimeatCon
   const cached = operatorCache.get(config.nodeId);
   if (cached !== undefined) return cached;
   const owners = await storage.listOwners();
-  const op = owners.find((o) => o.roles?.includes('operator'));
+  const op = owners.find(isOperatorAccount);
   const ghii = op ? `${op.name}@${config.nodeId}` : null;
   operatorCache.set(config.nodeId, ghii);
   return ghii;

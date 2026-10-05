@@ -23,6 +23,7 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-23 — Extracted from routes/oauth-login.ts (BR-04 phase 2). Two widenings:
  *     provider ids are strings (`saml:<connection>` joins the union), and createOwnerForProvider
  *     carries managedBy. One addition: adoption keys and the email-domain restriction, both
@@ -40,6 +41,7 @@ import { establishOwnerSession } from './owner-session.js';
 import { provisionOwner, registrationRefusal, type RegistrationVia } from './owner-provisioning.js';
 import { emitChange } from './event-bus.js';
 import { validateOwnerName } from '../utils/gaii.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 
 /** Name of the short-lived, signed cookie that carries a not-yet-finalized external signup. */
@@ -259,7 +261,7 @@ export async function establishForGhii(
   const ownerRecord = await storage.getOwner(ownerName);
   const roles: string[] = [];
   if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-  if (ownerRecord?.roles.includes('operator')) roles.push('operator');
+  if (isOperatorAccount(ownerRecord)) roles.push('operator');
   if (roles.length === 0) roles.push('owner');
 
   await storage.updateGHII(ghiiRecord.ghii, {

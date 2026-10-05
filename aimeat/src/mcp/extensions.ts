@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v2.7.0 — 2026-10-05 — The action run passes the extension's capabilities to buildExtensionCtx
  *     (secaudit 2026-10, PKG-3).
  *   v2.6.0 — 2026-10-01 — aimeat_iam_define takes default_role, version, author and ext_name and passes
@@ -81,7 +82,8 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { makeExtensionDataPackage } from '../services/datapackage/ext-capability.js';
-import { canManageExtensionAs } from '../routes/extensions/permissions.js';
+import { canManageExtensionAs, type ExtensionCaller } from '../routes/extensions/permissions.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
 } from '../services/extension-lifecycle.js';
@@ -118,13 +120,15 @@ export function registerExtensionsTools(
      *
      * The role stays 'agent' and nothing else. An MCP session is always an agent record
      * (mcp/index.ts:346), and the current connect path — device authorization — issues a token
-     * carrying exactly ['agent'] (routes/agents/device-auth.ts:152). Reading the owner's roles here
-     * would hand an operator's agent an operator's reach on this door, which is a loosening no
-     * token in the modern flow asks for. Written once so the four call sites cannot drift apart.
+     * carrying exactly ['agent'] (routes/agents/device-auth.ts:152). The owner's roles are not
+     * copied here: the operator's reach is asked of the session (isOperatorCaller, inside
+     * canManageExtensionAs), so only an operator's agent holding operator:admin carries it, the same
+     * answer REST gives. Written once so the call sites cannot drift apart.
      */
-    function resolveCaller(): { owner: string; roles: string[]; scopes: string[] } {
-        const owner = getAgentGaii().includes('@') ? localAccountName(getAgentGaii()) : 'mcp-agent';
-        return { owner, roles: ['agent'], scopes: sessionScopes };
+    function resolveCaller(): ExtensionCaller {
+        const sub = getAgentGaii();
+        const owner = sub.includes('@') ? localAccountName(sub) : 'mcp-agent';
+        return { sub, owner, roles: ['agent'], scopes: sessionScopes };
     }
 
     // ── Resource: extension details ──
@@ -477,8 +481,9 @@ export function registerExtensionsTools(
             // ended up applying on some install paths and not others.
             const caller = resolveCaller();
             const callerOwner = caller.owner;
+            const isOperator = await isOperatorCaller(storage, caller);
             const built = buildExtensionRecordFromManifest(
-                manifestYaml, scripts, config, callerOwner, new Date().toISOString(),
+                manifestYaml, scripts, config, callerOwner, new Date().toISOString(), isOperator,
             );
             if (!built.ok) {
                 return { content: [{ type: 'text' as const, text: `${built.code}: ${built.message}` }], isError: true };
@@ -487,7 +492,7 @@ export function registerExtensionsTools(
             // is warn-only when AIMEAT_MCP_ENFORCE_SCOPES=false, and in that mode this tool installed
             // executable extension code with no permission check at all. routes/extensions/crud.ts
             // checks it in the handler for the same reason.
-            if (!canManageExtensionAs(caller, config, callerOwner)) {
+            if (!(await canManageExtensionAs(storage, config, caller, callerOwner, { action: 'install', subject: built.record.name }))) {
                 return { content: [{ type: 'text' as const, text: 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
             }
 
@@ -505,7 +510,7 @@ export function registerExtensionsTools(
                 // installedBy as permission, so an imported or legacy record could be overwritten
                 // in place by any agent holding ext:write. canManageExtensionAs compares owners
                 // directly, which refuses an empty installer to everyone but an operator.
-                if (!canManageExtensionAs(caller, config, existingExt.installedBy)) {
+                if (!(await canManageExtensionAs(storage, config, caller, existingExt.installedBy, { action: 'update', subject: name }))) {
                     return { content: [{ type: 'text' as const, text: `Extension "${name}" was installed by "${existingExt.installedBy || 'an unknown installer'}" — only the installing owner may update it` }], isError: true };
                 }
             }
@@ -521,7 +526,7 @@ export function registerExtensionsTools(
                     existing: existingExt ?? null,
                     ownerName: callerOwner,
                     actor: agentGaii,
-                    isOperator: caller.roles.includes('operator'),
+                    isOperator,
                 });
                 if (!written.ok) {
                     return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}${written.details ? `\n${JSON.stringify(written.details)}` : ''}` }], isError: true };
@@ -587,7 +592,7 @@ export function registerExtensionsTools(
             // another owner's. routes/extensions/crud.ts has refused that since it was written, via
             // canManageInstalledExt; that function needed an Express request, so the surface without
             // one never called it. Same rule, same wording: not found rather than not yours.
-            if (!canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
+            if (!(await canManageExtensionAs(storage, config, resolveCaller(), ext.installedBy, { action: 'activate', subject: name }))) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
@@ -643,7 +648,7 @@ export function registerExtensionsTools(
             // another owner's. routes/extensions/crud.ts has refused that since it was written, via
             // canManageInstalledExt; that function needed an Express request, so the surface without
             // one never called it. Same rule, same wording: not found rather than not yours.
-            if (!canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
+            if (!(await canManageExtensionAs(storage, config, resolveCaller(), ext.installedBy, { action: 'deactivate', subject: name }))) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
@@ -686,7 +691,7 @@ export function registerExtensionsTools(
             // another owner's. routes/extensions/crud.ts has refused that since it was written, via
             // canManageInstalledExt; that function needed an Express request, so the surface without
             // one never called it. Same rule, same wording: not found rather than not yours.
-            if (!canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
+            if (!(await canManageExtensionAs(storage, config, resolveCaller(), ext.installedBy, { action: 'delete', subject: name }))) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
@@ -732,7 +737,7 @@ export function registerExtensionsTools(
             // here, through the request-free half of it: the installer's own principal holding
             // ext:write, or an operator. Refused outright rather than answered without the scripts,
             // because an answer that lacks what was asked for, and says nothing, reads as "this action has no code".
-            if (include_source && !canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
+            if (include_source && !(await canManageExtensionAs(storage, config, resolveCaller(), ext.installedBy, { action: 'read-source', subject: name }))) {
                 return { content: [{ type: 'text' as const, text: `The source of extension "${name}" is readable only by its installer's own sessions holding ext:write.` }], isError: true };
             }
 

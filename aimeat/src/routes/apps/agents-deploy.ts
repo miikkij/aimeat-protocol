@@ -15,6 +15,7 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   v1.4.1 — 2026-10-05 — tokenHasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.4.0 — 2026-10-01 — Passes the caller's principal, so a deploy with no runner becomes a proposal
  *     the owner approves instead of RUNNER_NOT_FOUND (services/app-agent-propose.ts).
  *   v1.3.0 — 2026-09-27 — The app lookup, the declared-agent check, the runner lookup and the
@@ -39,6 +40,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import {
     deployAppAgent, appAgentInstances, appAgentStatus, type AppAgentRefusal,
 } from '../../services/app-agent-deploy.js';
@@ -48,10 +50,9 @@ function bareOwner(req: Request): string {
     return localAccountName(req.auth!.owner);
 }
 
+/** scopeIsCovered, the rule requireScope applies (C3). */
 function tokenHasScope(req: Request, scope: string): boolean {
-    const scopes: string[] = req.auth!.scopes ?? [];
-    const [domain] = scope.split(':');
-    return scopes.includes(scope) || scopes.includes(`${domain}:*`) || scopes.includes('*');
+    return scopeIsCovered(req.auth!.scopes ?? [], scope);
 }
 
 /** Send a service refusal as the envelope the route answered before the extraction. */

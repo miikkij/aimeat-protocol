@@ -21,6 +21,7 @@
  * @structure registerSeoTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   v1.3.1 — 2026-10-05 — A comment names requireOperator, the REST route's check since secaudit 2026-10, C2.
  *   v1.3.0 — 2026-09-27 — aimeat_app_seo_set moved into aimeat_app_manage (action "seo", src/mcp/app-manage.ts).
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the status and the announcement ask the
  *     operator:admin word as well as the account (services/owner-lifecycle.ts
@@ -56,8 +57,8 @@ export function registerSeoTools(
     {},
     annotationsFor('aimeat_seo_status'),
     async () => {
-      // The HTTP door is behind requireRole('operator'), and this one calls buildSeoStatus()
-      // directly rather than going over HTTP — so the role has to be checked HERE too, or the tool
+      // The REST route is behind requireOperator() (askOperator with operator:admin), and this tool
+      // calls buildSeoStatus() directly rather than over HTTP, so the check has to be made HERE too, or the tool
       // is a way around the gate on the route. That is the shape the August 2026 audit named: a
       // permission word is enforced on every door or it does not exist.
       //

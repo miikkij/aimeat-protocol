@@ -14,13 +14,15 @@
  *   activity) is deliberately out of scope — writers are visible; read-only members are not.
  * @structure memberVisibilityOf, canSeeMembers, redactOrganism
  * @usage
- *   const canSee = await canSeeMembers(storage, organism, { ownerName, isOperator });
+ *   const canSee = await canSeeMembers(storage, organism, await rosterCallerFromAuth(storage, req.auth));
  *   res.json({ organism: redactOrganism(organism, canSee), members_hidden: !canSee });
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). rosterCallerFromAuth is async and takes the storage.
  *   v1.0.0 — 2026-07-03 — Initial (privacy fix: rosters were world-readable via detail/list/members).
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { isOrganismOwner } from './organism-ownership.js';
+import { isOperatorCaller, type OperatorAuth } from './operator-override.js';
 
 export type MemberVisibility = NonNullable<OrganismRecord['memberVisibility']>;
 
@@ -42,12 +44,14 @@ export interface RosterCaller {
 }
 
 /** Build a RosterCaller from an Express `req.auth`. The one place that maps the anonymous-mode
- *  shared identity to "not a real principal", so every surface treats the anon internet uniformly. */
-export function rosterCallerFromAuth(auth?: { owner?: string; roles?: string[]; anonymous?: boolean }): RosterCaller {
+ *  shared identity to "not a real principal", so every surface treats the anon internet uniformly.
+ *  `isOperator` is isOperatorCaller's answer, the question the MCP tools ask: the operator in person,
+ *  or the operator's agent holding operator:admin. A roster read writes no operator trail. */
+export async function rosterCallerFromAuth(storage: Storage, auth?: OperatorAuth | null): Promise<RosterCaller> {
   const isAnon = !!auth?.anonymous;
   return {
-    ownerName: isAnon ? undefined : (auth?.owner as string | undefined),
-    isOperator: !isAnon && !!auth?.roles?.includes('operator'),
+    ownerName: isAnon ? undefined : auth?.owner,
+    isOperator: !isAnon && await isOperatorCaller(storage, auth),
     isAnonymous: isAnon,
   };
 }

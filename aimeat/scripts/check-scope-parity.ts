@@ -45,6 +45,7 @@
  *   cd aimeat && pnpm check:scope-parity --strict  # gate (pre-commit + CI)
  *   cd aimeat && pnpm check:scope-parity --seed    # rewrite the exemption file from today's state
  * @version-history
+ *   v1.0.2 — 2026-10-05 — A TOOL_SCOPES entry may name several words (secaudit 2026-10, C3).
  *   v1.0.1 — 2026-09-29 — mcp/catalog/scopes-operator.ts counts as a definition file: it is the operator
  *     rows of the tool table, moved out of scopes.ts unchanged.
  *   v1.0.0 — 2026-09-04 — Initial (wish-invarianttiauditointi N3: the same word on every door).
@@ -54,7 +55,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from '
 import { join, relative } from 'node:path';
 import { scopeMentions } from './inventory/scope-mentions.js';
 import { readVocabulary, demandedScopes } from './inventory/scope-vocabulary.js';
-import { TOOL_SCOPES } from '../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, toolScopeWords } from '../src/mcp/catalog/scopes.js';
 import { actionScopeWords } from '../src/mcp/catalog/action-scopes.js';
 
 const AIMEAT = process.cwd();
@@ -99,7 +100,7 @@ function findings(): Finding[] {
     const files = sources();
     const mentions = scopeMentions(files, vocabulary, AIMEAT, DEFINITION_FILES);
     const actionWords = actionScopeWords();
-    const mcpWords = new Set([...Object.values(TOOL_SCOPES), ...actionWords.map(a => a.word)]);
+    const mcpWords = new Set([...Object.values(TOOL_SCOPES).flatMap(toolScopeWords), ...actionWords.map(a => a.word)]);
     const demanded = demandedScopes(files);
 
     const out: Finding[] = [];
@@ -126,7 +127,7 @@ function findings(): Finding[] {
     }
     for (const word of mcpWords) {
         if (vocabulary.has(word)) continue;
-        const tools = Object.entries(TOOL_SCOPES).filter(([, w]) => w === word).map(([t]) => t);
+        const tools = Object.entries(TOOL_SCOPES).filter(([, w]) => toolScopeWords(w).includes(word)).map(([t]) => t);
         const actions = actionWords.filter(a => a.word === word).map(a => `TOOL_ACTION_SCOPES[${a.tool}.${a.action}]`);
         seen.set(word, [...(seen.get(word) ?? []), ...tools.map(t => `TOOL_SCOPES[${t}]`), ...actions]);
     }

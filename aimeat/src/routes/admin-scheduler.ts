@@ -14,13 +14,14 @@
  *   - GET execution-log: scheduled-job execution history
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -29,7 +30,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
   const router = Router();
 
   // ── GET /v1/admin/scheduler/jobs — List all scheduled jobs ────────
-  router.get('/v1/admin/scheduler/jobs', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/scheduler/jobs', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const filter: { type?: string; extensionName?: string; enabled?: boolean } = {};
       if (req.query.type) filter.type = req.query.type as string;
@@ -45,7 +46,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
   });
 
   // ── GET /v1/admin/scheduler/jobs/:id — Get job detail ────────────
-  router.get('/v1/admin/scheduler/jobs/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/scheduler/jobs/:id', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const id = req.params.id as string;
       const job = await storage.getScheduledJob(id);
@@ -61,7 +62,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
   });
 
   // ── POST /v1/admin/scheduler/jobs/:id/trigger — Manual trigger ───
-  router.post('/v1/admin/scheduler/jobs/:id/trigger', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/scheduler/jobs/:id/trigger', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     try {
       const job = await storage.getScheduledJob(id);
@@ -85,7 +86,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
   });
 
   // ── PATCH /v1/admin/scheduler/jobs/:id — Update job (enable/disable, cron) ──
-  router.patch('/v1/admin/scheduler/jobs/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.patch('/v1/admin/scheduler/jobs/:id', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     try {
       const job = await storage.getScheduledJob(id);
@@ -112,7 +113,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
   });
 
   // ── DELETE /v1/admin/scheduler/jobs/:id — Remove job ─────────────
-  router.delete('/v1/admin/scheduler/jobs/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.delete('/v1/admin/scheduler/jobs/:id', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     try {
       const job = await storage.getScheduledJob(id);
@@ -133,7 +134,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
   });
 
   // ── GET /v1/admin/scheduler/execution-log — List execution history ──
-  router.get('/v1/admin/scheduler/execution-log', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/scheduler/execution-log', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const filter: {
         jobId?: string; extensionName?: string; trigger?: string; result?: string;
@@ -164,7 +165,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
   });
 
   // ── DELETE /v1/admin/scheduler/execution-log — Prune old entries ────
-  router.delete('/v1/admin/scheduler/execution-log', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.delete('/v1/admin/scheduler/execution-log', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const days = parseInt(req.query.olderThanDays as string || '30', 10);
       const cutoff = new Date(Date.now() - days * 86400000).toISOString();

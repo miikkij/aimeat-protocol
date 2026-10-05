@@ -17,7 +17,7 @@
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS, type AimeatToolDefinition } from '../../src/mcp/catalog/definitions.js';
 import { TOOL_ANNOTATIONS } from '../../src/mcp/annotations.js';
-import { TOOL_SCOPES } from '../../src/mcp/catalog/scopes.js';
+import { TOOL_SCOPES, toolScopeWords } from '../../src/mcp/catalog/scopes.js';
 
 /** Rough token estimate (English ≈ 4 chars/token). Good enough for relative before/after comparison. */
 function estimateTokens(text: string): number {
@@ -40,7 +40,7 @@ function domainOf(name: string): string {
 
 function main(): void {
     const defs = CLI_FALLBACK_TOOL_DEFINITIONS;
-    const rows = defs.map(d => ({ name: d.name, domain: domainOf(d.name), gated: TOOL_SCOPES[d.name] ?? '', ...toolWeight(d) }))
+    const rows = defs.map(d => ({ name: d.name, domain: domainOf(d.name), gated: toolScopeWords(TOOL_SCOPES[d.name]).join(' '), ...toolWeight(d) }))
         .sort((a, b) => b.tokens - a.tokens);
 
     const totalTokens = rows.reduce((s, r) => s + r.tokens, 0);

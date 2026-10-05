@@ -5,13 +5,14 @@
  * @description Network-policy (genesis-defined federation rules) + federation-book (operator phone-book)
  *   routes — policy get/put/pull with signature verification, node-card, book get/rebuild/pull. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
  */
 
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { sign, verify } from '../../auth/keypair.js';
@@ -37,7 +38,7 @@ export function registerPolicyBookRoutes(router: Router, config: AimeatConfig, s
     });
 
     // PUT /v1/federation/network-policy — author the network policy (operator). Signed with the node key.
-    router.put('/v1/federation/network-policy', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/federation/network-policy', requireAuth(), requireOperator(storage), async (req, res) => {
         const incoming = coercePolicy(req.body ?? {});
         const current = await getActivePolicy(storage);
         const doc: NetworkPolicyDoc = {
@@ -57,7 +58,7 @@ export function registerPolicyBookRoutes(router: Router, config: AimeatConfig, s
     // POST /v1/federation/network-policy/pull — fetch the policy from this node's genesis and apply it
     // (operator). The doc is signature-verified against the genesis peer's known public key and only
     // applied if its policy_version is newer than the local one.
-    router.post('/v1/federation/network-policy/pull', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/network-policy/pull', requireAuth(), requireOperator(storage), async (req, res) => {
         const source = (req.body?.source_url as string) || config.genesisUrl;
         if (!source) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No genesis/source URL configured'));
@@ -120,14 +121,14 @@ export function registerPolicyBookRoutes(router: Router, config: AimeatConfig, s
     });
 
     // POST /v1/federation/book/rebuild — primary reassembles the book from peers' node-cards (operator).
-    router.post('/v1/federation/book/rebuild', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.post('/v1/federation/book/rebuild', requireAuth(), requireOperator(storage), async (_req, res) => {
         const book = await assembleBook(config, storage, peers);
         res.json(success(config.nodeId, { book, nodes: book.nodes.length }));
         emitChange('federation');
     });
 
     // POST /v1/federation/book/pull — leaf mirrors the book from its genesis: fetch + verify + version-gate.
-    router.post('/v1/federation/book/pull', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/book/pull', requireAuth(), requireOperator(storage), async (req, res) => {
         const r = await pullBook(config, storage, peers, req.body?.source_url as string | undefined);
         if (!r.ok) {
             res.status(r.status).json(error(config.nodeId, r.code ?? 'FETCH_FAILED', r.message ?? 'pull failed'));

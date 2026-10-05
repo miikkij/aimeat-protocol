@@ -20,6 +20,7 @@
  * @usage
  *   patchable.tool = wrapToolHandler(gatedTool, () => agentGaii);
  * @version-history
+ *   v1.2.1 — 2026-10-05 — Notes every word a tool needs (requiredScopesForTool; secaudit 2026-10, C3).
  *   v1.2.0 — 2026-10-02 — A successful call notes the permission its tool needs (services/scope-use.ts).
  *   v1.1.0 — 2026-09-30 — A SCOPE_DENIED result to an agent is noted as a refusal
  *     (services/agent-refusals.ts), as auth/deny.ts notes the REST one.
@@ -28,7 +29,7 @@
 import { recordUsageCall } from '../services/usage/usage-buffer.js';
 import { noteAgentRefusal } from '../services/agent-refusals.js';
 import { noteScopeUse } from '../services/scope-use.js';
-import { requiredScopeForTool } from './catalog/scopes.js';
+import { requiredScopesForTool } from './catalog/scopes.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import type { UsageActorKind } from '../storage/interface.js';
 
@@ -86,8 +87,8 @@ export function wrapToolHandler(register: AnyFn, principal: () => string): AnyFn
         } else if (actorKindOf(gaii) === 'agent') {
           // The word this tool needs, for the narrowing a `*` agent's owner is offered
           // (services/scope-use.ts decides at flush whether the agent holds `*`).
-          const word = requiredScopeForTool(name);
-          if (word) noteScopeUse(gaii, [word]);
+          const words = requiredScopesForTool(name);
+          if (words.length) noteScopeUse(gaii, words);
         }
         return result;
       } catch (err) {

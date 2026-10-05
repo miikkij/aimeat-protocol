@@ -13,6 +13,7 @@
  *   - POST /v1/msm: parse (YAML or JSON), validate, and register an MSM integration
  *
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-12 — The public read really does strip the auth env var name. The filter named
  *     the snake_case keys the YAML is written in, while parseMsm normalises them to camelCase
  *     before storage, so it matched nothing and every unauthenticated read of a manifest carried
@@ -32,6 +33,7 @@ import { parseMsm, validateMsm } from '../services/msm-parser.js';
 import { emitChange } from '../services/event-bus.js';
 import type { MsmDefinition } from '../services/msm-parser.js';
 import { logger } from '../utils/logger.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 /**
  * The auth keys the public read must not carry, in BOTH spellings.
@@ -300,9 +302,10 @@ export function msmRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Only the registerer or an operator can delete
-    const isOperator = req.auth!.roles.includes('operator');
-    if (msm.registeredBy !== ownerName && !isOperator) {
+    // Only the registerer or an operator can delete; the operator deleting another person's MSM
+    // integration writes the operator trail.
+    if (msm.registeredBy !== ownerName
+      && !(await operatorOverride(storage, config, req.auth, { ownerOf: msm.registeredBy, area: 'msm', action: 'delete', subject: name }))) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only delete MSM integrations you registered'));
       return;
     }

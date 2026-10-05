@@ -5,6 +5,7 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.0 — 2026-10-01 — An introduction that only becomes a pending request no longer deletes the
  *     offline or de-peering peer of that node id; only an admission (an invite or an open join)
  *     replaces it, and an open join may not replace one held under another key (409
@@ -24,7 +25,7 @@ import type { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { executeHooks } from '../../services/hooks.js';
 import { PeeringRequestSchema, validateBody } from '../../models/schemas.js';
@@ -330,7 +331,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
     });
 
     // POST /v1/federation/peer/request — request peering (operator auth)
-    router.post('/v1/federation/peer/request', requireAuth(), requireRole('operator'), validateBody(PeeringRequestSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/federation/peer/request', requireAuth(), requireOperator(storage), validateBody(PeeringRequestSchema, config.nodeId), async (req, res) => {
         const { target_url, target_node_id, public_key, message } = req.body ?? {};
 
         // Extension hook: pre_federation_peer
@@ -395,7 +396,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
     });
 
     // POST /v1/federation/test — test federation readiness of a target node
-    router.post('/v1/federation/test', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/test', requireAuth(), requireOperator(storage), async (req, res) => {
         const { target_url } = req.body ?? {};
         if (!target_url) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_url is required'));

@@ -10,6 +10,7 @@
  *   GET /v1/packages/:groupId/entitlements · PUT and DELETE /v1/packages/:groupId/entitlements/:nodeId
  *   GET /v1/federation/packages (signed by the calling node) · GET /v1/packages/:groupId/config-needs
  * @version-history
+ *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-10-05 — A grant passes the repository role (PKG-8), and the signed listing must name
  *     this node as its audience (PKG-10; secaudit 2026-10).
  *   v1.3.0 — 2026-10-02 — A grant's new node counts against the packages-only peer cap (config.packagePeerCap).
@@ -30,22 +31,25 @@ import {
 import { adoptPendingPeer } from '../services/package-peer-register.js';
 import { verifyPackageNode } from '../services/package-node-auth.js';
 import { packageConfigNeeds } from '../services/package-config-needs.js';
+import { isOperatorCaller, type OperatorAuth } from '../services/operator-override.js';
 
 export function registerPackageEntitlementRoutes(
     router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>,
 ): void {
-    const callerOf = (req: { auth?: { owner: string; roles: string[] } }) =>
-        ({ owner: req.auth!.owner, isOperator: req.auth!.roles.includes('operator') });
+    // isOperator is the operator in person, or the operator's agent holding operator:admin: the
+    // answer the MCP tool gets (services/operator-override.ts).
+    const callerOf = async (req: { auth?: OperatorAuth & { owner: string } }) =>
+        ({ owner: req.auth!.owner, isOperator: await isOperatorCaller(storage, req.auth) });
 
     router.get('/v1/packages/:groupId/entitlements', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
-        const out = await listEntitlements(storage, callerOf(req), decodeURIComponent(req.params.groupId as string));
+        const out = await listEntitlements(storage, await callerOf(req), decodeURIComponent(req.params.groupId as string));
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entitlements: out.entitlements, repository_role: config.packageRepository }));
     });
 
     router.put('/v1/packages/:groupId/entitlements/:nodeId', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
-        const out = await grantEntitlement(storage, callerOf(req), {
+        const out = await grantEntitlement(storage, await callerOf(req), {
             groupId: decodeURIComponent(req.params.groupId as string),
             nodeId: req.params.nodeId as string,
             updatesUntil: body.updates_until,
@@ -63,7 +67,7 @@ export function registerPackageEntitlementRoutes(
     // What a package or an install bundle needs the customer to give: the questions a shop asks
     // before payment, with the permission it grants with (services/package-config-needs.ts).
     router.get('/v1/packages/:groupId/config-needs', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
-        const out = await packageConfigNeeds(storage, config, callerOf(req), decodeURIComponent(req.params.groupId as string));
+        const out = await packageConfigNeeds(storage, config, await callerOf(req), decodeURIComponent(req.params.groupId as string));
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, {
             group_id: out.group_id, version: out.version, bundle: out.bundle, name: out.name,
@@ -72,7 +76,7 @@ export function registerPackageEntitlementRoutes(
     });
 
     router.delete('/v1/packages/:groupId/entitlements/:nodeId', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
-        const out = await revokeEntitlement(storage, callerOf(req),
+        const out = await revokeEntitlement(storage, await callerOf(req),
             decodeURIComponent(req.params.groupId as string), req.params.nodeId as string);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { revoked: true }));

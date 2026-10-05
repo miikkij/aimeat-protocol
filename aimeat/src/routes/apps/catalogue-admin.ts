@@ -6,6 +6,7 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.12.1 — 2026-09-26 — The app owner in the moderate and delete doors comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
  *     namesake (secaudit 2026-09, F-1).
@@ -43,7 +44,7 @@ import { resolveIdentity, localAccountName } from '../../utils/gaii.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { requireAuth, optionalAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, optionalAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { randomBytes } from 'node:crypto';
@@ -56,6 +57,7 @@ import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app-seo.js';
 import { stripLegalContent } from '../../services/app-legal.js';
 import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -79,7 +81,7 @@ export function registerCatalogueAdminRoutes(
         }
         // An operator sees the reason behind their own per-app search block on every row, which is
         // what makes the moderation list in the admin dashboard readable. It grants nothing else.
-        const isOperator = req.auth?.roles?.includes('operator') ?? false;
+        const isOperator = await isOperatorCaller(storage, req.auth);
         // `own=true` narrows the list to the caller's own apps. It was a published parameter on
         // aimeat_app_list that this route never read, so "list my apps" answered with the whole
         // catalogue and reported success. Refused rather than ignored without a session: nobody
@@ -276,7 +278,7 @@ export function registerCatalogueAdminRoutes(
     // GET /v1/admin/apps — operator-only: list EVERY app on the node (all owners,
     // including parked + operator-hidden) for the admin moderation surface. Static
     // path, registered before the parameterized download route below.
-    router.get('/v1/admin/apps', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/admin/apps', requireAuth(), requireOperator(storage), async (req, res) => {
         const limit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
         const offset = parseInt(req.query.offset as string) || 0;
         const { apps, total } = await storage.listApps({ adminView: true, limit, offset, sort: 'newest' });
@@ -339,7 +341,7 @@ export function registerCatalogueAdminRoutes(
     // apps whose content closely matches another they are NOT fork-linked to (copied without
     // forking), plus any watermark evidence (a stored app that embeds another app's per-serve
     // fingerprint). A moderation SIGNAL to review, not proof. ?threshold=0..1 (default 0.7).
-    router.get('/v1/admin/apps/similar', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/admin/apps/similar', requireAuth(), requireOperator(storage), async (req, res) => {
         const thresholdRaw = parseFloat(req.query.threshold as string);
         const threshold = Number.isFinite(thresholdRaw) ? Math.min(1, Math.max(0.1, thresholdRaw)) : 0.7;
         // listAppsWithContent, not listApps: this scan COMPARES the apps' bytes, and the plain
@@ -359,7 +361,7 @@ export function registerCatalogueAdminRoutes(
     // pulled from a suspiciously-copied app), decode it back to which viewer was served
     // it, for which app/version, and when. Only decodable with the node key. Static path,
     // registered before the parameterized moderate route below.
-    router.post('/v1/admin/apps/watermark/decode', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/apps/watermark/decode', requireAuth(), requireOperator(storage), async (req, res) => {
         const token = typeof req.body?.token === 'string' ? req.body.token : '';
         if (!token) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'token is required (the watermark string or the aimeat-wm comment from a leaked copy)'));
@@ -382,7 +384,7 @@ export function registerCatalogueAdminRoutes(
     // POST /v1/admin/apps/:owner/:filename/moderate — operator-only: hide or
     // un-hide an app from every public surface. Body: { hidden: boolean, reason?: string }.
     // Unlike the owner's `parked` toggle, only an operator can lift this.
-    router.post('/v1/admin/apps/:owner/:filename/moderate', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/apps/:owner/:filename/moderate', requireAuth(), requireOperator(storage), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
         const owner = localAccountName(ownerParam);
@@ -430,7 +432,7 @@ export function registerCatalogueAdminRoutes(
     // that owner+filename, the download counter, and the screenshot). Unlike the
     // owner DELETE this targets ANY owner. Irreversible — the moderation hide is
     // the soft alternative.
-    router.delete('/v1/admin/apps/:owner/:filename', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.delete('/v1/admin/apps/:owner/:filename', requireAuth(), requireOperator(storage), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
         const owner = localAccountName(ownerParam);

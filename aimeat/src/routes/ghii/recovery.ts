@@ -6,6 +6,8 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-05 — The password change checks the current password with checkPassword
+ *     (services/password-check.ts), so the account's lock and attempt count apply (secaudit 2026-10, C1).
  *   v1.4.0 — 2026-10-01 — POST /v1/ghii/email/confirm applies the open app roster invitations of the
  *     address it confirms (services/app-member-invites.ts), beside the contact promotion.
  *   v1.3.0 — 2026-09-29 — Password reset: only the newest code works (earlier pending codes expire
@@ -32,7 +34,8 @@ import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { createHash, randomBytes } from 'node:crypto';
-import { hashPassword, verifyPassword } from '../../services/password.js';
+import { hashPassword } from '../../services/password.js';
+import { checkPassword } from '../../services/password-check.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { logger } from '../../utils/logger.js';
@@ -378,8 +381,14 @@ export function registerRecoveryRoutes(
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'current_password is required'));
                 return;
             }
-            const valid = await verifyPassword(current_password, ghiiRecord.passwordHash);
-            if (!valid) {
+            // services/password-check.ts, as the sign-in route: the account's lock and attempt count
+            // apply here too, so a held session cannot guess the password without limit (C1).
+            const checked = await checkPassword(storage, config, ghiiRecord, current_password);
+            if (!checked.ok) {
+                if (checked.code === 'PASSWORD_LOCKED') {
+                    res.status(checked.status).json(error(config.nodeId, checked.code, checked.message));
+                    return;
+                }
                 res.status(401).json(error(config.nodeId, 'WRONG_PASSWORD', 'That is not your current password. Try again, or reset it if you have forgotten it.'));
                 return;
             }

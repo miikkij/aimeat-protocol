@@ -18,12 +18,14 @@
  * @usage import { buildNodeCard, assembleBook, getActiveBook } from './federation-book.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial federation book (node-card + primary assembly + signed doc).
+ *   v1.0.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { buildNodeDescriptor } from '../utils/node-descriptor.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { computeServiceSummary } from '../utils/service-summary.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { sign, verify } from '../auth/keypair.js';
@@ -81,7 +83,7 @@ export async function buildNodeCard(config: AimeatConfig, storage: Storage): Pro
   const operators: NodeCardOperator[] = [];
   try {
     for (const o of await storage.listOwners()) {
-      if (o.name === 'anonymous' || !o.roles?.includes('operator')) continue;
+      if (o.name === 'anonymous' || !isOperatorAccount(o)) continue;
       const ghii = await storage.getGHIIByOwner(o.name).catch(err => { logger.warn('buildNodeCard: continuing after a suppressed failure', { error: String(err) }); return null; });
       operators.push({
         ghii: ghii?.ghii ?? `${o.name}@${config.nodeId}`,

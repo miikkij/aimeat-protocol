@@ -13,6 +13,7 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -27,6 +28,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { grantConsent, revokeConsent } from '../services/consent-write.js';
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
@@ -178,7 +180,10 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             return;
         }
 
-        if (consent.ownerGaii !== resolve(req) && !req.auth!.roles.includes('operator')) {
+        // Another person's record: the operator's pass (operatorOverride) admits the operator and the
+        // operator's agent holding operator:admin, as on MCP, and writes the operator trail.
+        if (consent.ownerGaii !== resolve(req) && !(await operatorOverride(storage, config, req.auth,
+            { ownerOf: consent.ownerGaii, area: 'consent', action: 'read', subject: consent.id }))) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this consent record'));
             return;
         }

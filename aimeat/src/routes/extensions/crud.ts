@@ -6,6 +6,7 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  *   v1.1.0 — 2026-08-10 — GET :name/actions/:actionId checks installedBy, as the PATCH beside it
  *                         always has. It returns scriptContent, and the ext:write scope was the
@@ -49,7 +50,8 @@ import {
 } from '../../services/component-versions.js';
 import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
 import { managedChangeRefusal } from '../../services/package-managed.js';
-import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
+import { hasExtWritePermission, mayManageInstalledExt } from './permissions.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension-workspace-declaration.js';
@@ -111,10 +113,10 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   router.post('/v1/extensions', requireAuth(), validateBody(ExtensionInstallSchema, config.nodeId), async (req, res) => {
     try {
       const roles = req.auth!.roles;
-      const isOperator = roles.includes('operator');
+      const isOperator = await isOperatorCaller(storage, req.auth);
       const isOwner = roles.includes('owner');
 
-      if (!hasExtWritePermission(req, config)) {
+      if (!(await hasExtWritePermission(req, config, storage))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
           'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
         return;
@@ -164,7 +166,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // grants unrestricted email, which is what the capability always claimed and never checked.
       const built = buildExtensionRecordFromManifest(
         manifestYaml, scripts, config, req.auth!.owner, new Date().toISOString(),
-        req.auth!.roles.includes('operator'),
+        isOperator,
       );
       if (!built.ok) {
         res.status(built.status).json(error(config.nodeId, built.code, built.message));
@@ -227,22 +229,23 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       // Permission: create mirrors POST (ext:write / install role); update requires ownership.
       if (!existing) {
-        if (!hasExtWritePermission(req, config)) {
+        if (!(await hasExtWritePermission(req, config, storage))) {
           res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
             'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
           return;
         }
-      } else if (!canManageInstalledExt(req, config, existing.installedBy)) {
+      } else if (!(await mayManageInstalledExt(req, config, storage, existing.installedBy, { action: 'update', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
+      const isOperator = await isOperatorCaller(storage, req.auth);
 
       // Validate + build the record. Preserve the original installer/timestamp on update.
       const built = buildExtensionRecordFromManifest(
         manifestYaml, scripts, config,
         existing ? existing.installedBy : req.auth!.owner,
         existing ? existing.installedAt : new Date().toISOString(),
-        req.auth!.roles.includes('operator'),
+        isOperator,
       );
       if (!built.ok) {
         res.status(built.status).json(error(config.nodeId, built.code, built.message));
@@ -265,7 +268,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         existing: existing ?? null,
         ownerName: req.auth!.owner as string,
         actor: req.auth!.sub,
-        isOperator: req.auth!.roles.includes('operator'),
+        isOperator,
       });
       if (!written.ok) {
         res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, 'details' in written ? written.details : undefined));
@@ -320,7 +323,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
           res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Script content requires authentication'));
           return;
         }
-        if (!canManageInstalledExt(req, config, ext.installedBy)) {
+        if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'read-source', subject: name }))) {
           res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Script content requires owner/operator or ext:write scope'));
           return;
         }
@@ -388,7 +391,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // the only thing standing in front of it was the ext:write scope, which an owner session
       // bypasses. So any account on the node could read any other account's source. The write was
       // gated and the read was not, on the same resource, in the same file.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'read-source', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
@@ -426,7 +429,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       // Allow operator always; the original owner (or one of their agents
       // carrying ext:write) only on their own installed extensions.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'update-script', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
@@ -522,7 +525,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       // Allow operator always; the original owner (or one of their agents
       // carrying ext:write) only on their own installed extensions.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'delete', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
@@ -555,7 +558,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       // Ownership: owner sessions bypass requireScope, so guard activate the same way as
       // update/delete — only the installing owner (or an operator) may toggle it.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'activate', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
@@ -589,7 +592,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // Ownership: only the installing owner (or an operator) may deactivate it.
-      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+      if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'deactivate', subject: name }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }

@@ -11,6 +11,7 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   v1.8.0 -- 2026-10-05 -- Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). aimeat_board_rules_set on another person's board asks operatorOverride, as PATCH /v1/boards/:id/rules does.
  *   v1.0.0 — 2026-03-21 — Initial creation: 7 tools + 1 resource for board management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -45,6 +46,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
+import { operatorOverride } from '../services/operator-override.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
@@ -267,9 +269,11 @@ export function registerBoardsTools(
             // The keeper rule PATCH /v1/boards/:id/rules applies, word for word: the exact identity
             // that created the board, or an operator. Another agent of the same owner is refused on
             // both doors. Whether a same-owner principal should pass is open; until it is decided the
-            // two doors give the same answer.
-            const caller = await boardCaller();
-            if (board.ownerGaii !== caller.gaii && !caller.roles.includes('operator')) {
+            // two doors give the same answer. The operator's pass on another person's board is
+            // operatorOverride, as on the route, so it writes the operator trail on both surfaces.
+            if (board.ownerGaii !== agentGaii && !(await operatorOverride(storage, config,
+                { sub: agentGaii, roles: ['agent'], scopes },
+                { ownerOf: board.ownerGaii, area: 'board', action: 'rules', subject: board.name }))) {
                 return { content: [{ type: 'text' as const, text: 'ACCESS_DENIED: Only the keeper of this board sets its rules. Ask them, or open a board of your own.' }], isError: true };
             }
 

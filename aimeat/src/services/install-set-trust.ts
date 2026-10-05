@@ -18,6 +18,7 @@
  *   install set on this node names that repository (the records in the system namespace below).
  * @structure NS_INSTALL_SETS · installSetRepositories() · rememberClaimedRepository()
  * @version-history
+ *   v1.2.1 — 2026-10-05 — The applying account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-10-05 — Only an install set an operator applied names a trusted repository; an
  *     owner's own bundle record no longer does (secaudit 2026-10, PKG-9).
  *   v1.1.0 — 2026-10-02 — A repository the operator redeemed a package claim at is trusted the same way
@@ -26,6 +27,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 
 /** The system namespace of the applied install set records (install-set-apply.ts). */
 export const NS_INSTALL_SETS = 'install-sets';
@@ -52,7 +54,7 @@ export async function installSetRepositories(storage: Storage): Promise<Set<stri
         // (install-set-startup.ts).
         if (value.applied_by === 'startup') { out.add(node); continue; }
         const account = localAccountName(value.applied_by);
-        if (!operator.has(account)) operator.set(account, !!(await storage.getOwner(account))?.roles.includes('operator'));
+        if (!operator.has(account)) operator.set(account, isOperatorAccount(await storage.getOwner(account)));
         if (operator.get(account)) out.add(node);
     }
     const claimed = (await storage.getMemory(NS_INSTALL_SETS, CLAIMED_KEY))?.value as { nodes?: unknown } | undefined;

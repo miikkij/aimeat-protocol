@@ -22,6 +22,7 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-10-01 — Keeping the audit log (IAM round 2 leftover 7): the read names the archived
  *     years and the limit in force and reads a year with ?archive=; the owner archives entries before
  *     a date; GET|PUT /v1/audit/apps/settings sets the owner's limit, a number only by the signed-in
@@ -62,6 +63,7 @@ import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-pr
 import { appReviewedBy } from '../../services/app-marks.js';
 import { localAccountName } from '../../utils/gaii.js';
 import type { CanonicalOwner } from './helpers.js';
+import { operatorOverride } from '../../services/operator-override.js';
 
 export function registerLegalRoutes(
   router: Router,
@@ -85,9 +87,11 @@ export function registerLegalRoutes(
     if (!app && bare !== owner) app = await storage.getAppByOwnerName(bare, filename);
     if (!app) return null;
     if (app.operatorHidden) {
-      const isOperator = !!req.auth?.roles?.includes('operator');
       const isOwner = authenticated(req) ? (await canonicalOwner(req)).owner === app.ownerName : false;
-      if (!isOperator && !isOwner) return 'hidden';
+      // The operator reading another person's hidden app writes the operator trail.
+      if (!isOwner && !(await operatorOverride(storage, config, req.auth, {
+        ownerOf: app.ownerName, area: 'app', action: 'read', subject: filename,
+      }))) return 'hidden';
     }
     return app;
   }

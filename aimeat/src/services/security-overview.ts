@@ -27,6 +27,7 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   v1.1.1 -- 2026-10-05 -- The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.1.0 -- 2026-09-25 -- The apps line (services/app-isolation-status.ts, audit A7-1): how this node
  *     keeps an app away from the sign-in of the person who opens it, and on a node several people
  *     share with no app addresses, a warning in words with the two settings that give every app one.
@@ -37,6 +38,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readRecentAuthFailures, authLogStatus, type AuthFailureLine } from './auth-audit.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { listSecurityIncidents, type SecurityIncidentValue } from './security-incident.js';
 import { getStats } from './stats.js';
 import { appIsolationStatus, type AppIsolationStatus } from './app-isolation-status.js';
@@ -266,7 +268,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
     incidents,
     accounts: {
       owners_total: owners.length,
-      operators: owners.filter(o => o.roles.includes('operator')).map(o => o.name).sort(),
+      operators: owners.filter(isOperatorAccount).map(o => o.name).sort(),
       deactivated: owners.filter(o => o.disabledAt).map(o => ({ name: o.name, since: o.disabledAt ?? null, by: o.disabledBy ?? null })),
       managed_by_directory: owners.filter(o => o.managedBy).length,
       two_step_on: ghiis.filter(g => g.totpEnabled === true).length,

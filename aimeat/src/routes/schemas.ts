@@ -11,6 +11,7 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-08 — semantic_context is checked before the write: its prefixes must resolve,
  *     and every field its `properties` map names must be a field of the schema it describes. Both
  *     were stored unexamined, so a per-field mapping with a typo in the field name looked complete
@@ -26,6 +27,7 @@ import { validateSchemaItself, removeFromCache } from '../services/schema-valida
 import { SchemaSetSchema } from '../models/schemas.js';
 import { semanticContextErrors } from '../utils/onto-context.js';
 import { emitChange } from '../services/event-bus.js';
+import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -33,7 +35,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   // PUT /v1/memory/:key/schema — set a schema for a memory key
   router.put('/v1/memory/:key/schema', requireAuth(), async (req, res) => {
     const roles = req.auth!.roles;
-    if (!roles.includes('owner') && !roles.includes('operator')) {
+    if (!roles.includes('owner') && !(await isOperatorCaller(storage, req.auth))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Owner or operator role required'));
       return;
     }
@@ -60,7 +62,8 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
 
     const existing = await storage.getSchema(key, apply_to);
 
-    if (existing && existing.lockedBy !== req.auth!.sub && !roles.includes('operator')) {
+    if (existing && existing.lockedBy !== req.auth!.sub && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: existing.lockedBy, area: 'schema', action: 'update', subject: key }))) {
       res.status(403).json(error(config.nodeId, 'SCHEMA_LOCKED_BY_OTHER', `This structure is locked by ${existing.lockedBy}. Ask them to unlock it, or make your own copy.`));
       return;
     }
@@ -145,7 +148,8 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    if (record.lockedBy !== req.auth!.sub && !req.auth!.roles.includes('operator')) {
+    if (record.lockedBy !== req.auth!.sub && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: record.lockedBy, area: 'schema', action: 'delete', subject: key }))) {
       res.status(403).json(error(config.nodeId, 'NOT_SCHEMA_OWNER', 'Only whoever set this structure, or whoever runs the node, can remove it. Ask one of them.'));
       return;
     }

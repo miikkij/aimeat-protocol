@@ -5,6 +5,7 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   v2.4.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v2.3.0 — 2026-09-04 — The two doors that OPEN a verification join the two that close it. Each
  *     mints a nonce stamped with `req.auth!.owner` and hands back a state; the callback that
  *     consumes that state cannot be authenticated (it is a wallet or bank-ID redirect) and writes
@@ -36,9 +37,10 @@ import type { EudiwService } from '../services/eudiw.js';
 import type { VcIssuerService } from '../services/vc-issuer.js';
 import type { MyDataReceiptService } from '../services/mydata-receipt.js';
 import type { OidcClient } from '../services/oidc-client.js';
-import { requireAuth, requireOwnerPrincipal, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 export function verificationRouter(
   config: AimeatConfig,
@@ -456,7 +458,9 @@ export function verificationRouter(
       const ghii = await storage.getGHIIByOwner(ownerName);
       const agentGaiis = (await storage.getAgentsByOwner(ownerName)).map(a => a.gaii);
       const isOwner = consent.ownerGaii === ghii?.ghii || agentGaiis.includes(consent.ownerGaii);
-      if (!isOwner && !req.auth!.roles.includes('operator')) {
+      if (!isOwner && !(await operatorOverride(storage, config, req.auth, {
+        ownerOf: consent.ownerGaii, area: 'consent', action: 'receipt', subject: consentId,
+      }))) {
         res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Can only request own consent receipts'));
         return;
       }
@@ -469,7 +473,7 @@ export function verificationRouter(
   });
 
   // POST /v1/trusted-issuers — Add trusted issuer (operator only)
-  router.post('/v1/trusted-issuers', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/trusted-issuers', requireAuth(), requireOperator(storage), async (req, res) => {
     try {
       const { name, url, publicKey, type } = req.body;
       if (!name || !url || !publicKey || !type) {

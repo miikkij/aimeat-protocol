@@ -11,6 +11,7 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-09-09 — The relay-share credit loop is gone: it looked a node id up with
  *     storage.getAgent (a GAII) and had never credited anyone. The distribution is still reported;
  *     who a relay share belongs to is docs/known_gaps.md GAP-001.
@@ -24,7 +25,7 @@ import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -202,7 +203,7 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
 
     // POST /v1/federation/settle/outbound — Send a signed settlement to a peer node (operator only)
     // This endpoint allows operators to initiate a settlement to credit morsels on a remote node.
-    router.post('/v1/federation/settle/outbound', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/settle/outbound', requireAuth(), requireOperator(storage), async (req, res) => {
         const { target_node, gaii, amount, tracking_code, reason } = req.body ?? {};
 
         if (!target_node || !gaii || amount === undefined || !tracking_code) {

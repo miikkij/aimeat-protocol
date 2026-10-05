@@ -21,6 +21,7 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.8.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.7.2 — 2026-09-26 — The agent-work routes (POST /v1/exchange/work, its deliver and the list) moved
  *     as they were to routes/exchange-agent-work.ts, which this router calls, to keep the file under
  *     the 800-line limit.
@@ -52,7 +53,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
@@ -455,7 +456,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
    * agreed to — and where an older record priced differently, that is a real change to what a call
    * costs, so it is reported per group rather than left to be discovered.
    */
-  router.post('/v1/exchange/entitlements/merge', requireAuth(), requireRole('operator'), async (req: Request, res: Response) => {
+  router.post('/v1/exchange/entitlements/merge', requireAuth(), requireOperator(storage), async (req: Request, res: Response) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     const dryRun = b.dry_run !== false && String(req.query.dry_run ?? '') !== '0';
 

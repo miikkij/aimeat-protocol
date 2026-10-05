@@ -4,17 +4,18 @@
  * SPDX-License-Identifier: MIT
  * @description Admin endpoints for capability management: list all, override, logs.
  * @version-history
+ *   v1.1.0 - 2026-10-05 - The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 - 2026-05-02 - Initial admin capability endpoints
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityFilter } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 
 export function adminCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const auth = [requireAuth(), requireRole('operator')];
+  const auth = [requireAuth(), requireOperator(storage)];
 
   router.get('/v1/admin/capabilities', ...auth, async (req, res) => {
     const filters: CapabilityFilter = {};

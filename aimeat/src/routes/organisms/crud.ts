@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.13.0 -- 2026-10-01 -- POST takes `shape` and `lang` and answers the workspaces the shape made;
  *     GET /v1/organisms/shapes lists the starting shapes (guided journey P5).
  *   v1.12.0 -- 2026-09-30 -- DELETE removes the organism's classification exceptions too.
@@ -60,6 +61,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
 import { purgeExceptions } from '../../services/classification/exceptions.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -116,7 +118,9 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     params: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; include?: string },
   ): Promise<{ organisms: unknown[]; total: number }> {
     const memberBare = params.member ? localAccountName(params.member) : undefined;
-    const selfOrOperator = !!auth && (auth.owner === memberBare || auth.roles.includes('operator'));
+    // The operator half asks isOperatorCaller, as the MCP tools do: the operator's agent holding
+    // operator:admin passes too. A list read writes no operator trail.
+    const selfOrOperator = !!auth && (auth.owner === memberBare || await isOperatorCaller(storage, auth));
     const organisms = await storage.listOrganisms({
       type: params.type,
       city: params.city,
@@ -144,7 +148,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // Roster privacy: per-organism memberVisibility decides whether THIS caller gets the members[]/
     // agentGaiis fields. member_count is pre-redaction (a count is not an identity). The shared anonymous
     // identity is treated as unauthenticated (rosterCallerFromAuth).
-    const listCaller = rosterCallerFromAuth(auth);
+    const listCaller = await rosterCallerFromAuth(storage, auth);
     payload = await Promise.all((payload as Array<OrganismRecord & { workspace_count?: number }>).map(async (o) => {
       const canSee = await canSeeMembers(storage, o, listCaller);
       return { ...redactOrganism(o, canSee), member_count: o.members.length, members_hidden: !canSee };
@@ -270,7 +274,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // your_membership keeps "am I a member / what's my role" answerable for the SPA even when the
     // roster arrays are hidden; member_count stays (a count is not an identity). The shared
     // anonymous identity is treated as unauthenticated (rosterCallerFromAuth).
-    const detailCaller = rosterCallerFromAuth(req.auth);
+    const detailCaller = await rosterCallerFromAuth(storage, req.auth);
     const canSeeRoster = await canSeeMembers(storage, organism, detailCaller);
     const yourMembership = detailCaller.ownerName ? await storage.getMembership(id, detailCaller.ownerName) : null;
 

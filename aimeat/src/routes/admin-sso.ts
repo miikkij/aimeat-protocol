@@ -11,6 +11,7 @@
  *   POST …/:id/scim-token, POST …/:id/idp-metadata, and the public GET /v1/sso/:id/metadata.
  * @usage app.use(adminSsoRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-09-12 — The list also carries the two node-wide switches and what they mean for
  *     each connection. A complete connection on a node with sso.enabled off reaches nobody, and no
  *     surface could say so. → services/sso-overview.ts
@@ -22,7 +23,7 @@ import { Router } from 'express';
 import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { spMetadataXml } from '../services/saml-sp.js';
 import {
@@ -33,7 +34,7 @@ import { buildSsoOverview, buildSsoConnectionRow } from '../services/sso-overvie
 
 export function adminSsoRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  const operator = [requireAuth(), requireRole('operator')] as const;
+  const operator = [requireAuth(), requireOperator(storage)] as const;
   const sendRefusal = (res: Response, r: SsoAdminRefusal) =>
     res.status(r.status).json(error(config.nodeId, r.code, r.message));
 

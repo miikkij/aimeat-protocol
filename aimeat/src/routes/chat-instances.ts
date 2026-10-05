@@ -12,6 +12,7 @@
  *   - GET/other routes: list and touch chat instances for the caller
  *
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-10 — August audit step 8: the record build, the GHII check and the lastSeen
  *     write moved to services/chat-instance-write.ts, shared with the two MCP doors that were
@@ -29,6 +30,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
 import { localAccountName } from '../utils/gaii.js';
+import { operatorOverride } from '../services/operator-override.js';
 
 export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -98,7 +100,8 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
 
     // Ownership (SECURITY): a chat instance's economy (morsel balance, trust score) is private to its
     // owner. Only the same owner or an operator may read it — 404 (not 403) so existence isn't confirmed.
-    if (localAccountName(record.ghii) !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+    if (localAccountName(record.ghii) !== req.auth!.owner
+      && !(await operatorOverride(storage, config, req.auth, { ownerOf: record.ghii, area: 'chat-instance', action: 'read', subject: id }))) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }
@@ -135,7 +138,8 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
     }
 
     // Ownership (SECURITY): only the same owner or an operator may update this instance.
-    if (localAccountName(record.ghii) !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
+    if (localAccountName(record.ghii) !== req.auth!.owner
+      && !(await operatorOverride(storage, config, req.auth, { ownerOf: record.ghii, area: 'chat-instance', action: 'update', subject: id }))) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }
@@ -157,7 +161,8 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
 
     // Ownership (SECURITY): fetch first and verify the caller owns it — only the same owner or an
     // operator may delete this instance (previously deleted by id with no ownership check).
-    if (!record || (localAccountName(record.ghii) !== req.auth!.owner && !req.auth!.roles.includes('operator'))) {
+    if (!record || (localAccountName(record.ghii) !== req.auth!.owner
+      && !(await operatorOverride(storage, config, req.auth, { ownerOf: record.ghii, area: 'chat-instance', action: 'delete', subject: id })))) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Chat instance not found'));
       return;
     }

@@ -13,6 +13,7 @@
  *     POST /v1/admin/ai/catalog/refresh   the operator refreshes now, whatever the cadence says.
  * @structure aiModelsRouter(config, storage)
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-28 — The filtering moved to services/ai/catalog/query.ts, which aimeat_ai_models
  *     calls too (V5). The answer is unchanged.
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
@@ -20,7 +21,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -64,7 +65,7 @@ export function aiModelsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/admin/ai/catalog/refresh ── the operator, now
-  router.post('/v1/admin/ai/catalog/refresh', requireAuth(), requireRole('operator'), async (_req: Request, res: Response) => {
+  router.post('/v1/admin/ai/catalog/refresh', requireAuth(), requireOperator(storage), async (_req: Request, res: Response) => {
     const r = await refreshCatalog(storage, config);
     const meta = catalogMeta();
     res.json(success(config.nodeId, { written: r.written, sources: r.sources, snapshot: meta?.snapshot ?? null }));

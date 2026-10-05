@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.1 — 2026-10-05 — Test mode's re-registration wipes the old account with eraseOwner, the one
+ *     account deletion (secaudit 2026-10, C7).
  *   v1.12.0 — 2026-10-05 — Secaudit 2026-10, D1 and C1. The password and the second factor are
  *     services/password-check.ts, shared with attach-email and the home node's federation check. A
  *     federated sign-in signs its request to the home node (services/federation-auth-payload.ts),
@@ -63,6 +65,7 @@ import { generateKeyPair, sign } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { validateOwnerName, FEDERATED_ROLE, homeIdentityOf } from '../../utils/gaii.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash } from 'node:crypto';
 import { hashPassword } from '../../services/password.js';
@@ -79,6 +82,7 @@ import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
 import { registrationRefusal, creditWelcomeBonus } from '../../services/owner-provisioning.js';
+import { eraseOwner } from '../../services/owner-erasure.js';
 
 export function registerRegisterLoginRoutes(
     router: Router,
@@ -161,13 +165,8 @@ export function registerRegisterLoginRoutes(
             if (config.testMode) {
                 // Test mode: wipe old account entirely and re-create (E2E test isolation)
                 preservedRoles = existingOwner.roles;
-                const oldAgents = await storage.getAgentsByOwner(username);
-                for (const agent of oldAgents) {
-                    await storage.deleteAgent(agent.gaii);
-                }
-                const oldGhii = await storage.getGHII(ghii);
-                if (oldGhii) await storage.deleteGHII(ghii);
-                await storage.deleteOwner(username);
+                // The one account deletion (services/owner-erasure.ts; secaudit 2026-10, C7).
+                await eraseOwner(storage, config.nodeId, username);
             } else if (config.devMode) {
                 // Dev mode: reset credentials only, preserve all data (agents, memory, etc.)
                 preservedRoles = existingOwner.roles;
@@ -233,7 +232,7 @@ export function registerRegisterLoginRoutes(
         // Self-heal: if no operator exists anywhere, promote this user
         const allOwners = await storage.listOwners();
         const realOwners = allOwners.filter(o => o.name !== 'anonymous');
-        const hasOperator = allOwners.some(o => o.roles.includes('operator'));
+        const hasOperator = allOwners.some(isOperatorAccount);
         const roles: string[] = ['owner'];
         if (realOwners.length === 0 || !hasOperator) {
             roles.push('operator');

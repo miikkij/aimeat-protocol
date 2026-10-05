@@ -11,6 +11,7 @@
  *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
  *
  * @version-history
+ *   v2.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v2.2.0 — 2026-09-26 — Every door names the caller by its resolved identity (resolveIdentity): a
  *     person by their GHII, an agent by its GAII. A work item carries the same identity for its two
  *     parties, so a person who asked for work or delivered it in person uses the dispute doors on it,
@@ -52,11 +53,12 @@ import { Router } from 'express';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
-import { requireAuth, requireRole, requireExternalPrincipal, requireAnyScope } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireExternalPrincipal, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { returnEscrow, settlePayment } from '../services/morsel.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
 
 function param(p: string | string[]): string {
@@ -192,7 +194,9 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        if (work.providerGaii !== me && work.requesterGaii !== me && !req.auth!.roles.includes('operator')) {
+        // The operator reads a dispute as its arbiter (POST /v1/admin/disputes/:id/rule), a node duty
+        // over two parties rather than an act in one person's account, so no operator trail.
+        if (work.providerGaii !== me && work.requesterGaii !== me && !(await isOperatorCaller(storage, req.auth))) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not a party to this dispute'));
             return;
         }
@@ -463,7 +467,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // POST /v1/admin/disputes/:id/rule — Operator rules on dispute
-    router.post('/v1/admin/disputes/:id/rule', requireAuth(), requireRole('operator'), validateBody(OperatorRulingSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/admin/disputes/:id/rule', requireAuth(), requireOperator(storage), validateBody(OperatorRulingSchema, config.nodeId), async (req, res) => {
         const disputeId = param(req.params.id);
         const me = resolveIdentity(req.auth!, config.nodeId);
         const dispute = await storage.getDispute(disputeId);
@@ -542,7 +546,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // GET /v1/admin/disputes/:id/audit-log — Tamper-evident audit trail
-    router.get('/v1/admin/disputes/:id/audit-log', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/admin/disputes/:id/audit-log', requireAuth(), requireOperator(storage), async (req, res) => {
         const disputeId = param(req.params.id);
         const dispute = await storage.getDispute(disputeId);
         if (!dispute) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Dispute not found')); return; }

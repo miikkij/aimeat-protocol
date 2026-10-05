@@ -11,6 +11,7 @@
  * @structure EcoManifestSchema · validateEcoManifest(app, requestedScopes, manifest, maxEcoScopes)
  * @usage import { validateEcoManifest, EcoManifestSchema } from '../models/ecosystem-manifest.js';
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.0.0 — 2026-06-14 — Created for the connector-profile static-validation slice (chunk 4).
  *   v1.1.0 — 2026-06-15 — Accept an optional `automation` hint (schedulable capabilities + sink)
  *     for the eco-capability scheduler. Not required; purely a hint.
@@ -25,6 +26,7 @@
  */
 import { z } from 'zod';
 import { validateAppName } from '../utils/gaii.js';
+import { exceedsCeiling } from '../utils/scope-coverage.js';
 
 export const EcoManifestSchema = z.object({
   app: z.string().min(1).max(100),
@@ -77,12 +79,7 @@ export interface EcoValidationResult {
 
 /** True iff every requested scope is within the node's ceiling (mirrors the agent scope-ceiling check). */
 function scopesWithinCeiling(requested: string[], ceiling: string[]): boolean {
-  if (ceiling.includes('*')) return true;
-  return requested.every((s) => {
-    if (s === '*') return false;
-    const [domain] = s.split(':');
-    return ceiling.includes(s) || ceiling.includes(`${domain}:*`);
-  });
+  return exceedsCeiling(ceiling, requested).length === 0;
 }
 
 /**

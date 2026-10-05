@@ -23,6 +23,7 @@
  * @structure adminMemoryRouter · search · list · one record · delete · restore
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v2.4.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2). The delete and the restore hand the bin service rolesWithOperator(), so the operator's agent gets the same override as the operator in person.
  *   v2.3.0 — 2026-09-29 — The search and the one-record read present values through presentMemories
  *     (classification reader + credential mask, TARGET-082).
  *   v2.2.0 — 2026-09-24 — SECURITY (audit A8-2): the search, the one-record read, the delete and the
@@ -47,13 +48,14 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ArchiveFilter } from '../storage/interface.js';
 import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';
 import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
 import { readerFor } from '../services/classification/reader.js';
 import { recordOperatorAccess, type OperatorAccess } from '../services/operator-access-audit.js';
+import { rolesWithOperator } from '../services/operator-override.js';
 
 /** How much of a value is scanned for the search excerpt. A megabyte value is legal; reading all of
  *  it to highlight one word is not worth the wall clock, and the hit is ranked by the index anyway. */
@@ -122,7 +124,7 @@ export function adminMemoryRouter(
     storage: Storage,
 ): Router {
     const router = Router();
-    const operator = [requireAuth(), requireRole('operator')] as const;
+    const operator = [requireAuth(), requireOperator(storage)] as const;
 
     /** Write the trail for one reach into somebody's entries, before the door answers. */
     const trail = (req: Express.Request, what: Pick<OperatorAccess, 'ownerOf' | 'action' | 'key' | 'count'>) => {
@@ -353,8 +355,9 @@ export function adminMemoryRouter(
             ownerOverride: ownerGaii,
             // The operator's override skips the organism membership check, which is what this door
             // has always meant. The append-only guard still holds: "never erased" is not a rule an
-            // operator is above, and this door never claimed it was.
-            roles: req.auth!.roles,
+            // operator is above, and this door never claimed it was. rolesWithOperator() puts
+            // 'operator' in the list for the operator's agent too, as requireOperator admitted it.
+            roles: await rolesWithOperator(storage, req.auth),
         });
         if (!out.ok) {
             res.status(out.status ?? 404).json(error(config.nodeId, out.code, out.message));
@@ -382,7 +385,7 @@ export function adminMemoryRouter(
             ownerOverride: ownerGaii,
             // As the delete above: the operator's override skips the organism membership check,
             // and the append-only guard still holds, now that restore asks both (A6-12).
-            roles: req.auth!.roles,
+            roles: await rolesWithOperator(storage, req.auth),
         });
         if (!out.ok) {
             res.status(out.status ?? 404).json(error(config.nodeId, out.code, out.message));

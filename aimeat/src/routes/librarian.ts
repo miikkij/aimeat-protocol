@@ -12,6 +12,8 @@
  *   carrying `memory:read`; otherwise it is scoped to the caller's own identity.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
+ *   v1.3.1 — 2026-10-05 — ai:use and memory:read are asked with scopeIsCovered, so `ai:*` and
+ *     `memory:*` pass here as they pass requireScope (secaudit 2026-10, C3).
  *   v1.3.0 — 2026-09-29 — The search, classify, plan and distribute pass the caller's classification
  *     reader (TARGET-082).
  *   v1.0.0 — 2026-06-19 — Initial: Tier-1 fan-across librarian search.
@@ -34,6 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { librarianSearch } from '../services/librarian.js';
 import { readerFor } from '../services/classification/reader.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
@@ -57,7 +60,8 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     // to run the owner's AI over the owner's material without holding the word for it.
     if (roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
-    if (scopes.includes('ai:use') || scopes.includes('*')) return true;
+    // scopeIsCovered: `ai:*` passes here as it passes assertAiUseAllowed (C3).
+    if (scopeIsCovered(scopes, 'ai:use')) return true;
     // The human sentence stays jargon-free; the machine-readable scope word rides in `details` so an
     // agent reads exactly which permission to ask its owner for without the person meeting "ai:use".
     res.status(403).json(error(config.nodeId, 'FORBIDDEN',
@@ -88,7 +92,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     // to read the owner's private surface lives in the GRANT, not in content classification (mirrors
     // discovery/sources/memory-source.ts). Without it, the search stays scoped to the caller's own id.
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
-    const fanOutOwner = isOwnerSession || scopes.includes('memory:read') || scopes.includes('*');
+    const fanOutOwner = isOwnerSession || scopeIsCovered(scopes, 'memory:read');
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
 
     const { hits, ownersSearched } = await librarianSearch(storage, config, {

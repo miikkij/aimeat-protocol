@@ -22,6 +22,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.49.0 -- 2026-10-05 -- An entry may name several words, all needed (ToolScope, toolScopeWords,
+ *     requiredScopesForTool replaces requiredScopeForTool): aimeat_refinery_run names the four its
+ *     route asks, so it is no longer offered to an agent that cannot run it (secaudit 2026-10, C3).
  *   v1.48.0 -- 2026-10-02 -- aimeat_agent_runtime_report moves to SCOPE_EXEMPT_TOOLS, as tags did: an
  *     agent reports its own runtime and model road without agent:write.
  *   v1.47.0 -- 2026-10-02 -- aimeat_workspace_object_delete -> memory:purge (removes for good).
@@ -156,7 +159,14 @@ import { OPERATOR_TOOL_SCOPES } from './scopes-operator.js';
 // The tools that change state and deliberately need no scope, each with its reason (moved unchanged).
 export { SCOPE_EXEMPT_TOOLS } from './scope-exempt-tools.js';
 
-export const TOOL_SCOPES: Record<string, string> = {
+/** One word, or every word of a list: a tool whose route asks for several asks for all of them. */
+export type ToolScope = string | readonly string[];
+
+/** The words a TOOL_SCOPES entry names, as a list. */
+export const toolScopeWords = (entry: ToolScope | undefined): string[] =>
+    entry === undefined ? [] : typeof entry === 'string' ? [entry] : [...entry];
+
+export const TOOL_SCOPES: Record<string, ToolScope> = {
     // ── August 2026 audit, step 3a ───────────────────────────────────────────────────────────────
     // 73 mutating tools had no entry here, and scopeAllowsTool() reads a missing entry as PERMISSION,
     // so any agent holding any single scope could call all of them. These 55 now say what they need.
@@ -642,7 +652,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_mail_read: 'connections:read-through',
     aimeat_mail_aliases: 'connections:read-through',
     // A refinery batch reads what is in a mailbox, and its progress names the subjects it read.
-    aimeat_refinery_run: 'connections:read-through',
+    // A run spends all four, as POST /v1/refinery/runs asks (REFINERY_RUN_SCOPES): offered on one word,
+    // the tool was listed to an agent every call of which then failed (secaudit 2026-10, C3).
+    aimeat_refinery_run: ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'],
     aimeat_refinery_status: 'connections:read-through',
 
     // Remote MCP servers. The same three-way split as connections above, and for the same reason:
@@ -739,9 +751,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_exchange_proposal_decide: 'exchange:write',
 };
 
-/** The scope required to use a tool, or undefined if the tool is not scope-gated. */
-export function requiredScopeForTool(toolName: string): string | undefined {
-    return TOOL_SCOPES[toolName];
+/** The scopes required to use a tool, all of them; empty if the tool is not scope-gated. */
+export function requiredScopesForTool(toolName: string): string[] {
+    return toolScopeWords(TOOL_SCOPES[toolName]);
 }
 
 /**
@@ -757,9 +769,7 @@ export function requiredScopeForTool(toolName: string): string | undefined {
  * refused RESERVED_KEY. One rule, one place, so the exception cannot be lost again.
  */
 export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
-    const required = TOOL_SCOPES[toolName];
-    if (!required) return true;
-    return scopeIsCovered(scopes, required);
+    return requiredScopesForTool(toolName).every((word) => scopeIsCovered(scopes, word));
 }
 
 // The role-based scope bundles for provisioning agents live in ./scope-profiles.ts.

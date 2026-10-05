@@ -13,6 +13,7 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Operator agent — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   Join keys first — 2026-10-01 — completeJoin exchanges keys before it saves the peer, saves nothing
  *     when the exchange fails, and never replaces a peer this node already has: the id came from the
  *     target's own card, and a keyless active peer took the first key any caller sent to
@@ -33,13 +34,14 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, WalletTransaction } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { RoleGrantSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { emitChange } from '../services/event-bus.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import type { PeerInfo } from '../services/federation.js';
 import { deriveTierFlags } from '../services/federation-tiers.js';
 import { performKeyExchange } from '../services/federation-helpers.js';
@@ -57,7 +59,7 @@ export function adminMonitoringRouter(
     const router = Router();
 
     // GET /v1/admin/work — list all work items (operator only)
-    router.get('/v1/admin/work', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/work', requireAuth(), requireOperator(storage), async (_req, res) => {
         const allWork = await storage.listAllWork();
         res.json(success(config.nodeId, {
             work: allWork.map(w => ({
@@ -85,7 +87,7 @@ export function adminMonitoringRouter(
     });
 
     // GET /v1/admin/federation — federation info (operator only)
-    router.get('/v1/admin/federation', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/federation', requireAuth(), requireOperator(storage), async (_req, res) => {
         const peers = await storage.listPeeringRequests();
         res.json(success(config.nodeId, {
             peers: peers.map(p => ({
@@ -102,7 +104,7 @@ export function adminMonitoringRouter(
     });
 
     // POST /v1/admin/federation/join — introduce this node to a genesis/target node (operator only)
-    router.post('/v1/admin/federation/join', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/federation/join', requireAuth(), requireOperator(storage), async (req, res) => {
         const { genesis_url, role } = req.body ?? {};
         if (!genesis_url || typeof genesis_url !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'genesis_url is required'));
@@ -220,7 +222,7 @@ export function adminMonitoringRouter(
     });
 
     // GET /v1/admin/stats — aggregate statistics (operator only)
-    router.get('/v1/admin/stats', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/stats', requireAuth(), requireOperator(storage), async (_req, res) => {
         const agents = await storage.listAgents();
         const actions = await storage.listActions();
 
@@ -249,7 +251,7 @@ export function adminMonitoringRouter(
     // hello-page opens, MCP connections, rescues sent. Deliberately a TABLE and not a chart:
     // the decision it supports is "did the change move activation", not a dashboard.
     // ?since=<ISO> narrows the window, ?limit caps the row count (default 200, max 1000).
-    router.get('/v1/admin/onboarding-funnel', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/admin/onboarding-funnel', requireAuth(), requireOperator(storage), async (req, res) => {
         const { readOnboardingFunnel } = await import('../services/onboarding-funnel.js');
         const since = typeof req.query.since === 'string' ? req.query.since : undefined;
         const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
@@ -344,14 +346,14 @@ export function adminMonitoringRouter(
     // GET /v1/admin/messages/stats — direct-message delivery telemetry (operator only).
     // Operator visibility into whether sends land or pile up in errors. Carries NO message content
     // and NO participant identities — only routing/outcome metadata.
-    router.get('/v1/admin/messages/stats', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/messages/stats', requireAuth(), requireOperator(storage), async (_req, res) => {
         const stats = await storage.getMessageDeliveryStats();
         const recent = await storage.listMessageDeliveryLogs(50);
         res.json(success(config.nodeId, { stats, recent }));
     });
 
     // GET /v1/admin/backup — export all data as JSON (operator only)
-    router.get('/v1/admin/backup', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/backup', requireAuth(), requireOperator(storage), async (_req, res) => {
         const owners = await storage.listOwners();
         const agents = await storage.listAgents();
         const actions = await storage.listActions();
@@ -378,7 +380,7 @@ export function adminMonitoringRouter(
     });
 
     // POST /v1/admin/restore — import data from backup (operator only)
-    router.post('/v1/admin/restore', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/restore', requireAuth(), requireOperator(storage), async (req, res) => {
         const { owners, agents, actions, boards, agent_data } = req.body ?? {};
         const imported = { owners: 0, agents: 0, actions: 0, boards: 0, memories: 0 };
 
@@ -428,7 +430,7 @@ export function adminMonitoringRouter(
     });
 
     // POST /v1/admin/roles/grant — grant operator role (operator only)
-    router.post('/v1/admin/roles/grant', requireAuth(), requireRole('operator'), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/admin/roles/grant', requireAuth(), requireOperator(storage), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
         const { owner } = req.body ?? {};
 
         const ownerRecord = await storage.getOwner(owner);
@@ -437,7 +439,7 @@ export function adminMonitoringRouter(
             return;
         }
 
-        if (ownerRecord.roles.includes('operator')) {
+        if (isOperatorAccount(ownerRecord)) {
             res.status(409).json(error(config.nodeId, 'CONFLICT', `Owner "${owner}" already has operator role`));
             return;
         }
@@ -453,7 +455,7 @@ export function adminMonitoringRouter(
     });
 
     // POST /v1/admin/roles/revoke — take the operator role away (operator only)
-    router.post('/v1/admin/roles/revoke', requireAuth(), requireRole('operator'), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/admin/roles/revoke', requireAuth(), requireOperator(storage), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
         const { owner } = req.body ?? {};
 
         const ownerRecord = await storage.getOwner(owner);
@@ -462,16 +464,17 @@ export function adminMonitoringRouter(
             return;
         }
 
-        if (!ownerRecord.roles.includes('operator')) {
+        if (!isOperatorAccount(ownerRecord)) {
             res.status(409).json(error(config.nodeId, 'CONFLICT', `Owner "${owner}" does not have operator role`));
             return;
         }
 
         // Two doors that would lock the node out of its own administration. The last-operator
-        // check goes first: the caller holds the role (requireRole, read live since 2026-09-09),
-        // so when the target is the only operator the target IS the caller, and "last operator"
+        // check goes first: the caller's account holds the role (requireOperator, which reads the
+        // account live; the operator's agent with operator:admin acts for that account), so when the
+        // target is the only operator the target IS the caller's account, and "last operator"
         // is the reason that matters. Behind the self-revoke check it could never be reached.
-        const operators = (await storage.listOwners()).filter(o => o.roles.includes('operator'));
+        const operators = (await storage.listOwners()).filter(isOperatorAccount);
         if (operators.length <= 1) {
             res.status(409).json(error(config.nodeId, 'CONFLICT', 'The last operator cannot be revoked'));
             return;
@@ -493,7 +496,7 @@ export function adminMonitoringRouter(
     });
 
     // D.2: Trust advisory broadcast endpoint (operator only)
-    router.post('/v1/admin/federation/trust-advisory', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/federation/trust-advisory', requireAuth(), requireOperator(storage), async (req, res) => {
         const { target_node, advisory_type, reason, evidence_hash } = req.body ?? {};
 
         if (!target_node || !advisory_type || !reason) {
@@ -542,7 +545,7 @@ export function adminMonitoringRouter(
     });
 
     // D.2: List trust advisories (received + issued)
-    router.get('/v1/admin/federation/trust-advisories', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/admin/federation/trust-advisories', requireAuth(), requireOperator(storage), async (req, res) => {
         const systemGaii = `system@${config.nodeId}`;
         // Query trust advisory memories
         const memories = await storage.listMemory(systemGaii, { prefix: 'trust_advisory:' });
@@ -567,7 +570,7 @@ export function adminMonitoringRouter(
     });
 
     // B.3: Sync health metrics (operator only)
-    router.get('/v1/admin/federation/sync-health', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/federation/sync-health', requireAuth(), requireOperator(storage), async (_req, res) => {
         const queueSize = await storage.replicationQueueSize();
 
         res.json(success(config.nodeId, {
@@ -577,7 +580,7 @@ export function adminMonitoringRouter(
     });
 
     // F.4: Relay earnings query (operator only)
-    router.get('/v1/admin/federation/relay-earnings', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/admin/federation/relay-earnings', requireAuth(), requireOperator(storage), async (req, res) => {
         const since = req.query.since as string | undefined;
         const until = req.query.until as string | undefined;
 

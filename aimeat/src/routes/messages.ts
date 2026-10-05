@@ -21,6 +21,7 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.17.0 -- 2026-10-05 -- POST /v1/messages/broadcast asks isOperatorCaller for the node-wide audience, as aimeat_dm_broadcast does: the operator's agent holding operator:admin passes as the operator in person (secaudit 2026-10, C2).
  *   v1.16.0 -- 2026-09-30 -- The transcribe route answers `classification_warnings` when the audio is
  *     warning-classified (TARGET-082 review, item 2).
  *   v1.15.0 -- 2026-09-29 -- TARGET-082 V4: the transcribe route reads the audio bytes through
@@ -102,6 +103,7 @@ import { sendGroupMessage } from '../services/conversation-group.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner-mailbox-reads.js';
 import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
@@ -335,7 +337,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     // runs it after its own refusals — stamping it writes a row, and this door was writing that row
     // before the service could say the audience was operator-only.
     const result = await broadcastFromPrincipal(deliveryCtx, {
-      senderGhii, isOperator: req.auth!.roles.includes('operator'),
+      senderGhii, isOperator: await isOperatorCaller(storage, req.auth),
       to: input.to, groupId: input.group_id, audience: input.audience,
       mode: input.mode, body: input.body, subject: input.subject, attachments, interactive: input.interactive,
       stampProvenance: broadcastProvenanceStamp({ storage, config }, {

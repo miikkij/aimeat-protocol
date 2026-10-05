@@ -14,6 +14,7 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.7.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-09-29 — TARGET-082 review: what leave() keeps from a peer's memory read is counted
  *     in the answer (`withheld: { count, reason }`, no keys) and logged by key on this node.
  *   v1.5.0 — 2026-09-29 — A peer's memory read passes leaveToPeer, the classification component's
@@ -39,7 +40,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
@@ -60,7 +61,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
     // ── Phase 3.4: Genesis Peering ──
 
     // POST /v1/federation/genesis-peer — Request genesis peering (operator only)
-    router.post('/v1/federation/genesis-peer', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/federation/genesis-peer', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const { genesisNodeId, genesisUrl, publicKey } = req.body;
             if (!genesisNodeId || !genesisUrl || !publicKey) {
@@ -83,7 +84,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
     });
 
     // GET /v1/federation/genesis-peers — List genesis peers (operator only)
-    router.get('/v1/federation/genesis-peers', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/federation/genesis-peers', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const status = req.query.status as string | undefined;
             const genesisPeers = await storage.listGenesisPeers(status ? { status } : undefined);
@@ -102,7 +103,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
     });
 
     // PUT /v1/federation/genesis-peer/:id/approve — Approve genesis peering
-    router.put('/v1/federation/genesis-peer/:id/approve', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/federation/genesis-peer/:id/approve', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const id = req.params.id as string;
             const peer = await genesisPeeringService.approvePeering(id);
@@ -118,7 +119,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
     });
 
     // DELETE /v1/federation/genesis-peer/:id — Remove genesis peering
-    router.delete('/v1/federation/genesis-peer/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.delete('/v1/federation/genesis-peer/:id', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const id = req.params.id as string;
             const removed = await genesisPeeringService.removePeering(id);
@@ -636,7 +637,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
     });
 
     // PUT /v1/federation/genesis-peer/:id/subscriptions — E.3: Set memory prefix subscriptions
-    router.put('/v1/federation/genesis-peer/:id/subscriptions', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/federation/genesis-peer/:id/subscriptions', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const id = req.params.id as string;
             const { prefixes } = req.body ?? {};
@@ -700,7 +701,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
     });
 
     // GET /v1/federation/genesis-peer/:id/subscriptions — E.3: Get memory prefix subscriptions
-    router.get('/v1/federation/genesis-peer/:id/subscriptions', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.get('/v1/federation/genesis-peer/:id/subscriptions', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const id = req.params.id as string;
             const peer = await storage.getGenesisPeer(id);
@@ -737,7 +738,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
     });
 
     // PUT /v1/federation/genesis-peer/:id/suspend — Suspend genesis peering
-    router.put('/v1/federation/genesis-peer/:id/suspend', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.put('/v1/federation/genesis-peer/:id/suspend', requireAuth(), requireOperator(storage), async (req, res) => {
         try {
             const id = req.params.id as string;
             const peer = await genesisPeeringService.suspendPeering(id);

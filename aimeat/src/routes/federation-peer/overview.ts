@@ -14,12 +14,13 @@
  * @structure registerOverviewRoutes(router, config, storage, peers)
  * @usage registerOverviewRoutes(router, config, storage, peers);
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-12 — Initial, with the Federation page's rebuild.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success } from '../../middleware/envelope.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { buildFederationOverview } from '../../services/federation-overview.js';
@@ -30,7 +31,7 @@ export function registerOverviewRoutes(
   storage: Storage,
   peers: Map<string, PeerInfo>,
 ): void {
-  router.get('/v1/admin/federation/overview', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/federation/overview', requireAuth(), requireOperator(storage), async (_req, res) => {
     res.json(success(config.nodeId, await buildFederationOverview(config, storage, peers)));
   });
 }

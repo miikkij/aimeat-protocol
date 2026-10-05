@@ -17,10 +17,12 @@
  *   - findOperatorGhii() — the first, for a single-recipient notification
  * @usage const operators = await listOperatorGhiis(storage, config);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-11 — Initial, for support@operators; feedback.ts and federation-book.ts fold in.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 
 /**
  * Every operator's GHII on this node, in owner-name order so the list is stable between calls.
@@ -31,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 export async function listOperatorGhiis(storage: Storage, config: AimeatConfig): Promise<string[]> {
   const owners = await storage.listOwners();
   return owners
-    .filter(o => o.name !== 'anonymous' && o.roles?.includes('operator'))
+    .filter(o => o.name !== 'anonymous' && isOperatorAccount(o))
     .map(o => o.name)
     .sort()
     .map(name => `${name}@${config.nodeId}`);

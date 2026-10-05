@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.20.0 — 2026-10-05 — registerOrganismsTools and registerDmMessageTools receive the session's scopes: the roster check and the node-wide broadcast ask isOperatorCaller, so the operator's agent holding operator:admin passes as on REST (secaudit 2026-10, C2).
  *   v1.19.0 — 2026-10-02 — aimeat_tools_find on the `chat` surface (mcp/tool-loader.ts).
  *   v1.18.0 — 2026-10-02 — registerWorkspaceTools receives the session's scopes: removing rows needs
  *     organism:write beside memory:purge, as the REST route asks.
@@ -172,7 +173,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
 
     registerCoreTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers);
     registerBoardsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
     registerRefineryTools(mcp, storage, config, agentGaii, scopes);
@@ -231,7 +232,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAgentV2MessagingTools(mcp, storage, config, agentGaii, owner);
     // The v2 task handle, beside the dashboard work item registered above. Both stay.
     registerAgentV2TaskTools(mcp, storage, config, agentGaii, owner);
-    registerDmMessageTools(mcp, storage, config, agentGaii, peers);
+    registerDmMessageTools(mcp, storage, config, agentGaii, peers, scopes);
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii);
     registerContactTools(mcp, storage, config, agentGaii, getToken);

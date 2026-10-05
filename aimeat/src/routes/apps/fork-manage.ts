@@ -6,6 +6,7 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.0 — 2026-09-28 — PATCH refuses `cortex` (the bundled crew-defs) on an app a managed package
  *     install owns, 409 MANAGED_BY_PACKAGE (services/package-managed.ts); the settings stay open.
  *   v1.7.0 — 2026-09-27 — PATCH writes name, description, descriptions, access_code, parked,
@@ -67,6 +68,7 @@ import {
 import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
+import { operatorOverride } from '../../services/operator-override.js';
 
 /** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
 interface PatchRefusal { status: number; code: string; message: string; }
@@ -174,10 +176,16 @@ export function registerForkManageRoutes(
             return;
         }
 
-        const isOperator = req.auth!.roles?.includes('operator') ?? false;
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const { owner: callerOwner, ownerGhii: callerGhii } = await canonicalOwner(req);
         const sameOwner = callerOwner === source.ownerName;
+        // The operator check is asked only where one of the gates below would refuse a caller who is
+        // not the owner, so the operator trail is written only for a fork that needed the override.
+        const paidSource = !!(config.marketplaceEnabled && source.manifest.priceMorsels && source.manifest.priceMorsels > 0);
+        const isOperator = !sameOwner && (!!source.operatorHidden || !source.forkable || paidSource)
+            && await operatorOverride(storage, config, req.auth, {
+                ownerOf: source.ownerName, area: 'app', action: 'fork', subject: sourceFilename,
+            });
 
         // Operator-hidden apps are unreachable to everyone but their owner/operator —
         // mirror the read gate's 404 so moderation status is not leaked via fork.
@@ -196,7 +204,7 @@ export function registerForkManageRoutes(
         // OWNER GHII, the same coordinate the purchase receipt stored (app-store.ts) and the wallet
         // debited — not the raw `sub`, which on an owner session is a bare name that no receipt holds
         // (audit AI-triage 2026-08-23, invariant 1).
-        if (config.marketplaceEnabled && source.manifest.priceMorsels && source.manifest.priceMorsels > 0 && !sameOwner && !isOperator) {
+        if (paidSource && !sameOwner && !isOperator) {
             const hasLicense = await storage.hasValidLicense(ownerGhiiOf(callerGaii), source.ownerGaii, sourceFilename);
             if (!hasLicense) {
                 res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app costs ${source.manifest.priceMorsels} morsels. Purchase it first via POST /v1/app-store/purchase before forking.`));

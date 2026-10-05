@@ -29,6 +29,7 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.11.1 — 2026-10-05 — The provenance declaration is asked of the session's words too (secaudit 2026-10, C3).
  *   v1.11.0 — 2026-09-29 — A landed write is scheduled for write-time classification
  *     (services/classify-on-write.ts, TARGET-082 V3): off the request path, and nothing while
  *     classification is off.
@@ -434,6 +435,7 @@ export async function writeMemoryRecord(
     const held: AiProvenanceRecordRow[] = [];
     const aiProvenanceId = await provenanceForWrite(storage, {
         principal: caller.principal,
+        scopes: caller.scopes,
         content: memoryContentBytes(input.value),
         declaredId: input.declaredProvenanceId,
         declared: input.declaredProvenance,

@@ -27,6 +27,7 @@
  *                                       POST /v1/admin/apps/:owner/:filename/seo-approve
  * @usage registerAdminSeoRoutes(router, config, storage, canonicalOwner);
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-10-01 — The status reports seo.announce_apps, and app_host_count follows it.
  *   v1.1.1 — 2026-09-26 — The app owner in the two per-app doors comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
@@ -39,7 +40,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { sitemapPages } from '../data/public-pages.js';
@@ -179,7 +180,7 @@ export function registerAdminSeoRoutes(
   storage: Storage,
   canonicalOwner: CanonicalOwner,
 ): void {
-  router.get('/v1/admin/seo/status', requireAuth(), requireRole('operator'), async (_req, res) => {
+  router.get('/v1/admin/seo/status', requireAuth(), requireOperator(storage), async (_req, res) => {
     res.json(success(config.nodeId, await buildSeoStatus(config, storage), [
       { description: 'Change a setting', method: 'PUT', url: '/v1/admin/config' },
       { description: 'Tell the search engines about the whole site now', method: 'POST', url: '/v1/admin/seo/indexnow' },
@@ -187,7 +188,7 @@ export function registerAdminSeoRoutes(
   });
 
   /** What a whole-site notice would carry, host by host. Sends nothing. */
-  router.get('/v1/admin/seo/indexnow/plan', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.get('/v1/admin/seo/indexnow/plan', requireAuth(), requireOperator(storage), async (req, res) => {
     const scope = parseScope(req.query.scope);
     if (!scope) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope must be "all" or "pages"'));
@@ -211,7 +212,7 @@ export function registerAdminSeoRoutes(
    * discovery switch still do, and the refusal names which one. The MCP tool calls the same
    * announceEverything, so the grouping, the stamp on each app and the log happen in one place.
    */
-  router.post('/v1/admin/seo/indexnow', requireAuth(), requireRole('operator'), async (req, res) => {
+  router.post('/v1/admin/seo/indexnow', requireAuth(), requireOperator(storage), async (req, res) => {
     const scope = parseScope((req.body ?? {}).scope);
     if (!scope) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope must be "all" or "pages"'));
@@ -254,7 +255,7 @@ export function registerAdminSeoRoutes(
    * search engine. That is the proportionate answer to an app origin being used to farm keywords
    * on the operator's domain.
    */
-  router.post('/v1/admin/apps/:owner/:filename/seo-block', requireAuth(), requireRole('operator'),
+  router.post('/v1/admin/apps/:owner/:filename/seo-block', requireAuth(), requireOperator(storage),
     async (req, res) => {
       const ownerParam = req.params.owner as string;
       const filename = req.params.filename as string;
@@ -296,7 +297,7 @@ export function registerAdminSeoRoutes(
    * Approve or withdraw approval in `review` mode. A no-op in `owner` mode, and it says so rather
    * than writing a field that would silently start mattering if the mode were switched later.
    */
-  router.post('/v1/admin/apps/:owner/:filename/seo-approve', requireAuth(), requireRole('operator'),
+  router.post('/v1/admin/apps/:owner/:filename/seo-approve', requireAuth(), requireOperator(storage),
     async (req, res) => {
       const ownerParam = req.params.owner as string;
       const filename = req.params.filename as string;

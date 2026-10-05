@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.10.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2). adminNodeUpdateRouter takes storage.
+ *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.0 — 2026-09-30 — Mounts adminNodeUpdateRouter: GET /v1/admin/node-update, the npm version check.
  *   v1.7.0 — 2026-09-15 — POST /v1/admin/seed-examples runs the boot's package sync: only a package
  *     whose bundled content changed gets a new version, and the listing keeps its counts.
@@ -31,7 +33,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
@@ -61,6 +63,7 @@ import { validatePasswordStrength } from '../utils/password-validation.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { ADMIN_LOGIN_HTML, ADMIN_SETUP_HTML } from './admin/setup-html.js';
 import { logger } from '../utils/logger.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -299,7 +302,7 @@ export function adminRouter(
     });
 
     // GET /v1/admin/dashboard — node overview (operator only)
-    router.get('/v1/admin/dashboard', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/dashboard', requireAuth(), requireOperator(storage), async (_req, res) => {
         const owners = await storage.listOwners();
         const agents = await storage.listAgents();
         const actions = await storage.listActions();
@@ -541,7 +544,7 @@ export function adminRouter(
     });
 
     // GET /v1/admin/owners — full owners list with roles
-    router.get('/v1/admin/owners', requireAuth(), requireRole('operator'), async (_req, res) => {
+    router.get('/v1/admin/owners', requireAuth(), requireOperator(storage), async (_req, res) => {
         const owners = await storage.listOwners();
         const agentsByOwner = await storage.getAgentsByOwners(owners.map(o => o.name));
         const result = owners.map(o => ({
@@ -564,7 +567,7 @@ export function adminRouter(
     // knowledge remain, every credential acting in its name stops now, nothing new is minted.
     // An operator may deactivate another operator (offboarding is real), never themselves — a node
     // must not be able to lock out the person holding its keys with one mistyped call.
-    router.post('/v1/admin/owners/:name/disable', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/owners/:name/disable', requireAuth(), requireOperator(storage), async (req, res) => {
         const name = req.params.name as string;
         const r = await deactivateOwnerByOperator(storage, name, req.auth!.owner);
         if (!r.ok) {
@@ -585,7 +588,7 @@ export function adminRouter(
 
     // POST /v1/admin/owners/:name/enable — reactivate. Clears the flag only: credentials revoked
     // by deactivation stay dead, the person signs in fresh.
-    router.post('/v1/admin/owners/:name/enable', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.post('/v1/admin/owners/:name/enable', requireAuth(), requireOperator(storage), async (req, res) => {
         const name = req.params.name as string;
         const r = await reactivateOwnerByOperator(storage, name);
         if (!r.ok) {
@@ -603,7 +606,7 @@ export function adminRouter(
     // grants no access — the password still stands — but it writes an account event the person
     // reads, because a second factor disappearing quietly is the thing the factor exists to stop.
     // Never on yourself: the refusals live in the service, shared with the MCP tool.
-    router.delete('/v1/admin/owners/:name/totp', requireAuth(), requireRole('operator'), async (req, res) => {
+    router.delete('/v1/admin/owners/:name/totp', requireAuth(), requireOperator(storage), async (req, res) => {
         const name = req.params.name as string;
         const r = await resetTotpByOperator(storage, name, req.auth!.owner as string, resolveIdentity(req.auth!, config.nodeId), config);
         if (!r.ok) {
@@ -620,7 +623,7 @@ export function adminRouter(
     });
 
     // GET /v1/admin/translations — serve locale JSON for admin dashboard
-    router.get('/v1/admin/translations', requireAuth(), requireRole('operator'), (req, res) => {
+    router.get('/v1/admin/translations', requireAuth(), requireOperator(storage), (req, res) => {
         const lang = (req.query.lang as string) ?? 'en';
         const safeLang = lang.replace(/[^a-z]/gi, '').slice(0, 5) || 'en';
         try {
@@ -642,7 +645,7 @@ export function adminRouter(
         const operator = 'system';
 
         // Auth: JWT operator OR admin password
-        if (req.auth?.sub && req.auth.roles?.includes('operator')) {
+        if (await isOperatorCaller(storage, req.auth)) {
             // OK — operator JWT
         } else {
             // Check admin password
@@ -676,7 +679,7 @@ export function adminRouter(
 
     // ── Mount domain sub-routers ──
     router.use(adminConfigRouter(config, storage, provenance, consulService));
-    router.use(adminNodeUpdateRouter(config));
+    router.use(adminNodeUpdateRouter(config, storage));
     router.use(adminMonitoringRouter(config, storage, peers));
     router.use(adminAgentsRouter(config, storage));
     router.use(adminMaintenanceRouter(config, storage, maintenanceCache));
