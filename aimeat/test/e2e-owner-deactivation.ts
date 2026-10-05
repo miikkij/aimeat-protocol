@@ -16,6 +16,10 @@
  *   every REST route — including the session-resume branch, which asked nothing at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-deactivation
  * @version-history
+ *   v1.0.2 — 2026-10-05 — The federation attestation test asks as an active peer, signs as it would,
+ *     and the victim's auth consent for that peer is set up before deactivation (secaudit 2026-10,
+ *     D1). Green after the change because the old setup no longer matched the route, which had
+ *     taken any requesting_node on the body's word.
  *   v1.0.1 — 2026-09-26 — The app grant's redirect is the app's own path with its owner: a node several
  *     people share with no app origin now takes only an address bound to the requesting app.
  *   v1.0.0 — 2026-08-23 — Initial, with the deactivation feature itself (BR-04 phase 0).
@@ -185,6 +189,21 @@ async function run() {
         mcpSession = mcp.sessionId!;
     });
 
+    // Since secaudit 2026-10 (D1) the home node answers only an active peer's signed request, and only
+    // for a person whose auth consent names that peer. Both are set up while the victim can still act.
+    const fedSecret = ed.utils.randomSecretKey();
+    const fedPeerId = `aimeat-deact-peer-${Date.now()}`;
+    await test('setup: a peer that may ask for sign-ins, and the victim\'s auth consent for it', async () => {
+        const add = await json('/v1/federation/peers', { method: 'POST', headers: bearer(op.ownerToken),
+            body: JSON.stringify({ node_id: fedPeerId, url: 'http://localhost:9999', public_key: Buffer.from(await ed.getPublicKeyAsync(fedSecret)).toString('base64') }) });
+        assert(add.status === 201, `add peer ${add.status} ${JSON.stringify(add.body?.error)}`);
+        const act = await json(`/v1/federation/peers/${fedPeerId}`, { method: 'PUT', headers: bearer(op.ownerToken), body: JSON.stringify({ status: 'active' }) });
+        assert(act.status === 200, `activate peer ${act.status} ${JSON.stringify(act.body?.error)}`);
+        const consent = await json('/v1/consent', { method: 'POST', headers: bearer(victim.ownerToken),
+            body: JSON.stringify({ data_pattern: '_identity', recipient: `node:${fedPeerId}`, scope: 'auth', purpose: 'federation_login' }) });
+        assert(consent.status === 201, `consent ${consent.status} ${JSON.stringify(consent.body?.error)}`);
+    });
+
     // ── Failure paths on the door itself ──
     await test('a non-operator cannot deactivate anyone: 403', async () => {
         const r = await json(`/v1/admin/owners/${victim.owner}/disable`, { method: 'POST', headers: bearer(bystander.ownerToken) });
@@ -250,9 +269,12 @@ async function run() {
         assert(r.status === 403 && r.body.error?.code === 'ACCOUNT_DISABLED', `expected 403 ACCOUNT_DISABLED, got ${r.status} ${r.body.error?.code}`);
     });
     await test('the federation attestation refuses: deactivation holds on other nodes', async () => {
+        const timestamp = new Date().toISOString();
+        const signature = await sign(Buffer.from(fedSecret).toString('base64'),
+            JSON.stringify({ purpose: 'federation-auth-verify', username: victim.owner, requesting_node: fedPeerId, timestamp }));
         const r = await json('/v1/federation/auth/verify', {
             method: 'POST',
-            body: JSON.stringify({ username: victim.owner, password: PASSWORD, requesting_node: 'other-node', timestamp: new Date().toISOString() }),
+            body: JSON.stringify({ username: victim.owner, password: PASSWORD, requesting_node: fedPeerId, timestamp, signature }),
         });
         assert(r.status === 403 && r.body.error?.code === 'ACCOUNT_DISABLED', `expected 403 ACCOUNT_DISABLED, got ${r.status} ${r.body.error?.code}`);
     });

@@ -10,6 +10,9 @@
  * @structure registerAttachEmailRoute(router, config, storage, emailService).
  * @usage registerAttachEmailRoute(router, config, storage, emailService);
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The password and its lock are services/password-check.ts, the check every
+ *     route that takes a password calls; this file held a hand copy of the sign-in route's lock
+ *     (secaudit 2026-10, C1).
  *   v1.0.0 — 2026-08-07 — Extracted verbatim from register-login.ts (behaviour unchanged).
  */
 import type { Router } from 'express';
@@ -18,7 +21,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import { success, error } from '../../middleware/envelope.js';
 import { createHash } from 'node:crypto';
-import { verifyPassword } from '../../services/password.js';
+import { checkPassword } from '../../services/password-check.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
@@ -67,30 +70,12 @@ export function registerAttachEmailRoute(
             return;
         }
 
-        // Per-account password lockout (mirror the login handler)
-        if (ghiiRecord.passwordLockedUntil) {
-            const lockExpires = new Date(ghiiRecord.passwordLockedUntil).getTime();
-            if (Date.now() < lockExpires) {
-                res.status(429).json(error(config.nodeId, 'PASSWORD_LOCKED',
-                    `Account temporarily locked due to too many failed login attempts. Try again after ${ghiiRecord.passwordLockedUntil}`));
-                return;
-            }
-            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
-        }
-
-        const valid = await verifyPassword(password, ghiiRecord.passwordHash);
-        if (!valid) {
-            const attempts = (ghiiRecord.passwordFailedAttempts ?? 0) + 1;
-            const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
-            if (attempts >= config.passwordLockoutAttempts) {
-                update.passwordLockedUntil = new Date(Date.now() + config.passwordLockoutMinutes * 60_000).toISOString();
-            }
-            await storage.updateGHII(ghii, update);
-            res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
+        // The password with the account's lock: the same check as the sign-in route
+        // (services/password-check.ts).
+        const pw = await checkPassword(storage, config, ghiiRecord, password);
+        if (!pw.ok) {
+            res.status(pw.status).json(error(config.nodeId, pw.code, pw.message));
             return;
-        }
-        if (ghiiRecord.passwordFailedAttempts) {
-            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
         }
 
         // This endpoint is only for accounts still short of email verification. Once verified there is

@@ -39,6 +39,6 @@ export function federationRouter(
     router.use(federationSyncRouter(config, storage, peers));
     router.use(federationSettlementsRouter(config, storage, peers));
     router.use(federationGenesisRouter(config, storage, peers, networkDirectory));
-    router.use(federationAuthRouter(config, storage));
+    router.use(federationAuthRouter(config, storage, peers));
     return router;
 }

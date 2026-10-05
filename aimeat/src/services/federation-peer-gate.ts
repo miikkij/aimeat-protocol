@@ -34,6 +34,9 @@
  *   if (!gate.ok) { res.status(gate.status).json(error(config.nodeId, gate.code, gate.message)); return; }
  *   // ...then verify the signature against gate.peer.publicKey
  * @version-history
+ *   v1.3.0 — 2026-10-05 — gatePeer() takes `null` for a door that needs an active, keyed peer and no
+ *     capability flag: the home node's answer to a federated sign-in (routes/federation-auth.ts),
+ *     which had no peer check at all (secaudit 2026-10, D1).
  *   v1.2.0 — 2026-10-01 — peerTakesMessages(): the outbound check the message paths share (status and
  *     messaging flag), next to the inbound one.
  *   v1.1.0 — 2026-09-03 — `allowRouting` is out of the vocabulary. No door ever asked for it, so its
@@ -102,7 +105,9 @@ const DENIED: Record<PeerCapability, string> = {
 export function gatePeer(
   peers: Map<string, PeerInfo>,
   sourceNode: unknown,
-  capability: PeerCapability,
+  // null: the door needs an active peer with a key and no capability flag of its own (the home
+  // node's answer to a federated sign-in, which checks the tier's ceiling itself).
+  capability: PeerCapability | null,
   opts?: {
     /** Statuses accepted instead of the default `['active']`. Settlement passes `['active',
      *  'depeering']`, because money already owed must still land while a link is being taken down;
@@ -121,7 +126,7 @@ export function gatePeer(
   // already apply that default, so an undefined here is a peer built in memory by a caller that
   // forgot a flag — treat it as absent-means-allowed to match the stored rows rather than inventing
   // a third behaviour, and let the round-trip test hold the providers to it.
-  if (peer[capability] === false) {
+  if (capability && peer[capability] === false) {
     return { ok: false, status: 403, code: 'POLICY_DENIED', message: DENIED[capability] };
   }
 

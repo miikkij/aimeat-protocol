@@ -20,6 +20,8 @@
  *   - four cases: signed · badly signed · no pinned key · no signature field
  * @usage cd aimeat && pnpm exec vitest run test/unit/federated-login-verifies-unconditionally.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The node under test has its node key in storage, which it now signs the
+ *     verify request with (secaudit 2026-10, D1). Setup only; every case asserts what it did.
  *   v1.0.0 — 2026-09-01 — Initial, with the fix.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -93,6 +95,9 @@ describe('federated login verifies the home node\'s attestation unconditionally'
         config = { ...loadConfig().config, nodeId: NODE_ID, federationAuthPolicy: 'all_peers' } as AimeatConfig;
         const kp = await generateKeyPair();
         await initNodeKeys(kp.publicKey, kp.privateKey);
+        // The node signs its request to the home node with its stored key (secaudit 2026-10, D1); a
+        // booted node always has one.
+        await storage.setNodeKey(kp.publicKey, kp.privateKey);
         initSessionAuth(storage, config);
         homeKeys = await generateKeyPair();
 
