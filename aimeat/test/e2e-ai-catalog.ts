@@ -273,6 +273,14 @@ async function setupOwner(label: string): Promise<Owner> {
       assert((await rules({ poolOrder: 'priority', maxCostPerCallUsd: 0.01 })).status === 200, 'ceiling');
       const r2 = await complete(q, {});
       assert(r2.status === 200 && r2.body.data.route.answeredBy.provider === 'z-cheap', `the dearer one skipped: ${JSON.stringify(r2.body.data?.route ?? r2.body.error)}`);
+      // Secaudit 2026-10, AI-4: the ceiling measures this call. 200,000 characters are about 50,000
+      // tokens, which on Gemini Flash alone cost more than $0.005; the old 1,024-token guess put the
+      // call at about $0.003 and let it through.
+      assert((await rules({ poolOrder: 'priority', maxCostPerCallUsd: 0.005 })).status === 200, 'lower ceiling');
+      const long = await complete(q, { prompt: 'word '.repeat(40_000) });
+      assert(long.status !== 200, `a long prompt over the ceiling is refused on both: ${long.status} ${JSON.stringify(long.body.data?.route ?? long.body.error)}`);
+      const short = await complete(q, {});
+      assert(short.status === 200 && short.body.data.route.answeredBy.provider === 'z-cheap', `a short one still goes: ${JSON.stringify(short.body.data?.route ?? short.body.error)}`);
     });
 
     await test('11. allowed=true lists only what the caller\'s policy allows on a provider it has', async () => {
