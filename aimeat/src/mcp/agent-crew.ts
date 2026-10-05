@@ -15,13 +15,13 @@
  *     aimeat_crew_draft, aimeat_crew_publish
  * @usage registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-08-28 -- Initial: the five tools over services/crew-ops.ts.
  *   v1.0.2 -- 2026-10-02 -- aimeat_crew_llm_set's choice names the {kind:'node', role?} shape.
  *   v1.0.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -32,12 +32,9 @@ import {
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { crewMenu, writeLlmChoice } from '../services/crew-menu.js';
-
-const DocSchema = z.record(z.string(), z.unknown());
-const agentNameSchema = z.string().describe('The agent whose definition this is (bare name of one of your owner\'s agents, or its full GAII). An agent may name itself or a same-owner sibling.');
-
-/** The longest one tool call waits for a trial before handing back a try_id to continue with. */
-const MAX_WAIT_SECONDS = 120;
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+// The longest one tool call waits for a trial: the same constant the catalog's wait_seconds bound names.
+import { MAX_WAIT_SECONDS } from '../tool-catalog/input-schemas.js';
 
 function refusalText(r: CrewRefusal): string {
     return JSON.stringify({ error: { code: r.code, message: r.message, details: r.details } }, null, 2);
@@ -74,7 +71,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_get',
         descriptionFor('aimeat_crew_get'),
-        { target_agent_name: agentNameSchema },
+        zodShapeFor('aimeat_crew_get'),
         annotationsFor('aimeat_crew_get'),
         async ({ target_agent_name }) => {
             const out = await crewState(deps, callerOf('mcp.crew_get'), target_agent_name);
@@ -86,10 +83,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_validate',
         descriptionFor('aimeat_crew_validate'),
-        {
-            target_agent_name: agentNameSchema,
-            doc: DocSchema.describe('The whole crew definition to check (target_agent_name, agents[], tasks[], …).'),
-        },
+        zodShapeFor('aimeat_crew_validate'),
         annotationsFor('aimeat_crew_validate'),
         async ({ target_agent_name, doc }) => {
             const out = await crewValidate(deps, callerOf('mcp.crew_validate'), target_agent_name, doc);
@@ -101,13 +95,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_try',
         descriptionFor('aimeat_crew_try'),
-        {
-            target_agent_name: agentNameSchema,
-            doc: DocSchema.optional().describe('Start a trial: the definition to run once. Omit when continuing to wait on a try_id.'),
-            prompt: z.string().min(1).max(20_000).optional().describe('Start a trial: what the crew should do in this run (becomes {{ctx.prompt}}). Required with doc.'),
-            try_id: z.string().optional().describe('Continue waiting on a trial this tool already started and returned as running.'),
-            wait_seconds: z.number().int().min(0).max(MAX_WAIT_SECONDS).optional().describe(`How long this call waits for the result before handing back the try_id (default 50, max ${MAX_WAIT_SECONDS}). Call again with try_id to keep waiting.`),
-        },
+        zodShapeFor('aimeat_crew_try'),
         annotationsFor('aimeat_crew_try'),
         async ({ target_agent_name, doc, prompt, try_id, wait_seconds }) => {
             const caller = callerOf('mcp.crew_try');
@@ -136,10 +124,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_draft',
         descriptionFor('aimeat_crew_draft'),
-        {
-            target_agent_name: agentNameSchema,
-            doc: DocSchema.optional().describe('The edits to keep. Omit it to discard the saved draft.'),
-        },
+        zodShapeFor('aimeat_crew_draft'),
         annotationsFor('aimeat_crew_draft'),
         async ({ target_agent_name, doc }) => {
             const caller = callerOf('mcp.crew_draft');
@@ -154,11 +139,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_publish',
         descriptionFor('aimeat_crew_publish'),
-        {
-            target_agent_name: agentNameSchema,
-            doc: DocSchema.optional().describe('The definition to make live. The agent\'s runtime validates it first; on problems nothing is written and the list comes back.'),
-            revision: z.number().int().positive().optional().describe('Instead of doc: republish this kept revision (it goes through the validator and becomes a new revision).'),
-        },
+        zodShapeFor('aimeat_crew_publish'),
         annotationsFor('aimeat_crew_publish'),
         async ({ target_agent_name, doc, revision }) => {
             const caller = callerOf('mcp.crew_publish');
@@ -176,11 +157,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_seed',
         descriptionFor('aimeat_crew_seed'),
-        {
-            target_agent_name: agentNameSchema,
-            doc: DocSchema.describe('The FIRST definition for this agent. Refused if it already has one.'),
-            validate_with: z.string().optional().describe('Which connected same-owner agent should check it. Omit and any connected one is used.'),
-        },
+        zodShapeFor('aimeat_crew_seed'),
         annotationsFor('aimeat_crew_seed'),
         async ({ target_agent_name, doc, validate_with }) => {
             const out = await crewSeed(deps, callerOf('mcp.crew_seed'), target_agent_name, doc, validate_with);
@@ -195,7 +172,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_menu',
         descriptionFor('aimeat_crew_menu'),
-        { target_agent_name: agentNameSchema },
+        zodShapeFor('aimeat_crew_menu'),
         annotationsFor('aimeat_crew_menu'),
         async ({ target_agent_name }) => {
             const out = await crewMenu(deps, callerOf('mcp.crew_menu'), target_agent_name);
@@ -209,12 +186,7 @@ export function registerAgentCrewTools(
     mcp.tool(
         'aimeat_crew_llm_set',
         descriptionFor('aimeat_crew_llm_set'),
-        {
-            target_agent_name: agentNameSchema.optional()
-                .describe("The agent to set it for. Omit to set the owner's DEFAULT for every agent they have."),
-            choice: z.record(z.string(), z.unknown()).nullish()
-                .describe("{kind:'node', role?} (think through this node, which picks the model and the key), {kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
-        },
+        zodShapeFor('aimeat_crew_llm_set'),
         annotationsFor('aimeat_crew_llm_set'),
         async ({ target_agent_name, choice }) => {
             const caller = callerOf('mcp.crew_llm_set');

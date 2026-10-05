@@ -191,24 +191,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_agent_description_set:             'agent:write',
     aimeat_agent_run_mode_set:                'agent:write',
     aimeat_agent_console_set:                 'agent:write',
-    // aimeat_agent_tags_set and aimeat_agent_runtime_report left this list on 2026-10-02 for
-    // SCOPE_EXEMPT_TOOLS: an agent's own record needs no word, a sibling's needs agent:write, and the
-    // handler checks which (auth/self-or-scope.ts).
-    // A crew definition is a memory record in the agent's namespace: reading it is memory:read,
-    // and every step toward changing it (validate, try, draft, publish) is memory:write, the scope
-    // the REST doors gate the writes on. Validate and try change nothing, but they are only ever
-    // steps of a publish, and an agent that may not publish has no business driving a sibling's
-    // runtime through them.
-    aimeat_crew_get:                          'memory:read',
-    aimeat_crew_validate:                     'memory:write',
-    aimeat_crew_try:                          'memory:write',
-    aimeat_crew_draft:                        'memory:write',
-    aimeat_crew_publish:                      'memory:write',
-    aimeat_crew_seed:                         'memory:write',
-    // The menu is a read of what the runtime offers; the choice is a record in the owner's
-    // namespace, so it takes the same word every other record there takes.
-    aimeat_crew_menu:                         'memory:read',
-    aimeat_crew_llm_set:                      'memory:write',
     aimeat_agent_basics_request:              'memory:write',
     // A proposal IS a memory write — a record under `agents.proposals.` plus a line on the owner's
     // open items — and the same word the sibling ask-route takes. Creating the agent is a different
