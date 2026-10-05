@@ -10,6 +10,8 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-05 — aimeat_cortex_install registers the catalog's schema, and its upload offer is
+ *     cortexUploadOffer(), the one POST /v1/cortex answers (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.9.1 -- 2026-09-26 -- The upload response and the refusal of update:true without a manifest say
  *     that a ZIP under the name of a cortex the caller installed replaces it in place, as the upload
@@ -50,11 +52,10 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { generateUploadToken } from '../services/upload-token.js';
+import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import {
     installCortex, activateCortex, deactivateCortex, deleteCortex,
@@ -173,11 +174,7 @@ export function registerCortexTools(
     mcp.tool(
         'aimeat_cortex_install',
         descriptionFor('aimeat_cortex_install'),
-        {
-            manifest: z.string().optional().describe('YAML manifest string. Omit to get an upload URL for a ZIP bundle.'),
-            libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files.'),
-            update: z.boolean().optional().describe('Replace your installed cortex of the manifest\'s metadata.name in place (inline mode). Without it an inline install of an existing name is refused; a ZIP upload replaces a cortex you installed either way.'),
-        },
+        zodShapeFor('aimeat_cortex_install'),
         annotationsFor('aimeat_cortex_install'),
         async ({ manifest, libs, update }) => {
             const agentGaii = getAgentGaii();
@@ -197,35 +194,9 @@ export function registerCortexTools(
                 };
             }
 
-            // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
+            // --- UPLOAD MODE: no manifest, the presigned offer POST /v1/cortex answers for mode presigned ---
             if (!manifest) {
-                const maxBytes = config.cortexMaxLibSizeKb * 1024 * 50;
-                const token = await generateUploadToken({
-                    sub: agentGaii,
-                    utype: 'cortex',
-                    meta: {},
-                    maxBytes,
-                    contentType: 'application/zip',
-                });
-
-                const uploadUrl = `${config.baseUrl}/v1/upload/${token}`;
-
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({
-                            mode: 'upload',
-                            upload_url: uploadUrl,
-                            upload_method: 'PUT',
-                            content_type: 'application/zip',
-                            max_size_bytes: maxBytes,
-                            expires_in_seconds: 3600,
-                            zip_structure: 'manifest.yaml at root, lib files in libs/ directory',
-                            note: 'Create a ZIP with manifest.yaml and libs/*.js, then PUT it to upload_url. '
-                                + 'A ZIP that carries the name of a cortex you installed replaces it in place; an active one is activated again from the new manifest.',
-                        }, null, 2),
-                    }],
-                };
+                return { content: [{ type: 'text' as const, text: JSON.stringify(await cortexUploadOffer(config, agentGaii), null, 2) }] };
             }
 
             // --- INLINE MODE: manifest provided, process immediately ---

@@ -121,8 +121,8 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // the manifest's own metadata.name, so a manifest that names something is held constant. Without
     // it `update` would be measured only on the upload branch, which never reaches the redeploy door.
     aimeat_extension_install: { always: { manifest: 'metadata:\n  name: zqxprobezqx\n' } },
-    // The cortex door has no upload branch over HTTP: every call carries a manifest, and `update`
-    // turns the POST into a PUT on the name the manifest declares.
+    // A manifest is held constant so `update` turns the POST into a PUT on the name the manifest
+    // declares; without one the call asks POST /v1/cortex for the ZIP upload offer instead.
     aimeat_cortex_install: { always: { manifest: 'metadata:\n  name: zqxprobezqx\n' } },
     // A decision is made ON a request, so `decision` alone is refused before the wire. With a
     // request named it goes to the decision door, which is the branch that carries it.

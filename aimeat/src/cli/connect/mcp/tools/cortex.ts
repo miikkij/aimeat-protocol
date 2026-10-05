@@ -5,6 +5,8 @@
  * @description MCP tool registrations for cortex model lifecycle -- listing,
  *   installing, activating, deactivating, and deleting cortex models.
  * @version-history
+ *   2026-10-05 — aimeat_cortex_install registers the catalog's schema: without a manifest it answers
+ *     the upload offer through POST /v1/cortex (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-09-27 -- aimeat_cortex_list takes name (GET /v1/cortex/:name) and include_source (/export).
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -16,7 +18,6 @@
  *     (installCortexOverHttp, shared with the CLI dispatch).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
@@ -37,11 +38,7 @@ export function registerCortexTools(mcp: McpServer, registry: AgentRegistry): vo
     return envelopeResult({ ok: true, data: { ...(detail.data as object), source: source.data } });
   });
 
-  mcp.tool('aimeat_cortex_install', descriptionFor('aimeat_cortex_install'), {
-    manifest: z.string().describe('Cortex manifest in YAML format'),
-    libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files'),
-    update: z.boolean().optional().describe('Replace your installed cortex of the manifest\'s metadata.name in place. Without it an existing name is refused.'),
-  }, annotationsFor('aimeat_cortex_install'), async ({ manifest, libs, update }) => {
+  mcp.tool('aimeat_cortex_install', descriptionFor('aimeat_cortex_install'), zodShapeFor('aimeat_cortex_install'), annotationsFor('aimeat_cortex_install'), async ({ manifest, libs, update }) => {
     // One function with the CLI dispatch: a plain install posts, update redeploys through PUT.
     const resp = await installCortexOverHttp(client, { manifest, libs, update });
     return envelopeResult(resp);
