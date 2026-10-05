@@ -236,8 +236,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
-        'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
+        
+        
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         
         
@@ -324,8 +324,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
-        'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
+        
+        
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         
         
@@ -374,8 +374,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
-        'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
+        
+        
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         
         

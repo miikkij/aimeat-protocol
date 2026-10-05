@@ -130,15 +130,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // In-place document edits. The append is NOT idempotent — running it twice adds the text twice,
     // which is the honest answer for an operation that exists to accumulate. The section replace is:
     // the same block replacing the same heading leaves the same document.
-    aimeat_workspace_doc_append: { title: 'Append To Workspace Document', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_doc_section_replace: { title: 'Replace Workspace Document Section', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // Row spaces. The append is idempotent BY THE CALLER'S CHOICE: supplying row_id makes a repeat
-    // replace that row, omitting it makes every call a new row. Marked non-idempotent because the
-    // hint has to describe the call a client might retry blindly, and that one has no row_id.
-    aimeat_workspace_rows_append: { title: 'Append Workspace Rows', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_rows_read: { title: 'Read Workspace Rows', readOnlyHint: true },
-    aimeat_workspace_rows_stats: { title: 'Workspace Row Space Stats', readOnlyHint: true },
-    aimeat_workspace_rows_delete: { title: 'Delete Workspace Rows', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Outbound connections and mail ──
     // openWorldHint is TRUE on every one of these that leaves the node: they reach a provider whose
