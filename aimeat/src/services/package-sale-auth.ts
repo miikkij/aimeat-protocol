@@ -15,13 +15,16 @@
  *   The method, the path and the body are all covered, so a signature taken for reading the questions
  *   cannot be replayed as a grant, and a grant for one node cannot be replayed for another. The body is
  *   the canonical JSON of what was sent (JSON.stringify of the parsed object), which the receiver
- *   computes from the parsed body; the timestamp holds a signature to five minutes.
+ *   computes from the parsed body; the timestamp holds a signature to five minutes. The signing and
+ *   the checks are services/signed-node-request.ts, shared with the package requests.
  * @structure SALE_PURPOSE · CLAIM_PURPOSE · bodyDigest() · signedSaleHeaders() · verifySaleRequest() ·
  *   verifyRequestWithKey()
  * @usage
  *   const headers = await signedSaleHeaders(storage, config, 'PUT', path, body);   // the seller
  *   const who = await verifySaleRequest(req.headers, peers, req.method, req.originalUrl, req.body);   // the repository
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Signing and checking are services/signed-node-request.ts, which the package
+ *     requests use too; the signed string is the same (secaudit 2026-10, C6).
  *   v1.2.0 — 2026-10-05 — The signed message names the node it is for (x-audience) and a one-time
  *     x-nonce; both verifiers require them and accept a nonce once (request-nonce.ts). A request
  *     carrying neither comes from an older node and is refused (secaudit 2026-10, PKG-10).
@@ -33,11 +36,9 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
-import { sign, verify } from '../auth/keypair.js';
-import { newNonce, nonceAccepted } from './request-nonce.js';
+import { signNodeRequest, checkNodeRequest, type NodeRequestCheck } from './signed-node-request.js';
 
 export const SALE_PURPOSE = 'package-sale';
-const WINDOW_MS = 5 * 60 * 1000;
 
 /** SHA-256 hex of the canonical JSON of a body; an absent body is `{}`. */
 export function bodyDigest(body: unknown): string {
@@ -47,45 +48,19 @@ export function bodyDigest(body: unknown): string {
 /** The purpose a buyer node signs a claim with (package-claims.ts). */
 export const CLAIM_PURPOSE = 'package-claim';
 
-/** What is signed: the exact request, and since 2026-10-05 the node it is for and a one-time nonce (PKG-10). */
-function message(sourceNode: string, timestamp: string, method: string, path: string, digest: string, audience: string, nonce: string, purpose = SALE_PURPOSE): string {
-    return JSON.stringify({ source_node: sourceNode, timestamp, purpose, method: method.toUpperCase(), path, body_sha256: digest, audience, nonce });
+/** What a sale request signs besides the common fields: the exact request. */
+function fieldsOf(method: string, path: string, body: unknown, purpose = SALE_PURPOSE): Record<string, string> {
+    return { purpose, method: method.toUpperCase(), path, body_sha256: bodyDigest(body) };
 }
 
 /** Headers that prove this node asked `audience` for this exact request, or none when the node has no key yet. */
 export async function signedSaleHeaders(
     storage: Storage, config: AimeatConfig, audience: string, method: string, path: string, body: unknown, purpose = SALE_PURPOSE,
 ): Promise<Record<string, string>> {
-    const key = await storage.getNodeKey();
-    if (!key?.privateKey) return {};
-    const timestamp = new Date().toISOString();
-    const nonce = newNonce();
-    return {
-        'x-source-node': config.nodeId,
-        'x-timestamp': timestamp,
-        'x-audience': audience,
-        'x-nonce': nonce,
-        'x-signature': await sign(key.privateKey, message(config.nodeId, timestamp, method, path, bodyDigest(body), audience, nonce, purpose)),
-    };
+    return signNodeRequest(storage, config, audience, fieldsOf(method, path, body, purpose));
 }
 
-/**
- * The audience and nonce a signed request carries, checked: it names this node, and the nonce has a
- * shape. The nonce is accepted (once) only after the signature checks out (acceptNonce).
- */
-function audienceOf(pick: (h: string) => string | undefined, thisNodeId: string): { audience: string; nonce: string } | SaleNodeCheck {
-    const audience = pick('x-audience');
-    const nonce = pick('x-nonce');
-    if (audience !== thisNodeId || !nonce) {
-        return { ok: false, status: 401, code: 'UNAUTHORIZED', message: `A signed request names the node it is for (x-audience: ${thisNodeId}) and a one-time x-nonce. A node that sends neither runs an older version.` };
-    }
-    return { audience, nonce };
-}
-
-function acceptNonce(sourceNode: string, nonce: string, now: number): SaleNodeCheck | null {
-    return nonceAccepted(sourceNode, nonce, now) ? null
-        : { ok: false, status: 401, code: 'REPLAYED', message: 'This signed request was already received. A node signs every request anew.' };
-}
+export type SaleNodeCheck = NodeRequestCheck;
 
 /**
  * A request signed with the key it names itself: a node that is not a peer yet proves it holds the
@@ -97,28 +72,13 @@ export async function verifyRequestWithKey(
     headers: Record<string, string | string[] | undefined>, publicKey: string, purpose: string, thisNodeId: string,
     method: string, path: string, body: unknown, now = Date.now(),
 ): Promise<SaleNodeCheck> {
-    const pick = (h: string): string | undefined => { const v = headers[h]; return Array.isArray(v) ? v[0] : v; };
-    const sourceNode = pick('x-source-node');
-    const signature = pick('x-signature');
-    const timestamp = pick('x-timestamp');
-    if (!sourceNode || !signature || !timestamp || !publicKey) {
-        return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The request is signed by the node it names: x-source-node, x-timestamp and x-signature, with the key in the body.' };
-    }
-    const ts = Date.parse(timestamp);
-    if (!Number.isFinite(ts) || Math.abs(now - ts) > WINDOW_MS) {
-        return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
-    }
-    const aud = audienceOf(pick, thisNodeId);
-    if ('ok' in aud) return aud;
-    if (!await verify(publicKey, message(sourceNode, timestamp, method, path, bodyDigest(body), aud.audience, aud.nonce, purpose), signature)) {
-        return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The signature does not check out with the key this request names.' };
-    }
-    return acceptNonce(sourceNode, aud.nonce, now) ?? { ok: true, nodeId: sourceNode };
+    const missingMessage = 'The request is signed by the node it names: x-source-node, x-timestamp and x-signature, with the key in the body.';
+    return checkNodeRequest(headers, {
+        thisNodeId, now, fields: fieldsOf(method, path, body, purpose), missingMessage,
+        badSignatureMessage: 'The signature does not check out with the key this request names.',
+        keyOf: () => (publicKey ? { publicKey } : { ok: false, status: 401, code: 'UNAUTHORIZED', message: missingMessage }),
+    });
 }
-
-export type SaleNodeCheck =
-    | { ok: true; nodeId: string }
-    | { ok: false; status: number; code: string; message: string };
 
 /**
  * Which node signed this exact request. The node must be an active peer with a key; what it may do is
@@ -132,28 +92,16 @@ export async function verifySaleRequest(
     method: string, path: string, body: unknown,
     now = Date.now(),
 ): Promise<SaleNodeCheck> {
-    const pick = (h: string): string | undefined => {
-        const v = headers[h];
-        return Array.isArray(v) ? v[0] : v;
-    };
-    const sourceNode = pick('x-source-node');
-    const signature = pick('x-signature');
-    const timestamp = pick('x-timestamp');
-    if (!sourceNode || !signature || !timestamp) {
-        return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'A sale request is signed by the selling node: x-source-node, x-timestamp and x-signature.' };
-    }
-    const peer = peers.get(sourceNode);
-    if (!peer || peer.status !== 'active' || !peer.publicKey) {
-        return { ok: false, status: 403, code: 'FORBIDDEN', message: `${sourceNode} is not an active peer of this repository. Its author names it a seller first (aimeat_package_sellers).` };
-    }
-    const ts = Date.parse(timestamp);
-    if (!Number.isFinite(ts) || Math.abs(now - ts) > WINDOW_MS) {
-        return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
-    }
-    const aud = audienceOf(pick, thisNodeId);
-    if ('ok' in aud) return aud;
-    if (!await verify(peer.publicKey, message(sourceNode, timestamp, method, path, bodyDigest(body), aud.audience, aud.nonce), signature)) {
-        return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The node signature on this sale request does not check out for this method, path and body.' };
-    }
-    return acceptNonce(sourceNode, aud.nonce, now) ?? { ok: true, nodeId: sourceNode };
+    return checkNodeRequest(headers, {
+        thisNodeId, now, fields: fieldsOf(method, path, body),
+        missingMessage: 'A sale request is signed by the selling node: x-source-node, x-timestamp and x-signature.',
+        badSignatureMessage: 'The node signature on this sale request does not check out for this method, path and body.',
+        keyOf: (sourceNode) => {
+            const peer = peers.get(sourceNode);
+            if (!peer || peer.status !== 'active' || !peer.publicKey) {
+                return { ok: false, status: 403, code: 'FORBIDDEN', message: `${sourceNode} is not an active peer of this repository. Its author names it a seller first (aimeat_package_sellers).` };
+            }
+            return { publicKey: peer.publicKey };
+        },
+    });
 }
