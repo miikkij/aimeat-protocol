@@ -33,9 +33,11 @@
  *   AIMEAT.ai.disclose(r.provenance, { target: '#answer-label' });
  *   await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import { APEX_URL } from '../_core/config.js';
+import { storedLang } from '../_core/lang.js';
 import { euIconFor } from '../../../../public/components/ai-label-icons.js';
 import LABEL_CSS from '../../../../public/css/components/ai-label.css';
 import { pick } from './strings.js';
@@ -89,10 +91,7 @@ function osDarkIcons(base) {
 
 /** The reader's language, resolved the way every AIMEAT app resolves it. */
 function locale() {
-  const stored = (() => {
-    try { return localStorage.getItem('aimeat-lang'); } catch { return null; }
-  })();
-  const lang = stored || document.documentElement.lang || 'en';
+  const lang = storedLang() || document.documentElement.lang || 'en';
   return lang.slice(0, 2) === 'fi' ? 'fi' : 'en';
 }
 

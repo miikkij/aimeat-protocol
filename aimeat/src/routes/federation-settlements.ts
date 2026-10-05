@@ -11,6 +11,7 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   v1.4.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-09-09 — The relay-share credit loop is gone: it looked a node id up with
  *     storage.getAgent (a GAII) and had never credited anyone. The distribution is still reported;
@@ -32,6 +33,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { gatePeer } from '../services/federation-peer-gate.js';
 import { sign, verify } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 import type { RouteManifest } from '../types/route-manifest.js';
 import { buildHopSigningMessage, computeRelayFeeDistribution } from '../types/route-manifest.js';
 import type { RelayFeeDistribution } from '../types/route-manifest.js';
@@ -251,7 +253,7 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
                 return;
             }
 
-            const response = await fetch(`${peer.url}/v1/federation/settle`, {
+            const response = await peerFetch(`${peer.url}/v1/federation/settle`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -264,12 +266,17 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
                     timestamp: settlementTimestamp,
                     signature: settlementSignature,
                 }),
-                signal: AbortSignal.timeout(30_000),
-            });
+            }, { timeoutMs: 30_000 });
+            if (!response.ok) {
+                // Unreachable, a redirect, a timeout or an answer over the ceiling: the 502 a failed fetch got.
+                res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
+                    `Failed to send settlement to ${target_node}: ${response.message}`));
+                return;
+            }
 
-            const data = await response.json().catch(err => { logger.warn('POST /v1/federation/settle/outbound: continuing after a suppressed failure', { error: String(err) }); return null; });
+            const data = response.json ?? null;
 
-            if (response.ok) {
+            if (response.status >= 200 && response.status < 300) {
                 logger.info(`Outbound settlement sent: ${amount} morsels for ${gaii} to node ${target_node} (tc: ${tracking_code})`);
                 res.json(success(config.nodeId, {
                     sent: true,

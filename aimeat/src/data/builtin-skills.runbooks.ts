@@ -12,6 +12,9 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.9.2 — 2026-10-05 — aimeat-node-operations: operator:admin also opens the REST admin routes, and
+ *     an operator act in another person's account shows in that person's account feed (secaudit
+ *     2026-10, C2).
  *   v1.9.1 — 2026-10-02 — manage-my-agents: a memory:read refusal of a crew agent is given, not
  *     declined; without it the agent never starts.
  *   v1.9.0 — 2026-10-02 — manage-my-agents: a worker on the owner's computer uses their settings and
@@ -107,7 +110,11 @@ until it is bound again on the Hooks page.
 - If a check needs a tool this session does not have, say which tool is missing rather than guessing.
 - The \`aimeat_admin_*\` tools reach an agent only while its operator has given it the
   \`operator:admin\` permission in the agent's settings. When they are missing, tell the owner that
-  this permission is what is missing.
+  this permission is what is missing. The same permission lets the agent use the node's admin
+  routes over REST, as the operator in person does.
+- An operator act in another person's account (their board, app, extension, consent or account
+  data) is recorded, and that person sees a line about it in their account feed. Tell the owner
+  this before you act there.
 `,
   },
   {

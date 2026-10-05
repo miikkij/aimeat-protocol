@@ -14,6 +14,7 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.7.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-09-29 — TARGET-082 review: what leave() keeps from a peer's memory read is counted
  *     in the answer (`withheld: { count, reason }`, no keys) and logged by key on this node.
@@ -46,6 +47,7 @@ import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { verify } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from '../services/event-bus.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
@@ -477,24 +479,26 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                     if (key) queryParams.set('key', key);
                     if (prefix) queryParams.set('prefix', prefix);
 
-                    const resp = await fetch(
+                    const resp = await peerFetch(
                         `${peer.genesisUrl}/v1/federation/genesis-memory-read?${queryParams}`,
                         {
                             method: 'GET',
                             headers: { 'Accept': 'application/json' },
-                            signal: AbortSignal.timeout(config.federationTimeoutMs),
                         },
+                        { timeoutMs: config.federationTimeoutMs },
                     );
+                    // Unreachable, a redirect, a timeout or an answer over the ceiling: skipped, as a failed fetch was.
+                    if (!resp.ok) throw new Error(resp.message);
 
                     peersQueried++;
 
-                    if (!resp.ok) return;
+                    if (resp.status < 200 || resp.status >= 300) return;
 
-                    const body = await resp.json() as {
+                    const body = resp.json as {
                         data?: { results?: Array<Record<string, unknown>> };
-                    };
+                    } | undefined;
 
-                    if (body.data?.results) {
+                    if (body?.data?.results) {
                         for (const result of body.data.results) {
                             results.push({
                                 ...result,

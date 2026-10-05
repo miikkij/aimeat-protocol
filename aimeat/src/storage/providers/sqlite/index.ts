@@ -11,8 +11,13 @@
  *   Object.assign. The `interface SqliteStorage extends Storage, SqliteInternals`
  *   declaration merge tells the type-checker the class has every method the merge
  *   supplies at runtime. Split out of one 7.2k-line file to satisfy max-file-lines.
+ *   Each methods file carries the name of its postgres-kysely/methods twin and the same method set,
+ *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   v1.14.0 — 2026-10-05 — The method groups are wired from files named after their
+ *     postgres-kysely/methods twins; consentMethods is bound directly now that governance.ts, which
+ *     spread it, is gone (secaudit 2026-10, M8).
  *   v1.0.0 — pre-2026-06 — Initial SQLite storage implementation
  *   v1.1.0 — 2026-06-05 — Add normalizeAppOwnerNames() to strip the legacy
  *     `@node` suffix from app ownerName values (bare-name normalization).
@@ -49,45 +54,69 @@ import type { Storage, ChunkedUploadRecord } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
 import type { SqliteInternals } from './methods/internal.js';
-import { ownerMethods } from './methods/owner.js';
-import { agentMethods } from './methods/agents.js';
-import { cascadeMethods } from './methods/owner-cascade.js';
-import { ownerMemoryBulkMethods } from './methods/owner-memory-bulk.js';
-import { ownerMemoryScopeMethods } from './methods/owner-memory-scope.js';
-import { workMethods } from './methods/work.js';
-import { identityNodesMethods } from './methods/identity-nodes.js';
-import { storageFileMethods } from './methods/storage-files.js';
-import { governanceMethods } from './methods/governance.js';
-import { communityMethods } from './methods/community.js';
-import { extensionsNotifyMethods } from './methods/extensions-notify.js';
-import { appsMethods } from './methods/apps.js';
-import { knowledgeLinkMethods } from './methods/knowledge-links.js';
-import { federationOauthMethods } from './methods/federation-oauth.js';
-import { packagesMethods } from './methods/packages.js';
-import { capabilityAgentsMethods } from './methods/capability-agents.js';
-import { messagingMethods } from './methods/messaging.js';
-import { aiProvenanceMethods } from './methods/ai-provenance.js';
-import { aiDecisionMethods } from './methods/ai-decisions.js';
-import { contentLabelMethods } from './methods/content-labels.js';
-import { classificationAuditMethods } from './methods/classification-audit.js';
-import { connectionMethods } from './methods/connections.js';
-import { mcpServerMethods } from './methods/mcp-servers.js';
-import { financeMethods } from './methods/finance.js';
-import { outboundMethods } from './methods/outbound.js';
-import { companyMethods } from './methods/companies.js';
-import { usageMethods } from './methods/usage.js';
 import { accountEventMethods } from './methods/account-events.js';
-import { workspaceRowMethods } from './methods/workspace-rows.js';
-import { memoryTallyMethods } from './methods/memory-tally.js';
-import { ssoConnectionMethods } from './methods/sso-connections.js';
+import { actionMethods } from './methods/actions.js';
 import { agentEnrolmentMethods } from './methods/agent-enrolment.js';
+import { agentDirectiveMethods, agentActivityMethods, agentWebhookMethods, sharingGroupMethods } from './methods/agent-misc.js';
+import { agentMessageMethods, disputeMethods, invitationMethods } from './methods/agent-msg-dispute-invite.js';
+import { agentOnboardingMethods } from './methods/agent-onboarding.js';
+import { agentTaskMethods } from './methods/agent-tasks.js';
+import { agentUsageMethods } from './methods/agent-usage.js';
 import { agentV2MessagingMethods } from './methods/agent-v2-messaging.js';
 import { agentV2TasksMethods } from './methods/agent-v2-tasks.js';
-import { dependencyMethods } from './methods/dependencies.js';
+import { aiDecisionMethods } from './methods/ai-decisions.js';
+import { aiProvenanceMethods } from './methods/ai-provenance.js';
+import { appGrantMethods } from './methods/app-grants.js';
+import { appPurchaseMethods } from './methods/app-purchases.js';
+import { appMethods } from './methods/apps.js';
+import { boardMethods } from './methods/boards.js';
+import { capabilityMethods } from './methods/capabilities.js';
+import { catalogueMethods } from './methods/catalogue.js';
+import { classificationAuditMethods } from './methods/classification-audit.js';
+import { companyMethods } from './methods/companies.js';
 import { componentVersionMethods } from './methods/component-versions.js';
-import { passkeyMethods } from './methods/passkeys.js';
-import { secretMethods } from './methods/secrets.js';
+import { connectionMethods } from './methods/connections.js';
+import { consentMethods } from './methods/consent.js';
+import { contentLabelMethods } from './methods/content-labels.js';
+import { dependencyMethods } from './methods/dependencies.js';
+import { deviceAuthMethods } from './methods/device-auth.js';
+import { directMessageMethods } from './methods/direct-message.js';
+import { ecosystemMethods } from './methods/ecosystem.js';
+import { federationMethods } from './methods/federation.js';
+import { fileMethods } from './methods/files.js';
+import { financeMethods } from './methods/finance.js';
 import { heldNameMethods } from './methods/held-names.js';
+import { identityMethods } from './methods/identity.js';
+import { identityExtraMethods } from './methods/identity-extras.js';
+import { knowledgeMethods } from './methods/knowledge.js';
+import { mcpServerMethods } from './methods/mcp-servers.js';
+import { memoryMethods } from './methods/memory.js';
+import { memoryTallyMethods } from './methods/memory-tally.js';
+import { moderationMethods } from './methods/moderation.js';
+import { nodeExtEscrowMethods } from './methods/node-ext-escrow.js';
+import { nodeInfraMethods } from './methods/node-infra.js';
+import { notificationMethods } from './methods/notifications.js';
+import { oauthMethods } from './methods/oauth.js';
+import { organismMethods } from './methods/organisms.js';
+import { otkMethods } from './methods/otk.js';
+import { outboundMethods } from './methods/outbound.js';
+import { cascadeMethods } from './methods/owner-cascade.js';
+import { packageMethods } from './methods/packages.js';
+import { passkeyMethods } from './methods/passkeys.js';
+import { patMethods } from './methods/pat.js';
+import { scheduleMethods } from './methods/schedules.js';
+import { schemaMethods } from './methods/schema.js';
+import { secretMethods } from './methods/secrets.js';
+import { sessionMethods } from './methods/sessions.js';
+import { ssoConnectionMethods } from './methods/sso-connections.js';
+import { subdomainSiteMethods } from './methods/subdomain-sites.js';
+import { systemMethods } from './methods/system.js';
+import { systemPromptMethods, replicationQueueMethods } from './methods/system-extras.js';
+import { templateListingMethods } from './methods/template-listings.js';
+import { usageMethods } from './methods/usage.js';
+import { walletMethods } from './methods/wallet.js';
+import { workMethods } from './methods/work.js';
+import { workspaceRowMethods } from './methods/workspace-rows.js';
 
 /**
  * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
@@ -207,45 +236,75 @@ export interface SqliteStorage extends Storage, SqliteInternals {}
 
 Object.assign(
   SqliteStorage.prototype,
-  ownerMethods,
-  agentMethods,
-  cascadeMethods,
-  ownerMemoryBulkMethods,
-  ownerMemoryScopeMethods,
-  workMethods,
-  identityNodesMethods,
-  storageFileMethods,
-  governanceMethods,
-  communityMethods,
-  extensionsNotifyMethods,
-  appsMethods,
-  knowledgeLinkMethods,
-  federationOauthMethods,
-  packagesMethods,
-  capabilityAgentsMethods,
-  messagingMethods,
-  aiProvenanceMethods,
-  aiDecisionMethods,
-  contentLabelMethods,
-  classificationAuditMethods,
-  connectionMethods,
-  mcpServerMethods,
-  financeMethods,
-  outboundMethods,
-  companyMethods,
-  usageMethods,
   accountEventMethods,
-  workspaceRowMethods,
-  memoryTallyMethods,
-  ssoConnectionMethods,
+  actionMethods,
   agentEnrolmentMethods,
-  dependencyMethods,
-  componentVersionMethods,
-  passkeyMethods,
-  secretMethods,
+  agentDirectiveMethods,
+  agentActivityMethods,
+  agentWebhookMethods,
+  sharingGroupMethods,
+  agentMessageMethods,
+  disputeMethods,
+  invitationMethods,
+  agentOnboardingMethods,
+  agentTaskMethods,
+  agentUsageMethods,
   agentV2MessagingMethods,
   agentV2TasksMethods,
+  aiDecisionMethods,
+  aiProvenanceMethods,
+  appGrantMethods,
+  appPurchaseMethods,
+  appMethods,
+  boardMethods,
+  capabilityMethods,
+  catalogueMethods,
+  classificationAuditMethods,
+  companyMethods,
+  componentVersionMethods,
+  connectionMethods,
+  consentMethods,
+  contentLabelMethods,
+  dependencyMethods,
+  deviceAuthMethods,
+  directMessageMethods,
+  ecosystemMethods,
+  federationMethods,
+  fileMethods,
+  financeMethods,
   heldNameMethods,
+  identityMethods,
+  identityExtraMethods,
+  knowledgeMethods,
+  mcpServerMethods,
+  memoryMethods,
+  memoryTallyMethods,
+  moderationMethods,
+  nodeExtEscrowMethods,
+  nodeInfraMethods,
+  notificationMethods,
+  oauthMethods,
+  organismMethods,
+  otkMethods,
+  outboundMethods,
+  cascadeMethods,
+  packageMethods,
+  passkeyMethods,
+  patMethods,
+  scheduleMethods,
+  schemaMethods,
+  secretMethods,
+  sessionMethods,
+  ssoConnectionMethods,
+  subdomainSiteMethods,
+  systemMethods,
+  systemPromptMethods,
+  replicationQueueMethods,
+  templateListingMethods,
+  usageMethods,
+  walletMethods,
+  workMethods,
+  workspaceRowMethods,
 );
 
 // Applied after the merge so it wraps every method group, including any added later.

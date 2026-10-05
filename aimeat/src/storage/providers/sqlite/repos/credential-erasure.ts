@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SQLite SQL for the credentials issued in an account name: the app grants, the personal
- *   access tokens and the session rows. The account deletion (deleteOwner in methods/owner.ts), the
+ *   access tokens and the session rows. The account deletion (deleteOwner in methods/identity.ts), the
  *   start step for credentials and the operator's decision on a held name (repos/held-names.ts) call
  *   this one function. A free function over the connection, like the other erasure repos, so there is
  *   no import cycle through the provider class. The Postgres twin is deleteAccountCredentialsDb in its
@@ -13,6 +13,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-26 — What deleteOwner did for the app grants and the personal access tokens
  *     inline, with the session rows, as the Postgres cascade deletes them.
+ *   v1.0.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  */
 import type Database from 'better-sqlite3';
 

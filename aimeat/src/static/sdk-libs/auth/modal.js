@@ -13,6 +13,7 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.13.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.13.0 — 2026-10-05 — A sign-up reaches the code step every time. The late dictionary load no
  *     longer redraws the dialog while a step is open or a button is working (the redraw threw a
  *     person whose POST /v1/ghii had answered 201 back to the form, and a second press then met
@@ -71,7 +72,8 @@
  */
 import { auth, api } from './session.js';
 import { escHtml } from './theme.js';
-import { currentModalLang, loadModalI18n, MODAL_LANG_KEY, MODAL_LANGS } from './i18n.js';
+import { currentModalLang, loadModalI18n, MODAL_LANGS } from './i18n.js';
+import { writeLang } from '../_core/lang.js';
 import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
 import { MODAL_CSS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
@@ -149,10 +151,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
   // Switch language: persist the choice, reload translations, re-render in place (no page reload).
   function switchLang(next) {
     if (next === lang) return;
-    try {
-      localStorage.setItem(MODAL_LANG_KEY, next);
-      document.cookie = 'aimeat-lang=' + next + ';path=/;max-age=31536000;SameSite=Lax';
-    } catch { /* storage blocked */ }
+    writeLang(next);
     var vals = captureInputs();
     loadModalI18n(next).then(function (fresh) {
       lang = next;

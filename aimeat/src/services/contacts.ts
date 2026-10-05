@@ -26,6 +26,8 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.6.0 — 2026-10-05 — listContactsFor(storage, nodeId, auth, query): the address book as one caller
+ *     sees it, which GET /v1/contacts and aimeat_contact_list both call (secaudit 2026-10, M6).
  *   v2.5.0 — 2026-10-01 — withoutCorrespondence(row): the same row with the conversation columns empty,
  *     for a caller reading the book on contacts:read that may not read the owner's mailbox.
  *   v2.4.1 — 2026-09-26 — The inviter's and a resolved owner's account names come from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -60,7 +62,9 @@ import { inviteEmailHash } from './invitations.js';
 import { getActiveEmailService } from './email.js';
 import { ensureContact, updateContactCard, sendOutbound, OutboundError } from './outbound/outbound-service.js';
 import { revokeContactHandles } from './contact-handles.js';
-import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountName, ownerCoordinate } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { mailboxReaderOf, type MailboxPrincipal } from './owner-mailbox-reads.js';
 import {
   MAIL_PREFIX, identityKind, isIdentityShaped, localIdentityExists, type IdentityKind,
 } from './local-identity.js';
@@ -284,6 +288,30 @@ export interface MergedContacts {
  * attached to that identity's row instead, and the row is created if neither of the first two
  * sources produced one. That is what stops the same person appearing twice once they join.
  */
+/**
+ * The address book as one caller sees it: what GET /v1/contacts and the MCP tool aimeat_contact_list
+ * both answer. The owner in person, or an app reading their mailbox, sees the correspondence on each
+ * row; anything else acting for them does not. `together` (the organisms each person and the owner
+ * share) needs organism:read unless it is the owner in person. One implementation: the tool reached
+ * this through the route over loopback HTTP until 2026-10-05 (secaudit 2026-10, M6).
+ */
+export async function listContactsFor(
+  storage: Storage, nodeId: string,
+  auth: MailboxPrincipal,
+  query: { q?: unknown; state?: unknown; include?: unknown },
+): Promise<{ contacts: ContactRow[]; total: number; truncated: boolean }> {
+  const reader = mailboxReaderOf(auth, nodeId);
+  const include = parseContactInclude(query.include);
+  if (reader?.kind !== 'owner' && !scopeIsCovered(auth.scopes ?? [], 'organism:read')) include.delete('together');
+  const { contacts, truncated } = await listContactsMerged(storage, ownerCoordinate(auth, nodeId), {
+    state: typeof query.state === 'string' ? query.state as ContactConsentRecord['state'] : undefined,
+    q: typeof query.q === 'string' ? query.q : undefined,
+    include,
+  });
+  const rows = reader ? contacts : contacts.map(withoutCorrespondence);
+  return { contacts: rows, total: rows.length, truncated };
+}
+
 export async function listContactsMerged(
   storage: Storage, ownerGhii: string,
   opts?: { state?: ContactConsentRecord['state']; q?: string; include?: Iterable<ContactInclude> },

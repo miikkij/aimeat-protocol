@@ -22,6 +22,16 @@
     };
   }
 
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  function storedLang() {
+    try {
+      return localStorage.getItem(LANG_KEY) || null;
+    } catch {
+      return null;
+    }
+  }
+
   // src/static/sdk-libs/_core/namespace.js
   function namespace() {
     if (!window.AIMEAT) window.AIMEAT = {};
@@ -332,11 +342,8 @@
       if (attr) out.push(attr.slice(0, 2).toLowerCase());
     } catch {
     }
-    try {
-      const saved = window.localStorage.getItem("aimeat-lang");
-      if (saved) out.push(saved.slice(0, 2).toLowerCase());
-    } catch {
-    }
+    const saved = storedLang();
+    if (saved) out.push(saved.slice(0, 2).toLowerCase());
     return out;
   }
   var hooks = createHooks({ langs });

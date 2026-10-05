@@ -24,6 +24,8 @@
  * @structure DECIDE_SKILL_ENTRY
  * @usage import { DECIDE_SKILL_ENTRY } from './builtin-skills.decide.js';
  * @version-history
+ *   v1.4.1 — 2026-10-05 — A decision counts against the account's AI call limit, and a run counts once
+ *     at its start (secaudit 2026-10, C5).
  *   v1.4.0 — 2026-10-01 — settingsUrl() for the unavailable state, and the kit's decision block.
  *   v1.3.2 — 2026-09-29 — The scrub covers object keys, and scrub.allowed names what the owner let through.
  *   v1.3.1 — 2026-09-23 — The setup order starts with choosing a provider; the key is the TypeSafe branch.
@@ -95,6 +97,11 @@ decision model card). An Atelier app gets all of this, and the answers with thei
 - **One call, every question.** The cost is in the state and the answers are free: ask everything
   you might need in one \`ask\`, including questions only one branch will read, and ignore the rest.
   A second call is right only when the first answer decides what the second one can even contain.
+- **Calls are counted per account.** Each \`ask\` is one AI call against the account's limit (30 a
+  minute unless the operator set another number), and the owner and every agent and app acting for
+  them share it. Over it, the call is refused with \`RATE_LIMITED\` and says when to try again. Many
+  records at once go in a run (\`AIMEAT.decide.run.start()\`, \`aimeat_decide_run\`), which counts once
+  when it starts and once when it resumes, not once per record.
 - **English.** Instructions and options in English, whatever language the content is in.
 - **Code first, model second.** Code finds candidates (a regular expression, a roster, a search),
   does arithmetic, compares dates and numbers, and matches exact strings. The model makes the

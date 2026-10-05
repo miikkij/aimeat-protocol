@@ -4,13 +4,17 @@
  * SPDX-License-Identifier: MIT
  * @description Consent methods for the SQLite backend: grants, the (memory key, accessor) match, the
  *   node-wide roll-up, and the audit log. Extracted from sqlite/methods/governance.ts to satisfy
- *   max-file-lines; bodies verbatim, merged back onto SqliteStorage by governance.ts.
+ *   max-file-lines; bodies verbatim, merged onto SqliteStorage in ../index.ts.
  *
  *   The Postgres backend has had its consent domain in its own file since it was written, so this
  *   also makes the two providers mirror each other rather than only agree.
- * @structure consentMethods — the object governance.ts spreads into governanceMethods
+ * @structure consentMethods
+ * @usage Object.assign(SqliteStorage.prototype, consentMethods) in ../index.ts
  * @version-history
  *   v1.0.0 — 2026-08-23 — Pure extraction from governance.ts (BR-02 pushed it past 800 lines).
+ *   v1.1.0 — 2026-10-05 — Bound in ../index.ts directly: governance.ts, which spread consentMethods
+ *     into its own group, is gone, its methods moved to the files that mirror postgres-kysely/methods
+ *     (secaudit 2026-10, M8).
  */
 import type { ConsentRecord, ConsentAuditEntry, ConsentFacet, ConsentFacetQuery } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';

@@ -13,6 +13,7 @@
  * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
  * @usage import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
  * @version-history
+ *   v1.5.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.4.0 — 2026-09-24 — SECURITY (audit A5-3): broadcastFromPrincipal() counts the broadcast as ONE
  *     send against the account's limit (services/message-send-limit.ts), first, before any other
  *     decision, and answers 429 RATE_LIMITED past it. Every copy carries that turn, so the fan-out is
@@ -42,6 +43,7 @@ import { sendDirectMessage } from './message-send.js';
 import { takeSendTurn, type SendLimitMark } from './message-send-limit.js';
 import { sign } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 
 export interface AudienceSelector {
   /** Explicit recipient identities (owner@node, agent#owner@node, eco:app#owner@node). */
@@ -319,13 +321,13 @@ export async function broadcastToFederation(
         timestamp: new Date().toISOString(),
       };
       const signature = nodeKey?.privateKey ? await sign(nodeKey.privateKey, JSON.stringify(payload)) : undefined;
-      const resp = await fetch(`${peer.url}/v1/federation/broadcast`, {
+      const resp = await peerFetch(`${peer.url}/v1/federation/broadcast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-source-node': config.nodeId },
         body: JSON.stringify({ ...payload, signature }),
-        signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5000),
-      });
-      if (resp.ok) count++;
+      }, { timeoutMs: config.federationTimeoutMs ?? 5000 });
+      if (!resp.ok) throw new Error(resp.message);
+      if (resp.status >= 200 && resp.status < 300) count++;
     } catch (err) {
       logger.warn('Federation broadcast to peer failed', { peer: peer.nodeId, error: (err as Error).message });
     }

@@ -9,25 +9,21 @@
  * @structure MODAL_LANG_KEY · MODAL_LANGS · currentModalLang() · flattenModalI18n() · loadModalI18n(lang).
  * @usage import { currentModalLang, loadModalI18n } from './i18n.js';
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.1.0 — 2026-08-12 — Spanish added; the language list is one array rather than four comparisons.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
  */
 import { NODE_URL } from './config.js';
+import { LANG_KEY, readLang } from '../_core/lang.js';
 
-export var MODAL_LANG_KEY = 'aimeat-lang';
+export var MODAL_LANG_KEY = LANG_KEY;
 
 /** The languages the node ships modal text in. Mirrors LOCALES in src/i18n.ts. */
 export var MODAL_LANGS = ['en', 'fi', 'es'];
 
+/** The modal's language: ?lang=, stored choice, cookie, browser, English (_core/lang.js). */
 export function currentModalLang() {
-  try {
-    var u = new URLSearchParams(location.search).get('lang');
-    if (MODAL_LANGS.indexOf(u) !== -1) return u;
-    var s = localStorage.getItem(MODAL_LANG_KEY);
-    if (MODAL_LANGS.indexOf(s) !== -1) return s;
-  } catch { /* storage blocked */ }
-  var nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
-  return MODAL_LANGS.indexOf(nav) !== -1 ? nav : 'en';
+  return /** @type {string} */ (readLang(MODAL_LANGS));
 }
 
 export function flattenModalI18n(obj, prefix, out) {

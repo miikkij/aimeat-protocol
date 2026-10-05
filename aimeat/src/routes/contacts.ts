@@ -15,6 +15,8 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.7.1 — 2026-10-05 — GET /v1/contacts answers listContactsFor (services/contacts.ts), which the MCP
+ *     tool calls too, in place of reaching this route over loopback (secaudit 2026-10, M6).
  *   v1.7.0 — 2026-10-01 — GET /v1/contacts admits an app grant, an agent or an ecosystem app holding
  *     contacts:read beside the owner in person, and reads the owner's own book for each of them
  *     (the developer's ruling of 2026-10-01). A caller that may not read the owner's mailbox gets the
@@ -52,17 +54,15 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ContactConsentRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import type { OutboundContactLink } from '../models/outbound-schemas.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-import { resolveIdentity, ownerCoordinate } from '../utils/gaii.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { mailboxReaderOf } from '../services/owner-mailbox-reads.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import {
-  ContactsError, listContactsMerged, addContact, updatePersonContact, removeContact, resolveContactEmail,
-  sendToContact, parseContactInclude, withoutCorrespondence, type AddContactInput,
+  ContactsError, listContactsMerged, listContactsFor, addContact, updatePersonContact, removeContact, resolveContactEmail,
+  sendToContact, type AddContactInput,
 } from '../services/contacts.js';
 import { identityKind } from '../services/local-identity.js';
 import { contactTogether } from '../services/contacts-together.js';
@@ -137,18 +137,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * own card on each person (saved name, email, note, tags, links) stays: it is the owner's data and
    * the reason the word exists. ── */
   router.get('/v1/contacts', requireAuth(), requireLocalSession(), requireScope('contacts:read'), async (req, res) => {
-    const auth = req.auth!;
-    const reader = mailboxReaderOf(auth, config.nodeId);
-    const inPerson = reader?.kind === 'owner';
-    const include = parseContactInclude(req.query.include);
-    if (!inPerson && !scopeIsCovered(auth.scopes ?? [], 'organism:read')) include.delete('together');
-    const { contacts, truncated } = await listContactsMerged(storage, ownerCoordinate(auth, config.nodeId), {
-      state: typeof req.query.state === 'string' ? req.query.state as ContactConsentRecord['state'] : undefined,
-      q: typeof req.query.q === 'string' ? req.query.q : undefined,
-      include,
-    });
-    const rows = reader ? contacts : contacts.map(withoutCorrespondence);
-    res.json(success(config.nodeId, { contacts: rows, total: rows.length, truncated }));
+    res.json(success(config.nodeId, await listContactsFor(storage, config.nodeId, req.auth!, req.query)));
   });
 
   /* ── GET /v1/contacts/:contactId/together — what the owner and ONE person have in common: the

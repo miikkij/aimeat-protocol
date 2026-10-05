@@ -9,10 +9,13 @@
  *   gate; email lookup is EXACT-match only (privacy-preserving hash — no enumeration). Contacts
  *   feed identity pickers: use a resolved/looked-up owner with aimeat_organism_invite /
  *   aimeat_organism_member_add / aimeat_workspace_member_grant.
- * @structure registerContactTools(mcp, storage, config, getAgentGaii, getToken) — registers
+ * @structure registerContactTools(mcp, storage, config, getAgentGaii, scopes) — registers
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   v1.7.0 — 2026-10-05 — aimeat_contact_list and aimeat_contact_resolve_email call the services the
+ *     routes call (listContactsFor, resolveContactEmail) in place of reaching the routes over loopback
+ *     HTTP; the tool takes the session's scopes in place of its bearer (secaudit 2026-10, M6).
  *   v1.6.0 — 2026-10-01 — aimeat_contact_list asks GET /v1/contacts with the session's own bearer over
  *     loopback, as aimeat_contact_resolve_email does, and is registered on contacts:read: the route
  *     decides who reads the book and which columns a scoped reader sees, for this tool, the
@@ -46,12 +49,11 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
-    ContactsError, addContact, removeContact,
+    ContactsError, addContact, removeContact, listContactsFor, resolveContactEmail,
     type AddContactInput,
 } from '../services/contacts.js';
 import { createContactInvitation, ContactInvitationError } from '../services/contact-invitations.js';
 import { invitePublic } from '../services/invitations.js';
-import { AimeatClient } from '../cli/connect/api-client.js';
 import { toolError } from './tool-error.js';
 
 /** The link shape both MCP surfaces accept, declared once so they cannot drift. */
@@ -65,9 +67,13 @@ export function registerContactTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
-    /** The session's live bearer: the email lookup asks the REST door with it (see below). */
-    getToken: () => string | undefined = () => undefined,
+    /** The session's scopes: the address book's columns depend on what the reader holds. */
+    scopes: readonly string[] = [],
 ): void {
+    /** This session as the services read a principal: the agent, its owner, its scopes. */
+    const session = () => ({
+        sub: getAgentGaii(), owner: localAccountName(getAgentGaii()), roles: ['agent'], scopes: [...scopes],
+    });
     /** Contacts belong to the OWNER — resolve the agent's owner GHII (never a client-supplied id). */
     const ownerGhii = (): string => {
         const owner = localAccountName(getAgentGaii());
@@ -78,10 +84,12 @@ export function registerContactTools(
 
     // ── aimeat_contact_list — the owner's merged address book ──
     //
-    // THE ROUTE, NOT THE SERVICE, for the reason the email lookup below gives. GET /v1/contacts decides
-    // who reads the book (contacts:read) and which columns a scoped reader sees (the conversation
-    // columns only with the owner's mailbox, ?include=together only with organism:read). Calling
-    // listContactsMerged() here handed every agent on messages:read the owner's last messages too.
+    // THE SAME SERVICE AS THE ROUTE: listContactsFor decides which columns a scoped reader sees (the
+    // conversation columns only with the owner's mailbox, `together` only with organism:read), for
+    // GET /v1/contacts and this tool alike; the tool is registered on contacts:read, the word the
+    // route asks, and the session's scopes are the live ones. Calling listContactsMerged() here once
+    // handed every agent on messages:read the owner's last messages; the tool then reached the route
+    // over loopback HTTP until 2026-10-05 (secaudit 2026-10, M6).
     mcp.tool(
         'aimeat_contact_list',
         descriptionFor('aimeat_contact_list'),
@@ -92,19 +100,8 @@ export function registerContactTools(
         },
         annotationsFor('aimeat_contact_list'),
         async ({ q, state, include }) => {
-            const bearer = getToken();
-            if (!bearer) return { ...toolError('AUTH_REQUIRED', 'This session carries no credential to read the address book with.') };
-            const qs = new URLSearchParams();
-            if (q) qs.set('q', q);
-            if (state) qs.set('state', state);
-            if (include) qs.set('include', include);
-            // Loopback, not config.baseUrl: the call never leaves this process's host.
-            const client = new AimeatClient(`http://127.0.0.1:${config.port}`, bearer);
-            const answer = await client.get(`/v1/contacts${qs.size ? `?${qs}` : ''}`);
-            if (!answer.ok) {
-                return { ...toolError(answer.error?.code ?? 'REFUSED', answer.error?.message ?? 'The address book could not be read.') };
-            }
-            return { content: [{ type: 'text' as const, text: JSON.stringify(answer.data, null, 2) }] };
+            const answer = await listContactsFor(storage, config.nodeId, session(), { q, state, include });
+            return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
         },
     );
 
@@ -191,14 +188,13 @@ export function registerContactTools(
 
     // ── aimeat_contact_resolve_email — exact-match email → local owner ──
     //
-    // THE ROUTE, NOT THE SERVICE. Whether an address has an account here is an oracle, so POST
-    // /v1/contacts/resolve decides who asks: the owner in person or an agent holding messages:read.
-    // How often is the service's (services/email-lookup-limit.ts): 20 lookups in 10 minutes per
-    // account, the owner and their agents together, a save by email included. This tool called
-    // resolveContactEmail() itself behind messages:read, so any agent holding that word asked as often
-    // as it liked (security audit A5-2). It asks the route with the session's own bearer over
-    // loopback, the way aimeat_invoke does, so the gate is the route's single copy and the agent reads
-    // the answer REST would give it.
+    // Whether an address has an account here is an oracle, so who may ask and how often are decided
+    // once. Who: an agent holding messages:read, the word POST /v1/contacts/resolve asks and this tool
+    // is registered on (the session's live scopes). How often: resolveContactEmail counts it
+    // (services/email-lookup-limit.ts), 20 lookups in 10 minutes per account, the owner and their
+    // agents together, a save by email included. The limit lived on the route until 2026-09-24
+    // (security audit A5-2), and this tool asked the route over loopback HTTP until 2026-10-05; both
+    // now call the service (secaudit 2026-10, M6).
     mcp.tool(
         'aimeat_contact_resolve_email',
         descriptionFor('aimeat_contact_resolve_email'),
@@ -207,15 +203,13 @@ export function registerContactTools(
         },
         annotationsFor('aimeat_contact_resolve_email'),
         async ({ email }) => {
-            const bearer = getToken();
-            if (!bearer) return { ...toolError('AUTH_REQUIRED', 'This session carries no credential to look the address up with.') };
-            // Loopback, not config.baseUrl: the call never leaves this process's host.
-            const client = new AimeatClient(`http://127.0.0.1:${config.port}`, bearer);
-            const answer = await client.post('/v1/contacts/resolve', { email });
-            if (!answer.ok) {
-                return { ...toolError(answer.error?.code ?? 'REFUSED', answer.error?.message ?? 'The lookup was refused.') };
+            try {
+                const result = await resolveContactEmail(storage, getAgentGaii(), String(email ?? ''));
+                return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+            } catch (e) {
+                if (e instanceof ContactsError) return { ...toolError(e.code, e.message) };
+                throw e;
             }
-            return { content: [{ type: 'text' as const, text: JSON.stringify(answer.data, null, 2) }] };
         },
     );
 }

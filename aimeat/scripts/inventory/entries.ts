@@ -18,6 +18,8 @@
  * @structure collectRestRoutes · collectMcpTools · collectCliDispatch · enclosingUnit · callsInside · EntryPoint
  * @usage const entries = [...collectRestRoutes(program), ...collectMcpTools(program)];
  * @version-history
+ *   v1.2.1 — 2026-10-05 — computesPrincipalTest also recognises a call to isOwnerInPerson, which replaced
+ *     the hand copies of the owner test (secaudit 2026-10, C4).
  *   v1.2.0 — 2026-09-04 — enclosingUnit() joins it, for the same reason: the third analyser needed
  *     the same "which door is this line inside" walk, and the answer must not differ between gates.
  *   v1.1.0 — 2026-09-04 — callsInside() lives here now. Two gates written the same day each carried
@@ -99,6 +101,12 @@ export function computesPrincipalTest(unit: ts.Node): boolean {
     let found = false;
     const visit = (n: ts.Node): void => {
         if (found) return;
+        // The same test as one call: isOwnerInPerson (utils/gaii.ts), which replaced about 70 hand
+        // copies of `roles.includes('owner') && !roles.includes('agent')` (secaudit 2026-10, C4).
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'isOwnerInPerson') {
+            found = true;
+            return;
+        }
         if (ts.isPrefixUnaryExpression(n) && n.operator === ts.SyntaxKind.ExclamationToken
             && ts.isCallExpression(n.operand) && ts.isPropertyAccessExpression(n.operand.expression)
             && n.operand.expression.name.text === 'includes') {

@@ -3,13 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SQLite SQL for the ledger lines an erased person leaves in other people's ledgers.
- *   deleteOwner (methods/owner.ts) calls it inside its own transaction, after the per-identity
+ *   deleteOwner (methods/identity.ts) calls it inside its own transaction, after the per-identity
  *   cascade has deleted the person's own lines. A free function over the connection, like
  *   repos/app-purchase-erasure.ts, so the owner methods can call it without an import cycle through
  *   the provider class.
  * @structure pseudonymiseLedgerParty(db, party, opts)
  * @usage pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiis, pseudonym, agents));
  * @version-history
+ *   v1.1.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  *   v1.1.0 — 2026-09-26 — `before`: only the lines written before a time, for the operator's decision
  *     that a held name's rows were a previous holder's (repos/held-names.ts).
  *   v1.0.0 — 2026-09-26 — Initial: the other side's ledger lines name an erased person by the

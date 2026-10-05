@@ -8,8 +8,9 @@
  *   Each language is written in that language, not as translated English.
  *
  *   It follows the PLATFORM language choice rather than inventing a second one: the current
- *   language is read from AIMEAT.auth.getLang() when the auth library is present, else the
- *   `aimeat-lang` storage key, else the browser, and it re-renders on the platform's
+ *   language is resolved by _core/lang.js (pageLang), the same resolver AIMEAT.auth.getLang() uses:
+ *   ?lang=, the `aimeat-lang` storage key, the cookie, then the browser, kept to the page's
+ *   declared languages when it declares two or more. It re-renders on the platform's
  *   `aimeat-lang-change` event. There is no language switch in this kit — the login pill has one.
  *   The language it draws in goes on <html lang> at load and on every change (markPage), when the
  *   page declares that language or, declaring none, the person chose it.
@@ -17,6 +18,7 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.13.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v0.13.0 — 2026-10-05 — fillFirst and formIncomplete (en/fi/es): the line under a held button
  *     that names the fields still missing (form gate).
  *   v0.12.1 — 2026-10-04 — delegateDeclined (en/fi/es): the agent refused the delegated task.
@@ -50,6 +52,7 @@
  *   v0.1.1 — 2026-08-28 — +signInHint, the shell's default hint on the designed sign-in state.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
+import { pageLang, storedLang, writeLang } from '../_core/lang.js';
 
 /** The kit's own strings. A host dictionary of the same shape is merged over this. */
 const BASE = {
@@ -502,18 +505,9 @@ const listeners = [];
 
 let current = detect();
 
-/** Resolve the platform language: auth library → storage key → browser → 'en'. */
+/** Resolve the platform language, the one way every served library does (_core/lang.js). */
 function detect() {
-  try {
-    const ns = /** @type {any} */ (window).AIMEAT;
-    if (ns && ns.auth && typeof ns.auth.getLang === 'function') {
-      const l = ns.auth.getLang();
-      if (l) return String(l).slice(0, 2);
-    }
-    const stored = localStorage.getItem('aimeat-lang');
-    if (stored) return stored.slice(0, 2);
-  } catch { /* storage blocked — fall through to the browser */ }
-  return (navigator.language || 'en').slice(0, 2);
+  return pageLang();
 }
 
 /** The languages the page declares in its aimeat-locales meta, or null when it declares none. */
@@ -529,7 +523,7 @@ function declared() {
 
 /** Whether the person chose a language on this origin (the shared `aimeat-lang` key). */
 function chosen() {
-  try { return !!localStorage.getItem('aimeat-lang'); } catch { return false; }
+  return !!storedLang();
 }
 
 /**
@@ -587,7 +581,7 @@ export const i18n = {
     try {
       const ns = /** @type {any} */ (window).AIMEAT;
       if (ns && ns.auth && typeof ns.auth.setLang === 'function') ns.auth.setLang(next);
-      else localStorage.setItem('aimeat-lang', next);
+      else writeLang(next);
     } catch { /* storage blocked — the in-memory language still changed */ }
     announce(current);
   },

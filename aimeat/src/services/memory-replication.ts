@@ -13,6 +13,7 @@
  *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
  *
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.2.0 — 2026-09-29 — TARGET-082 review: what the classification keeps on this node is counted
  *     (`classified_withheld` per peer) and logged by key; a single replication says CLASSIFIED.
  *   v1.1.0 — 2026-09-29 — Both replications ask leaveToPeer before a record leaves (TARGET-082).
@@ -28,6 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sign } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 import { logger } from '../utils/logger.js';
 import { leaveMemoriesToPeer, WITHHELD_REASON } from './classification-exits.js';
 
@@ -169,22 +171,20 @@ export async function replicateMemoryToPeer(
       replicateSignature = await sign(nodeKey.privateKey, signPayload);
     }
 
-    const resp = await fetch(`${peer.url}/v1/federation/replicate`, {
+    const resp = await peerFetch(`${peer.url}/v1/federation/replicate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload, signature: replicateSignature }),
-      signal: AbortSignal.timeout(config.federationTimeoutMs),
-    });
+    }, { timeoutMs: config.federationTimeoutMs });
+    if (!resp.ok) return { success: false, error: resp.message };
 
-    if (resp.ok) {
+    if (resp.status >= 200 && resp.status < 300) {
       // Track successful replication
       const trackKey = replicationTrackingKey(peer.nodeId, ownerGaii, key);
       replicationState.set(trackKey, new Date().toISOString());
       return { success: true };
     } else {
-      // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-      const body = await resp.text().catch(() => '');
-      return { success: false, error: `HTTP ${resp.status}: ${body}` };
+      return { success: false, error: `HTTP ${resp.status}: ${resp.text}` };
     }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'unknown error' };

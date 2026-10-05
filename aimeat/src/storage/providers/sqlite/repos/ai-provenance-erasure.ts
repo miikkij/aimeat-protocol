@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SQLite SQL for the AI provenance records an erased person leaves behind. deleteOwner
- *   (methods/owner.ts) calls it inside its own transaction, beside the purchase receipts
+ *   (methods/identity.ts) calls it inside its own transaction, beside the purchase receipts
  *   (repos/app-purchase-erasure.ts) and with the same pseudonym. A free function over the connection
  *   for the same reason that file gives: no import cycle through the provider class.
  * @structure pseudonymiseProvenanceOwner(db, name, ghiis, pseudonym)
@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-09-26 — Initial: the kept records, with the owner and principal columns rewritten to
  *     a pseudonym no account can hold (secaudit 2026-09: A8-4). The Postgres twin is
  *     pseudonymiseProvenanceOwnerDb in its owner-cascade.ts.
+ *   v1.0.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  */
 import type Database from 'better-sqlite3';
 import { partyIdentities } from '../../../erased-party.js';

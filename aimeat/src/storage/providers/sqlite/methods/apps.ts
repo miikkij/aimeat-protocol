@@ -2,7 +2,9 @@
  * @file src/storage/providers/sqlite/methods/apps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Token-revocation, App-catalog, Subdomain, App-grant, App-draft, App-marketplace, Config, Knowledge-link methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
+ * @description App-catalog and App-draft methods, the twin of postgres-kysely/methods/apps.ts. Extracted
+ *   from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype
+ *   merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-07-25 — Add getAppGrantByOwnerAndApp for the one-live-grant-per-(owner, app)
@@ -21,42 +23,25 @@
  *   v1.8.0 — 2026-09-26 — revokeTokenIfAbsent: INSERT OR IGNORE, true when this call filed the hash
  *     (the one-time assertion spend, secaudit 2026-09 N5).
  *   v1.9.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
+ *   v1.10.0 — 2026-10-05 — revokeToken, revokeTokenIfAbsent, isTokenRevoked, cleanExpiredRevocations moved to
+ *     identity.ts; createSubdomainSite, getSubdomainSite, listSubdomainSites, updateSubdomainSite,
+ *     deleteSubdomainSite, deserializeSubdomainSite moved to subdomain-sites.ts; createAppGrant, getAppGrant,
+ *     getAppGrantByRefreshHash, getAppGrantByOwnerAndApp, listAppGrantsByOwner, listAppGrants,
+ *     updateAppGrant, deserializeAppGrant moved to app-grants.ts; createAppPurchase, getAppPurchase,
+ *     listAppPurchasesByBuyer, listAppPurchasesBySeller, hasValidLicense, deserializeAppPurchase moved to
+ *     app-purchases.ts; supportsConfigPersistence, setConfigValue, deleteConfigValue, getAllConfigValues
+ *     moved to system.ts so the file mirrors postgres-kysely/methods/apps.ts (secaudit 2026-10, M8).
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
-  AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
-  AppProtection, AppSeo, SubdomainSiteRecord, AppGrantRecord, AppMarks, AppAuthorship, AppAuthorshipLogEntry,
-  AppLegalKind, AppLegalDoc
+  AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppManifest, AppManifestCortex,
+  AppListOptions, AppForkRecord, AppProtection, AppSeo, AppMarks, AppAuthorship, AppAuthorshipLogEntry,
+  AppLegalKind, AppLegalDoc,
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { SUMMARY_COLUMNS, runAppListing } from './apps-listing.js';
 
-export const appsMethods = {
-  // ── Token Revocation ──
-  // ══════════════════════════════════════════════════════════
-
-  async revokeToken(this: SqliteStorage, tokenHash: string, expiresAt: number): Promise<void> {
-    this.db.prepare(
-      'INSERT OR REPLACE INTO revoked_tokens (token_hash, expires_at) VALUES (?, ?)'
-    ).run(tokenHash, expiresAt);
-  },
-
-  /** One statement: INSERT OR IGNORE files the hash only when it is absent, and `changes` says whether it did. */
-  async revokeTokenIfAbsent(this: SqliteStorage, tokenHash: string, expiresAt: number): Promise<boolean> {
-    return this.db.prepare(
-      'INSERT OR IGNORE INTO revoked_tokens (token_hash, expires_at) VALUES (?, ?)'
-    ).run(tokenHash, expiresAt).changes === 1;
-  },
-
-  async isTokenRevoked(this: SqliteStorage, tokenHash: string): Promise<boolean> {
-    const row = this.db.prepare('SELECT 1 FROM revoked_tokens WHERE token_hash = ?').get(tokenHash);
-    return !!row;
-  },
-
-  async cleanExpiredRevocations(this: SqliteStorage): Promise<number> {
-    const result = this.db.prepare('DELETE FROM revoked_tokens WHERE expires_at < ?').run(Math.floor(Date.now() / 1000));
-    return result.changes;
-  },
+export const appMethods = {
 
   // ══════════════════════════════════════════════════════════
   // ── App Catalog ──
@@ -329,158 +314,6 @@ export const appsMethods = {
     return rows;
   },
 
-  // ── Subdomain sites (operator-managed subdomain → app/redirect mappings) ──
-
-  async createSubdomainSite(this: SqliteStorage, site: SubdomainSiteRecord): Promise<SubdomainSiteRecord> {
-    this.db.prepare(
-      `INSERT INTO subdomain_sites (subdomain, kind, target, enabled, createdBy, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      site.subdomain, site.kind, site.target, site.enabled ? 1 : 0,
-      site.createdBy, site.createdAt, site.updatedAt,
-    );
-    return site;
-  },
-
-  async getSubdomainSite(this: SqliteStorage, subdomain: string): Promise<SubdomainSiteRecord | null> {
-    const row = this.db.prepare('SELECT * FROM subdomain_sites WHERE subdomain = ?')
-      .get(subdomain) as Record<string, unknown> | undefined;
-    return row ? this.deserializeSubdomainSite(row) : null;
-  },
-
-  async listSubdomainSites(this: SqliteStorage): Promise<SubdomainSiteRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM subdomain_sites ORDER BY subdomain')
-      .all() as Record<string, unknown>[];
-    return rows.map(r => this.deserializeSubdomainSite(r));
-  },
-
-  async updateSubdomainSite(this: SqliteStorage, 
-    subdomain: string,
-    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt'>>,
-  ): Promise<SubdomainSiteRecord | null> {
-    const sets: string[] = [];
-    const params: unknown[] = [];
-    if (updates.kind !== undefined) { sets.push('kind = ?'); params.push(updates.kind); }
-    if (updates.target !== undefined) { sets.push('target = ?'); params.push(updates.target); }
-    if (updates.enabled !== undefined) { sets.push('enabled = ?'); params.push(updates.enabled ? 1 : 0); }
-    sets.push('updatedAt = ?');
-    params.push(updates.updatedAt ?? new Date().toISOString());
-    params.push(subdomain);
-    const result = this.db.prepare(`UPDATE subdomain_sites SET ${sets.join(', ')} WHERE subdomain = ?`)
-      .run(...params);
-    if (result.changes === 0) return null;
-    return this.getSubdomainSite(subdomain);
-  },
-
-  async deleteSubdomainSite(this: SqliteStorage, subdomain: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM subdomain_sites WHERE subdomain = ?').run(subdomain);
-    return result.changes > 0;
-  },
-
-  deserializeSubdomainSite(this: SqliteStorage, row: Record<string, unknown>): SubdomainSiteRecord {
-    return {
-      subdomain: row.subdomain as string,
-      kind: row.kind as SubdomainSiteRecord['kind'],
-      target: row.target as string,
-      enabled: (row.enabled as number) === 1,
-      createdBy: row.createdBy as string,
-      createdAt: row.createdAt as string,
-      updatedAt: row.updatedAt as string,
-    };
-  },
-
-  // ── App grants (owner-issued app authorizations → agent tokens) ──
-
-  async createAppGrant(this: SqliteStorage, grant: AppGrantRecord): Promise<AppGrantRecord> {
-    this.db.prepare(
-      `INSERT INTO app_grants (grantId, app, appName, appOrigin, owner, gaii, scopes, spendCapMorsels, spentMorsels, ownerAddedScopes, refreshTokenHash, createdAt, lastUsedAt, revoked)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      grant.grantId, grant.app, grant.appName, grant.appOrigin, grant.owner, grant.gaii,
-      JSON.stringify(grant.scopes), grant.spendCapMorsels ?? null, grant.spentMorsels ?? 0,
-      JSON.stringify(grant.ownerAddedScopes ?? []),
-      grant.refreshTokenHash, grant.createdAt, grant.lastUsedAt,
-      grant.revoked ? 1 : 0,
-    );
-    return grant;
-  },
-
-  async getAppGrant(this: SqliteStorage, grantId: string): Promise<AppGrantRecord | null> {
-    const row = this.db.prepare('SELECT * FROM app_grants WHERE grantId = ?')
-      .get(grantId) as Record<string, unknown> | undefined;
-    return row ? this.deserializeAppGrant(row) : null;
-  },
-
-  async getAppGrantByRefreshHash(this: SqliteStorage, tokenHash: string): Promise<AppGrantRecord | null> {
-    const row = this.db.prepare('SELECT * FROM app_grants WHERE refreshTokenHash = ?')
-      .get(tokenHash) as Record<string, unknown> | undefined;
-    return row ? this.deserializeAppGrant(row) : null;
-  },
-
-  async getAppGrantByOwnerAndApp(this: SqliteStorage, owner: string, app: string): Promise<AppGrantRecord | null> {
-    // Ordered + LIMIT 1 rather than a bare get: the partial unique index guarantees at most one live
-    // row, but a DB that predates the index (pre-dedupe boot) must still resolve deterministically to
-    // the freshest grant instead of an arbitrary leftover.
-    const row = this.db.prepare(
-      'SELECT * FROM app_grants WHERE owner = ? AND app = ? AND revoked = 0 ORDER BY lastUsedAt DESC, createdAt DESC LIMIT 1'
-    ).get(owner, app) as Record<string, unknown> | undefined;
-    return row ? this.deserializeAppGrant(row) : null;
-  },
-
-  async listAppGrantsByOwner(this: SqliteStorage, owner: string): Promise<AppGrantRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM app_grants WHERE owner = ? ORDER BY createdAt DESC')
-      .all(owner) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeAppGrant(r));
-  },
-
-  async listAppGrants(this: SqliteStorage): Promise<AppGrantRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM app_grants WHERE revoked = 0 ORDER BY createdAt DESC')
-      .all() as Record<string, unknown>[];
-    return rows.map(r => this.deserializeAppGrant(r));
-  },
-
-  async updateAppGrant(this: SqliteStorage, 
-    grantId: string,
-    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt' | 'ownerAddedScopes'>>,
-  ): Promise<AppGrantRecord | null> {
-    const sets: string[] = [];
-    const params: unknown[] = [];
-    if (updates.ownerAddedScopes !== undefined) { sets.push('ownerAddedScopes = ?'); params.push(JSON.stringify(updates.ownerAddedScopes)); }
-    if (updates.refreshTokenHash !== undefined) { sets.push('refreshTokenHash = ?'); params.push(updates.refreshTokenHash); }
-    if (updates.lastUsedAt !== undefined) { sets.push('lastUsedAt = ?'); params.push(updates.lastUsedAt); }
-    if (updates.revoked !== undefined) { sets.push('revoked = ?'); params.push(updates.revoked ? 1 : 0); }
-    if (updates.scopes !== undefined) { sets.push('scopes = ?'); params.push(JSON.stringify(updates.scopes)); }
-    if (updates.spendCapMorsels !== undefined) { sets.push('spendCapMorsels = ?'); params.push(updates.spendCapMorsels); }
-    if (updates.spentMorsels !== undefined) { sets.push('spentMorsels = ?'); params.push(updates.spentMorsels); }
-    if (updates.scopesFixedAt !== undefined) { sets.push('scopesFixedAt = ?'); params.push(updates.scopesFixedAt); }
-    if (sets.length === 0) return this.getAppGrant(grantId);
-    params.push(grantId);
-    const result = this.db.prepare(`UPDATE app_grants SET ${sets.join(', ')} WHERE grantId = ?`)
-      .run(...params);
-    if (result.changes === 0) return null;
-    return this.getAppGrant(grantId);
-  },
-
-  deserializeAppGrant(this: SqliteStorage, row: Record<string, unknown>): AppGrantRecord {
-    return {
-      grantId: row.grantId as string,
-      spendCapMorsels: (row.spendCapMorsels as number | null) ?? null,
-      spentMorsels: (row.spentMorsels as number | null) ?? 0,
-      scopesFixedAt: (row.scopesFixedAt as string | null) ?? null,
-      ownerAddedScopes: row.ownerAddedScopes ? JSON.parse(row.ownerAddedScopes as string) as string[] : [],
-      app: row.app as string,
-      appName: row.appName as string,
-      appOrigin: row.appOrigin as string,
-      owner: row.owner as string,
-      gaii: row.gaii as string,
-      scopes: JSON.parse(row.scopes as string) as string[],
-      refreshTokenHash: (row.refreshTokenHash as string | null) ?? null,
-      createdAt: row.createdAt as string,
-      lastUsedAt: (row.lastUsedAt as string | null) ?? null,
-      revoked: (row.revoked as number) === 1,
-    };
-  },
-
   async normalizeAppOwnerNames(this: SqliteStorage, nodeId: string): Promise<number> {
     // Strip THIS node's `@node` suffix from any ownerName stored as a full GHII of this node. A name of
     // another node (a visitor's own home GHII) stays whole, so it never becomes the local account that
@@ -685,99 +518,4 @@ export const appsMethods = {
       .all(ownerGaii) as Array<{ filename: string }>;
     return rows.map(r => r.filename);
   },
-
-  // ── App Marketplace (purchase receipts) ──
-
-  async createAppPurchase(this: SqliteStorage, record: AppPurchaseRecord): Promise<AppPurchaseRecord> {
-    this.db.prepare(`INSERT INTO app_purchases (transactionId, buyerGaii, buyerOwner, sellerGaii, sellerOwner, appFilename, appName, appVersionNumber, licenseType, priceMorsels, transactionFeeMorsels, purchasedAt, appContent, appManifest, appScreenshot, signature, nodeId, nodePublicKey) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      record.transactionId, record.buyerGaii, record.buyerOwner,
-      record.sellerGaii, record.sellerOwner, record.appFilename,
-      record.appName, record.appVersionNumber, record.licenseType,
-      record.priceMorsels, record.transactionFeeMorsels, record.purchasedAt,
-      record.appContent, JSON.stringify(record.appManifest),
-      record.appScreenshot ?? null, record.signature,
-      record.nodeId, record.nodePublicKey,
-    );
-    return record;
-  },
-
-  async getAppPurchase(this: SqliteStorage, transactionId: string): Promise<AppPurchaseRecord | null> {
-    const row = this.db.prepare('SELECT * FROM app_purchases WHERE transactionId = ?').get(transactionId) as Record<string, unknown> | undefined;
-    return row ? this.deserializeAppPurchase(row) : null;
-  },
-
-  async listAppPurchasesByBuyer(this: SqliteStorage, buyerGaii: string): Promise<AppPurchaseRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM app_purchases WHERE buyerGaii = ? ORDER BY purchasedAt DESC').all(buyerGaii) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeAppPurchase(r));
-  },
-
-  async listAppPurchasesBySeller(this: SqliteStorage, sellerGaii: string): Promise<AppPurchaseRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM app_purchases WHERE sellerGaii = ? ORDER BY purchasedAt DESC').all(sellerGaii) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeAppPurchase(r));
-  },
-
-  async hasValidLicense(this: SqliteStorage, buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime'): Promise<boolean> {
-    // Lifetime license: any purchase of this app grants access to all versions
-    const lifetime = this.db.prepare('SELECT 1 FROM app_purchases WHERE buyerGaii = ? AND sellerGaii = ? AND appFilename = ? AND licenseType = ? LIMIT 1').get(buyerGaii, sellerGaii, filename, 'lifetime') as Record<string, unknown> | undefined;
-    if (lifetime) return true;
-    // Single license: buyer has at least one purchase of this app (version-specific check done at download)
-    if (!licenseType || licenseType === 'single') {
-      const single = this.db.prepare('SELECT 1 FROM app_purchases WHERE buyerGaii = ? AND sellerGaii = ? AND appFilename = ? LIMIT 1').get(buyerGaii, sellerGaii, filename) as Record<string, unknown> | undefined;
-      return !!single;
-    }
-    return false;
-  },
-
-  deserializeAppPurchase(this: SqliteStorage, row: Record<string, unknown>): AppPurchaseRecord {
-    const record: AppPurchaseRecord = {
-      transactionId: row.transactionId as string,
-      buyerGaii: row.buyerGaii as string,
-      buyerOwner: row.buyerOwner as string,
-      sellerGaii: row.sellerGaii as string,
-      sellerOwner: row.sellerOwner as string,
-      appFilename: row.appFilename as string,
-      appName: row.appName as string,
-      appVersionNumber: row.appVersionNumber as number,
-      licenseType: row.licenseType as 'single' | 'lifetime',
-      priceMorsels: row.priceMorsels as number,
-      transactionFeeMorsels: row.transactionFeeMorsels as number,
-      purchasedAt: row.purchasedAt as string,
-      appContent: row.appContent as string,
-      appManifest: JSON.parse((row.appManifest as string) || '{}'),
-      signature: row.signature as string,
-      nodeId: row.nodeId as string,
-      nodePublicKey: row.nodePublicKey as string,
-    };
-    if (row.appScreenshot) record.appScreenshot = row.appScreenshot as string;
-    return record;
-  },
-
-  // ══════════════════════════════════════════════════════════
-  // ── Config Persistence ──
-  // ══════════════════════════════════════════════════════════
-
-  supportsConfigPersistence(this: SqliteStorage): boolean {
-    // In-memory SQLite (:memory:) does not persist across restarts
-    return this.db.name !== ':memory:';
-  },
-
-  async setConfigValue(this: SqliteStorage, key: string, value: string): Promise<void> {
-    this.db.prepare(`
-      INSERT INTO system_settings (key, value, updatedAt) VALUES (?, ?, datetime('now'))
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updatedAt = datetime('now')
-    `).run(`config:${key}`, value);
-  },
-
-  async deleteConfigValue(this: SqliteStorage, key: string): Promise<void> {
-    this.db.prepare('DELETE FROM system_settings WHERE key = ?').run(`config:${key}`);
-  },
-
-  async getAllConfigValues(this: SqliteStorage): Promise<Record<string, string>> {
-    const rows = this.db.prepare("SELECT key, value FROM system_settings WHERE key LIKE 'config:%'").all() as { key: string; value: string }[];
-    const result: Record<string, string> = {};
-    for (const r of rows) result[r.key.replace('config:', '')] = r.value;
-    return result;
-  },
-
-  // ══════════════════════════════════════════════════════════
 };

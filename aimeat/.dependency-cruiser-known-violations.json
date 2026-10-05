@@ -210,20 +210,6 @@
     }
   },
   {
-    "type": "dependency",
-    "from": "src/mcp/contacts.ts",
-    "to": "src/cli/connect/api-client.ts",
-    "unresolvedTo": "../cli/connect/api-client.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-the-cli"
-    }
-  },
-  {
     "type": "cycle",
     "from": "src/cli/connect/agent-key.ts",
     "to": "src/cli/connect/config.ts",
@@ -6905,6 +6891,37 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/actions.ts",
+    "unresolvedTo": "./methods/actions.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/actions.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
     "to": "src/storage/providers/sqlite/methods/agent-enrolment.ts",
     "unresolvedTo": "./methods/agent-enrolment.js",
     "dependencyTypes": [
@@ -6918,6 +6935,161 @@
     "cycle": [
       {
         "name": "src/storage/providers/sqlite/methods/agent-enrolment.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/agent-misc.ts",
+    "unresolvedTo": "./methods/agent-misc.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/agent-misc.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/agent-msg-dispute-invite.ts",
+    "unresolvedTo": "./methods/agent-msg-dispute-invite.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/agent-msg-dispute-invite.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/agent-onboarding.ts",
+    "unresolvedTo": "./methods/agent-onboarding.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/agent-onboarding.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/agent-tasks.ts",
+    "unresolvedTo": "./methods/agent-tasks.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/agent-tasks.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/agent-usage.ts",
+    "unresolvedTo": "./methods/agent-usage.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/agent-usage.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -6998,8 +7170,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/agents.ts",
-    "unresolvedTo": "./methods/agents.js",
+    "to": "src/storage/providers/sqlite/methods/ai-provenance.ts",
+    "unresolvedTo": "./methods/ai-provenance.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7010,7 +7182,7 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/agents.ts",
+        "name": "src/storage/providers/sqlite/methods/ai-provenance.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7029,8 +7201,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/ai-provenance.ts",
-    "unresolvedTo": "./methods/ai-provenance.js",
+    "to": "src/storage/providers/sqlite/methods/app-grants.ts",
+    "unresolvedTo": "./methods/app-grants.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7041,7 +7213,38 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/ai-provenance.ts",
+        "name": "src/storage/providers/sqlite/methods/app-grants.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/app-purchases.ts",
+    "unresolvedTo": "./methods/app-purchases.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/app-purchases.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7091,8 +7294,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/capability-agents.ts",
-    "unresolvedTo": "./methods/capability-agents.js",
+    "to": "src/storage/providers/sqlite/methods/boards.ts",
+    "unresolvedTo": "./methods/boards.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7103,7 +7306,7 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/capability-agents.ts",
+        "name": "src/storage/providers/sqlite/methods/boards.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7122,8 +7325,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/community.ts",
-    "unresolvedTo": "./methods/community.js",
+    "to": "src/storage/providers/sqlite/methods/capabilities.ts",
+    "unresolvedTo": "./methods/capabilities.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7134,7 +7337,38 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/community.ts",
+        "name": "src/storage/providers/sqlite/methods/capabilities.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/catalogue.ts",
+    "unresolvedTo": "./methods/catalogue.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/catalogue.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7246,6 +7480,37 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/consent.ts",
+    "unresolvedTo": "./methods/consent.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/consent.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
     "to": "src/storage/providers/sqlite/methods/dependencies.ts",
     "unresolvedTo": "./methods/dependencies.js",
     "dependencyTypes": [
@@ -7277,8 +7542,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/extensions-notify.ts",
-    "unresolvedTo": "./methods/extensions-notify.js",
+    "to": "src/storage/providers/sqlite/methods/device-auth.ts",
+    "unresolvedTo": "./methods/device-auth.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7289,7 +7554,7 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/extensions-notify.ts",
+        "name": "src/storage/providers/sqlite/methods/device-auth.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7308,8 +7573,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/federation-oauth.ts",
-    "unresolvedTo": "./methods/federation-oauth.js",
+    "to": "src/storage/providers/sqlite/methods/direct-message.ts",
+    "unresolvedTo": "./methods/direct-message.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7320,7 +7585,100 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/federation-oauth.ts",
+        "name": "src/storage/providers/sqlite/methods/direct-message.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/ecosystem.ts",
+    "unresolvedTo": "./methods/ecosystem.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/ecosystem.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/federation.ts",
+    "unresolvedTo": "./methods/federation.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/federation.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/files.ts",
+    "unresolvedTo": "./methods/files.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/files.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7370,8 +7728,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/governance.ts",
-    "unresolvedTo": "./methods/governance.js",
+    "to": "src/storage/providers/sqlite/methods/identity-extras.ts",
+    "unresolvedTo": "./methods/identity-extras.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7382,7 +7740,7 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/governance.ts",
+        "name": "src/storage/providers/sqlite/methods/identity-extras.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7401,8 +7759,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/identity-nodes.ts",
-    "unresolvedTo": "./methods/identity-nodes.js",
+    "to": "src/storage/providers/sqlite/methods/identity.ts",
+    "unresolvedTo": "./methods/identity.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7413,7 +7771,7 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/identity-nodes.ts",
+        "name": "src/storage/providers/sqlite/methods/identity.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7432,8 +7790,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/knowledge-links.ts",
-    "unresolvedTo": "./methods/knowledge-links.js",
+    "to": "src/storage/providers/sqlite/methods/knowledge.ts",
+    "unresolvedTo": "./methods/knowledge.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7444,7 +7802,7 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/knowledge-links.ts",
+        "name": "src/storage/providers/sqlite/methods/knowledge.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7494,8 +7852,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/messaging.ts",
-    "unresolvedTo": "./methods/messaging.js",
+    "to": "src/storage/providers/sqlite/methods/memory.ts",
+    "unresolvedTo": "./methods/memory.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7506,7 +7864,224 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/messaging.ts",
+        "name": "src/storage/providers/sqlite/methods/memory.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/moderation.ts",
+    "unresolvedTo": "./methods/moderation.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/moderation.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/node-ext-escrow.ts",
+    "unresolvedTo": "./methods/node-ext-escrow.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/node-ext-escrow.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/node-infra.ts",
+    "unresolvedTo": "./methods/node-infra.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/node-infra.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/notifications.ts",
+    "unresolvedTo": "./methods/notifications.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/notifications.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/oauth.ts",
+    "unresolvedTo": "./methods/oauth.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/oauth.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/organisms.ts",
+    "unresolvedTo": "./methods/organisms.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/organisms.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/otk.ts",
+    "unresolvedTo": "./methods/otk.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/otk.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7587,99 +8162,6 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/owner-memory-bulk.ts",
-    "unresolvedTo": "./methods/owner-memory-bulk.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/storage/providers/sqlite/methods/owner-memory-bulk.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/storage/providers/sqlite/index.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
-    "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/owner-memory-scope.ts",
-    "unresolvedTo": "./methods/owner-memory-scope.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/storage/providers/sqlite/methods/owner-memory-scope.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/storage/providers/sqlite/index.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
-    "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/owner.ts",
-    "unresolvedTo": "./methods/owner.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/storage/providers/sqlite/methods/owner.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/storage/providers/sqlite/index.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
-    "from": "src/storage/providers/sqlite/index.ts",
     "to": "src/storage/providers/sqlite/methods/packages.ts",
     "unresolvedTo": "./methods/packages.js",
     "dependencyTypes": [
@@ -7693,6 +8175,130 @@
     "cycle": [
       {
         "name": "src/storage/providers/sqlite/methods/packages.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/pat.ts",
+    "unresolvedTo": "./methods/pat.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/pat.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/schedules.ts",
+    "unresolvedTo": "./methods/schedules.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/schedules.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/schema.ts",
+    "unresolvedTo": "./methods/schema.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/schema.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/sessions.ts",
+    "unresolvedTo": "./methods/sessions.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/sessions.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7742,8 +8348,8 @@
   {
     "type": "cycle",
     "from": "src/storage/providers/sqlite/index.ts",
-    "to": "src/storage/providers/sqlite/methods/storage-files.ts",
-    "unresolvedTo": "./methods/storage-files.js",
+    "to": "src/storage/providers/sqlite/methods/subdomain-sites.ts",
+    "unresolvedTo": "./methods/subdomain-sites.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -7754,7 +8360,100 @@
     },
     "cycle": [
       {
-        "name": "src/storage/providers/sqlite/methods/storage-files.ts",
+        "name": "src/storage/providers/sqlite/methods/subdomain-sites.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/system-extras.ts",
+    "unresolvedTo": "./methods/system-extras.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/system-extras.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/system.ts",
+    "unresolvedTo": "./methods/system.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/system.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/template-listings.ts",
+    "unresolvedTo": "./methods/template-listings.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/template-listings.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7786,6 +8485,37 @@
     "cycle": [
       {
         "name": "src/storage/providers/sqlite/methods/usage.ts",
+        "dependencyTypes": [
+          "local",
+          "import"
+        ]
+      },
+      {
+        "name": "src/storage/providers/sqlite/index.ts",
+        "dependencyTypes": [
+          "local",
+          "type-only",
+          "import"
+        ]
+      }
+    ]
+  },
+  {
+    "type": "cycle",
+    "from": "src/storage/providers/sqlite/index.ts",
+    "to": "src/storage/providers/sqlite/methods/wallet.ts",
+    "unresolvedTo": "./methods/wallet.js",
+    "dependencyTypes": [
+      "local",
+      "import"
+    ],
+    "rule": {
+      "severity": "error",
+      "name": "no-circular"
+    },
+    "cycle": [
+      {
+        "name": "src/storage/providers/sqlite/methods/wallet.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -7895,45 +8625,6 @@
       },
       {
         "name": "src/storage/providers/sqlite/methods/apps-listing.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
-    "from": "src/storage/providers/sqlite/methods/consent.ts",
-    "to": "src/storage/providers/sqlite/index.ts",
-    "unresolvedTo": "../index.js",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "no-circular"
-    },
-    "cycle": [
-      {
-        "name": "src/storage/providers/sqlite/index.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      },
-      {
-        "name": "src/storage/providers/sqlite/methods/governance.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/storage/providers/sqlite/methods/consent.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -8973,11 +9664,11 @@
   },
   {
     "type": "module",
-    "from": "src/static/sdk-libs/header/index.js",
-    "to": "src/static/sdk-libs/header/index.js",
+    "from": "src/storage/repositories/index.ts",
+    "to": "src/storage/repositories/index.ts",
     "rule": {
       "severity": "warn",
-      "name": "no-orphans"
+      "name": "reachable-from-the-node"
     }
   }
 ]

@@ -13,6 +13,7 @@
  *   - syncCatalogueToPeer(peer, config, storage): diff, hash, sign, and push to one peer
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -22,6 +23,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { sign } from '../auth/keypair.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 import { logger } from '../utils/logger.js';
 
 /** Per-peer sync metadata. */
@@ -156,20 +158,19 @@ export async function syncCatalogueToPeer(
     }
 
     // 7. POST to peer
-    const resp = await fetch(`${peer.url}/v1/federation/catalogue-sync`, {
+    const resp = await peerFetch(`${peer.url}/v1/federation/catalogue-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload, signature: payloadSignature }),
-      signal: AbortSignal.timeout(config.federationTimeoutMs),
-    });
+    }, { timeoutMs: config.federationTimeoutMs });
+    if (!resp.ok) throw new Error(resp.message);
 
-    if (!resp.ok) {
-      // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-      const body = await resp.text().catch(() => '');
-      throw new Error(`Peer returned HTTP ${resp.status}: ${body}`);
+    if (resp.status < 200 || resp.status >= 300) {
+      throw new Error(`Peer returned HTTP ${resp.status}: ${resp.text}`);
     }
+    if (resp.json === undefined) throw new Error('The answer is not JSON.');
 
-    const responseData = await resp.json() as {
+    const responseData = resp.json as {
       data?: {
         synced?: number;
         updated?: number;

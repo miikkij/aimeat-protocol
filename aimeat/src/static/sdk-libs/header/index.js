@@ -8,11 +8,12 @@
  *   keys so theme/language stay in sync with the SPA. Componentized ESM source esbuild bundles to the
  *   IIFE served, unchanged, at /v1/libs/aimeat-header.js. Ported verbatim from lib-header.ts; this is
  *   a self-running shim (mounts into #aimeat-header or prepends to <body>) — it does not attach to
- *   window.AIMEAT, so it imports nothing from _core.
+ *   window.AIMEAT. From _core it takes only the language (lang.js), which touches no namespace.
  * @structure readLang/readTheme/applyTheme/flatten/ensureThemeCss/loadScript/loadTranslations/
  *   modalI18n/buildMarkup/wire/refreshSession/init — runs init() on DOM ready.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.3.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.3.0 — 2026-09-30 — An operator sees the new-version tag (GET /v1/admin/node-update) beside the
  *     pill; it links to /v1/admin?nodeUpdate=1, where the SPA opens the dialog.
  *   v1.2.0 — 2026-08-12 — Spanish added. The language switch and readLang() come off one LANGS list
@@ -23,6 +24,7 @@
  *     (a site-footer link now). The bar carries at most five targets in either state.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-header.ts (SDK-libs migration Phase 1).
  */
+import { readLang as resolveLang, writeLang } from '../_core/lang.js';
 
 if (!window.__AIMEAT_HEADER_MOUNTED__) {
   window.__AIMEAT_HEADER_MOUNTED__ = true;
@@ -31,7 +33,6 @@ if (!window.__AIMEAT_HEADER_MOUNTED__) {
 
 function main() {
   var THEME_KEY = 'aimeat-theme';
-  var LANG_KEY = 'aimeat-lang';
   // The languages the node ships UI text in. Mirrors LOCALES in src/i18n.ts.
   var LANGS = ['en', 'fi', 'es'];
   var NAV_FALLBACK = {
@@ -41,14 +42,7 @@ function main() {
   };
 
   function readLang() {
-    try {
-      var u = new URLSearchParams(location.search).get('lang');
-      if (LANGS.indexOf(u) !== -1) return u;
-      var s = localStorage.getItem(LANG_KEY);
-      if (LANGS.indexOf(s) !== -1) return s;
-    } catch { /* storage blocked */ }
-    var nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
-    return LANGS.indexOf(nav) !== -1 ? nav : 'en';
+    return /** @type {string} */ (resolveLang(LANGS));
   }
 
   function readTheme() {
@@ -203,11 +197,7 @@ function main() {
     nav.querySelectorAll('[data-lang]').forEach(function (b) {
       if (b.getAttribute('data-lang') === lang) b.classList.add('active');
       b.addEventListener('click', function () {
-        var next = b.getAttribute('data-lang');
-        try {
-          localStorage.setItem(LANG_KEY, next);
-          document.cookie = 'aimeat-lang=' + next + ';path=/;max-age=31536000;SameSite=Lax';
-        } catch { /* storage blocked — cookie may still be set */ }
+        writeLang(b.getAttribute('data-lang'));
         location.reload();
       });
     });

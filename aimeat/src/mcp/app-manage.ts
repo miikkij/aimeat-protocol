@@ -12,19 +12,22 @@
  *   (app-visitors.ts), _versions (apps.ts) and _ui_get, _ui_set (app-ui.ts).
  *
  *   ORDER OF CHECKS. The field list first (every missing and foreign field in one answer), then the
- *   action's permission word (catalog/action-scopes.ts), then the service, which decides whose app it
- *   is and refuses what it has always refused.
+ *   action's permission word (tool-catalog/action-scopes.ts), then the service, which decides whose
+ *   app it is and refuses what it has always refused.
  *
- *   THE MEMBER ACTIONS GO THROUGH THE ROUTE. routes/app-members.ts holds the roster logic in its
- *   handlers (the owner test, the seat cap, the grant sync, the notifications), and no service
- *   function carries it. So those actions call the route over loopback with the session's own
- *   bearer, through the same appManageCall() the connector and the CLI use, as aimeat_invoke and
- *   aimeat_contact_resolve_email do. The route's scope gate and its refusals are then the answer,
- *   so this file does not check their permission word a second time: the route's gate lets the
- *   app's own token through without the word, and a copy here would refuse what REST allows.
+ *   THE MEMBER ACTIONS CALL THE SERVICES TOO. The roster, plan, audit-keeping, development-right and
+ *   design-spec actions (mcp/app-manage-members.ts) call the services their routes call, with the
+ *   session as the caller (its agent identity, role agent, its scopes). The permission word is the
+ *   route's scope word and is checked here first, like every other action's: the route's gate lets
+ *   only the app's own token through without the word, and an MCP session is never that token.
  * @structure registerAppManageTool
- * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken)
+ * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes)
  * @version-history
+ *   v1.6.0 — 2026-10-05 — The member, plan, audit_archive, audit_keep, builder and spec actions call
+ *     the services their routes call (mcp/app-manage-members.ts) and are checked against their
+ *     permission word before dispatch; the loopback HTTP call, AimeatClient and the getToken
+ *     parameter are gone. aimeat_app_manage calls the service in place of the route over loopback
+ *     HTTP (secaudit 2026-10, M6).
  *   v1.5.2 — 2026-10-05 — config_get's owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.5.1 — 2026-10-05 — config_get passes the reader to getAppConfig: the session's owner or the
  *     operator's agent passes an app's own gates (secaudit 2026-10, APP-6).
@@ -81,8 +84,7 @@ import { exportAppsBackupToStorage } from '../services/apps-backup-export.js';
 import {
     listSubdomainSites, createSubdomainSite, updateSubdomainSite, deleteSubdomainSite,
 } from '../services/subdomain-sites.js';
-import { appManageCall, MEMBER_ACTIONS } from '../tool-dispatch/app-manage-call.js';
-import { AimeatClient } from '../tool-dispatch/api-client.js';
+import { appManageMemberAction } from './app-manage-members.js';
 
 type Args = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
@@ -100,7 +102,6 @@ export function registerAppManageTool(
     config: AimeatConfig,
     getAgentGaii: () => string,
     scopes: string[],
-    getToken: () => string | undefined = () => undefined,
 ): void {
     const ui = new AppUiService(storage, config);
 
@@ -114,9 +115,6 @@ export function registerAppManageTool(
             const checked = checkAppManageInput(args);
             if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
             const action = checked.action;
-            // A member action's permission word is checked by its route alone (requireScopeOrOwnApp),
-            // so the answer is exactly what REST answers, owner bypass and the app's own token included.
-            if (MEMBER_ACTIONS.has(action)) return viaRoute(args);
             const word = requiredScopeForAction('aimeat_app_manage', action);
             if (word && !scopeIsCovered(scopes, word)) {
                 return toolError('SCOPE_DENIED', `action "${action}" needs the "${word}" permission, which the owner grants this agent in its settings.`);
@@ -130,23 +128,13 @@ export function registerAppManageTool(
         },
     );
 
-    /**
-     * A member action: the route over loopback, as the caller. Not config.baseUrl, which would add a
-     * public-internet hop for a call that never leaves this host. The owner defaults to the caller's
-     * own account, as on the connector and the CLI.
-     */
-    async function viaRoute(args: Args): Promise<ToolAnswer> {
-        const bearer = getToken();
-        if (!bearer) return toolError('AUTH_REQUIRED', 'This session carries no credential to reach the member roster with.');
-        const client = new AimeatClient(`http://127.0.0.1:${config.port}`, bearer);
-        const out = await appManageCall(client, localAccountName(getAgentGaii()), args);
-        if (!out.ok) return toolError(out.error?.code ?? 'REFUSED', out.error?.message ?? 'The member roster refused the call.');
-        return answer(out.data ?? {});
-    }
-
     async function dispatch(action: string, args: Args): Promise<ToolAnswer> {
         const callerGaii = getAgentGaii();
         const callerOwner = localAccountName(callerGaii);
+        // The roster, plan, audit-keeping, development-right and design-spec actions: the services
+        // their routes call, with this session as the caller. An MCP session is a local agent.
+        const shared = await appManageMemberAction(storage, config, { sub: callerGaii, owner: callerOwner, roles: ['agent'], scopes }, action, args);
+        if (shared) return shared;
         const ownerGhii = `${callerOwner}@${config.nodeId}`;
         const filename = String(args.filename ?? '');
         const appOwner = str(args.owner) ?? callerOwner;

@@ -109,7 +109,7 @@ export const fileMethods = {
 
   async listFontFilesAcrossOwners(this: PostgresKyselyStorage, opts: { limit: number; excludeOwner?: string }): Promise<{ total: number; items: StorageFileRecord[] }> {
     // One statement: the rows and, by a window count, how many matched. `data` is not selected, so
-    // no bytea is read. The test for a font is the SQLite provider's (methods/storage-files.ts).
+    // no bytea is read. The test for a font is the SQLite provider's (methods/files.ts).
     const rows = await this.db.selectFrom('StorageFile')
       .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'createdAt', sql<string>`count(*) over ()`.as('total')])
       .where('ownerGaii', '!=', opts.excludeOwner ?? '')

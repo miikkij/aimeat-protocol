@@ -31,9 +31,8 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
-  // src/static/sdk-libs/atelier/dom.js
+  // src/static/sdk-libs/_core/dom.js
   var SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };
-  var seq = 0;
   function el(tag, attrs, kids) {
     const node = document.createElement(tag);
     if (attrs) {
@@ -70,6 +69,9 @@
       ) : document.createTextNode(String(c)));
     }
   }
+
+  // src/static/sdk-libs/atelier/dom.js
+  var seq = 0;
   function $(sel, root) {
     return (
       /** @type {HTMLElement|null} */

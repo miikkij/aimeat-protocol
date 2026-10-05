@@ -276,6 +276,16 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  function storedLang() {
+    try {
+      return localStorage.getItem(LANG_KEY) || null;
+    } catch {
+      return null;
+    }
+  }
+
   // public/components/ai-label-icons.js
   var AI_PROVENANCE_SPEC_V1 = "aimeat.provenance/v1";
   var EU_ICONS = {
@@ -578,14 +588,7 @@
     return `@media (prefers-color-scheme: dark){` + ["ai-basic", "ai-generated", "ai-modified"].map((s) => `:root:not([data-theme="light"]) .ai-label__icon--${s}{background-image:url('${url(s)}')}`).join("") + "}";
   }
   function locale() {
-    const stored = (() => {
-      try {
-        return localStorage.getItem("aimeat-lang");
-      } catch {
-        return null;
-      }
-    })();
-    const lang2 = stored || document.documentElement.lang || "en";
+    const lang2 = storedLang() || document.documentElement.lang || "en";
     return lang2.slice(0, 2) === "fi" ? "fi" : "en";
   }
   function t(key) {

@@ -24,6 +24,11 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   v1.20.2 — 2026-10-05 — registerAppManageTool no longer receives getToken: the member, plan,
+ *     audit-keeping, builder and spec actions moved to services the routes call; aimeat_app_manage
+ *     calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
+ *   v1.20.1 — 2026-10-05 — registerContactTools receives the session's scopes in place of its bearer:
+ *     the contact tools call the services, not the routes over loopback (secaudit 2026-10, M6).
  *   v1.20.0 — 2026-10-05 — registerOrganismsTools and registerDmMessageTools receive the session's scopes: the roster check and the node-wide broadcast ask isOperatorCaller, so the operator's agent holding operator:admin passes as on REST (secaudit 2026-10, C2).
  *   v1.19.0 — 2026-10-02 — aimeat_tools_find on the `chat` surface (mcp/tool-loader.ts).
  *   v1.18.0 — 2026-10-02 — registerWorkspaceTools receives the session's scopes: removing rows needs
@@ -213,7 +218,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
-    registerAppManageTool(mcp, storage, config, agentGaii, scopes, getToken);
+    registerAppManageTool(mcp, storage, config, agentGaii, scopes);
     registerAiImageTool(mcp, storage, config, agentGaii);
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
@@ -235,7 +240,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDmMessageTools(mcp, storage, config, agentGaii, peers, scopes);
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii);
-    registerContactTools(mcp, storage, config, agentGaii, getToken);
+    registerContactTools(mcp, storage, config, agentGaii, scopes);
     registerCompanyTools(mcp, storage, config, agentGaii);
     // peers: pulling a package from another node reads that node's address and key from the peer
     // record, never from the caller's arguments.

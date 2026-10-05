@@ -309,6 +309,65 @@
     return manifest(next);
   }
 
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  function readLocales(opts) {
+    let list = opts && Array.isArray(opts.locales) ? opts.locales : null;
+    if (!list) {
+      try {
+        const m = (
+          /** @type {HTMLMetaElement|null} */
+          document.querySelector('meta[name="aimeat-locales"]')
+        );
+        if (m && m.content) list = m.content.split(/[\s,]+/);
+      } catch {
+      }
+    }
+    if (!list) return [];
+    const seen = {};
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const c = String(list[i] || "").trim().toLowerCase();
+      if (/^[a-z]{2}$/.test(c) && !seen[c]) {
+        seen[c] = 1;
+        out.push(c);
+      }
+    }
+    return out.length > 1 ? out : [];
+  }
+  function readLang(locales) {
+    const list = Array.isArray(locales) ? locales : null;
+    const pick = list ? function(v) {
+      return v && list.indexOf(v) >= 0 ? v : null;
+    } : function(v) {
+      return v ? String(v).slice(0, 2) : null;
+    };
+    try {
+      const u = pick(new URLSearchParams(location.search).get("lang"));
+      if (u) return u;
+      const s = pick(localStorage.getItem(LANG_KEY));
+      if (s) return s;
+      const c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+      const cv = c ? pick(c[1]) : null;
+      if (cv) return cv;
+    } catch {
+    }
+    let nav = null;
+    try {
+      nav = pick(String(navigator.language || "").slice(0, 2).toLowerCase());
+    } catch {
+    }
+    if (nav) return nav;
+    return list ? list[0] : "en";
+  }
+  function pageLang() {
+    const list = readLocales();
+    return (
+      /** @type {string} */
+      readLang(list.length ? list : null)
+    );
+  }
+
   // src/static/sdk-libs/assets/texts.js
   var VAR_RE = /\{(\w+)\}/g;
   function detectLang() {
@@ -321,16 +380,9 @@
         const kit = root.atelier.i18n.lang();
         if (kit) return String(kit).slice(0, 2);
       }
-      if (root && root.auth && typeof root.auth.getLang === "function") {
-        const auth = root.auth.getLang();
-        if (auth) return String(auth).slice(0, 2);
-      }
-      const stored = localStorage.getItem("aimeat-lang");
-      if (stored) return stored.slice(0, 2);
     } catch {
     }
-    if (typeof navigator !== "undefined" && navigator.language) return navigator.language.slice(0, 2);
-    return "en";
+    return pageLang();
   }
   function fill(text, vars) {
     const value = String(text == null ? "" : text);

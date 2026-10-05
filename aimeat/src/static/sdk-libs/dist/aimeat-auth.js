@@ -476,13 +476,14 @@
     if (shift) pop.style.transform = "translateX(" + Math.round(shift) + "px)";
   }
 
-  // src/static/sdk-libs/auth/locale.js
-  var AIMEAT_LANG_KEY = "aimeat-lang";
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  var COOKIE_MAX_AGE = 31536e3;
   function readLocales(opts) {
-    var list = opts && Array.isArray(opts.locales) ? opts.locales : null;
+    let list = opts && Array.isArray(opts.locales) ? opts.locales : null;
     if (!list) {
       try {
-        var m = (
+        const m = (
           /** @type {HTMLMetaElement|null} */
           document.querySelector('meta[name="aimeat-locales"]')
         );
@@ -491,9 +492,10 @@
       }
     }
     if (!list) return [];
-    var seen = {}, out = [];
-    for (var i = 0; i < list.length; i++) {
-      var c = String(list[i] || "").trim().toLowerCase();
+    const seen = {};
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const c = String(list[i] || "").trim().toLowerCase();
       if (/^[a-z]{2}$/.test(c) && !seen[c]) {
         seen[c] = 1;
         out.push(c);
@@ -501,28 +503,45 @@
     }
     return out.length > 1 ? out : [];
   }
-  function aimeatReadLang(locales) {
-    var ok = function(v) {
-      return v && locales.indexOf(v) >= 0 ? v : null;
+  function readLang(locales) {
+    const list = Array.isArray(locales) ? locales : null;
+    const pick = list ? function(v) {
+      return v && list.indexOf(v) >= 0 ? v : null;
+    } : function(v) {
+      return v ? String(v).slice(0, 2) : null;
     };
     try {
-      var u = ok(new URLSearchParams(location.search).get("lang"));
+      const u = pick(new URLSearchParams(location.search).get("lang"));
       if (u) return u;
-      var s = ok(localStorage.getItem(AIMEAT_LANG_KEY));
+      const s = pick(localStorage.getItem(LANG_KEY));
       if (s) return s;
-      var c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
-      if (c && ok(c[1])) return c[1];
+      const c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+      const cv = c ? pick(c[1]) : null;
+      if (cv) return cv;
     } catch {
     }
-    var nav = ok((navigator.language || "").slice(0, 2).toLowerCase());
-    return nav || locales[0];
+    let nav = null;
+    try {
+      nav = pick(String(navigator.language || "").slice(0, 2).toLowerCase());
+    } catch {
+    }
+    if (nav) return nav;
+    return list ? list[0] : "en";
+  }
+  function writeLang(lang) {
+    try {
+      localStorage.setItem(LANG_KEY, lang);
+      document.cookie = LANG_KEY + "=" + lang + ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
+    } catch {
+    }
+  }
+
+  // src/static/sdk-libs/auth/locale.js
+  function aimeatReadLang(locales) {
+    return readLang(locales);
   }
   function aimeatApplyLang(lang) {
-    try {
-      localStorage.setItem(AIMEAT_LANG_KEY, lang);
-      document.cookie = "aimeat-lang=" + lang + ";path=/;max-age=31536000;SameSite=Lax";
-    } catch {
-    }
+    writeLang(lang);
     try {
       document.documentElement.setAttribute("lang", lang);
     } catch {
@@ -1132,18 +1151,12 @@
   }
 
   // src/static/sdk-libs/auth/i18n.js
-  var MODAL_LANG_KEY = "aimeat-lang";
   var MODAL_LANGS = ["en", "fi", "es"];
   function currentModalLang() {
-    try {
-      var u = new URLSearchParams(location.search).get("lang");
-      if (MODAL_LANGS.indexOf(u) !== -1) return u;
-      var s = localStorage.getItem(MODAL_LANG_KEY);
-      if (MODAL_LANGS.indexOf(s) !== -1) return s;
-    } catch {
-    }
-    var nav = (navigator.language || "en").slice(0, 2).toLowerCase();
-    return MODAL_LANGS.indexOf(nav) !== -1 ? nav : "en";
+    return (
+      /** @type {string} */
+      readLang(MODAL_LANGS)
+    );
   }
   function flattenModalI18n(obj, prefix, out) {
     out = out || {};
@@ -1939,11 +1952,7 @@
     }
     function switchLang(next) {
       if (next === lang) return;
-      try {
-        localStorage.setItem(MODAL_LANG_KEY, next);
-        document.cookie = "aimeat-lang=" + next + ";path=/;max-age=31536000;SameSite=Lax";
-      } catch {
-      }
+      writeLang(next);
       var vals = captureInputs();
       loadModalI18n(next).then(function(fresh) {
         lang = next;

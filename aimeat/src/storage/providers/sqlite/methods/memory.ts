@@ -1,279 +1,59 @@
 /**
- * @file src/storage/providers/sqlite/methods/owner.ts
+ * @file src/storage/providers/sqlite/methods/memory.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
+ * @description SQLite methods for the domain of postgres-kysely/methods/memory.ts (memoryMethods), so a fix
+ *   in one provider finds its twin by file name. Bodies moved verbatim from the files named in the version
+ *   history; bound to SqliteStorage via the prototype merge in ../index.ts.
+ * @structure memoryMethods
+ * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
- *   v1.21.0 -- 2026-10-05 -- deleteOwner gives the classification audit rows where the person was the
- *     reader of somebody else's content the erasure's pseudonym (secaudit 2026-10, STO-1).
- *   v1.20.0 -- 2026-09-26 -- The app grants, the personal access tokens and the session rows go through
- *     repos/credential-erasure.ts deleteAccountCredentials, which the start step and the operator's
- *     decision on a held name call too; deleteOwner deletes the session rows as the Postgres cascade does.
- *   v1.19.0 -- 2026-09-26 -- deleteOwner deletes the app grants and the personal access tokens issued
- *     in the account name (app_grants, personal_access_tokens).
- *   v1.18.0 -- 2026-09-26 -- The ecosystem apps go through repos/eco-app-erasure.ts deleteEcosystemApps,
- *     which the start step and the operator's decision on a held name call too.
- *   v1.17.0 -- 2026-09-26 -- deleteOwner takes the ecosystem apps the person connected, as it takes the
- *     agents: each app's identity data, its record with the pinned key, and the automation recipes
- *     set for it. The apps' identities are named to the work settlement and the ledger rule beside
- *     the agents'.
- *   v1.16.0 -- 2026-09-26 -- deleteOwner deletes the person's own ledger lines filed under the bare
- *     account name (the ones written before 2026-08-16), as it deletes those under the GHII.
- *   v1.15.0 -- 2026-09-26 -- deleteOwner takes the cortexes the person installed, after the actions
- *     under their own identities (repos/cortex-erasure.ts): each record, with what its activation made
- *     and the lib files, kept versions and dependency edges keyed by its name (secaudit 2026-09, R4
- *     "found": the cortex record).
- *   v1.14.0 -- 2026-09-26 -- deleteOwner writes the erasure's pseudonym in place of the person on the
- *     ledger lines of other people that name them, as counterparty or as the one who acted
- *     (repos/ledger-erasure.ts). The lines stay for those people's books.
- *   v1.13.0 -- 2026-09-26 -- The work settlement names the owner's agents as well, so their work is
- *     found for an account with no GHII row.
- *   v1.12.0 -- 2026-09-26 -- deleteOwner settles the person's work first (repos/work-erasure.ts): open
- *     work is cancelled and the requester's held morsels go back, finished work stays for the other
- *     side under the erasure's pseudonym (secaudit 2026-09: A8-4, N6).
- *   v1.11.0 -- 2026-09-26 -- deleteOwner deletes the actions the owner published in person, stored
- *     under the bare account name, and rewrites the owner and principal of the kept AI provenance
- *     records to the erasure's pseudonym (repos/ai-provenance-erasure.ts). A freed name inherits
- *     neither (secaudit 2026-09: A8-4, N6).
- *   v1.10.0 -- 2026-09-24 -- deleteOwner rewrites the erased person out of the purchase receipts they
- *     are a party to (repos/app-purchase-erasure.ts). The receipts stay for the other side's books.
- *   v1.9.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
- *   v1.6.0 -- 2026-09-06 -- Review item 5.5: listAllMemory takes the Postgres order and default --
- *     key unless newestFirst, and no implicit limit -- so the same call answers the same on both.
- *   v1.8.0 — 2026-09-04 — deleteOwner clears eco_auth, the ecosystem-app device handshakes keyed on
- *     the owner name. It had sat in security/storage-parity-exemptions.json since 2026-08-10.
- *   v1.7.0 — 2026-09-03 — createMemoryIfAbsent treats a row in the bin as absent and takes it over
- *     (new value, tombstone cleared), as setMemory already did; a DO NOTHING against a binned row
- *     answered null on every retry, and the workspace append could never seed a draft for a
- *     document whose draft a publish had just binned.
- *   v1.6.0 — 2026-09-02 — The Agents group moved out to methods/agents.ts by pure extraction when
- *     this file reached the 800-line limit; nothing else changed.
- *   v1.1.0 — 2026-08-23 — Owner lifecycle columns (disabledAt/disabledBy/managedBy, BR-04) carried
- *     through deserializeOwner and updateOwner. This file is the copy the prototype actually uses;
- *     repos/owner.ts got the same change.
- *   v1.5.0 — 2026-08-13 — …and `registeredBy`. It is carried through updateAgent rather than
- *     omitted from the SET list: the write-once rule lives where the value is set (createAgent
- *     alone), so both providers behave the same way.
- *   v1.4.0 — 2026-08-13 — createAgent/updateAgent/deserializeAgent carry `consoleUrl`, matching the
- *     Postgres provider (migration 0034).
- *   v1.3.0 — 2026-08-11 — The memory writes persist `groupId` (shared rule in storage/memory-sharing.ts).
- *     This backend had never written the column on any path, so every `visibility:'group'` record on a
- *     SQLite node was unreadable by every member of the group it named, permanently and silently — the
- *     write answering 201 with the group's own name in the response.
- *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
- *   v1.1.0 — 2026-07-14 — Perf: add listMemoryMeta (metadata + byteSize projection, no value column)
- *     backing ?include=meta.
- *   v1.2.0 — 2026-07-25 — listAllMemory gains excludeOwnerPrefix (filters in SQL, so a windowed read
- *     is not emptied by rows it was going to drop); newestFirst is accepted for Postgres parity and
- *     is already this backend's ordering.
+ *   v1.0.0 — 2026-10-05 — 27 methods (setMemory, listMemoryHistory, createMemoryIfAbsent, …) moved here from
+ *     owner.ts; getMemoryByKeys, getMemoryByKeysAnyOwner, bulkSetMemory, deleteMemorySubtree,
+ *     deleteMemoryByPrefix, bulkDeleteMemory, listMemoryKeysByPrefix moved here from owner-memory-bulk.ts;
+ *     listMemoryMeta, listMemoryForOwners, listMemoryMetaForOwners, listAllMemoryMeta moved here from
+ *     owner-memory-scope.ts so the file mirrors postgres-kysely/methods/memory.ts (secaudit 2026-10, M8).
  */
+import type { MemoryRecord, ArchiveFilter } from '../../../interface.js';
 import type {
-  OwnerRecord, MemoryRecord, ArchiveFilter
-} from '../../../interface.js';
-import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+  MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord, MemoryMetaRow,
+} from '../../../repositories/memory.repository.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
-import { pseudonymiseWriter } from '../repos/memory-tally.js';
-import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
-import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
-import { settleErasedPartyWork } from '../repos/work-erasure.js';
-import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
-import { deleteInstalledCortexes } from '../repos/cortex-erasure.js';
-import { deleteEcosystemApps } from '../repos/eco-app-erasure.js';
-import { deleteAccountCredentials } from '../repos/credential-erasure.js';
-import { erasedPartyPseudonym, erasedAccountParty } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
-import { searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
+import {
+  searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo,
+  sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql,
+  archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo,
+  unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo,
+  NOT_DELETED_SQL,
+} from '../repos/memory.js';
 
-export const ownerMethods = {
-  // ══════════════════════════════════════════════════════════
-  // ── Owners ──
-  // ══════════════════════════════════════════════════════════
+/** The projected columns, in one place so the three reads below cannot drift apart on what META means. */
+const META_COLS = 'key, ownerGaii, visibility, groupId, workspaceRef, allowedOrigins, aiProvenanceId, '
+  + 'archived, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt';
 
-  async createOwner(this: SqliteStorage, owner: OwnerRecord): Promise<OwnerRecord> {
-    try {
-      this.db.prepare(
-        `INSERT INTO owners (name, displayName, publicKey, roles, createdAt)
-         VALUES (?, ?, ?, ?, ?)`
-      ).run(
-        owner.name,
-        owner.displayName ?? null,
-        owner.publicKey,
-        JSON.stringify(owner.roles),
-        owner.createdAt,
-      );
-      return owner;
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('NAME_TAKEN', { cause: err });
-      throw err;
-    }
-  },
+/** Shared row→meta mapping for the projections below (tags parsed, defaults applied). */
+function rowToMeta(row: Record<string, unknown>): MemoryMetaRow {
+  return {
+    key: row.key as string,
+    ownerGaii: row.ownerGaii as string,
+    visibility: row.visibility as MemoryMetaRow['visibility'],
+    tags: JSON.parse((row.tags as string) ?? '[]') as string[],
+    version: row.version as number,
+    flagCount: (row.flagCount as number | null) ?? 0,
+    byteSize: (row.byteSize as number | null) ?? 0,
+    ttlHours: (row.ttlHours as number | null) ?? null,
+    createdAt: row.createdAt as string,
+    updatedAt: row.updatedAt as string,
+    groupId: (row.groupId as string | null) ?? null,
+    workspaceRef: (row.workspaceRef as string | null) ?? null,
+    allowedOrigins: row.allowedOrigins ? JSON.parse(row.allowedOrigins as string) as string[] : null,
+    aiProvenanceId: (row.aiProvenanceId as string | null) ?? null,
+    archived: !!row.archived,
+  };
+}
 
-  async getOwner(this: SqliteStorage, name: string): Promise<OwnerRecord | null> {
-    const row = this.db.prepare('SELECT * FROM owners WHERE name = ?').get(name) as Record<string, unknown> | undefined;
-    return row ? this.deserializeOwner(row) : null;
-  },
-
-  async listOwners(this: SqliteStorage): Promise<OwnerRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM owners').all() as Record<string, unknown>[];
-    return rows.map(r => this.deserializeOwner(r));
-  },
-
-  async updateOwner(this: SqliteStorage, name: string, updates: Partial<OwnerRecord>): Promise<OwnerRecord | null> {
-    const existing = await this.getOwner(name);
-    if (!existing) return null;
-    const updated = { ...existing, ...updates };
-    this.db.prepare(
-      `UPDATE owners SET displayName = ?, publicKey = ?, roles = ?, createdAt = ?,
-         disabledAt = ?, disabledBy = ?, managedBy = ? WHERE name = ?`
-    ).run(
-      updated.displayName ?? null,
-      updated.publicKey,
-      JSON.stringify(updated.roles),
-      updated.createdAt,
-      updated.disabledAt ?? null,
-      updated.disabledBy ?? null,
-      updated.managedBy ?? null,
-      name,
-    );
-    return updated;
-  },
-
-  async deleteOwner(this: SqliteStorage, name: string): Promise<boolean> {
-    const txn = this.db.transaction(() => {
-      // 0. The work this person is a party to, settled before the per-identity passes below delete
-      // what they find: open work is cancelled and the requester's held morsels go back, finished
-      // work stays for the other side under the erasure's pseudonym (repos/work-erasure.ts). One
-      // pseudonym for the whole erasure, so the other side's books still see one party. The agents
-      // are named too, for an account whose agents no GHII pattern would find.
-      const ghiiRows = this.db.prepare('SELECT ghii FROM ghiis WHERE ownerName = ?').all(name) as { ghii: string }[];
-      const agentRows = this.db.prepare('SELECT gaii FROM agents WHERE owner = ?').all(name) as { gaii: string }[];
-      const agentGaiis = agentRows.map(r => r.gaii);
-      // The ecosystem apps the person connected act for them under `eco:<app>#<name>@<node>`, as agents do.
-      const ecoGeais = (this.db.prepare('SELECT geai FROM ecosystem_apps WHERE owner = ?').all(name) as { geai: string }[]).map(r => r.geai);
-      const actors = [...agentGaiis, ...ecoGeais];
-      const pseudonym = erasedPartyPseudonym();
-      settleErasedPartyWork(this.db, name, ghiiRows.map(r => r.ghii), pseudonym, id => this.resolveGhii(id), {}, actors);
-      // The classification audit of OTHER people's content, where this person was the reader: the row
-      // is the content owner's record and stays, under the erasure's pseudonym (secaudit 2026-10,
-      // STO-1). One value per identity, so two of them cannot meet on the audit's unique address.
-      [...ghiiRows.map(r => r.ghii), ...actors].forEach((id, i) => {
-        this.db.prepare('UPDATE classification_audit SET reader = ? WHERE reader = ?').run(i ? `${pseudonym}.${i}` : pseudonym, id);
-      });
-
-      // 1-2. Cascade delete all agent-related data for each agent
-      for (const gaii of agentGaiis) {
-        this.cascadeDeleteAgentData(gaii);
-      }
-
-      // 3. Delete all agents for this owner
-      this.db.prepare('DELETE FROM agents WHERE owner = ?').run(name);
-
-      // 3a. An ecosystem app goes as an agent does: what it holds, then its record with the key pinned
-      // at its first connection, and the automation recipes the person set for it. Every credential of
-      // the app stops with its record (auth/middleware.ts ecosystemAppGone). repos/eco-app-erasure.ts,
-      // which the start step and the operator's decision on a held name call too.
-      deleteEcosystemApps(this.db, name, ecoGeais, geai => this.cascadeDeleteAgentData(geai), { everyRecipe: true });
-
-      // 3b. Data owned by the GHII itself, not by an agent. cascadeDeleteAgentData above runs per
-      // AGENT gaii, so everything written under the person's own identity — which is most of what a
-      // person has, because owner sessions and app grants both resolve to the GHII — survived the
-      // delete. Found by test/unit/storage-conformance.test.ts on the day it was written: Postgres
-      // clears these and SQLite did not, the mirror image of the audit's H-30 in the other provider.
-      for (const row of ghiiRows) {
-        this.cascadeDeleteAgentData(row.ghii);
-      }
-
-      // 3c. An action the owner published in person. It is stored under the bare account name (the
-      // owner session's raw `sub`), which neither pass above walks, and the name is released for
-      // reuse, so the next holder of the name could change or delete it.
-      this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(name);
-      // 3d. The person's own ledger lines from before 2026-08-16, which were filed under the bare
-      // account name. They are theirs, so they go with the account, like the lines under the GHII.
-      this.db.prepare('DELETE FROM wallet_transactions WHERE gaii = ?').run(name);
-
-      // 3d. The cortexes this person installed, now that the actions under their own identities are
-      // gone: each record, with what its activation made and what is keyed by its name
-      // (repos/cortex-erasure.ts, the rule in ../../../erased-cortex.ts).
-      deleteInstalledCortexes(this.db, name, ghiiRows.map(r => r.ghii));
-
-      // What this person WROTE into somebody else's namespace is that other owner's record of who
-      // touched their data, so it is pseudonymised rather than deleted — removing it would silently
-      // turn their "four hands" into three. The node id comes from a GHII, so this runs while one is
-      // still readable.
-      const tallyNodeId = ghiiRows[0]?.ghii.split('@')[1] ?? '';
-      if (tallyNodeId) pseudonymiseWriter(this.db, name, tallyNodeId);
-
-      // The purchase receipts this person is a party to stay, because each one is also the other
-      // side's book entry. The name leaves them: it is released for reuse, and every purchase read
-      // keys on it. The pseudonym is the one the work above took.
-      pseudonymisePurchaseParties(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
-      // The AI provenance records stay too, for the content that outlives the account. The name
-      // leaves the two columns every owner read keys on, under the same pseudonym.
-      pseudonymiseProvenanceOwner(this.db, name, ghiiRows.map(r => r.ghii), pseudonym);
-      // So do the other side's ledger lines: the person's own went with the passes above, and the
-      // lines in other people's ledgers name them by the same pseudonym (repos/ledger-erasure.ts).
-      pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiiRows.map(r => r.ghii), pseudonym, actors));
-
-      // 4. Delete GHII records for this owner
-      this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);
-
-      // 5. Delete personal nodes and their mailbox items & push subscriptions
-      const nodeRows = this.db.prepare('SELECT nodeId FROM personal_nodes WHERE ownerName = ?').all(name) as { nodeId: string }[];
-      for (const node of nodeRows) {
-        this.db.prepare('DELETE FROM mailbox_items WHERE personalNodeId = ?').run(node.nodeId);
-        this.db.prepare('DELETE FROM personal_push_subscriptions WHERE personalNodeId = ?').run(node.nodeId);
-        this.db.prepare('DELETE FROM notification_preferences WHERE personalNodeId = ?').run(node.nodeId);
-      }
-      this.db.prepare('DELETE FROM personal_nodes WHERE ownerName = ?').run(name);
-
-      // 6. Delete push subscriptions for this owner
-      this.db.prepare('DELETE FROM push_subscriptions WHERE ownerName = ?').run(name);
-      this.db.prepare('DELETE FROM personal_push_subscriptions WHERE ownerName = ?').run(name);
-
-      // 7. Delete listings for this owner
-      this.db.prepare('DELETE FROM listings WHERE ownerName = ?').run(name);
-
-      // 8. Delete purchases for this owner (as buyer or seller)
-      this.db.prepare('DELETE FROM purchases WHERE buyerOwner = ? OR sellerOwner = ?').run(name, name);
-
-      // 9. Delete chat instances for this owner
-      this.db.prepare('DELETE FROM chat_instances WHERE ownerName = ?').run(name);
-
-      // 10. Delete email verifications for this owner
-      this.db.prepare('DELETE FROM email_verifications WHERE ownerName = ?').run(name);
-
-      // 10b. Ecosystem-app device handshakes. Keyed on the bare owner name, like the push
-      // subscriptions above, because the handshake happens before the app has an identity of its
-      // own. A pending row is a live invitation to bind an app to this account, and the name is
-      // released for reuse, so leaving one hands the next registrant somebody else's handshake.
-      this.db.prepare('DELETE FROM eco_auth WHERE ownerName = ?').run(name);
-
-      // 10c. The apps the person granted access to, the personal access tokens they made and the
-      // session rows. They are credentials issued in the account name, which is released for reuse, so
-      // they go with the account and the next holder of the name starts with none, as on Postgres.
-      // repos/credential-erasure.ts, which the start step and the operator's decision call too.
-      deleteAccountCredentials(this.db, name, { sessions: true });
-
-      // 11. Delete the owner record itself
-      const result = this.db.prepare('DELETE FROM owners WHERE name = ?').run(name);
-      return result.changes > 0;
-    });
-    return txn();
-  },
-
-
-  deserializeOwner(this: SqliteStorage, row: Record<string, unknown>): OwnerRecord {
-    return {
-      name: row.name as string,
-      displayName: (row.displayName as string) ?? undefined,
-      publicKey: row.publicKey as string,
-      roles: JSON.parse(row.roles as string) as string[],
-      createdAt: row.createdAt as string,
-      disabledAt: (row.disabledAt as string) ?? null,
-      disabledBy: (row.disabledBy as string) ?? null,
-      managedBy: (row.managedBy as string) ?? null,
-    };
-  },
+export const memoryMethods = {
 
   // ══════════════════════════════════════════════════════════
   // ── Memory ──
@@ -707,6 +487,226 @@ export const ownerMethods = {
     }
     return null;
   },
+  // BULK PRIMITIVE (Phase 1) — many keys under one owner in ONE `key IN (…)` query. Live rows only
+  // (TTL-expired rows are pruned lazily, mirroring getMemory/listMemory). Order not guaranteed.
+  async getMemoryByKeys(this: SqliteStorage, ownerGaii: string, keys: string[]): Promise<MemoryRecord[]> {
+    if (keys.length === 0) return [];
+    const placeholders = keys.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT * FROM memory WHERE ownerGaii = ? AND key IN (${placeholders})${NOT_DELETED_SQL}`).all(ownerGaii, ...keys) as Record<string, unknown>[];
+    const out: MemoryRecord[] = [];
+    for (const row of rows) {
+      const record = this.deserializeMemory(row);
+      if (this.isMemoryExpired(record)) {
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
+        continue;
+      }
+      out.push(record);
+    }
+    return out;
+  },
 
-  // ══════════════════════════════════════════════════════════
+  // BULK PRIMITIVE (Phase 2) — many keys across ALL owners in ONE `key IN (…)` query (no owner filter).
+  // Live rows only (TTL-expired rows pruned lazily, mirroring getMemoryByKeys). Backs the organism
+  // discovery list's batched workspace-manifest read (N canReadWs manifest scans → 1). A key forked
+  // across owners returns >1 row; the caller dedupes.
+  async getMemoryByKeysAnyOwner(this: SqliteStorage, keys: string[]): Promise<MemoryRecord[]> {
+    if (keys.length === 0) return [];
+    const placeholders = keys.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT * FROM memory WHERE key IN (${placeholders})${NOT_DELETED_SQL}`).all(...keys) as Record<string, unknown>[];
+    const out: MemoryRecord[] = [];
+    for (const row of rows) {
+      const record = this.deserializeMemory(row);
+      if (this.isMemoryExpired(record)) {
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
+        continue;
+      }
+      out.push(record);
+    }
+    return out;
+  },
+
+  // BULK PRIMITIVE (Phase 1) — upsert many rows in ONE transaction. Reuses setMemory verbatim (version
+  // bump + trackable-history + byteSize stay identical); a manual BEGIN/COMMIT wraps the loop into a
+  // single commit. better-sqlite3 runs every statement synchronously, so the awaited setMemory calls
+  // execute inside the open transaction with nothing else touching the connection between them.
+  //
+  // Inside a caller's storage.transaction() the loop runs bare: SQLite has no nested BEGIN, and the
+  // Storage.transaction contract says a nested call joins the open transaction. Opening a second one
+  // threw `cannot start a transaction within a transaction`, which reached the caller as a 500 —
+  // every batch record publish did this, since publishDraftsBatch wraps the upsert and the delete in
+  // one boundary. The caller's rollback covers a throw from here, so the try/catch drops with it.
+  async bulkSetMemory(this: SqliteStorage, records: MemoryRecord[]): Promise<MemoryRecord[]> {
+    if (records.length === 0) return [];
+    const out: MemoryRecord[] = [];
+    if (this.insideTransaction) {
+      for (const r of records) out.push(await this.setMemory(r));
+      return out;
+    }
+    this.db.exec('BEGIN');
+    try {
+      for (const r of records) out.push(await this.setMemory(r));
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+    return out;
+  },
+
+  // BULK PRIMITIVE (Phase 1) — delete a record's whole family in ONE statement: the base key itself plus
+  // its `base.*` children (.draft/.latest/.version.N), WITHOUT matching a sibling `baseX` (mirrors the
+  // 'subtree' match archiveMemoryByKey uses). Replaces the per-key gated deletes a record teardown ran.
+  async deleteMemorySubtree(this: SqliteStorage, ownerGaii: string, baseKey: string): Promise<number> {
+    const result = this.db.prepare(
+      'DELETE FROM memory WHERE ownerGaii = ? AND (key = ? OR key LIKE ?)'
+    ).run(ownerGaii, baseKey, baseKey + '.%');
+    return result.changes;
+  },
+
+  // BULK PRIMITIVE (Phase 2) — delete EVERY row under a key prefix, all owners, active AND archived, in
+  // ONE statement (the AFTER DELETE trigger keeps both FTS tables in sync per row). Backs the workspace/
+  // organism wipe, replacing its per-key deleteMemory loop over thousands of rows.
+  async deleteMemoryByPrefix(this: SqliteStorage, keyPrefix: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM memory WHERE key LIKE ?').run(keyPrefix + '%');
+    return result.changes;
+  },
+
+  // BULK PRIMITIVE (Phase 2) — delete many explicit (ownerGaii, key) rows in ONE transaction (a manual
+  // BEGIN/COMMIT round a prepared per-key delete — better-sqlite3 runs it synchronously). Backs the
+  // batched record-family delete (rows collected across records, possibly spanning owner identities).
+  // Same nesting rule as bulkSetMemory above: inside a caller's transaction the deletes run bare and
+  // commit with it.
+  async bulkDeleteMemory(this: SqliteStorage, refs: { ownerGaii: string; key: string }[]): Promise<number> {
+    if (refs.length === 0) return 0;
+    const stmt = this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?');
+    let removed = 0;
+    if (this.insideTransaction) {
+      for (const r of refs) removed += stmt.run(r.ownerGaii, r.key).changes;
+      return removed;
+    }
+    this.db.exec('BEGIN');
+    try {
+      for (const r of refs) removed += stmt.run(r.ownerGaii, r.key).changes;
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+    return removed;
+  },
+
+  // BULK PRIMITIVE (Phase 2) — value-free (ownerGaii, key) enumeration under a prefix (SELECT projects
+  // only the two columns, never the value). ACTIVE rows only (archived = 0), matching object_delete's
+  // scan — an archived record is not deletable. Backs the batched record delete's addressing scan.
+  async listMemoryKeysByPrefix(this: SqliteStorage, keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]> {
+    return this.db.prepare('SELECT ownerGaii, key FROM memory WHERE key LIKE ? AND archived = 0 AND deletedAt IS NULL').all(keyPrefix + '%') as { ownerGaii: string; key: string }[];
+  },
+  async listMemoryMeta(this: SqliteStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]> {
+    // META projection: select metadata + byteSize, NEVER the `value` column (the whole point — a
+    // keyspace of thousands of keys lists without loading/serialising any value). ttlHours + createdAt
+    // are read only to prune lazily-expired rows, then dropped from the result.
+    let sql = `SELECT ${META_COLS} FROM memory WHERE ownerGaii = ?`;
+    const params: unknown[] = [ownerGaii];
+    if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
+    sql += archivedSql(opts?.archived);
+
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const out: MemoryMetaRow[] = [];
+    for (const row of rows) {
+      const ttlHours = row.ttlHours as number | null;
+      if (ttlHours) {
+        const expiresAt = new Date(row.createdAt as string).getTime() + ttlHours * 3_600_000;
+        if (Date.now() > expiresAt) {
+          this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(ownerGaii, row.key);
+          continue;
+        }
+      }
+      const meta = rowToMeta(row);
+      if (opts?.tags?.length && !opts.tags.every(t => meta.tags.includes(t))) continue;
+      if (opts?.maxFlags !== undefined && meta.flagCount > opts.maxFlags) continue;
+      out.push(meta);
+    }
+    return out;
+  },
+
+  async listMemoryForOwners(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]> {
+    if (ownerGaiis.length === 0) return [];
+    const ph = ownerGaiis.map(() => '?').join(',');
+    let sql = `SELECT * FROM memory WHERE ownerGaii IN (${ph})`;
+    const params: unknown[] = [...ownerGaiis];
+    if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
+    sql += archivedSql(opts?.archived);
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const results: MemoryRecord[] = [];
+    for (const row of rows) {
+      const record = this.deserializeMemory(row);
+      if (this.isMemoryExpired(record)) { this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key); continue; }
+      if (opts?.tags?.length && !opts.tags.every(t => record.tags.includes(t))) continue;
+      if (opts?.maxFlags !== undefined && (record.flagCount ?? 0) > opts.maxFlags) continue;
+      results.push(record);
+    }
+    return results;
+  },
+
+  async listMemoryMetaForOwners(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]> {
+    if (ownerGaiis.length === 0) return [];
+    const ph = ownerGaiis.map(() => '?').join(',');
+    let sql = `SELECT ${META_COLS} FROM memory WHERE ownerGaii IN (${ph})`;
+    const params: unknown[] = [...ownerGaiis];
+    if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
+    sql += archivedSql(opts?.archived);
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const out: MemoryMetaRow[] = [];
+    for (const row of rows) {
+      const ttlHours = row.ttlHours as number | null;
+      if (ttlHours && Date.now() > new Date(row.createdAt as string).getTime() + ttlHours * 3_600_000) {
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(row.ownerGaii, row.key);
+        continue;
+      }
+      const meta = rowToMeta(row);
+      if (opts?.tags?.length && !opts.tags.every(t => meta.tags.includes(t))) continue;
+      if (opts?.maxFlags !== undefined && meta.flagCount > opts.maxFlags) continue;
+      out.push(meta);
+    }
+    return out;
+  },
+
+  async listAllMemoryMeta(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryMetaRow[]; total: number }> {
+    // listAllMemory's filters + windowing with the META projection: the value column never leaves
+    // the database. Lazily-expired rows are pruned here the same way the other meta reads do.
+    let whereClauses = '';
+    const params: unknown[] = [];
+    if (opts?.ownerPrefix) { whereClauses += ' AND ownerGaii LIKE ?'; params.push(opts.ownerPrefix + '%'); }
+    if (opts?.excludeOwnerPrefix) { whereClauses += ' AND ownerGaii NOT LIKE ?'; params.push(opts.excludeOwnerPrefix + '%'); }
+    if (opts?.prefix) { whereClauses += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.visibility) { whereClauses += ' AND visibility = ?'; params.push(opts.visibility); }
+    if (opts?.excludeVersionRows) { whereClauses += " AND key NOT LIKE '%.version.%'"; }
+    whereClauses += archivedSql(opts?.archived);
+    const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
+
+    const countRow = this.db.prepare('SELECT COUNT(*) as cnt FROM memory' + whereStr).get(...params) as { cnt: number };
+    // The same order and the same default as listAllMemory beside it, which is now the same as the
+    // Postgres backend's: key unless the caller asked for recency, and no implicit ceiling.
+    const offset = opts?.offset ?? 0;
+    const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC' : ' ORDER BY key';
+    const cols = `SELECT ${META_COLS} FROM memory`;
+    const rows = (opts?.limit
+      ? this.db.prepare(cols + whereStr + orderSql + ' LIMIT ? OFFSET ?').all(...params, opts.limit, offset)
+      : this.db.prepare(cols + whereStr + orderSql).all(...params)
+    ) as Record<string, unknown>[];
+
+    const items: MemoryMetaRow[] = [];
+    for (const row of rows) {
+      const ttlHours = row.ttlHours as number | null;
+      if (ttlHours && Date.now() > new Date(row.createdAt as string).getTime() + ttlHours * 3_600_000) {
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(row.ownerGaii, row.key);
+        continue;
+      }
+      items.push(rowToMeta(row));
+    }
+    return { items, total: countRow.cnt };
+  },
 };
