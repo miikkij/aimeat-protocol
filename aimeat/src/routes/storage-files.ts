@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   v1.2.0 -- 2026-10-05 -- Every classification read passes the file's workspace binding to fileTarget,
+ *     so a workspace file is shown under its organism's classification (secaudit 2026-10, DATA-4).
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): presigned GET /v1/download/:token + storage
  *     GET ?mode=handle|inline so binary bytes are fetched out-of-band, never base64'd into context.
  *   v1.2.0 -- 2026-06-07 -- Access parity with memory: read paths go through shared authorizeRead()
@@ -319,7 +321,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         const gaii = resolve(req);
         // The classification reader (TARGET-082): a file this caller may not see is not listed.
         const files = await contentReaderFor({ storage, config }, req.auth)
-            .show(await storage.listStorageFiles(gaii), f => fileTarget(gaii, f.key));
+            .show(await storage.listStorageFiles(gaii), f => fileTarget(gaii, f.key, f.workspaceRef));
 
         res.json(success(config.nodeId, {
             files: files.map(f => ({
@@ -388,7 +390,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // caller, so an outsider writes no refusal row into the owner's classification audit log
         // (TARGET-082 review). A file the admitted caller may not see answers as absent.
         const hiddenFromCaller = async (): Promise<boolean> =>
-            !(await contentReaderFor({ storage, config }, req.auth).show([file], () => fileTarget(gaii, key)))[0];
+            !(await contentReaderFor({ storage, config }, req.auth).show([file], () => fileTarget(gaii, key, file.workspaceRef)))[0];
 
         // ?mode=handle — answer an ALLOWED read with a presigned URL + metadata instead of the bytes.
         // Same access decision as the byte path (this runs only after it passes); the caller just gets
@@ -539,7 +541,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // Metadata only: a HEAD answers entirely out of it, and reading the bytes to send none of
         // them is what made a range reader's first probe cost a full download.
         const meta = await storage.getStorageFileMeta(gaii, key);
-        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key)) : [];
+        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key, meta.workspaceRef)) : [];
         if (!file) {
             // ASCII only: a header value with a non-ASCII character (an em dash, say) makes Node throw
             // ERR_INVALID_CHAR and turns this 404 into a 500.
@@ -577,7 +579,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // for its OWNER's file by bare key and got a blank "not found" that read as data loss.
         // The classification reader (TARGET-082): a file this caller may not see answers as absent.
         const meta = await storage.getStorageFileMeta(gaii, key);
-        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key)) : [];
+        const [file] = meta ? await contentReaderFor({ storage, config }, req.auth).show([meta], () => fileTarget(gaii, key, meta.workspaceRef)) : [];
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
                 `File not found in your namespace: ${key}. This route reads only your own files - for a file owned by someone else (e.g. your owner's upload or a DM attachment) use GET /v1/pub/{owner}/{key}.`));

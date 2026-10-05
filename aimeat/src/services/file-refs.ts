@@ -27,6 +27,7 @@
  *   const h = await fileHandleFor(storage, config, `${ownerGhii}/${key}`, { gaii: agentGaii });
  *   if (h.access !== 'granted') return refuse(h.reason);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-07-26 — Initial: shared file-reference resolution so an agent can read a file it
  *     does not own (owner-uploaded PDFs, DM attachments, task attachments) through one guard.
  *   v1.1.0 — 2026-09-29 — The accessor carries a classification reader, and a granted file passes it
@@ -153,7 +154,7 @@ export async function resolveFileRef(
         return { access: 'denied', ref: canonical, ownerGaii: gaii, key, reason: decision.reason ?? 'not_permitted' };
     }
     // The classification reader: a file this caller may not see answers as an absent one.
-    const [shown] = await accessor.reader.show([file], () => fileTarget(gaii, key));
+    const [shown] = await accessor.reader.show([file], () => fileTarget(gaii, key, file.workspaceRef));
     if (!shown) return { access: 'missing', ref: canonical, ownerGaii: gaii, key, reason: 'not_found' };
 
     return { access: 'granted', ref: canonical, ownerGaii: gaii, key, file: shown };

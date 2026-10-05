@@ -13,6 +13,7 @@
  * @structure MemoryTabService.overview(reader, ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
  * @usage const m = await createMemoryTabService(config, storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.2.1 — 2026-10-05 — A file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.2.0 — 2026-09-29 — TARGET-082 review: the memory keys and the files pass the caller's
  *     classification reader, as the two endpoints this composite folds already did.
  *   v1.1.0 — 2026-07-31 — files carries max_file_size_bytes so the upload form states the node's real limit.
@@ -90,7 +91,7 @@ export class MemoryTabService {
       // files (mirrors GET /v1/memory/files owner session: GHII files first, then each agent).
       const fileRows: Array<Record<string, unknown>> = [];
       for (const g of gaiis) {
-        for (const f of await reader.show(filesByOwner[g] ?? [], x => fileTarget(x.ownerGaii, x.key))) {
+        for (const f of await reader.show(filesByOwner[g] ?? [], x => fileTarget(x.ownerGaii, x.key, x.workspaceRef))) {
           fileRows.push({
             key: f.key, owner_gaii: f.ownerGaii, size: f.size, mime_type: f.mimeType,
             visibility: f.visibility, tags: f.tags || [], created_at: f.createdAt,

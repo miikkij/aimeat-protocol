@@ -22,6 +22,7 @@
  * @structure PublishRunInput · PublishRunOutcome · runOwnPublish
  * @usage import { runOwnPublish } from './publish-run.js';
  * @version-history
+ *   v1.3.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.3.0 — 2026-09-29 — The stored file passes the classification component's leave() before the
  *     gate opens an attempt (TARGET-082 V4): a file whose label may not leave its organism is
  *     refused with CLASSIFIED and nothing is published. `reader` is the caller's; the scheduler,
@@ -104,7 +105,7 @@ export async function runOwnPublish(
     // The bytes go to an outside service, so the file passes leave() before the gate writes an
     // attempt: a refused file leaves no row in flight (TARGET-082).
     const reader = input.reader ?? systemReader(ctx, input.publisher);
-    const { left } = await reader.leave([input.storageKey], k => fileTarget(input.publisher, k),
+    const { left } = await reader.leave([input.storageKey], k => fileTarget(input.publisher, k, stored.workspaceRef),
       { kind: 'external', to: `connection:${input.connectionId}` });
     if (left.length) {
       return {

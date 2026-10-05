@@ -38,12 +38,16 @@
  *   credential keeps every refusal it had.
  * @structure ClassificationError · LabelActor · labelActorOf() · isOwnerPerson() · isAppActor() ·
  *   appNameOf() · documentKeyOf() · memoryTarget() · labelAddressOf() · documentContentKeys() ·
- *   fileTarget() · rowTarget() · setLabel() · reviewLabel() · labelsFor() · targetOf() ·
+ *   fileTarget() · fileAddressOf() · rowTarget() · setLabel() · reviewLabel() · labelsFor() · targetOf() ·
  *   readContentLabel() · labelForException()
  * @usage
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.8.0 — 2026-10-05 — A file shared into an organism workspace takes the organism's
+ *     classification: fileTarget(owner, key, workspaceRef) answers the organism's address, and
+ *     fileAddressOf moves a label request that names only the holder and key there too (Jouni,
+ *     2026-10-05; secaudit 2026-10, DATA-4).
  *   v1.7.0 — 2026-09-30 — TARGET-082 second review. An AI does not reject a suggestion that would
  *     protect the content more, even with relayed words (S6); the accept refusal names the Data
  *     Wallet; LabelActor carries the credential's scopes for the node level (S1).
@@ -225,8 +229,33 @@ async function currentRow(storage: Storage, policy: ClassificationPolicy, target
   return { row, stale: copies.map(r => ({ kind: r.kind, scope: r.scope, key: r.key })) };
 }
 
-export function fileTarget(ownerGaii: string, storageKey: string): ContentLabelTarget {
+/**
+ * A file's label address. A file shared into an organism workspace (`workspaceRef`, "org/ws", the
+ * first binding when there are several) belongs to that organism's classification: its labels, its
+ * "may not leave" and its audience apply, keyed under the workspace by holder and storage key so two
+ * members' files never share a label (Jouni, 2026-10-05: "they should"; secaudit 2026-10, DATA-4).
+ * Any other file is its holder's.
+ */
+export function fileTarget(ownerGaii: string, storageKey: string, workspaceRef?: string | null): ContentLabelTarget {
+  const first = (workspaceRef ?? '').split(/\s+/).find(Boolean) ?? '';
+  const slash = first.indexOf('/');
+  if (slash > 0 && slash < first.length - 1) {
+    const org = first.slice(0, slash);
+    const ws = first.slice(slash + 1);
+    return { kind: 'file', scope: `organism:${org}`, key: `organism.${org}.w.${ws}.files.${ownerGaii}/${storageKey}` };
+  }
   return { kind: 'file', scope: ownerGaii, key: storageKey };
+}
+
+/**
+ * The address of a file target named by its holder and key (a label request, which does not carry
+ * the file): the stored file's workspace binding moves it to the organism's address (fileTarget).
+ * Anything else comes back as it was.
+ */
+export async function fileAddressOf(storage: Pick<Storage, 'getStorageFile'>, t: ContentLabelTarget): Promise<ContentLabelTarget> {
+  if (t.kind !== 'file' || scopeOrganism(t.scope)) return t;
+  const file = await storage.getStorageFile(t.scope, t.key);
+  return file?.workspaceRef ? fileTarget(t.scope, t.key, file.workspaceRef) : t;
 }
 
 export function rowTarget(organismId: string, ws: string, space: string, rowId: string): ContentLabelTarget {
@@ -406,7 +435,7 @@ export async function setLabel(
   deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget, input: SetLabelInput,
   opts: { via?: 'review' } = {},
 ): Promise<SetLabelResult> {
-  const target = labelAddressOf(named);
+  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
   const justification = trimmed(input.justification, 'justification', 2000);
   const humanSaid = trimmed(input.humanSaid, 'humanSaid', 2000);
   const reason = trimmed(input.reason, 'reason', 1000);
@@ -528,7 +557,7 @@ export async function reviewLabel(
   deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget,
   input: { decision: 'accept' | 'reject'; justification?: string | null; humanSaid?: string | null },
 ): Promise<SetLabelResult> {
-  const target = labelAddressOf(named);
+  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
   const humanSaid = trimmed(input.humanSaid, 'humanSaid', 2000);
   if (actor.kind === 'rule' || (actor.kind === 'ai' && !humanSaid)) {
     throw new ClassificationError('PERSON_REQUIRED', 403, 'A person reviews a suggestion. An AI relays their decision with their own words in humanSaid.');
@@ -663,7 +692,7 @@ export interface LabelView {
 
 /** The label a piece of content carries, with its waiting suggestion and its last changes. */
 export async function readContentLabel(deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget): Promise<LabelView> {
-  const target = labelAddressOf(named);
+  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
   await assertMayLabel(deps, actor, target, 'read');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const { row } = await currentRow(deps.storage, policy, target);
@@ -683,7 +712,7 @@ export async function readContentLabel(deps: ClassificationDeps, actor: LabelAct
 export async function labelForException(
   deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget,
 ): Promise<{ target: ContentLabelTarget; label: string; labelDetail: ClassificationLabel | null }> {
-  const target = labelAddressOf(named);
+  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
   await assertMayLabel(deps, actor, target, 'write');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const { row } = await currentRow(deps.storage, policy, target);

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.3 — 2026-10-05 — The bundle passes a file's workspace binding to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.11.2 — 2026-10-05 — discover passes the config, so the listing leaves out an organism record
  *     kept inside its organism (services/memory-discover.ts, secaudit 2026-10, DATA-3).
  *   v1.11.1 — 2026-10-02 — export takes the caller's identity from resolve(req), as bulk, import and
@@ -492,7 +493,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       try {
         if (kind === 'file') {
           const stored = await storage.getStorageFile(owner, key);
-          const [file] = stored ? await reader.show([stored], () => fileTarget(owner, key)) : [];
+          const [file] = stored ? await reader.show([stored], () => fileTarget(owner, key, stored.workspaceRef)) : [];
           if (!file) { manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'not_found' }); continue; }
           archive.append(file.data as Buffer, { name: `files/${sanitize(key)}` });
           manifest.items.push({ kind, key, owner_gaii: owner, included: true, mime_type: file.mimeType, size: file.size, url: `${config.baseUrl}/v1/pub/${encodeURIComponent(owner)}/${encKeyPath(key)}` });

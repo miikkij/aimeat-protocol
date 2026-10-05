@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-10-05 — An attachment's workspace binding goes to fileTarget, so a workspace file
+ *     leaves by federation under its organism's classification (secaudit 2026-10, DATA-4).
  *   v1.5.0 — 2026-10-01 — POST /v1/federation/message refuses a sender who is not on the signing node
  *     (403 SENDER_NOT_OF_PEER): a linked peer could name any sender, also a user of another node, and
  *     pass the recipient's contact check as that person.
@@ -553,7 +555,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // The download token lets the peer pull the bytes, so the file passes leave() before one is
         // minted. Federation has no caller of this node behind it: the node's own reader (TARGET-082).
         const { left } = await systemReader({ storage, config }, owner_ghii)
-            .leave([storage_key], k => fileTarget(owner_ghii, k), { kind: 'federation', peer: source_node });
+            .leave([storage_key], k => fileTarget(owner_ghii, k, file.workspaceRef), { kind: 'federation', peer: source_node });
         if (left.length) {
             logger.info('storage grant refused: the attachment is classified', { peer: source_node, key: storage_key, label: left[0]!.label });
             res.status(403).json(error(config.nodeId, 'CLASSIFIED', `The attachment is ${left[0]!.reason}, so no download is granted.`));

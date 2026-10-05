@@ -28,6 +28,8 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.7.2 — 2026-10-05 — The file's workspace binding goes to fileTarget, so a workspace file leaves under its organism's classification (secaudit 2026-10, DATA-4).
+ *     explainReadThrough moved to routes/connections-read-through.ts unchanged (max-file-lines).
  *   v1.7.1 — 2026-09-29 — The delegated publish's CLASSIFIED refusal is refuseClassified(): a plain sentence and the way forward, the key and label in details.
  *   v1.7.0 — 2026-09-29 — POST /publish passes the stored file through the classification leave()
  *     on both paths before an attempt opens; a file that may not leave its organism is 403 CLASSIFIED.
@@ -52,16 +54,14 @@
  */
 
 import { Router } from 'express';
-import type { Request, Response, RequestHandler } from 'express';
+import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseClassified } from '../middleware/refusals.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
-import { denyScope403 } from '../auth/deny.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { READ_THROUGH_SCOPE } from '../services/app-grant-scopes.js';
+import { explainReadThrough } from './connections-read-through.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { buildOutboundProviders, listProviderMeta, findProvider } from '../services/connections/providers.js';
@@ -87,30 +87,6 @@ import type { ConnectionMode, ModerationMode } from '../models/connection-schema
 const toPublic = toPublicConnection;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
-
-/**
- * An APP or an AGENT that may not read through a connection is told what it lacks and how it gets
- * it, where requireScope would only name the word. An app adds the word to its
- * `<meta name="aimeat-scopes">`, and its owner approves it in the consent window (routes/app-grants.ts,
- * consent_required with reason app_updated). An agent's owner gives it on the agent's page. Anything
- * else, or a caller that holds the word, goes on to requireScope, which stays the door's gate.
- */
-const explainReadThrough: RequestHandler = (req, res, next) => {
-  const auth = req.auth;
-  if (auth?.roles.includes('app') && !scopeIsCovered(auth.scopes ?? [], READ_THROUGH_SCOPE)) {
-    denyScope403(req, res, [READ_THROUGH_SCOPE],
-      'This app may not read what is in the accounts its owner connected: that takes the "connections:read-through" permission, which the owner has not given it. '
-      + 'The app asks for it by adding connections:read-through to its <meta name="aimeat-scopes">, and the owner approves it in the consent window that opens the next time the app signs in.');
-    return;
-  }
-  if (auth?.roles.includes('agent') && !scopeIsCovered(auth.scopes ?? [], READ_THROUGH_SCOPE)) {
-    denyScope403(req, res, [READ_THROUGH_SCOPE],
-      'This agent may not read what is in its connected accounts: that takes the "connections:read-through" permission, which its owner has not given it. '
-      + 'Its owner gives it on this agent\'s page under Agents.');
-    return;
-  }
-  next();
-};
 
 export function connectionsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -574,7 +550,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
         return;
       }
       // Leaving for an outside service, checked before the gate writes an attempt (TARGET-082).
-      const { left } = await reader.leave([storageKey], k => fileTarget(principal, k), { kind: 'external', to: `app:${appId}/${action}` });
+      const { left } = await reader.leave([storageKey], k => fileTarget(principal, k, stored.workspaceRef), { kind: 'external', to: `app:${appId}/${action}` });
       if (left.length) {
         res.status(403).json(refuseClassified(config, { thing: 'file', done: 'published', details: { storage_key: storageKey, label: left[0]!.label, reason: left[0]!.reason } }));
         return;

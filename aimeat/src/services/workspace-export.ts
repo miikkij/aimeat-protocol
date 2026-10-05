@@ -14,6 +14,8 @@
  *   - exportWorkspace(storage, config, { orgId, ws, exporterGaii, exportedAt }) -> { buffer, filename }
  * @usage import { exportWorkspace } from '../services/workspace-export.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-05 -- An image shared into the organism leaves the export only when its organism
+ *     classification lets it: its workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 -- 2026-06-09 -- Initial: ZIP export (workspace.json + images/) reusing archiver.
  *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
  *   v1.1.0 -- 2026-07-10 -- An owner-level exporter with ACTIVE organism membership captures every
@@ -194,8 +196,10 @@ export async function collectWorkspace(
   for (const key of imageKeys) {
     const stored = await storage.getStorageFile(exporterGaii, key).catch(err => { logger.warn('md: continuing after a suppressed failure', { error: String(err) }); return null; });
     // An image leaves with the export under the same two questions as a record.
-    const shown = stored ? await reader.show([stored], () => fileTarget(exporterGaii, key)) : [];
-    const { kept: [file], left } = await reader.leave(shown, () => fileTarget(exporterGaii, key), { kind: 'export', organismId: orgId });
+    // The image's own workspace binding decides its address: one shared into this organism takes the
+    // organism's labels and its "may not leave" (secaudit 2026-10, DATA-4).
+    const shown = stored ? await reader.show([stored], () => fileTarget(exporterGaii, key, stored.workspaceRef)) : [];
+    const { kept: [file], left } = await reader.leave(shown, () => fileTarget(exporterGaii, key, stored?.workspaceRef), { kind: 'export', organismId: orgId });
     out.leftOut.push(...leftOutOf(left, () => key));
     if (!file) continue;
     const ext = (file.mimeType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';

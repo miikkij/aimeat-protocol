@@ -12,6 +12,7 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.4.1 -- 2026-10-05 -- The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.4.0 -- 2026-10-01 -- No storage-grant request to a peer whose messaging is off, or that is not
  *     active or degraded (peerTakesMessages in message-delivery.ts; the peer-registration incident,
  *     finding F).
@@ -117,7 +118,7 @@ async function fetchAttachmentBytes(
     // The copy goes to another account, so the sender's file passes leave() first (TARGET-082). A
     // cross-node copy is checked by the origin node when it mints the grant (federation-sync/messaging.ts).
     const { left } = await systemReader(ctx, held.holder)
-      .leave([held], h => fileTarget(h.holder, att.storageKey), { kind: 'external', to: message.recipientGhii });
+      .leave([held], h => fileTarget(h.holder, att.storageKey, file?.workspaceRef), { kind: 'external', to: message.recipientGhii });
     if (left.length) {
       logger.warn('attachment duplication: classified, not copied', {
         messageId: message.id, attachmentId: att.id, key: att.storageKey, label: left[0]!.label, reason: left[0]!.reason,

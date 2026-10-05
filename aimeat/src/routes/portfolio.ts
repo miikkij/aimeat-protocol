@@ -8,6 +8,7 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.10.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.10.0 — 2026-10-03 — `enable: true` on the JSON upload (and on the MCP tool) switches the page
  *     on unless the owner switched it off; the answer carries `served`. A card an AI published was
  *     stored and answered 404 for anyone who never pasted a mat. Without `enable`, nothing changes.
@@ -251,7 +252,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // Gather images from storage files
     const images: Array<{ key: string; gaii: string; mimeType: string; size: number; url: string; tags: string[] }> = [];
     for (const agent of agents) {
-      const files = await fileReader.show(filesByAgent[agent.gaii] ?? [], f => fileTarget(f.ownerGaii, f.key));
+      const files = await fileReader.show(filesByAgent[agent.gaii] ?? [], f => fileTarget(f.ownerGaii, f.key, f.workspaceRef));
       for (const f of files) {
         if (f.mimeType.startsWith('image/')) {
           images.push({
