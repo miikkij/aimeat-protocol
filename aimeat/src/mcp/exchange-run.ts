@@ -21,6 +21,7 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 — 2026-10-01 — aimeat_exchange_run refuses MEMBERS_ONLY before it settles a tool whose backing
  *     extension serves members only, as its REST twin does.
  *   v1.7.2 — 2026-09-26 — aimeat_exchange_work refuses SELF_WORK and SAME_OWNER_WORK when the caller and
@@ -57,7 +58,6 @@
  *     the REST routes so every MCP client, not only crewaimeat, can act on EXCHANGE).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -81,12 +81,12 @@ import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
-
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
 async function listAppToolManifests(storage: Storage, ownerGhii: string): Promise<string[]> {
@@ -150,12 +150,7 @@ export function registerExchangeRunTools(
     mcp.tool(
         'aimeat_app_tool_invoke',
         descriptionFor('aimeat_app_tool_invoke'),
-        {
-            owner: z.string().min(1).max(120),
-            app: z.string().min(1).max(120),
-            tool: z.string().min(1).max(120),
-            input: z.record(z.string(), z.unknown()).optional(),
-        },
+        zodShapeFor('aimeat_app_tool_invoke'),
         annotationsFor('aimeat_app_tool_invoke'),
         async ({ owner: appOwner, app, tool, input }) => {
             const ownerName = localAccountName(appOwner);
@@ -257,11 +252,7 @@ export function registerExchangeRunTools(
     mcp.tool(
         'aimeat_exchange_work',
         descriptionFor('aimeat_exchange_work'),
-        {
-            offering_id: z.string().min(1).max(120),
-            input: z.record(z.string(), z.unknown()).optional(),
-            note: z.string().max(2000).optional(),
-        },
+        zodShapeFor('aimeat_exchange_work'),
         annotationsFor('aimeat_exchange_work'),
         async ({ offering_id, input, note }) => {
             const o = await getOffering(storage, offering_id);
@@ -299,12 +290,7 @@ export function registerExchangeRunTools(
     mcp.tool(
         'aimeat_exchange_work_deliver',
         descriptionFor('aimeat_exchange_work_deliver'),
-        {
-            work_id: z.string().min(1).max(120),
-            output: z.unknown().optional(),
-            note: z.string().max(2000).optional(),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_exchange_work_deliver'),
         annotationsFor('aimeat_exchange_work_deliver'),
         async ({ work_id, output, note, ai_provenance, ai_provenance_id }) => {
             const w = await getWork(storage, work_id);
@@ -362,9 +348,7 @@ export function registerExchangeRunTools(
     mcp.tool(
         'aimeat_exchange_work_list',
         descriptionFor('aimeat_exchange_work_list'),
-        {
-            role: z.enum(['consumer', 'provider']).optional(),
-        },
+        zodShapeFor('aimeat_exchange_work_list'),
         annotationsFor('aimeat_exchange_work_list'),
         async ({ role }) => {
             const items = role === 'provider' ? await listWorkByProvider(storage, owner) : await listWorkByConsumer(storage, owner);
@@ -376,7 +360,7 @@ export function registerExchangeRunTools(
     mcp.tool(
         'aimeat_exchange_proposals',
         descriptionFor('aimeat_exchange_proposals'),
-        {},
+        zodShapeFor('aimeat_exchange_proposals'),
         annotationsFor('aimeat_exchange_proposals'),
         async () => {
             const list = await listProposalsForOwner(storage, owner);
@@ -395,10 +379,7 @@ export function registerExchangeRunTools(
     mcp.tool(
         'aimeat_exchange_proposal_decide',
         descriptionFor('aimeat_exchange_proposal_decide'),
-        {
-            proposal_id: z.string().min(1).max(120),
-            decision: z.enum(['accept', 'decline', 'withdraw']),
-        },
+        zodShapeFor('aimeat_exchange_proposal_decide'),
         annotationsFor('aimeat_exchange_proposal_decide'),
         async ({ proposal_id, decision }) => {
             const p = await getProposal(storage, proposal_id);

@@ -497,25 +497,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Commerce (TARGET-033/034 over MCP) ──
 
     // ── Exchange marketplace (TARGET-045 over MCP) ──
-    aimeat_exchange_offerings: { title: 'Browse Exchange Offerings', readOnlyHint: true },
-    aimeat_exchange_offering_get: { title: 'Get Exchange Offering Detail', readOnlyHint: true },
-    // accept mints a durable metered entitlement (idempotent per (consumer, ext, action): re-accepting
-    // replaces + carries spend forward, not a new contract each call).
-    aimeat_exchange_accept: { title: 'Accept Exchange Contract', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_exchange_contracts: { title: 'List My Exchange Contracts', readOnlyHint: true },
-    // pause is reversible; revoke is terminal — the consumer off-switch carries a destructive path.
-    aimeat_exchange_contract_off: { title: 'Pause / Revoke Exchange Contract', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_exchange_needs: { title: 'Browse Exchange Needs', readOnlyHint: true },
-    aimeat_exchange_need_post: { title: 'Post Exchange Need', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_exchange_bid: { title: 'Bid on Exchange Need', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_exchange_bid_accept: { title: 'Accept Exchange Bid (mint contract)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_exchange_consumers: { title: 'List Offering Consumers (provider lineage)', readOnlyHint: true },
-    aimeat_app_tool_invoke: { title: 'Invoke App Tool (metered, via contract)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_exchange_work: { title: 'Start Agent Work (async task)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_exchange_work_deliver: { title: 'Deliver Agent Work (settle on delivery)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_exchange_work_list: { title: 'List Agent Work Items', readOnlyHint: true },
-    aimeat_exchange_proposals: { title: 'List Renegotiation Proposals', readOnlyHint: true },
-    aimeat_exchange_proposal_decide: { title: 'Decide Renegotiation Proposal', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 };
 
 /** Tool -> its annotations: each catalog entry's `annotations`, and the list above. */
