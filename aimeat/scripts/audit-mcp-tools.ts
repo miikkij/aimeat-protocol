@@ -17,6 +17,9 @@
  *   v1.2.0 -- 2026-05-28 -- Report catalog drift against MCP surfaces and CLI handlers
  *   v1.3.0 -- 2026-05-29 -- Add TOOL_ANNOTATIONS coverage check
  *   v1.4.0 -- 2026-07-19 -- Add --check gate mode (exit 1 on drift) for pre-commit + CI
+ *   v1.5.0 -- 2026-10-05 -- The connector tools registered over their CLI dispatch definition
+ *     (dispatch-tools.ts) are read from the registration (inventory/mcp-capture.ts); no source line
+ *     names them (secaudit 2026-10, M3).
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -26,6 +29,7 @@ import { CONNECT_CLI_TOOLS } from '../src/cli/connect/tool-call.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/tool-catalog/definitions.js';
 import { TOOL_ANNOTATIONS } from '../src/mcp/annotations.js';
 import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../src/tool-catalog/scopes.js';
+import { captureConnector } from './inventory/mcp-capture.js';
 
 interface SurfaceConfig {
     id: 'server' | 'connector';
@@ -236,6 +240,15 @@ function printMarkdownReport(report: AuditReport): void {
 
 const serverTools = await collectTools(surfaces[0]);
 const connectorTools = await collectTools(surfaces[1]);
+// The connector tools with no handler of their own run their CLI dispatch definition and are
+// registered in a loop (dispatch-tools.ts), so no source line names them: the registration itself does.
+{
+    const named = new Set(connectorTools.map(t => t.name));
+    for (const name of captureConnector().keys()) {
+        if (!named.has(name)) connectorTools.push({ surface: 'connector', file: 'src/cli/connect/mcp/tools/dispatch-tools.ts', line: 1, name });
+    }
+    connectorTools.sort((first, second) => first.name.localeCompare(second.name) || first.file.localeCompare(second.file));
+}
 const report = buildReport(serverTools, connectorTools);
 
 /**

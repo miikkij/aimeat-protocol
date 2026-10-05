@@ -7,6 +7,10 @@
  *   ai-provenance-marks.ts that names the forbidden vocabulary in order to forbid it.
  * @usage pnpm test -- check-ai-disclosure
  * @version-history
+ *   v1.3.0 — 2026-10-05 — The required-tool case drops the field from the catalog entry (both MCP surfaces
+ *     register the catalog's schema) and runs the gate in a child process; the connector-read case
+ *     breaks the fold inside withProvenanceCarrying(), which most connector reads run through now
+ *     (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-30 — [connector-provenance]: the connector's aimeat_memory_read_public going
  *     back to the plain unwrap fails the gate (TARGET-082 review).
  *   v1.2.0 — 2026-09-05 — The gate runs in-process: the module is re-imported fresh per test with
@@ -21,6 +25,7 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { stripComments } from '../../scripts/check-ai-disclosure.js';
@@ -62,6 +67,16 @@ async function runGate(): Promise<{ code: number; out: string }> {
 
 /** Break a file, run the gate, put it back whatever happens. */
 const restores: Array<() => void> = [];
+/**
+ * The gate in a child process. Needed where a mutation changes a MODULE the gate imports (the tool
+ * catalog, read through the registered MCP schemas): the in-process re-import keeps serving the
+ * cached module, so the mutation is not seen there.
+ */
+function runGateProcess(): { code: number; out: string } {
+  const r = spawnSync(process.execPath, ['--import', 'tsx', 'scripts/check-ai-disclosure.ts'], { cwd: ROOT, encoding: 'utf8' });
+  return { code: r.status ?? 1, out: `${r.stdout}\n${r.stderr}` };
+}
+
 function breakFile(relPath: string, mutate: (src: string) => string): void {
   const full = join(ROOT, relPath);
   const original = readFileSync(full, 'utf8');
@@ -125,20 +140,24 @@ describe('drop a label on purpose and the build fails', () => {
   });
 
   it('[mcp-provenance] dropping ai_provenance from a required write tool', async () => {
-    breakFile('src/mcp/core.ts', (src) => src.replace('...aiProvenanceInputs,', '// removed'));
-    const { code, out } = await runGate();
+    // Both MCP surfaces register the catalog's schema (zodShapeFor) since 2026-10-05, so the field
+    // leaves the tool by leaving its catalog entry.
+    breakFile('src/tool-catalog/definitions/discovery-work-boards.ts', (src) =>
+      src.replace(/(name: 'aimeat_board_post'[\s\S]*?)\.\.\.aiProvenanceCatalogInput,/, '$1'));
+    const { code, out } = runGateProcess();
     expect(code).toBe(1);
     expect(out).toContain('no longer declares the ai_provenance input');
   });
 
-  it('[connector-provenance] the connector public read back to the plain unwrap', async () => {
+  it('[connector-provenance] the connector reads back to the plain unwrap', async () => {
     // The connector's aimeat_memory_read_public handed on the provenance id and dropped the
-    // statement until 2026-09-30; CONNECTOR_META_READS now names it, so the unwrap fails the gate.
-    breakFile('src/cli/connect/mcp/tools/memory-ext.ts', (src) =>
-      src.replace('return payloadResult(readPayloadWithProvenance(resp), resp);', 'return payloadResult(resp.data ?? resp, resp);'));
+    // statement until 2026-09-30. It runs its CLI dispatch definition since 2026-10-05, like most
+    // connector reads, so the fold that matters is the one inside withProvenanceCarrying().
+    breakFile('src/tool-dispatch/ai-provenance-carry.ts', (src) =>
+      src.replace('if (!declared && !declaredId) return { ...resp, data: readPayloadWithProvenance(resp) };', 'if (!declared && !declaredId) return resp;'));
     const { code, out } = await runGate();
     expect(code).toBe(1);
-    expect(out).toContain('connector MCP tool aimeat_memory_read_public unwraps the envelope without folding meta.provenance');
+    expect(out).toContain('no longer folds meta.provenance onto read payloads');
   });
 
   it('[derived-visibility] a provider predicate that stops covering apps', async () => {

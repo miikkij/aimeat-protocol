@@ -15,6 +15,8 @@
  *   Each door is exercised with a sent outcome as well, so "everything is an error now" cannot pass.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mail-send-failed-outcome.test.ts
  * @version-history
+ *   v1.2.1 — 2026-10-05 — The connector case takes the tool from the whole connector: it is served over
+ *     its CLI dispatch definition now (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-26 — The tool's refusal no longer carries `channel`: whether an address has an
  *     account here reaches only the owner in person, and a tool session is always an agent's.
  *   v1.1.0 — 2026-09-13 —The connector doors are fed the SEND_FAILED error a current node answers,
@@ -25,7 +27,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerConnectionTools as registerNodeConnectionTools } from '../../src/mcp/connections.js';
-import { registerConnectionTools as registerConnectorConnectionTools } from '../../src/cli/connect/mcp/tools/connections.js';
+import { registerAllTools as registerConnectorTools } from '../../src/cli/connect/mcp/tools/index.js';
 import { connectionCliTools } from '../../src/tool-dispatch/tool-call-defs-connections.js';
 import { getAimeatToolDefinition } from '../../src/tool-catalog/definitions.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
@@ -183,8 +185,10 @@ describe('CLI dispatch aimeat_mail_send', () => {
 describe('connector MCP aimeat_mail_send', () => {
     const handlerFor = (answer: ApiResponse): Handler => {
         const { mcp, handlers } = capturingMcp();
-        const registry = { resolve: () => ({ client: { post: async () => answer } }) } as unknown as AgentRegistry;
-        registerConnectorConnectionTools(mcp, registry);
+        // The connector serves aimeat_mail_send over its CLI dispatch definition since 2026-10-05.
+        const agent = { client: { post: async () => answer }, agent: 'probe', owner: 'owner', config: { node_url: 'http://node.test' } };
+        const registry = { resolve: () => agent, list: () => [agent], size: () => 1 } as unknown as AgentRegistry;
+        registerConnectorTools(mcp, registry);
         return handlers.get('aimeat_mail_send')!;
     };
 

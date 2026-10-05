@@ -30,20 +30,6 @@ export function registerCommerceTools(mcp: McpServer, registry: AgentRegistry): 
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  // Seller PSP credentials — through the commerce payout routes, which store the secret encrypted and
-  // answer with a last-four hint. The generic memory routes stored it plain and returned it whole.
-  mcp.tool('aimeat_commerce_psp_set', descriptionFor('aimeat_commerce_psp_set'), zodShapeFor('aimeat_commerce_psp_set'), annotationsFor('aimeat_commerce_psp_set'), async ({ provider, secret_key, webhook_secret }) => {
-    return out(await client.put('/v1/commerce/payout/stripe', { provider, secret_key, webhook_secret }));
-  });
-
-  mcp.tool('aimeat_commerce_psp_status', descriptionFor('aimeat_commerce_psp_status'), zodShapeFor('aimeat_commerce_psp_status'), annotationsFor('aimeat_commerce_psp_status'), async () => {
-    return out(await client.get('/v1/commerce/payout'));
-  });
-
-  mcp.tool('aimeat_commerce_psp_delete', descriptionFor('aimeat_commerce_psp_delete'), zodShapeFor('aimeat_commerce_psp_delete'), annotationsFor('aimeat_commerce_psp_delete'), async () => {
-    return out(await client.delete('/v1/commerce/payout/stripe'));
-  });
-
   // Publish the sellable tool manifest — server MCP validates + writes apps.{id}.tools; the connector
   // writes that public owner record via POST /v1/memory.
   mcp.tool('aimeat_app_tools_publish', descriptionFor('aimeat_app_tools_publish'), {
@@ -101,17 +87,6 @@ export function registerCommerceTools(mcp: McpServer, registry: AgentRegistry): 
     if (clear_money) offer.priceMoney = null;
     if (visibility) offer.visibility = visibility;
     return out(await client.put(`/v1/agents/${encodeURIComponent(agent_name)}/offers`, { offers }));
-  });
-
-  mcp.tool('aimeat_checkout_open', descriptionFor('aimeat_checkout_open'), zodShapeFor('aimeat_checkout_open'), annotationsFor('aimeat_checkout_open'), async ({ items, note, currency }) => {
-    const payload: Record<string, unknown> = { items };
-    if (note) payload.note = note;
-    if (currency) payload.currency = currency;
-    return out(await client.post('/v1/commerce/checkout-sessions', payload));
-  });
-
-  mcp.tool('aimeat_checkout_complete', descriptionFor('aimeat_checkout_complete'), zodShapeFor('aimeat_checkout_complete'), annotationsFor('aimeat_checkout_complete'), async ({ session_id, handler }) => {
-    return out(await client.post(`/v1/commerce/checkout-sessions/${encodeURIComponent(session_id)}/complete`, handler ? { handler } : {}));
   });
 
   mcp.tool('aimeat_checkout_list', descriptionFor('aimeat_checkout_list'), zodShapeFor('aimeat_checkout_list'), annotationsFor('aimeat_checkout_list'), async ({ limit }) => {

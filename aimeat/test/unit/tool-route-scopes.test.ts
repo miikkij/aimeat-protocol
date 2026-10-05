@@ -16,6 +16,8 @@
  *   entry that no longer differs.
  * @usage pnpm test -- tool-route-scopes
  * @version-history
+ *   v1.0.1 — 2026-10-05 — Two pairs the AI-model dispatch definitions hid behind a spread name are listed
+ *     (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C3).
  */
 import { describe, it, expect } from 'vitest';
@@ -152,6 +154,10 @@ const KNOWN: Record<string, string> = {
   aimeat_package_publish: 'UNREVIEWED: the tool asks app:write; the route asks packages:write.',
   aimeat_skill_list: 'UNREVIEWED',
   aimeat_workflow_pending_inputs: 'UNREVIEWED',
+  // Visible since 2026-10-05, when the AI-model dispatch definitions wrote their names out (they had
+  // spread them from the catalog, and the pairing reads a literal name; secaudit 2026-10, M3).
+  aimeat_ai_policy_set: 'UNREVIEWED: the tool asks memory:write-reserved; the GET /v1/ai/policy it reads first asks ai:use.',
+  aimeat_ai_routing_set: 'UNREVIEWED: the tool asks memory:write-reserved; the GET /v1/ai/routing it reads first asks ai:use.',
 };
 
 describe('an MCP tool asks the scope words of the route it runs on', () => {

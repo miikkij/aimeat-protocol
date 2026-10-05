@@ -33,14 +33,4 @@ export function registerAgentCapsTools(mcp: McpServer, registry: AgentRegistry):
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_agent_activity', descriptionFor('aimeat_agent_activity'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_activity') }, annotationsFor('aimeat_agent_activity'), async ({ agent_name, days, granularity }) => {
-    const { client, agent } = pickAgent(registry, agent_name);
-    const enc = encodeURIComponent(agent);
-    const params = new URLSearchParams();
-    if (days !== undefined) params.set('days', String(days));
-    if (granularity) params.set('granularity', granularity);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const resp = await client.get(`/v1/agents/${enc}/activity${qs}`);
-    return envelopeResult(resp);
-  });
 }

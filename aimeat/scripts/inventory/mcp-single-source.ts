@@ -14,9 +14,13 @@
  * @structure singleSourceReport(server, connector) · BASELINE_PATH
  * @usage const r = singleSourceReport(captureServer(), captureConnector()); r.unlisted, r.stale
  * @version-history
+ *   v1.1.0 — 2026-10-05 — ownHandlerReport(): the connector tools that keep a handler of their own beside
+ *     their CLI dispatch definition, against security/connector-own-handlers.json (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M3).
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 import { zodShapeFor } from '../../src/tool-catalog/zod-shape.js';
@@ -47,6 +51,32 @@ export function schemaText(shape: Record<string, unknown> | undefined, drop: rea
     } catch (err) {
         return `UNCONVERTIBLE: ${err instanceof Error ? err.message : String(err)}`;
     }
+}
+
+export const OWN_HANDLERS_PATH = new URL('../../security/connector-own-handlers.json', import.meta.url);
+
+/**
+ * Connector tools that have a CLI dispatch definition and still register a handler of their own
+ * (src/cli/connect/mcp/tools/), against the list of the ones not yet settled. Every other connector
+ * tool runs its dispatch definition (dispatch-tools.ts). A listed tool differs from its dispatch
+ * definition in what it sends or answers; settling one means making the two the same and deleting
+ * the handler. The list only shrinks.
+ */
+export function ownHandlerReport(dispatchNames: ReadonlySet<string>): { own: string[]; unlisted: string[]; stale: string[] } {
+    const dir = fileURLToPath(new URL('../../src/cli/connect/mcp/tools/', import.meta.url));
+    const own = new Set<string>();
+    for (const f of readdirSync(dir)) {
+        if (!f.endsWith('.ts') || f === 'dispatch-tools.ts') continue;
+        for (const m of readFileSync(join(dir, f), 'utf8').matchAll(/\bmcp\.(?:register)?[Tt]ool\(\s*'([a-z0-9_]+)'/g)) {
+            if (dispatchNames.has(m[1]!)) own.add(m[1]!);
+        }
+    }
+    const listed = new Set<string>((JSON.parse(readFileSync(OWN_HANDLERS_PATH, 'utf8')) as { tools: string[] }).tools);
+    return {
+        own: [...own].sort(),
+        unlisted: [...own].filter(n => !listed.has(n)).sort(),
+        stale: [...listed].filter(n => !own.has(n)).sort(),
+    };
 }
 
 export interface SingleSourceReport {

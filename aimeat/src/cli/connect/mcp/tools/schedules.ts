@@ -30,28 +30,6 @@ import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, agent } = registry.resolve();
-  const out = (resp: { data?: unknown; ok?: boolean }) =>
-    ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
-
-  mcp.tool('aimeat_schedule_create', descriptionFor('aimeat_schedule_create'), zodShapeFor('aimeat_schedule_create'), annotationsFor('aimeat_schedule_create'), async (a) => {
-    return out(await client.post('/v1/schedules', a as Record<string, unknown>));
-  });
-
-  mcp.tool('aimeat_schedule_list', descriptionFor('aimeat_schedule_list'), zodShapeFor('aimeat_schedule_list'), annotationsFor('aimeat_schedule_list'), async ({ detail }) => {
-    return out(await client.get(detail ? '/v1/schedules?detail=true' : '/v1/schedules'));
-  });
-
-  mcp.tool('aimeat_schedule_update', descriptionFor('aimeat_schedule_update'), zodShapeFor('aimeat_schedule_update'), annotationsFor('aimeat_schedule_update'), async ({ schedule_id, ...rest }) => {
-    return out(await client.patch(`/v1/schedules/${encodeURIComponent(schedule_id)}`, rest as Record<string, unknown>));
-  });
-
-  mcp.tool('aimeat_schedule_delete', descriptionFor('aimeat_schedule_delete'), zodShapeFor('aimeat_schedule_delete'), annotationsFor('aimeat_schedule_delete'), async ({ schedule_id }) => {
-    return out(await client.delete(`/v1/schedules/${encodeURIComponent(schedule_id)}`));
-  });
-
-  mcp.tool('aimeat_schedule_trigger', descriptionFor('aimeat_schedule_trigger'), zodShapeFor('aimeat_schedule_trigger'), annotationsFor('aimeat_schedule_trigger'), async ({ schedule_id }) => {
-    return out(await client.post(`/v1/schedules/${encodeURIComponent(schedule_id)}/trigger`, {}));
-  });
 
   // No dedicated REST route: the internal-scheduler mirror is a structured memory record under
   // `agents.<name>.scheduler` (matches the server MCP tool). Write it via /v1/memory.

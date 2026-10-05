@@ -22,6 +22,8 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-10-05 — PROBE_SETUP conversation ids for aimeat_dm_thread, aimeat_dm_thread_as_owner and
+ *     aimeat_dm_archive_as_owner: the connector registers the node's id pattern now (secaudit 2026-10, M3).
  *   2026-09-27 — aimeat_app_manage gets a PROBE_SETUP entry (action versions).
  *   v1.0.0 -- 2026-09-07 -- Written with the sweep it guards.
  */
@@ -66,6 +68,11 @@ const NEVER_CALLS_THE_NODE = new Map<string, string>([
  */
 const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_datapackage_export: { ref: 'pkg:someone/thing' },
+  // A conversation id is 8 to 128 of [A-Za-z0-9_.:-] on the node's schema, which the connector has
+  // registered too since 2026-10-05 (secaudit 2026-10, M3); the generic 'probe' is too short.
+  aimeat_dm_thread: { conversation_id: 'conv-probe-0001' },
+  aimeat_dm_thread_as_owner: { conversation_id: 'conv-probe-0001' },
+  aimeat_dm_archive_as_owner: { conversation_ids: ['conv-probe-0001'] },
   aimeat_datamap_get: { app: 'someone/thing.html' },
   aimeat_datamap_set: { app: 'someone/thing.html', data_map: { spec: 'aimeat.datamap/1' } },
   aimeat_skill_get: { name: 'probe' },

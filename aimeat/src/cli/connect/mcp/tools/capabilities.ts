@@ -24,23 +24,6 @@ import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
-  mcp.tool('aimeat_capabilities_list', descriptionFor('aimeat_capabilities_list'), zodShapeFor('aimeat_capabilities_list'), annotationsFor('aimeat_capabilities_list'), async ({ search, tags, callable, authRequired, source_type }) => {
-    const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    if (tags?.length) params.set('tags', tags.join(','));
-    if (callable !== undefined) params.set('callable', String(callable));
-    if (authRequired) params.set('authRequired', authRequired);
-    if (source_type) params.set('source_type', source_type);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const resp = await client.get(`/v1/capabilities${qs}`);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_capabilities_get', descriptionFor('aimeat_capabilities_get'), zodShapeFor('aimeat_capabilities_get'), annotationsFor('aimeat_capabilities_get'), async ({ id }) => {
-    const resp = await client.get(`/v1/capabilities/${encodeURIComponent(id)}`);
-    return envelopeResult(resp);
-  });
-
   mcp.tool('aimeat_capabilities_invoke', descriptionFor('aimeat_capabilities_invoke'), zodShapeFor('aimeat_capabilities_invoke'), annotationsFor('aimeat_capabilities_invoke'), async ({ id, input, mode }) => {
     const qs = mode ? `?mode=${encodeURIComponent(mode)}` : '';
     const resp = await client.post(`/v1/capabilities/${encodeURIComponent(id)}/invoke${qs}`, { input: input ?? {} });
@@ -94,15 +77,4 @@ export function registerCapabilitiesTools(mcp: McpServer, registry: AgentRegistr
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_capabilities_delete', descriptionFor('aimeat_capabilities_delete'), zodShapeFor('aimeat_capabilities_delete'), annotationsFor('aimeat_capabilities_delete'), async ({ id }) => {
-    const resp = await client.delete(`/v1/capabilities/${encodeURIComponent(id)}`);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_capabilities_vouch', descriptionFor('aimeat_capabilities_vouch'), zodShapeFor('aimeat_capabilities_vouch'), annotationsFor('aimeat_capabilities_vouch'), async ({ id, comment }) => {
-    const body: Record<string, unknown> = {};
-    if (comment) body.comment = comment;
-    const resp = await client.post(`/v1/capabilities/${encodeURIComponent(id)}/vouch`, body);
-    return envelopeResult(resp);
-  });
 }

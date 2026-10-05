@@ -8,6 +8,8 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   2026-10-05 — Every connector tool without a handler of its own runs its CLI dispatch definition
+ *     (dispatch-tools.ts); registerAllTools records the names the modules register (secaudit 2026-10, M3).
  *   v2.6.0 -- 2026-09-29 -- Register aimeat_classification (TARGET-082 V5).
  *   v2.5.0 -- 2026-09-29 -- Register the mail refinery tools (aimeat_refinery_classes/run/status).
  *   v1.5.0 -- 2026-09-28 -- Register aimeat_admin_install_set.
@@ -31,42 +33,23 @@ import { registerCoreTools } from './core.js';
 import { registerAgentTasksTools } from './agent-tasks.js';
 import { registerAgentMessagesTools } from './agent-messages.js';
 import { registerDmMessagesTools } from './dm-messages.js';
-import { registerAgentV2MessagingTools } from './agent-v2-messaging.js';
-import { registerAgentV2TaskTools } from './agent-v2-tasks.js';
 import { registerAgentCapsTools } from './agent-caps.js';
 import { registerAgentManagementTools } from './agent-management.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerBoardsTools } from './boards.js';
-import { registerCatalogueTools } from './catalogue.js';
 import { registerCapabilitiesTools } from './capabilities.js';
-import { registerExtensionsTools } from './extensions.js';
-import { registerCortexTools } from './cortex.js';
 import { registerAppsTools } from './apps.js';
 import { registerKnowledgeTools } from './knowledge.js';
 import { registerSkillsTools } from './skills.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
-import { registerConnectionTools } from './connections.js';
-import { registerRefineryTools } from './refinery.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerSchedulesTools } from './schedules.js';
 import { registerWorkflowTools } from './workflows.js';
-import { registerAiJobTools } from './ai-jobs.js';
 import { registerDecideTools } from './decide.js';
 import { registerAiVoiceTools } from './ai-voice.js';
-import { registerAiPolicyTools } from './ai-policy.js';
-import { registerAiProviderTools } from './ai-providers.js';
-import { registerAiCapabilityTools } from './ai-capabilities.js';
-import { registerConsentTools } from './consent.js';
-import { registerAccessTools } from './access.js';
-import { registerSecretTools } from './secrets.js';
-import { registerGroupsTools } from './groups.js';
-import { registerInstancesTools } from './instances.js';
-import { registerMemoryExtTools } from './memory-ext.js';
-import { registerWalletExtTools } from './wallet-ext.js';
 import { registerFlagsTools } from './flags.js';
 import { registerHandbookTools } from './handbook.js';
-import { registerOnboardingTools } from './onboarding.js';
 import { registerAppdevTools } from './appdev.js';
 import { registerCommerceTools } from './commerce.js';
 import { registerExchangeTools } from './exchange.js';
@@ -76,55 +59,47 @@ import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppManageTool } from './app-manage.js';
 import { registerDesignbookTools } from './designbook.js';
-import { registerUiLibraryTools } from './ui-library.js';
 import { registerThemeTools } from './themes.js';
 import { registerOperatorTools } from './operator.js';
 import { registerComplianceTools } from './compliance.js';
 import { registerInstallSetTools } from './install-sets.js';
 import { registerDataMapTools } from './data-map.js';
-import { registerClassificationTools } from './classification.js';
+import { registerDispatchTools } from './dispatch-tools.js';
 
-export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void {
+export function registerAllTools(server: McpServer, registry: AgentRegistry): void {
+  // The modules register the tools that have a handler of their own; every other connector tool runs
+  // its CLI dispatch definition (dispatch-tools.ts). The names the modules took are recorded on the way.
+  const registered = new Set<string>();
+  const mcp = new Proxy(server, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if ((prop === 'tool' || prop === 'registerTool') && typeof value === 'function') {
+        return (...args: unknown[]) => { registered.add(args[0] as string); return value.apply(target, args); };
+      }
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
   registerCoreTools(mcp, registry);
   registerAgentTasksTools(mcp, registry);
   registerAgentMessagesTools(mcp, registry);
   registerDmMessagesTools(mcp, registry);
-  registerAgentV2MessagingTools(mcp, registry);
-  registerAgentV2TaskTools(mcp, registry);
   registerAgentCapsTools(mcp, registry);
   registerAgentManagementTools(mcp, registry);
   registerAgentTelemetryTools(mcp, registry);
   registerBoardsTools(mcp, registry);
-  registerCatalogueTools(mcp, registry);
   registerCapabilitiesTools(mcp, registry);
-  registerExtensionsTools(mcp, registry);
-  registerCortexTools(mcp, registry);
   registerAppsTools(mcp, registry);
   registerKnowledgeTools(mcp, registry);
   registerSkillsTools(mcp, registry);
   registerOrganismsTools(mcp, registry);
   registerWorkspaceTools(mcp, registry);
-  registerConnectionTools(mcp, registry);
-  registerRefineryTools(mcp, registry);
   registerMcpProxyTools(mcp, registry);
   registerSchedulesTools(mcp, registry);
   registerWorkflowTools(mcp, registry);
-  registerAiJobTools(mcp, registry);
   registerDecideTools(mcp, registry);
   registerAiVoiceTools(mcp, registry);
-  registerAiPolicyTools(mcp, registry);
-  registerAiProviderTools(mcp, registry);
-  registerAiCapabilityTools(mcp, registry);
-  registerConsentTools(mcp, registry);
-  registerAccessTools(mcp, registry);
-  registerSecretTools(mcp, registry);
-  registerGroupsTools(mcp, registry);
-  registerInstancesTools(mcp, registry);
-  registerMemoryExtTools(mcp, registry);
-  registerWalletExtTools(mcp, registry);
   registerFlagsTools(mcp, registry);
   registerHandbookTools(mcp, registry);
-  registerOnboardingTools(mcp, registry);
   registerAppdevTools(mcp, registry);
   registerCommerceTools(mcp, registry);
   registerExchangeTools(mcp, registry);
@@ -134,11 +109,10 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerSurfaceLayoutTools(mcp, registry);
   registerAppManageTool(mcp, registry);
   registerDesignbookTools(mcp, registry);
-  registerUiLibraryTools(mcp, registry);
   registerThemeTools(mcp, registry);
   registerOperatorTools(mcp, registry);
   registerComplianceTools(mcp, registry);
   registerInstallSetTools(mcp, registry);
   registerDataMapTools(mcp, registry);
-  registerClassificationTools(mcp, registry);
+  registerDispatchTools(server, registry, registered);
 }

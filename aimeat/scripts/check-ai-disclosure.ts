@@ -28,6 +28,9 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.7.0 — 2026-10-05 — Whether a tool carries ai_provenance, and whether it takes free text, is read from
+ *     the schema each MCP surface registers (inventory/mcp-capture.ts), not from the registration
+ *     source: the schemas come from the catalog through zodShapeFor() (secaudit 2026-10, M3).
  *   v1.6.0 — 2026-09-28 — The transport check knows the AI SDK (System 2 plan, V1). `ai` is imported
  *     by the gateway alone, provider packages by its adapters alone, `@ai-sdk/gateway` by nothing,
  *     the adapters by the gateway alone, and no AI SDK call gets a string model id, which the AI SDK
@@ -64,6 +67,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { createConnectorChecks, CONNECTOR_MCP_DIR, CONNECTOR_SHELL_WRAPPER } from './lib/check-ai-disclosure-connector.js';
+import { captureServer, captureConnector } from './inventory/mcp-capture.js';
 import { createAiSdkBoundaryCheck, AI_GATEWAY, AI_ADAPTERS_DIR } from './lib/check-ai-sdk-boundary.js';
 import { PUBLICLY_LINKED_CONTAINERS } from '../src/storage/types/ai-provenance.js';
 
@@ -291,6 +295,13 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
+  // OPEN, listed 2026-10-05 (secaudit 2026-10, M3), and NOT decided: the developer decides. The
+  // company record's `description` is one or two sentences the front page and the company tools
+  // show. This gate never saw it, because the field sat in a shape constant beside the registration
+  // rather than in it; reading the registered schema found it. The company service has no
+  // provenance carrier, so the honest state is "not carried", named here instead of failing.
+  'aimeat_company_create',
+  'aimeat_company_update',
   // DECIDED, 2026-10-02 (package sale design, phase 4; the developer reviews it with the build). The
   // free text is the set's listing: a title, a description, one outcome sentence and up to three
   // example prompts, the same fields aimeat_package_compose takes. The apps it packages are copied
@@ -442,30 +453,23 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
 ];
 
 /** A parameter name that carries prose a person will read. */
-const FREE_TEXT_PARAM = /\b(body|text|content|message|value|summary|description|title|note|notes|prompt|answer|reply)\s*:\s*z\./;
+const FREE_TEXT_KEYS = new Set(['body', 'text', 'content', 'message', 'value', 'summary', 'description', 'title', 'note', 'notes', 'prompt', 'answer', 'reply']);
 /** A tool name that writes something. */
 const WRITE_VERB = /_(write|post|send|publish|contribute|complete|save|create|update|reply|comment|report|deliver|answer|ask|invite|define|propose|grant|set)\b/;
 
-function mcpToolBlocks(): Array<{ name: string; file: string; block: string }> {
-  const out: Array<{ name: string; file: string; block: string }> = [];
-  for (const file of walk(join(root, 'src', 'mcp'))) {
-    // Comments stripped FIRST, and this is not a nicety. `ai-provenance-input.ts` documents itself
-    // with a worked `mcp.tool('aimeat_memory_write', … ...aiProvenanceInput …)` example in its
-    // @usage block. Reading that as a real registration made the gate believe memory_write was
-    // covered no matter what the actual tool did — the gate passed while the label was gone.
-    const src = stripped(file);
-    const starts = [...src.matchAll(/mcp\.tool\(\s*'([a-z0-9_]+)'/g)];
-    starts.forEach((m, i) => {
-      const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
-      out.push({ name: m[1], file: rel(file), block: src.slice(m.index!, end) });
-    });
-  }
-  return out;
-}
+/**
+ * Each tool's input keys as the two MCP surfaces REGISTER them, read by registering the real tools
+ * against a fake server (inventory/mcp-capture.ts, what check:mcp-schemas reads). Until 2026-10-05
+ * this read the registration SOURCE for an `...aiProvenanceInputs` spread; the schemas come from the
+ * catalog through zodShapeFor() now (secaudit 2026-10, M3), so the source says nothing about the
+ * fields and the registered schema is the only honest answer.
+ */
+const registered = { node: captureServer(), connector: captureConnector() };
+const keysOf = (surface: 'node' | 'connector', name: string): Set<string> => new Set(registered[surface].get(name)?.inputKeys ?? []);
 
 function checkMcpWriteTools(): void {
-  const blocks = mcpToolBlocks();
-  const carrying = new Set(blocks.filter(b => /aiProvenanceInputs?\b/.test(b.block)).map(b => b.name));
+  const blocks = [...registered.node.keys()].map(name => ({ name, keys: keysOf('node', name) }));
+  const carrying = new Set(blocks.filter(b => b.keys.has('ai_provenance')).map(b => b.name));
 
   for (const name of AI_PROVENANCE_REQUIRED) {
     if (!carrying.has(name)) {
@@ -479,8 +483,8 @@ function checkMcpWriteTools(): void {
   const decided = new Set([...AI_PROVENANCE_REQUIRED, ...AI_PROVENANCE_REVIEWED_WITHOUT]);
   for (const b of blocks) {
     if (decided.has(b.name)) continue;
-    if (!WRITE_VERB.test(b.name) || !FREE_TEXT_PARAM.test(b.block)) continue;
-    fail('mcp-provenance', `new MCP write tool ${b.name} (${b.file}) takes free text and nobody has decided about ai_provenance`,
+    if (!WRITE_VERB.test(b.name) || ![...b.keys].some(k => FREE_TEXT_KEYS.has(k))) continue;
+    fail('mcp-provenance', `new MCP write tool ${b.name} takes free text and nobody has decided about ai_provenance`,
       'either spread `...aiProvenanceInputs` into it and thread the declaration through '
       + 'provenanceForWrite(), or add it to AI_PROVENANCE_REVIEWED_WITHOUT in this file with a '
       + 'reason. Silence is not a decision.');
@@ -688,7 +692,7 @@ function checkPubliclyLinkedContainers(): void {
   }
 }
 
-const connectorChecks = createConnectorChecks({ root, walk, stripped, rel, read, stripComments, fail, mcpToolBlocks, notes });
+const connectorChecks = createConnectorChecks({ root, walk, stripped, rel, read, stripComments, fail, keysOf, connectorNames: () => new Set(registered.connector.keys()), notes });
 
 // ── run ─────────────────────────────────────────────────────────────────────────────────────────
 

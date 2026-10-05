@@ -10,6 +10,8 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
+ *   2026-10-05 — read() makes the call with the path written in it, so check:field-reach's CodeQL query
+ *     sees the route; the connector MCP serves these tools through here now (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-28 — aimeat_mail_read forwards store, filename, mime_type and key: the attachment
  *     is stored as a private file and the answer names it.
  *   v1.2.0 — 2026-09-13 —refuseUnsentSend() reads the SEND_FAILED error a current node answers
@@ -21,13 +23,18 @@
  *     refuseUnsentSend() is shared with the connector MCP door.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
-import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
+import type { ConnectCliToolDefinition, ToolCallContext } from './tool-call-helpers.js';
+
+type ConnectCliToolContextClient = ToolCallContext['client'];
 import { requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
 import type { ApiResponse } from './api-client.js';
 
-/** The read direction names a RESOURCE; the node builds every URL from the parameters. */
-const readPath = (connectionId: string, resource: string) =>
-    `/v1/connections/${encodeURIComponent(connectionId)}/read/${encodeURIComponent(resource)}`;
+/**
+ * The read direction names a RESOURCE; the node builds every URL from the parameters. The call is made
+ * here, with the path written in it, so check:field-reach's CodeQL query sees which route it reaches.
+ */
+const read = (client: ConnectCliToolContextClient, connectionId: string, resource: string, params: Record<string, unknown>) =>
+    client.post(`/v1/connections/${encodeURIComponent(connectionId)}/read/${encodeURIComponent(resource)}`, params);
 
 /**
  * A send that did not go out, as one refusal whatever node answered it.
@@ -106,7 +113,7 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             const q = optionalString(input, 'query'); if (q) body.query = q;
             const limit = optionalNumber(input, 'limit'); if (limit !== undefined) body.limit = limit;
             const page = optionalString(input, 'page_token'); if (page) body.page_token = page;
-            return client.post(readPath(requiredString(input, 'connection_id'), 'messages'), body);
+            return read(client, requiredString(input, 'connection_id'), 'messages', body);
         },
     },
     {
@@ -116,11 +123,11 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             const connectionId = requiredString(input, 'connection_id');
             const messageId = requiredString(input, 'message_id');
             const attachmentId = optionalString(input, 'attachment_id');
-            if (!attachmentId) return client.post(readPath(connectionId, 'message'), { id: messageId });
+            if (!attachmentId) return read(client, connectionId, 'message', { id: messageId });
             const filename = optionalString(input, 'filename');
             const mimeType = optionalString(input, 'mime_type');
             const key = optionalString(input, 'key');
-            return client.post(readPath(connectionId, 'attachment'), {
+            return read(client, connectionId, 'attachment', {
                 message_id: messageId, attachment_id: attachmentId,
                 ...(optionalBoolean(input, 'store') === true ? { store: true } : {}),
                 ...(filename ? { filename } : {}),
@@ -132,7 +139,7 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
     {
         // → POST /v1/connections/:id/read/sendAs
         name: 'aimeat_mail_aliases',
-        handler: ({ client }, input) => client.post(readPath(requiredString(input, 'connection_id'), 'sendAs'), {}),
+        handler: ({ client }, input) => read(client, requiredString(input, 'connection_id'), 'sendAs', {}),
     },
     {
         // → POST /v1/outbound/send: the policied door, not around it. A send that did not go out

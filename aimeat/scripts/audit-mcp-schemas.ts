@@ -50,7 +50,8 @@ import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/tool-catalog/su
 
 // ── Both surfaces, registered for real against a fake MCP server (shared with check:field-reach) ──
 import { captureServer, captureConnector } from './inventory/mcp-capture.js';
-import { singleSourceReport } from './inventory/mcp-single-source.js';
+import { singleSourceReport, ownHandlerReport } from './inventory/mcp-single-source.js';
+import { CONNECT_CLI_TOOLS } from '../src/cli/connect/tool-call.js';
 
 /** Connector tools carry an extra agent-routing param; it is an intentional difference, not drift. */
 const CONNECTOR_EXTRA = new Set(['agent_name']);
@@ -234,6 +235,17 @@ function main(): void {
     if (one.unlisted.length) console.log(one.unlisted.map(n => `  ✖ ${n}: ${one.differing.get(n)!.join(' and ')} schema is not zodShapeFor('${n}')`).join('\n'));
     if (one.stale.length) console.log(one.stale.map(n => `  ✖ ${n}: matches now; remove it from security/mcp-schema-single-source.json`).join('\n'));
     const oneFail = one.unlisted.length > 0 || one.stale.length > 0;
+
+    // The connector's own handlers beside the dispatch table. The list of them only shrinks.
+    const own = ownHandlerReport(new Set(CONNECT_CLI_TOOLS.map(t => t.name)));
+    console.log(`\n## Connector tools with a handler of their own beside their CLI dispatch definition — ${own.own.length}`);
+    if (own.unlisted.length) console.log(own.unlisted.map(n => `  ✖ ${n}: a new connector handler; run its dispatch definition (dispatch-tools.ts) instead`).join('\n'));
+    if (own.stale.length) console.log(own.stale.map(n => `  ✖ ${n}: runs its dispatch definition now; remove it from security/connector-own-handlers.json`).join('\n'));
+    if (check && (own.unlisted.length || own.stale.length)) {
+        console.error(`\n✖ Connector handlers: ${own.unlisted.length} new, ${own.stale.length} listed but gone.`
+            + '\nA connector tool runs its CLI dispatch definition unless it is listed in security/connector-own-handlers.json.');
+        process.exit(1);
+    }
     if (check && oneFail) {
         console.error(`\n✖ One source: ${one.unlisted.length} tool(s) register a schema of their own, ${one.stale.length} listed tool(s) match now.`
             + '\nRegister zodShapeFor(name) (src/tool-catalog/zod-shape.ts) on both surfaces, with the field\'s exact'

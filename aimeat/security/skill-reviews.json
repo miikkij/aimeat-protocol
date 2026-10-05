@@ -36,7 +36,7 @@
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts"
       ],
-      "digest": "sha256:b4087c9f3b9d0f8f7ef3dd52"
+      "digest": "sha256:dfbe4fdbd804b1b90185ea88"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-02",
@@ -71,7 +71,7 @@
       "watches": [
         "aimeat/src/mcp/portfolio.ts"
       ],
-      "digest": "sha256:f40e9e2a30150f4441126ffe"
+      "digest": "sha256:3a134ff51b311fbfa1f5d479"
     },
     "node:aimeat-activating-a-person": {
       "reviewedOn": "2026-09-19",
@@ -100,7 +100,7 @@
         "aimeat/src/tool-catalog/definitions/connections.ts",
         "aimeat/src/services/connections/providers.ts"
       ],
-      "digest": "sha256:c771bf8eba933661661c9fb7"
+      "digest": "sha256:72a5fea20edc4d4a8b21fe6a"
     },
     "node:aimeat-app-workstation": {
       "reviewedOn": "2026-09-19",
@@ -236,7 +236,7 @@
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:c1269006ad04d16c710adb2d"
+      "digest": "sha256:a2bf41c7125d8baa4ca17098"
     },
     "node:manage-my-agents": {
       "reviewedOn": "2026-10-05",
@@ -244,14 +244,14 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:1b0bd65a238f5d9a725cbec5"
+      "digest": "sha256:53f5c3c8f6b61f2076ca504f"
     },
     "node:manage-my-profile-data": {
-      "reviewedOn": "2026-09-27",
+      "reviewedOn": "2026-10-05",
       "watches": [
         "aimeat/src/routes/memory/shared.ts"
       ],
-      "digest": "sha256:0a1de73486e6f8295b25e4de"
+      "digest": "sha256:e1ddf3bb411ec5a076246d93"
     },
     "node:add-a-crew-agent": {
       "reviewedOn": "2026-10-05",
@@ -262,7 +262,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:84618798b00f3752742fe8c8"
+      "digest": "sha256:30b46abbf95ec8da78648703"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-05",
@@ -322,7 +322,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:c07fc106e970b54770880086"
+      "digest": "sha256:e9ece0fdecc180a777880bb8"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -409,7 +409,7 @@
       "aimeat/src/services/model-recommendation.ts": "d81eaca4a619f479"
     },
     "node:aimeat-welcome-pages": {
-      "aimeat/src/mcp/portfolio.ts": "9d1bf35ad0a7ed9f"
+      "aimeat/src/mcp/portfolio.ts": "ae0365a979772632"
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
@@ -419,7 +419,7 @@
       "aimeat/src/services/ai/completion.ts": "ce06a7436d5822ba"
     },
     "node:aimeat-mail-to-data": {
-      "aimeat/src/tool-catalog/definitions/connections.ts": "774105847fbe84e3",
+      "aimeat/src/tool-catalog/definitions/connections.ts": "b64e09646d4986a7",
       "aimeat/src/services/connections/providers.ts": "9350b01985108cad"
     },
     "node:aimeat-app-workstation": {
@@ -501,19 +501,19 @@
       "aimeat/src/services/ai-provenance.ts": "966aef506342bfbc"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "016b8c4c12ec58eb"
+      "aimeat/src/mcp/core-admin.ts": "fd3a6da1b1490f40"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "5d76886df115d0d2",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "dec251b6d78c65c1"
+      "aimeat/src/mcp/core.ts": "0b3c7ece162f4982",
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "5c6ae0067c166273"
     },
     "node:manage-my-profile-data": {
-      "aimeat/src/routes/memory/shared.ts": "4dfb11c1bdee087c"
+      "aimeat/src/routes/memory/shared.ts": "0aa6b56759507d92"
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "79314b0fa6239904",
-      "aimeat/src/tool-catalog/scopes.ts": "766c5a79c68956fd",
-      "aimeat/src/tool-catalog/definitions/crew.ts": "ba94ec309cb43232",
+      "aimeat/src/tool-catalog/scopes.ts": "71d0dafedf7d3fc0",
+      "aimeat/src/tool-catalog/definitions/crew.ts": "346905563a40a6f8",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "26be98a71d067631",
       "aimeat/src/data/basic-agents.ts": "42e260bfa070b0e6"
     },
@@ -534,7 +534,7 @@
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "e90ed3079802d6f0",
-      "aimeat/src/mcp/agent-schedules.ts": "d7b006c9d28f024a",
+      "aimeat/src/mcp/agent-schedules.ts": "e8474cbbc8ef73a9",
       "aimeat/src/services/scheduler.ts": "3fb3a96d2a3bf98a",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
@@ -573,7 +573,7 @@
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "d10acbe327138c37",
-      "aimeat/src/mcp/agent-schedules.ts": "d7b006c9d28f024a",
+      "aimeat/src/mcp/agent-schedules.ts": "e8474cbbc8ef73a9",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "26be98a71d067631"
     },
     "node:aimeat-decide": {

@@ -27,15 +27,6 @@ export function registerSurfaceLayoutTools(mcp: McpServer, registry: AgentRegist
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_surface_layout_get', descriptionFor('aimeat_surface_layout_get'), zodShapeFor('aimeat_surface_layout_get'), annotationsFor('aimeat_surface_layout_get'), async ({ surface }) => {
-    // Two reads rather than one: the layout, and the catalogue of blocks this node can serve. The
-    // second is the vocabulary, and without it the first write an AI attempts is always a refusal.
-    const layout = await client.get(`/v1/site/layout/${encodeURIComponent(surface)}`);
-    if (layout.ok === false) return out(layout);
-    const blocks = await client.get(`/v1/site/blocks?surface=${encodeURIComponent(surface)}`);
-    return out({ ok: true, data: { ...(layout.data as object), available_blocks: (blocks.data as { blocks?: unknown })?.blocks ?? [] } });
-  });
-
   mcp.tool('aimeat_surface_layout_set', descriptionFor('aimeat_surface_layout_set'), zodShapeFor('aimeat_surface_layout_set'), annotationsFor('aimeat_surface_layout_set'), async ({ surface, blocks, note, ai_provenance, ai_provenance_id }) => {
     return out(await client.put(`/v1/site/layout/${encodeURIComponent(surface)}`, {
       v: 1, blocks,
