@@ -19,9 +19,10 @@
  *   settings have no history. These do: every write archives what it replaced, and set answers with
  *   the version number that went into it, so putting a page back is one call rather than a token
  *   dance. The gate is also stricter — an exact word no wildcard carries.
- * @structure registerSurfaceLayoutTools(mcp, storage, config, getAgentGaii, scopes)
- * @usage registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii, scopes);
+ * @structure registerSurfaceLayoutTools(mcp, storage, config, getAgentGaii, scopes, caller)
+ * @usage registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test at call time is asked of the
  *     agent and its scopes (the service's callerIsOperator, through services/operator-principal.ts),
@@ -39,6 +40,7 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 interface TextResult {
     content: Array<{ type: 'text'; text: string }>;
@@ -62,8 +64,11 @@ export function registerSurfaceLayoutTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
-    /** This session's granted scopes: the operator test asks site:layout-write of them. */
-    scopes: readonly string[] = [],
+    /** This session's granted scopes. Unused here: the session caller below carries them. */
+    _scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts): the operator test asks site:layout-write of
+     *  its scopes. */
+    caller: () => CallerContext,
 ): void {
     const svc = new SurfaceLayoutService(config, storage);
 
@@ -77,7 +82,7 @@ export function registerSurfaceLayoutTools(
      * and a node run with AIMEAT_MCP_ENFORCE_SCOPES=false does not.
      */
     async function isOperator(): Promise<boolean> {
-        return svc.callerIsOperator({ sub: getAgentGaii(), roles: ['agent'], scopes });
+        return svc.callerIsOperator(caller().auth);
     }
 
     const notOperator = (): TextResult => out({

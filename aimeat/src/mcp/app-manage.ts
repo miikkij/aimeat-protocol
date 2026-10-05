@@ -21,8 +21,9 @@
  *   route's scope word and is checked here first, like every other action's: the route's gate lets
  *   only the app's own token through without the word, and an MCP session is never that token.
  * @structure registerAppManageTool
- * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes)
+ * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 — 2026-10-05 — The member, plan, audit_archive, audit_keep, builder and spec actions call
  *     the services their routes call (mcp/app-manage-members.ts) and are checked against their
@@ -86,6 +87,7 @@ import {
 } from '../services/subdomain-sites.js';
 import { appManageMemberAction } from './app-manage-members.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 type Args = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
@@ -103,6 +105,8 @@ export function registerAppManageTool(
     config: AimeatConfig,
     getAgentGaii: () => string,
     scopes: string[],
+    /** The session's caller (services/caller-context.ts), for the actions the route services take. */
+    caller: () => CallerContext,
 ): void {
     const ui = new AppUiService(storage, config);
 
@@ -134,7 +138,7 @@ export function registerAppManageTool(
         const callerOwner = localAccountName(callerGaii);
         // The roster, plan, audit-keeping, development-right and design-spec actions: the services
         // their routes call, with this session as the caller. An MCP session is a local agent.
-        const shared = await appManageMemberAction(storage, config, { sub: callerGaii, owner: callerOwner, roles: ['agent'], scopes }, action, args);
+        const shared = await appManageMemberAction(storage, config, caller().auth, action, args);
         if (shared) return shared;
         const ownerGhii = `${callerOwner}@${config.nodeId}`;
         const filename = String(args.filename ?? '');

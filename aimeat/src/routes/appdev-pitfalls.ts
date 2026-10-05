@@ -10,6 +10,7 @@
  * @structure appdevPitfallsRouter(config, storage) → Router
  * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-10-05 — The pitfall report's caller is the request's CallerContext (middleware/caller.ts; secaudit 2026-10, C9).
  *   v1.4.0 — 2026-09-29 — TARGET-082 V4: GET /learned hands queryLearnedPitfalls() the caller's
  *     classification reader (readerFor), so an entry the caller may not see is left out.
  *   v1.3.0 — 2026-09-13 — POST /learned reports (upserts) an entry through reportLearnedPitfall(),
@@ -31,6 +32,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { callerOf } from '../middleware/caller.js';
 import {
   getAppdevPitfalls, getAppdevPitfallFacets,
 } from '../data/appdev-pitfalls.js';
@@ -99,11 +101,8 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
     const appliesTo = Array.isArray(b.applies_to)
       ? (b.applies_to as unknown[]).filter((a): a is string => typeof a === 'string' && a.length <= 20).slice(0, 8)
       : undefined;
-    const r = await reportLearnedPitfall(storage, config, {
-      principal: resolveIdentity(req.auth!, config.nodeId),
-      scopes: req.auth!.scopes ?? [],
-      roles: req.auth!.roles,
-    }, {
+    // The request's caller (middleware/caller.ts, secaudit 2026-10, C9).
+    const r = await reportLearnedPitfall(storage, config, callerOf(req, config.nodeId, storage).principalView, {
       model, category, title, symptom, resolution,
       slug: str(b.slug, 64), applies_to: appliesTo, severity, status,
       app_ref: str(b.app_ref, 200),

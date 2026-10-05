@@ -12,11 +12,12 @@
  *   what the owner's UI sees. Cross-owner member edits (another owner's agent in a shared org) are a
  *   deferred edge case. Publish honours the publish gate: if it's on, the tool refuses and tells the
  *   agent to leave the draft for human review (it does not create the approval here).
- * @structure registerWorkspaceTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes)
+ * @structure registerWorkspaceTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller)
  *   - aimeat_workspace_list / _read / _write_draft / _publish / _add_document / _delete / _create
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The row, document and member-change tools receive it too.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.27.0 -- 2026-10-02 -- Takes the session's scopes and hands them to the row tools.
  *   v1.26.0 -- 2026-09-29 -- aimeat_workspace_read and the two overviews pass the agent's classification
@@ -176,6 +177,7 @@ import { registerWorkspaceTransferTool } from './workspace-transfer.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -187,6 +189,8 @@ export function registerWorkspaceTools(
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
     scopes: string[],
+    /** The session's caller (services/caller-context.ts). */
+    caller: () => CallerContext,
 ): void {
     // The organism route helpers, built from the same factory routes/organisms/organisms.ts uses.
     // Publishing a draft, reopening one and appending the gate's decision entry are the SAME
@@ -204,10 +208,12 @@ export function registerWorkspaceTools(
     // write everything under ownerGhii, collapsing every agent action onto the owner), else the owner
     // GHII. Workspace META (manifest / registry / schemas / sections) stays under ownerGhii.
     const writerGaii = parsed ? agentGaii : ownerGhii;
-    // The same caller, in the shape services/workspace-tool-ops.ts takes: the read, the draft
+    // The session caller, in the shape services/workspace-tool-ops.ts takes: the read, the draft
     // write and the publish run there, so the extension sandbox can run them as its caller too.
-    // Roles stay ['agent'] — an MCP session is always an agent record (mcp/index.ts).
-    const opsCaller = workspaceCallerOf({ principal: agentGaii, ownerName, roles: ['agent'] }, config);
+    // Its roles are the agent role alone: an MCP session is always an agent record (mcp/index.ts).
+    // Built once, at registration, as before: it carries no scopes.
+    const session = caller();
+    const opsCaller = workspaceCallerOf({ principal: session.principal, ownerName: session.owner, roles: [...session.roles] }, config);
     const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
@@ -472,10 +478,10 @@ export function registerWorkspaceTools(
     // The four ROW-space tools live in ./workspace-rows.ts — a pure extraction at the
     // max-file-lines boundary. They call services/workspace-rows/row-service.ts, which is what
     // the REST routes call too, so neither door can answer differently from the other.
-    registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName, scopes });
+    registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, scopes }, caller);
     // The two in-place DOCUMENT edits, extracted for the same reason and calling the same service
     // the REST routes call: services/workspace-doc-edit.ts.
-    registerWorkspaceDocumentTools(mcp, { storage, config, agentGaii, ownerName });
+    registerWorkspaceDocumentTools(mcp, { storage, config }, caller);
 
     mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
         zodShapeFor('aimeat_workspace_object_delete'),
@@ -497,7 +503,7 @@ export function registerWorkspaceTools(
             // which writes the index that counts and keeps its owner. This wrote the index under the
             // caller and deleted the creator's, so a member's delete took the tree away from the creator.
             // Only when no copy of the document is left under anyone.
-            await unfileDeletedDocument({ storage, config }, { principal: agentGaii, owner: ownerName, roles: ['agent'] },
+            await unfileDeletedDocument({ storage, config }, caller().principalView,
                 { orgId: organism_id, ws, namespace, docId: id });
             emitChange('organisms');
             // The structure history records creates and publishes; without this it silently skipped an
@@ -521,7 +527,7 @@ export function registerWorkspaceTools(
     // ── aimeat_workspace_space_add / _sections_set / _suggestions ── a member's change to a
     // workspace, and a manager's decision on a member's suggestion. ./workspace-member-changes.ts,
     // calling the services the REST routes call.
-    registerWorkspaceMemberChangeTools(mcp, { storage, config, agentGaii, ownerName });
+    registerWorkspaceMemberChangeTools(mcp, { storage, config }, caller);
 
     // ── aimeat_workspace_transfer ── (workspace export/import as a base64 ZIP)
     // Extracted to workspace-transfer.ts; registered here to preserve tool order.

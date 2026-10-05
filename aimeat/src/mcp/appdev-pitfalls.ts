@@ -10,8 +10,9 @@
  *   own learned entries, the curated registry (data/appdev-pitfalls.ts), and other owners'
  *   public-shared entries. Model attribution is MANDATORY per entry and INDICATIVE only.
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
- * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
+ * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: the list reads own and shared learned entries through
  *     services/appdev-kb.ts ownPitfallRecords() and sharedPitfallRecords() with the session's
@@ -51,6 +52,7 @@ import { getSoftwareVersion } from '../utils/version.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { classificationWarningOf } from '../services/classification/present-memory.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 export { PITFALL_PACKAGE_ID };
 
@@ -87,6 +89,10 @@ export function registerAppdevPitfallTools(
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     /** The session's own scopes, for the shared memory write in the report tool. */
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts). register-all.ts passes it; a caller that
+     *  does not (test/unit/classification-knowledge.test.ts) gets the same agent built from the
+     *  arguments above. */
+    caller: () => CallerContext = () => agentSessionCaller(getAgentGaii(), '', sessionScopes, config.nodeId, storage),
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -102,7 +108,7 @@ export function registerAppdevPitfallTools(
             // entry is a memory record and answers to memory's rules (archive guard, key and size
             // ceilings, byte quota) inside that function, and it stamps the verification.
             const r = await reportLearnedPitfall(storage, config,
-                { principal: agentGaii, scopes: sessionScopes, roles: ['agent'] },
+                caller().principalView,
                 { model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share },
                 getSoftwareVersion());
             if (!r.ok) {

@@ -8,14 +8,15 @@
  *   call. Nothing here reaches storage, resolves a recipient or decides who may do what: this file
  *   declares parameters and turns an answer into text, which is what the protocol makes it own.
  *
- *   A SESSION HERE IS AN AGENT. The node MCP door authenticates against an agent record, so the
- *   principal handed to the operations carries `roles: ['agent']` — which is why an agent may
+ *   A SESSION HERE IS AN AGENT. The node MCP endpoint authenticates against an agent record, so the
+ *   principal handed to the operations is the session caller with the agent role, which is why an agent may
  *   register a delivery target for itself and not for a sibling. Registering one for somebody else
  *   is the account holder's move, and it is made on a surface where the account holder is present.
  *
- * @structure registerAgentV2MessagingTools(mcp, storage, config, getAgentGaii, getOwner)
- * @usage registerAgentV2MessagingTools(mcp, storage, config, () => agentGaii, () => owner);
+ * @structure registerAgentV2MessagingTools(mcp, storage, config, getAgentGaii, getOwner, caller?)
+ * @usage registerAgentV2MessagingTools(mcp, storage, config, () => agentGaii, () => owner, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — aimeat_v2_message_list takes response_format and gives the catalog's concise view
  *     (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -31,6 +32,7 @@ import {
   type Principal, type OpResult,
 } from '../services/agent-v2-messaging-ops.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 /** One answer, as MCP content. A refusal keeps its code, so a model can tell the kinds apart. */
 function reply<T>(out: OpResult<T>, shape: (value: T) => unknown) {
@@ -49,8 +51,11 @@ export function registerAgentV2MessagingTools(
   config: AimeatConfig,
   getAgentGaii: () => string,
   getOwner: () => string,
+  /** The session's caller (services/caller-context.ts). register-all.ts passes it; a caller that does
+   *  not (test/unit/v2-list-concise.test.ts) gets the same agent built from the arguments above. */
+  caller: () => CallerContext = () => agentSessionCaller(getAgentGaii(), getOwner(), [], config.nodeId, storage),
 ): void {
-  const principal = (): Principal => ({ sub: getAgentGaii(), owner: getOwner(), roles: ['agent'] });
+  const principal = (): Principal => caller().auth;
 
   mcp.tool(
     'aimeat_v2_message_send',

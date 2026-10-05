@@ -12,9 +12,10 @@
  *   into text. The caller here is always an AI: what it sets as its own judgement stays a suggestion
  *   where the policy says so, a person's words relayed in `human_said` make the label theirs, and a
  *   change that loosens a policy waits for the person to accept it in their own session.
- * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes)
- * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes);
+ * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes, caller)
+ * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-30 — exception_list (the exceptions list of a level) and exception_set, which
  *     the service refuses for an AI with PERSON_REQUIRED (decided 2026-09-30); audit_action takes
@@ -30,7 +31,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -45,6 +45,7 @@ import { explorerQueryOf, listLabels } from '../services/classification/explorer
 import { setClassificationSwitch } from '../services/classification/switch.js';
 import { makeException, readExceptions } from '../services/classification/exception-admin.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
@@ -54,8 +55,10 @@ export function registerClassificationTools(
   mcp: McpServer,
   storage: Storage,
   config: AimeatConfig,
-  getAgentGaii: () => string,
+  _getAgentGaii: () => string,
   scopes: string[],
+  /** The session's caller (services/caller-context.ts): the AI the labels and policy changes name. */
+  caller: () => CallerContext,
 ): void {
   const deps = { storage, config };
 
@@ -72,8 +75,8 @@ export function registerClassificationTools(
         return toolError('SCOPE_DENIED', `action "${args.action}" needs the "memory:write" permission, which the owner grants this agent in its settings.`);
       }
       try {
-        const principal = getAgentGaii();
-        const actor = labelActorOf({ sub: principal, owner: localAccountName(principal), roles: ['agent'], scopes }, config.nodeId);
+        const session = caller();
+        const actor = labelActorOf(session.auth, config.nodeId);
         switch (args.action) {
           case 'get':
             return text(await readContentLabel(deps, actor, targetOf(actor, args)));
@@ -112,9 +115,7 @@ export function registerClassificationTools(
           case 'switch_set': {
             if (args.level && args.level !== 'node') return toolError('INVALID_INPUT', 'switch_set is at level node, the only one.');
             if (!args.mode) return toolError('INVALID_INPUT', 'mode is off, owner or all.');
-            return text(await setClassificationSwitch({ storage, config }, {
-              sub: principal, owner: localAccountName(principal), roles: ['agent'], scopes,
-            }, args.mode));
+            return text(await setClassificationSwitch({ storage, config }, session.auth, args.mode));
           }
           case 'exception_list':
             return text(await readExceptions(deps, actor, args.level ?? 'owner', args.organism_id,

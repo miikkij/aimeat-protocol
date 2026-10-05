@@ -333,6 +333,358 @@
         "count": 1,
         "why": "(owner || operator) when nothing acts for someone: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
       }
+    },
+    "agent-role": {
+      "src/commerce/agent-purchase-limit.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/index-start.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/middleware/readiness-gate.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/access-tokens.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agent-capabilities.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agent-messages.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agent-skill-bundle.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agent-telemetry.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agent-webhook.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agents-v2/enrolment.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agents/device-auth.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agents/management.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/apps/agents-deploy.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/auth.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/connections-read-through.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/datapackages.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/extensions/actions.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/crud.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/federation.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/patch.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/skills.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/wallet.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/agent-proposals.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/agent-refusals.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/classification/reader-kind.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/connect-tunnel.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/consent-write.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/group-shares.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/memory-write.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/metered-access.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/notification-create.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/owner-mailbox-reads.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/packages/install/package-install-request-policy.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/packages/install/package-install-requests.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/packages/install/package-install.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      }
+    },
+    "wildcard-test": {
+      "src/auth/middleware.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/auth/sse-domain-scopes.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/config-posture.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/mcp/index.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/middleware/cors.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/ecosystem-apps.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/agent-task-rules.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/agent-task-start-write.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/capability-record.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/chat-agent.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/cors-overview.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/design-book/component.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/extension-manifest.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/iam/define-app-iam.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/iam/generate-extension.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/operator-admin-migration.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/scope-use.ts": {
+        "count": 3,
+        "why": "UNREVIEWED"
+      },
+      "src/services/scope-vocabulary-migration.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/services/task-start-notice.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/services/workflow/engine-steps.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/storage/providers/postgres-kysely/methods/schema.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/storage/providers/sqlite/methods/schema.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      }
+    },
+    "caller-built": {
+      "src/mcp/commerce.ts": {
+        "count": 1,
+        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
+      },
+      "src/mcp/oauth.ts": {
+        "count": 2,
+        "why": "The claims an OAuth authorization code carries until the token endpoint mints them; an Express router with no MCP session and no caller yet."
+      },
+      "src/mcp/tool-usage-wrap.ts": {
+        "count": 1,
+        "why": "The refusal log entry written by the wrapper around every MCP tool; the wrapper is installed before the tool groups and holds only the session's GAII."
+      },
+      "src/routes/agents-v2/enrolment.ts": {
+        "count": 1,
+        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
+      },
+      "src/routes/agents-v2/token.ts": {
+        "count": 1,
+        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
+      },
+      "src/routes/agents/device-auth.ts": {
+        "count": 1,
+        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
+      },
+      "src/routes/auth.ts": {
+        "count": 1,
+        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time). This one is the anonymous-mode token."
+      },
+      "src/routes/upload.ts": {
+        "count": 1,
+        "why": "A presigned upload token carries no roles or scopes, so the operator question is asked of the principal it names, with the scopes its agent record holds now."
+      },
+      "src/services/chat-agent.ts": {
+        "count": 1,
+        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
+      },
+      "src/services/classification/reader.ts": {
+        "count": 1,
+        "why": "readerForAgent, the reader for MCP call sites that hold only the agent's GAII. The reader reads no scopes; it moves onto caller() when those call sites do."
+      },
+      "src/services/operator-principal.ts": {
+        "count": 1,
+        "why": "resolveOperatorAgentName, the operator answer for MCP call sites that hold the agent's GAII and the session scopes (admin-*.ts and others); it moves onto caller().operator() when those call sites do. One count is the @usage line."
+      }
+    },
+    "request-caller-built": {
+      "src/routes/a2a.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/agui.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/apps/agents-deploy.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/commerce-acp.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/commerce-ucp.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/commerce.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/consent.ts": {
+        "count": 2,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/data-map.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/extensions/actions.ts": {
+        "count": 6,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/bulk.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/crud.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/federation.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/memory/key.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/organisms/gates.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/organisms/workspace-member-changes.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/sharing-groups.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/webmcp.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      },
+      "src/routes/workflows.ts": {
+        "count": 1,
+        "why": "UNREVIEWED"
+      }
     }
   }
 }

@@ -6,9 +6,10 @@
  *   their devices if they turned push on). The same call as POST /v1/notifications
  *   (services/notification-create.ts), so the owner's settings, the name in front of the title and
  *   the same-node link rule hold on both doors. Self-targeted only.
- * @structure registerNotifyTools(mcp, storage, config, getAgentGaii)
+ * @structure registerNotifyTools(mcp, storage, config, getAgentGaii, caller)
  * @usage import { registerNotifyTools } from './notify.js';
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -23,21 +24,23 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { localAccountName } from '../utils/gaii.js';
 import { createPrincipalNotification, NotificationCreateError } from '../services/notification-create.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
-export function registerNotifyTools(mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string): void {
+export function registerNotifyTools(
+    mcp: McpServer, storage: Storage, config: AimeatConfig, _getAgentGaii: () => string,
+    /** The session's caller (services/caller-context.ts): the agent that tells its owner. */
+    caller: () => CallerContext,
+): void {
     mcp.tool(
         'aimeat_notify',
         descriptionFor('aimeat_notify'),
         zodShapeFor('aimeat_notify'),
         annotationsFor('aimeat_notify'),
         async ({ title, body, link, type }) => {
-            const gaii = getAgentGaii();
-            const owner = localAccountName(gaii);
             try {
-                const r = await createPrincipalNotification(storage, config, { owner, sub: gaii, roles: ['agent'] }, { title, body, link, type });
+                const r = await createPrincipalNotification(storage, config, caller().auth, { title, body, link, type });
                 if (r.muted) {
                     // Not a failure: the owner said "nothing from you" and the node honoured it. The
                     // sender is told plainly, and told what to do instead.

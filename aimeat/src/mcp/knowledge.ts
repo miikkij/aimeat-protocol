@@ -9,8 +9,9 @@
  *   - registerKnowledgeTools() — registers all knowledge tools and resources on an McpServer instance
  * @usage
  *   import { registerKnowledgeTools } from './knowledge.js';
- *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-21 — Initial creation: 4 tools + 1 resource for knowledge management via MCP
@@ -51,6 +52,7 @@ import {
     addKnowledgePackageEntry, type KnowledgeManifestValue,
 } from '../services/knowledge-package-entry.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -59,8 +61,12 @@ export function registerKnowledgeTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
-    /** The session's own scopes, for the gate inside the shared memory write. */
+    /** The session's own scopes, for the classification reader. */
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts), for the gate inside the shared memory write.
+     *  register-all.ts passes it; a caller that does not (test/unit/classification-knowledge.test.ts)
+     *  gets the same agent built from the arguments above. */
+    caller: () => CallerContext = () => agentSessionCaller(getAgentGaii(), '', sessionScopes, config.nodeId, storage),
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -233,11 +239,10 @@ export function registerKnowledgeTools(
             // parameters because the protocol requires that, maps `ai_provenance` from the wire
             // shape, and renders the answer as text; the entry record, the reserved-package guard
             // and the manifest's index line belong to the capability, not to this door.
+            const session = caller();
             const out = await addKnowledgePackageEntry({ storage, config }, {
-                principal: agentGaii,
-                targetGaii: agentGaii,
-                scopes: sessionScopes,
-                roles: ['agent'],
+                ...session.principalView,
+                targetGaii: session.principal,
             }, {
                 packageId: package_id,
                 entryKey: entry_key,

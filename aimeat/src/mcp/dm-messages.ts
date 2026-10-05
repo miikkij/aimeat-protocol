@@ -9,9 +9,10 @@
  *   the human inbox uses (`sendDirectMessage`). Files travel out-of-band: upload via aimeat_storage_upload
  *   (presigned), then pass the returned storage keys as `attachments` here. Phase A of the federated-inbox
  *   plan (docs/internal/2026-06-22-agent-federated-inbox-messaging-design.md); read tools land in Phase B.
- * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes)
+ * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). aimeat_dm_broadcast asks caller().operator(), which is isOperatorCaller for the session.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.12.0 -- 2026-10-05 -- aimeat_dm_broadcast asks isOperatorCaller with the session (the caller's GAII, roles ['agent'], its scopes), as POST /v1/messages/broadcast now does: the operator's agent holding operator:admin may send to a node-wide audience (secaudit 2026-10, C2). The register function takes the session's scopes.
  *   v1.11.2 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -87,8 +88,8 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
-import { isOperatorCaller } from '../services/operator-override.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 /**
  * How ONE attachment is shown to the agent reading its inbox. `ref` is the point: the descriptor used
@@ -132,8 +133,11 @@ export function registerDmMessageTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     peers: Map<string, PeerInfo>,
-    /** This session's granted scopes: the broadcast's operator check asks operator:admin of them. */
-    scopes: readonly string[] = [],
+    /** This session's granted scopes. Unused here: the session caller below carries them. */
+    _scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts): the broadcast's operator check asks
+     *  operator:admin of its scopes. */
+    caller: () => CallerContext,
 ): void {
     const ctx: DeliveryCtx = { config, storage, peers };
 
@@ -293,7 +297,7 @@ export function registerDmMessageTools(
             // give the same principal the same answer (secaudit 2026-10, C2; Jouni 2026-10-05: "Agent
             // must be capable of maintaining the system fully when using operator:admin rights").
             // Any other agent is refused the audience by the service, as before.
-            const isOperator = await isOperatorCaller(storage, { sub: senderGhii, roles: ['agent'], scopes });
+            const isOperator = await caller().operator();
             const result = await broadcastFromPrincipal(ctx, {
                 senderGhii, isOperator,
                 to, groupId: group_id, audience,

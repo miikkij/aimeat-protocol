@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The tool groups that built a caller of their own receive `caller` as their last argument; it is built per call, because the session's scopes are the current request's.
  *   v1.20.3 — 2026-10-05 — registerCompanyTools receives the session's scopes: declaring how a company
  *     description was made needs provenance:write there too.
  *   v1.20.2 — 2026-10-05 — registerAppManageTool no longer receives getToken: the member, plan,
@@ -146,6 +147,7 @@ import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 /** What every tool group needs. The two emitters are passed in so this file has no cycle home. */
 export interface ServerToolDeps {
@@ -177,32 +179,39 @@ export interface ServerToolDeps {
 export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): void {
     const { storage, config, agentGaii, owner, scopes, peers, getToken } = deps;
     const { emitResourceUpdated, emitResourceListChanged } = deps;
+    // The session's caller, defined once (secaudit 2026-10, C9): the agent, its owner's account, the
+    // session's scopes, and the answers on them. Read late, because the handshake names the agent.
+    // Built on every call and never kept for the session: `scopes` reads the CURRENT request's
+    // scopes (mcp/request-authority.ts), which a token refresh can narrow, and operator() keeps its
+    // answer for the life of the object, so a session-long object would keep the first request's
+    // scopes and the first operator answer after either changed.
+    const caller = (): CallerContext => agentSessionCaller(agentGaii(), owner(), scopes, config.nodeId, storage);
 
-    registerCoreTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers);
-    registerBoardsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerCoreTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
+    registerBoardsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
+    registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
+    registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
-    registerRefineryTools(mcp, storage, config, agentGaii, scopes);
+    registerRefineryTools(mcp, storage, config, agentGaii, scopes, caller);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
-    registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes);
+    registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
+    registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes, caller);
     registerAppdevResearchTools(mcp, storage, config, agentGaii);
     registerAppTemplateProposalTools(mcp, storage, config, agentGaii);
-    registerAppdevProofTools(mcp, storage, config, agentGaii, scopes);
+    registerAppdevProofTools(mcp, storage, config, agentGaii, scopes, caller);
     registerSkillsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerOperatorConfigTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerOperatorConfigTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerComplianceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerDataMapTools(mcp, storage, config, agentGaii, () => scopes);
-    registerClassificationTools(mcp, storage, config, agentGaii, scopes);
-    registerExtensionsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerDataMapTools(mcp, storage, config, agentGaii, () => scopes, caller);
+    registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
+    registerExtensionsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerCatalogueTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerMemoryExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerWalletExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerConsentTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerConsentTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAccessTools(mcp, storage, config, agentGaii);
     registerSecretTools(mcp, storage, config, agentGaii);
-    registerCommerceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerCommerceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerExchangeTools(mcp, storage, config, agentGaii);
     registerExchangeRunTools(mcp, storage, config, agentGaii, getToken, scopes);
     registerChatInstancesTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
@@ -220,13 +229,13 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
-    registerAppManageTool(mcp, storage, config, agentGaii, scopes);
+    registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller);
     registerAiImageTool(mcp, storage, config, agentGaii);
-    registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerWorkflowTools(mcp, storage, config, agentGaii, scopes);
-    registerAiJobTools(mcp, storage, config, agentGaii, scopes);
+    registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
+    registerWorkflowTools(mcp, storage, config, agentGaii, scopes, caller);
+    registerAiJobTools(mcp, storage, config, agentGaii, scopes, caller);
     registerDecideTools(mcp, storage, config, agentGaii);
     registerAiVoiceTools(mcp, storage, config, agentGaii);
     registerAiPolicyTools(mcp, storage, config, agentGaii);
@@ -235,29 +244,29 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     // The v2 turn, beside the dashboard thread above it and the federated DM below. A session
-    // here authenticates against an agent record, so the ops see roles: ['agent'].
-    registerAgentV2MessagingTools(mcp, storage, config, agentGaii, owner);
+    // here authenticates against an agent record, so the ops see the session caller with the agent role.
+    registerAgentV2MessagingTools(mcp, storage, config, agentGaii, owner, caller);
     // The v2 task handle, beside the dashboard work item registered above. Both stay.
-    registerAgentV2TaskTools(mcp, storage, config, agentGaii, owner);
-    registerDmMessageTools(mcp, storage, config, agentGaii, peers, scopes);
+    registerAgentV2TaskTools(mcp, storage, config, agentGaii, owner, caller);
+    registerDmMessageTools(mcp, storage, config, agentGaii, peers, scopes, caller);
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
-    registerNotifyTools(mcp, storage, config, agentGaii);
-    registerContactTools(mcp, storage, config, agentGaii, scopes);
+    registerNotifyTools(mcp, storage, config, agentGaii, caller);
+    registerContactTools(mcp, storage, config, agentGaii, scopes, caller);
     registerCompanyTools(mcp, storage, config, agentGaii, scopes);
     // peers: pulling a package from another node reads that node's address and key from the peer
     // record, never from the caller's arguments.
-    registerPackageTools(mcp, storage, config, agentGaii, peers, scopes);
+    registerPackageTools(mcp, storage, config, agentGaii, peers, scopes, caller);
     // The requests an install that lacked the words became, answered from a chat.
-    registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes);
+    registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes, caller);
     // The operator sets up this node from an install set: owner, packages, organisms, users, agents.
     registerAdminInstallSetTools(mcp, storage, config, peers, agentGaii, scopes);
     registerPortfolioTools(mcp, storage, config, agentGaii);
-    registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes);
+    registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes, caller);
     registerDesignbookTools(mcp, storage, config, agentGaii);
     registerUiLibraryTools(mcp, storage, config);
-    registerThemeTools(mcp, storage, config, agentGaii, scopes);
+    registerThemeTools(mcp, storage, config, agentGaii, scopes, caller);
     registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAgentOnboardingTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerAgentManagementTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerAgentManagementTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAgentCrewTools(mcp, storage, config, agentGaii, scopes);
 }

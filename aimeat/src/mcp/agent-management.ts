@@ -15,8 +15,9 @@
  *     aimeat_agent_console_set
  * @usage
  *   import { registerAgentManagementTools } from './agent-management.js';
- *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
+ *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.9.0 -- 2026-10-02 -- aimeat_agent_runtime_report takes `llm` ('node' | 'machine'), and an agent
  *     reports its own runtime without agent:write (scope-exempt, the sibling check in the handler).
@@ -61,6 +62,7 @@ import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAgentManagementTools(
     mcp: McpServer,
@@ -72,6 +74,8 @@ export function registerAgentManagementTools(
     /** What THIS session was granted. The proposal ceiling reads it: an agent may not propose a
      *  principal that can do more than the agent proposing it. */
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts): this token's scopes and roles. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -264,12 +268,7 @@ export function registerAgentManagementTools(
             }
             // The SCOPES AND ROLES OF THIS TOKEN, not the agent record's defaults: the ceiling this
             // service applies is "no more than the caller holds", and the caller is this session.
-            const out = await proposeAgent({ config, storage }, {
-                sub: agentGaii,
-                owner: localAccountName(agentGaii),
-                roles: ['agent'],
-                scopes: sessionScopes,
-            }, input as Parameters<typeof proposeAgent>[2]);
+            const out = await proposeAgent({ config, storage }, caller().auth, input as Parameters<typeof proposeAgent>[2]);
             if (!out.ok) return { content: [{ type: 'text' as const, text: out.message }], isError: true };
             const approvalUrl = proposalApprovalUrl(config.baseUrl);
             return {

@@ -11,9 +11,10 @@
  *   THEY CALL services/memory-bin.ts, the same one behind DELETE /v1/memory/:key. The connector MCP
  *   and the CLI dispatch are HTTP proxies onto that route; this surface runs inside the node and
  *   reaches the service directly. Three doors, one answer to who may remove what.
- * @structure registerMemoryBinTools(mcp, deps)
- * @usage registerMemoryBinTools(mcp, { storage, config, agentGaii });
+ * @structure registerMemoryBinTools(mcp, deps, caller)
+ * @usage registerMemoryBinTools(mcp, { storage, config }, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -24,16 +25,23 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../services/memory-bin.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerMemoryBinTools(
   mcp: McpServer,
-  { storage, config, agentGaii }: { storage: Storage; config: AimeatConfig; agentGaii: string },
+  { storage, config }: { storage: Storage; config: AimeatConfig },
+  /** The session's caller (services/caller-context.ts): the agent that deletes or restores. */
+  caller: () => CallerContext,
 ): void {
+/** The service's caller fields, from the session caller. */
+const binCaller = () => {
+    const session = caller();
+    return { caller: session.principal, ownerName: session.owner, roles: [...session.roles] };
+};
 // ── The bin: delete, and take it back ──
 //
 // These call services/memory-bin.ts, the same one behind DELETE /v1/memory/:key, because who may
@@ -46,11 +54,10 @@ mcp.tool(
     annotationsFor('aimeat_memory_delete'),
     async ({ key, owner_scope }) => {
         const out = await deleteMemoryRecord({ storage, config }, {
-            caller: agentGaii, ownerName: localAccountName(agentGaii), key,
-            ownerScope: owner_scope === true,
             // An agent session, never an operator one: this surface is minted per agent, so the
             // organism namespace check and the append-only guard inside the service both apply.
-            roles: ['agent'],
+            ...binCaller(), key,
+            ownerScope: owner_scope === true,
         });
         if (!out.ok) {
             return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }, null, 2) }], isError: true };
@@ -69,11 +76,10 @@ mcp.tool(
     annotationsFor('aimeat_memory_restore'),
     async ({ key, owner_scope }) => {
         const out = await restoreMemoryRecord({ storage, config }, {
-            caller: agentGaii, ownerName: localAccountName(agentGaii), key,
-            ownerScope: owner_scope === true,
             // As the delete above: an agent session, so the organism namespace check and the
             // append-only guard inside the service both apply to putting a record back too.
-            roles: ['agent'],
+            ...binCaller(), key,
+            ownerScope: owner_scope === true,
         });
         if (!out.ok) {
             return { content: [{ type: 'text' as const, text: JSON.stringify({ error: out.code, message: out.message }, null, 2) }], isError: true };

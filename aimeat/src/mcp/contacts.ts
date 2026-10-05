@@ -9,10 +9,11 @@
  *   gate; email lookup is EXACT-match only (privacy-preserving hash — no enumeration). Contacts
  *   feed identity pickers: use a resolved/looked-up owner with aimeat_organism_invite /
  *   aimeat_organism_member_add / aimeat_workspace_member_grant.
- * @structure registerContactTools(mcp, storage, config, getAgentGaii, scopes) — registers
+ * @structure registerContactTools(mcp, storage, config, getAgentGaii, scopes, caller) — registers
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.0 — 2026-10-05 — aimeat_contact_list and aimeat_contact_resolve_email call the services the
  *     routes call (listContactsFor, resolveContactEmail) in place of reaching the routes over loopback
@@ -56,19 +57,21 @@ import { createContactInvitation, ContactInvitationError } from '../services/con
 import { invitePublic } from '../services/invitations.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerContactTools(
     mcp: McpServer,
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
-    /** The session's scopes: the address book's columns depend on what the reader holds. */
-    scopes: readonly string[] = [],
+    /** The session's scopes. Unused here: the session caller below carries them. */
+    _scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts): the address book's columns depend on what
+     *  the reader holds. */
+    caller: () => CallerContext,
 ): void {
     /** This session as the services read a principal: the agent, its owner, its scopes. */
-    const session = () => ({
-        sub: getAgentGaii(), owner: localAccountName(getAgentGaii()), roles: ['agent'], scopes: [...scopes],
-    });
+    const session = () => caller().auth;
     /** Contacts belong to the OWNER — resolve the agent's owner GHII (never a client-supplied id). */
     const ownerGhii = (): string => {
         const owner = localAccountName(getAgentGaii());

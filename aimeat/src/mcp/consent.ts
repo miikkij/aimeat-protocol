@@ -9,8 +9,9 @@
  *   - registerConsentTools() — registers all consent tools and resources on an McpServer instance
  * @usage
  *   import { registerConsentTools } from './consent.js';
- *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+ *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for consent management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -28,6 +29,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { grantConsent, revokeConsent } from '../services/consent-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerConsentTools(
     mcp: McpServer,
@@ -36,15 +38,24 @@ export function registerConsentTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
-    /** The session's own scopes. The gate lives inside the shared service, not only in the
-     *  registration filter, so a door that forgets to register cannot also forget to check. */
-    sessionScopes: string[] = [],
+    /** The session's own scopes. Unused here: the session caller below carries them. */
+    _sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts). Its scopes reach the shared service, where
+     *  the gate lives, not only the registration filter, so a tool that is registered by mistake
+     *  still meets the check. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
     /** Resolve owner GHII from agent GAII */
     function ownerGhii(): string {
         return `${localAccountName(agentGaii)}@${config.nodeId}`;
+    }
+
+    /** The consent services' caller: the owner's account, with this session's scopes and roles. */
+    function consentCaller(): { ownerGaii: string; scopes: string[]; roles: string[] } {
+        const session = caller();
+        return { ownerGaii: session.ownerGhii, scopes: [...session.scopes], roles: [...session.roles] };
     }
 
     // ── Resource: consent record ──
@@ -107,11 +118,7 @@ export function registerConsentTools(
             // itself, which is why it accepted a recipient no access check will ever match, wrote no
             // audit entry, and never refreshed the federation directory — three things the REST door
             // has always done for the same operation.
-            const granted = await grantConsent({ storage, config }, {
-                ownerGaii: ownerGhii(),
-                scopes: sessionScopes,
-                roles: ['agent'],
-            }, {
+            const granted = await grantConsent({ storage, config }, consentCaller(), {
                 recipient: target_gaii,
                 dataPattern: data_pattern,
                 purpose,
@@ -177,11 +184,7 @@ export function registerConsentTools(
         async ({ consent_id }) => {
             // Same function the REST door calls: it owns the ownership check, the audit entry and
             // the directory refresh, so this door cannot be the one that forgets one of them.
-            const revoked = await revokeConsent({ storage, config }, {
-                ownerGaii: ownerGhii(),
-                scopes: sessionScopes,
-                roles: ['agent'],
-            }, consent_id);
+            const revoked = await revokeConsent({ storage, config }, consentCaller(), consent_id);
             if (!revoked.ok) {
                 return { content: [{ type: 'text' as const, text: `${revoked.code}: ${revoked.message}` }], isError: true };
             }
