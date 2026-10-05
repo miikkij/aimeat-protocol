@@ -592,11 +592,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Creates accounts, installs and organisms; applying again creates nothing twice, and it reaches
     // the package repository named in the set.
     aimeat_admin_install_set: { title: 'Admin: Apply an Install Set', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    aimeat_designbook_search: { title: 'Design Book: browse the parts', readOnlyHint: true },
-    aimeat_designbook_get: { title: 'Design Book: one part, whole', readOnlyHint: true },
-    aimeat_designbook_propose: { title: 'Design Book: propose (benched first)', idempotentHint: true },
-    aimeat_designbook_adopt: { title: 'Design Book: adopt into your app', destructiveHint: true, idempotentHint: true },
-    aimeat_designbook_keep: { title: 'Design Book: the owner is satisfied with this app', idempotentHint: true },
     aimeat_ui_component_list: { title: 'Interface parts: list', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_ui_component_get: { title: 'Interface parts: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_theme_list: { title: 'Themes: list, with the operator\'s choices', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

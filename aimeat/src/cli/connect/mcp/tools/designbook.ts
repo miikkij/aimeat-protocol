@@ -11,6 +11,7 @@
  * @structure registerDesignbookTools(mcp, registry)
  * @usage import { registerDesignbookTools } from './designbook.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.8 — 2026-09-26 — The propose contract says that beside a <ul> or <ol> of the markup every
  *     counter-reset also names list-item, and "all" takes only revert or revert-layer (parity with the
  *     server MCP).
@@ -48,25 +49,17 @@
  *   v1.0.0 — 2026-08-28 — Initial (TARGET-074 phase 5, slice 1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { BOOK_VIEW_PARAM } from '../../../../tool-catalog/definitions/designbook.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_designbook_search', descriptionFor('aimeat_designbook_search'), {
-    kind: z.string().optional().describe('Only this part kind: "layout", "fill", "look", "motion", "illustration", "genre", "ambient", "effect" or "component".'),
-    status: z.string().optional().describe('Only this lifecycle state: proposed, published, aging or retired.'),
-    q: z.string().optional().describe('A word matched against id, title, summary and tags.'),
-    limit: z.number().optional().describe('Rows to return, 1-200. Default 50.'),
-    view: z.string().optional().describe(BOOK_VIEW_PARAM),
-  }, annotationsFor('aimeat_designbook_search'), async ({ kind, status, q, limit, view }) => {
+  mcp.tool('aimeat_designbook_search', descriptionFor('aimeat_designbook_search'), zodShapeFor('aimeat_designbook_search'), annotationsFor('aimeat_designbook_search'), async ({ kind, status, q, limit, view }) => {
     // A view other than the map is sent on as it is: the route decides what a view means.
     if (view && view !== 'map') return out(await client.get(`/v1/designbook?view=${encodeURIComponent(view)}`));
     const params = new URLSearchParams();
@@ -84,23 +77,15 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     return out(await client.get(`/v1/designbook${qs ? `?${qs}` : ''}`));
   });
 
-  mcp.tool('aimeat_designbook_get', descriptionFor('aimeat_designbook_get'), {
-    id: z.string().describe('The part id, from the search.'),
-  }, annotationsFor('aimeat_designbook_get'), async ({ id }) => {
+  mcp.tool('aimeat_designbook_get', descriptionFor('aimeat_designbook_get'), zodShapeFor('aimeat_designbook_get'), annotationsFor('aimeat_designbook_get'), async ({ id }) => {
     return out(await client.get(`/v1/designbook/${encodeURIComponent(id)}`));
   });
 
-  mcp.tool('aimeat_designbook_keep', descriptionFor('aimeat_designbook_keep'), {
-    filename: z.string().describe('The published app the owner is satisfied with, e.g. "habits.html".'),
-    kept: z.boolean().optional().describe('false takes it back. Default true.'),
-  }, annotationsFor('aimeat_designbook_keep'), async ({ filename, kept }) => {
+  mcp.tool('aimeat_designbook_keep', descriptionFor('aimeat_designbook_keep'), zodShapeFor('aimeat_designbook_keep'), annotationsFor('aimeat_designbook_keep'), async ({ filename, kept }) => {
     return out(await client.post('/v1/designbook/keep', { filename, kept: kept !== false }));
   });
 
-  mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), {
-    part: z.record(z.string(), z.unknown()).describe('The part: { id, kind: "layout"|"fill"|"look"|"motion"|"illustration"|"genre"|"ambient"|"effect"|"component", title, summary, body, tags? }. A COMPONENT (what an app made by hand, offered to the next one) has body { prefix, html, css, use, judgement: { reach: "general"|"special", why }, from_app? }: markup that closes every element it opens and a stylesheet under one class prefix that closes every block, bracket, comment and string it opens (a nested rule starts with "&"; the only at-rules are @media, @supports, @container and @starting-style, and @keyframes, @property, @counter-style, @font-palette-values, @position-try, @function and @font-feature-values under a name that starts with the prefix, with the blocks of @font-feature-values inside it and the parameters of a @function untyped; a counter, anchor, view transition or timeline a declaration names starts with the prefix too, as the word itself, never through var(); an <li> stands only inside a <ul> or <ol>, no display holds list-item, and with a <summary> in the markup every counter-increment also writes list-item 0; with a <ul> or <ol> in the markup every counter-reset also names list-item and all takes only revert or revert-layer), every colour a var(--ak-…) token, NO script; a general one from an app its owner was satisfied with is published by itself. The kind decides the body: a whole mosaic layout (layout/fill), { tokens, look? } (look), { tokens } of motion tokens only (motion), { style, palette_words? } (illustration), { template } naming a served genre template (genre), { ambient: waves|aurora|dust|grid|static|ink|plasma|lava|tunnel, alpha?, speed?, look?, tokens? } (ambient — "none" is an arrangement\'s choice, never a part), or { effect: scanlines|vignette|duotone|recolour|distort|glitch|vhs|ripple|kaleidoscope, params?, on?: hero|figure|layer, look?, tokens? } (effect — a post-process filter proven where it lands: a moment on the hero band, a picture effect on a figure, or a living pass over the ambient layer).'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_designbook_propose'), async ({ part, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), zodShapeFor('aimeat_designbook_propose'), annotationsFor('aimeat_designbook_propose'), async ({ part, ai_provenance, ai_provenance_id }) => {
     return out(await client.post('/v1/designbook', {
       part,
       ...(ai_provenance ? { ai_provenance } : {}),
@@ -108,11 +93,7 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
     }));
   });
 
-  mcp.tool('aimeat_designbook_adopt', descriptionFor('aimeat_designbook_adopt'), {
-    id: z.string().describe('The part to adopt.'),
-    filename: z.string().describe('Your published app file the layout lands in.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_designbook_adopt'), async ({ id, filename, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_designbook_adopt', descriptionFor('aimeat_designbook_adopt'), zodShapeFor('aimeat_designbook_adopt'), annotationsFor('aimeat_designbook_adopt'), async ({ id, filename, ai_provenance, ai_provenance_id }) => {
     return out(await client.post(`/v1/designbook/${encodeURIComponent(id)}/adopt`, {
       filename,
       ...(ai_provenance ? { ai_provenance } : {}),
