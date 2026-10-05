@@ -14,6 +14,8 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   v1.4.1 — 2026-10-05 — The skills section lists through the caller's reader too, so a skill hidden
+ *     from AI stays hidden from an AI on a personal access token (secaudit 2026-10, DATA-2).
  *   v1.4.0 — 2026-09-29 — TARGET-082 V4: takes the caller's classification reader instead of an
  *     identity. The learned pitfalls and the template proposals are read through it (appdev-kb.ts
  *     listLearnedPitfalls, listOwnerScopeShown), so a record the caller may not see is left out and
@@ -197,7 +199,10 @@ export async function buildAppdevOverview(
 
     // ── Skills — the paved-path builder skill first, then the owner's own ──
     if (wanted.has('skills')) {
-        const accessor: SkillAccessor = { ownerName: owner, gaii: callerGaii };
+        // The caller's own reader: without it the skill listing rebuilt one from the owner's name, so
+        // an AI on a personal access token was read as the owner and saw the skills hidden from AI
+        // (secaudit 2026-10, DATA-2).
+        const accessor: SkillAccessor = { ownerName: owner, gaii: callerGaii, reader };
         const [nodeSkills, userSkills] = await Promise.all([
             listSkills(storage, config, 'node', accessor).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }),
             owner ? listSkills(storage, config, 'user', accessor, owner).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }) : Promise.resolve([]),
