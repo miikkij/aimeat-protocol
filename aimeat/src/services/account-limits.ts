@@ -18,7 +18,9 @@
  *   counted in the AI service function both call, against `config.rateLimits.openrouter` (the number
  *   the REST path limiter had). Node-internal AI work (a schedule, a workflow step, a refinery batch,
  *   a classifier, a background job's run, a provider test's inner call) passes `limit: 'exempt'`,
- *   because it is not one request per call and the limit would break a batch.
+ *   because it is not one request per call and the limit would break a batch. An extension's
+ *   `ctx.ai.start` is counted against its installer (an action is a request anyone the extension
+ *   admits can make); only a chain's continuation is exempt, its first start having been counted.
  * @structure AccountLimitRefusal · accountLimiter(name, limit, sentence) · MAIL_SEND_LIMIT ·
  *   INVITE_EMAIL_LIMIT · takeMailSend · takeInviteEmail · AiCallLimitMark · AI_CALL_DEFAULT_LIMIT ·
  *   takeAiCall · requireAiCallTurn · retryAfterOf
@@ -27,6 +29,7 @@
  *   if (!turn.ok) return refuse(429, turn.code, turn.message);
  *   requireAiCallTurn(config, gaii, opts.limit);   // throws AiCompletionError RATE_LIMITED 429
  * @version-history
+ *   v1.1.1 — 2026-10-06 — The header names the extension start as counted (secaudit 2026-10 follow-up, A5).
  *   v1.1.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C5).
  */

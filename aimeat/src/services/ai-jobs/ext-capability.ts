@@ -26,6 +26,8 @@
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.4.0 — 2026-10-06 — `start` draws on the installer's AI call limit; only a chain's continuation
+ *     passes `limit: 'exempt'` (secaudit 2026-10 follow-up, A5).
  *   v1.3.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     `start` passes `limit: 'exempt'`: an extension's start is the node's own work.
  *   v1.2.0 — 2026-09-28 — `start` passes on `role`, the AI role the job's call runs as.
@@ -126,10 +128,12 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                     ownerGhii,
                     createdBy,
                     extension: extName,
-                    // An extension's start is the node's own work (an action, a callback chain, a
-                    // schedule): it does not draw on the account's AI call limit for requests.
-                    limit: 'exempt',
-                    ...(chain ? { parentJob: chain.parentJob, chainDepth: chain.parentDepth + 1 } : {}),
+                    // The installer's AI call limit (services/account-limits.ts), the allowance
+                    // POST /v1/ai/jobs draws on: an action is a request anyone the extension admits
+                    // can make, so its start is counted. A refusal comes back as a decision the
+                    // extension can degrade on. A start that continues a chain is exempt: the chain's
+                    // first start was counted, as a job's run is not counted again (run-op.ts).
+                    ...(chain ? { limit: 'exempt' as const, parentJob: chain.parentJob, chainDepth: chain.parentDepth + 1 } : {}),
                     ...(chain ? { onRefused: chain.onRefused } : {}),
                 });
                 return { ok: true, job_id: started.job_id, queue_position: started.queue_position };
