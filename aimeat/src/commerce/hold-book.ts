@@ -14,6 +14,8 @@
  * @structure HoldRecord · createHold · getHold · listHolds · captureHold · releaseHold
  * @usage import { createHold, captureHold, releaseHold } from '../commerce/hold-book.js';
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The limit is checked and the amount counted in one compare-and-swap before the
+ *     rail authorizes, and given back when the rail declines (secaudit 2026-10, PKG-6).
  *   v1.1.0 — 2026-10-02 — An agent's hold is held to the daily purchase limit its owner set on its card:
  *     refused past it before the rail authorizes, and counted toward today once authorized.
  *   v1.0.0 — 2026-08-06 — Initial hold book (TINKI phase 1)
@@ -28,7 +30,7 @@ import { isMoneyCurrency } from './money.js';
 import { STRIPE_HANDLER_ID } from './stripe-handler.js';
 import { TEST_MONEY_HANDLER_ID } from './test-money-handler.js';
 import { logger } from '../utils/logger.js';
-import { agentPurchaseRefusal, recordAgentPurchase } from './agent-purchase-limit.js';
+import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 
 /** Holds expire safely inside Stripe's ~7-day uncaptured-card-intent window. */
 const HOLD_TTL_MS = 6 * 24 * 60 * 60 * 1000;
@@ -126,10 +128,20 @@ export async function createHold(storage: Storage, config: AimeatConfig, args: {
   const ctx: PaymentContext = { config, storage };
   const id = `hold-${randomUUID()}`;
   const seller = await sellerFor(storage, { sellerGhii, sellerOwner: args.sellerOwner });
-  const { trackingCode } = await handler.authorize!(ctx, {
-    buyerGhii, amount: args.amount, currency: args.currency,
-    reference: args.reference, instrument: args.instrument, seller,
-  });
+  // Checked and counted in one step before the rail authorizes (secaudit 2026-10, PKG-6), and given
+  // back when the rail declines.
+  const reserved = await reserveAgentPurchase(storage, config, spend, holder);
+  if (reserved) throw reserved;
+  let trackingCode: string;
+  try {
+    ({ trackingCode } = await handler.authorize!(ctx, {
+      buyerGhii, amount: args.amount, currency: args.currency,
+      reference: args.reference, instrument: args.instrument, seller,
+    }));
+  } catch (err) {
+    await releaseAgentPurchase(storage, spend, holder);
+    throw err;
+  }
   const now = new Date().toISOString();
   const hold: HoldRecord = {
     id, status: 'held', purpose: args.purpose,
@@ -141,7 +153,6 @@ export async function createHold(storage: Storage, config: AimeatConfig, args: {
     expiresAt: new Date(Date.now() + HOLD_TTL_MS).toISOString(),
   };
   await saveHold(storage, hold);
-  await recordAgentPurchase(storage, spend, holder);
   return hold;
 }
 
