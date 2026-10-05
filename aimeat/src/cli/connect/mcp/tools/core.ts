@@ -8,6 +8,7 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.20.0 -- 2026-10-01 -- aimeat_admin_federation_peer_remove (DELETE /v1/federation/peers/:nodeId,
  *     ?emergency=true).
  *   v1.19.0 -- 2026-09-30 -- aimeat_admin_node_update, thin over GET /v1/admin/node-update.
@@ -73,6 +74,7 @@ import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { carrierAttach, provenanceEchoedResult, readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { agentNameSchema, pickAgent, envelopeResult, payloadResult, flagged } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void {
   // ── Memory ──────────────────────────────────────────────────────────
@@ -208,12 +210,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Catalogue ───────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_catalogue_search', descriptionFor('aimeat_catalogue_search'), {
-    agent_name: agentNameSchema,
-    search: z.string().optional().describe('Free-text search (name/description/GAII)'),
-    category: z.string().optional().describe('Filter by capability category'),
-    response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_catalogue_search'), async ({ agent_name, search, category, response_format }) => {
+  mcp.tool('aimeat_catalogue_search', descriptionFor('aimeat_catalogue_search'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_catalogue_search') }, annotationsFor('aimeat_catalogue_search'), async ({ agent_name, search, category, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (search) params.set('search', search);
@@ -225,17 +222,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Master directory (cross-domain discovery) ───────────────────────
 
-  mcp.tool('aimeat_discover', descriptionFor('aimeat_discover'), {
-    agent_name: agentNameSchema,
-    mode: z.enum(['map', 'find']).optional().describe('"find" (default) returns entries; "map" returns only facet counts'),
-    q: z.string().optional().describe('Free-text query; omit to browse by filters'),
-    type: z.string().optional().describe('CSV of types to include'),
-    tags: z.string().optional().describe('CSV of tags; an entry must carry ALL'),
-    segment: z.string().optional().describe('CSV of segments to include'),
-    scope: z.enum(['own', 'public', 'shared']).optional().describe('own (default), public, or shared'),
-    limit: z.number().optional().describe('Max entries (default 20, max 100)'),
-    response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_discover'), async ({ agent_name, mode, q, type, tags, segment, scope, limit, response_format }) => {
+  mcp.tool('aimeat_discover', descriptionFor('aimeat_discover'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_discover') }, annotationsFor('aimeat_discover'), async ({ agent_name, mode, q, type, tags, segment, scope, limit, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (q) params.set('q', q);
@@ -255,11 +242,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Invoke: the other half of discover ───────────────────────
 
-  mcp.tool('aimeat_invoke', descriptionFor('aimeat_invoke'), {
-    agent_name: agentNameSchema,
-    capability: z.string().describe('The capability id, e.g. aimeat_memory_write.'),
-    input: z.record(z.string(), z.unknown()).optional().describe("That capability's own parameters, as an object."),
-  }, annotationsFor('aimeat_invoke'), async ({ agent_name, capability, input }) => {
+  mcp.tool('aimeat_invoke', descriptionFor('aimeat_invoke'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_invoke') }, annotationsFor('aimeat_invoke'), async ({ agent_name, capability, input }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post('/v1/invoke', { capability, input: input ?? {} });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
@@ -281,10 +264,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     },
   );
 
-  mcp.tool('aimeat_agent_profile', descriptionFor('aimeat_agent_profile'), {
-    agent_name: agentNameSchema,
-    gaii: z.string().describe('Agent GAII identifier'),
-  }, annotationsFor('aimeat_agent_profile'), async ({ agent_name, gaii }) => {
+  mcp.tool('aimeat_agent_profile', descriptionFor('aimeat_agent_profile'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_profile') }, annotationsFor('aimeat_agent_profile'), async ({ agent_name, gaii }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/agents/${encodeURIComponent(gaii)}`);
     return envelopeResult(resp);
@@ -292,13 +272,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Work ────────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_action_execute', descriptionFor('aimeat_action_execute'), {
-    agent_name: agentNameSchema,
-    action_id: z.string().describe('Action identifier'),
-    provider_gaii: z.string().describe('The provider_gaii the catalogue lists for the action: an agent\'s GAII, or a person\'s GHII when a person published it (required to route + escrow)'),
-    input: z.record(z.string(), z.unknown()).optional().describe('Input parameters for the action'),
-    ttl_hours: z.number().optional().describe('Hours before the work request expires (default 24)'),
-  }, annotationsFor('aimeat_action_execute'), async ({ agent_name, action_id, provider_gaii, input, ttl_hours }) => {
+  mcp.tool('aimeat_action_execute', descriptionFor('aimeat_action_execute'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_action_execute') }, annotationsFor('aimeat_action_execute'), async ({ agent_name, action_id, provider_gaii, input, ttl_hours }) => {
     const { client } = pickAgent(registry, agent_name);
     const body: Record<string, unknown> = { action_id, provider_gaii, input: input ?? {} };
     if (ttl_hours !== undefined) body.ttl_hours = ttl_hours;
@@ -306,30 +280,19 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_work_inbox', descriptionFor('aimeat_work_inbox'), {
-    agent_name: agentNameSchema,
-    response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_work_inbox'), async ({ agent_name, response_format }) => {
+  mcp.tool('aimeat_work_inbox', descriptionFor('aimeat_work_inbox'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_work_inbox') }, annotationsFor('aimeat_work_inbox'), async ({ agent_name, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/work/inbox');
     return flagged(jsonContent(shapeResponse('aimeat_work_inbox', response_format, resp.data ?? resp)), resp);
   });
 
-  mcp.tool('aimeat_work_accept', descriptionFor('aimeat_work_accept'), {
-    agent_name: agentNameSchema,
-    tracking_code: z.string().describe('Work item tracking code'),
-  }, annotationsFor('aimeat_work_accept'), async ({ agent_name, tracking_code }) => {
+  mcp.tool('aimeat_work_accept', descriptionFor('aimeat_work_accept'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_work_accept') }, annotationsFor('aimeat_work_accept'), async ({ agent_name, tracking_code }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post(`/v1/work/${encodeURIComponent(tracking_code)}/accept`);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_work_deliver', descriptionFor('aimeat_work_deliver'), {
-    agent_name: agentNameSchema,
-    tracking_code: z.string().describe('Work item tracking code'),
-    output: z.unknown().describe('Delivery payload (the work result)'),
-    metadata: z.unknown().optional().describe('Optional delivery metadata'),
-  }, annotationsFor('aimeat_work_deliver'), async ({ agent_name, tracking_code, output, metadata }) => {
+  mcp.tool('aimeat_work_deliver', descriptionFor('aimeat_work_deliver'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_work_deliver') }, annotationsFor('aimeat_work_deliver'), async ({ agent_name, tracking_code, output, metadata }) => {
     const { client } = pickAgent(registry, agent_name);
     const body: Record<string, unknown> = { output };
     if (metadata !== undefined) body.metadata = metadata;
@@ -339,9 +302,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Wallet ──────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_wallet_balance', descriptionFor('aimeat_wallet_balance'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_wallet_balance'), async ({ agent_name }) => {
+  mcp.tool('aimeat_wallet_balance', descriptionFor('aimeat_wallet_balance'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_wallet_balance') }, annotationsFor('aimeat_wallet_balance'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/wallet');
     return envelopeResult(resp);
@@ -349,13 +310,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Boards (basic read/post) ────────────────────────────────────────
 
-  mcp.tool('aimeat_board_read', descriptionFor('aimeat_board_read'), {
-    agent_name: agentNameSchema,
-    board_id: z.string().describe('Board identifier'),
-    category: z.string().optional().describe('Filter posts by category'),
-    limit: z.number().optional().describe('Maximum posts to return (default 20)'),
-    response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_board_read'), async ({ agent_name, board_id, category, limit, response_format }) => {
+  mcp.tool('aimeat_board_read', descriptionFor('aimeat_board_read'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_board_read') }, annotationsFor('aimeat_board_read'), async ({ agent_name, board_id, category, limit, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (category) params.set('category', category);
@@ -365,14 +320,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return flagged(jsonContent(shapeResponse('aimeat_board_read', response_format, resp.data ?? resp)), resp);
   });
 
-  mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), {
-    agent_name: agentNameSchema,
-    board_id: z.string().describe('Board identifier'),
-    title: z.string().describe('Post title'),
-    body: z.string().describe('Post body'),
-    category: z.string().optional().describe('Optional post category'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_board_post'), async ({ agent_name, board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_board_post') }, annotationsFor('aimeat_board_post'), async ({ agent_name, board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const reqBody: Record<string, unknown> = { title, body };
     if (category) reqBody.category = category;
@@ -383,15 +331,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Storage ─────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_storage_upload', descriptionFor('aimeat_storage_upload'), {
-    agent_name: agentNameSchema,
-    key: z.string().describe('Storage key'),
-    data_base64: z.string().describe('Base64-encoded file data'),
-    mime_type: z.string().optional().describe('MIME type of the file'),
-    visibility: z.string().optional().describe('Access control (default: private)'),
-    group_id: z.string().optional().describe('ID of sharing group (required for group visibility)'),
-    workspace_refs: z.array(z.string()).optional().describe('For visibility "workspace": the workspaces the file is shared with, each "<organismId>/<workspaceId>"'),
-  }, annotationsFor('aimeat_storage_upload'), async ({ agent_name, key, data_base64, mime_type, visibility, group_id, workspace_refs }) => {
+  mcp.tool('aimeat_storage_upload', descriptionFor('aimeat_storage_upload'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_storage_upload') }, annotationsFor('aimeat_storage_upload'), async ({ agent_name, key, data_base64, mime_type, visibility, group_id, workspace_refs }) => {
     const { client } = pickAgent(registry, agent_name);
     // REST POST /v1/storage reads the base64 payload as `data`.
     const body: Record<string, unknown> = { key, data: data_base64 };
@@ -403,12 +343,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_storage_download', descriptionFor('aimeat_storage_download'), {
-    agent_name: agentNameSchema,
-    key: z.string().describe('Storage key in the agent\'s own namespace, or a full "owner@node/key" reference.'),
-    owner: z.string().optional().describe('GHII/GAII that owns the file. Omit for the agent\'s own files; set it for the owner\'s uploads and for DM/task attachments.'),
-    inline: z.boolean().optional().describe('Only for small text files (<= 32 KB): return content inline. Binaries always return a download handle, never base64 in context.'),
-  }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key, owner, inline }) => {
+  mcp.tool('aimeat_storage_download', descriptionFor('aimeat_storage_download'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_storage_download') }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key, owner, inline }) => {
     const { client } = pickAgent(registry, agent_name);
     // F11: never pull raw bytes through the model context — request a handle (presigned
     // download_url + metadata), or inline only for small text files.
@@ -448,15 +383,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return flagged(jsonContent(resp.data ?? resp), resp);
   });
 
-  mcp.tool('aimeat_datapackage_export', descriptionFor('aimeat_datapackage_export'), {
-    agent_name: agentNameSchema,
-    ref: z.string().describe('pkg:owner/name, optionally @sha256:... to pin a version.'),
-    resource: z.string().describe('Which resource of the package.'),
-    format: z.enum(['url', 'csv', 'json']).optional().describe('url (default) = the permanent CSV address. csv/json = a window of rows inline.'),
-    limit: z.number().optional(),
-    offset: z.number().optional(),
-    select: z.array(z.string()).optional(),
-  }, annotationsFor('aimeat_datapackage_export'), async ({ agent_name, ref, resource, format, limit, offset, select }) => {
+  mcp.tool('aimeat_datapackage_export', descriptionFor('aimeat_datapackage_export'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_datapackage_export') }, annotationsFor('aimeat_datapackage_export'), async ({ agent_name, ref, resource, format, limit, offset, select }) => {
     const { client } = pickAgent(registry, agent_name);
     const m = /^pkg:([^/@]+)\/([^@]+)(?:@(sha256:[a-f0-9]{64}))?$/.exec(ref);
     if (!m) return flagged(jsonContent({ error: 'ref must look like "pkg:owner/name" or "pkg:owner/name@sha256:..."' }), { ok: false });
@@ -477,10 +404,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return flagged(jsonContent(resp.data ?? resp), resp);
   });
 
-  mcp.tool('aimeat_storage_delete', descriptionFor('aimeat_storage_delete'), {
-    agent_name: agentNameSchema,
-    key: z.string().describe('Storage key in the agent\'s own namespace. Only the agent\'s own files can be deleted.'),
-  }, annotationsFor('aimeat_storage_delete'), async ({ agent_name, key }) => {
+  mcp.tool('aimeat_storage_delete', descriptionFor('aimeat_storage_delete'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_storage_delete') }, annotationsFor('aimeat_storage_delete'), async ({ agent_name, key }) => {
     const { client } = pickAgent(registry, agent_name);
     // One door, unlike the download above: /v1/storage is namespaced to the caller, and there is no
     // /v1/pub form for a delete because reading someone else's file is allowed and removing it is not.
@@ -494,18 +418,13 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   // has operator scope. Documented here so the param isn't misread as
   // "operator masquerade".
 
-  mcp.tool('aimeat_admin_stats', descriptionFor('aimeat_admin_stats'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_stats'), async ({ agent_name }) => {
+  mcp.tool('aimeat_admin_stats', descriptionFor('aimeat_admin_stats'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_stats') }, annotationsFor('aimeat_admin_stats'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/admin/stats');
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_admin_agents', descriptionFor('aimeat_admin_agents'), {
-    agent_name: agentNameSchema,
-    limit: z.number().optional().describe('Maximum number of agents to return'),
-  }, annotationsFor('aimeat_admin_agents'), async ({ agent_name, limit }) => {
+  mcp.tool('aimeat_admin_agents', descriptionFor('aimeat_admin_agents'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_agents') }, annotationsFor('aimeat_admin_agents'), async ({ agent_name, limit }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/admin/agents');
     // REST returns all agents; apply the limit client-side to match the server MCP tool.
@@ -516,9 +435,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return payloadResult(data, resp);
   });
 
-  mcp.tool('aimeat_admin_config', descriptionFor('aimeat_admin_config'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_config'), async ({ agent_name }) => {
+  mcp.tool('aimeat_admin_config', descriptionFor('aimeat_admin_config'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_config') }, annotationsFor('aimeat_admin_config'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/admin/config');
     return envelopeResult(resp);
@@ -527,112 +444,63 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   // ── BR-04: SSO administration + manual account lifecycle (operator's agent) ──
   const asText = (resp: ApiResponse) => envelopeResult(resp);
 
-  mcp.tool('aimeat_admin_sso_list', descriptionFor('aimeat_admin_sso_list'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_sso_list'), async ({ agent_name }) => {
+  mcp.tool('aimeat_admin_sso_list', descriptionFor('aimeat_admin_sso_list'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_sso_list') }, annotationsFor('aimeat_admin_sso_list'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/sso/connections'));
   });
 
-  mcp.tool('aimeat_admin_sso_get', descriptionFor('aimeat_admin_sso_get'), {
-    agent_name: agentNameSchema,
-    id: z.string().describe('The connection id (slug).'),
-  }, annotationsFor('aimeat_admin_sso_get'), async ({ agent_name, id }) => {
+  mcp.tool('aimeat_admin_sso_get', descriptionFor('aimeat_admin_sso_get'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_sso_get') }, annotationsFor('aimeat_admin_sso_get'), async ({ agent_name, id }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get(`/v1/admin/sso/connections/${encodeURIComponent(id)}`));
   });
 
-  mcp.tool('aimeat_admin_sso_create', descriptionFor('aimeat_admin_sso_create'), {
-    agent_name: agentNameSchema,
-    id: z.string().describe('Permanent slug id (lowercase letters, digits, dashes; 2-31 chars).'),
-    name: z.string().describe('The organisation\'s name — the sign-in button label when listed.'),
-    domains: z.array(z.string()).optional().describe('Email domains this organisation vouches for, e.g. ["contoso.com"].'),
-    organism_id: z.string().optional().describe('Organism its people are added to on first sign-in or provisioning.'),
-    login_visibility: z.enum(['listed', 'hidden']).optional().describe('"listed" shows a sign-in button; "hidden" keeps the organisation off the public modal (default listed).'),
-    allow_idp_initiated: z.boolean().optional().describe('Accept sign-ins started from the IdP\'s own portal tile (default false).'),
-  }, annotationsFor('aimeat_admin_sso_create'), async ({ agent_name, ...body }) => {
+  mcp.tool('aimeat_admin_sso_create', descriptionFor('aimeat_admin_sso_create'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_sso_create') }, annotationsFor('aimeat_admin_sso_create'), async ({ agent_name, ...body }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.post('/v1/admin/sso/connections', body));
   });
 
-  mcp.tool('aimeat_admin_sso_update', descriptionFor('aimeat_admin_sso_update'), {
-    agent_name: agentNameSchema,
-    id: z.string().describe('The connection id.'),
-    name: z.string().optional().describe('New organisation name.'),
-    domains: z.array(z.string()).optional().describe('New email-domain list (replaces the old one).'),
-    organism_id: z.string().optional().describe('New organism binding; an empty string clears it.'),
-    login_visibility: z.enum(['listed', 'hidden']).optional().describe('"listed" or "hidden".'),
-    allow_idp_initiated: z.boolean().optional().describe('Accept IdP-initiated sign-ins.'),
-  }, annotationsFor('aimeat_admin_sso_update'), async ({ agent_name, id, ...body }) => {
+  mcp.tool('aimeat_admin_sso_update', descriptionFor('aimeat_admin_sso_update'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_sso_update') }, annotationsFor('aimeat_admin_sso_update'), async ({ agent_name, id, ...body }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.put(`/v1/admin/sso/connections/${encodeURIComponent(id)}`, body));
   });
 
-  mcp.tool('aimeat_admin_sso_delete', descriptionFor('aimeat_admin_sso_delete'), {
-    agent_name: agentNameSchema,
-    id: z.string().describe('The connection id.'),
-  }, annotationsFor('aimeat_admin_sso_delete'), async ({ agent_name, id }) => {
+  mcp.tool('aimeat_admin_sso_delete', descriptionFor('aimeat_admin_sso_delete'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_sso_delete') }, annotationsFor('aimeat_admin_sso_delete'), async ({ agent_name, id }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.delete(`/v1/admin/sso/connections/${encodeURIComponent(id)}`));
   });
 
-  mcp.tool('aimeat_admin_sso_idp_metadata', descriptionFor('aimeat_admin_sso_idp_metadata'), {
-    agent_name: agentNameSchema,
-    id: z.string().describe('The connection id.'),
-    url: z.string().optional().describe('The IdP metadata URL (e.g. Entra\'s federation metadata address).'),
-    xml: z.string().optional().describe('The IdP metadata document itself, when a URL is not reachable.'),
-    name_id_format: z.string().optional().describe('Requested NameID format, when the IdP\'s default is not wanted.'),
-  }, annotationsFor('aimeat_admin_sso_idp_metadata'), async ({ agent_name, id, ...body }) => {
+  mcp.tool('aimeat_admin_sso_idp_metadata', descriptionFor('aimeat_admin_sso_idp_metadata'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_sso_idp_metadata') }, annotationsFor('aimeat_admin_sso_idp_metadata'), async ({ agent_name, id, ...body }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.post(`/v1/admin/sso/connections/${encodeURIComponent(id)}/idp-metadata`, body));
   });
 
-  mcp.tool('aimeat_admin_sso_scim_token', descriptionFor('aimeat_admin_sso_scim_token'), {
-    agent_name: agentNameSchema,
-    id: z.string().describe('The connection id.'),
-  }, annotationsFor('aimeat_admin_sso_scim_token'), async ({ agent_name, id }) => {
+  mcp.tool('aimeat_admin_sso_scim_token', descriptionFor('aimeat_admin_sso_scim_token'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_sso_scim_token') }, annotationsFor('aimeat_admin_sso_scim_token'), async ({ agent_name, id }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.post(`/v1/admin/sso/connections/${encodeURIComponent(id)}/scim-token`));
   });
 
-  mcp.tool('aimeat_admin_owner_disable', descriptionFor('aimeat_admin_owner_disable'), {
-    agent_name: agentNameSchema,
-    name: z.string().describe('The owner name to deactivate.'),
-  }, annotationsFor('aimeat_admin_owner_disable'), async ({ agent_name, name }) => {
+  mcp.tool('aimeat_admin_owner_disable', descriptionFor('aimeat_admin_owner_disable'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_owner_disable') }, annotationsFor('aimeat_admin_owner_disable'), async ({ agent_name, name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.post(`/v1/admin/owners/${encodeURIComponent(name)}/disable`));
   });
 
-  mcp.tool('aimeat_admin_owner_enable', descriptionFor('aimeat_admin_owner_enable'), {
-    agent_name: agentNameSchema,
-    name: z.string().describe('The owner name to reactivate.'),
-  }, annotationsFor('aimeat_admin_owner_enable'), async ({ agent_name, name }) => {
+  mcp.tool('aimeat_admin_owner_enable', descriptionFor('aimeat_admin_owner_enable'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_owner_enable') }, annotationsFor('aimeat_admin_owner_enable'), async ({ agent_name, name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.post(`/v1/admin/owners/${encodeURIComponent(name)}/enable`));
   });
 
-  mcp.tool('aimeat_admin_totp_reset', descriptionFor('aimeat_admin_totp_reset'), {
-    agent_name: agentNameSchema,
-    name: z.string().describe('The owner name whose two-step sign-in should be removed.'),
-  }, annotationsFor('aimeat_admin_totp_reset'), async ({ agent_name, name }) => {
+  mcp.tool('aimeat_admin_totp_reset', descriptionFor('aimeat_admin_totp_reset'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_totp_reset') }, annotationsFor('aimeat_admin_totp_reset'), async ({ agent_name, name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.delete(`/v1/admin/owners/${encodeURIComponent(name)}/totp`));
   });
 
   // The Security page in one read, and the incident action, over the same two routes the page uses.
-  mcp.tool('aimeat_admin_security_overview', descriptionFor('aimeat_admin_security_overview'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_security_overview'), async ({ agent_name }) => {
+  mcp.tool('aimeat_admin_security_overview', descriptionFor('aimeat_admin_security_overview'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_security_overview') }, annotationsFor('aimeat_admin_security_overview'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/security/overview'));
   });
 
-  mcp.tool('aimeat_admin_incident_resolve', descriptionFor('aimeat_admin_incident_resolve'), {
-    agent_name: agentNameSchema,
-    id: z.string().describe('The incident id, from the overview\'s incidents list.'),
-    name: z.string().optional().describe('To decide one name of an incident the move to the full identity opened: the account name, from the incident\'s names.'),
-    resolution: z.string().optional().describe('With `name`: "holder" (its rows, cortexes, ecosystem apps, app grants and access tokens are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).'),
-  }, annotationsFor('aimeat_admin_incident_resolve'), async ({ agent_name, id, name, resolution }) => {
+  mcp.tool('aimeat_admin_incident_resolve', descriptionFor('aimeat_admin_incident_resolve'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_incident_resolve') }, annotationsFor('aimeat_admin_incident_resolve'), async ({ agent_name, id, name, resolution }) => {
     const { client } = pickAgent(registry, agent_name);
     const decide = name !== undefined || resolution !== undefined ? { name, resolution } : undefined;
     return asText(await client.post(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`, decide));
@@ -640,26 +508,17 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // The CORS page in one read, and the one write it has, over the same routes the page uses. An
   // agent's address carries a `#`, a person's does not; that is what picks the door.
-  mcp.tool('aimeat_admin_cors_overview', descriptionFor('aimeat_admin_cors_overview'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_cors_overview'), async ({ agent_name }) => {
+  mcp.tool('aimeat_admin_cors_overview', descriptionFor('aimeat_admin_cors_overview'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_cors_overview') }, annotationsFor('aimeat_admin_cors_overview'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/cors/overview'));
   });
 
-  mcp.tool('aimeat_admin_hooks', descriptionFor('aimeat_admin_hooks'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_hooks'), async ({ agent_name }) => {
+  mcp.tool('aimeat_admin_hooks', descriptionFor('aimeat_admin_hooks'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_hooks') }, annotationsFor('aimeat_admin_hooks'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/hooks'));
   });
 
-  mcp.tool('aimeat_admin_usage', descriptionFor('aimeat_admin_usage'), {
-    agent_name: agentNameSchema,
-    from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the trailing thirty days.'),
-    to: z.string().optional().describe('Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well, or neither is used.'),
-    ask_provider: z.boolean().optional().describe('Ask the provider what this node\'s own house and chat keys have actually spent. One outbound call per key.'),
-  }, annotationsFor('aimeat_admin_usage'), async ({ agent_name, from, to, ask_provider }) => {
+  mcp.tool('aimeat_admin_usage', descriptionFor('aimeat_admin_usage'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_usage') }, annotationsFor('aimeat_admin_usage'), async ({ agent_name, from, to, ask_provider }) => {
     const { client } = pickAgent(registry, agent_name);
     // The dates go as a pair or not at all; `ask_provider` is a SEPARATE route because asking the
     // provider costs a round trip the page's own read must never pay.
@@ -679,11 +538,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return asText({ ...page, data: { ...(page.data as object), keys: answered } });
   });
 
-  mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'), {
-    agent_name: agentNameSchema,
-    from: z.string().optional().describe('First day of the period, inclusive, as YYYY-MM-DD. Give `to` as well, or neither is used and you get the whole life of this node.'),
-    to: z.string().optional().describe('Last day of the period, inclusive, as YYYY-MM-DD. Give `from` as well, or neither is used.'),
-  }, annotationsFor('aimeat_admin_statistics'), async ({ agent_name, from, to }) => {
+  mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_statistics') }, annotationsFor('aimeat_admin_statistics'), async ({ agent_name, from, to }) => {
     const { client } = pickAgent(registry, agent_name);
     // Both or neither: the route reads them as a pair, and one alone would silently return the
     // node's whole life wearing a period's label.
@@ -691,50 +546,28 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return asText(await client.get(`/v1/stats${qs}`));
   });
 
-  mcp.tool('aimeat_admin_node_update', descriptionFor('aimeat_admin_node_update'), {
-    agent_name: agentNameSchema,
-    refresh: z.boolean().optional().describe('Ask the registry now instead of answering from the six-hour cache.'),
-  }, annotationsFor('aimeat_admin_node_update'), async ({ agent_name, refresh }) => {
+  mcp.tool('aimeat_admin_node_update', descriptionFor('aimeat_admin_node_update'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_node_update') }, annotationsFor('aimeat_admin_node_update'), async ({ agent_name, refresh }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get(`/v1/admin/node-update${refresh === true ? '?refresh=true' : ''}`));
   });
 
-  mcp.tool('aimeat_admin_federation', descriptionFor('aimeat_admin_federation'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_federation'), async ({ agent_name }) => {
+  mcp.tool('aimeat_admin_federation', descriptionFor('aimeat_admin_federation'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_federation') }, annotationsFor('aimeat_admin_federation'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.get('/v1/admin/federation/overview'));
   });
 
-  mcp.tool('aimeat_admin_federation_relay_claim_set', descriptionFor('aimeat_admin_federation_relay_claim_set'), {
-    agent_name: agentNameSchema,
-    node_id: z.string().describe('The peer, by its node id as aimeat_admin_federation lists it.'),
-    relay_claim: z.enum(['optional', 'required', 'node']).describe('"optional" or "required" for this peer alone, or "node" to follow this node\'s setting again.'),
-  }, annotationsFor('aimeat_admin_federation_relay_claim_set'), async ({ agent_name, node_id, relay_claim }) => {
+  mcp.tool('aimeat_admin_federation_relay_claim_set', descriptionFor('aimeat_admin_federation_relay_claim_set'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_federation_relay_claim_set') }, annotationsFor('aimeat_admin_federation_relay_claim_set'), async ({ agent_name, node_id, relay_claim }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.put(`/v1/federation/peers/${encodeURIComponent(node_id)}/relay-claim`, { relay_claim }));
   });
 
-  mcp.tool('aimeat_admin_federation_peer_remove', descriptionFor('aimeat_admin_federation_peer_remove'), {
-    agent_name: agentNameSchema,
-    node_id: z.string().describe('The peer, by its node id as aimeat_admin_federation lists it.'),
-    emergency: z.boolean().optional().describe('true: remove it now and free the node id. Omitted or false: start its de-peering grace.'),
-    reason: z.string().max(500).optional().describe('Why, in a few words: kept with the removal and sent with an emergency notice.'),
-  }, annotationsFor('aimeat_admin_federation_peer_remove'), async ({ agent_name, node_id, emergency, reason }) => {
+  mcp.tool('aimeat_admin_federation_peer_remove', descriptionFor('aimeat_admin_federation_peer_remove'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_federation_peer_remove') }, annotationsFor('aimeat_admin_federation_peer_remove'), async ({ agent_name, node_id, emergency, reason }) => {
     const { client } = pickAgent(registry, agent_name);
     const q = new URLSearchParams({ ...(emergency === true ? { emergency: 'true' } : {}), ...(reason ? { reason } : {}) }).toString();
     return asText(await client.delete(`/v1/federation/peers/${encodeURIComponent(node_id)}${q ? `?${q}` : ''}`));
   });
 
-  mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'), {
-    agent_name: agentNameSchema,
-    page: z.number().int().optional().describe('Which page of packages, from 1. A page past the end comes back as the last page rather than empty.'),
-    limit: z.number().int().optional().describe('How many packages on the page. 20 by default, 50 at most.'),
-    q: z.string().optional().describe('Free text over the name, the author and the tags.'),
-    author_key: z.string().optional().describe('One author, collapsed across the spellings of their name. Take the key from facets.authors rather than typing a name.'),
-    content_type: z.string().optional().describe('One kind of package, as facets.kinds names it.'),
-    flagged: z.boolean().optional().describe('Only packages somebody has reported.'),
-  }, annotationsFor('aimeat_admin_knowledge'), async ({ agent_name, page, limit, q, author_key, content_type, flagged }) => {
+  mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_knowledge') }, annotationsFor('aimeat_admin_knowledge'), async ({ agent_name, page, limit, q, author_key, content_type, flagged }) => {
     const { client } = pickAgent(registry, agent_name);
     // Every filter goes on its own: none of them is read as a pair, and each one left behind would
     // answer about a larger collection than the caller asked about, under the caller's own label.
@@ -749,20 +582,12 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return asText(await client.get(`/v1/admin/knowledge${parts.length ? '?' + parts.join('&') : ''}`));
   });
 
-  mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'), {
-    agent_name: agentNameSchema,
-    hook: z.string().describe('The moment to bind, e.g. "pre_owner_registration".'),
-    actions: z.array(z.string()).describe('The action references to call, in order, each naming an action already published on the node: publish it, then bind it. An empty list clears the moment.'),
-  }, annotationsFor('aimeat_admin_hook_set'), async ({ agent_name, hook, actions }) => {
+  mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_hook_set') }, annotationsFor('aimeat_admin_hook_set'), async ({ agent_name, hook, actions }) => {
     const { client } = pickAgent(registry, agent_name);
     return asText(await client.put(`/v1/admin/hooks/${encodeURIComponent(hook)}`, { actions }));
   });
 
-  mcp.tool('aimeat_admin_cors_set', descriptionFor('aimeat_admin_cors_set'), {
-    agent_name: agentNameSchema,
-    who: z.string().describe('A person\'s address (owner@node), a bare owner name, or an agent\'s address (name#owner@node).'),
-    origins: z.array(z.string()).nullable().describe('The origins to allow: each an http(s) URL or "*"; null clears the list so the default applies again.'),
-  }, annotationsFor('aimeat_admin_cors_set'), async ({ agent_name, who, origins }) => {
+  mcp.tool('aimeat_admin_cors_set', descriptionFor('aimeat_admin_cors_set'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_cors_set') }, annotationsFor('aimeat_admin_cors_set'), async ({ agent_name, who, origins }) => {
     const { client } = pickAgent(registry, agent_name);
     const path = who.includes('#')
       ? `/v1/admin/agents/${encodeURIComponent(who)}/cors`

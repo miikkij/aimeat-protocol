@@ -12,19 +12,20 @@
  * @structure registerCoreBoardTools(mcp, deps)
  * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii });
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-03 — Extracted from core.ts (max-file-lines). No behaviour change.
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../tool-catalog/shape.js';
+import { descriptionFor, shapeResponse, jsonContent } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { createBoardPost } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerCoreBoardTools(
   mcp: McpServer,
@@ -34,7 +35,7 @@ export function registerCoreBoardTools(
 mcp.tool(
     'aimeat_board_read',
     descriptionFor('aimeat_board_read'),
-    { board_id: z.string(), category: z.string().optional(), limit: z.number().optional(), response_format: responseFormatSchema },
+    zodShapeFor('aimeat_board_read'),
     annotationsFor('aimeat_board_read'),
     async ({ board_id, category, limit, response_format }) => {
         // Load the board and rule on it. This tool used to list the posts and nothing else, so
@@ -72,7 +73,7 @@ mcp.tool(
 mcp.tool(
     'aimeat_board_post',
     descriptionFor('aimeat_board_post'),
-    { board_id: z.string(), title: z.string(), body: z.string(), category: z.string().optional(), ...aiProvenanceInputs },
+    zodShapeFor('aimeat_board_post'),
     annotationsFor('aimeat_board_post'),
     async ({ board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
         // ONE implementation (services/board-post.ts). This tool never loaded the board, so it

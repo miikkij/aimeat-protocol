@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.33.0 — 2026-10-02 — aimeat_agents_list carries task_start, task_start_effective and
  *     task_start_held_by, like GET /v1/agents.
  *   v1.32.0 — 2026-09-30 — registerAdminNodeUpdateTools: is a newer AIMEAT on npm, and the update prompt.
@@ -170,7 +171,7 @@ import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
 import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
 import { taskStartView, scopeUseLookup } from '../services/agent-task-start-write.js';
-
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -245,7 +246,7 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_catalogue_search',
         descriptionFor('aimeat_catalogue_search'),
-        { search: z.string().optional(), category: z.string().optional(), response_format: responseFormatSchema },
+        zodShapeFor('aimeat_catalogue_search'),
         annotationsFor('aimeat_catalogue_search'),
         async ({ search, category, response_format }) => {
             const actions = await storage.listActions({ search, category });
@@ -275,16 +276,7 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_discover',
         descriptionFor('aimeat_discover'),
-        {
-            mode: z.enum(['map', 'find']).optional(),
-            q: z.string().optional(),
-            type: z.string().optional(),
-            tags: z.string().optional(),
-            segment: z.string().optional(),
-            scope: z.enum(['own', 'public', 'shared']).optional(),
-            limit: z.number().optional(),
-            response_format: responseFormatSchema,
-        },
+        zodShapeFor('aimeat_discover'),
         annotationsFor('aimeat_discover'),
         async ({ mode, q, type, tags, segment, scope, limit, response_format }) => {
             const parsed = parseGAII(agentGaii);
@@ -322,7 +314,7 @@ export function registerCoreTools(
     // ── Tool 2: aimeat_agent_profile ──
     mcp.registerTool(
         'aimeat_agent_profile',
-        { description: descriptionFor('aimeat_agent_profile'), inputSchema: { gaii: z.string() }, outputSchema: agentProfileOutput, annotations: annotationsFor('aimeat_agent_profile') },
+        { description: descriptionFor('aimeat_agent_profile'), inputSchema: zodShapeFor('aimeat_agent_profile'), outputSchema: agentProfileOutput, annotations: annotationsFor('aimeat_agent_profile') },
         async ({ gaii }) => {
             const agent = await storage.getAgent(gaii);
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
@@ -620,12 +612,7 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_action_execute',
         descriptionFor('aimeat_action_execute'),
-        {
-            action_id: z.string(),
-            provider_gaii: z.string(),
-            input: z.record(z.string(), z.any()),
-            ttl_hours: z.number().optional(),
-        },
+        zodShapeFor('aimeat_action_execute'),
         annotationsFor('aimeat_action_execute'),
         async ({ action_id, provider_gaii, input, ttl_hours }) => {
             // One implementation, called from both doors. This tool used to re-do the commission by
@@ -670,7 +657,7 @@ export function registerCoreTools(
     // ── Tool 7: aimeat_work_inbox ──
     mcp.registerTool(
         'aimeat_work_inbox',
-        { description: descriptionFor('aimeat_work_inbox'), inputSchema: { response_format: responseFormatSchema }, outputSchema: genericListOutput, annotations: annotationsFor('aimeat_work_inbox') },
+        { description: descriptionFor('aimeat_work_inbox'), inputSchema: zodShapeFor('aimeat_work_inbox'), outputSchema: genericListOutput, annotations: annotationsFor('aimeat_work_inbox') },
         async ({ response_format }) => {
             const items = await storage.listWorkByProvider(agentGaii);
             const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
@@ -689,7 +676,7 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_work_accept',
         descriptionFor('aimeat_work_accept'),
-        { tracking_code: z.string() },
+        zodShapeFor('aimeat_work_accept'),
         annotationsFor('aimeat_work_accept'),
         async ({ tracking_code }) => {
             // ONE implementation (services/work-lifecycle.ts). This tool wrote the status itself and
@@ -707,7 +694,7 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_work_deliver',
         descriptionFor('aimeat_work_deliver'),
-        { tracking_code: z.string(), output: z.record(z.string(), z.any()), metadata: z.unknown().optional() },
+        zodShapeFor('aimeat_work_deliver'),
         annotationsFor('aimeat_work_deliver'),
         async ({ tracking_code, output }) => {
             // ONE implementation (services/work-lifecycle.ts). This tool settled and stored the
@@ -729,7 +716,7 @@ export function registerCoreTools(
     // ── Tool 10: aimeat_wallet_balance ──
     mcp.registerTool(
         'aimeat_wallet_balance',
-        { description: descriptionFor('aimeat_wallet_balance'), inputSchema: {}, outputSchema: walletBalanceOutput, annotations: annotationsFor('aimeat_wallet_balance') },
+        { description: descriptionFor('aimeat_wallet_balance'), inputSchema: zodShapeFor('aimeat_wallet_balance'), outputSchema: walletBalanceOutput, annotations: annotationsFor('aimeat_wallet_balance') },
         async () => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };

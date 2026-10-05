@@ -25,6 +25,7 @@
  * @structure registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii, scopes) — one read.
  * @usage registerAdminKnowledgeTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: the overview is built with the session's classification
  *     reader (readerForAgent). The data space stays the operator's GHII; what is shown is decided for
  *     the agent that asked, so a manifest hidden from AI is not listed here.
@@ -33,14 +34,14 @@
  *   v1.0.0 — 2026-09-12 — Initial, with the Knowledge page's rebuild.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
-import { buildKnowledgeOverview, DEFAULT_PER_PAGE, MAX_PER_PAGE } from '../services/knowledge-overview.js';
+import { buildKnowledgeOverview } from '../services/knowledge-overview.js';
 import { readerForAgent } from '../services/classification/reader.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -56,14 +57,7 @@ export function registerAdminKnowledgeTools(
   const agentGaii = getAgentGaii();
 
   mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'),
-    {
-      page: z.number().int().optional().describe('Which page of packages, from 1. A page past the end comes back as the last page rather than empty.'),
-      limit: z.number().int().optional().describe(`How many packages on the page. ${DEFAULT_PER_PAGE} by default, ${MAX_PER_PAGE} at most.`),
-      q: z.string().optional().describe('Free text over the name, the author and the tags.'),
-      author_key: z.string().optional().describe('One author, collapsed across the spellings of their name. Take the key from facets.authors rather than typing a name: this node writes the same person as both `alice` and `alice@node-id`.'),
-      content_type: z.string().optional().describe('One kind of package, as facets.kinds names it.'),
-      flagged: z.boolean().optional().describe('Only packages somebody has reported.'),
-    },
+    zodShapeFor('aimeat_admin_knowledge'),
     annotationsFor('aimeat_admin_knowledge'),
     async ({ page, limit, q, author_key, content_type, flagged }) => {
       const operator = await resolveOperatorAgentName(storage, agentGaii, scopes);

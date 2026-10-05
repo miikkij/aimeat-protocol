@@ -110,14 +110,6 @@ import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
 const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Core / discovery ──
     aimeat_handbook_get: { title: 'Read Agent Handbook', readOnlyHint: true },
-    aimeat_catalogue_search: { title: 'Search Action Catalogue', readOnlyHint: true },
-    aimeat_discover: { title: 'Discover (Master Directory)', readOnlyHint: true, openWorldHint: true },
-    // NOT read-only and NOT idempotent: it runs whatever it was pointed at, and what that does is
-    // the target capability's business. openWorld, because the set of what it can reach is data.
-    aimeat_invoke: { title: 'Run a Node Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    // Read-only for the person's data: what it changes is which of this session's tools are listed.
-    aimeat_tools_find: { title: 'Find and Add Tools', readOnlyHint: true, idempotentHint: true },
-    aimeat_agent_profile: { title: 'View Agent Profile', readOnlyHint: true },
 
     // ── Onboarding ──
     aimeat_onboarding_status: { title: 'Check Onboarding Status', readOnlyHint: true },
@@ -144,31 +136,11 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Operator config enactment ──
 
     // ── Storage ──
-    aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },
-    aimeat_storage_upload: { title: 'Upload Storage File', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // idempotent because the version IS the content hash: publishing the same rows twice lands on
-    // the same address and creates no second version.
-    aimeat_datapackage_publish: { title: 'Publish Data Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_datapackage_export: { title: 'Export Data Package', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_storage_delete: { title: 'Delete Storage File', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Wallet & morsels ──
-    aimeat_wallet_balance: { title: 'Read Wallet Balance', readOnlyHint: true },
     aimeat_wallet_transactions: { title: 'List Wallet Transactions', readOnlyHint: true },
 
     // ── Boards ──
-    aimeat_board_list: { title: 'List Boards', readOnlyHint: true },
-    aimeat_board_read: { title: 'Read Board Posts', readOnlyHint: true },
-    aimeat_board_members: { title: 'List Board Members', readOnlyHint: true },
-    aimeat_board_create: { title: 'Create Board', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_board_post: { title: 'Post to Board', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_board_reply: { title: 'Reply to Board Post', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_board_react: { title: 'React to Board Post', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_board_subscribe: { title: 'Subscribe to Board', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_board_delete: { title: 'Delete Board', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    // Replaces the rule set, and the same set sent twice leaves the same board. Nothing is removed:
-    // posts already on the board keep the lifetime they were given.
-    aimeat_board_rules_set: { title: 'Set Board Rules', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Sharing groups ──
 
@@ -269,13 +241,9 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_workflow_answer: { title: 'Answer Workflow Input', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Work queue ──
-    aimeat_work_inbox: { title: 'List Work Inbox', readOnlyHint: true },
-    aimeat_work_accept: { title: 'Accept Work', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_work_deliver: { title: 'Deliver Work', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Actions & capabilities ──
     // openWorldHint: dispatches to third-party action providers/capabilities/sandboxed code
-    aimeat_action_execute: { title: 'Execute Catalogue Action', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 
     // ── Agent telemetry & capabilities ──
     aimeat_agent_telemetry_report: { title: 'Report Agent Telemetry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -391,43 +359,8 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Flags / moderation ──
 
     // ── Admin (operator-only) ──
-    aimeat_admin_stats: { title: 'Admin: Node Stats', readOnlyHint: true },
-    aimeat_admin_agents: { title: 'Admin: List Agents', readOnlyHint: true },
     aimeat_organism_owner_add: { title: 'Add Organism Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_owner_remove: { title: 'Remove Organism Owner', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_admin_organism_ownership: { title: 'Admin: Organism Ownership', readOnlyHint: true },
-    aimeat_admin_organism_owner_add: { title: 'Admin: Add Organism Owner', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-    aimeat_admin_config: { title: 'Admin: Read Config', readOnlyHint: true },
-    aimeat_admin_sso_list: { title: 'Admin: List SSO Connections', readOnlyHint: true },
-    aimeat_admin_sso_get: { title: 'Admin: Read SSO Connection', readOnlyHint: true },
-    aimeat_admin_sso_create: { title: 'Admin: Create SSO Connection', readOnlyHint: false, destructiveHint: false, idempotentHint: false },
-    aimeat_admin_sso_update: { title: 'Admin: Update SSO Connection', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    aimeat_admin_sso_delete: { title: 'Admin: Delete SSO Connection', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-    aimeat_admin_sso_idp_metadata: { title: 'Admin: Set SSO IdP Metadata', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    aimeat_admin_sso_scim_token: { title: 'Admin: Mint SCIM Token', readOnlyHint: false, destructiveHint: true, idempotentHint: false },
-    aimeat_admin_owner_disable: { title: 'Admin: Deactivate Account', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-    aimeat_admin_owner_enable: { title: 'Admin: Reactivate Account', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    aimeat_admin_totp_reset: { title: 'Admin: Remove Two-Step Sign-In', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-    aimeat_admin_security_overview: { title: 'Admin: Security Overview', readOnlyHint: true },
-    aimeat_admin_incident_resolve: { title: 'Admin: Resolve Security Incident', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
-    aimeat_admin_cors_overview: { title: 'Admin: CORS Overview', readOnlyHint: true },
-    aimeat_admin_hooks: { title: 'Admin: Hooks', readOnlyHint: true },
-    aimeat_admin_statistics: { title: 'Admin: Statistics', readOnlyHint: true },
-    aimeat_admin_knowledge: { title: 'Admin: Knowledge', readOnlyHint: true },
-    aimeat_admin_federation: { title: 'Admin: Federation', readOnlyHint: true },
-    // Reads npm, an outside service, but changes nothing anywhere.
-    aimeat_admin_node_update: { title: 'Admin: Newer AIMEAT Version', readOnlyHint: true, openWorldHint: true },
-    // Setting the same word twice leaves the same peer; the previous word was a setting, not data.
-    aimeat_admin_federation_relay_claim_set: { title: 'Admin: Keep a Peer on Its Own Relay-Claim Setting', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // Ends a link and, with emergency, cancels the work in flight with that peer; a second call finds nothing.
-    aimeat_admin_federation_peer_remove: { title: 'Admin: Remove a Federation Peer', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    // Read-only about this node, but `ask_provider` reaches a third party, so it is not closed-world.
-    aimeat_admin_usage: { title: 'Admin: Usage', readOnlyHint: true, openWorldHint: true },
-    // Not destructive: binding replaces a list the operator can read first and set back.
-    aimeat_admin_hook_set: { title: 'Admin: Bind a Hook', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // Replacing a list is not destructive (the previous one was a setting, not data), and setting
-    // the same list twice leaves the same list.
-    aimeat_admin_cors_set: { title: 'Admin: Set Allowed Origins', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 

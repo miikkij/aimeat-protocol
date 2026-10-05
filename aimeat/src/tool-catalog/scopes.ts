@@ -284,15 +284,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
 
     aimeat_organism_join:                     'social:write',
 
-    aimeat_storage_upload:                    'storage:write',
-    aimeat_storage_delete:                    'storage:write',
-
-    // Publishing a data package writes BYTES and a catalogue entry. storage:write is the one that
-    // matters — the catalogue is a projection of what was stored, and a package with bytes and no
-    // listing is a package; a listing with no bytes is not.
-    aimeat_datapackage_publish:               'storage:write',
-    aimeat_datapackage_export:                'storage:read',
-
     // Creates work that will run.
     aimeat_schedule_create:                   'task:write',
     // Running a schedule now creates the same work its cron would, only sooner.
@@ -332,35 +323,11 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // declaration, services/ai-provenance.ts:provenanceForWrite, and mirrors requireScope() exactly
     // — so this parameter and POST /v1/provenance cannot answer differently.
 
-    // Boards / social (mutations → social:write; subscribe → social:read).
-    // NOTE: aimeat_board_read / aimeat_board_list are intentionally NOT gated — the REST
-    // GET /v1/boards/:id/posts route is public, so gating them on MCP would be stricter than REST.
-    aimeat_board_create: 'social:write',
-    aimeat_board_post: 'social:write',
-    aimeat_board_reply: 'social:write',
-    aimeat_board_react: 'social:write',
-    aimeat_board_delete: 'social:write',
-    // PATCH /v1/boards/:id/rules asks social:write, and so does the tool that is that door.
-    aimeat_board_rules_set: 'social:write',
-    // Who may READ a shared board, which is a different promise from posting to one. The HTTP
-    // route rejects every agent session outright ("even operator agents must use their owner
-    // session"); this door stays open and costs its own tick.
-    aimeat_board_members: 'social:members',
-    aimeat_board_subscribe: 'social:read',
-
-    // Wallet (GET /v1/wallet, /v1/wallet/transactions → wallet:read)
-    aimeat_wallet_balance: 'wallet:read',
     aimeat_wallet_transactions: 'wallet:read',
     // Usage reports (GET /v1/usage/summary → wallet:read). The same word as the route it calls,
     // because the tool IS that door: a permission enforced on one surface and not the other is a
     // permission the owner was told they had.
     aimeat_usage_report: 'wallet:read',
-
-    // Work queue (inbox → work:read; accept/deliver → work:accept; request execution → work:request)
-    aimeat_work_inbox: 'work:read',
-    aimeat_work_accept: 'work:accept',
-    aimeat_work_deliver: 'work:accept',
-    aimeat_action_execute: 'work:request',
 
     // Agent Workflows (REST: PUT/run → workflow:write; GET → workflow:read)
     aimeat_workflow_save: 'workflow:write',

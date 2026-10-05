@@ -16,15 +16,16 @@
  * @structure registerInvokeTool(mcp, config, getToken, getAgentGaii)
  * @usage registerInvokeTool(mcp, config, getToken, () => agentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { invokeNodeCapability } from '../services/node-invoke.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerInvokeTool(
     mcp: McpServer,
@@ -35,10 +36,7 @@ export function registerInvokeTool(
     mcp.tool(
         'aimeat_invoke',
         descriptionFor('aimeat_invoke'),
-        {
-            capability: z.string().describe('The capability id, e.g. aimeat_memory_write. Get it from aimeat_discover or GET /v1/capabilities/node.'),
-            input: z.record(z.string(), z.unknown()).optional().describe("That capability's own parameters, as an object."),
-        },
+        zodShapeFor('aimeat_invoke'),
         annotationsFor('aimeat_invoke'),
         async ({ capability, input }) => {
             const agentGaii = getAgentGaii();

@@ -13,6 +13,7 @@
  * @structure registerAdminHooksTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminHooksTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.1 — 2026-09-26 — aimeat_admin_hook_set's `actions` says each reference names an action
  *     already published: publish it, then bind it (security audit A8-3).
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
@@ -20,7 +21,6 @@
  *   v1.0.0 — 2026-09-12 — Initial: aimeat_admin_hooks, aimeat_admin_hook_set.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -28,6 +28,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { buildHooksOverview, setHookActions } from '../services/hooks-overview.js';
 import { emitChange } from '../services/event-bus.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -44,17 +45,14 @@ export function registerAdminHooksTools(
   const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
   mcp.tool('aimeat_admin_hooks', descriptionFor('aimeat_admin_hooks'),
-    {}, annotationsFor('aimeat_admin_hooks'),
+    zodShapeFor('aimeat_admin_hooks'), annotationsFor('aimeat_admin_hooks'),
     async () => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       return text(await buildHooksOverview(config, storage));
     });
 
   mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'),
-    {
-      hook: z.string().describe('The moment to bind, e.g. "pre_owner_registration". Read aimeat_admin_hooks for the eleven.'),
-      actions: z.array(z.string()).describe('The action references to call, in order, each naming an action already published here: publish it, then bind it. An empty list clears the moment so it stops calling out.'),
-    },
+    zodShapeFor('aimeat_admin_hook_set'),
     annotationsFor('aimeat_admin_hook_set'),
     async ({ hook, actions }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);

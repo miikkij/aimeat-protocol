@@ -11,6 +11,7 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-10-05 -- Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). aimeat_board_rules_set on another person's board asks operatorOverride, as PATCH /v1/boards/:id/rules does.
  *   v1.0.0 — 2026-03-21 — Initial creation: 7 tools + 1 resource for board management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -41,7 +42,6 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -55,8 +55,9 @@ import {
     boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
 } from '../services/board-write.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /**
  * How long a post lives when neither the post nor the board names a lifetime.
@@ -98,14 +99,6 @@ function lifetimeNote(effective: Record<string, unknown>): string {
     return `A post on this board is removed ${span} after it is written unless the post names its own lifetime. `
         + 'Change it with aimeat_board_rules_set.';
 }
-
-/** The rule set an agent may send. Strict, so a misspelled rule is refused instead of dropped. */
-const boardRulesInput = z.strictObject({
-    posting: z.enum(['owner', 'members', 'anyone']).optional(),
-    categories: z.array(z.string()).optional(),
-    default_ttl_hours: z.number().optional(),
-    post_cost: z.number().optional(),
-});
 
 export function registerBoardsTools(
     mcp: McpServer,
@@ -187,7 +180,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_list',
         descriptionFor('aimeat_board_list'),
-        {},
+        zodShapeFor('aimeat_board_list'),
         annotationsFor('aimeat_board_list'),
         async () => {
             const boards = await storage.listBoards();
@@ -213,13 +206,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_create',
         descriptionFor('aimeat_board_create'),
-        {
-            name: z.string(),
-            visibility: z.enum(['private', 'shared', 'public']),
-            description: z.string().optional(),
-            allowed_gaiis: z.array(z.string()).optional(),
-            rules: boardRulesInput.optional(),
-        },
+        zodShapeFor('aimeat_board_create'),
         annotationsFor('aimeat_board_create'),
         async ({ name, visibility, description, allowed_gaiis, rules }) => {
             // services/board-write.ts — the same create POST /v1/boards performs. The operator rule
@@ -257,10 +244,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_rules_set',
         descriptionFor('aimeat_board_rules_set'),
-        {
-            board_id: z.string(),
-            rules: boardRulesInput,
-        },
+        zodShapeFor('aimeat_board_rules_set'),
         annotationsFor('aimeat_board_rules_set'),
         async ({ board_id, rules }) => {
             const board = await storage.getBoard(board_id);
@@ -300,14 +284,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_subscribe',
         descriptionFor('aimeat_board_subscribe'),
-        {
-            board_id: z.string(),
-            callback_url: z.string().optional(),
-            filters: z.object({
-                categories: z.array(z.string()).optional(),
-                tags: z.array(z.string()).optional(),
-            }).optional(),
-        },
+        zodShapeFor('aimeat_board_subscribe'),
         annotationsFor('aimeat_board_subscribe'),
         async ({ board_id, callback_url, filters }) => {
             // services/board-write.ts — the same subscription POST /v1/boards/:id/subscribe writes,
@@ -334,12 +311,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_react',
         descriptionFor('aimeat_board_react'),
-        {
-            board_id: z.string(),
-            post_id: z.string(),
-            emoji: z.string(),
-            remove: z.boolean().optional(),
-        },
+        zodShapeFor('aimeat_board_react'),
         annotationsFor('aimeat_board_react'),
         async ({ board_id, post_id, emoji, remove }) => {
             // services/board-write.ts — the same reaction POST /v1/boards/:b/posts/:p/react writes,
@@ -367,12 +339,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_reply',
         descriptionFor('aimeat_board_reply'),
-        {
-            board_id: z.string(),
-            post_id: z.string(),
-            body: z.string(),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_board_reply'),
         annotationsFor('aimeat_board_reply'),
         async ({ board_id, post_id, body, ai_provenance, ai_provenance_id }) => {
             // The whole reply is services/board-post.ts: the board's ACCESS rule (which neither door
@@ -411,11 +378,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_members',
         descriptionFor('aimeat_board_members'),
-        {
-            board_id: z.string(),
-            add: z.array(z.string()).optional(),
-            remove: z.array(z.string()).optional(),
-        },
+        zodShapeFor('aimeat_board_members'),
         annotationsFor('aimeat_board_members'),
         async ({ board_id, add, remove }) => {
             const board = await storage.getBoard(board_id);
@@ -452,9 +415,7 @@ export function registerBoardsTools(
     mcp.tool(
         'aimeat_board_delete',
         descriptionFor('aimeat_board_delete'),
-        {
-            board_id: z.string(),
-        },
+        zodShapeFor('aimeat_board_delete'),
         annotationsFor('aimeat_board_delete'),
         async ({ board_id }) => {
             // services/board-write.ts — the same delete DELETE /v1/boards/:id performs, with the
