@@ -40,12 +40,15 @@
  *   const refused = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
  *   if (refused) return { refusal: refused };
  * @version-history
+ *   v1.2.0 — 2026-10-05 — setPackageInstance: turning automatic updates on takes the owner in person or
+ *     packages:install-code (secaudit 2026-10, PKG-12).
  *   v1.1.1 — 2026-09-30 — The refusal has a word for a `skill` component.
  *   v1.1.0 — 2026-09-28 — setPackageInstance(): label and auto-update (install packages, phase 3).
  *   v1.0.0 — 2026-09-28 — Initial: managed installs (install packages, phase 1).
  */
 import type { Storage, PackageComponentType, PackageInstanceRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
+import { INSTALL_CODE_SCOPE } from './package-approvals.js';
 
 /** What a caller is about to change. Both are locked; the word goes into the refusal. */
 export type ManagedChange = 'code' | 'layout';
@@ -172,7 +175,10 @@ export async function forkPackageInstance(
  * check updates it by itself. Only the instance's owner.
  */
 export async function setPackageInstance(
-    storage: Storage, caller: { owner: string }, instanceId: string, input: { label?: unknown; autoUpdate?: unknown },
+    storage: Storage,
+    /** `mayInstallCode`: the owner in person, or an agent holding packages:install-code. */
+    caller: { owner: string; mayInstallCode: boolean },
+    instanceId: string, input: { label?: unknown; autoUpdate?: unknown },
 ): Promise<ForkResult> {
     const instance = await storage.getInstance(instanceId);
     if (!instance || instance.status === 'removed') {
@@ -191,6 +197,11 @@ export async function setPackageInstance(
     if (input.autoUpdate !== undefined) {
         if (typeof input.autoUpdate !== 'boolean') {
             return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'auto_update is true or false.' };
+        }
+        // On means later versions install with nobody watching, which an agent may start only with
+        // the word that lets it install code (secaudit 2026-10, PKG-12). Off is always allowed.
+        if (input.autoUpdate && !caller.mayInstallCode) {
+            return { ok: false, status: 403, code: 'SCOPE_DENIED', message: `Turning automatic updates on lets new versions install by themselves. The owner turns it on in person, or gives this agent ${INSTALL_CODE_SCOPE}.` };
         }
         updates.autoUpdate = input.autoUpdate;
     }

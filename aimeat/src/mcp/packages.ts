@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   v1.15.0 — 2026-10-05 — aimeat_package_instance_set turns automatic updates on only with
+ *     packages:install-code (secaudit 2026-10, PKG-12).
  *   v1.14.0 — 2026-10-04 — aimeat_package_install takes `grant_apps` and answers `app_grants`.
  *   v1.13.0 — 2026-10-02 — aimeat_package_withdraw (package sale design, phase 5: T6).
  *   v1.12.0 — 2026-10-02 — aimeat_package_compose_set (a set to sell, with its dry run); aimeat_package_compose
@@ -92,6 +94,8 @@ import { createSession } from '../commerce/session-service.js';
 import { bundleInstallOf, installSetForOwner } from '../services/install-bundle-owner.js';
 import { composeSet } from '../services/package-compose-set.js';
 import { withdrawVersion } from '../services/package-withdrawals.js';
+import { INSTALL_CODE_SCOPE } from '../services/package-approvals.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
 function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
@@ -501,7 +505,8 @@ export function registerPackageTools(
         label: z.string().optional().describe('A new name for this copy.'),
         auto_update: z.boolean().optional().describe('true: the daily check updates this copy by itself. false: it tells your owner an update is ready.'),
     }, annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
-        const out = await setPackageInstance(storage, { owner: ownerOf() }, instance_id, { label, autoUpdate: auto_update });
+        // A session is always an agent: auto-update on takes packages:install-code (PKG-12).
+        const out = await setPackageInstance(storage, { owner: ownerOf(), mayInstallCode: scopeIsCovered(sessionScopes, INSTALL_CODE_SCOPE) }, instance_id, { label, autoUpdate: auto_update });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ instance_id: out.instance.id, label: out.instance.label, auto_update: out.instance.autoUpdate === true }, null, 2) }] };
     });

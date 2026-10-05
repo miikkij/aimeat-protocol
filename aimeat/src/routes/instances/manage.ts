@@ -6,6 +6,8 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-05 — PATCH turns automatic updates on only for the owner in person or an agent
+ *     holding packages:install-code (secaudit 2026-10, PKG-12).
  *   v1.6.0 — 2026-10-02 — GET /v1/instances/:id carries `approval`: what the install was approved to do
  *     and by whom (services/package-approvals.ts). DELETE removes that record with the install.
  *   v1.5.0 — 2026-09-30 — DELETE with removeComponents removes a skill component only when this
@@ -44,7 +46,9 @@ import { forkPackageInstance, setPackageInstance } from '../../services/package-
 import { refreshInstalledPackages } from '../../services/package-upstream-refresh.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { listInstancesFor } from '../../services/package-read.js';
-import { approvalOf, forgetApproval } from '../../services/package-approvals.js';
+import { approvalOf, forgetApproval, INSTALL_CODE_SCOPE } from '../../services/package-approvals.js';
+import { isOwnerInPerson } from '../../auth/effective-scopes.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 
 // ── Register instance management routes ───────────────────────────────
 
@@ -181,8 +185,10 @@ export function registerManageRoutes(
   // updates it by itself (services/package-managed.ts).
   router.patch('/v1/instances/:id', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
-    const out = await setPackageInstance(storage, { owner: req.auth!.owner }, req.params.id as string,
-      { label: body.label, autoUpdate: body.auto_update });
+    const out = await setPackageInstance(storage, {
+      owner: req.auth!.owner,
+      mayInstallCode: isOwnerInPerson(req.auth!) || scopeIsCovered(req.auth!.scopes ?? [], INSTALL_CODE_SCOPE),
+    }, req.params.id as string, { label: body.label, autoUpdate: body.auto_update });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
