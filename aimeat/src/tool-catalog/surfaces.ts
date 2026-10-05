@@ -334,8 +334,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // A person asks THEIR OWN agent for a new agent, so the proposal tools belong here. They sat
         // on `admin` alone until 2026-10-02, under a comment saying they were on this list.
         'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
-        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
-        'aimeat_crew_menu', 'aimeat_crew_llm_set',
+        
+        
         'aimeat_usage_report',
         // Who holds a key to the owner's account: the Access page's read, for the agent the owner
         // trusted with account:security. Read-only; every revoke stays on the page.
@@ -378,8 +378,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
-        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
-        'aimeat_crew_menu', 'aimeat_crew_llm_set',
+        
+        
         'aimeat_usage_report',
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
@@ -458,8 +458,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // On `agent` too, because their usual caller is one of the owner's own agents telling the
         // person where to press; here for the owner-side agent management this surface carries.
         'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
-        'aimeat_crew_get', 'aimeat_crew_validate', 'aimeat_crew_try', 'aimeat_crew_draft', 'aimeat_crew_publish', 'aimeat_crew_seed',
-        'aimeat_crew_menu', 'aimeat_crew_llm_set',
+        
+        
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config', 
         
     ],

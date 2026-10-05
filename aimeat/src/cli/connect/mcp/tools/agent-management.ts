@@ -11,6 +11,7 @@
  *     a same-owner sibling's mode, so a device-authed crew self-sets task-runner at startup.
  *
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.0 -- 2026-10-02 -- aimeat_crew_llm_set's choice names the {kind:'node', role?} shape;
  *     aimeat_agent_runtime_report takes `llm` ('node' | 'machine').
  *   v1.6.0 -- 2026-08-31 -- aimeat_agent_basics_get, parity with the server MCP surface: a thin
@@ -34,6 +35,7 @@ import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegistry): void {
 
@@ -180,14 +182,12 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   // ── Crew definition tools: thin proxies onto /v1/agents/:name/crew*, the same routes the Crew
   // tab and the node MCP use. `agent_name` here picks the REGISTERED agent that makes the call
   // (the connector convention); the definition's agent is `target_agent_name`.
-  const crewAgentSchema = z.string().describe("The agent whose definition this is (bare name of one of the owner's agents, or its full GAII). The calling agent may name itself or a same-owner sibling.");
-  const docSchema = z.record(z.string(), z.unknown());
   const text = (resp: ApiResponse) => envelopeResult(resp);
 
   mcp.tool(
     'aimeat_crew_get',
     descriptionFor('aimeat_crew_get'),
-    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_get') },
     async ({ agent_name, target_agent_name }) => {
       const { client } = pickAgent(registry, agent_name);
       return text(await client.get(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew`));
@@ -197,7 +197,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_crew_validate',
     descriptionFor('aimeat_crew_validate'),
-    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema, doc: docSchema.describe('The whole crew definition to check.') },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_validate') },
     async ({ agent_name, target_agent_name, doc }) => {
       const { client } = pickAgent(registry, agent_name);
       return text(await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/validate`, { doc }));
@@ -207,14 +207,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_crew_try',
     descriptionFor('aimeat_crew_try'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: crewAgentSchema,
-      doc: docSchema.optional().describe('Start a trial: the definition to run once. Omit when continuing to wait on a try_id.'),
-      prompt: z.string().optional().describe('Start a trial: what the crew should do in this run. Required with doc.'),
-      try_id: z.string().optional().describe('Continue waiting on a trial already started.'),
-      wait_seconds: z.number().int().min(0).max(120).optional().describe('How long this call waits before handing back the try_id (default 50, max 120).'),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_try') },
     async ({ agent_name, target_agent_name, doc, prompt, try_id, wait_seconds }) => {
       const { client } = pickAgent(registry, agent_name);
       const path = `/v1/agents/${encodeURIComponent(target_agent_name)}/crew/try`;
@@ -238,7 +231,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_crew_draft',
     descriptionFor('aimeat_crew_draft'),
-    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema, doc: docSchema.optional().describe('The edits to keep. Omit it to discard the saved draft.') },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_draft') },
     async ({ agent_name, target_agent_name, doc }) => {
       const { client } = pickAgent(registry, agent_name);
       const path = `/v1/agents/${encodeURIComponent(target_agent_name)}/crew/draft`;
@@ -249,12 +242,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_crew_publish',
     descriptionFor('aimeat_crew_publish'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: crewAgentSchema,
-      doc: docSchema.optional().describe('The definition to make live.'),
-      revision: z.number().int().positive().optional().describe('Instead of doc: republish this kept revision.'),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_publish') },
     async ({ agent_name, target_agent_name, doc, revision }) => {
       const { client } = pickAgent(registry, agent_name);
       const base = `/v1/agents/${encodeURIComponent(target_agent_name)}/crew`;
@@ -267,12 +255,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_crew_seed',
     descriptionFor('aimeat_crew_seed'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: crewAgentSchema,
-      doc: docSchema.describe('The FIRST definition for this agent. Refused if it already has one.'),
-      validate_with: z.string().optional().describe('Which connected same-owner agent should check it. Omit and any connected one is used.'),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_seed') },
     async ({ agent_name, target_agent_name, doc, validate_with }) => {
       const { client } = pickAgent(registry, agent_name);
       return text(await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/seed`, { doc, validate_with }));
@@ -284,7 +267,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_crew_menu',
     descriptionFor('aimeat_crew_menu'),
-    { agent_name: agentNameSchema, target_agent_name: crewAgentSchema },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_menu') },
     annotationsFor('aimeat_crew_menu'),
     async ({ agent_name, target_agent_name }) => {
       const { client } = pickAgent(registry, agent_name);
@@ -295,11 +278,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_crew_llm_set',
     descriptionFor('aimeat_crew_llm_set'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: z.string().optional().describe("The agent to set it for. Omit to set the owner's default for every agent."),
-      choice: z.record(z.string(), z.unknown()).nullish().describe("{kind:'node', role?} (think through the node, which picks the model and the key), {kind:'profile', profile} or {kind:'model', label, provider}. Omit or null to clear."),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_llm_set') },
     annotationsFor('aimeat_crew_llm_set'),
     async ({ agent_name, target_agent_name, choice }) => {
       const { client } = pickAgent(registry, agent_name);
