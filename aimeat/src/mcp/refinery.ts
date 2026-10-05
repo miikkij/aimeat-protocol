@@ -19,7 +19,6 @@
  *   v1.0.1 — 2026-10-05 — The run scopes and the prefix rule are the one copy in
  *     services/refinery/schedule-input.ts (secaudit 2026-10, drift 1).
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -34,6 +33,7 @@ import type { RefineryCaller } from '../services/refinery/pipeline.js';
 
 // The scopes a batch spends and the prefix rule: the one copy the REST route and the scheduler read.
 import { REFINERY_RUN_SCOPES as RUN_SCOPES, REFINERY_PREFIX_RE as PREFIX_RE } from '../services/refinery/schedule-input.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerRefineryTools(
   mcp: McpServer,
@@ -51,15 +51,12 @@ export function registerRefineryTools(
     return { ownerGhii: `${owner}@${config.nodeId}`, owner, principal, roles: ['agent'], scopes, isOwner: false };
   };
 
-  mcp.tool('aimeat_refinery_classes', descriptionFor('aimeat_refinery_classes'), {},
+  mcp.tool('aimeat_refinery_classes', descriptionFor('aimeat_refinery_classes'), zodShapeFor('aimeat_refinery_classes'),
     annotationsFor('aimeat_refinery_classes'),
     async () => ok({ classes: CLASS_PACKS }));
 
   mcp.tool('aimeat_refinery_run', descriptionFor('aimeat_refinery_run'),
-    {
-      prefix: z.string().describe('Names the definition, `<prefix>.config`: lowercase letters, digits, - or _ (e.g. postinjalostamo).'),
-      message_ids: z.array(z.string()).optional().describe('Run exactly these messages again (at most 50), whether or not they already have rows.'),
-    },
+    zodShapeFor('aimeat_refinery_run'),
     annotationsFor('aimeat_refinery_run'),
     async ({ prefix, message_ids }) => {
       const missing = RUN_SCOPES.filter((s) => !scopeIsCovered(scopes, s));
@@ -76,7 +73,7 @@ export function registerRefineryTools(
     });
 
   mcp.tool('aimeat_refinery_status', descriptionFor('aimeat_refinery_status'),
-    { run_id: z.string().describe('The run id aimeat_refinery_run answered with.') },
+    zodShapeFor('aimeat_refinery_status'),
     annotationsFor('aimeat_refinery_status'),
     async ({ run_id }) => {
       const who = caller();

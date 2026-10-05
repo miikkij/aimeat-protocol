@@ -24,6 +24,9 @@
  *   import { toolsForSurface } from './surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-10-05 — MCP_SURFACES is each catalog entry's `surfaces` plus the lists here, which only
+ *     shrink as each catalog group carries its own (secaudit 2026-10, M3). SurfaceRole moved to
+ *     definitions/types.ts and is re-exported.
  *   2026-10-04 — aimeat_task_decline on the agent surface, beside aimeat_task_fail.
  *   2026-10-02 — An eighth surface, `chat`, for the node's own chat: 19 tools on at the start, every
  *     other tool registered and switched off until aimeat_tools_find (CHAT_ONLY) or a call by name
@@ -110,7 +113,8 @@
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 
-export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce' | 'primitives' | 'chat' | 'full';
+import type { SurfaceRole } from './definitions/types.js';
+export type { SurfaceRole };
 export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce', 'primitives', 'chat', 'full'];
 
 /**
@@ -138,8 +142,12 @@ export const V2_EXCLUDED: readonly string[] = [
     'aimeat_package_versions', 'aimeat_package_publish', 'aimeat_package_delete',
 ];
 
-/** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */
-export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
+/**
+ * role -> the tools whose catalog entry does not carry its `surfaces` yet. Derived from
+ * docs/mcp_audit/11-v2-mcp-design.md §2/§3. Secaudit 2026-10, M3: one catalog group per commit moves
+ * its names onto the definitions, and these lists only shrink.
+ */
+const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
     /**
      * The PRIMITIVES surface (/v2/mcp/primitives) — Agent v2, V2.
      *
@@ -305,7 +313,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_connection_providers', 'aimeat_connection_list', 'aimeat_connection_start',
         'aimeat_mail_search', 'aimeat_mail_read', 'aimeat_mail_aliases', 'aimeat_mail_send',
         // The mail refinery: a batch that reads, classifies and files a connected mailbox.
-        'aimeat_refinery_classes', 'aimeat_refinery_run', 'aimeat_refinery_status',
+        
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
         'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
@@ -493,6 +501,12 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         .map(d => d.name)
         .filter(name => !V2_EXCLUDED.includes(name) && !CHAT_ONLY.includes(name)),
 };
+
+/** role -> allowlist of tool names: the lists above, then each catalog entry that names the role. */
+export const MCP_SURFACES: Record<SurfaceRole, string[]> = Object.fromEntries(V2_ROLES.map(role => [role, [
+    ...LISTED_SURFACES[role],
+    ...(role === 'full' ? [] : CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.surfaces?.includes(role)).map(d => d.name)),
+]])) as Record<SurfaceRole, string[]>;
 
 const _surfaceSets: Record<SurfaceRole, Set<string>> = {
     primitives: new Set(MCP_SURFACES.primitives),

@@ -23,6 +23,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-10-05 — TOOL_ANNOTATIONS is each catalog entry's `annotations` plus the list here, which only
+ *     shrinks as each catalog group carries its own (secaudit 2026-10, M3).
  *   2026-10-04 — aimeat_task_decline (a write, not destructive, idempotent like aimeat_task_fail).
  *   2026-10-02 — aimeat_tools_find (read-only: it changes which of the session's tools are listed).
  *   2026-10-02 — aimeat_task_start and aimeat_agent_task_start_set.
@@ -90,6 +92,7 @@
  */
 
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
 
 /**
  * Annotation rules (MCP spec 2025-11-25):
@@ -102,7 +105,9 @@ import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
  *   side-effects are not bounded by AIMEAT itself (capability invoke, extension
  *   invoke, action execute).
  */
-export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
+// The tools whose catalog entry does not carry its `annotations` yet (secaudit 2026-10, M3: one
+// catalog group per commit moves its entries onto the definitions, and this list only shrinks).
+const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Core / discovery ──
     aimeat_handbook_get: { title: 'Read Agent Handbook', readOnlyHint: true },
     aimeat_catalogue_search: { title: 'Search Action Catalogue', readOnlyHint: true },
@@ -261,9 +266,6 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_mail_search: { title: 'Search a Connected Mailbox', readOnlyHint: true, openWorldHint: true },
     aimeat_mail_read: { title: 'Read One Message', readOnlyHint: true, openWorldHint: true },
     aimeat_mail_aliases: { title: 'Addresses This Mailbox May Send As', readOnlyHint: true, openWorldHint: true },
-    aimeat_refinery_classes: { title: 'Mail Refinery Class Packs', readOnlyHint: true, openWorldHint: false },
-    aimeat_refinery_run: { title: 'Run a Mail Refinery Batch', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_refinery_status: { title: 'Mail Refinery Batch Progress', readOnlyHint: true, openWorldHint: false },
     // NOT idempotent, and that is the whole point: a blind retry sends the message twice, which is
     // the one mistake in this family a person actually notices.
     aimeat_mail_send: { title: 'Send Mail', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -694,6 +696,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_exchange_work_list: { title: 'List Agent Work Items', readOnlyHint: true },
     aimeat_exchange_proposals: { title: 'List Renegotiation Proposals', readOnlyHint: true },
     aimeat_exchange_proposal_decide: { title: 'Decide Renegotiation Proposal', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+};
+
+/** Tool -> its annotations: each catalog entry's `annotations`, and the list above. */
+export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
+    ...LISTED_ANNOTATIONS,
+    ...Object.fromEntries(CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.annotations).map(d => [d.name, d.annotations!])),
 };
 
 /**

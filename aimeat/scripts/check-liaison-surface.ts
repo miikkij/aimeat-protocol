@@ -28,6 +28,8 @@
  *   cd aimeat && pnpm check:liaison-surface --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:liaison-surface --record   # after publishing, write the new baseline
  * @version-history
+ *   v1.2.0 — 2026-10-05 — The node's tools are read from TOOL_ANNOTATIONS itself, not from the text
+ *     of src/mcp/annotations.ts: the entries move onto the catalog definitions (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-15 — Say when a release is STAGED but not out. A bumped version with a moved
  *     fingerprint satisfied neither failure condition, so the reminder vanished the moment somebody
  *     edited package.json and nothing mentioned it again. Reported every run, never fatal.
@@ -36,6 +38,7 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { TOOL_ANNOTATIONS } from '../src/mcp/annotations.js';
 
 const ROOT = process.cwd();
 const REPO = join(ROOT, '..');
@@ -102,10 +105,7 @@ function liaisonTools(): { named: string[]; ownTools: string[] } {
 
 /** Every tool the node itself registers, from the canonical annotation table. */
 function nodeTools(): Set<string> {
-    const src = readFileSync(join(ROOT, 'src', 'mcp', 'annotations.ts'), 'utf-8');
-    const names = new Set<string>();
-    for (const m of src.matchAll(/\b(aimeat_[a-z0-9_]+)\s*:/g)) names.add(m[1]);
-    return names;
+    return new Set(Object.keys(TOOL_ANNOTATIONS));
 }
 
 const fingerprint = (names: string[]): string =>

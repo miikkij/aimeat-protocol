@@ -47,7 +47,7 @@ function schemaProperty(field: ToolInputField): { type: string; description: str
   return {
     type: field.type === 'unknown' ? 'string' : field.type,
     description: field.description,
-    ...(field.enum ? { enum: field.enum } : {}),
+    ...(field.enum ? { enum: [...field.enum] } : {}),
   };
 }
 

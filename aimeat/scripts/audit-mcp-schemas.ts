@@ -47,6 +47,7 @@ import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/tool-catalog/su
 
 // ── Both surfaces, registered for real against a fake MCP server (shared with check:field-reach) ──
 import { captureServer, captureConnector } from './inventory/mcp-capture.js';
+import { singleSourceReport } from './inventory/mcp-single-source.js';
 
 /** Connector tools carry an extra agent-routing param; it is an intentional difference, not drift. */
 const CONNECTOR_EXTRA = new Set(['agent_name']);
@@ -224,6 +225,19 @@ function main(): void {
     if (uncovered.length) console.log(`  ⚠ catalog tools in no surface & not excluded: ${uncovered.join(', ')}`);
 
     const surfaceFail = surfaceUnregistered.length > 0 || unknownTools.length > 0 || uncovered.length > 0;
+
+    // Whole schemas against the catalog's (zodShapeFor). The list of tools not moved yet only shrinks.
+    const one = singleSourceReport(server, connector);
+    console.log(`\n## One source: the schema both surfaces register is the catalog's — ${one.differing.size} not yet (${one.listed} listed)`);
+    if (one.unlisted.length) console.log(one.unlisted.map(n => `  ✖ ${n}: ${one.differing.get(n)!.join(' and ')} schema is not zodShapeFor('${n}')`).join('\n'));
+    if (one.stale.length) console.log(one.stale.map(n => `  ✖ ${n}: matches now; remove it from security/mcp-schema-single-source.json`).join('\n'));
+    const oneFail = one.unlisted.length > 0 || one.stale.length > 0;
+    if (check && oneFail) {
+        console.error(`\n✖ One source: ${one.unlisted.length} tool(s) register a schema of their own, ${one.stale.length} listed tool(s) match now.`
+            + '\nRegister zodShapeFor(name) (src/tool-catalog/zod-shape.ts) on both surfaces, with the field\'s exact'
+            + '\nschema in its catalog entry when the coarse type cannot state it; then take the tool off the list.');
+        process.exit(1);
+    }
 
     // The CLI dispatch behind /local/call is the THIRD surface, and it is NOT audited here.
     // It was, for one afternoon, by reading each handler's source for the parameter names it
