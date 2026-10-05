@@ -20,6 +20,7 @@ import { packageCapabilities } from '../../src/services/package-capabilities.js'
 import { appScopesOf, parseAppScopes } from '../../src/services/protected-resource.js';
 import { grantEntitlement } from '../../src/services/package-entitlements.js';
 import { isOwnPackage } from '../../src/services/package-approvals.js';
+import { installSetRepositories } from '../../src/services/install-set-trust.js';
 import type { PackageRecord } from '../../src/storage/interface.js';
 
 const config = {
@@ -158,6 +159,22 @@ describe('PKG-5: a package from another node is never the installer\'s own', () 
     it('a pulled or signed package is not, even when its descriptor names the installer as author', () => {
         const pulled = { ...base, upstream: { node: 'other-node', authorGhii: 'alice@test-node' } } as unknown as PackageRecord;
         expect(isOwnPackage(pulled, 'alice@test-node')).toBe(false);
+    });
+});
+
+describe('PKG-9: only an install set an operator applied names a trusted package source', () => {
+    it('an owner\'s own bundle record adds no source; the operator\'s does', async () => {
+        const storage = {
+            listMemory: async () => [
+                { key: 'install-sets.op.set1', value: { bundle: { node_id: 'repo-trusted' }, applied_by: 'op' } },
+                { key: 'install-sets.alice.mine', value: { bundle: { node_id: 'repo-alice-chose' }, applied_by: 'alice' } },
+                { key: 'install-sets.bot.mine', value: { bundle: { node_id: 'repo-agent-chose' }, applied_by: 'bot#alice@n' } },
+                { key: 'install-sets.dco.boot', value: { bundle: { node_id: 'repo-at-startup' }, applied_by: 'startup' } },
+            ],
+            getOwner: async (name: string) => ({ name, roles: name === 'op' ? ['owner', 'operator'] : ['owner'] }),
+            getMemory: async () => null,
+        } as unknown as Storage;
+        expect([...await installSetRepositories(storage)].sort()).toEqual(['repo-at-startup', 'repo-trusted']);
     });
 });
 

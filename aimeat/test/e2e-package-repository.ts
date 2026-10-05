@@ -277,6 +277,15 @@ await test('When the updates end, a version made after it is not served, and the
     });
     assert(noteOnly.status === 200 && noteOnly.body.data.entitlement.updatesUntil === until, `the date stays: ${noteOnly.status} ${JSON.stringify(noteOnly.body)}`);
     await publishVersion('v4');
+    // Secaudit 2026-10, PKG-12: automatic updates install later versions with nobody watching, so an
+    // agent turns them on only with packages:install-code; the owner in person always may.
+    const reg = await C.json('/v1/agents', { method: 'POST', headers: auth(C.ownerToken),
+        body: JSON.stringify({ name: `pkgbot${Date.now() % 100000}`, owner: C.ownerName, capabilities: ['memory'], mode: 'interactive', scopes: ['packages:write', 'packages:read'] }) });
+    assert(reg.status === 201, `agent: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const at = new Date().toISOString();
+    const agentTok = await C.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii: reg.body.data.agent.gaii, timestamp: at, signature: await sign(reg.body.data.private_key, reg.body.data.agent.gaii + at) }) });
+    const byAgent = await C.json(`/v1/instances/${instanceId}`, { method: 'PATCH', headers: auth(agentTok.body.data.token), body: JSON.stringify({ auto_update: true }) });
+    assert(byAgent.status === 403 && byAgent.body.error?.code === 'SCOPE_DENIED', `an agent without packages:install-code: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
     const on = await C.json(`/v1/instances/${instanceId}`, { method: 'PATCH', headers: auth(C.ownerToken), body: JSON.stringify({ auto_update: true }) });
     assert(on.status === 200, `patch: ${on.status}`);
     const r = await C.json('/v1/instances/check-updates', { method: 'POST', headers: auth(C.ownerToken), body: '{}' });

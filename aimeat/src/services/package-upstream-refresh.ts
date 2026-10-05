@@ -25,6 +25,8 @@
  * @usage
  *   const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner }, { notify: false });
  * @version-history
+ *   v1.5.0 — 2026-10-05 — The renewal notice links to the seller at the address this node's peer record
+ *     holds, never the repository's `sold_by_url` (secaudit 2026-10, PKG-12).
  *   v1.4.0 — 2026-10-02 — A copy of a version the repository withdrew has its extensions switched off and
  *     its owner told once (package-withdrawals.ts), on every check; firstNoticeFor moved to
  *     package-notices.ts unchanged (package sale design, phase 5: T6).
@@ -139,7 +141,11 @@ async function repositoryNotices(deps: RefreshDeps, instances: PackageInstanceRe
             for (const { inst } of installs.filter(i => i.groupId === row.group_id)) {
                 if (!await firstNoticeFor(storage, `${inst.id}:renew`, row.updates_until!)) continue;
                 const ownerGhii = await resolveGhii(storage, inst.owner, config);
-                const where = row.sold_by_url ? `${stripTrailingSlashes(row.sold_by_url)}/v1/profile?tab=packages` : '/v1/profile?tab=packages';
+                // The seller's address from this node's own peer record, never the repository's word:
+                // a repository named any address as `sold_by_url`, and it became a link in the
+                // owner's notifications (secaudit 2026-10, PKG-12).
+                const sellerUrl = row.sold_by ? deps.peers.get(row.sold_by)?.url : undefined;
+                const where = sellerUrl ? `${stripTrailingSlashes(sellerUrl)}/v1/profile?tab=packages` : '/v1/profile?tab=packages';
                 await notify(storage, ownerGhii, {
                     type: 'package_renewal_due',
                     title: `The updates of ${inst.label} end on ${row.updates_until!.slice(0, 10)}`,
