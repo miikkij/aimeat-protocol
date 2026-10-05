@@ -26,6 +26,8 @@
  *   v1.4.0 — 2026-09-29 — read and listGlob present values through presentMemories with the node's
  *     classification reader, the one presentation of a memory value, and the llm judge asks useForAi
  *     for the record it is about to send; a refusal is a red leaf (TARGET-082).
+ *   v1.5.0 — 2026-10-05 — The llm judge asks as the principal the run acts for (ai-caller.ts), like
+ *     the run's ai steps (secaudit 2026-10, AI-3).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -40,6 +42,7 @@ import type { ContentLabelTarget } from '../../storage/interface.js';
 import { globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { costCapReached, recordSignalCost } from './run-cost.js';
 import type { WorkflowRun } from '../../models/workflow-schemas.js';
+import { workflowAiCaller } from './ai-caller.js';
 
 /**
  * The node-OpenRouter judge for `llm` leaves. Any failure degrades to a pass (never breaks a run).
@@ -66,9 +69,12 @@ function makeLlmJudge(
     }
     try {
       const text = typeof content === 'string' ? content : JSON.stringify(content);
+      // As the principal the run acts for (ai-caller.ts), like the run's ai steps.
+      const who = await workflowAiCaller(storage, run);
       const result = await completeForOwner(storage, config, ownerGhii, {
         prompt: `Answer strictly as JSON {"ok":boolean,"reason":string}. Question: ${ask}\n\nContent:\n${text.slice(0, 20_000)}`,
         appId: `workflow:${run.workflowId}`,
+        caller: who.caller, ...(who.agent ? { agent: who.agent } : {}), ...(who.verifiedApp ? { verifiedApp: who.verifiedApp } : {}),
       });
       recordSignalCost(run, result.usage?.costUsd);
       const m = /\{[\s\S]*\}/.exec(result.content);

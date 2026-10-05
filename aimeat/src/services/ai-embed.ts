@@ -14,6 +14,7 @@
  * @usage
  *   const r = await embedForOwner(storage, config, payer, { input: ['a', 'b'], appId: 'notes' });
  * @version-history
+ *   v1.3.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.2.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v1.1.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
@@ -39,7 +40,7 @@ export interface EmbedForOwnerOptions {
   model?: string;
   appId?: string;
   agent?: string;
-  caller?: CallerClass;
+  caller: CallerClass;
   verifiedApp?: string;
   /** The request's word on the person's language, for a refusal's sentence. */
   lang?: RequestLanguage;
@@ -76,7 +77,7 @@ export async function embedForOwner(
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'embed', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
-    ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    caller: opts.caller, ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.lang ? { lang: opts.lang } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
     ...(opts.role ? { role: opts.role } : {}),

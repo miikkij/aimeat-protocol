@@ -31,6 +31,7 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-10-05 — A schedule an app makes records the app's grant (secaudit 2026-10, AI-2).
  *   2026-09-27 — GET /v1/schedules?detail=true names each schedule's prompt; PATCH takes `prompt` (services/schedule-prompt.ts).
  *   v1.8.0 — 2026-08-16 — The aggregate tells a manifest-declared extension job from the owner's own
  *     schedule by its id, not by whether it has an owner scope. Those jobs now carry the installer's
@@ -115,6 +116,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     identity: resolveIdentity(req.auth!, config.nodeId),
     isOwnerSession: isOwnerSession(req),
     scopes: req.auth!.scopes ?? [],
+    ...(req.auth!.roles.includes('app') && req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
   });
 
   /** Read an agent's self-reported internal scheduler mirror (display-only). */

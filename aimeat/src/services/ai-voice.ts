@@ -6,6 +6,7 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.7.0 - 2026-10-05 - `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.6.0 - 2026-09-28 - The reply and the speech take `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v1.4.0 - 2026-09-28 - Speech takes no model and no voice when a role gives them (System 2 plan,
  *     V5): the model is the speech role's (NO_TTS_MODEL without one), the voice the provider's, the
@@ -44,7 +45,7 @@ import { resolveTtsVoice } from './ai-model-defaults.js';
 
 function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
   return {
-    ...(o.caller ? { caller: o.caller } : {}), ...(o.verifiedApp ? { verifiedApp: o.verifiedApp } : {}),
+    caller: o.caller, ...(o.verifiedApp ? { verifiedApp: o.verifiedApp } : {}),
     ...(o.role ? { role: o.role } : {}),
   };
 }
@@ -52,7 +53,7 @@ function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
 export type VoiceEmit = (event: Record<string, unknown>) => Promise<void>;
 /** Whose call this is and the app its grant names, for the owner's model policy (routes/ai-policy.ts). */
 export interface VoicePolicyCaller {
-  caller?: CallerClass; verifiedApp?: string;
+  caller: CallerClass; verifiedApp?: string;
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
   role?: string;
 }

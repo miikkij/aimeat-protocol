@@ -96,6 +96,7 @@ import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../s
 import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
 import { holdsImplicitFreeModel } from '../services/ai-model-defaults.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { aiCallerOf } from './ai-policy.js';
 
 /**
  * OpenRouter's reasoning parameter as the owner's default: the four documented fields and nothing
@@ -502,7 +503,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         // every other one — which also means it is refused once the owner's daily budget is spent,
         // and says so.
         await completeForOwner(storage, config, gaii, {
-          prompt: 'Reply with exactly: OK', model, appId: TEST_APP_ID,
+          prompt: 'Reply with exactly: OK', model, appId: TEST_APP_ID, caller: aiCallerOf(req, config.nodeId).caller,
         });
         // The model this route was ASKED to test, not what the provider echoed — unchanged.
         res.json(success(config.nodeId, { ok: true, model }));
@@ -559,7 +560,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         // explicit override still wins and a role still picks the role's model.
         const r = await completeForOwner(storage, config, gaii, {
           prompt, systemPrompt, model: modelOverride, modelRole,
-          temperature, topP: top_p, maxTokens: max_tokens, appId,
+          temperature, topP: top_p, maxTokens: max_tokens, appId, caller: aiCallerOf(req, config.nodeId).caller,
         });
 
         // TARGET-058: the provenance of the bytes about to be handed back, on the ONE envelope

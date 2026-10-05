@@ -110,6 +110,7 @@ import { AiCompletionError } from '../services/ai-completion.js';
 import { readAiFile } from '../services/ai-inputs.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
+import { aiCallerOf } from './ai-policy.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -576,7 +577,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     try {
       const r = await transcribeForOwner(storage, config, ghii, {
         audio: { data: file.data, mime: att.mime || file.mimeType, filename: att.name || 'voice-message' },
-        model, language, appId: 'inbox',
+        model, language, appId: 'inbox', caller: aiCallerOf(req, config.nodeId).caller,
       });
       const transcript = {
         text: r.text,

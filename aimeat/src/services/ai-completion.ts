@@ -185,7 +185,7 @@ export interface CompleteForOwnerOptions {
   /** The owner's agent that is asking, by bare name (see PrepareAiCallOptions.agent). */
   agent?: string;
   /** Whose call this is and the app the node identified, for the model policy (PrepareAiCallOptions). */
-  caller?: CallerClass;
+  caller: CallerClass;
   verifiedApp?: string;
   /** A provider the call names (an id of the caller's, or a type), and the call's word on fallback. */
   provider?: string;
@@ -307,8 +307,13 @@ export interface PrepareAiCallOptions {
   agent?: string;
   /** What the call asks for, when the operation alone does not say (a spoken reply is `speech`). */
   capability?: AiCapability;
-  /** Whose call this is, for the owner's policy switches. Default: `agent` with an agent, else `owner`. */
-  caller?: CallerClass;
+  /**
+   * Whose call this is, for the owner's policy switches, the per-app and per-agent model lists, the
+   * agent's daily cap and the app-role binding. Required: a call that left it out was planned as
+   * the owner in person, and five entry points did (secaudit 2026-10, AI-3). A call the node makes
+   * for the owner with nobody asking (a classifier, a pulse) says 'owner' on purpose.
+   */
+  caller: CallerClass;
   /** The app the node identified from an app grant (`owner/file.html`), never a body field. */
   verifiedApp?: string;
   /** A provider the call names: one of the caller's provider ids, or a type. No fallback then. */
@@ -335,8 +340,12 @@ export interface PrepareAiCallOptions {
  * the settings link (ai/ai-fix-words.ts), so every caller of this gate gives the person the same.
  */
 export async function prepareAiCall(
-  storage: Storage, config: AimeatConfig, gaii: string, opts: PrepareAiCallOptions = {},
+  storage: Storage, config: AimeatConfig, gaii: string, opts: PrepareAiCallOptions,
 ): Promise<AiCallPlan> {
+  // The type requires it; this holds a JavaScript caller and a cast to the same rule.
+  if (!opts || typeof opts.caller !== 'string') {
+    throw new AiCompletionError('INTERNAL', 500, 'An AI call must say who is asking (caller); none was given.');
+  }
   try { return await planAiCall(storage, config, gaii, opts); } catch (e) {
     if (!(e instanceof AiCompletionError)) throw e;
     const cap = opts.capability ?? OP_CAPABILITY[opts.op ?? 'text'] ?? (opts.hasImages ? 'vision' : 'text');
@@ -624,7 +633,7 @@ export async function completeForOwner(
   const plan = await prepareAiCall(storage, config, gaii, {
     model: opts.model, modelRole: opts.modelRole, appId: opts.appId, hasImages, agent: opts.agent,
     ...(opts.role ? { role: opts.role } : {}),
-    ...(opts.caller ? { caller: opts.caller } : {}),
+    caller: opts.caller,
     ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}),
     ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),

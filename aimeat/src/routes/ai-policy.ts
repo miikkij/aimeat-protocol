@@ -17,6 +17,8 @@
  *     PUT  /v1/ai/policy       — owner: apply; agent: propose, then confirm with confirm_token
  *     GET  /v1/ai/recommended  — the node's recommended models per capability
  * @version-history
+ *   v1.2.1 — 2026-10-05 — aiCallerOf decides through services/ai/caller-context.ts, the rule every
+ *     AI entry point uses now (secaudit 2026-10, AI-3).
  *   v1.2.0 — 2026-10-02 — aiCallerOf carries the request's language, so an AI refusal's `fix` is in
  *     the person's language.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: aiCallerOf names the owner's chat agent `chat`, and GET
@@ -36,7 +38,7 @@ import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { policyView, recommendedModelsOf, setOwnerAiPolicy } from '../services/ai/policy-store.js';
 import type { CallerClass } from '../services/ai/policy.js';
-import { CHAT_AGENT_NAME } from '../services/chat-agent.js';
+import { aiCallerFromCredential } from '../services/ai/caller-context.js';
 import { detectLocale, localeFromCookie } from '../i18n.js';
 import type { RequestLanguage } from '../services/ai/ai-fix-words.js';
 
@@ -58,10 +60,10 @@ export function aiCallerOf(req: Request, nodeId: string): { caller: CallerClass;
   const auth = req.auth!;
   const lang = requestLanguageOf(req);
   const withLang = lang ? { lang } : {};
-  if (auth.roles.includes('app') && auth.app) return { caller: 'app', verifiedApp: auth.app, ...withLang };
-  const { agent } = aiPayerOf(resolveIdentity(auth, nodeId));
-  if (agent === CHAT_AGENT_NAME) return { caller: 'chat', ...withLang };
-  return { caller: agent ? 'agent' : 'owner', ...withLang };
+  // The one rule for every entry point (services/ai/caller-context.ts). The agent's name is not
+  // returned here: the routes pass the payer's agent themselves (aiPayerOf).
+  const who = aiCallerFromCredential(auth, resolveIdentity(auth, nodeId));
+  return { caller: who.caller, ...(who.verifiedApp ? { verifiedApp: who.verifiedApp } : {}), ...withLang };
 }
 
 /** What the request says about the person's language, or undefined when it says nothing. */

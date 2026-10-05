@@ -45,6 +45,8 @@
  *   v1.9.0 — 2026-09-28 — `role` reaches every call, as `provider` does: the AI role the step runs as.
  *   v1.10.0 — 2026-09-29 — prompt_key, input_keys and audio_key are read through the one loader of
  *     what a model reads (services/ai-inputs.ts), with the node's classification reader (TARGET-082).
+ *   v1.11.0 — 2026-10-05 — Every model call runs as the principal the run acts for (ai-caller.ts):
+ *     an agent's cap and the owner's rules for that agent or app apply (secaudit 2026-10, AI-3).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -57,6 +59,8 @@ import { reportOutcome, type ResultWrite } from './engine-answer.js';
 import { logger } from '../../utils/logger.js';
 import { readAiRecords, readAiFile } from '../ai-inputs.js';
 import { systemReader } from '../classification/reader.js';
+import { workflowAiCaller } from './ai-caller.js';
+import type { AiCallerContext } from '../ai/caller-context.js';
 
 /**
  * Run a prompt on the owner's own model and land the answer in their namespace.
@@ -92,6 +96,13 @@ export function dispatchAiStep(
   // A step runs with no caller present: the node's own classification reader, whose useForAi
   // still refuses content a model may not read (TARGET-082).
   const reader = systemReader(deps, ownerGhii);
+  // Who the step's model calls run as: the principal the run acts for (ai-caller.ts), so the owner's
+  // rules for that agent or app apply. Read once, when the first call needs it.
+  let whoP: Promise<AiCallerContext> | null = null;
+  const who = async () => {
+    const w = await (whoP ??= workflowAiCaller(deps.storage, run));
+    return { caller: w.caller, ...(w.agent ? { agent: w.agent } : {}), ...(w.verifiedApp ? { verifiedApp: w.verifiedApp } : {}) };
+  };
 
   // The write of the step's answer to result_to_key. The engine makes it, and only while the step
   // still waits for the answer: once the step has ended, a later answer writes nothing (engine.ts
@@ -124,7 +135,7 @@ export function dispatchAiStep(
       ...(action.language ? { language: action.language } : {}),
       ...(action.provider ? { provider: action.provider } : {}),
       ...(action.role ? { role: action.role } : {}),
-      appId,
+      appId, ...await who(),
     });
     addSpend(r.usage.costUsd);
     return landValue(action.json
@@ -182,7 +193,7 @@ export function dispatchAiStep(
         ...(action.size ? { size: action.size } : {}),
         ...(action.provider ? { provider: action.provider } : {}),
         ...(action.role ? { role: action.role } : {}),
-        appId,
+        appId, ...await who(),
       });
       addSpend(r.usage.costUsd);
       return landValue({ storage_key: r.storageKey, url: r.fetchUrl, mime_type: r.mime, model: r.model });
@@ -199,7 +210,7 @@ export function dispatchAiStep(
         ...(action.provider ? { provider: action.provider } : {}),
         ...(action.role ? { role: action.role } : {}),
         uncapped: true,
-        appId,
+        appId, ...await who(),
       });
       addSpend(answer.usage?.costUsd);
       return answer;

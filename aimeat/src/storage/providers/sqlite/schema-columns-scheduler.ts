@@ -9,6 +9,8 @@
  *   v1.0.0 — 2026-10-04 — Moved out of schema.ts unchanged (max-file-lines), plus
  *     scheduled_jobs.lastFireAt: the last cron fire a node process claimed (claimScheduledFire,
  *     mirrors Postgres migration 0093).
+ *   v1.1.0 — 2026-10-05 — scheduled_jobs.createdByApp: the app grant that made a schedule (mirrors
+ *     Postgres migration 0094; secaudit 2026-10, AI-2).
  */
 
 /** The ALTER helper initializeSchema owns: adds a column, and treats "duplicate column" as done. */
@@ -28,6 +30,8 @@ export function applySchedulerColumns(safeAddColumn: SafeAddColumn): void {
   safeAddColumn('scheduled_jobs', 'timezone', 'TEXT');
   safeAddColumn('scheduled_jobs', 'constraints', 'TEXT');
   safeAddColumn('scheduled_jobs', 'runCount', 'INTEGER NOT NULL DEFAULT 0');
+  // The app grant that made a schedule (Postgres migration 0094; secaudit 2026-10, AI-2).
+  safeAddColumn('scheduled_jobs', 'createdByApp', 'TEXT');
   safeAddColumn('execution_log', 'taskId', 'TEXT');
   safeAddColumn('agents', 'scheduleConstraintDefaults', 'TEXT');
   // The last cron fire a node process claimed (claimScheduledFire); mirrors postgres 0093. Only the

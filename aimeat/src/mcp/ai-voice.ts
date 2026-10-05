@@ -10,6 +10,7 @@ import { ownerGhiiOf } from '../utils/gaii.js';
 import { streamReply, streamSpeech } from '../services/ai-voice.js';
 import { voiceReplySchema, voiceSpeechSchema } from '../services/ai-voice-contract.js';
 import { createVoiceResult } from '../services/ai-voice-result.js';
+import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
@@ -21,14 +22,15 @@ export function registerAiVoiceTools(mcp: McpServer, storage: Storage, config: A
       try {
         const result = createVoiceResult();
         const signal = AbortSignal.any([extra.signal, AbortSignal.timeout(180000)]);
-        await streamReply(storage, config, ownerGhiiOf(getAgentGaii()), voiceReplySchema.parse(input), signal, result.emit);
+        await streamReply(storage, config, ownerGhiiOf(getAgentGaii()),
+          { ...voiceReplySchema.parse(input), caller: aiCallerOfPrincipal(getAgentGaii()).caller }, signal, result.emit);
         return out(result.reply());
       } catch (error) { return failed(error); }
     });
   mcp.tool('aimeat_voice_speak', descriptionFor('aimeat_voice_speak'), voiceSpeechSchema.shape,
     annotationsFor('aimeat_voice_speak'), async (input, extra) => {
       try {
-        const options = voiceSpeechSchema.parse(input), result = createVoiceResult();
+        const options = { ...voiceSpeechSchema.parse(input), caller: aiCallerOfPrincipal(getAgentGaii()).caller }, result = createVoiceResult();
         const owner = ownerGhiiOf(getAgentGaii());
         const signal = AbortSignal.any([extra.signal, AbortSignal.timeout(180000)]);
         await streamSpeech(storage, config, owner, options, signal, result.emit);

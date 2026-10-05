@@ -19,6 +19,9 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.5.0 — 2026-10-05 — The model call runs as the app or agent that started the job (starter.ts
+ *     jobCaller): the owner's per-app and per-agent rules and the agent's cap apply. Before, every job
+ *     was planned as the owner in person (secaudit 2026-10, AI-3).
  *   v1.4.0 — 2026-09-30 — A transcription hands back the warning-classified audio it gave the model
  *     (`warnings` on the outcome), which service.ts keeps on the job (TARGET-082 review, item 2).
  *   v1.3.0 — 2026-09-29 — The transcription reads its audio as the job's starter (starter.ts jobReader),
@@ -32,7 +35,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai-completion.js';
 import { readAiFile } from '../ai-inputs.js';
-import { jobReader } from './starter.js';
+import { jobReader, jobCaller } from './starter.js';
 import { warningsNote } from '../classification/reader.js';
 import { generateForOwner } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
@@ -90,8 +93,12 @@ export async function runJobOp(
 ): Promise<JobOpOutcome> {
     const { storage, config } = deps;
     const { payer, agent } = aiPayerOf(job.owner);
+    // Who the call runs as: the app or agent that started the job, under the owner's rules for it.
+    const who = jobCaller(job);
     const common = {
         ...(agent ? { agent } : {}),
+        caller: who.caller,
+        ...(who.verifiedApp ? { verifiedApp: who.verifiedApp } : {}),
         ...(job.model ? { model: job.model } : {}),
         ...(job.app_id ? { appId: job.app_id } : {}),
         ...(job.provider ? { provider: job.provider } : {}),

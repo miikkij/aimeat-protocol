@@ -6,6 +6,8 @@
  *   cron scheduler + the agents-card next-run + execution history. Translated 1:1 from the Prisma
  *   implementation. Replaces the listScheduledJobs startup-compat placeholder.
  * @version-history
+ *   v1.2.0 — 2026-10-05 — createdByApp (migration 0094): the app grant that made a schedule, so it
+ *     fires as that app and stops when the grant goes (secaudit 2026-10, AI-2).
  *   v1.1.0 — 2026-10-04 — claimScheduledFire (lastFireAt, migration 0093): a cron fire runs once
  *     when two node processes share the database.
  *   v1.0.0 — 2026-07-15 — Phase 5: scheduler on Postgres+Kysely.
@@ -29,6 +31,7 @@ function toJob(r: Selectable<ScheduledJob>): ScheduledJobRecord {
     lastRunError: r.lastRunError ?? undefined, lastRunDurationMs: r.lastRunDurationMs ?? undefined, nextRunAt: isoOpt(r.nextRunAt),
     createdBy: r.createdBy, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt), ownerScope: r.ownerScope ?? undefined,
     agentName: r.agentName ?? undefined, agentGaii: r.agentGaii ?? undefined, createdByAgent: r.createdByAgent ?? undefined,
+    createdByApp: r.createdByApp ?? undefined,
     displayName: r.displayName ?? undefined, description: r.description ?? undefined, purpose: r.purpose ?? undefined,
     timezone: r.timezone ?? undefined, constraints: (r.constraints ?? undefined) as ScheduledJobRecord['constraints'], runCount: r.runCount ?? undefined,
   };
@@ -42,7 +45,7 @@ function toLog(r: Selectable<ExecutionLog>): ExecutionLogEntry {
   };
 }
 
-const JOB_COLS = ['name', 'type', 'extensionName', 'instanceId', 'actionId', 'coreHandler', 'cron', 'enabled', 'input', 'lastRunAt', 'lastRunResult', 'lastRunError', 'lastRunDurationMs', 'nextRunAt', 'ownerScope', 'agentName', 'agentGaii', 'createdByAgent', 'displayName', 'description', 'purpose', 'timezone', 'constraints', 'runCount'] as const;
+const JOB_COLS = ['name', 'type', 'extensionName', 'instanceId', 'actionId', 'coreHandler', 'cron', 'enabled', 'input', 'lastRunAt', 'lastRunResult', 'lastRunError', 'lastRunDurationMs', 'nextRunAt', 'ownerScope', 'agentName', 'agentGaii', 'createdByAgent', 'createdByApp', 'displayName', 'description', 'purpose', 'timezone', 'constraints', 'runCount'] as const;
 const DATE_FIELDS = new Set(['lastRunAt', 'nextRunAt', 'createdAt', 'updatedAt']);
 const JSON_FIELDS = new Set(['input', 'constraints']);
 
@@ -54,7 +57,7 @@ export const scheduleMethods = {
       lastRunAt: r.lastRunAt ? new Date(r.lastRunAt) : null, lastRunResult: r.lastRunResult ?? null, lastRunError: r.lastRunError ?? null,
       lastRunDurationMs: r.lastRunDurationMs ?? null, nextRunAt: r.nextRunAt ? new Date(r.nextRunAt) : null, createdBy: r.createdBy,
       createdAt: new Date(r.createdAt), updatedAt: new Date(r.updatedAt), ownerScope: r.ownerScope ?? null, agentName: r.agentName ?? null,
-      agentGaii: r.agentGaii ?? null, createdByAgent: r.createdByAgent ?? false, displayName: r.displayName ?? null, description: r.description ?? null,
+      agentGaii: r.agentGaii ?? null, createdByAgent: r.createdByAgent ?? false, createdByApp: r.createdByApp ?? null, displayName: r.displayName ?? null, description: r.description ?? null,
       purpose: r.purpose ?? null, timezone: r.timezone ?? null, constraints: jsonb(r.constraints ?? null), runCount: r.runCount ?? 0,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();

@@ -16,6 +16,8 @@
  * @usage registerRefineryTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
+ *   v1.0.1 — 2026-10-05 — The run scopes and the prefix rule are the one copy in
+ *     services/refinery/schedule-input.ts (secaudit 2026-10, drift 1).
  */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,9 +32,8 @@ import { CLASS_PACKS } from '../data/refinery-classes.js';
 import { startRun, getRun } from '../services/refinery/runs.js';
 import type { RefineryCaller } from '../services/refinery/pipeline.js';
 
-/** The scopes a batch spends, all four needed (the REST route's REFINERY_RUN_SCOPES). */
-const RUN_SCOPES = ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'] as const;
-const PREFIX_RE = /^[a-z0-9][a-z0-9_-]{1,40}$/;
+// The scopes a batch spends and the prefix rule: the one copy the REST route and the scheduler read.
+import { REFINERY_RUN_SCOPES as RUN_SCOPES, REFINERY_PREFIX_RE as PREFIX_RE } from '../services/refinery/schedule-input.js';
 
 export function registerRefineryTools(
   mcp: McpServer,

@@ -14,6 +14,8 @@
  *     and unclaimed relay times.
  *   v1.4.0 — 2026-10-04 — claimScheduledFire (scheduled_jobs.lastFireAt): a cron fire runs once when
  *     two node processes share the database file.
+ *   v1.5.0 — 2026-10-05 — scheduled_jobs.createdByApp: the app grant that made a schedule
+ *     (Postgres 0094; secaudit 2026-10, AI-2).
  */
 import type {
   EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, OperatorReviewRecord, ScheduledJobRecord, ExtensionInstanceRecord,
@@ -56,9 +58,9 @@ export const federationOauthMethods = {
          coreHandler, cron, enabled, input, lastRunAt, lastRunResult, lastRunError,
          lastRunDurationMs, nextRunAt, createdBy, createdAt, updatedAt,
          ownerScope, agentName, agentGaii, createdByAgent, displayName, description,
-         purpose, timezone, constraints, runCount)
+         purpose, timezone, constraints, runCount, createdByApp)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.id, record.name, record.type,
         record.extensionName ?? null, record.instanceId ?? null, record.actionId ?? null,
@@ -71,7 +73,7 @@ export const federationOauthMethods = {
         record.createdByAgent ? 1 : 0, record.displayName ?? null, record.description ?? null,
         record.purpose ?? null, record.timezone ?? null,
         record.constraints ? JSON.stringify(record.constraints) : null,
-        record.runCount ?? 0,
+        record.runCount ?? 0, record.createdByApp ?? null,
       );
       return record;
     } catch (err: unknown) {
@@ -112,7 +114,7 @@ export const federationOauthMethods = {
        nextRunAt = ?, createdBy = ?, createdAt = ?, updatedAt = ?,
        ownerScope = ?, agentName = ?, agentGaii = ?, createdByAgent = ?,
        displayName = ?, description = ?, purpose = ?, timezone = ?,
-       constraints = ?, runCount = ? WHERE id = ?`
+       constraints = ?, runCount = ?, createdByApp = ? WHERE id = ?`
     ).run(
       updated.name, updated.type,
       updated.extensionName ?? null, updated.instanceId ?? null, updated.actionId ?? null,
@@ -125,7 +127,7 @@ export const federationOauthMethods = {
       updated.createdByAgent ? 1 : 0, updated.displayName ?? null, updated.description ?? null,
       updated.purpose ?? null, updated.timezone ?? null,
       updated.constraints ? JSON.stringify(updated.constraints) : null,
-      updated.runCount ?? 0, id,
+      updated.runCount ?? 0, updated.createdByApp ?? null, id,
     );
     return updated;
   },
@@ -169,6 +171,7 @@ export const federationOauthMethods = {
     if (row.agentName) record.agentName = row.agentName as string;
     if (row.agentGaii) record.agentGaii = row.agentGaii as string;
     if ((row.createdByAgent as number) === 1) record.createdByAgent = true;
+    if (row.createdByApp) record.createdByApp = row.createdByApp as string;
     if (row.displayName) record.displayName = row.displayName as string;
     if (row.description) record.description = row.description as string;
     if (row.purpose) record.purpose = row.purpose as string;

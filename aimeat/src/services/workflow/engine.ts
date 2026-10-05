@@ -108,6 +108,7 @@
  *     of `__proto__` is refused as not waiting (CodeQL js/prototype-polluting-assignment).
  *   v1.19.2 — 2026-10-04 — A declined task ends its step like a done or failed one
  *     (isTerminalTaskStatus); the step is then judged by its output, as before.
+ *   v1.20.0 — 2026-10-05 — A run keeps who its AI calls run as (ai-caller.ts; secaudit 2026-10, AI-3).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -137,6 +138,7 @@ import {
   currentCallOpen,
 } from './run-cost.js';
 import { refuseTriggerStart, clearRefusal } from './trigger-authority.js';
+import { aiCallerForStart } from './ai-caller.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep,
 } from '../../models/workflow-schemas.js';
@@ -295,7 +297,7 @@ export class WorkflowEngine {
     const run: WorkflowRun = {
       runId, workflowId, defSnapshot: def, resolved: v.resolved, vars,
       mode: opts.mode, keyPrefix: opts.mode === 'full-sandbox' ? `wf-test.${runId}.` : '',
-      status: 'running', steps, startedAt: now,
+      status: 'running', steps, startedAt: now, aiCaller: await aiCallerForStart(this.storage, def, opts.caller),
     };
 
     if (opts.mode === 'signals-only') {

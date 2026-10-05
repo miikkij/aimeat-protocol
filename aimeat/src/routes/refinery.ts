@@ -13,6 +13,8 @@
  * @usage app.use(refineryRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
+ *   v1.0.1 — 2026-10-05 — The run scopes and the prefix rule are the one copy in
+ *     services/refinery/schedule-input.ts (secaudit 2026-10, drift 1).
  */
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -25,10 +27,10 @@ import { CLASS_PACKS } from '../data/refinery-classes.js';
 import { startRun, getRun } from '../services/refinery/runs.js';
 import type { RefineryCaller } from '../services/refinery/pipeline.js';
 
-/** The scopes a batch spends, all four needed. */
-export const REFINERY_RUN_SCOPES = ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'] as const;
+import { REFINERY_RUN_SCOPES, REFINERY_PREFIX_RE as PREFIX_RE } from '../services/refinery/schedule-input.js';
 
-const PREFIX_RE = /^[a-z0-9][a-z0-9_-]{1,40}$/;
+/** The scopes a batch spends, all four needed: the one copy in services/refinery/schedule-input.ts. */
+export { REFINERY_RUN_SCOPES };
 
 /** Who is asking, as the pipeline takes it: the human whose mailbox and budget, and who asked. */
 export function refineryCallerOf(req: Request, nodeId: string): RefineryCaller {

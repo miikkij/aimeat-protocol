@@ -35,6 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { CompletionOptions } from './openrouter.js';
 import { completeForOwner, AiCompletionError, type CompleteForOwnerResult } from './ai-completion.js';
 import { getEncryptionKey } from './encryption.js';
+import { OWNER_CALLER } from './ai/caller-context.js';
 
 /** Raised with a stable `code` so routes can map it to the right HTTP status + envelope. */
 export class NotebookAiError extends Error {
@@ -108,6 +109,8 @@ export async function completeOwner(
       systemPrompt,
       model: owner.model,
       appId: owner.appId,
+      // The notebook features run for the owner, on the owner's own request.
+      caller: OWNER_CALLER.caller,
       temperature: options?.temperature,
       topP: options?.top_p,
       maxTokens: options?.max_tokens,

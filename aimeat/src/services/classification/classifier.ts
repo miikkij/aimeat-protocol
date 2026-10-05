@@ -67,6 +67,7 @@ import { ownerOfScope, scopeOrganism } from './policy.js';
 import { ClassificationError, setLabel, type LabelActor, type SetLabelResult } from './labels.js';
 import { activePolicies, systemReader } from './reader.js';
 import { readSystem, UNCHANGED, updateSystem } from './system-record.js';
+import { OWNER_CALLER } from '../ai/caller-context.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
@@ -302,6 +303,8 @@ async function askLlm(deps: Deps, payer: string, policy: ClassificationPolicy, c
     + `Answer with one JSON object and nothing else: {"label": "<id>", "confidence": <0..1>, "reason": "<one sentence>"}.\n\nCONTENT:\n${content}`;
   const out = await completeForOwner(deps.storage, deps.config, payer, {
     prompt, capability: 'text', appId: 'classification',
+    // The node classifies for the owner with nobody else asking (services/ai/caller-context.ts).
+    caller: OWNER_CALLER.caller,
     ...(policy.classifier.provider ? { provider: policy.classifier.provider } : {}),
   });
   const j = firstJsonObject(out.content) ?? {};

@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v2.3.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
  *   v2.2.0 — 2026-09-28 — Takes `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v2.1.0 — 2026-09-28 — Takes caller and verifiedApp for the owner's model policy (V2).
@@ -84,7 +85,7 @@ export interface GenerateForOwnerOptions {
   /** An outside reason to stop waiting, combined with the call's own timeout. */
   signal?: AbortSignal;
   /** Whose call this is and the app its grant names, for the owner's model policy. */
-  caller?: CallerClass;
+  caller: CallerClass;
   verifiedApp?: string;
   /** The request's word on the person's language, for a refusal's sentence. */
   lang?: RequestLanguage;
@@ -159,7 +160,7 @@ export async function generateForOwner(
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'image', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
-    ...(opts.caller ? { caller: opts.caller } : {}), ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
+    caller: opts.caller, ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
     ...(opts.lang ? { lang: opts.lang } : {}),
     ...(opts.provider ? { provider: opts.provider } : {}), ...(opts.fallback !== undefined ? { fallback: opts.fallback } : {}),
     ...(opts.role ? { role: opts.role } : {}),

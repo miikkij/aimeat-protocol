@@ -16,6 +16,9 @@
  * @structure runRefineryJob
  * @usage registered by the Scheduler for job.type === 'refinery'
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Who it fires as is services/schedule-actor.ts: an app's schedule runs as
+ *     that app, with its grant's scopes and its app reference, and stops when the grant goes. It ran
+ *     as the owner with every scope (secaudit 2026-10, AI-2).
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -24,9 +27,8 @@ import type { JobRunResult } from '../scheduler.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { startRun } from './runs.js';
-import { REFINERY_PREFIX_RE, refineryRunAs } from './schedule-input.js';
-
-const RUN_SCOPES = ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'] as const;
+import { REFINERY_PREFIX_RE, REFINERY_RUN_SCOPES } from './schedule-input.js';
+import { scheduleActor } from '../schedule-actor.js';
 
 /** Fire one refinery schedule: start the batch and wait for it. */
 export async function runRefineryJob(storage: Storage, config: AimeatConfig, job: ScheduledJobRecord): Promise<JobRunResult> {
@@ -34,18 +36,17 @@ export async function runRefineryJob(storage: Storage, config: AimeatConfig, job
   if (!ownerGhii) throw new Error(`refinery job "${job.id}" has no ownerScope`);
   const prefix = String((job.input as { prefix?: unknown } | undefined)?.prefix ?? '');
   if (!REFINERY_PREFIX_RE.test(prefix)) throw new Error(`refinery job "${job.id}" has no valid input.prefix`);
-  const principal = refineryRunAs(job);
-  const byAgent = principal !== ownerGhii;
-  let scopes: string[] = ['*'];
-  if (byAgent) {
-    const agent = await storage.getAgent(principal);
-    if (!agent) throw new Error(`the agent that made this schedule (${principal}) no longer exists`);
-    scopes = agent.defaultScopes ?? [];
-    const missing = RUN_SCOPES.filter((s) => !scopeIsCovered(scopes, s));
-    if (missing.length) throw new Error(`the agent that made this schedule no longer holds ${missing.join(', ')}`);
+  // Who it fires as, asked now (services/schedule-actor.ts): the owner, or the agent or app that made
+  // it with the words it holds today. An app's schedule runs as that app, never as the owner.
+  const actor = await scheduleActor(storage, job);
+  if (!actor.ok) throw new Error(actor.reason);
+  if (!actor.isOwner) {
+    const missing = REFINERY_RUN_SCOPES.filter((s) => !scopeIsCovered(actor.scopes, s));
+    if (missing.length) throw new Error(`what made this schedule no longer holds ${missing.join(', ')}`);
   }
   const { run, done, already } = startRun({ storage, config }, {
-    ownerGhii, owner: localAccountName(ownerGhii), principal, roles: byAgent ? ['agent'] : ['owner'], scopes, isOwner: !byAgent,
+    ownerGhii, owner: localAccountName(ownerGhii), principal: actor.principal, roles: actor.roles, scopes: actor.scopes,
+    isOwner: actor.isOwner, ...(actor.appRef ? { appRef: actor.appRef } : {}),
   }, prefix, { by: `schedule ${job.displayName || job.id}` });
   if (already) return { reads: [], writes: [], skipped: true, skipReason: `a batch of ${prefix} was already running (${run.id})` };
   const finished = await done;
