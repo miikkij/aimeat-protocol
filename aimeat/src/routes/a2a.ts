@@ -40,6 +40,10 @@
  * @structure a2aRouter(config, storage)
  * @usage app.use(a2aRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-10-06 — The account road builds its caller with callerOf (middleware/caller.ts), so
+ *     the caller carries `federated` and a visitor is refused by name as well as by the owner
+ *     comparison (secaudit 2026-10 follow-up, A3; no defect was found: verifyJWT names a visitor by
+ *     its home GHII, and e2e-federated-namesake already proved the 403).
  *   v1.3.0 — 2026-09-04 — The node directory at `/.well-known/agent-card.json` validates as an A2A
  *     Agent Card. It carried only a registry, so a client that checks the schema before reading the
  *     document got nothing — a validator named all six missing fields. They are present now and
@@ -56,6 +60,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
+import { callerOf } from '../middleware/caller.js';
 import { buildGAII } from '../utils/gaii.js';
 import { a2aCardFor, directoryDescriptionFor } from '../services/a2a-card.js';
 import { oasfRecordFor } from '../services/oasf-projection.js';
@@ -224,8 +229,10 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
     if (req.headers.authorization) {
       return auth(req, res, async () => {
         // The same fence V4 and V5 apply, applied before the SDK sees the request: this road
-        // carries work between principals of ONE account.
-        if (agent.owner !== req.auth!.owner) {
+        // carries work between principals of ONE account. A visitor from another node is named by
+        // its home GHII, so it never equals the local owner name; it is refused by name as well.
+        const who = callerOf(req, config.nodeId, storage);
+        if (who.visitor || agent.owner !== who.owner) {
           res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
             'This A2A interface answers to principals of the agent\'s own account. To hire it from outside, drop the bearer and present your own signed agent card.'));
           return;
@@ -233,10 +240,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
         // The scopes travel with the caller because the gate is per JSON-RPC METHOD, not per HTTP
         // door: one requireScope() here would have to name one word and be wrong for every other
         // method behind it. The handler asks the same question requireScope asks, method by method.
-        const caller: A2ACaller = {
-          sub: req.auth!.sub, owner: req.auth!.owner,
-          roles: req.auth!.roles ?? [], scopes: req.auth!.scopes ?? [],
-        };
+        const caller: A2ACaller = who.auth;
         const offerings = await offeringsForAgent(storage, agent);
         const card = a2aCardFor(config, agent, url, { offerings });
         return serveRpc(new AimeatA2ARequestHandler(storage, config, agent, caller, card), req.auth!.sub)(req, res, next);
