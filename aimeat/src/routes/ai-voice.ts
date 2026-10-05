@@ -22,7 +22,7 @@ import { AiCompletionError } from '../services/ai/completion.js';
 import { retryAfterOf } from '../services/account-limits.js';
 import { streamReply, streamSpeech } from '../services/ai-voice.js';
 import { logger } from '../utils/logger.js';
-import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../services/ai-voice-contract.js';
+import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../models/ai-voice-contract.js';
 import { createVoiceResult } from '../services/ai-voice-result.js';
 import { aiCallerOf } from './ai-policy.js';
 

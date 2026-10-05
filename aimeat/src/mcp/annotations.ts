@@ -165,8 +165,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // screenshot_clear remove, an empty access_code clears one. Not idempotent: agent_deploy starts
     // a new task on every call. A client that confirms each call is the safe reading of a mixed tool.
     aimeat_app_manage: { title: 'Manage an App', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    aimeat_voice_reply: { title: 'Generate Voice Reply', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_voice_speak: { title: 'Generate Speech', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 
     // ── Extensions ──
 

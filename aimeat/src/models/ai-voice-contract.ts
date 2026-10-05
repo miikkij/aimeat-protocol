@@ -1,7 +1,9 @@
 /**
- * @file ai-voice-contract.ts
+ * @file src/models/ai-voice-contract.ts
  * @description One validated input contract for REST, node MCP and connector voice tools.
  * @version-history
+ *   v1.3.0 - 2026-10-05 - Moved unchanged from services/ to models/: the tool catalog takes its fields'
+ *     exact schemas from here, and the catalog imports nothing above models/ (secaudit 2026-10, M3).
  *   v1.2.0 - 2026-09-28 - Reply and speech take `role`, the AI role the call runs as (services/ai/roles.ts).
  *   v1.1.0 - 2026-09-28 - Speech `model` and `voice` are optional: the speech role gives them; reply and
  *     speech take `provider` (an id or a type, no fallback then). System 2 plan, V5.

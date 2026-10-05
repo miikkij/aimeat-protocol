@@ -327,20 +327,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return flagged(jsonContent(resp.data ?? resp), resp);
   });
 
-  mcp.tool('aimeat_datapackage_publish', descriptionFor('aimeat_datapackage_publish'), {
-    agent_name: agentNameSchema,
-    name: z.string().describe('Package name: lowercase letters, digits and dashes. It becomes part of the permanent URL.'),
-    changes: z.string().describe('REQUIRED. What changed against the previous version and why.'),
-    resources: z.array(z.record(z.string(), z.unknown())).describe('One or more { name, rows, schema?, title?, description? }.'),
-    title: z.string().optional(),
-    description: z.string().optional(),
-    license: z.string().optional(),
-    sources: z.array(z.record(z.string(), z.unknown())).optional(),
-    legal_basis: z.string().optional(),
-    // Crews publish through the connector, so the declaration has to exist HERE too — the node
-    // surface being right does not help a caller that never touches it.
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_datapackage_publish'), async ({ agent_name, ...body }) => {
+  mcp.tool('aimeat_datapackage_publish', descriptionFor('aimeat_datapackage_publish'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_datapackage_publish') }, annotationsFor('aimeat_datapackage_publish'), async ({ agent_name, ...body }) => {
     const { client } = pickAgent(registry, agent_name);
     // Straight through: the quality gate, the content hash and the address all live on the node, and
     // a refusal comes back with the row and the column rather than a verdict.

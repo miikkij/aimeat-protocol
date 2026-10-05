@@ -29,14 +29,13 @@
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { SiteError } from '../services/site.js';
 import { SurfaceLayoutService, type LayoutSubmission } from '../services/surface-layout/service.js';
 import { blocksForSurface, operatorLabelKey } from '../services/surface-layout/registry.js';
 import type { SurfaceId } from '../services/surface-layout/types.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -123,13 +122,7 @@ export function registerSurfaceLayoutTools(
     mcp.tool(
         'aimeat_surface_layout_set',
         descriptionFor('aimeat_surface_layout_set'),
-        {
-            surface: z.string().describe("Which page: 'portal', 'home' or 'home-onboarding'."),
-            blocks: z.array(z.record(z.string(), z.unknown()))
-                .describe('The blocks in the order they should appear. Each is { id, key } with optional props, titles, hidden, children and — on a free-form block — body.'),
-            note: z.string().optional().describe('One line on what this change was for. It shows in the node change log.'),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_surface_layout_set'),
         annotationsFor('aimeat_surface_layout_set'),
         async ({ surface, blocks, note, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
             if (!await isOperator()) return notOperator();
