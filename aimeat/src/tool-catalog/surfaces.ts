@@ -173,7 +173,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Take work, hand it back.
         
         // Talk to the person.
-        'aimeat_message_inbox', 'aimeat_message_send',
+        
         // Carry bytes.
         
         // And the pair that reaches everything else.
@@ -195,7 +195,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
      */
     chat: [
         // Where to start, what exists, and the door to everything else.
-        'aimeat_handbook_get', 
+        
         // What the person knows.
         
         // What their groups know. Writing to a workspace is found when it is needed: its description
@@ -204,7 +204,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Their apps and skills.
         'aimeat_app_list', 
         // Their agents, a new one, and work for them. A schedule is found when it is needed.
-        'aimeat_agents_list', 'aimeat_agent_propose',
+        
         
     ],
     appdev: [
@@ -243,7 +243,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         'aimeat_app_fork', 
         
-        'aimeat_handbook_get',
+        
     ],
     agent: [
         'aimeat_image_generate', 
@@ -275,10 +275,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
-        'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread', 'aimeat_notify',
-        'aimeat_dm_inbox_as_owner', 'aimeat_dm_thread_as_owner',
-        'aimeat_dm_archive_as_owner', 'aimeat_dm_organize_as_owner',
+        
+        
+        
+        
         // A turn between two principals of ONE account, beside the owner thread and the federated
         // DM above it rather than instead of either. Agent surface only: the service surface carries
         // no messaging at all, and the primitives surface reaches these through aimeat_invoke.
@@ -305,7 +305,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         // The person's own welcome page, beside the company one: same act, different owner.
         
-        'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',
+        
         // Outbound connections and mail, beside the address book because that is where they meet:
         // a send takes a saved contact, and a mailbox is what it can leave through. Scopes still
         // decide who sees which of them — reading the list of accounts, spending one, and sending
@@ -330,13 +330,13 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
+        
         // A person asks THEIR OWN agent for a new agent, so the proposal tools belong here. They sat
         // on `admin` alone until 2026-10-02, under a comment saying they were on this list.
-        'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
         
         
-        'aimeat_usage_report',
+        
+        
         // Who holds a key to the owner's account: the Access page's read, for the agent the owner
         // trusted with account:security. Read-only; every revoke stays on the page.
         
@@ -344,9 +344,9 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // exactly the work an owner's own agent does, and a key it stores is one the owner never
         // has to paste anywhere. It can store and remove; nothing anywhere reads a value back.
         
-        'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
-        'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
-        'aimeat_handbook_get',
+        
+        
+        
         // Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
         
         // EXCHANGE marketplace: browse/accept/post/bid the two-sided data-service market.
@@ -377,13 +377,13 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
-        'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_tags_set', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         
         
-        'aimeat_usage_report',
-        'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
-        'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
-        'aimeat_handbook_get',
+        
+        
+        
+        
+        
         // Commerce, both sides: a marketplace/provider agent sells (PSP credentials, app-tool
         // manifests, offer pricing) and buys (checkout) on the same commerce core.
         
@@ -452,12 +452,12 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_agent_mode_set', 'aimeat_agent_run_mode_set', 'aimeat_agent_runtime_report', 'aimeat_agent_description_set',
-        'aimeat_agent_tags_set', 'aimeat_agent_console_set',
+        
+        
         // What the one-press basic agents would give this account, and a proposal for a new one.
         // On `agent` too, because their usual caller is one of the owner's own agents telling the
         // person where to press; here for the owner-side agent management this surface carries.
-        'aimeat_agent_basics_get', 'aimeat_agent_basics_request', 'aimeat_agent_propose',
+        
         
         
         
@@ -480,7 +480,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         'aimeat_wallet_transactions',
         
-        'aimeat_handbook_get',
+        
     ],
 
     /**

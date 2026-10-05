@@ -11,22 +11,23 @@
  * @structure registerDmOrganizeTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerDmOrganizeTools } from './dm-organize.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-09-13 -- Initial, with the Messages list's sections, rules and archive.
  *   v1.0.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import { ownerMailbox } from '../services/direct-message-delete.js';
-import { CONVERSATION_ID, InboxOrganizePatchSchema, InboxRuleInputSchema } from '../models/inbox-organize-schemas.js';
+import { InboxOrganizePatchSchema } from '../models/inbox-organize-schemas.js';
 import { archiveConversations, organizeView, readInboxOrganizeStrict, updateInboxOrganize } from '../services/inbox-organize/record.js';
 import { logger } from '../utils/logger.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 const refusal = (message: string, code: string) => ({ isError: true, ...text({ error: message, code }) });
@@ -43,10 +44,7 @@ export function registerDmOrganizeTools(
     mcp.tool(
         'aimeat_dm_archive_as_owner',
         descriptionFor('aimeat_dm_archive_as_owner'),
-        {
-            conversation_ids: z.array(z.string().regex(CONVERSATION_ID)).min(1).max(500).describe('Conversation ids to archive or restore, from aimeat_dm_inbox_as_owner.'),
-            restore: z.boolean().optional().describe('true brings the conversations back to the list instead of archiving them.'),
-        },
+        zodShapeFor('aimeat_dm_archive_as_owner'),
         annotationsFor('aimeat_dm_archive_as_owner'),
         async ({ conversation_ids, restore }) => {
             const back = restore === true;
@@ -67,14 +65,7 @@ export function registerDmOrganizeTools(
     mcp.tool(
         'aimeat_dm_organize_as_owner',
         descriptionFor('aimeat_dm_organize_as_owner'),
-        {
-            auto_archive_enabled: z.boolean().optional().describe("Archive the own agents' conversations by age."),
-            auto_archive_days: z.number().int().min(1).max(365).optional().describe('Days without a message before that happens.'),
-            fold_same_subject: z.boolean().optional().describe('One row for conversations one sender opened with the same subject within an hour.'),
-            add_rule: InboxRuleInputSchema.optional().describe('Add a rule, or edit one by giving its id.'),
-            remove_rule: z.string().regex(/^[a-z0-9-]{1,40}$/).optional().describe('Id of a rule to remove.'),
-            rules: z.array(InboxRuleInputSchema).max(50).optional().describe('Replace every rule with this list.'),
-        },
+        zodShapeFor('aimeat_dm_organize_as_owner'),
         annotationsFor('aimeat_dm_organize_as_owner'),
         async ({ auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules }) => {
             const patch = InboxOrganizePatchSchema.safeParse({

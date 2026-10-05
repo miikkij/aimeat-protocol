@@ -29,7 +29,6 @@
  *     GET /v1/agents/:name/statistics) so the shell-callable tool is also reachable via MCP.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
@@ -39,9 +38,7 @@ import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegistry): void {
 
-  mcp.tool('aimeat_agent_statistics', descriptionFor('aimeat_agent_statistics'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_agent_statistics'), async ({ agent_name }) => {
+  mcp.tool('aimeat_agent_statistics', descriptionFor('aimeat_agent_statistics'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_statistics') }, annotationsFor('aimeat_agent_statistics'), async ({ agent_name }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/agents/${encodeURIComponent(agent)}/statistics`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
@@ -49,18 +46,13 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
 
   // Read-only: what the one-press basic agents would give this account, and whether the owner's
   // connector is up. Creating them is the owner's own press, so there is no write half here.
-  mcp.tool('aimeat_agent_basics_get', descriptionFor('aimeat_agent_basics_get'), {
-    agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_agent_basics_get'), async ({ agent_name }) => {
+  mcp.tool('aimeat_agent_basics_get', descriptionFor('aimeat_agent_basics_get'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_basics_get') }, annotationsFor('aimeat_agent_basics_get'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/agents/v2/basic-agents');
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_agent_basics_request', descriptionFor('aimeat_agent_basics_request'), {
-    agent_name: agentNameSchema,
-    note: z.string().max(300).optional().describe('One short phrase on why you are asking, shown to the person with the request.'),
-  }, annotationsFor('aimeat_agent_basics_request'), async ({ agent_name, note }) => {
+  mcp.tool('aimeat_agent_basics_request', descriptionFor('aimeat_agent_basics_request'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_basics_request') }, annotationsFor('aimeat_agent_basics_request'), async ({ agent_name, note }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post('/v1/agents/v2/basic-agents/request', { note });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
@@ -68,16 +60,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
 
   // A NEW agent, put in front of the owner. Creates nothing here either: the approve door is the
   // owner in person, and this writes the proposal and one line on their open items.
-  mcp.tool('aimeat_agent_propose', descriptionFor('aimeat_agent_propose'), {
-    agent_name: agentNameSchema,
-    name: z.string().describe('The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.'),
-    purpose: z.string().describe('What this agent is for, in a sentence the owner can decide from.'),
-    display_name: z.string().optional().describe('The name shown to the person. Defaults to the agent name.'),
-    scopes: z.array(z.string()).optional().describe('Exactly what it may do. Never more than the calling agent holds.'),
-    mode: z.string().optional().describe('Task handling: task-runner, autonomous, interactive, coordinator or workstation.'),
-    run_mode: z.string().optional().describe("'spawn' (a worker per piece of work) or 'resident' (stays up)."),
-    crew_def: z.record(z.string(), z.unknown()).optional().describe('What it would BE, in the crewaimeat crew_def shape.'),
-  }, annotationsFor('aimeat_agent_propose'), async ({ agent_name, ...body }) => {
+  mcp.tool('aimeat_agent_propose', descriptionFor('aimeat_agent_propose'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_propose') }, annotationsFor('aimeat_agent_propose'), async ({ agent_name, ...body }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.post('/v1/agents/v2/agent-proposals', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
@@ -86,11 +69,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_agent_tags_set',
     descriptionFor('aimeat_agent_tags_set'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: z.string().describe('Agent whose tags to update (same owner as the calling agent; pass the caller\'s own name to self-tag).'),
-      tags: z.array(z.string()).describe('Replacement tag list. Empty array clears all tags.'),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_tags_set') },
     async ({ agent_name, target_agent_name, tags }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/tags`, { tags });
@@ -101,11 +80,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_agent_mode_set',
     descriptionFor('aimeat_agent_mode_set'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: z.string().describe('Agent whose mode to update (same owner as the calling agent; pass the caller\'s own name to self-set).'),
-      mode: z.enum(['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation']).describe('New mode.'),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_mode_set') },
     async ({ agent_name, target_agent_name, mode }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/mode`, { mode });
@@ -116,11 +91,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_agent_description_set',
     descriptionFor('aimeat_agent_description_set'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: z.string().describe('Agent whose description to set (same owner; pass your own name to describe yourself).'),
-      description: z.string().describe('What this agent is, in a sentence or two. Empty clears it.'),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_description_set') },
     async ({ agent_name, target_agent_name, description }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/description`, { description });
@@ -131,11 +102,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_agent_run_mode_set',
     descriptionFor('aimeat_agent_run_mode_set'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: z.string().describe("Agent whose run mode to set (same owner; pass the caller's own name to self-set)."),
-      run_mode: z.enum(['spawn', 'resident']).nullable().describe("'spawn' = started per job; 'resident' = kept running; null = nobody has said, and a spawner leaves it alone."),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_run_mode_set') },
     async ({ agent_name, target_agent_name, run_mode }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/run-mode`, { run_mode });
@@ -146,17 +113,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_agent_runtime_report',
     descriptionFor('aimeat_agent_runtime_report'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: z.string().describe("Agent this is about (same owner; pass the caller's own name to report your own)."),
-      kind: z.string().describe("What kind of thing runs, e.g. 'python' or 'crew-def'."),
-      file: z.string().optional().describe('Path to the file that runs, relative to your own root.'),
-      sha256: z.string().optional().describe("Hash of that file's contents."),
-      commit: z.string().optional().describe('Commit the file came from.'),
-      runtime: z.string().optional().describe("Which runtime read it, e.g. 'crewaimeat 0.7.0'."),
-      definition_revision: z.number().optional().describe('For a JSON crew: which definition revision was live.'),
-      llm: z.enum(['node', 'machine']).optional().describe("Where the crew's model calls go: 'node' through the node's /v1/llm with the agent's token, 'machine' to its provider with a key on its own machine."),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_runtime_report') },
     async ({ agent_name, target_agent_name, ...src }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/runtime-source`, { runtime_source: src });
@@ -167,11 +124,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   mcp.tool(
     'aimeat_agent_console_set',
     descriptionFor('aimeat_agent_console_set'),
-    {
-      agent_name: agentNameSchema,
-      target_agent_name: z.string().describe('Agent whose console address to set (same owner as the calling agent; pass the caller\'s own name to record your own).'),
-      console_url: z.string().describe('Absolute http(s) URL of that agent\'s page in its host, or \'\' to clear it.'),
-    },
+    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_console_set') },
     async ({ agent_name, target_agent_name, console_url }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/console-url`, { console_url });

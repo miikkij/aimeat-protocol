@@ -7,6 +7,7 @@
  *   the node REST API (POST /v1/messages, GET /v1/messages/agent-inbox|agent-thread). Distinct from the
  *   agent↔owner dashboard tools in agent-messages.ts. Mirrors the server MCP surface (src/mcp/dm-messages.ts).
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner / aimeat_dm_organize_as_owner: organising the
  *     owner's Messages list on messages:organize-as-owner, parity with the node MCP.
  *   v1.5.0 -- 2026-09-12 -- aimeat_dm_inbox_as_owner / aimeat_dm_thread_as_owner: the owner's own
@@ -22,40 +23,25 @@
  *     speak strictly as the owner from an agent).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { organizePatchBody } from '../../../../tool-dispatch/tool-call-helpers-organize.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
 
   // The agent tells its own owner something: POST /v1/notifications as the connected principal,
   // parameter for parameter with the server tool (src/mcp/notify.ts).
-  mcp.tool('aimeat_notify', descriptionFor('aimeat_notify'), {
-    title: z.string().max(200).describe('What happened, in one line; your name is put in front of it.'),
-    body: z.string().max(10_000).optional().describe('The detail, a few lines at most.'),
-    link: z.string().max(500).optional().describe('Where a click leads: a path on this AIMEAT starting with "/".'),
-    type: z.string().max(64).optional().describe('A short machine word for the kind of event.'),
-  }, annotationsFor('aimeat_notify'), async ({ title, body, link, type }) => {
+  mcp.tool('aimeat_notify', descriptionFor('aimeat_notify'), zodShapeFor('aimeat_notify'), annotationsFor('aimeat_notify'), async ({ title, body, link, type }) => {
     const { client } = registry.resolve();
     const resp = await client.post('/v1/notifications', { title, body, link, type });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_dm_send', descriptionFor('aimeat_dm_send'), {
-    agent_name: agentNameSchema,
-    to: z.string().describe('Recipient: owner@node, agent#owner@node, or eco:app#owner@node.'),
-    body: z.string().optional().describe('Message body (GFM markdown). Optional if you attach a file.'),
-    reply_to: z.string().optional().describe('Id of a message you are replying to (keeps the thread).'),
-    subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
-    conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
-    attachments: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 20 { storage_key, mime, kind, size, name } descriptors (upload files first via aimeat_storage_upload).'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_dm_send'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_dm_send', descriptionFor('aimeat_dm_send'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_send') }, annotationsFor('aimeat_dm_send'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const payload: Record<string, unknown> = { to };
     if (body) payload.body = body;
@@ -68,18 +54,7 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
       { tool: 'aimeat_dm_send', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_dm_broadcast', descriptionFor('aimeat_dm_broadcast'), {
-    agent_name: agentNameSchema,
-    to: z.array(z.string()).optional().describe('Recipient identities (owner@node, agent#owner@node, eco:app#owner@node), up to 500.'),
-    group_id: z.string().optional().describe('A Share Group whose members are the audience.'),
-    audience: z.string().optional().describe('"node-users" or "federation-users". OPERATOR-ONLY.'),
-    mode: z.string().optional().describe('"broadcast" (default, repliable) or "announcement" (read-only).'),
-    subject: z.string().optional().describe('Titles the thread each recipient sees.'),
-    body: z.string().optional().describe('Message body (GFM markdown). Optional with attachments or questions.'),
-    attachments: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 20 { storage_key, mime, kind, size, name } descriptors (upload files first).'),
-    interactive: z.record(z.string(), z.unknown()).optional().describe('A question set { role:"questions", v:1, questions:[…] } — makes it a poll.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_dm_broadcast'), async ({ agent_name, to, group_id, audience, mode, subject, body, attachments, interactive, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_dm_broadcast', descriptionFor('aimeat_dm_broadcast'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_broadcast') }, annotationsFor('aimeat_dm_broadcast'), async ({ agent_name, to, group_id, audience, mode, subject, body, attachments, interactive, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const payload: Record<string, unknown> = {};
     if (to) payload.to = to;
@@ -95,16 +70,7 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
       { tool: 'aimeat_dm_broadcast', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_dm_ask', descriptionFor('aimeat_dm_ask'), {
-    agent_name: agentNameSchema,
-    to: z.string().describe('Recipient: owner@node, agent#owner@node, or eco:app#owner@node.'),
-    questions: z.array(z.record(z.string(), z.unknown())).describe('1–20 questions, each { id, header, prompt, options:[{id,label}], multiSelect?, allowOther?, required? }.'),
-    body: z.string().optional().describe('Optional intro text shown above the questions (GFM markdown).'),
-    subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
-    conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
-    submit_label: z.string().optional().describe('Optional submit-button label.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_dm_ask'), async ({ agent_name, to, questions, body, subject, conversation_id, submit_label, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_dm_ask', descriptionFor('aimeat_dm_ask'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_ask') }, annotationsFor('aimeat_dm_ask'), async ({ agent_name, to, questions, body, subject, conversation_id, submit_label, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const payload: Record<string, unknown> = {
       to,
@@ -118,16 +84,7 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
       { tool: 'aimeat_dm_ask', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_dm_send_as_owner', descriptionFor('aimeat_dm_send_as_owner'), {
-    agent_name: agentNameSchema,
-    to: z.string().describe('Recipient: owner@node, agent#owner@node, or eco:app#owner@node.'),
-    body: z.string().optional().describe('Message body (GFM markdown). Optional if you attach a file.'),
-    reply_to: z.string().optional().describe('Id of a message you are replying to (keeps the thread).'),
-    subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
-    conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
-    attachments: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 20 { storage_key, mime, kind, size, name } descriptors.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_dm_send_as_owner'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_dm_send_as_owner', descriptionFor('aimeat_dm_send_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_send_as_owner') }, annotationsFor('aimeat_dm_send_as_owner'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const payload: Record<string, unknown> = { to };
     if (body) payload.body = body;
@@ -140,11 +97,7 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
       { tool: 'aimeat_dm_send_as_owner', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_dm_inbox', descriptionFor('aimeat_dm_inbox'), {
-    agent_name: agentNameSchema,
-    page: z.number().int().positive().optional().describe('Page number (default 1)'),
-    per_page: z.number().int().positive().max(100).optional().describe('Messages per page (default 20, max 100)'),
-  }, annotationsFor('aimeat_dm_inbox'), async ({ agent_name, page, per_page }) => {
+  mcp.tool('aimeat_dm_inbox', descriptionFor('aimeat_dm_inbox'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_inbox') }, annotationsFor('aimeat_dm_inbox'), async ({ agent_name, page, per_page }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (page) params.set('page', String(page));
@@ -156,33 +109,21 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
 
   // The owner's mailbox, on one explicit word. Thin over DELETE /v1/messages/:id, which is where the
   // scope is enforced and where the mailbox is resolved — this surface adds no rule of its own.
-  mcp.tool('aimeat_dm_delete_as_owner', descriptionFor('aimeat_dm_delete_as_owner'), {
-    agent_name: agentNameSchema,
-    message_id: z.string().describe('Id of the message to remove, from aimeat_dm_inbox or aimeat_dm_thread.'),
-  }, annotationsFor('aimeat_dm_delete_as_owner'), async ({ agent_name, message_id }) => {
+  mcp.tool('aimeat_dm_delete_as_owner', descriptionFor('aimeat_dm_delete_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_delete_as_owner') }, annotationsFor('aimeat_dm_delete_as_owner'), async ({ agent_name, message_id }) => {
     const { client } = pickAgent(registry, agent_name);
     return envelopeResult(await client.delete(`/v1/messages/${encodeURIComponent(message_id)}`));
   });
 
   // Reading the owner's mailbox, on messages:read-as-owner. Thin over GET /v1/messages/overview and
   // /conversations/:id, which is where the word is enforced and the mailbox resolved.
-  mcp.tool('aimeat_dm_inbox_as_owner', descriptionFor('aimeat_dm_inbox_as_owner'), {
-    agent_name: agentNameSchema,
-    limit: z.number().int().positive().max(200).optional().describe('At most this many conversations, newest first (default 30, max 200).'),
-    unread_only: z.boolean().optional().describe('Only conversations with something unread.'),
-  }, annotationsFor('aimeat_dm_inbox_as_owner'), async ({ agent_name, limit, unread_only }) => {
+  mcp.tool('aimeat_dm_inbox_as_owner', descriptionFor('aimeat_dm_inbox_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_inbox_as_owner') }, annotationsFor('aimeat_dm_inbox_as_owner'), async ({ agent_name, limit, unread_only }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams({ limit: String(limit ?? 30) });
     if (unread_only) params.set('unread', 'true');
     return envelopeResult(await client.get(`/v1/messages/overview?${params}`));
   });
 
-  mcp.tool('aimeat_dm_thread_as_owner', descriptionFor('aimeat_dm_thread_as_owner'), {
-    agent_name: agentNameSchema,
-    conversation_id: z.string().describe("The owner's conversation id (from aimeat_dm_inbox_as_owner or the reply context)."),
-    page: z.number().int().positive().optional().describe('Page number (default 1)'),
-    per_page: z.number().int().positive().max(200).optional().describe('Messages per page (default 50, max 200)'),
-  }, annotationsFor('aimeat_dm_thread_as_owner'), async ({ agent_name, conversation_id, page, per_page }) => {
+  mcp.tool('aimeat_dm_thread_as_owner', descriptionFor('aimeat_dm_thread_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_thread_as_owner') }, annotationsFor('aimeat_dm_thread_as_owner'), async ({ agent_name, conversation_id, page, per_page }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (page) params.set('page', String(page));
@@ -194,35 +135,18 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
   // Organising the owner's Messages list, on messages:organize-as-owner. Thin over
   // POST /v1/messages/organize/archive and GET/PUT /v1/messages/organize, where the word is enforced
   // and the mailbox resolved.
-  mcp.tool('aimeat_dm_archive_as_owner', descriptionFor('aimeat_dm_archive_as_owner'), {
-    agent_name: agentNameSchema,
-    conversation_ids: z.array(z.string()).describe('Conversation ids to archive or restore (1-500), from aimeat_dm_inbox_as_owner.'),
-    restore: z.boolean().optional().describe('true brings the conversations back to the list instead of archiving them.'),
-  }, annotationsFor('aimeat_dm_archive_as_owner'), async ({ agent_name, conversation_ids, restore }) => {
+  mcp.tool('aimeat_dm_archive_as_owner', descriptionFor('aimeat_dm_archive_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_archive_as_owner') }, annotationsFor('aimeat_dm_archive_as_owner'), async ({ agent_name, conversation_ids, restore }) => {
     const { client } = pickAgent(registry, agent_name);
     return envelopeResult(await client.post('/v1/messages/organize/archive', { conversation_ids, ...(restore !== undefined ? { restore } : {}) }));
   });
 
-  mcp.tool('aimeat_dm_organize_as_owner', descriptionFor('aimeat_dm_organize_as_owner'), {
-    agent_name: agentNameSchema,
-    auto_archive_enabled: z.boolean().optional().describe("Archive the own agents' conversations by age."),
-    auto_archive_days: z.number().int().optional().describe('Days without a message before that happens (1-365).'),
-    fold_same_subject: z.boolean().optional().describe('One row for conversations one sender opened with the same subject within an hour.'),
-    add_rule: z.record(z.string(), z.unknown()).optional().describe('A rule { id?, name, enabled?, action: "fold" | "group" | "archive", match: { with?, subject?, body?, scope?, older_than_days? } }.'),
-    remove_rule: z.string().optional().describe('Id of a rule to remove.'),
-    rules: z.array(z.record(z.string(), z.unknown())).optional().describe('Replace every rule with this list.'),
-  }, annotationsFor('aimeat_dm_organize_as_owner'), async ({ agent_name, auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules }) => {
+  mcp.tool('aimeat_dm_organize_as_owner', descriptionFor('aimeat_dm_organize_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_organize_as_owner') }, annotationsFor('aimeat_dm_organize_as_owner'), async ({ agent_name, auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules }) => {
     const { client } = pickAgent(registry, agent_name);
     const body = organizePatchBody({ auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules });
     return envelopeResult(Object.keys(body).length ? await client.put('/v1/messages/organize', body) : await client.get('/v1/messages/organize'));
   });
 
-  mcp.tool('aimeat_dm_thread', descriptionFor('aimeat_dm_thread'), {
-    agent_name: agentNameSchema,
-    conversation_id: z.string().describe('Conversation id (from aimeat_dm_inbox or aimeat_dm_send).'),
-    page: z.number().int().positive().optional().describe('Page number (default 1)'),
-    per_page: z.number().int().positive().max(200).optional().describe('Messages per page (default 50, max 200)'),
-  }, annotationsFor('aimeat_dm_thread'), async ({ agent_name, conversation_id, page, per_page }) => {
+  mcp.tool('aimeat_dm_thread', descriptionFor('aimeat_dm_thread'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_thread') }, annotationsFor('aimeat_dm_thread'), async ({ agent_name, conversation_id, page, per_page }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (page) params.set('page', String(page));

@@ -11,6 +11,7 @@
  *   import { registerAgentTelemetryTools } from './agent-telemetry.js';
  *   registerAgentTelemetryTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-05-28 -- Add public MCP telemetry reporting tool
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -29,14 +30,14 @@
 import { randomUUID } from 'node:crypto';
 import { recordTelemetryUsage } from '../services/usage-metering.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { pushTelemetry, recordTelemetryActivity } from '../services/telemetry-buffer.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { readUsageReport, OWNER_REPORTS, UnknownReportError } from '../services/usage/usage-read.js';
+import { readUsageReport, UnknownReportError } from '../services/usage/usage-read.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentTelemetryTools(
     mcp: McpServer,
@@ -48,14 +49,7 @@ export function registerAgentTelemetryTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool('aimeat_agent_telemetry_report', descriptionFor('aimeat_agent_telemetry_report'), {
-        type: z.enum(['llm_call', 'tool_call', 'agent_report']).default('agent_report')
-            .describe('Telemetry event type'),
-        data: z.record(z.string(), z.unknown()).optional()
-            .describe('Telemetry data such as tokens_in, tokens_out, ai_calls, duration_seconds, or tool name'),
-        session_id: z.string().optional().describe('Optional runtime session identifier'),
-        task_id: z.string().optional().describe('Optional related AIMEAT task id'),
-    }, annotationsFor('aimeat_agent_telemetry_report'), async ({ type, data, session_id, task_id }) => {
+    mcp.tool('aimeat_agent_telemetry_report', descriptionFor('aimeat_agent_telemetry_report'), zodShapeFor('aimeat_agent_telemetry_report'), annotationsFor('aimeat_agent_telemetry_report'), async ({ type, data, session_id, task_id }) => {
         const agent = await storage.getAgent(agentGaii);
         if (!agent) {
             return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
@@ -92,14 +86,7 @@ export function registerAgentTelemetryTools(
     // the report resolution and the freshness stamp happen once, where they were written. A tool
     // that queried storage itself would be a second implementation of the scoping rule, which is
     // exactly the shape that made one defect in aimeat_memory_write need fixing three times.
-    mcp.tool('aimeat_usage_report', descriptionFor('aimeat_usage_report'), {
-        report: z.enum(Object.keys(OWNER_REPORTS) as [string, ...string[]]).default('day')
-            .describe('Which report to read'),
-        from: z.string().optional().describe('Inclusive start day, YYYY-MM-DD (default: 30 days ago)'),
-        to: z.string().optional().describe('Inclusive end day, YYYY-MM-DD (default: today)'),
-        grain: z.enum(['day', 'hour']).optional().describe('Bucket size, where the report has one'),
-        limit: z.number().optional().describe('Maximum groups to return'),
-    }, annotationsFor('aimeat_usage_report'), async ({ report, from, to, grain, limit }) => {
+    mcp.tool('aimeat_usage_report', descriptionFor('aimeat_usage_report'), zodShapeFor('aimeat_usage_report'), annotationsFor('aimeat_usage_report'), async ({ report, from, to, grain, limit }) => {
         // The human behind this session, whichever principal is speaking. An agent asking about
         // usage is asking about its owner's account, which is the only account it has.
         const ownerGhii = ownerGhiiOf(agentGaii);

@@ -343,7 +343,7 @@ export function registerCoreTools(
     // aimeat_task_create. Mirrors the REST endpoint GET /v1/agents.
     mcp.registerTool(
         'aimeat_agents_list',
-        { description: descriptionFor('aimeat_agents_list'), inputSchema: {}, outputSchema: agentsListOutput, annotations: annotationsFor('aimeat_agents_list') },
+        { description: descriptionFor('aimeat_agents_list'), inputSchema: zodShapeFor('aimeat_agents_list'), outputSchema: agentsListOutput, annotations: annotationsFor('aimeat_agents_list') },
         async () => {
             const parsed = parseGAII(agentGaii);
             if (!parsed) {

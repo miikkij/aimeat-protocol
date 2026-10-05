@@ -17,6 +17,7 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.9.0 -- 2026-10-02 -- aimeat_agent_runtime_report takes `llm` ('node' | 'machine'), and an agent
  *     reports its own runtime without agent:write (scope-exempt, the sibling check in the handler).
  *   v1.8.0 -- 2026-10-02 -- aimeat_agent_tags_set: an agent sets its own tags without agent:write,
@@ -49,7 +50,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName, agentGaiiFromIdentifier } from '../utils/gaii.js';
@@ -58,9 +58,9 @@ import { toolError } from './tool-error.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
-import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentManagementTools(
     mcp: McpServer,
@@ -82,10 +82,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_tags_set',
         descriptionFor('aimeat_agent_tags_set'),
-        {
-            target_agent_name: z.string().describe('Agent whose tags to update (must be owned by the same owner as the calling agent).'),
-            tags: z.array(z.string()).describe('Replacement tag list. Empty array clears all tags.'),
-        },
+        zodShapeFor('aimeat_agent_tags_set'),
         annotationsFor('aimeat_agent_tags_set'),
         async ({ target_agent_name, tags }) => {
             const callerParsed = parseGAII(agentGaii);
@@ -123,10 +120,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_description_set',
         descriptionFor('aimeat_agent_description_set'),
-        {
-            target_agent_name: z.string().describe('Agent whose description to set (same owner as the caller).'),
-            description: z.string().describe('What this agent is, in a sentence or two. Empty clears it.'),
-        },
+        zodShapeFor('aimeat_agent_description_set'),
         annotationsFor('aimeat_agent_description_set'),
         async ({ target_agent_name, description }) => {
             const callerParsed = parseGAII(agentGaii);
@@ -146,10 +140,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_run_mode_set',
         descriptionFor('aimeat_agent_run_mode_set'),
-        {
-            target_agent_name: z.string().describe('Agent whose run mode to set (same owner as the caller).'),
-            run_mode: z.enum(['spawn', 'resident']).nullable().describe("'spawn' = started per job; 'resident' = kept running; null = nobody has said, and a spawner leaves it alone."),
-        },
+        zodShapeFor('aimeat_agent_run_mode_set'),
         annotationsFor('aimeat_agent_run_mode_set'),
         async ({ target_agent_name, run_mode }) => {
             const callerParsed = parseGAII(agentGaii);
@@ -165,16 +156,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_runtime_report',
         descriptionFor('aimeat_agent_runtime_report'),
-        {
-            target_agent_name: z.string().describe('Agent this is about (same owner as the caller).'),
-            kind: z.string().describe("What kind of thing runs, e.g. 'python' or 'crew-def'."),
-            file: z.string().optional().describe('Path to the file that runs, relative to your own root.'),
-            sha256: z.string().optional().describe("Hash of that file's contents."),
-            commit: z.string().optional().describe('Commit the file came from.'),
-            runtime: z.string().optional().describe("Which runtime read it, e.g. 'crewaimeat 0.7.0'."),
-            definition_revision: z.number().optional().describe('For a JSON crew: which definition revision was live.'),
-            llm: z.enum(['node', 'machine']).optional().describe("Where the crew's model calls go: 'node' through this node's /v1/llm with the agent's token, 'machine' to its provider with a key on its own machine."),
-        },
+        zodShapeFor('aimeat_agent_runtime_report'),
         annotationsFor('aimeat_agent_runtime_report'),
         async ({ target_agent_name, ...src }) => {
             const callerParsed = parseGAII(agentGaii);
@@ -198,10 +180,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_mode_set',
         descriptionFor('aimeat_agent_mode_set'),
-        {
-            target_agent_name: z.string().describe('Agent whose mode to update (must be owned by the same owner as the calling agent).'),
-            mode: z.enum(VALID_MODES).describe('New mode.'),
-        },
+        zodShapeFor('aimeat_agent_mode_set'),
         annotationsFor('aimeat_agent_mode_set'),
         async ({ target_agent_name, mode }) => {
             const callerParsed = parseGAII(agentGaii);
@@ -234,7 +213,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_basics_get',
         descriptionFor('aimeat_agent_basics_get'),
-        {},
+        zodShapeFor('aimeat_agent_basics_get'),
         annotationsFor('aimeat_agent_basics_get'),
         async () => {
             const callerParsed = parseGAII(agentGaii);
@@ -253,7 +232,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_basics_request',
         descriptionFor('aimeat_agent_basics_request'),
-        { note: z.string().max(300).optional().describe('One short phrase on why you are asking, shown to the person with the request.') },
+        zodShapeFor('aimeat_agent_basics_request'),
         annotationsFor('aimeat_agent_basics_request'),
         async ({ note }) => {
             const callerParsed = parseGAII(agentGaii);
@@ -276,15 +255,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_propose',
         descriptionFor('aimeat_agent_propose'),
-        {
-            name: z.string().describe('The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.'),
-            purpose: z.string().describe('What this agent is for, in a sentence the owner can decide from.'),
-            display_name: z.string().optional().describe('The name shown to the person. Defaults to the agent name.'),
-            scopes: z.array(z.string()).optional().describe('Exactly what it may do. Never more than the calling agent holds.'),
-            mode: z.string().optional().describe("Task handling: task-runner, autonomous, interactive, coordinator or workstation."),
-            run_mode: z.string().optional().describe("'spawn' (a worker per piece of work) or 'resident' (stays up)."),
-            crew_def: z.record(z.string(), z.unknown()).optional().describe('What it would BE, in the crewaimeat crew_def shape.'),
-        },
+        zodShapeFor('aimeat_agent_propose'),
         annotationsFor('aimeat_agent_propose'),
         async (input) => {
             const callerParsed = parseGAII(agentGaii);
@@ -323,10 +294,7 @@ export function registerAgentManagementTools(
     mcp.tool(
         'aimeat_agent_console_set',
         descriptionFor('aimeat_agent_console_set'),
-        {
-            target_agent_name: z.string().describe('Agent whose console address to set (must be owned by the same owner as the calling agent).'),
-            console_url: z.string().describe("Absolute http(s) URL of that agent's page in its host, or '' to clear it."),
-        },
+        zodShapeFor('aimeat_agent_console_set'),
         annotationsFor('aimeat_agent_console_set'),
         async ({ target_agent_name, console_url }) => {
             const callerParsed = parseGAII(agentGaii);
