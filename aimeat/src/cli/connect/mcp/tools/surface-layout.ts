@@ -17,9 +17,7 @@
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
@@ -38,13 +36,7 @@ export function registerSurfaceLayoutTools(mcp: McpServer, registry: AgentRegist
     return out({ ok: true, data: { ...(layout.data as object), available_blocks: (blocks.data as { blocks?: unknown })?.blocks ?? [] } });
   });
 
-  mcp.tool('aimeat_surface_layout_set', descriptionFor('aimeat_surface_layout_set'), {
-    surface: z.string().describe("Which page: 'portal', 'home' or 'home-onboarding'."),
-    blocks: z.array(z.record(z.string(), z.unknown()))
-      .describe('The blocks in the order they should appear. Each is { id, key } with optional props, titles, hidden, children and — on a free-form block — body.'),
-    note: z.string().optional().describe('One line on what this change was for. It shows in the node change log.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_surface_layout_set'), async ({ surface, blocks, note, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_surface_layout_set', descriptionFor('aimeat_surface_layout_set'), zodShapeFor('aimeat_surface_layout_set'), annotationsFor('aimeat_surface_layout_set'), async ({ surface, blocks, note, ai_provenance, ai_provenance_id }) => {
     return out(await client.put(`/v1/site/layout/${encodeURIComponent(surface)}`, {
       v: 1, blocks,
       ...(note ? { meta: { note } } : {}),

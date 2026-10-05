@@ -21,7 +21,9 @@
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
+import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
+import { AiProvenanceBlockSchema } from '../ai-provenance-schema.js';
 
 export const surfaceLayoutTools = [
     {
@@ -49,9 +51,9 @@ export const surfaceLayoutTools = [
         surfaces: ['admin'],
         input: {
             surface: { type: 'string', required: true, description: "Which page: 'portal', 'home' or 'home-onboarding'." },
-            blocks: { type: 'array', required: true, description: 'The blocks in the order they should appear. Each is { id, key } with optional props, titles, hidden, children and — on a free-form block — body.' },
+            blocks: { type: 'array', required: true, description: 'The blocks in the order they should appear. Each is { id, key } with optional props, titles, hidden, children and — on a free-form block — body.', zod: z.array(z.record(z.string(), z.unknown())) },
             note: { type: 'string', description: 'One line on what this change was for. It shows in the node change log.' },
-            ai_provenance: { type: 'object', description: 'What you did to produce the words in a free-form block, if you wrote them. Optional; saying nothing leaves it unstated rather than claiming a person wrote it.' },
+            ai_provenance: { type: 'object', description: 'What you did to produce the words in a free-form block, if you wrote them. Optional; saying nothing leaves it unstated rather than claiming a person wrote it.', zod: AiProvenanceBlockSchema },
             ai_provenance_id: { type: 'string', description: 'An existing provenance record of your own to attach instead of declaring a new one.' },
         },
     },

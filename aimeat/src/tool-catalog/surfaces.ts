@@ -227,7 +227,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_voice_reply', 'aimeat_voice_speak',
+        
         
         
         
@@ -248,7 +248,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
     agent: [
         
         
-        'aimeat_voice_reply', 'aimeat_voice_speak',
+        
         
         
         

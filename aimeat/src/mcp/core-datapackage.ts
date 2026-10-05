@@ -30,12 +30,11 @@
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, B3).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { emitChange } from '../services/event-bus.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -81,25 +80,7 @@ export function registerCoreDataPackageTools(
     mcp.tool(
         'aimeat_datapackage_publish',
         descriptionFor('aimeat_datapackage_publish'),
-        {
-            name: z.string().describe('Package name: lowercase letters, digits and dashes. It becomes part of the permanent URL.'),
-            changes: z.string().describe('REQUIRED. What changed against the previous version and why. A version nobody explained is one a consumer cannot decide about.'),
-            resources: z.array(z.object({
-                name: z.string().describe('Becomes data/{name}.csv inside the package.'),
-                rows: z.array(z.record(z.string(), z.unknown())).describe('The table, as an array of objects.'),
-                schema: z.unknown().optional().describe('A Frictionless Table Schema to DECLARE the types. Omit to have them inferred — the descriptor then records schemaSource "inferred", so a consumer can see nobody confirmed them.'),
-                title: z.string().optional(),
-                description: z.string().optional(),
-            })).min(1),
-            title: z.string().optional(),
-            description: z.string().optional(),
-            license: z.string().optional().describe('e.g. CC-BY-4.0. You are publishing under your owner\'s name; say the terms.'),
-            sources: z.array(z.object({
-                url: z.string().optional(), title: z.string().optional(), retrievedAt: z.string().optional(),
-            })).optional().describe('Where the data came from. Part of the product for anything derived from a register.'),
-            legal_basis: z.string().optional(),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_datapackage_publish'),
         annotationsFor('aimeat_datapackage_publish'),
         async ({ name, changes, resources, title, description, license, sources, legal_basis, ai_provenance, ai_provenance_id }) => {
             const bytes = Buffer.byteLength(JSON.stringify(resources ?? []), 'utf8');

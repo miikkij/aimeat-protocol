@@ -188,9 +188,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // Reconfigure ANOTHER of the owner's agents. An agent describing itself needs nothing;
     // reaching sideways at a sibling principal with its own identity and trust score does.
 
-    aimeat_voice_reply:                       'ai:use',
-    aimeat_voice_speak:                       'ai:use',
-
     // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
     ...OPERATOR_TOOL_SCOPES,
 
