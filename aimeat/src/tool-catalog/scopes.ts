@@ -285,24 +285,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
 
     aimeat_wallet_transactions: 'wallet:read',
 
-    // Agent v2 messaging. Same words as the doors behind them, and the same words the DM tools take:
-    // sending on this account's behalf is one permission however the turn is shaped. Registering a
-    // delivery target rides agent:write, not a messaging word, because it configures a PRINCIPAL and
-    // what it configures is where this node makes an outbound call carrying a secret — the same
-    // class of act as setting an agent's webhook.
-    aimeat_v2_message_send: 'messages:send',
-    aimeat_v2_message_list: 'messages:read',
-    aimeat_v2_push_set: 'agent:write',
-    aimeat_v2_push_list: 'messages:read',
-    aimeat_v2_push_delete: 'agent:write',
-
-    // Agent v2 tasks ride task:write, the word the existing task routes take. Creating work,
-    // reporting on it and cancelling it are one authority over work on this account; the reads are
-    // ungated for the same reason the existing task reads are.
-    aimeat_v2_task_create: 'task:write',
-    aimeat_v2_task_status: 'task:write',
-    aimeat_v2_task_cancel: 'task:write',
-
 };
 
 /** Tool -> the scope words it needs: each catalog entry's `scope`, and the list above. */

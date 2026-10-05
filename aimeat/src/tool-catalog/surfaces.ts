@@ -282,10 +282,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // A turn between two principals of ONE account, beside the owner thread and the federated
         // DM above it rather than instead of either. Agent surface only: the service surface carries
         // no messaging at all, and the primitives surface reaches these through aimeat_invoke.
-        'aimeat_v2_message_send', 'aimeat_v2_message_list',
-        'aimeat_v2_push_set', 'aimeat_v2_push_list', 'aimeat_v2_push_delete',
-        'aimeat_v2_task_create', 'aimeat_v2_task_list', 'aimeat_v2_task_get',
-        'aimeat_v2_task_status', 'aimeat_v2_task_cancel',
+        
+        
+        
+        
         
         
         // Taking a shipped package into use, beside the company tools rather than with the

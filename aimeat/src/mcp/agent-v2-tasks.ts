@@ -14,6 +14,7 @@
  * @structure registerAgentV2TaskTools(mcp, storage, config, getAgentGaii, getOwner)
  * @usage registerAgentV2TaskTools(mcp, storage, config, () => agentGaii, () => owner);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,6 +26,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { publicTask } from '../models/agent-v2-task.js';
 import { createTask, listTasks, getTask, setTaskStatus, cancelTask } from '../services/agent-v2-tasks-ops.js';
 import type { Principal, OpResult } from '../services/agent-v2-messaging-ops.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 function reply<T>(out: OpResult<T>, shape: (value: T) => unknown) {
   if (!out.ok) {
@@ -35,9 +37,6 @@ function reply<T>(out: OpResult<T>, shape: (value: T) => unknown) {
   }
   return { content: [{ type: 'text' as const, text: JSON.stringify(shape(out.value), null, 2) }] };
 }
-
-const partsSchema = z.array(z.record(z.string(), z.unknown()))
-  .describe('Parts: {kind:"text",text} or {kind:"file",file:{uri,name?,mimeType?}} or {kind:"data",data:{...}}.');
 
 export function registerAgentV2TaskTools(
   mcp: McpServer,
@@ -51,15 +50,7 @@ export function registerAgentV2TaskTools(
   mcp.tool(
     'aimeat_v2_task_create',
     descriptionFor('aimeat_v2_task_create'),
-    {
-      assigned_to: z.string().describe('The principal that is to do this.'),
-      input: partsSchema,
-      context_id: z.string().optional().describe('The exchange this work belongs to.'),
-      status_message: z.string().optional().describe('One line for a person about what this is.'),
-      ttl_ms: z.number().optional().describe('How long the result stays worth reading, in milliseconds.'),
-      poll_interval_ms: z.number().optional().describe('How often you intend to poll, in milliseconds.'),
-      metadata: z.record(z.string(), z.unknown()).optional().describe('Carried along, never read by the node.'),
-    },
+    zodShapeFor('aimeat_v2_task_create'),
     annotationsFor('aimeat_v2_task_create'),
     async (args) => reply(
       await createTask(storage, config, principal(), args),
@@ -87,7 +78,7 @@ export function registerAgentV2TaskTools(
   mcp.tool(
     'aimeat_v2_task_get',
     descriptionFor('aimeat_v2_task_get'),
-    { task_id: z.string().describe('The task id.') },
+    zodShapeFor('aimeat_v2_task_get'),
     annotationsFor('aimeat_v2_task_get'),
     async (args) => reply(
       await getTask(storage, principal(), args.task_id),
@@ -98,15 +89,7 @@ export function registerAgentV2TaskTools(
   mcp.tool(
     'aimeat_v2_task_status',
     descriptionFor('aimeat_v2_task_status'),
-    {
-      task_id: z.string().describe('The task id.'),
-      status: z.enum(['working', 'input_required', 'completed', 'failed']).describe('Where it has got to.'),
-      status_message: z.string().optional().describe('One line for a person.'),
-      result: partsSchema.optional().describe('What came back. Required when completing.'),
-      error: z.record(z.string(), z.unknown()).optional().describe('{ code, message }. Required when failing.'),
-      ttl_ms: z.number().optional().describe('How long the result stays worth reading, in milliseconds.'),
-      poll_interval_ms: z.number().optional().describe('How often the caller should poll from here.'),
-    },
+    zodShapeFor('aimeat_v2_task_status'),
     annotationsFor('aimeat_v2_task_status'),
     async (args) => reply(
       await setTaskStatus(storage, config, principal(), args.task_id, args),
@@ -117,10 +100,7 @@ export function registerAgentV2TaskTools(
   mcp.tool(
     'aimeat_v2_task_cancel',
     descriptionFor('aimeat_v2_task_cancel'),
-    {
-      task_id: z.string().describe('The task id.'),
-      reason: z.string().optional().describe('Why, in one line.'),
-    },
+    zodShapeFor('aimeat_v2_task_cancel'),
     annotationsFor('aimeat_v2_task_cancel'),
     async (args) => reply(
       await cancelTask(storage, config, principal(), args.task_id, args.reason),

@@ -16,6 +16,7 @@
  * @structure registerAgentV2MessagingTools(mcp, storage, config, getAgentGaii, getOwner)
  * @usage registerAgentV2MessagingTools(mcp, storage, config, () => agentGaii, () => owner);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -28,6 +29,7 @@ import {
   sendTurn, listTurns, setPushTarget, listPushTargets, deletePushTarget,
   type Principal, type OpResult,
 } from '../services/agent-v2-messaging-ops.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** One answer, as MCP content. A refusal keeps its code, so a model can tell the kinds apart. */
 function reply<T>(out: OpResult<T>, shape: (value: T) => unknown) {
@@ -39,10 +41,6 @@ function reply<T>(out: OpResult<T>, shape: (value: T) => unknown) {
   }
   return { content: [{ type: 'text' as const, text: JSON.stringify(shape(out.value), null, 2) }] };
 }
-
-/** The parts array, as the tool declares it. Validated properly by the model layer behind the ops. */
-const partsSchema = z.array(z.record(z.string(), z.unknown()))
-  .describe('Ordered parts. Each is {kind:"text",text} or {kind:"file",file:{uri,name?,mimeType?}} or {kind:"data",data:{...}}.');
 
 export function registerAgentV2MessagingTools(
   mcp: McpServer,
@@ -56,14 +54,7 @@ export function registerAgentV2MessagingTools(
   mcp.tool(
     'aimeat_v2_message_send',
     descriptionFor('aimeat_v2_message_send'),
-    {
-      to: z.string().describe('The recipient principal on this account: an agent GAII, an ecosystem app, or the owner GHII.'),
-      parts: partsSchema,
-      role: z.enum(['user', 'agent']).optional().describe('"user" if you are asking, "agent" if you are answering. Default "user".'),
-      context_id: z.string().optional().describe('The exchange this turn belongs to. Omit on the first turn.'),
-      task_id: z.string().optional().describe('The task this turn belongs to, if there is one.'),
-      metadata: z.record(z.string(), z.unknown()).optional().describe('Carried along, never read by the node.'),
-    },
+    zodShapeFor('aimeat_v2_message_send'),
     annotationsFor('aimeat_v2_message_send'),
     async (args) => reply(
       await sendTurn(storage, config, principal(), {
@@ -95,13 +86,7 @@ export function registerAgentV2MessagingTools(
   mcp.tool(
     'aimeat_v2_push_set',
     descriptionFor('aimeat_v2_push_set'),
-    {
-      url: z.string().describe('The https address to POST a turn to.'),
-      token: z.string().optional().describe('An opaque string echoed back inside every delivery.'),
-      authentication: z.record(z.string(), z.unknown()).optional().describe('{ schemes: ["Bearer"], credentials: "…" }. The credentials are stored and sent, never returned.'),
-      id: z.string().optional().describe('Replace this existing target. Must be one already registered on this account.'),
-      principal: z.string().optional().describe('Whose deliveries these are. Defaults to you.'),
-    },
+    zodShapeFor('aimeat_v2_push_set'),
     annotationsFor('aimeat_v2_push_set'),
     async (args) => reply(
       await setPushTarget(storage, config, principal(), args),
@@ -112,7 +97,7 @@ export function registerAgentV2MessagingTools(
   mcp.tool(
     'aimeat_v2_push_list',
     descriptionFor('aimeat_v2_push_list'),
-    { principal: z.string().optional().describe('Account holder only: whose targets to list.') },
+    zodShapeFor('aimeat_v2_push_list'),
     annotationsFor('aimeat_v2_push_list'),
     async (args) => reply(
       await listPushTargets(storage, config, principal(), args.principal),
@@ -123,7 +108,7 @@ export function registerAgentV2MessagingTools(
   mcp.tool(
     'aimeat_v2_push_delete',
     descriptionFor('aimeat_v2_push_delete'),
-    { id: z.string().describe('The target id, from aimeat_v2_push_list.') },
+    zodShapeFor('aimeat_v2_push_delete'),
     annotationsFor('aimeat_v2_push_delete'),
     async (args) => reply(
       await deletePushTarget(storage, config, principal(), args.id),
