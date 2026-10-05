@@ -33,6 +33,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   v1.4.1 — 2026-10-05 — aimeat-paying-for-the-ai: a call that names its model is refused once the
+ *     allowance is spent, and the operator may choose daily limits instead (secaudit 2026-10, AI-1).
  *   v1.4.0 — 2026-10-03 — aimeat-first-conversation: the first move is the profile interview and the
  *     business card made from it (stage 1 of aimeat-guided-journey), not a welcome page in the first
  *     reply; the page names are links (the Connect page and the AI keys page), and the model names
@@ -482,9 +484,14 @@ not you:
 2. **The node's key**, while their allowance has something left, and only when the person has no
    provider of their own for what the call asks for. A person whose own provider cannot answer is
    told why; the node's key does not quietly step in.
-3. **A free model** once the allowance is spent — \`openrouter/free\` by default. The answer still
-   comes; it comes from a weaker model. Unless the owner's model policy leaves the free model out:
-   then the call is refused (\`QUOTA_EXHAUSTED\`, saying so), because the owner ruled weaker models out.
+3. **A free model** once the allowance is spent — \`openrouter/free\` by default — for a text call
+   that names no model. The answer still comes; it comes from a weaker model. Unless the owner's
+   model policy leaves the free model out: then the call is refused (\`QUOTA_EXHAUSTED\`, saying so),
+   because the owner ruled weaker models out. A call that names its own model is refused
+   (\`QUOTA_EXHAUSTED\`) once the allowance is spent: the node never swaps the model a caller named,
+   and its key pays nothing more. The operator may choose otherwise: with daily limits on, the
+   node's key keeps paying past the allowance up to a cap per account and a cap for all accounts,
+   and the refusal then says which cap was reached and that it opens again the next day (UTC).
 
 **One step can come before all three: a key for a single agent.** The owner may give one agent a key
 of its own on that agent's page (AI keys, cap and gate). That key then pays for that agent's calls

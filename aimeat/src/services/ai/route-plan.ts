@@ -54,7 +54,6 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import type { NodeKeyStanding } from '../ai-allowance.js';
 import { AiCompletionError } from './errors.js';
 import { chooseModel, freeModelAllowed, type LoadedPolicy, type PolicyCallContext } from './policy-gate.js';
 import { parseModelRef } from './policy.js';
@@ -84,6 +83,14 @@ export interface AiCandidate {
   allowanceRemainingUsd?: number;
   /** The allowance was spent and the free model answers instead of a refusal. */
   degradedToFree?: boolean;
+}
+
+/** What ai-allowance.ts nodeKeyStanding answers: may the node's key pay one more call, and if not, why. */
+export interface NodeKeyAnswer {
+  remainingUsd: number;
+  mayPay: boolean;
+  reason?: string;
+  message?: string;
 }
 
 export type RejectReason =
@@ -127,8 +134,9 @@ export interface RoutePlanInput {
    * what every call used before providers existed (ai-model-defaults.ts).
    */
   legacyModel: (capability: AiCapability) => string | undefined;
-  /** Whether the node's key may pay for this owner (ai-allowance.ts nodeKeyStanding), read at most once. */
-  nodeAllowance: () => Promise<NodeKeyStanding>;
+  /** Whether the node's key may pay for this owner (ai-allowance.ts nodeKeyStanding), read at most once.
+   *  The shape is written out here: importing it would close a cycle through ai-completion.ts. */
+  nodeAllowance: () => Promise<NodeKeyAnswer>;
   /** What the call will use, for the owner's price ceiling: the prompt's tokens (a quarter of its
    *  length) and the answer's cap. Absent, a text call is estimated at 1024 tokens each way. */
   estimate?: { promptTokens?: number; maxTokens?: number };
@@ -304,7 +312,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
   const rejected: RejectedCandidate[] = [];
   const reject = (p: AiProvider, reason: RejectReason, message: string, extra: Partial<RejectedCandidate> = {}) =>
     rejected.push({ provider: p.id, title: p.title, reason, message, ...extra });
-  let allowance: NodeKeyStanding | null = null;
+  let allowance: NodeKeyAnswer | null = null;
   const deferred: Array<{ candidate: AiCandidate; message: string }> = [];
 
   for (const [p, by, sameModelRef] of list) {
