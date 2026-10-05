@@ -37,13 +37,20 @@ import { getAimeatToolDefinition } from '../../src/tool-catalog/definitions.js';
 export interface CapturedTool {
     inputKeys: string[];
     hasOutputSchema: boolean;
+    /** The zod raw shape the tool registered (MCP surfaces only), for comparing whole schemas. */
+    shape?: Record<string, unknown>;
+}
+
+/** The zod raw shape from an mcp.tool(...) call's arguments. */
+function shapeFromToolArgs(args: unknown[]): Record<string, unknown> | undefined {
+    // Codebase forms: tool(name, descString, schemaObj, annObj?, handler) or tool(name, schemaObj, handler)
+    const candidate = typeof args[1] === 'string' ? args[2] : args[1];
+    return candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? candidate as Record<string, unknown> : undefined;
 }
 
 /** Extract the top-level input-schema keys from an mcp.tool(...) call's arguments. */
 function keysFromToolArgs(args: unknown[]): string[] {
-    // Codebase forms: tool(name, descString, schemaObj, annObj?, handler) or tool(name, schemaObj, handler)
-    const candidate = typeof args[1] === 'string' ? args[2] : args[1];
-    return candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? Object.keys(candidate) : [];
+    return Object.keys(shapeFromToolArgs(args) ?? {});
 }
 
 /** A Proxy that satisfies whatever the register functions call; records tool registrations. */
@@ -54,7 +61,7 @@ function makeFakeMcp(sink: Map<string, CapturedTool>) {
             if (prop === 'server') return server;
             if (prop === 'tool') {
                 return (...args: unknown[]) => {
-                    sink.set(args[0] as string, { inputKeys: keysFromToolArgs(args), hasOutputSchema: false });
+                    sink.set(args[0] as string, { inputKeys: keysFromToolArgs(args), hasOutputSchema: false, shape: shapeFromToolArgs(args) });
                     return undefined;
                 };
             }
@@ -64,6 +71,7 @@ function makeFakeMcp(sink: Map<string, CapturedTool>) {
                     sink.set(args[0] as string, {
                         inputKeys: cfg.inputSchema ? Object.keys(cfg.inputSchema) : [],
                         hasOutputSchema: cfg.outputSchema !== undefined,
+                        shape: cfg.inputSchema as Record<string, unknown> | undefined,
                     });
                     return undefined;
                 };

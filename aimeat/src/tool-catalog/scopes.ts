@@ -22,6 +22,9 @@
  *   import { scopeAllowsTool } from './scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.50.0 -- 2026-10-05 -- TOOL_SCOPES is each catalog entry's `scope` plus the list here, which
+ *     only shrinks as each catalog group carries its own (secaudit 2026-10, M3). ToolScope moved to
+ *     definitions/types.ts and is re-exported.
  *   v1.49.0 -- 2026-10-05 -- An entry may name several words, all needed (ToolScope, toolScopeWords,
  *     requiredScopesForTool replaces requiredScopeForTool): aimeat_refinery_run names the four its
  *     route asks, so it is no longer offered to an agent that cannot run it (secaudit 2026-10, C3).
@@ -151,6 +154,8 @@
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { OPERATOR_TOOL_SCOPES } from './scopes-operator.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
+import type { ToolScope } from './definitions/types.js';
 
 /**
  * Tool -> required scope, mirroring the REST requireScope() gate for the SAME operation.
@@ -159,14 +164,15 @@ import { OPERATOR_TOOL_SCOPES } from './scopes-operator.js';
 // The tools that change state and deliberately need no scope, each with its reason (moved unchanged).
 export { SCOPE_EXEMPT_TOOLS } from './scope-exempt-tools.js';
 
-/** One word, or every word of a list: a tool whose route asks for several asks for all of them. */
-export type ToolScope = string | readonly string[];
+export type { ToolScope };
 
 /** The words a TOOL_SCOPES entry names, as a list. */
 export const toolScopeWords = (entry: ToolScope | undefined): string[] =>
     entry === undefined ? [] : typeof entry === 'string' ? [entry] : [...entry];
 
-export const TOOL_SCOPES: Record<string, ToolScope> = {
+// The tools whose catalog entry does not carry its `scope` yet (secaudit 2026-10, M3: one catalog
+// group per commit moves its entries onto the definitions, and this list only shrinks).
+const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // ── August 2026 audit, step 3a ───────────────────────────────────────────────────────────────
     // 73 mutating tools had no entry here, and scopeAllowsTool() reads a missing entry as PERMISSION,
     // so any agent holding any single scope could call all of them. These 55 now say what they need.
@@ -651,11 +657,6 @@ export const TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_mail_search: 'connections:read-through',
     aimeat_mail_read: 'connections:read-through',
     aimeat_mail_aliases: 'connections:read-through',
-    // A refinery batch reads what is in a mailbox, and its progress names the subjects it read.
-    // A run spends all four, as POST /v1/refinery/runs asks (REFINERY_RUN_SCOPES): offered on one word,
-    // the tool was listed to an agent every call of which then failed (secaudit 2026-10, C3).
-    aimeat_refinery_run: ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'],
-    aimeat_refinery_status: 'connections:read-through',
 
     // Remote MCP servers. The same three-way split as connections above, and for the same reason:
     // knowing WHICH servers are attached, calling a tool THROUGH one, and attaching another are
@@ -749,6 +750,12 @@ export const TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_exchange_work: 'exchange:write',
     aimeat_exchange_work_deliver: 'exchange:write',
     aimeat_exchange_proposal_decide: 'exchange:write',
+};
+
+/** Tool -> the scope words it needs: each catalog entry's `scope`, and the list above. */
+export const TOOL_SCOPES: Record<string, ToolScope> = {
+    ...LISTED_TOOL_SCOPES,
+    ...Object.fromEntries(CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.scope !== undefined).map(d => [d.name, d.scope!])),
 };
 
 /** The scopes required to use a tool, all of them; empty if the tool is not scope-gated. */

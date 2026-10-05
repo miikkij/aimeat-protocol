@@ -10,9 +10,9 @@
  *   APPENDED, NEVER SUBSTITUTED. Every one of those descriptions is working prompt text an agent
  *   already behaves correctly on; this adds a sentence at the end and changes nothing before it.
  *
- *   A LEAF MODULE ON PURPOSE. The catalog is loaded by the CLI fallback path as well as the server,
- *   so it imports nothing but types. `src/mcp/ai-provenance-input.ts` (the zod side) re-exports the
- *   sentence from here rather than spelling it a second time.
+ *   The `ai_provenance` field carries its exact schema (../ai-provenance-schema.ts), which both MCP
+ *   surfaces register through zodShapeFor(). `src/mcp/ai-provenance-input.ts` re-exports the sentence
+ *   and the schema rather than spelling either a second time.
  * @structure
  *   - AI_PROVENANCE_TOOL_NOTE   — the sentence, appended to a write tool's description
  *   - aiProvenanceCatalogInput  — the `ai_provenance` + `ai_provenance_id` input entries
@@ -21,10 +21,13 @@
  *   { name: 'aimeat_memory_write', description: 'Write a memory entry…' + AI_PROVENANCE_TOOL_NOTE,
  *     input: { key: {…}, ...aiProvenanceCatalogInput } }
  * @version-history
+ *   v1.1.0 — 2026-10-05 — `ai_provenance` carries its exact schema, and the fragment keeps its literal type
+ *     (`as const satisfies`), so zodShapeFor() types it (secaudit 2026-10, M3).
  *   v1.0.1 — 2026-09-26 — The catalog entry names `provider` and asks for the declarer's own model.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4.
  */
 import type { ToolInputField } from './types.js';
+import { AiProvenanceBlockSchema } from '../ai-provenance-schema.js';
 
 /**
  * The one sentence. Stated positively — what to DO — and it names the consequence of silence,
@@ -38,9 +41,10 @@ export const AI_PROVENANCE_TOOL_NOTE =
   + ' person wrote, say so with level:"original" — silence is recorded as model-written.';
 
 /** The two provenance inputs, for the catalog's documented input contract. */
-export const aiProvenanceCatalogInput: Record<string, ToolInputField> = {
+export const aiProvenanceCatalogInput = {
   ai_provenance: {
     type: 'object',
+    zod: AiProvenanceBlockSchema,
     description:
       'How this content was made: { level, method?, human_involvement?, model?, provider?, sources?, '
       + 'notes? }. `level` is required when the block is present: original | assisted | synthesized | '
@@ -56,4 +60,4 @@ export const aiProvenanceCatalogInput: Record<string, ToolInputField> = {
       'Attach an EXISTING provenance record instead of declaring a new one — the id the node '
       + 'returned when it generated this content for you. Only your own records can be attached.',
   },
-};
+} as const satisfies Record<string, ToolInputField>;

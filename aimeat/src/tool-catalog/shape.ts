@@ -69,7 +69,7 @@ export function descriptionFor(name: string): string {
  * fields are present (e.g. a surface uses a different field name), return the record unchanged
  * so 'concise' degrades to a no-op rather than producing {}.
  */
-function projectRecord(value: unknown, fields: string[]): unknown {
+function projectRecord(value: unknown, fields: readonly string[]): unknown {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
     const source = value as Record<string, unknown>;
     const out: Record<string, unknown> = {};
@@ -79,7 +79,7 @@ function projectRecord(value: unknown, fields: string[]): unknown {
     return Object.keys(out).length === 0 ? value : out;
 }
 
-function projectArray(value: unknown[], fields: string[]): unknown[] {
+function projectArray(value: unknown[], fields: readonly string[]): unknown[] {
     return value.map(item => projectRecord(item, fields));
 }
 

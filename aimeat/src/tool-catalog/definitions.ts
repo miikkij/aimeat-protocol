@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-10-05 -- CatalogTool: the entries with their literal types, for zodShapeFor()
+ *     (secaudit 2026-10, M3).
  *   v1.x -- 2026-09-29 -- definitions/classification.ts: aimeat_classification (TARGET-082 V2).
  *   v1.x -- 2026-09-29 -- definitions/refinery.ts: aimeat_refinery_classes, _run and _status (wish aimeat-refinery).
  *   v1.x -- 2026-09-28 -- definitions/install-sets.ts: aimeat_admin_install_set (install packages, phase 4).
@@ -77,7 +79,7 @@ import { connectionTools } from './definitions/connections.js';
 import { refineryTools } from './definitions/refinery.js';
 import { mcpProxyTools } from './definitions/mcp-proxy.js';
 
-export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
+const CATALOG = [
     ...agentMessagingTools,
     ...crewTools,
     ...schedulesTasksMemoryTools,
@@ -111,6 +113,14 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...refineryTools,
     ...mcpProxyTools,
 ];
+
+export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;
+
+/**
+ * Every catalog entry with its literal type, for a group file declared `as const satisfies`: what
+ * zodShapeFor() (zod-shape.ts) reads to type a tool's handler arguments from its catalog entry.
+ */
+export type CatalogTool = (typeof CATALOG)[number];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));
 

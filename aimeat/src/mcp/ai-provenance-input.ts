@@ -41,6 +41,8 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.3.0 — 2026-10-05 — AiProvenanceBlockSchema moved unchanged to src/tool-catalog/ai-provenance-schema.ts,
+ *     the catalog's exact schema of the field, and is re-exported here (secaudit 2026-10, M3).
  *   v1.2.1 — 2026-09-26 — `model` asks the declarer for its OWN model id. A GPT-6 build of
  *     material-lab declared `provider: "openai"` and no model, so its record could not say which one.
  *   v1.2.0 — 2026-08-01 — TARGET-058. parseDeclaredProvenanceInput(): the same validation + mapping
@@ -53,63 +55,17 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4.
  */
 import { z } from 'zod';
-import {
-  AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AiSourceUrlSchema,
-} from '../models/ai-provenance-schemas.js';
+import { AiProvenanceBlockSchema } from '../tool-catalog/ai-provenance-schema.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
 
-// The sentence appended to every write tool's description lives in the catalog (a leaf module the
-// CLI fallback path can load without pulling in zod or the services layer) and is re-exported here
-// so there is exactly one copy of it.
+// The sentence appended to every write tool's description lives in the catalog and is re-exported
+// here so there is exactly one copy of it.
 export { AI_PROVENANCE_TOOL_NOTE } from '../tool-catalog/definitions/ai-provenance-note.js';
 
-const sourceInput = z.object({
-  // The SAME scheme rule the stored record enforces, applied at the door. This field used to be a
-  // bare `z.string()`: a declaration could carry `javascript:…`, the mint would then throw deep in
-  // the service, and an author publishing an app got an opaque failure for an input the tool had
-  // just accepted. One rule, stated once, refused where the caller can see it.
-  url: AiSourceUrlSchema.describe('Where the material came from. Must be an http or https address.'),
-  title: z.string().optional(),
-  retrieved_at: z.string().optional().describe('ISO 8601 timestamp of when you fetched it.'),
-  role: z.string().optional().describe("How it was used, e.g. 'primary' or 'background'."),
-});
-
-/**
- * The declaration block. `level` is required once the block is present, because a block that says
- * nothing about level says nothing at all; everything else is optional detail the node records if
- * offered and works out for itself if not.
- *
- * EXPORTED because the connector's SHELL-callable surface (`aimeat connect call`,
- * `POST /local/call/:tool`) has no zod layer of its own and must validate the same block against the
- * same enums. Two spellings of "what a declaration may say" is how the two surfaces drifted apart in
- * the first place (TARGET-058 Phase 11).
- */
-export const AiProvenanceBlockSchema = z.object({
-  level: z.enum(AI_PROVENANCE_LEVELS).describe(
-    "How much of this a model made. 'original' = a person wrote it, no model involved. "
-    + "'assisted' = a person wrote it and a model edited or refined it. 'synthesized' = a model "
-    + "combined real sources into new content at someone's direction. 'ai-generated' = a model "
-    + 'produced it.'),
-  method: z.enum(AI_PROVENANCE_METHODS).optional().describe(
-    'Optional detail under level: how the content was produced.'),
-  human_involvement: z.enum(AI_HUMAN_INVOLVEMENT).optional().describe(
-    'Whether a person examined what the model produced. Only a step where someone reads the '
-    + 'SUBSTANCE and can reject it counts: a skim, a spell-check or clicking publish is '
-    + "'light-review' at most. Omitted means 'none'."),
-  model: z.string().optional().describe(
-    "The model that produced it, as the provider names it, e.g. 'anthropic/claude-opus-5'. "
-    + 'When you made it, this is YOUR OWN model id: self-identify from your own configuration, never '
-    + 'ask the person. Without it the record says only who served the model, never which one.'),
-  provider: z.string().optional().describe(
-    "Who served the model, when that is not obvious from its name — e.g. 'openrouter' in front of "
-    + "someone else's model. Say it when you route through an intermediary, because 'which model' "
-    + 'and "who ran it" are different questions and a reader chasing an output needs both.'),
-  sources: z.array(sourceInput).max(100).optional().describe(
-    'For synthesized content: where the material came from.'),
-  notes: z.string().max(1_000).optional().describe(
-    'Anything a reader would need to interpret the above. Never prompt text or anything private — '
-    + 'the record is publishable alongside the content.'),
-});
+// The block itself is the catalog's exact schema of the `ai_provenance` field (moved there on
+// 2026-10-05, secaudit 2026-10, M3), re-exported so the connector's shell dispatch and the REST
+// routes validate against the same object.
+export { AiProvenanceBlockSchema };
 
 /** The optional `ai_provenance` parameter. Spread into a write tool's input shape. */
 export const aiProvenanceInput = {

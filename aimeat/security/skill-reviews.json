@@ -229,7 +229,7 @@
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:abf44d69d06e9fc32679042f"
+      "digest": "sha256:9cb4a6b22044411852ad5e74"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-10-05",
@@ -262,7 +262,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:2c08785fdfa5a9a2bb939c6c"
+      "digest": "sha256:84618798b00f3752742fe8c8"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-05",
@@ -497,7 +497,7 @@
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
     "node:ai-transparency": {
-      "aimeat/src/mcp/ai-provenance-input.ts": "ca63e1a35c45ff0d",
+      "aimeat/src/mcp/ai-provenance-input.ts": "dfd9bc9ddb962338",
       "aimeat/src/services/ai-provenance.ts": "966aef506342bfbc"
     },
     "node:aimeat-node-operations": {
@@ -512,7 +512,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "79314b0fa6239904",
-      "aimeat/src/tool-catalog/scopes.ts": "5186ce04a5ca7b8a",
+      "aimeat/src/tool-catalog/scopes.ts": "766c5a79c68956fd",
       "aimeat/src/tool-catalog/definitions/crew.ts": "ba94ec309cb43232",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "26be98a71d067631",
       "aimeat/src/data/basic-agents.ts": "42e260bfa070b0e6"
