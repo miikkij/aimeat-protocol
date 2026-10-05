@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Owner and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.21.0 -- 2026-10-05 -- deleteOwner gives the classification audit rows where the person was the
+ *     reader of somebody else's content the erasure's pseudonym (secaudit 2026-10, STO-1).
  *   v1.20.0 -- 2026-09-26 -- The app grants, the personal access tokens and the session rows go through
  *     repos/credential-erasure.ts deleteAccountCredentials, which the start step and the operator's
  *     decision on a held name call too; deleteOwner deletes the session rows as the Postgres cascade does.
@@ -151,6 +153,12 @@ export const ownerMethods = {
       const actors = [...agentGaiis, ...ecoGeais];
       const pseudonym = erasedPartyPseudonym();
       settleErasedPartyWork(this.db, name, ghiiRows.map(r => r.ghii), pseudonym, id => this.resolveGhii(id), {}, actors);
+      // The classification audit of OTHER people's content, where this person was the reader: the row
+      // is the content owner's record and stays, under the erasure's pseudonym (secaudit 2026-10,
+      // STO-1). One value per identity, so two of them cannot meet on the audit's unique address.
+      [...ghiiRows.map(r => r.ghii), ...actors].forEach((id, i) => {
+        this.db.prepare('UPDATE classification_audit SET reader = ? WHERE reader = ?').run(i ? `${pseudonym}.${i}` : pseudonym, id);
+      });
 
       // 1-2. Cascade delete all agent-related data for each agent
       for (const gaii of agentGaiis) {
