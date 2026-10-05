@@ -32,6 +32,10 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.3.0 — 2026-10-05 — redeemLoginLink() also refuses a link whose account turned the link off or
+ *     changed the address it was mailed to (the seven-day welcome link included), and spends it with
+ *     one conditional update; loginReturnTarget() takes the account on open, and an app address must
+ *     be its own app or one it holds a grant for (secaudit 2026-10, AUTH-3 and WEB-3).
  *   v1.2.0 — 2026-10-04 — sendWelcomeLink() takes a `redirect` too: an install set's owner lands on
  *     the set's landing app.
  *   v1.1.0 — 2026-09-29 — The return address: loginReturnTarget(), and a `redirect` the link carries.
@@ -70,7 +74,7 @@ function hasUnsafeChar(s: string): boolean {
  * origin is this node's own or one of its published app, portfolio or company origins, with the
  * node's scheme and port and no user name. Everything else is null.
  */
-export async function loginReturnTarget(storage: Storage, config: AimeatConfig, raw: unknown): Promise<string | null> {
+export async function loginReturnTarget(storage: Storage, config: AimeatConfig, raw: unknown, accountName?: string): Promise<string | null> {
     if (typeof raw !== 'string' || !raw || raw.length > 2048) return null;
     if (isSameOriginPath(raw)) return `${config.baseUrl}${raw}`;
     if (hasUnsafeChar(raw)) return null;
@@ -85,7 +89,16 @@ export async function loginReturnTarget(storage: Storage, config: AimeatConfig, 
     const rest = `${url.pathname}${url.search}${url.hash}`;
     if (url.origin === base.origin) return isSameOriginPath(rest) ? `${config.baseUrl}${rest}` : null;
     const app = await resolveAppOriginTarget(config, storage, url.origin);
-    return app.ok ? `${url.origin}${rest}` : null;
+    if (!app.ok) return null;
+    // On open, the account is known: it lands on an app of its own, or one it already holds a live
+    // grant for. Anyone may ask for a link to somebody's address naming any app on this node, so
+    // without this a link the victim did not ask for landed them, signed in, on a page the asker
+    // wrote (secaudit 2026-10, WEB-3). A first visit to another person's app lands on the front page.
+    if (accountName !== undefined && app.owner.toLowerCase() !== accountName.toLowerCase()) {
+        const grants = await storage.listAppGrantsByOwner(accountName);
+        if (!grants.some(g => !g.revoked && g.app === app.target)) return null;
+    }
+    return `${url.origin}${rest}`;
 }
 
 /**
@@ -162,7 +175,13 @@ export type RedeemResult =
 
 /**
  * Check and spend a sign-in link. Every refusal comes before the token is spent (invariant 14), so a
- * link for a deactivated account stays unspent and changes nothing.
+ * link for a deactivated account stays unspent and changes nothing. Both link endpoints run this one
+ * check (the emailed GET /v1/ghii/magic-link/open and the JSON GET /v1/ghii/magic-link/verify).
+ *
+ * Since 2026-10-05 (secaudit 2026-10, AUTH-3) it also holds that the account still has the link on,
+ * and that the address the link was mailed to is still the account's: a person who turned the link
+ * off, or changed their address, ends the links already in a mailbox, the seven-day welcome link
+ * included. The spend is one conditional update, so two concurrent clicks cannot both sign in.
  */
 export async function redeemLoginLink(storage: Storage, config: AimeatConfig, token: string): Promise<RedeemResult> {
     const record = token ? await storage.getEmailVerification(token) : null;
@@ -175,7 +194,10 @@ export async function redeemLoginLink(storage: Storage, config: AimeatConfig, to
     if (!owner || owner.disabledAt) return { ok: false, code: 'ACCOUNT_DISABLED' };
     const ghii = await storage.getGHII(`${record.ownerName}@${config.nodeId}`);
     if (!ghii) return { ok: false, code: 'INVALID_TOKEN' };
-    await storage.updateEmailVerification(token, { status: 'verified', verifiedAt: new Date().toISOString() });
+    if (!ghii.magicLinkEnabled || !ghii.notificationEmail || emailHashOf(ghii.notificationEmail) !== record.emailHash) {
+        return { ok: false, code: 'INVALID_TOKEN' };
+    }
+    if (!(await storage.spendEmailVerification(token, new Date().toISOString()))) return { ok: false, code: 'INVALID_TOKEN' };
     // Clicking the link proves the mailbox, as it always has.
     if ((ghii.verificationLevel ?? 0) < 1) await storage.updateGHII(ghii.ghii, { verificationLevel: 1 });
     return { ok: true, ghii };

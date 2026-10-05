@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description File, Peering, Chunked-upload, GHII, Chat-instance, Email-verify, Personal-node, Mailbox, Maintenance methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.1.0 — 2026-10-05 — spendEmailVerification (secaudit 2026-10, AUTH-3).
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.2.0 — 2026-07-16 — Add getGHIIsByGhiis batch (Phase 3): many GHII records by ghii in one query.
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
@@ -433,6 +434,12 @@ export const identityNodesMethods = {
       updated.createdAt, updated.verifiedAt, id,
     );
     return updated;
+  },
+
+  /** One conditional UPDATE, so two concurrent redeems of a single-use link cannot both win. */
+  async spendEmailVerification(this: SqliteStorage, id: string, verifiedAt: string): Promise<boolean> {
+    return this.db.prepare(`UPDATE email_verifications SET status = 'verified', verifiedAt = ? WHERE id = ? AND status = 'pending'`)
+      .run(verifiedAt, id).changes === 1;
   },
 
   deserializeEmailVerification(this: SqliteStorage, row: Record<string, unknown>): EmailVerificationRecord {

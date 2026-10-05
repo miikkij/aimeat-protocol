@@ -10,6 +10,8 @@
  *   - IdentityRepository: interface for GHII CRUD + lookups, chat-instance CRUD, and email-verification lifecycle
  *
  * @version-history
+ *   v1.3.0 — 2026-10-05 — spendEmailVerification: a conditional spend, so a single-use link is spent
+ *     once under concurrent redeems (secaudit 2026-10, AUTH-3).
  *   v1.2.0 — 2026-09-09 — getGHIIsByGhiis, getGHIIByGoogleSub, deleteExpiredEmailVerifications and
  *     getEmailVerificationsByOwner deleted: no caller (Google sign-in reads getGHIIByExternalId).
  *   v1.1.0 — 2026-07-16 — Add getGHIIsByGhiis batch primitive (Phase 3 fan-out→IN; matches list).
@@ -43,4 +45,6 @@ export interface IdentityRepository {
   getEmailVerification(id: string): Promise<EmailVerificationRecord | null>;
   getActiveEmailVerification(ownerName: string, purpose: string): Promise<EmailVerificationRecord | null>;
   updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null>;
+  /** Mark a pending record verified, only if it is still pending: true for the one caller that spent it. */
+  spendEmailVerification(id: string, verifiedAt: string): Promise<boolean>;
 }
