@@ -165,7 +165,7 @@ export function registerPackageSaleRoutes(
         const groupId = decodeURIComponent(req.params.groupId as string);
         const pkg = (await storage.listVersions(groupId, 1, 0)).versions[0];
         if (!pkg) { res.status(404).json(error(config.nodeId, 'CLAIM_NOT_FOUND', 'No claim with that code waits for this package.')); return; }
-        const out = await redeemClaim({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap }, {
+        const out = await redeemClaim({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository }, {
             groupId, author: pkg.author, code: body.code, nodeId: who.nodeId, node: { url: str(body.url), public_key: publicKey },
         });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
@@ -190,7 +190,7 @@ export function registerPackageSaleRoutes(
         const out = await grantEntitlement(storage, { owner: act.author, isOperator: false }, {
             groupId: act.groupId, nodeId: req.params.nodeId as string,
             updatesUntil: body.updates_until, channel: body.channel, note, node: body.node, terms: terms ?? undefined,
-        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller, thisNodeId: config.nodeId, peerCap: config.packagePeerCap });
+        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true }));
     });

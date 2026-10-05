@@ -16,9 +16,12 @@
  *   const moved = await portRedirectFor(storage, gaii);
  *   if (moved) { res.setHeader('Location', moved.location); res.status(301)… }
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The redirect goes only to a peer that can hold an agent (peerCarriesAgents),
+ *     never a packages-only peer (secaudit 2026-10, PKG-8).
  *   v1.0.0 — 2026-09-24 — Initial. The profile route forwarded to target_node_url as stored.
  */
 import type { Storage } from '../storage/interface.js';
+import { peerCarriesAgents } from './federation.js';
 
 /** The key the porting route writes. utils/reserved-keys.ts keeps every memory door off it. */
 export const PORT_REDIRECT_KEY = '__redirect__';
@@ -60,7 +63,8 @@ export async function portRedirectFor(
     if (!origin) return null;
 
     const peers = await storage.listFederationPeers();
-    const peer = peers.find(p => p.status === 'active' && httpOrigin(p.url) === origin);
+    // A peer that can hold an agent, never a packages-only one (PKG-8).
+    const peer = peers.find(p => peerCarriesAgents(p) && httpOrigin(p.url) === origin);
     if (!peer) return null;
 
     const base = peer.url.replace(/\/+$/, '');

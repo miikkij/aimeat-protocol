@@ -50,7 +50,7 @@ export function registerPackageEntitlementRoutes(
             note: body.note,
             channel: body.channel,
             node: body.node,
-        }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap });
+        }, peers, { timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, {
             entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true,
