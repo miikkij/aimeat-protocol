@@ -418,8 +418,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_v2_task_cancel: { title: 'Cancel Work', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Companies (the registry + the co address family) ──
-    aimeat_surface_layout_get: { title: 'Read a Page Layout', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_surface_layout_set: { title: 'Arrange a Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Contacts (address book) ──
     aimeat_contact_list: { title: 'List Contacts', readOnlyHint: true },

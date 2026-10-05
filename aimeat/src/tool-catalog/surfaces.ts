@@ -433,7 +433,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // package claim code for this node with that key.
         
         // Arranging this node's front page and the page its members land on.
-        'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
+        
         // ...and the parts those pages are drawn from, and the themes they wear.
         
         

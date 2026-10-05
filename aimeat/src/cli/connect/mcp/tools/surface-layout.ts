@@ -13,6 +13,7 @@
  * @structure registerSurfaceLayoutTools(mcp, registry)
  * @usage import { registerSurfaceLayoutTools } from './surface-layout.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,15 +22,14 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerSurfaceLayoutTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_surface_layout_get', descriptionFor('aimeat_surface_layout_get'), {
-    surface: z.string().describe("Which page: 'portal', 'home' or 'home-onboarding'."),
-  }, annotationsFor('aimeat_surface_layout_get'), async ({ surface }) => {
+  mcp.tool('aimeat_surface_layout_get', descriptionFor('aimeat_surface_layout_get'), zodShapeFor('aimeat_surface_layout_get'), annotationsFor('aimeat_surface_layout_get'), async ({ surface }) => {
     // Two reads rather than one: the layout, and the catalogue of blocks this node can serve. The
     // second is the vocabulary, and without it the first write an AI attempts is always a refusal.
     const layout = await client.get(`/v1/site/layout/${encodeURIComponent(surface)}`);

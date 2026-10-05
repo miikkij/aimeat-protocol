@@ -17,16 +17,24 @@
  * @structure surfaceLayoutTools
  * @usage import { surfaceLayoutTools } from './surface-layout.js';
  * @version-history
+ *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
+ *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { AimeatToolDefinition } from './types.js';
 
-export const surfaceLayoutTools: AimeatToolDefinition[] = [
+export const surfaceLayoutTools = [
     {
         name: 'aimeat_surface_layout_get',
         description: "Read how one of this node's pages is arranged, and what it could be arranged from. `surface` is 'portal' for the public front page, 'home' for the page members land on, or 'home-onboarding' for what someone sees while they are still setting up. You get back the blocks in order with their settings, the operator's own passages, and the catalogue of every block this node can serve with the settings each one takes. Read this before writing: the catalogue is the vocabulary, and a block name this node does not have is refused. `source: \"default\"` means nobody has arranged this page yet and you are looking at what it ships as.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
+        annotations: { title: 'Read a Page Layout', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Arranging the node's pages. The word is one no wildcard carries, because what it changes is
+        // what everyone sees on arrival. The read takes the same word: it carries the block vocabulary
+        // the write needs, and it was open to every agent of the operator on the account role alone.
+        scope: 'site:layout-write',
+        surfaces: ['admin'],
         input: {
             surface: { type: 'string', required: true, description: "Which page: 'portal', 'home' or 'home-onboarding'." },
         },
@@ -36,6 +44,9 @@ export const surfaceLayoutTools: AimeatToolDefinition[] = [
         description: "Arrange one of this node's pages: which blocks it shows, in what order, and the words between them. Send the WHOLE layout — this replaces what is there, it does not merge — so read it first with aimeat_surface_layout_get and change what they asked you to change. Each block is { id, key } plus optional `props` (only the settings that block declares), `titles` for your own heading per language, and `hidden` to park one without losing its settings. For a passage of your own, use the block id 'common.freeform' and put the words on it as `body`, in Markdown: script tags, iframes, inline event handlers and javascript: links are refused, and so is a passage over 64 KB. The whole layout is checked before anything is stored, and a refusal names the block and what was wrong. Only the node operator can do this, and only with the site:layout-write permission. The answer carries the version number of the layout you replaced, so putting it back is one call.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
+        annotations: { title: 'Arrange a Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'site:layout-write',
+        surfaces: ['admin'],
         input: {
             surface: { type: 'string', required: true, description: "Which page: 'portal', 'home' or 'home-onboarding'." },
             blocks: { type: 'array', required: true, description: 'The blocks in the order they should appear. Each is { id, key } with optional props, titles, hidden, children and — on a free-form block — body.' },
@@ -44,4 +55,4 @@ export const surfaceLayoutTools: AimeatToolDefinition[] = [
             ai_provenance_id: { type: 'string', description: 'An existing provenance record of your own to attach instead of declaring a new one.' },
         },
     },
-];
+] as const satisfies readonly AimeatToolDefinition[];
