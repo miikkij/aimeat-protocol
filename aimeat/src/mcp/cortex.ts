@@ -10,6 +10,7 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.9.1 -- 2026-09-26 -- The upload response and the refusal of update:true without a manifest say
  *     that a ZIP under the name of a cortex the caller installed replaces it in place, as the upload
  *     endpoint does (secaudit 2026-09, R4 4b).
@@ -66,6 +67,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { toolError } from './tool-error.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -124,10 +126,7 @@ export function registerCortexTools(
     mcp.tool(
         'aimeat_cortex_list',
         descriptionFor('aimeat_cortex_list'),
-        {
-            name: z.string().optional().describe('One cortex, in full, instead of the list.'),
-            include_source: z.boolean().optional().describe('With name: also its manifest and lib files, for editing. Your own cortex only; needs cortex:write.'),
-        },
+        zodShapeFor('aimeat_cortex_list'),
         annotationsFor('aimeat_cortex_list'),
         async ({ name, include_source }) => {
             // One cortex: the same reads GET /v1/cortex/:name and its /export make (services/cortex-read.ts).
@@ -302,9 +301,7 @@ export function registerCortexTools(
     mcp.tool(
         'aimeat_cortex_activate',
         descriptionFor('aimeat_cortex_activate'),
-        {
-            name: z.string().describe('Name of the cortex extension to activate'),
-        },
+        zodShapeFor('aimeat_cortex_activate'),
         annotationsFor('aimeat_cortex_activate'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
@@ -347,9 +344,7 @@ export function registerCortexTools(
     mcp.tool(
         'aimeat_cortex_deactivate',
         descriptionFor('aimeat_cortex_deactivate'),
-        {
-            name: z.string().describe('Name of the cortex extension to deactivate'),
-        },
+        zodShapeFor('aimeat_cortex_deactivate'),
         annotationsFor('aimeat_cortex_deactivate'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
@@ -390,9 +385,7 @@ export function registerCortexTools(
     mcp.tool(
         'aimeat_cortex_delete',
         descriptionFor('aimeat_cortex_delete'),
-        {
-            name: z.string().describe('Name of the cortex extension to delete'),
-        },
+        zodShapeFor('aimeat_cortex_delete'),
         annotationsFor('aimeat_cortex_delete'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();

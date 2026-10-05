@@ -14,6 +14,7 @@
  *   to attachProofOverHttp() in tool-call-defs-apps.ts, which the shell path calls as well.
  * @usage registerAppdevTools(mcp, registry);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 -- 2026-10-01 -- aimeat_iam_define takes default_role, version, author and ext_name, as the
  *     node MCP tool and the CLI dispatch do (audit 2026-10-01, defect B).
  *   v1.1.1 -- 2026-09-13 -- appdev_overview's model parameter is described as ordering, not filtering.
@@ -33,6 +34,7 @@ import { defineAppIam } from '../../../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../../../services/iam/model.js';
 import type { CommandDef } from '../../../../services/iam/app-commands.js';
 import { attachProofOverHttp } from '../../../../tool-dispatch/tool-call-defs-apps.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -148,15 +150,7 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
   });
 
   // iam_define is pure-local: validate + design an app IAM level/command schema (no node round-trip).
-  mcp.tool('aimeat_iam_define', descriptionFor('aimeat_iam_define'), {
-    app_id: z.string().optional().describe('owner/file.html of the app the gate protects; a name without a slash generates no extension.'),
-    levels: z.array(z.record(z.string(), z.unknown())).describe('Level definitions.'),
-    commands: z.array(z.record(z.string(), z.unknown())).describe('Command definitions.'),
-    default_role: z.string().optional().describe('Level key a signed-in caller not on the member list holds in the generated gate.'),
-    version: z.string().optional().describe('Manifest version of the generated gate, x.y.z (default 1.0.0).'),
-    author: z.string().optional().describe('Manifest author of the generated gate (default "generated").'),
-    ext_name: z.string().optional().describe('Extension name of the generated gate (default: slug of app_id plus -iam).'),
-  }, annotationsFor('aimeat_iam_define'), async ({ app_id, levels, commands, default_role, version, author, ext_name }) => {
+  mcp.tool('aimeat_iam_define', descriptionFor('aimeat_iam_define'), zodShapeFor('aimeat_iam_define'), annotationsFor('aimeat_iam_define'), async ({ app_id, levels, commands, default_role, version, author, ext_name }) => {
     const result = defineAppIam({
       appId: app_id, levels: levels as unknown as LevelDef[], commands: commands as unknown as CommandDef[],
       defaultRole: default_role, version, author, extName: ext_name,

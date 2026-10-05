@@ -297,13 +297,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_share_create:                      'share:manage',
     aimeat_share_revoke:                      'share:manage',
 
-    // RUN an installed extension's action. Separate from ext:write, which is about which
-    // extensions exist — using a capability is not the same as installing one.
-    aimeat_extension_invoke:                  'ext:invoke',
-
-    // Install, activate, deactivate or delete an extension.
-    aimeat_extension_install:                 'ext:write',
-
     // Removes a stored record.
     // Removes a record for good, no grace window: its own word since 2026-10-02, held on the
     // task-start floor (services/agent-task-rules.ts). memory:delete stays the undoable delete.
@@ -499,20 +492,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_secret_list: 'secrets:manage',
     aimeat_secret_set: 'secrets:manage',
     aimeat_secret_delete: 'secrets:manage',
-
-    // Cortex management (POST/PUT/DELETE /v1/cortex* → cortex:write; PUT is the idempotent upsert)
-    // List/get are NOT gated (mirrors REST: GET /v1/cortex is just requireAuth).
-    aimeat_cortex_install: 'cortex:write',
-    aimeat_cortex_activate: 'cortex:write',
-    aimeat_cortex_deactivate: 'cortex:write',
-    aimeat_cortex_delete: 'cortex:write',
-
-    // Extension lifecycle (POST /v1/extensions/:name/activate etc. → ext:write)
-    // Install is NOT gated (mirrors REST: POST /v1/extensions is just requireAuth — agents
-    // can push code, but it stays inert until ext:write activates it).
-    aimeat_extension_activate: 'ext:write',
-    aimeat_extension_deactivate: 'ext:write',
-    aimeat_extension_delete: 'ext:write',
 
     // Agent Workflows (REST: PUT/run → workflow:write; GET → workflow:read)
     aimeat_workflow_save: 'workflow:write',
