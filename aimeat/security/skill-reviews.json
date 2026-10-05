@@ -121,14 +121,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-10-02",
+      "reviewedOn": "2026-10-05",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:abdb98e5c30346276c8fb85c"
+      "digest": "sha256:79c4c34ffeee031fd36ad57a"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -365,13 +365,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-09-29",
+      "reviewedOn": "2026-10-05",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:e8a1d577a8359a7dce7a2131"
+      "digest": "sha256:ff46731b77d3f75e71156899"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -434,7 +434,7 @@
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "049cbf4731dbfd00",
       "aimeat/src/services/build-atelier-layers.ts": "1493a01bd84cc021",
-      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "f7e239264644305f",
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "baca79b3b245ef12",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
     "node:aimeat-phaser": {
@@ -558,7 +558,7 @@
       "scripts/gen_image.py": "e2435908849b31d3"
     },
     "project:aimeat-library-authoring": {
-      "aimeat/scripts/build-sdk-libs.ts": "b845bfe136701331",
+      "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
       ".githooks/pre-commit": "e8840eb33aa805c0",
       "aimeat/src/services/build-extension-prompt.ts": "3ea304e53b128d76"
     },

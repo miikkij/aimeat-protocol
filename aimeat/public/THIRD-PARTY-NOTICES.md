@@ -101,7 +101,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 482 npm packages that travel inside the `aimeat` package. Build and test
+The 483 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -117,6 +117,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.53 | Apache-2.0 |
 | [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.21 | Apache-2.0 |
 | [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.14 | Apache-2.0 |
+| [@cfworker/json-schema](https://github.com/cfworker/cfworker/tree/master/packages/json-schema/README.md) | 4.1.1 | MIT |
 | [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.5.1 | MIT |
 | [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.8.1 | MIT |
 | [@colors/colors](https://github.com/DABH/colors.js) | 1.6.0 | MIT |

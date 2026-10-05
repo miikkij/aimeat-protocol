@@ -10,6 +10,7 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=library-packs).
  * @version-history
+ *   v1.4.0 - 2026-10-05 - aimeat-validate: served, discoverable, a wrong check digit refused in Finnish.
  *   v1.3.0 - 2026-09-18 - Execute calendar and print APIs, including a malformed ICS refusal.
  *   v1.0.0 — 2026-07-16 — initial (Library Acceleration Program, Phase 1).
  *   v1.1.0 — 2026-07-30 — ffmpeg-core: the loader, its classic-script twin and the fetched 32 MB
@@ -466,6 +467,23 @@ await test('calendar and print bundles are served, discoverable and callable wit
   assert(refused === true, 'invalid ICS was silently accepted');
   assert(typeof apis.print.preview === 'function' && typeof apis.print.prepare === 'function', 'print methods missing');
   assert(apis.print.templates().includes('calendar'), 'calendar print preset missing');
+});
+await test('aimeat-validate is served, discoverable and answers per field in the asked language', async () => {
+  const res = await fetch(`${BASE}/v1/libs/aimeat-validate.js`);
+  assert(res.status === 200, `validate bundle status ${res.status}`);
+  assert((res.headers.get('content-type') || '').includes('javascript'), 'validate MIME type');
+  const window: Record<string, any> = {};
+  runInNewContext(await res.text(), { window, URL, console }, { timeout: 5000 });
+  const v = window.AIMEAT?.validate;
+  assert(v?.version === '1.0.0', 'validate did not attach its API');
+  const { body } = await json('/v1/library-packs/aimeat-validate');
+  assert(body.data?.pack?.ai_doc?.includes('AIMEAT.validate'), 'validate has no AI usage guide');
+  const schema = { type: 'object', required: ['ytunnus'], properties: { ytunnus: { type: 'string', title: 'Y-tunnus', format: 'fi-business-id' } } };
+  const wrong = v.check(schema, { ytunnus: '0737546-3' }, { lang: 'fi' });
+  assert(wrong.valid === false && wrong.fields.ytunnus?.params?.reason === 'check', `a wrong check digit was not refused: ${JSON.stringify(wrong)}`);
+  assert(/tarkistusnumero/.test(wrong.fields.ytunnus.message), `the Finnish message: ${wrong.fields.ytunnus.message}`);
+  assert(v.check(schema, { ytunnus: '0737546-2' }).valid === true, 'a right Business ID was refused');
+  assert(v.compile(schema).ready({ ytunnus: '' }, ['ytunnus']) === false, 'an empty required field read as ready');
 });
 console.log(`Library packs E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);

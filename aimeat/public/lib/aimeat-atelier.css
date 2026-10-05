@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.66.0 — 2026-10-05 — data.css: a field that passed its rules (.ak-form__field--valid), the
+ *     form's alert for a problem of no one field, the line under a held button (.ak-form__gate) and
+ *     a held .ak-btn (form validation from one JSON Schema, atelier/form.js).
  *   v0.65.1 — 2026-10-03 — No style changed: the script's version, for the faces the operator adds
  *     to the node (the kit links /v1/themes/fonts.css when a look names one; atelier/added-faces.js).
  *   v0.65.0 — 2026-10-03 — handbook.css: the handbook (an app's manual from its header, from the

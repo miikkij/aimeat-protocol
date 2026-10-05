@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.31.0 — 2026-10-05 — Kit 0.66.0: a form checks what is typed through one JSON Schema (field
+ *     rules, schema, gate, handle.gate), and the same schema locks the workspace. Read against
+ *     describe-data.js after form gained the alert and gate parts.
  *   v1.30.0 — 2026-10-02 — Research first reads the design spec of an app that already exists, and
  *     writes it back after the publish (services/app-design-spec.ts).
  *   v1.30.0 — 2026-10-03 — Kit 0.65.0: the handbook (handbook.js) and app({ help }), named beside the
@@ -317,6 +320,15 @@ moved under you says so.
    it on screen first). It also collects every element carrying \`data-ak-help="<id>"\` with
    \`data-ak-help-title\` and \`data-ak-help-text\`, so help written on the control is a chapter that
    points at it. \`app({ help: book })\` puts its button in the header.
+   **A form checks what is typed with the kit, never with checks of your own.** Declare the rules
+   on the fields of \`form()\` (\`required\`, \`format\` such as \`email\`, \`fi-business-id\`, \`iban\`,
+   \`fi-postal-code\`, \`phone\`, \`pattern\`, \`minLength\`, \`min\`, \`max\`, \`sameAs\`, \`messages\`), or
+   pass \`schema\`, a JSON Schema in draft-07, for a rule between fields (\`if\`/\`then\`,
+   \`dependencies\`, an \`anyOf\` of \`required\`). The form shows a format's example under its field,
+   says next to the field what to do in the person's language, and checks a field when it is left.
+   \`gate: true\` holds Send until the form is right; \`handle.gate(nextButton, names)\` holds a step's
+   Next. Lock the workspace space the form writes to with the same schema, so the node refuses what
+   the form refuses (\`aimeat-validate.js\` is the same check without the kit).
    Before you write your own version of one of these because "it does not quite fit", read its
    \`describe(id)\`: they take questions per run and a verdict (\`decision\`), invitations into
    several workspaces (\`workspaceTeam\` \`inviteInto\`), schemas, a private choice and a list

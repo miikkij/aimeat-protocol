@@ -275,6 +275,7 @@
     "@ai-sdk/openai-compatible": "3.0.62",
     "@ai-sdk/provider": "4.0.21",
     "@ai-sdk/xai": "5.0.14",
+    "@cfworker/json-schema": "^4.1.1",
     "@clack/prompts": "^1.8.1",
     "@js-temporal/polyfill": "^0.5.1",
     "@modelcontextprotocol/ext-apps": "^1.7.5",

@@ -17,6 +17,8 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.13.0 — 2026-10-05 — fillFirst and formIncomplete (en/fi/es): the line under a held button
+ *     that names the fields still missing (form gate).
  *   v0.12.1 — 2026-10-04 — delegateDeclined (en/fi/es): the agent refused the delegated task.
  *   v0.12.0 — 2026-10-01 — The words of crew, palette, compare and tour (en/fi/es): crewLive (the
  *     count of who is here now), paletteLabel, palettePlaceholder, paletteEmpty, compareLabel and
@@ -79,6 +81,8 @@ const BASE = {
     signInHint: 'Use the account button in the top corner.',
     required: 'Required',
     optional: 'Optional',
+    fillFirst: 'Complete or correct these first: {fields}.',
+    formIncomplete: 'the details above',
     total: 'Total',
     you: 'You',
     next: 'Next',
@@ -221,6 +225,8 @@ const BASE = {
     signInHint: 'Käytä yläkulman tilinappia.',
     required: 'Pakollinen',
     optional: 'Valinnainen',
+    fillFirst: 'Täydennä tai korjaa ensin: {fields}.',
+    formIncomplete: 'yllä olevat tiedot',
     total: 'Yhteensä',
     you: 'Sinä',
     next: 'Seuraava',
@@ -363,6 +369,8 @@ const BASE = {
     signInHint: 'Usa el botón de cuenta en la esquina superior.',
     required: 'Obligatorio',
     optional: 'Opcional',
+    fillFirst: 'Completa o corrige primero: {fields}.',
+    formIncomplete: 'los datos de arriba',
     total: 'Total',
     you: 'Tú',
     next: 'Siguiente',

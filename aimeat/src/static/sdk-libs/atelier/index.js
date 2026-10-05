@@ -57,6 +57,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.66.0 — 2026-10-05 — form() checks through the validate core (validate/core.js): one JSON
+ *     Schema from the fields and the host's `schema`, a message per field in the person's language,
+ *     a format's hint under its field, the check when a field is left and the mark when it is right,
+ *     `gate`, `gate(button, names)`, `check()`, `ready()`, `missing()` and `onValidity`.
  *   v0.65.1 — 2026-10-03 — ADDED FACES (added-faces.js): a look whose --ak-font or --ak-font-display
  *     names a face the operator added to the node (the font manager) gets /v1/themes/fonts.css
  *     linked once, after the kit's stylesheet has loaded; a look on the base faces loads nothing more.
@@ -473,7 +477,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.65.1',
+  version: '0.66.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
