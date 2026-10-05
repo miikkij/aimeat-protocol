@@ -31,6 +31,10 @@
  *   v1.3.0 — 2026-08-16 — Installed-app duties: share-target intake, offline-page fallback for
  *     navigations, push badge dot. BUMP OFFLINE_CACHE when /offline.html changes — the page is
  *     re-cached only when this file's bytes change and trigger a worker update.
+ *   v1.4.0 — 2026-10-05 — A navigation to an app (/v1/apps/…) is left to the browser. The worker's
+ *     own fetch() of it reached the node without `Sec-Fetch-Dest: document`, so on a node without app
+ *     origins a person who had opened the SPA got the app's sandboxed bytes instead of the isolated
+ *     frame's page, and the app could not sign in (found by the secaudit 2026-10 browser check).
  */
 
 // Local stand-in for /js/swallowed.js: this file must stay importable as a CLASSIC worker
@@ -145,7 +149,9 @@ self.addEventListener('fetch', (event) => {
   // Navigations only. When the network is gone the person gets the offline page — which says this
   // is an online application and holds the note box that feeds the same intake queue — instead of
   // the browser's error screen. Every non-navigation request passes through untouched.
-  if (event.request.mode === 'navigate' && event.request.method === 'GET') {
+  // An app's address is the exception: the node tells a browser's own navigation (the isolated frame's
+  // page) from any other load by `Sec-Fetch-Dest`, which a fetch made here does not carry.
+  if (event.request.mode === 'navigate' && event.request.method === 'GET' && !url.pathname.startsWith('/v1/apps/')) {
     event.respondWith(
       fetch(event.request).catch(async () =>
         (await caches.match(OFFLINE_URL))
