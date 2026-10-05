@@ -13,6 +13,8 @@
  * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.6.1 — 2026-10-06 — StartAiJobContext.limit is 'exempt' only for a chain's continuation
+ *     (secaudit 2026-10 follow-up, A5).
  *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     StartAiJobContext.limit: 'exempt' for ctx.ai.start.
  *   v1.5.0 — 2026-10-05 — `started_by.app`: the app an app grant names, so the job's model call runs
@@ -213,8 +215,9 @@ export interface StartAiJobContext {
     parentJob?: string;
     chainDepth?: number;
     onRefused?: (reason: AiJobChainStop) => void;
-    /** 'exempt' for a start the node makes itself (ctx.ai.start in an extension); absent, the start
-     *  counts against the account's AI call limit (services/account-limits.ts). */
+    /** 'exempt' for a start that continues a chain (ctx.ai.start in an on_done callback), whose first
+     *  start was counted; absent, the start counts against the account's AI call limit
+     *  (services/account-limits.ts). */
     limit?: AiCallLimitMark;
 }
 
