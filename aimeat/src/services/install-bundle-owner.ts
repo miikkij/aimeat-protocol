@@ -27,9 +27,9 @@
  */
 import type { InstallBundle } from './install-set-spec.js';
 import { bundleOfComponents } from './install-set-spec.js';
-import { getPackageFor } from './package-read.js';
-import { installOrRequest, type PackageActCaller } from './package-install-requests.js';
-import { installPackage } from './package-install.js';
+import { getPackageFor } from './packages/compose/package-read.js';
+import { installOrRequest, type PackageActCaller } from './packages/install/package-install-requests.js';
+import { installPackage } from './packages/install/package-install.js';
 import { checkWorkspaceManifest } from './workspace-provision.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../utils/gaii.js';

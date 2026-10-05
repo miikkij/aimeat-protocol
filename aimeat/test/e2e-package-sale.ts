@@ -37,9 +37,9 @@ import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import type { Storage } from '../src/storage/interface.js';
 import type { PeerInfo } from '../src/services/federation.js';
-import { runAutoRenewals } from '../src/services/package-renewals.js';
+import { runAutoRenewals } from '../src/services/packages/sale/package-renewals.js';
 import { runAsNode } from '../src/utils/gaii.js';
-import { cleanupPackagePeers } from '../src/services/package-peer-limits.js';
+import { cleanupPackagePeers } from '../src/services/packages/peer/package-peer-limits.js';
 
 let passed = 0;
 let failed = 0;

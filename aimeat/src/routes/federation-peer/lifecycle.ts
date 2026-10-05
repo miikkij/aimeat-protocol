@@ -37,7 +37,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
 import { deriveTierFlags, coerceTier, type PeerTier } from '../../services/federation-tiers.js';
-import { proveNodeCard } from '../../services/package-peer-register.js';
+import { proveNodeCard } from '../../services/packages/peer/package-peer-register.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
 import { removePeer } from '../../services/federation-peer-remove.js';
 

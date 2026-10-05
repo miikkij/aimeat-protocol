@@ -1,0 +1,117 @@
+/**
+ * @file services/packages/sale/package-sellers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Which nodes may sell a package author's packages on a package repository: read the
+ *   questions a package asks, grant a customer node, end its updates and revoke it, by a request
+ *   signed with the seller node's own key (package-sale-auth.ts), with no token.
+ *
+ *   A DECISION, NOT A SECRET. The author names the seller once ("store.aimeat.io sells my packages"),
+ *   from a chat or the API. Nothing is copied between machines: a seller this repository does not
+ *   know yet is given as { url, public_key }, and it is registered only when its own
+ *   /.well-known/aimeat answers with the same node id and key (package-peer-register.ts). Jouni ruled
+ *   on 2026-09-29 that the system does this itself.
+ *
+ *   WHO MAY NAME ONE. An author: the caller holds at least one package here, and the node has taken
+ *   the repository role. Naming a seller is not a sale, so a seller that does not answer is refused
+ *   (PEER_UNREACHABLE) rather than left pending; the author tries again.
+ *
+ *   PER AUTHOR. A seller sells every package of the author who named it, and nothing of anyone else's:
+ *   an install bundle and the packages it lists share their author (package-entitlements.ts), so one
+ *   decision covers a whole product. Only the author or an operator changes the list.
+ *
+ *   WHERE IT LIVES. The system namespace of the entitlements, `package-entitlements`, key
+ *   `sellers.<author>`: no principal can address it.
+ * @structure SellerRecord · listSellers() · addSeller() · removeSeller() · isSellerFor()
+ * @version-history
+ *   v1.2.0 — 2026-10-02 — A new seller node counts against the packages-only peer cap (package-peer-limits.ts).
+ *   v1.1.0 — 2026-10-01 — A new seller is registered only after its card answers with the same id and
+ *     key; adding one needs the repository role and an author with a package here. Until then any
+ *     owner with packages:write could register any node id as a peer through this route (the
+ *     peer-registration incident, finding F).
+ *   v1.0.0 — 2026-09-29 — Initial (install packages, phase 5: seller nodes).
+ */
+import type { Storage } from '../../../storage/interface.js';
+import type { PeerInfo } from '../../federation.js';
+import { NS_PACKAGE_ENTITLEMENTS } from './package-entitlements.js';
+import { linkPackagePeer } from '../peer/package-peer-register.js';
+
+export interface SellerRecord { nodeId: string; addedAt: string; addedBy: string; note?: string }
+type Stored = { author: string; nodes: Record<string, SellerRecord> };
+type Refusal = { ok: false; status: number; code: string; message: string };
+
+const key = (author: string): string => `sellers.${author}`;
+const NODE_RE = /^[a-z0-9][a-z0-9.-]{2,127}$/i;
+
+async function read(storage: Storage, author: string): Promise<Record<string, SellerRecord>> {
+    const rec = await storage.getMemory(NS_PACKAGE_ENTITLEMENTS, key(author));
+    return (rec?.value as Stored | undefined)?.nodes ?? {};
+}
+
+async function write(storage: Storage, author: string, nodes: Record<string, SellerRecord>): Promise<void> {
+    const now = new Date().toISOString();
+    const existing = await storage.getMemory(NS_PACKAGE_ENTITLEMENTS, key(author));
+    await storage.setMemory({
+        key: key(author), ownerGaii: NS_PACKAGE_ENTITLEMENTS, value: { author, nodes } satisfies Stored,
+        visibility: 'private', tags: ['package-sellers'], ttlHours: null,
+        version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+    });
+}
+
+/** The seller nodes of `author`. */
+export async function listSellers(storage: Storage, author: string): Promise<SellerRecord[]> {
+    return Object.values(await read(storage, author));
+}
+
+/** Whether `nodeId` may sell `author`'s packages. */
+export async function isSellerFor(storage: Storage, author: string, nodeId: string): Promise<boolean> {
+    return !!(await read(storage, author))[nodeId];
+}
+
+/**
+ * Name `nodeId` a seller of the caller's packages. With `node` ({ url, public_key }) a node this
+ * repository does not know yet is registered as a packages-only peer once its card answers with the
+ * same id and key (package-peer-register.ts); a known peer must be active and under the same key.
+ */
+export async function addSeller(
+    deps: { storage: Storage; peers: Map<string, PeerInfo>; config: { packageRepository: boolean; federationTimeoutMs: number; nodeId: string; packagePeerCap?: number } },
+    caller: { owner: string },
+    input: { nodeId: string; node?: unknown; note?: unknown },
+): Promise<Refusal | { ok: true; seller: SellerRecord; peerRegistered: boolean }> {
+    const { storage, peers, config } = deps;
+    if (!NODE_RE.test(input.nodeId)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node_id is a node id such as "aimeat-finland-003-store".' };
+    if (!config.packageRepository) {
+        return { ok: false, status: 404, code: 'NOT_A_REPOSITORY', message: 'This node does not serve packages as a repository, so nothing here can be sold. The operator turns the role on with AIMEAT_PACKAGE_REPOSITORY.' };
+    }
+    if ((await storage.listPackages({ author: caller.owner, limit: 1, offset: 0 })).total === 0) {
+        return { ok: false, status: 403, code: 'NOT_AN_AUTHOR', message: 'You have no packages on this repository, so there is nothing for a seller to sell. Publish a package first.' };
+    }
+    let peerRegistered = false;
+    if (input.node !== undefined && input.node !== null) {
+        const link = await linkPackagePeer({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, cap: config.packagePeerCap }, input.nodeId, input.node,
+            { source: 'package-seller', by: caller.owner }, { pendingWhenUnreachable: false });
+        if (!link.ok) return link;
+        peerRegistered = link.registered;
+    } else {
+        const known = peers.get(input.nodeId);
+        if (!known || known.status !== 'active' || !known.publicKey) {
+            return { ok: false, status: 409, code: 'PEER_UNKNOWN', message: `${input.nodeId} is not an active peer of this repository. Give node: { url, public_key } to register it.` };
+        }
+    }
+    const nodes = await read(storage, caller.owner);
+    const now = new Date().toISOString();
+    const seller: SellerRecord = {
+        nodeId: input.nodeId, addedAt: nodes[input.nodeId]?.addedAt ?? now, addedBy: caller.owner,
+        ...(typeof input.note === 'string' && input.note ? { note: input.note.slice(0, 500) } : {}),
+    };
+    await write(storage, caller.owner, { ...nodes, [input.nodeId]: seller });
+    return { ok: true, seller, peerRegistered };
+}
+
+/** Stop `nodeId` selling the caller's packages. Its grants stay; revoke them separately. */
+export async function removeSeller(storage: Storage, caller: { owner: string }, nodeId: string): Promise<Refusal | { ok: true }> {
+    const nodes = await read(storage, caller.owner);
+    if (!nodes[nodeId]) return { ok: false, status: 404, code: 'NOT_FOUND', message: `${nodeId} is not a seller of your packages.` };
+    await write(storage, caller.owner, Object.fromEntries(Object.entries(nodes).filter(([id]) => id !== nodeId)));
+    return { ok: true };
+}

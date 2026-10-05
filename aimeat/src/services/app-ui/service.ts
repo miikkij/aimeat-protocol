@@ -21,14 +21,14 @@
  *   const { layout } = await svc.read(app.ownerGaii, filename);
  * @version-history
  *   v1.1.0 — 2026-09-28 — write, restore and remove refuse the layout of an app a managed package
- *     install owns, 409 MANAGED_BY_PACKAGE (services/package-managed.ts).
+ *     install owns, 409 MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts).
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { resolveAppOwnerScope } from '../app-owner-scope.js';
-import { managedChangeRefusal } from '../package-managed.js';
+import { managedChangeRefusal } from '../packages/install/package-managed.js';
 import { provenanceForWrite, type DeclaredProvenance } from '../ai-provenance.js';
 import { validateUiLayout, AppUiError, type AppUiLayout } from './validate.js';
 
@@ -96,7 +96,7 @@ export class AppUiService {
   /**
    * The layout of an app a managed package install owns is part of the product: it changes only
    * with the package, and a fork of the install is how the owner takes it over (Jouni, 2026-09-28,
-   * decision 9; services/package-managed.ts). Asked before validation, so nothing is minted either.
+   * decision 9; services/packages/install/package-managed.ts). Asked before validation, so nothing is minted either.
    */
   private async refuseIfManaged(ownerGaii: string, filename: string): Promise<void> {
     const managed = await managedChangeRefusal(this.storage, localAccountName(ownerGaii), 'app', filename, 'layout');

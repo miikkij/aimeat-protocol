@@ -658,11 +658,11 @@ export function adminRouter(
         }
 
         try {
-            // The same function the boot runs (services/package-seeder.ts): a package whose bundled
+            // The same function the boot runs (services/packages/compose/package-seeder.ts): a package whose bundled
             // content changed gets a new version, an unchanged one is left alone. This door used to
             // republish all of them, so every installer saw an update for a package that had not
             // changed, and a second press inside one minute collided on the version.
-            const { syncExamplePackages } = await import('../services/package-seeder.js');
+            const { syncExamplePackages } = await import('../services/packages/compose/package-seeder.js');
             const r = await syncExamplePackages(storage, `${operator}@${config.nodeId}`);
             const seeded = [...r.created, ...r.updated].map(name => ({ name, packageGroupId: `${name}::${operator}` }));
             if (seeded.length > 0) emitChange('packages');

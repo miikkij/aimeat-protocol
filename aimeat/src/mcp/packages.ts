@@ -11,7 +11,7 @@
  *   is the one of them a conversation actually needs: it is how a package that ships with the node
  *   becomes this person's own copy, and until now it was reachable over HTTP and nowhere else.
  *
- *   ONE IMPLEMENTATION. The work is services/package-install.ts, the same function
+ *   ONE IMPLEMENTATION. The work is services/packages/install/package-install.ts, the same function
  *   POST /v1/packages/:groupId/install calls. This file resolves who is asking and renders the
  *   answer; it decides nothing the HTTP door does not.
  *
@@ -44,10 +44,10 @@
  *     packages-only peer with the grant (install packages, phase 5).
  *   v1.5.0 — 2026-09-28 — aimeat_package_instance_set, aimeat_package_check_updates,
  *     aimeat_package_repository and aimeat_package_entitlements: the package repository, both sides.
- *   v1.4.1 — 2026-09-28 — install takes `config`, each part's config (services/package-config.ts).
+ *   v1.4.1 — 2026-09-28 — install takes `config`, each part's config (services/packages/compose/package-config.ts).
  *   v1.4.0 — 2026-09-28 — install takes `mode` (managed | editable); aimeat_package_instances lists
  *     the owner's installed copies and aimeat_package_fork releases a managed one
- *     (services/package-managed.ts).
+ *     (services/packages/install/package-managed.ts).
  *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-25 — install and update go through installOrRequest / updateOrRequest: without
@@ -69,32 +69,32 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { installOrRequest, updateOrRequest, requestedBody } from '../services/package-install-requests.js';
-import { listPackagesFor, getPackageFor, listInstancesFor } from '../services/package-read.js';
-import { forkPackageInstance, setPackageInstance } from '../services/package-managed.js';
-import { refreshInstalledPackages } from '../services/package-upstream-refresh.js';
-import { listEntitlements, grantEntitlement, revokeEntitlement } from '../services/package-entitlements.js';
-import { packageConfigNeeds } from '../services/package-config-needs.js';
-import { packageSheet } from '../services/package-sheet.js';
-import { listSellers, addSeller, removeSeller } from '../services/package-sellers.js';
+import { installOrRequest, updateOrRequest, requestedBody } from '../services/packages/install/package-install-requests.js';
+import { listPackagesFor, getPackageFor, listInstancesFor } from '../services/packages/compose/package-read.js';
+import { forkPackageInstance, setPackageInstance } from '../services/packages/install/package-managed.js';
+import { refreshInstalledPackages } from '../services/packages/peer/package-upstream-refresh.js';
+import { listEntitlements, grantEntitlement, revokeEntitlement } from '../services/packages/sale/package-entitlements.js';
+import { packageConfigNeeds } from '../services/packages/compose/package-config-needs.js';
+import { packageSheet } from '../services/packages/compose/package-sheet.js';
+import { listSellers, addSeller, removeSeller } from '../services/packages/sale/package-sellers.js';
 import { installSetRepositories } from '../services/install-set-trust.js';
 import { toolError } from './tool-error.js';
 import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../tool-catalog/definitions/packages.js';
-import { setPackageVersionStatus } from '../services/package-create.js';
-import { composePackageFromApps } from '../services/package-compose.js';
-import { pullPackage, listRepositoryPackages } from '../services/package-pull.js';
+import { setPackageVersionStatus } from '../services/packages/compose/package-create.js';
+import { composePackageFromApps } from '../services/packages/compose/package-compose.js';
+import { pullPackage, listRepositoryPackages } from '../services/packages/peer/package-pull.js';
 import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { localAccountName } from '../utils/gaii.js';
-import { readOffer, setOffer, publicOffer } from '../services/package-offer.js';
-import { buyerOfferView } from '../services/package-sale-checkout.js';
-import { subscriptionsOf, readRequests, setAutoRenew } from '../services/package-sale-catalogue.js';
+import { readOffer, setOffer, publicOffer } from '../services/packages/sale/package-offer.js';
+import { buyerOfferView } from '../services/packages/sale/package-sale-checkout.js';
+import { subscriptionsOf, readRequests, setAutoRenew } from '../services/packages/sale/package-sale-catalogue.js';
 import { createSession } from '../commerce/session-service.js';
 import { bundleInstallOf, installSetForOwner } from '../services/install-bundle-owner.js';
-import { composeSet } from '../services/package-compose-set.js';
-import { withdrawVersion } from '../services/package-withdrawals.js';
-import { INSTALL_CODE_SCOPE } from '../services/package-approvals.js';
+import { composeSet } from '../services/packages/compose/package-compose-set.js';
+import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
+import { INSTALL_CODE_SCOPE } from '../services/packages/install/package-approvals.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
@@ -230,7 +230,7 @@ export function registerPackageTools(
                 isError: true,
             };
         }
-        // The "what you get" sheet, the same one GET /v1/packages/:groupId answers (services/package-sheet.ts).
+        // The "what you get" sheet, the same one GET /v1/packages/:groupId answers (services/packages/compose/package-sheet.ts).
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config) }, null, 2) }] };
     });
 

@@ -9,7 +9,7 @@
  *   v1.9.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.0 — 2026-09-28 — PATCH refuses `cortex` (the bundled crew-defs) on an app a managed package
- *     install owns, 409 MANAGED_BY_PACKAGE (services/package-managed.ts); the settings stay open.
+ *     install owns, 409 MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts); the settings stay open.
  *   v1.7.0 — 2026-09-27 — PATCH writes name, description, descriptions, access_code, parked,
  *     forkable and protection through services/app-settings.ts (applyOwnerSettingsUpdate), and
  *     patchRefusal validates them with its parseOwnerSettingsInput, so the MCP tool
@@ -53,7 +53,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
-import { managedChangeRefusal } from '../../services/package-managed.js';
+import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import {
     applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput,
@@ -321,7 +321,7 @@ export function registerForkManageRoutes(
         }
         // The bundled crew-defs are code. On an app a managed package install owns they come from
         // the package, and everything else in this PATCH is a setting the owner keeps
-        // (services/package-managed.ts). Asked before the first write, like the refusals above.
+        // (services/packages/install/package-managed.ts). Asked before the first write, like the refusals above.
         if ('cortex' in body) {
             const managed = await managedChangeRefusal(storage, owner, 'app', filename, 'code');
             if (managed) {

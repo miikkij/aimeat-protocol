@@ -8,11 +8,11 @@
  *   WHY FROM A CHAT. An owner's AI chat is an agent (mcp/oauth.ts mints role agent), so an
  *   owner-in-person door is out of its reach. The owner can still settle a request by talking: an
  *   agent of theirs decides it here, under the rule device authorization already uses for a sibling
- *   agent (services/package-install-request-policy.ts). It may approve only a request it did not
+ *   agent (services/packages/install/package-install-request-policy.ts). It may approve only a request it did not
  *   file, and only when it holds every word the install needs; otherwise it is refused and told the
  *   owner can approve on their Notifications page. Declining it may do for any request but its own.
  *
- *   ONE IMPLEMENTATION. The work is services/package-install-requests.ts, the same functions the
+ *   ONE IMPLEMENTATION. The work is services/packages/install/package-install-requests.ts, the same functions the
  *   /v1/package-install-requests doors call; this file resolves who is asking and renders the answer.
  *   packages:write is its word in TOOL_SCOPES, the one those doors ask.
  * @structure registerPackageInstallRequestTools(mcp, storage, config, getAgentGaii, sessionScopes)
@@ -29,7 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { listRequestsFor, readRequestFor, decideInstallRequest } from '../services/package-install-requests.js';
+import { listRequestsFor, readRequestFor, decideInstallRequest } from '../services/packages/install/package-install-requests.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { localAccountName } from '../utils/gaii.js';
 

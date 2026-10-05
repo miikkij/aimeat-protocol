@@ -177,7 +177,7 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // owner's routes (PUT /v1/ai/decide/settings) are the writers. New prefix, nothing wrote it before.
   'decide.',
   // 2026-09-25: `packages.install-requests.<id>` is an install an agent or an app asked for and could
-  // not do alone (services/package-install-request-store.ts), and the decision door ACTS on it: it
+  // not do alone (services/packages/install/package-install-request-store.ts), and the decision door ACTS on it: it
   // reads the package, the version, the options and the requester out of that record and installs
   // them as the owner. The words the requester lacked are written into the record when it is filed,
   // so a principal that could write the key directly could forge a request naming any package, any

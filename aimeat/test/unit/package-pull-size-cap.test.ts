@@ -56,7 +56,7 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     };
 });
 
-const { pullPackage, checkUpstream } = await import('../../src/services/package-pull.js');
+const { pullPackage, checkUpstream } = await import('../../src/services/packages/peer/package-pull.js');
 const { readBodyCapped } = await import('../../src/utils/read-capped.js');
 
 const config = { packageFederationEnabled: true, packageMaxSizeMb: CAP_MB, federationTimeoutMs: 5000 } as unknown as AimeatConfig;

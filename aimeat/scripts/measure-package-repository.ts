@@ -18,7 +18,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../src/storage/storage-factory.js';
-import { repositoryListing, NS_PACKAGE_ENTITLEMENTS, type PackageEntitlement } from '../src/services/package-entitlements.js';
+import { repositoryListing, NS_PACKAGE_ENTITLEMENTS, type PackageEntitlement } from '../src/services/packages/sale/package-entitlements.js';
 import type { PackageRecord } from '../src/storage/interface.js';
 
 const arg = (name: string, fallback: number): number => {

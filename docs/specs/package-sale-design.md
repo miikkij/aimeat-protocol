@@ -84,11 +84,11 @@ the signed seller request, which this design does not change.
 
 | # | Claim | Verdict | What the code says |
 |---|---|---|---|
-| 1 | A repository is multi-tenant: group id `{name}::{author}`, per-author create role, quota and ceilings, registration open/invite/closed | **Partly** | Group id and create role are right (`services/package-create.ts`). The component and size ceilings apply **per package version**, not per author. The quota **counts version rows, not groups** (`checkAuthorQuota` reads `listPackages(...).total`, a `COUNT(*)` on both providers), so every version of every package, archived ones too, uses up the room for new packages. Registration has four modes (`open`, `oauth`, `invite`, `closed`) and the default is `open`. |
-| 2 | Compose reads each app's dependency map, packages the author's own cortexes once, carries bound skills, names the rest in `expects` | **Correct, with two gaps** | All four hold (`services/package-compose.ts`, `services/package-skill-component.ts`). Gap 1: compose reads only the **app's** edges, never the edges of the cortexes it packages, and an app reaches extensions through a cortex. So an extension a cortex calls is usually in neither `expects` nor the refusal. Gap 2: compose makes **one new group only**; it cannot add a version (409 when the group exists) and has no dry run. The Packages page sends only `{ name, apps }`, so any app that calls an extension is refused there. |
-| 3 | Config questions come from each app's `aimeat-config` schema and each extension manifest, required and secret told apart | **Correct, two notes** | `services/package-config-needs.ts`. An app field can never be secret (publish refuses one); for an extension, `required` simply equals `secret`, because a manifest has no notion of required. It is a pre-sale reading for the author or a seller; at install the buyer is asked by the install dry run, which reads the same `planPackageConfig`, so the two cannot disagree. |
-| 4 | Selling is multi-vendor by design: the author names seller nodes, the seller signs, no token | **Correct, one comment wrong** | `services/package-sellers.ts`, `services/package-sale-auth.ts`, `routes/package-sales.ts`. The signature covers method, path and the body's hash, within five minutes, with no nonce. The file header says the seller's key "is read from its /.well-known/aimeat and pinned"; the code takes the key from the request body and checks only its length (`services/package-peer-register.ts`). |
-| 5 | `aimeat.install-bundle/1` is a product definition that is itself a package | **Correct, one part wrong** | `services/install-set-spec.ts`. The bundle lists packages (each with its default config), organisms with workspaces (manifest, schemas, readme) and crew agents. There is no top-level default config. **A package's `memory` component does not create organisms or workspaces**: it writes memory keys (`services/package-memory-component.ts`). Organisms and workspaces are created only by `applyInstallSet`, which is **operator-only**. |
+| 1 | A repository is multi-tenant: group id `{name}::{author}`, per-author create role, quota and ceilings, registration open/invite/closed | **Partly** | Group id and create role are right (`services/packages/compose/package-create.ts`). The component and size ceilings apply **per package version**, not per author. The quota **counts version rows, not groups** (`checkAuthorQuota` reads `listPackages(...).total`, a `COUNT(*)` on both providers), so every version of every package, archived ones too, uses up the room for new packages. Registration has four modes (`open`, `oauth`, `invite`, `closed`) and the default is `open`. |
+| 2 | Compose reads each app's dependency map, packages the author's own cortexes once, carries bound skills, names the rest in `expects` | **Correct, with two gaps** | All four hold (`services/packages/compose/package-compose.ts`, `services/packages/install/package-skill-component.ts`). Gap 1: compose reads only the **app's** edges, never the edges of the cortexes it packages, and an app reaches extensions through a cortex. So an extension a cortex calls is usually in neither `expects` nor the refusal. Gap 2: compose makes **one new group only**; it cannot add a version (409 when the group exists) and has no dry run. The Packages page sends only `{ name, apps }`, so any app that calls an extension is refused there. |
+| 3 | Config questions come from each app's `aimeat-config` schema and each extension manifest, required and secret told apart | **Correct, two notes** | `services/packages/compose/package-config-needs.ts`. An app field can never be secret (publish refuses one); for an extension, `required` simply equals `secret`, because a manifest has no notion of required. It is a pre-sale reading for the author or a seller; at install the buyer is asked by the install dry run, which reads the same `planPackageConfig`, so the two cannot disagree. |
+| 4 | Selling is multi-vendor by design: the author names seller nodes, the seller signs, no token | **Correct, one comment wrong** | `services/packages/sale/package-sellers.ts`, `services/packages/sale/package-sale-auth.ts`, `routes/package-sales.ts`. The signature covers method, path and the body's hash, within five minutes, with no nonce. The file header says the seller's key "is read from its /.well-known/aimeat and pinned"; the code takes the key from the request body and checks only its length (`services/packages/peer/package-peer-register.ts`). |
+| 5 | `aimeat.install-bundle/1` is a product definition that is itself a package | **Correct, one part wrong** | `services/install-set-spec.ts`. The bundle lists packages (each with its default config), organisms with workspaces (manifest, schemas, readme) and crew agents. There is no top-level default config. **A package's `memory` component does not create organisms or workspaces**: it writes memory keys (`services/packages/install/package-memory-component.ts`). Organisms and workspaces are created only by `applyInstallSet`, which is **operator-only**. |
 | 6 | A discovery layer with moderation and reviews | **Partly** | `TemplateListingRecord` has screenshots, ratings, install counts, reviews and discussions, and operator routes approve, reject, suspend and relist (`routes/templates.ts`). But `POST /v1/templates` creates a listing **already `listed`**, skipping review, and **does not check that the caller wrote the package**. Suspending a listing does not stop installs. The cross-node listing sync counts what it fetched and stores nothing. |
 | 7 | A complete commerce core, with the revenue share out of the provider's cut | **Correct** | `commerce/session-service.ts`, `commerce/beneficiary-split.ts`. The rake applies to every line (`commerceFeePercent`, default 5 %); for money it is booked as a receivable, never taken at the card rail. The split is taken from the seller's net, after the rake. The `distribute` hook exists and no resolver uses it. |
 
@@ -280,7 +280,7 @@ An entitlement names its subject as `{ kind: 'node', id }` and its record keys i
 offer's licence names `subject: 'node'`. Only `node` exists today. An owner subject
 (`{ kind: 'owner', ghii }`, key `owner:<ghii>`) is added later by adding a kind, not by rewriting
 records. Today's code keeps entitlements under `nodes`, keyed by the bare node id
-(`services/package-entitlements.ts`); the build of this section reads both shapes and writes the new
+(`services/packages/sale/package-entitlements.ts`); the build of this section reads both shapes and writes the new
 one.
 
 ### The checkout line
@@ -505,15 +505,15 @@ Each of these was checked in the code on `main`.
 
 | # | Gap | Where |
 |---|---|---|
-| T1 | **A packaged extension starts active.** It is stored `status: 'active'` and its activation jobs run at install. Nobody is shown what it reaches (its `ctx.fetch` has no host allowlist outside AI-provider runs; it can start AI jobs billed to the buyer; a vault secret binds to the first host the script names). | `services/component-registrar.ts`, `services/package-install.ts`, `services/extension-ctx.ts`, `services/owner-secrets.ts` |
+| T1 | **A packaged extension starts active.** It is stored `status: 'active'` and its activation jobs run at install. Nobody is shown what it reaches (its `ctx.fetch` has no host allowlist outside AI-provider runs; it can start AI jobs billed to the buyer; a vault secret binds to the first host the script names). | `services/component-registrar.ts`, `services/packages/install/package-install.ts`, `services/extension-ctx.ts`, `services/owner-secrets.ts` |
 | T2 | **A packaged app gets every scope it asks for, with no consent screen**, because an installed app is the buyer's own app and the silent bridge approves an owner's own app for whatever it wants. With `connect-src https:`, that app can send the buyer's memory anywhere. The file's own comment calls the own-app branch "the root" of an open escalation. | `routes/app-grants.ts` (`isOwnApp`), `utils/app-csp.ts` |
-| T3 | **A memory component overwrites the buyer's own keys.** The author names the keys, and the install writes them over whatever is there, only reserved keys excepted. | `services/component-registrar.ts`, `services/package-memory-component.ts` |
+| T3 | **A memory component overwrites the buyer's own keys.** The author names the keys, and the install writes them over whatever is there, only reserved keys excepted. | `services/component-registrar.ts`, `services/packages/install/package-memory-component.ts` |
 | T4 | **A cortex schema component replaces another owner's schema lock.** A lock is looked up by key alone, so it applies to every owner on the node; the schema route refuses to replace another's lock (`SCHEMA_LOCKED_BY_OTHER`), and the package path writes it without that check and ignores errors. A workspace's strict schema is such a lock. | `services/component-registrar.ts`, `routes/schemas.ts`, `services/schema-validator.ts` |
-| T5 | **The buyer is not shown who made it.** The install preview names no author, no signing node, no upstream and no verification result, although the data exists. An installed copy of a pulled package is labelled as the buyer's own. A package skill does not say who wrote it, and because a bare skill name resolves the user's registry first, **a package skill can take the name of a built-in node skill**. | `services/package-install.ts`, `public/views/profile/packages/rows.js`, `mcp/skills.ts` |
-| T6 | **Nothing withdraws a bad version from the nodes that have it.** Archiving stops new installs; revoking deletes an entitlement; managed installs keep running what they have and keep updating from the same key. | `services/package-upstream-refresh.ts`, `services/package-entitlements.ts` |
-| T7 | **Self-updates do not ask again.** A managed install takes a new version every night. A new version that adds an extension or a scope reaches the buyer with no question. | `services/package-upstream-refresh.ts` |
+| T5 | **The buyer is not shown who made it.** The install preview names no author, no signing node, no upstream and no verification result, although the data exists. An installed copy of a pulled package is labelled as the buyer's own. A package skill does not say who wrote it, and because a bare skill name resolves the user's registry first, **a package skill can take the name of a built-in node skill**. | `services/packages/install/package-install.ts`, `public/views/profile/packages/rows.js`, `mcp/skills.ts` |
+| T6 | **Nothing withdraws a bad version from the nodes that have it.** Archiving stops new installs; revoking deletes an entitlement; managed installs keep running what they have and keep updating from the same key. | `services/packages/peer/package-upstream-refresh.ts`, `services/packages/sale/package-entitlements.ts` |
+| T7 | **Self-updates do not ask again.** A managed install takes a new version every night. A new version that adds an extension or a scope reaches the buyer with no question. | `services/packages/peer/package-upstream-refresh.ts` |
 | T8 | **The gallery can be filled without review**: `POST /v1/templates` lists a package at once, for any caller, without checking authorship. | `routes/templates.ts` |
-| T9 | **Peer registration** (finding F). | `services/package-peer-register.ts` |
+| T9 | **Peer registration** (finding F). | `services/packages/peer/package-peer-register.ts` |
 
 ### What must land before selling, in my judgement
 
@@ -557,7 +557,7 @@ package is served by a node that does not hold their account, which nothing does
 **D. Deliberate for metered contracts, and the wrong tool for packages.** Lazy renewal is right for
 a capability somebody calls. A package entitlement must not use it, and does not: its date ends it.
 **File one defect:** an omitted `updates_until` resets an entitlement to "updates forever"
-(`grantEntitlement` in `services/package-entitlements.ts`). The road for packages is section 3's
+(`grantEntitlement` in `services/packages/sale/package-entitlements.ts`). The road for packages is section 3's
 renewal: a checkout that moves the date, and a notice before it passes.
 
 **E. Deliberate, and correct.** A pull takes a copy, and the copy is the puller's. The road for a
@@ -616,14 +616,14 @@ two documentation rows were corrected by `d48f79f4f`.
 | A cortex schema component replaces another owner's lock (T4) | `services/component-registrar.ts` | security |
 | A memory component overwrites the owner's existing keys (T3) | `services/component-registrar.ts` | security |
 | `POST /v1/templates` lists without review or authorship check (T8) | `routes/templates.ts` | security |
-| An omitted `updates_until` resets to unlimited updates | `services/package-entitlements.ts` | money |
-| A seller can change or revoke any grant of the author, including grants the author or another seller made | `services/package-entitlements.ts` (`mayManage` acts as the author) | money, multi-vendor |
-| The author quota counts version rows, not groups | `services/package-create.ts` | multi-tenant |
+| An omitted `updates_until` resets to unlimited updates | `services/packages/sale/package-entitlements.ts` | money |
+| A seller can change or revoke any grant of the author, including grants the author or another seller made | `services/packages/sale/package-entitlements.ts` (`mayManage` acts as the author) | money, multi-vendor |
+| The author quota counts version rows, not groups | `services/packages/compose/package-create.ts` | multi-tenant |
 | `POST /v1/packages/:groupId/versions` asks for `app:write`, not `packages:write`, and skips the create role | `routes/packages.ts` | consistency |
-| Compose does not read the extension edges of the cortexes it packages | `services/package-compose.ts` | correctness |
+| Compose does not read the extension edges of the cortexes it packages | `services/packages/compose/package-compose.ts` | correctness |
 | The admin suspend call sends `reason`; the route reads `comment` | `public/js/services/admin.js`, `routes/templates.ts` | small |
 | `openapi.yaml` still says a granted node must share its catalogue | `openapi.yaml` | docs; fixed in `d48f79f4f` |
-| `package-sellers.ts` says the seller key is read from `/.well-known/aimeat`; it is not | `services/package-sellers.ts` | docs; true since `d48f79f4f`, which reads it |
+| `package-sellers.ts` says the seller key is read from `/.well-known/aimeat`; it is not | `services/packages/sale/package-sellers.ts` | docs; true since `d48f79f4f`, which reads it |
 
 **Scale.** A repository keeps one entitlements record per package group, and a memory value holds
 at most 1024 kB, so one group can hold a few thousand entitled nodes (about 250 bytes each) before
@@ -674,8 +674,8 @@ Each phase is usable on its own and is tested before the next starts.
 2. **The trust layer before selling:** the consent step with `capabilities` (T1), no silent scopes
    for package-installed apps (T2), re-consent on a widening update (T7), and the display of author,
    signer and origin (T5). *Built 2026-10-02 on the API and MCP side: the dry run's `capabilities`
-   and `source` (services/package-capabilities.ts), packages:install-code with a request for the owner
-   that carries the list, the approval record (services/package-approvals.ts), consent for a
+   and `source` (services/packages/install/package-capabilities.ts), packages:install-code with a request for the owner
+   that carries the list, the approval record (services/packages/install/package-approvals.ts), consent for a
    package's app, an update that adds capabilities waiting for the owner, and a package skill that
    cannot take a node skill's name. The two screens (the install preview on the Packages page and the
    permission row on the agent page) wait for Jouni's look before they go to `main`.*
@@ -686,7 +686,7 @@ Each phase is usable on its own and is tested before the next starts.
    Then, in this order: **grants on approval and at once** (the request, its approval, the order at
    0), and **automatic renewal**, which must be done before a product with a monthly fee goes on sale
    through the platform. *Built 2026-10-02, all of it, on the API and MCP side: the offer
-   (services/package-offer.ts, author and operator only, its read hidden from everyone else), the
+   (services/packages/sale/package-offer.ts, author and operator only, its read hidden from everyone else), the
    seller's signed read, the catalogue, subscriptions and requests (package-sale-catalogue.ts), the
    `package` line and the sale carried out after payment (package-sale-checkout.ts), claim codes
    (package-claims.ts), the renewal notice, and automatic renewal (package-renewals.ts, a daily job).
@@ -697,7 +697,7 @@ Each phase is usable on its own and is tested before the next starts.
 4. **The set composer:** the `aimeat-workspace` declaration, compose that adds a version, compose-set
    with its dry run, and the owner part of the set install. *Built 2026-10-02: the declaration parsed
    and checked at publish (services/app-workspaces.ts, 422 APP_WORKSPACE_INVALID), compose publishing the
-   next version of a group the caller has, compose-set with its dry run (services/package-compose-set.ts,
+   next version of a group the caller has, compose-set with its dry run (services/packages/compose/package-compose-set.ts,
    POST /v1/packages/compose-set, aimeat_package_compose_set), and a set installed by its buyer through
    the ordinary install (services/install-bundle-owner.ts), with each installed app told where its
    workspace is (AIMEAT.data.appWorkspace). The install set calls the same parts for the owner it
@@ -706,7 +706,7 @@ Each phase is usable on its own and is tested before the next starts.
    workspaces into more than one organism; the author renames the one organism.*
 5. **A repository open to strangers:** withdrawal (T6), review on a selling node, the scale
    measurement, and the offer in the Exchange's discovery for agents. *Built 2026-10-02: withdrawal
-   with a reason (services/package-withdrawals.ts, POST /v1/packages/:groupId/versions/:version/withdraw,
+   with a reason (services/packages/compose/package-withdrawals.ts, POST /v1/packages/:groupId/versions/:version/withdraw,
    aimeat_package_withdraw): never served again, each copy's extensions switched off and its owner told
    once, on the repository at once and on a customer node at its daily check through `withdrawn` on the
    listing. Review on a selling node: the seller's offer read carries what the version on sale can do,
@@ -714,7 +714,7 @@ Each phase is usable on its own and is tested before the next starts.
    version can do more; renewals go on. Discovery: packages on sale are `offering` entries with segment
    `package` (discovery/sources/package-offers-source.ts). Finding F's open items: the cap on
    packages-only peers (AIMEAT_PACKAGE_PEER_CAP, default 500, told on the Security page) and the daily
-   removal of unused ones (services/package-peer-limits.ts). The scale measurement is in section 7;
+   removal of unused ones (services/packages/peer/package-peer-limits.ts). The scale measurement is in section 7;
    past about 2,088 nodes one package group's record outgrows the memory value rule, which needs a
    storage decision.*
 

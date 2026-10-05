@@ -8,13 +8,13 @@
  *   TWO DOORS, OPPOSITE DIRECTIONS. The attestation door is public and read-only, and exists so an
  *   update check costs one small JSON read rather than a whole archive download. The pull door is
  *   this owner's own act on their own node, and everything it refuses is argued in
- *   services/package-pull.ts.
+ *   services/packages/peer/package-pull.ts.
  * @structure registerFederationPackageRoutes(router, config, storage, peers)
  * @usage import { registerFederationPackageRoutes } from './federation-sync/packages.js';
  * @version-history
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-28 — The attestation serves an entitled peer node's signed read of a private
- *     package on a node in the repository role (services/package-entitlements.ts).
+ *     package on a node in the repository role (services/packages/sale/package-entitlements.ts).
  *     GET /v1/federation/peers/:nodeId/packages reads what a repository peer serves this node.
  *   v1.0.1 — 2026-09-12 — The pull caller stops carrying `sub`. It travelled three files to become
  *     the fallback identity resolveGhii took, and that fallback is gone: the helper composes the
@@ -27,11 +27,11 @@ import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { pullPackage, listRepositoryPackages } from '../../services/package-pull.js';
-import { getPackageFor, getPackageVersionFor } from '../../services/package-read.js';
+import { pullPackage, listRepositoryPackages } from '../../services/packages/peer/package-pull.js';
+import { getPackageFor, getPackageVersionFor } from '../../services/packages/compose/package-read.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
-import { attestationFor } from '../../services/package-attest-serve.js';
-import { resolveNodeRead } from '../../services/package-entitlements.js';
+import { attestationFor } from '../../services/packages/peer/package-attest-serve.js';
+import { resolveNodeRead } from '../../services/packages/sale/package-entitlements.js';
 
 export function registerFederationPackageRoutes(
     router: Router,
@@ -50,7 +50,7 @@ export function registerFederationPackageRoutes(
         const version = req.query.version as string | undefined;
 
         // An entitled peer's signed read of a private package, on the repository's terms
-        // (services/package-entitlements.ts), exactly as the export endpoint serves it.
+        // (services/packages/sale/package-entitlements.ts), exactly as the export endpoint serves it.
         const nodeRead = await resolveNodeRead(storage, config, peers, req.headers, groupId, version);
         if (nodeRead.kind === 'refused') {
             res.status(nodeRead.status).json(error(config.nodeId, nodeRead.code, nodeRead.message));
@@ -77,7 +77,7 @@ export function registerFederationPackageRoutes(
 
     // GET /v1/federation/peers/:nodeId/packages — what a peer that is a package repository serves
     // this node: its public packages and the private ones this node is entitled to
-    // (services/package-pull.ts listRepositoryPackages). Pull one with POST /v1/federation/packages/pull.
+    // (services/packages/peer/package-pull.ts listRepositoryPackages). Pull one with POST /v1/federation/packages/pull.
     router.get('/v1/federation/peers/:nodeId/packages', requireAuth(), requireScope('packages:write'), async (req, res) => {
         if (!config.packageFederationEnabled) {
             res.status(403).json(error(config.nodeId, 'PACKAGE_FEDERATION_DISABLED',

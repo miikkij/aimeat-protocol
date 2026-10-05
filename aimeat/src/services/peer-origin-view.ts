@@ -23,7 +23,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { listPeerOrigins, listPendingPeers, type PendingPeer } from './peer-origin.js';
-import { NS_PACKAGE_ENTITLEMENTS } from './package-entitlements.js';
+import { NS_PACKAGE_ENTITLEMENTS } from './packages/sale/package-entitlements.js';
 
 export type PeerOriginView =
     | { kind: 'recorded'; source: string; by: string; group_id?: string; proof: string; requested_at: string; proven_at: string }

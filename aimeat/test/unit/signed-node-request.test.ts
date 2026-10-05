@@ -11,8 +11,8 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import type { Storage } from '../../src/storage/interface.js';
 import { generateKeyPair, verify } from '../../src/auth/keypair.js';
 import { signNodeRequest, checkNodeRequest } from '../../src/services/signed-node-request.js';
-import { signedPackageHeaders } from '../../src/services/package-node-auth.js';
-import { signedSaleHeaders, bodyDigest } from '../../src/services/package-sale-auth.js';
+import { signedPackageHeaders } from '../../src/services/packages/peer/package-node-auth.js';
+import { signedSaleHeaders, bodyDigest } from '../../src/services/packages/sale/package-sale-auth.js';
 
 let keys: { publicKey: string; privateKey: string };
 let storage: Storage;

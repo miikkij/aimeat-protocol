@@ -10,13 +10,13 @@
  *   v1.7.0 — 2026-10-05 — PATCH turns automatic updates on only for the owner in person or an agent
  *     holding packages:install-code (secaudit 2026-10, PKG-12).
  *   v1.6.0 — 2026-10-02 — GET /v1/instances/:id carries `approval`: what the install was approved to do
- *     and by whom (services/package-approvals.ts). DELETE removes that record with the install.
+ *     and by whom (services/packages/install/package-approvals.ts). DELETE removes that record with the install.
  *   v1.5.0 — 2026-09-30 — DELETE with removeComponents removes a skill component only when this
- *     instance published it (services/package-skill-component.ts).
+ *     instance published it (services/packages/install/package-skill-component.ts).
  *   v1.4.0 — 2026-09-28 — PATCH /v1/instances/:id (label, auto_update) and POST /v1/instances/check-updates
- *     (services/package-upstream-refresh.ts), install packages phase 3.
+ *     (services/packages/peer/package-upstream-refresh.ts), install packages phase 3.
  *   v1.3.0 — 2026-09-28 — POST /v1/instances/:id/fork: a managed install becomes editable in place and
- *     stops receiving updates (services/package-managed.ts).
+ *     stops receiving updates (services/packages/install/package-managed.ts).
  *   v1.2.0 — 2026-09-14 — requireLocalSession on every door. Each one compares `instance.owner`
  *     against `req.auth.owner`, and a federated login mints that as the local part of the visitor's
  *     HOME name — so a visitor read, updated and removed the instances of whoever here shares it.
@@ -42,12 +42,12 @@ import {
 } from '../../services/component-registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
-import { planInstanceUpdate } from '../../services/package-update-plan.js';
-import { forkPackageInstance, setPackageInstance } from '../../services/package-managed.js';
-import { refreshInstalledPackages } from '../../services/package-upstream-refresh.js';
+import { planInstanceUpdate } from '../../services/packages/install/package-update-plan.js';
+import { forkPackageInstance, setPackageInstance } from '../../services/packages/install/package-managed.js';
+import { refreshInstalledPackages } from '../../services/packages/peer/package-upstream-refresh.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { listInstancesFor } from '../../services/package-read.js';
-import { approvalOf, forgetApproval, INSTALL_CODE_SCOPE } from '../../services/package-approvals.js';
+import { listInstancesFor } from '../../services/packages/compose/package-read.js';
+import { approvalOf, forgetApproval, INSTALL_CODE_SCOPE } from '../../services/packages/install/package-approvals.js';
 import { isOwnerInPerson } from '../../auth/effective-scopes.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { operatorOverride } from '../../services/operator-override.js';
@@ -174,7 +174,7 @@ export function registerManageRoutes(
       return;
     }
 
-    // What the install was approved to do, and by whom (services/package-approvals.ts); null for an
+    // What the install was approved to do, and by whom (services/packages/install/package-approvals.ts); null for an
     // install made before approvals were recorded.
     const approval = await approvalOf(storage, id);
     res.json(success(config.nodeId, { ...instance, approval }, [
@@ -184,7 +184,7 @@ export function registerManageRoutes(
   });
 
   // PATCH /v1/instances/:id — the owner's label for an install, and whether the daily package check
-  // updates it by itself (services/package-managed.ts).
+  // updates it by itself (services/packages/install/package-managed.ts).
   router.patch('/v1/instances/:id', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const out = await setPackageInstance(storage, {
@@ -200,14 +200,14 @@ export function registerManageRoutes(
 
   // POST /v1/instances/check-updates — bring the caller's own installs up to what their sources serve
   // now: a newer version is pulled, an install with auto-update on is updated, the rest are reported
-  // (services/package-upstream-refresh.ts). The daily core job runs the same for every owner.
+  // (services/packages/peer/package-upstream-refresh.ts). The daily core job runs the same for every owner.
   router.post('/v1/instances/check-updates', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner: req.auth!.owner }, { notify: false });
     res.json(success(config.nodeId, { checked: outcomes.length, outcomes }));
   });
 
   // POST /v1/instances/:id/fork — A managed install becomes the owner's own editable copy, in place.
-  // Every address and record stays; the package's updates stop (services/package-managed.ts).
+  // Every address and record stays; the package's updates stop (services/packages/install/package-managed.ts).
   router.post('/v1/instances/:id/fork', requireAuth(), requireLocalSession(), requireScope('packages:write'), async (req, res) => {
     const id = req.params.id as string;
     const out = await forkPackageInstance(storage, { owner: req.auth!.owner }, id);

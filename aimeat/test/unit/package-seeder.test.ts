@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, PackageRecord } from '../../src/storage/interface.js';
 import { getExamplePackages, buildRecords } from '../../src/data/example-packages.js';
-import { seedExamplePackages, packageFingerprint, nextSeedVersion } from '../../src/services/package-seeder.js';
+import { seedExamplePackages, packageFingerprint, nextSeedVersion } from '../../src/services/packages/compose/package-seeder.js';
 
 const SYSTEM = 'system@aimeat-test-001-dev';
 const GROUP = 'company-brain::system';

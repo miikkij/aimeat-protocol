@@ -19,7 +19,7 @@
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { memoryComponentWriteRefusal, memoryWordsFor } from '../../src/services/package-memory-component.js';
+import { memoryComponentWriteRefusal, memoryWordsFor } from '../../src/services/packages/install/package-memory-component.js';
 import { isOwnerInPerson } from '../../src/utils/gaii.js';
 
 const OWNER = 'alice@node-1';

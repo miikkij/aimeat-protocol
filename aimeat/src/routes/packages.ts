@@ -34,7 +34,7 @@
  *   v1.4.0 — 2026-03-15 — enforce packageMaxSizeMb, packageMaxComponents limits; remove (config as any) casts
  *   v2.0.0 — 2026-03-20 — change export/import from YAML to ZIP format (buildZip/parseZip)
  *   v2.1.0 — 2026-03-20 — add POST /v1/packages/:groupId/propose endpoint for template gallery proposals
- *   v2.2.0 — 2026-09-05 — The create and versions bodies move to services/package-create.ts, so the
+ *   v2.2.0 — 2026-09-05 — The create and versions bodies move to services/packages/compose/package-create.ts, so the
  *     MCP surface and the app composer write a package through the same ceilings and the same
  *     refusals rather than a second copy of them. The three deliberate behaviour changes that came
  *     with the move (status defaults to published, visibility defaults to private, both are
@@ -43,12 +43,12 @@
  *     bags handed to the package services stop carrying a field those services used only as that
  *     fallback. wish-identity-gate-sees-resolveghii.
  *   v2.3.0 — 2026-09-28 — The export serves a private package to an entitled peer node's signed pull
- *     on a node in the repository role (services/package-entitlements.ts), and the entitlement
+ *     on a node in the repository role (services/packages/sale/package-entitlements.ts), and the entitlement
  *     routes are registered here (routes/package-entitlements.ts).
  *   v2.4.0 — 2026-09-29 — The sale routes are registered here too (routes/package-sales.ts): seller
  *     nodes and their signed requests, with no token.
  *   v2.5.0 — 2026-09-30 — POST /v1/packages/compose takes `include_skills`: the composer's own skills
- *     bound to the apps travel as skill components (services/package-skill-component.ts).
+ *     bound to the apps travel as skill components (services/packages/install/package-skill-component.ts).
  *   v2.6.0 — 2026-10-02 — POST /v1/packages/:groupId/versions asks packages:write and the create role,
  *     as POST /v1/packages does (it asked app:write and no role).
  */
@@ -63,29 +63,29 @@ import { success, error } from '../middleware/envelope.js';
 import { createPackagesTabService } from '../services/db/packages-tab-db-service.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
-import { buildZip, parseZip, ZipValidationError } from '../services/package-zip.js';
+import { buildZip, parseZip, ZipValidationError } from '../services/packages/compose/package-zip.js';
 import {
   createPackageGroup, addPackageVersion, setPackageVersionStatus, VALID_VISIBILITIES,
-} from '../services/package-create.js';
+} from '../services/packages/compose/package-create.js';
 import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
-} from '../services/package-read.js';
-import { composePackageFromApps } from '../services/package-compose.js';
-import { composeSet } from '../services/package-compose-set.js';
-import { withdrawVersion } from '../services/package-withdrawals.js';
+} from '../services/packages/compose/package-read.js';
+import { composePackageFromApps } from '../services/packages/compose/package-compose.js';
+import { composeSet } from '../services/packages/compose/package-compose-set.js';
+import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
 import { getActiveScheduler } from '../services/scheduler.js';
-import { packageSheet } from '../services/package-sheet.js';
-import { importParsedPackage, upstreamFromZip } from '../services/package-import.js';
+import { packageSheet } from '../services/packages/compose/package-sheet.js';
+import { importParsedPackage, upstreamFromZip } from '../services/packages/compose/package-import.js';
 import type { PeerInfo } from '../services/federation.js';
-import { attestationFor } from '../services/package-attest-serve.js';
-import { checkUpstream } from '../services/package-pull.js';
-import { resolveNodeRead } from '../services/package-entitlements.js';
+import { attestationFor } from '../services/packages/peer/package-attest-serve.js';
+import { checkUpstream } from '../services/packages/peer/package-pull.js';
+import { resolveNodeRead } from '../services/packages/sale/package-entitlements.js';
 import { registerPackageEntitlementRoutes } from './package-entitlements.js';
 import { registerPackageSaleRoutes } from './package-sales.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy
-// per road. They are in services/package-create.ts now, which is the one place a package version is
+// per road. They are in services/packages/compose/package-create.ts now, which is the one place a package version is
 // written, so this file no longer decides any of them.
 
 export function packagesRouter(
@@ -151,7 +151,7 @@ export function packagesRouter(
   });
 
   // POST /v1/packages/compose-set — a set to sell: one package per app and the install bundle that
-  // lists them (services/package-compose-set.ts). With dry_run nothing is written.
+  // lists them (services/packages/compose/package-compose-set.ts). With dry_run nothing is written.
   router.post('/v1/packages/compose-set', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const owner = req.auth!.owner;
     if ((config.packageCreateRole ?? 'owner') === 'operator' && !(await isOperatorCaller(storage, req.auth))) {
@@ -474,7 +474,7 @@ export function packagesRouter(
     const versionParam = req.query.version as string | undefined;
 
     // A customer node's signed pull of a private package, on a node in the repository role
-    // (services/package-entitlements.ts). An unsigned request is decided on visibility as before.
+    // (services/packages/sale/package-entitlements.ts). An unsigned request is decided on visibility as before.
     const nodeRead = await resolveNodeRead(storage, config, peers, req.headers, groupId, versionParam);
     if (nodeRead.kind === 'refused') {
       res.status(nodeRead.status).json(error(config.nodeId, nodeRead.code, nodeRead.message));
@@ -552,7 +552,7 @@ export function packagesRouter(
     }
 
     // The "what you get" sheet travels with the record, so the page and an AI read the same thing
-    // before installing (services/package-sheet.ts).
+    // before installing (services/packages/compose/package-sheet.ts).
     res.json(success(config.nodeId, { ...pkg, sheet: packageSheet(pkg, config) }, [
       { description: 'List all versions', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/versions` },
       { description: 'Export as ZIP', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/export` },
@@ -600,7 +600,7 @@ export function packagesRouter(
   });
 
   // POST /v1/packages/:groupId/versions/:version/withdraw — take a bad version back from every node
-  // that has it, with a reason (services/package-withdrawals.ts). The author or an operator.
+  // that has it, with a reason (services/packages/compose/package-withdrawals.ts). The author or an operator.
   router.post('/v1/packages/:groupId/versions/:version/withdraw', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() },

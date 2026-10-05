@@ -159,7 +159,7 @@ import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
-import { managedChangeRefusal } from '../services/package-managed.js';
+import { managedChangeRefusal } from '../services/packages/install/package-managed.js';
 import { receiveFontUpload } from '../services/themes/fonts.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
@@ -515,7 +515,7 @@ async function handleExtensionUpload(
     if (kept) { res.status(kept.status).json({ success: false, error: kept.code, message: kept.message }); return; }
 
     // Other code for an extension a managed package install owns is refused here as on PUT
-    // (services/package-managed.ts). Config alone is a setting and goes through.
+    // (services/packages/install/package-managed.ts). Config alone is a setting and goes through.
     if (existing && extensionCodeOf(record) !== extensionCodeOf(existing)) {
         const managed = await managedChangeRefusal(storage, existing.installedBy, 'extension', record.name, 'code');
         if (managed) { res.status(managed.status).json({ success: false, error: managed.code, message: managed.message, details: managed.details }); return; }

@@ -78,15 +78,15 @@ import { parseBundledCrews } from './app-bundled-crews.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { publishApp } from './app-publish.js';
 import { putProgramMap } from './data-map/data-map-access.js';
-import { installPackageAppTools } from './package-app-tools.js';
+import { installPackageAppTools } from './packages/install/package-app-tools.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
 import { removeCortex } from './cortex-lifecycle.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
-import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './package-memory-component.js';
+import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './packages/install/package-memory-component.js';
 import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
-import { mergeExtensionConfig } from './package-config.js';
-import { registerSkillComponent, deleteSkillComponent } from './package-skill-component.js';
-import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './package-component-collisions.js';
+import { mergeExtensionConfig } from './packages/compose/package-config.js';
+import { registerSkillComponent, deleteSkillComponent } from './packages/install/package-skill-component.js';
+import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './packages/compose/package-component-collisions.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ export interface ComponentRegistrationInput {
    * `{ success }` shape. For a caller that has to know whether a component will register BEFORE it
    * does something it cannot take back.
    *
-   * services/package-migrate.ts is that caller: its `replace` and `custom` actions delete the
+   * services/packages/install/package-migrate.ts is that caller: its `replace` and `custom` actions delete the
    * owner's installed component and then register the replacement, because storage.createCsm and
    * its siblings throw NAME_TAKEN rather than overwrite. A refusal after the delete — an app whose
    * artifact lint fails, a crew-def that does not validate, a quota ceiling, an extension the
@@ -156,7 +156,7 @@ export interface ComponentRegistrationInput {
     extensionNames?: Map<string, string>;
   };
   /**
-   * The config the install gives this component, already checked (services/package-config.ts): an
+   * The config the install gives this component, already checked (services/packages/compose/package-config.ts): an
    * app's goes into its config record, an extension's into its own config with secrets encrypted.
    */
   configValues?: Record<string, unknown>;
