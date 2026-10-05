@@ -1416,6 +1416,89 @@
   function recoveryViewsHtml(i, field) {
     return '<div id="aimeat-forgot-pw-view" class="aimeat-body" style="display:none"><div id="aimeat-fpw-step1"><h3 class="aimeat-sub-title">' + escHtml(i.resetPasswordTitle || "Reset Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.resetPasswordDesc || "Enter your username to receive a reset code by email.") + "</p>" + field(i.usernameLabel || "Username", '<input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || "Username") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" class="aimeat-msg"></p><p id="aimeat-fpw-err" class="aimeat-err"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.enterNewPasswordTitle || "Enter New Password") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + "</p>" + field(i.codeLabel || "Reset Code", '<input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6">') + field(i.newPasswordLabel || "New Password", '<input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i.newPasswordPlaceholder || "New password (min 8 chars)") + '">') + '<div class="aimeat-actions"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" class="aimeat-msg"></p><p id="aimeat-fpw-err2" class="aimeat-err"></p></div></div><div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.recoverUsernameTitle || "Recover Username") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.recoverUsernameDesc || "Enter the email address associated with your account.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" class="aimeat-msg"></p></div><div id="aimeat-email-view" class="aimeat-body" style="display:none"><div id="aimeat-em-step1"><h3 class="aimeat-sub-title">' + escHtml(i.completeAccountTitle || "One last step") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" class="aimeat-err"></p></div><div id="aimeat-em-step2" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.enterCodeTitle || "Enter Verification Code") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + "</p>" + field(i.codeLabel || "Verification Code", '<input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric">') + '<div class="aimeat-actions"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" class="aimeat-msg"></p><p id="aimeat-em-err2" class="aimeat-err"></p></div></div>';
   }
+  function wireRecoveryViews(ctx) {
+    var i = ctx.i, api2 = ctx.api, showView = ctx.showView;
+    document.getElementById("aimeat-fpw-send").addEventListener("click", async function() {
+      var username = (
+        /** @type {any} */
+        document.getElementById("aimeat-fpw-username").value.trim().toLowerCase()
+      );
+      var msgEl = document.getElementById("aimeat-fpw-msg");
+      var errEl = document.getElementById("aimeat-fpw-err");
+      msgEl.style.display = "none";
+      errEl.style.display = "none";
+      if (!username) {
+        errEl.textContent = i.errUserShort || "Username is required";
+        errEl.style.display = "block";
+        return;
+      }
+      try {
+        await api2("/v1/ghii/password/reset-request", { method: "POST", body: JSON.stringify({ username }) });
+        msgEl.textContent = i.resetCodeSent || "If your account has a verified email, a reset code was sent.";
+        msgEl.style.display = "block";
+        document.getElementById("aimeat-fpw-step1").style.display = "none";
+        document.getElementById("aimeat-fpw-step2").style.display = "";
+        window.__aimeatResetUser = username;
+      } catch (e) {
+        errEl.textContent = e.message;
+        errEl.style.display = "block";
+      }
+    });
+    document.getElementById("aimeat-fpw-reset").addEventListener("click", async function() {
+      var code = (
+        /** @type {any} */
+        document.getElementById("aimeat-fpw-code").value.trim()
+      );
+      var newPass = (
+        /** @type {any} */
+        document.getElementById("aimeat-fpw-newpass").value
+      );
+      var msgEl = document.getElementById("aimeat-fpw-msg2");
+      var errEl = document.getElementById("aimeat-fpw-err2");
+      msgEl.style.display = "none";
+      errEl.style.display = "none";
+      if (!code) {
+        errEl.textContent = "Code is required";
+        errEl.style.display = "block";
+        return;
+      }
+      if (!newPass || newPass.length < 8) {
+        errEl.textContent = i.errPassWeak || "Password must be at least 8 characters";
+        errEl.style.display = "block";
+        return;
+      }
+      try {
+        await api2("/v1/ghii/password/reset", { method: "POST", body: JSON.stringify({
+          username: window.__aimeatResetUser || "",
+          code,
+          newPassword: newPass
+        }) });
+        msgEl.textContent = i.resetSuccess || "Password reset successful! You can now sign in.";
+        msgEl.style.display = "block";
+        setTimeout(function() {
+          showView("login");
+        }, 2e3);
+      } catch (e) {
+        errEl.textContent = e.message;
+        errEl.style.display = "block";
+      }
+    });
+    document.getElementById("aimeat-fu-send").addEventListener("click", async function() {
+      var email = (
+        /** @type {any} */
+        document.getElementById("aimeat-fu-email").value.trim()
+      );
+      var msgEl = document.getElementById("aimeat-fu-msg");
+      msgEl.style.display = "none";
+      if (!email) return;
+      try {
+        await api2("/v1/ghii/account/recover", { method: "POST", body: JSON.stringify({ email }) });
+      } catch {
+      }
+      msgEl.textContent = i.usernameSent || "If an account with that email exists, your username was sent.";
+      msgEl.style.display = "block";
+    });
+  }
 
   // src/static/sdk-libs/auth/http.js
   async function api(path, opts = {}) {
@@ -1831,6 +1914,10 @@
         restoreInputs(vals);
       });
     }
+    function busyOrAway() {
+      var body = document.getElementById("aimeat-modal-body");
+      return !!body && body.style.display === "none" || !!modal.querySelector("button:disabled");
+    }
     function render(anim) {
       modal.innerHTML = buildModalInner(i, lang, anim, tab);
       wireModal();
@@ -1848,8 +1935,9 @@
         }
       }
       if (!differs) return;
-      var vals = captureInputs();
       i = fresh;
+      if (busyOrAway()) return;
+      var vals = captureInputs();
       render(false);
       restoreInputs(vals);
     });
@@ -2047,6 +2135,12 @@
           showView("login");
         });
       });
+      function attachEmail(pending, email) {
+        return api("/v1/ghii/login/attach-email", {
+          method: "POST",
+          body: JSON.stringify({ username: pending.username, password: pending.password, email })
+        });
+      }
       async function sendEmailCode() {
         var email = (
           /** @type {any} */
@@ -2069,37 +2163,53 @@
         );
         btn.textContent = i.working || "Working...";
         btn.disabled = true;
+        var pending = pendingEmailLogin;
         try {
           var res;
-          if (pendingEmailLogin.mode === "register") {
+          if (pending.mode === "register") {
             res = await api("/v1/ghii", {
               method: "POST",
               credentials: "include",
               body: JSON.stringify({
-                username: pendingEmailLogin.username,
-                display_name: pendingEmailLogin.displayName,
-                password: pendingEmailLogin.password,
+                username: pending.username,
+                display_name: pending.displayName,
+                password: pending.password,
                 email,
                 // The account's locale, so the verification code arrives in the language the
                 // person is reading right now. Without it every account was created locale-less
                 // and every system email fell back to English (UX-remake v3, measured).
                 locale: currentModalLang()
               })
+            }).catch(function(e) {
+              if (e.code !== "NAME_TAKEN") throw e;
+              return attachEmail(pending, email).catch(function(e2) {
+                if (e2.code === "ALREADY_VERIFIED") return null;
+                throw e;
+              });
             });
+            if (res === null) {
+              try {
+                await auth.loginWithPassword(pending.username, pending.password);
+              } catch (le) {
+                if (le.code !== "TOTP_REQUIRED") throw le;
+                totpStep.openTotpStep(pending.username, pending.password);
+                return;
+              }
+              pendingEmailLogin = null;
+              finishLogin();
+              return;
+            }
           } else {
-            res = await api("/v1/ghii/login/attach-email", {
-              method: "POST",
-              body: JSON.stringify({ username: pendingEmailLogin.username, password: pendingEmailLogin.password, email })
-            });
+            res = await attachEmail(pending, email);
           }
-          pendingEmailLogin.verificationId = res.data && res.data.verification_id;
+          pending.verificationId = res.data && res.data.verification_id;
           document.getElementById("aimeat-em-step1").style.display = "none";
           document.getElementById("aimeat-em-step2").style.display = "";
           setTimeout(function() {
             document.getElementById("aimeat-em-code").focus();
           }, 50);
         } catch (e) {
-          errEl.textContent = e.message;
+          errEl.textContent = e.code === "NAME_TAKEN" ? i.errNameTaken || "That username is taken. If it is yours, sign in instead." : e.message;
           errEl.style.display = "block";
         } finally {
           btn.textContent = i.sendVerificationCode || "Send Verification Code";
@@ -2148,86 +2258,7 @@
           btn.disabled = false;
         }
       });
-      document.getElementById("aimeat-fpw-send").addEventListener("click", async function() {
-        var username = (
-          /** @type {any} */
-          document.getElementById("aimeat-fpw-username").value.trim().toLowerCase()
-        );
-        var msgEl = document.getElementById("aimeat-fpw-msg");
-        var errEl = document.getElementById("aimeat-fpw-err");
-        msgEl.style.display = "none";
-        errEl.style.display = "none";
-        if (!username) {
-          errEl.textContent = i.errUserShort || "Username is required";
-          errEl.style.display = "block";
-          return;
-        }
-        try {
-          await api("/v1/ghii/password/reset-request", { method: "POST", body: JSON.stringify({ username }) });
-          msgEl.textContent = i.resetCodeSent || "If your account has a verified email, a reset code was sent.";
-          msgEl.style.display = "block";
-          document.getElementById("aimeat-fpw-step1").style.display = "none";
-          document.getElementById("aimeat-fpw-step2").style.display = "";
-          window.__aimeatResetUser = username;
-        } catch (e) {
-          errEl.textContent = e.message;
-          errEl.style.display = "block";
-        }
-      });
-      document.getElementById("aimeat-fpw-reset").addEventListener("click", async function() {
-        var code = (
-          /** @type {any} */
-          document.getElementById("aimeat-fpw-code").value.trim()
-        );
-        var newPass = (
-          /** @type {any} */
-          document.getElementById("aimeat-fpw-newpass").value
-        );
-        var msgEl = document.getElementById("aimeat-fpw-msg2");
-        var errEl = document.getElementById("aimeat-fpw-err2");
-        msgEl.style.display = "none";
-        errEl.style.display = "none";
-        if (!code) {
-          errEl.textContent = "Code is required";
-          errEl.style.display = "block";
-          return;
-        }
-        if (!newPass || newPass.length < 8) {
-          errEl.textContent = i.errPassWeak || "Password must be at least 8 characters";
-          errEl.style.display = "block";
-          return;
-        }
-        try {
-          await api("/v1/ghii/password/reset", { method: "POST", body: JSON.stringify({
-            username: window.__aimeatResetUser || "",
-            code,
-            newPassword: newPass
-          }) });
-          msgEl.textContent = i.resetSuccess || "Password reset successful! You can now sign in.";
-          msgEl.style.display = "block";
-          setTimeout(function() {
-            showView("login");
-          }, 2e3);
-        } catch (e) {
-          errEl.textContent = e.message;
-          errEl.style.display = "block";
-        }
-      });
-      document.getElementById("aimeat-fu-send").addEventListener("click", async function() {
-        var email = (
-          /** @type {any} */
-          document.getElementById("aimeat-fu-email").value.trim()
-        );
-        var msgEl = document.getElementById("aimeat-fu-msg");
-        msgEl.style.display = "none";
-        if (!email) return;
-        try {
-          await api("/v1/ghii/account/recover", { method: "POST", body: JSON.stringify({ email }) });
-        } catch {
-        }
-        msgEl.textContent = i.usernameSent || "If an account with that email exists, your username was sent.";
-        msgEl.style.display = "block";
-      });
+      wireRecoveryViews({ i, api, showView });
       [
         ["aimeat-username", "aimeat-go-btn"],
         ["aimeat-password", "aimeat-go-btn"],

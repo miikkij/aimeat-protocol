@@ -13,6 +13,12 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.13.0 — 2026-10-05 — A sign-up reaches the code step every time. The late dictionary load no
+ *     longer redraws the dialog while a step is open or a button is working (the redraw threw a
+ *     person whose POST /v1/ghii had answered 201 back to the form, and a second press then met
+ *     "already registered"). A taken name with the same password gets a new code through attach-email,
+ *     or a sign-in when the address is already confirmed. The forgot-password and forgot-username
+ *     handlers moved to modal-recovery-views.js (pure extraction, for the line ceiling).
  *   v1.12.0 — 2026-09-29 — opts.authError: a refused sign-in's reason in the error line (auth-error.js).
  *   v1.12.0 — 2026-09-29 — opts.redirect names the place an emailed sign-in link returns to; without
  *     it the link returns to this page (modal-login-link.js).
@@ -69,7 +75,7 @@ import { currentModalLang, loadModalI18n, MODAL_LANG_KEY, MODAL_LANGS } from './
 import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
 import { MODAL_CSS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
-import { recoveryViewsHtml } from './modal-recovery-views.js';
+import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
 import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
 import { showAuthErrorIn } from './auth-error.js';
@@ -156,6 +162,12 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     });
   }
 
+  /** True when the person has left the two tabs for a step, or a button is waiting on a request. */
+  function busyOrAway() {
+    var body = document.getElementById('aimeat-modal-body');
+    return (!!body && body.style.display === 'none') || !!modal.querySelector('button:disabled');
+  }
+
   function render(anim) {
     modal.innerHTML = buildModalInner(i, lang, anim, tab);
     wireModal();
@@ -176,8 +188,14 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       if (Object.prototype.hasOwnProperty.call(fresh, k) && fresh[k] !== i[k]) { differs = true; break; }
     }
     if (!differs) return;
-    var vals = captureInputs();
     i = fresh;
+    // The redraw replaces every element. Pressed under a request that is still running, it threw the
+    // person back to the form while the request's answer opened the code step in the new, hidden copy:
+    // a sign-up whose POST /v1/ghii answered 201 showed no code field (3 of 11 finished on 2026-10-05;
+    // the dictionary fetch is uncached and can arrive seconds late). Once a step is open or a button is
+    // working, the new strings wait for the next redraw.
+    if (busyOrAway()) return;
+    var vals = captureInputs();
     render(false);
     restoreInputs(vals);
   });
@@ -491,6 +509,14 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       document.getElementById(id).addEventListener('click', function () { showView('login'); });
     });
 
+    /** POST /v1/ghii/login/attach-email: checks the password, records the address, mails a code. */
+    function attachEmail(pending, email) {
+      return api('/v1/ghii/login/attach-email', {
+        method: 'POST',
+        body: JSON.stringify({ username: pending.username, password: pending.password, email: email }),
+      });
+    }
+
     // Complete-account step 1 — send a verification code (re-verifies password server-side).
     // Named rather than inline so the Register tab can drive the same step with the address it
     // already collected, instead of repeating the create-and-verify calls.
@@ -507,36 +533,59 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       var btn = /** @type {any} */ (document.getElementById('aimeat-em-send'));
       btn.textContent = i.working || 'Working...';
       btn.disabled = true;
+      var pending = pendingEmailLogin;
       try {
         var res;
-        if (pendingEmailLogin.mode === 'register') {
+        if (pending.mode === 'register') {
           // Brand-new account under the email gate: create it now WITH the email (returns verification_id).
           res = await api('/v1/ghii', {
             method: 'POST',
             credentials: 'include',
             body: JSON.stringify({
-              username: pendingEmailLogin.username,
-              display_name: pendingEmailLogin.displayName,
-              password: pendingEmailLogin.password,
+              username: pending.username,
+              display_name: pending.displayName,
+              password: pending.password,
               email: email,
               // The account's locale, so the verification code arrives in the language the
               // person is reading right now. Without it every account was created locale-less
               // and every system email fell back to English (UX-remake v3, measured).
               locale: currentModalLang(),
             }),
+          }).catch(function (e) {
+            // The name is taken. When it is this person's own account, made by an earlier press whose
+            // code step never showed, the same password gets a new code for it through attach-email
+            // instead of a dead end. A wrong password keeps the "taken" answer, which is then true.
+            if (e.code !== 'NAME_TAKEN') throw e;
+            return attachEmail(pending, email).catch(function (e2) {
+              if (e2.code === 'ALREADY_VERIFIED') return null;
+              throw e;
+            });
           });
+          // Taken, the password matches and the address is already confirmed: the account is
+          // finished, so this is a sign-in.
+          if (res === null) {
+            try {
+              await auth.loginWithPassword(pending.username, pending.password);
+            } catch (le) {
+              if (le.code !== 'TOTP_REQUIRED') throw le;
+              totpStep.openTotpStep(pending.username, pending.password);
+              return;
+            }
+            pendingEmailLogin = null;
+            finishLogin();
+            return;
+          }
         } else {
-          res = await api('/v1/ghii/login/attach-email', {
-            method: 'POST',
-            body: JSON.stringify({ username: pendingEmailLogin.username, password: pendingEmailLogin.password, email: email }),
-          });
+          res = await attachEmail(pending, email);
         }
-        pendingEmailLogin.verificationId = res.data && res.data.verification_id;
+        pending.verificationId = res.data && res.data.verification_id;
         document.getElementById('aimeat-em-step1').style.display = 'none';
         document.getElementById('aimeat-em-step2').style.display = '';
         setTimeout(function () { /** @type {any} */ (document.getElementById('aimeat-em-code')).focus(); }, 50);
       } catch (e) {
-        errEl.textContent = e.message;
+        errEl.textContent = e.code === 'NAME_TAKEN'
+          ? (i.errNameTaken || 'That username is taken. If it is yours, sign in instead.')
+          : e.message;
         errEl.style.display = 'block';
       } finally {
         btn.textContent = i.sendVerificationCode || 'Send Verification Code';
@@ -575,62 +624,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       }
     });
 
-    // Send password reset code
-    document.getElementById('aimeat-fpw-send').addEventListener('click', async function () {
-      var username = /** @type {any} */ (document.getElementById('aimeat-fpw-username')).value.trim().toLowerCase();
-      var msgEl = document.getElementById('aimeat-fpw-msg');
-      var errEl = document.getElementById('aimeat-fpw-err');
-      msgEl.style.display = 'none';
-      errEl.style.display = 'none';
-      if (!username) { errEl.textContent = i.errUserShort || 'Username is required'; errEl.style.display = 'block'; return; }
-      try {
-        await api('/v1/ghii/password/reset-request', { method: 'POST', body: JSON.stringify({ username: username }) });
-        msgEl.textContent = i.resetCodeSent || 'If your account has a verified email, a reset code was sent.';
-        msgEl.style.display = 'block';
-        document.getElementById('aimeat-fpw-step1').style.display = 'none';
-        document.getElementById('aimeat-fpw-step2').style.display = '';
-        window.__aimeatResetUser = username;
-      } catch (e) {
-        errEl.textContent = e.message; errEl.style.display = 'block';
-      }
-    });
-
-    // Reset password with code
-    document.getElementById('aimeat-fpw-reset').addEventListener('click', async function () {
-      var code = /** @type {any} */ (document.getElementById('aimeat-fpw-code')).value.trim();
-      var newPass = /** @type {any} */ (document.getElementById('aimeat-fpw-newpass')).value;
-      var msgEl = document.getElementById('aimeat-fpw-msg2');
-      var errEl = document.getElementById('aimeat-fpw-err2');
-      msgEl.style.display = 'none';
-      errEl.style.display = 'none';
-      if (!code) { errEl.textContent = 'Code is required'; errEl.style.display = 'block'; return; }
-      if (!newPass || newPass.length < 8) { errEl.textContent = i.errPassWeak || 'Password must be at least 8 characters'; errEl.style.display = 'block'; return; }
-      try {
-        await api('/v1/ghii/password/reset', { method: 'POST', body: JSON.stringify({
-          username: window.__aimeatResetUser || '',
-          code: code,
-          newPassword: newPass,
-        }) });
-        msgEl.textContent = i.resetSuccess || 'Password reset successful! You can now sign in.';
-        msgEl.style.display = 'block';
-        setTimeout(function () { showView('login'); }, 2000);
-      } catch (e) {
-        errEl.textContent = e.message; errEl.style.display = 'block';
-      }
-    });
-
-    // Send username recovery
-    document.getElementById('aimeat-fu-send').addEventListener('click', async function () {
-      var email = /** @type {any} */ (document.getElementById('aimeat-fu-email')).value.trim();
-      var msgEl = document.getElementById('aimeat-fu-msg');
-      msgEl.style.display = 'none';
-      if (!email) return;
-      try {
-        await api('/v1/ghii/account/recover', { method: 'POST', body: JSON.stringify({ email: email }) });
-      } catch { /* always show success */ }
-      msgEl.textContent = i.usernameSent || 'If an account with that email exists, your username was sent.';
-      msgEl.style.display = 'block';
-    });
+    // Forgot password and forgot username.
+    wireRecoveryViews({ i: i, api: api, showView: showView });
 
     // Enter submits the tab the field belongs to.
     [['aimeat-username', 'aimeat-go-btn'], ['aimeat-password', 'aimeat-go-btn'],
