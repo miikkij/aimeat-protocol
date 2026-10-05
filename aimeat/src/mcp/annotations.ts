@@ -412,11 +412,8 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_package_entitlements: { title: 'Package Entitlements', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_package_config_needs: { title: 'Package Config Needs', readOnlyHint: true, openWorldHint: false },
     aimeat_package_sellers: { title: 'Package Sellers', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    // Reaches the package repository, and a revoke stops a customer's updates.
-    aimeat_package_sale: { title: 'Sell a Package', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     aimeat_package_offer: { title: 'Package Offer', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_package_buy: { title: 'Buy a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_package_claim: { title: 'Claim a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
     // call is refused because the copy is no longer managed.
     aimeat_package_fork: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
@@ -575,9 +572,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Replacing a list is not destructive (the previous one was a setting, not data), and setting
     // the same list twice leaves the same list.
     aimeat_admin_cors_set: { title: 'Admin: Set Allowed Origins', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    // Creates accounts, installs and organisms; applying again creates nothing twice, and it reaches
-    // the package repository named in the set.
-    aimeat_admin_install_set: { title: 'Admin: Apply an Install Set', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     aimeat_ui_component_list: { title: 'Interface parts: list', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_ui_component_get: { title: 'Interface parts: one, whole', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_theme_list: { title: 'Themes: list, with the operator\'s choices', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

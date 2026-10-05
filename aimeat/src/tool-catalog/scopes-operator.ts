@@ -52,9 +52,6 @@ export const OPERATOR_TOOL_SCOPES: Record<string, string> = {
     aimeat_admin_node_update:                 'operator:admin',
     aimeat_admin_federation_relay_claim_set:  'operator:admin',
     aimeat_admin_federation_peer_remove:      'operator:admin',
-    aimeat_admin_install_set:                 'operator:admin',
-    aimeat_package_sale:                      'operator:admin',
-    aimeat_package_claim:                     'operator:admin',
     // What this node's own MCP registry offers every owner, to whom, and at what price.
     aimeat_mcp_registry_list:                 'operator:admin',
     aimeat_mcp_registry_set:                  'operator:admin',
