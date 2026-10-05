@@ -15,12 +15,15 @@
  * @structure companyTools: AimeatToolDefinition[]
  * @usage import { companyTools } from './definitions/companies.js';
  * @version-history
+ *   2026-10-05 — aimeat_company_create and aimeat_company_update take ai_provenance and ai_provenance_id for
+ *     the description (secaudit 2026-10, M3 follow-up; the developer's decision).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-10-03 — aimeat_portfolio_publish takes `enable`: switches the person's page on.
  *   v1.0.0 — 2026-08-08 — Initial: list/get/create/update/front_page/portfolio_publish.
  */
 import type { AimeatToolDefinition } from './types.js';
+import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 /**
  * Shared across create and update. All but `organism_id` are the seller-party snapshot an invoice
@@ -66,7 +69,7 @@ export const companyTools = [
     },
     {
         name: 'aimeat_company_create',
-        description: "Register a company, which immediately reserves its public address {slug}.co.<apex> — the same way publishing an app reserves an apps subdomain. The slug is derived from the name unless given; a taken name answers SLUG_TAKEN and a reserved infrastructure label answers SLUG_RESERVED, so pick another and retry rather than treating it as a failure. Supplying the legal-identity fields here saves a follow-up aimeat_company_update, and they are what every later invoice prefills its seller party from.",
+        description: "Register a company, which immediately reserves its public address {slug}.co.<apex> — the same way publishing an app reserves an apps subdomain. The slug is derived from the name unless given; a taken name answers SLUG_TAKEN and a reserved infrastructure label answers SLUG_RESERVED, so pick another and retry rather than treating it as a failure. Supplying the legal-identity fields here saves a follow-up aimeat_company_update, and they are what every later invoice prefills its seller party from." + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         annotations: { title: 'Register Company', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -76,11 +79,13 @@ export const companyTools = [
             name: { type: 'string', required: true, description: 'Trade name as it should appear on invoices (e.g. "Perustaja Oy").' },
             slug: { type: 'string', description: 'Address label. Defaults to a normalised form of the name (ä→a, ö→o, spaces→hyphens).' },
             ...IDENTITY_FIELDS,
+            // About the description, the one free-text field: the front page and the company tools show it.
+            ...aiProvenanceCatalogInput,
         },
     },
     {
         name: 'aimeat_company_update',
-        description: "Fill in or correct a company's details. Every field is optional and only the ones passed are written, so this is safe to call repeatedly as a conversation gathers information — ask the owner for what is missing, then write just that. Passing an empty string clears a field. These values become the seller party on every invoice and the supplier block in the Finvoice e-invoice, so they must be the real registered details rather than plausible-looking ones: leave a field out when the owner has not stated it.",
+        description: "Fill in or correct a company's details. Every field is optional and only the ones passed are written, so this is safe to call repeatedly as a conversation gathers information — ask the owner for what is missing, then write just that. Passing an empty string clears a field. These values become the seller party on every invoice and the supplier block in the Finvoice e-invoice, so they must be the real registered details rather than plausible-looking ones: leave a field out when the owner has not stated it." + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         annotations: { title: 'Update Company Details', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -90,6 +95,8 @@ export const companyTools = [
             company_id: { type: 'string', required: true, description: 'Company id from aimeat_company_list.' },
             name: { type: 'string', description: 'Trade name (the address is not renamed by this).' },
             ...IDENTITY_FIELDS,
+            // About the description, when this call writes one.
+            ...aiProvenanceCatalogInput,
         },
     },
     {

@@ -14,6 +14,8 @@
  *   portfolio_publish
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-05 — Create and update send ai_provenance and ai_provenance_id with a description, and the
+ *     update sends the description only when the caller wrote one (secaudit 2026-10, M3 follow-up).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-08 — Initial: connector-surface coverage for the company registry.
  */
@@ -57,13 +59,15 @@ export function registerCompanyTools(mcp: McpServer, registry: AgentRegistry): v
     return out(await client.get(`/v1/companies${qs ? '?' + qs : ''}`));
   });
 
-  mcp.tool('aimeat_company_create', descriptionFor('aimeat_company_create'), zodShapeFor('aimeat_company_create'), annotationsFor('aimeat_company_create'), async ({ name, slug, ...identity }) => {
+  mcp.tool('aimeat_company_create', descriptionFor('aimeat_company_create'), zodShapeFor('aimeat_company_create'), annotationsFor('aimeat_company_create'), async ({ name, slug, ai_provenance, ai_provenance_id, ...identity }) => {
+    // The route records how the description was made (recorded-by-route, ai-provenance-carry.ts).
     return out(await client.post('/v1/companies', {
       name, ...(slug ? { slug } : {}), ...sentFields(identity as IdentityInput),
+      ...(ai_provenance ? { ai_provenance } : {}), ...(ai_provenance_id ? { ai_provenance_id } : {}),
     }));
   });
 
-  mcp.tool('aimeat_company_update', descriptionFor('aimeat_company_update'), zodShapeFor('aimeat_company_update'), annotationsFor('aimeat_company_update'), async ({ company_id, name, ...identity }) => {
+  mcp.tool('aimeat_company_update', descriptionFor('aimeat_company_update'), zodShapeFor('aimeat_company_update'), annotationsFor('aimeat_company_update'), async ({ company_id, name, ai_provenance, ai_provenance_id, ...identity }) => {
     // PUT replaces, so read the current record and merge onto it — an update that gathers details
     // over several turns must not blank what an earlier turn set. The server MCP does the same;
     // sending only the mentioned fields here would make the two surfaces disagree about the
@@ -73,11 +77,15 @@ export function registerCompanyTools(mcp: McpServer, registry: AgentRegistry): v
     const company = ((current.data as { company?: Record<string, unknown> })?.company) ?? {};
     const body: Record<string, unknown> = { name: name ?? company.name };
     for (const [wireName, recordName] of Object.entries(RECORD_FIELD)) {
+      // The description travels only when the caller wrote one: a description sent is a new one, and
+      // the route records its provenance (the node keeps a field it is not sent).
+      if (wireName === 'description') continue;
       const v = company[recordName];
       if (v !== undefined && v !== null) body[wireName] = v;
     }
     const patch = sentFields(identity as IdentityInput);
     Object.assign(body, patch);
+    if ('description' in patch) Object.assign(body, ai_provenance ? { ai_provenance } : {}, ai_provenance_id ? { ai_provenance_id } : {});
     const resp = await client.put(`/v1/companies/${encodeURIComponent(company_id)}`, body);
     if (resp.ok === false) return out(resp);
     return out({ ...resp, data: { ...(resp.data as object), updated_fields: Object.keys(patch) } });

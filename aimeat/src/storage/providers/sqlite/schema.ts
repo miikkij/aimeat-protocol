@@ -712,6 +712,8 @@ export function initializeSchema(db: Database.Database): void {
   // 'typesafe' and 'hosted', which is what they were. Mirrors Postgres 0081.
   safeAddColumn('ai_decisions', 'provider', 'TEXT');
   safeAddColumn('ai_decisions', 'providerKind', 'TEXT');
+  // The AI-provenance record of a company's current description. Mirrors Postgres 0095.
+  safeAddColumn('companies', 'descriptionProvenanceId', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_ai_decisions_provider ON ai_decisions(ownerGhii, provider, createdAt);');
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──

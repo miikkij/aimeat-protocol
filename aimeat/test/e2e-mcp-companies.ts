@@ -12,6 +12,10 @@
  *   Also covers the scope fence (an agent without company:write is refused) and the ownership
  *   fence (the tools resolve the agent's OWNER, never a client-supplied id).
  * @version-history
+ *   2026-10-05 — Phase 4: the description carries AI provenance (the developer's decision). A declared
+ *     write is recorded and kept on the company, an update without a description keeps it, a declaration
+ *     without provenance:write is refused before the write, an agent's silence is recorded, and the
+ *     owner in person is not stamped. Failed on the code before (secaudit 2026-10, M3 follow-up).
  *   v1.0.0 — 2026-08-08 — Initial: list/create/update/front_page/portfolio_publish.
  *   v1.1.0 — 2026-08-12 — The "it is served at the address" check opens its own socket. It passed
  *     `Host` to `fetch`, which drops it as a forbidden header, so the request arrived as plain
@@ -116,7 +120,7 @@ let seq = 100;
 const nextId = (): number => ++seq;
 
 /** Register an owner + agent with the given scopes, and open an MCP session as that agent. */
-async function connectAgent(label: string, scopes: string[]): Promise<{ session: McpSession; owner: string }> {
+async function connectAgent(label: string, scopes: string[]): Promise<{ session: McpSession; owner: string; ownerToken: string }> {
     const owner = `${label}${Date.now().toString(36).slice(-6)}`;
     const reg = await json('/v1/ghii', {
         method: 'POST',
@@ -176,7 +180,7 @@ async function connectAgent(label: string, scopes: string[]): Promise<{ session:
         },
         body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
     });
-    return { session, owner };
+    return { session, owner, ownerToken };
 }
 
 console.log('\n=== AIMEAT MCP Companies E2E ===\n');
@@ -341,6 +345,69 @@ await test("9. an agent cannot touch another owner's company", async () => {
     const mine = toolJson(await mcpRpc(full.session, 'tools/call', { name: 'aimeat_company_list', arguments: {} }, nextId()));
     const c = mine.companies.find((x: any) => x.id === companyId);
     assert(c.city === 'Espoo', `the company was modified across owners: city is ${c.city}`);
+});
+
+console.log('\nPhase 4 — the description carries AI provenance (decided 2026-10-05)');
+
+const declaring = await connectAgent('mcpprov', ['company:read', 'company:write', 'provenance:write']);
+let provCompany = '';
+let firstRecord = '';
+
+await test('10. a declared description is recorded and its record kept on the company', async () => {
+    const body = await mcpRpc(declaring.session, 'tools/call', {
+        name: 'aimeat_company_create',
+        arguments: {
+            name: `Prov Oy ${Date.now().toString(36).slice(-5)}`,
+            description: 'We build quiet tools for loud workshops.',
+            ai_provenance: { level: 'ai-generated', model: 'e2e/test-model' },
+        },
+    }, nextId());
+    const out = toolJson(body);
+    provCompany = out.company.id;
+    firstRecord = out.company.descriptionProvenanceId;
+    assert(typeof firstRecord === 'string' && firstRecord.length > 0, `no descriptionProvenanceId: ${JSON.stringify(out.company).slice(0, 300)}`);
+    assert(out.ai_provenance, `the answer carries no provenance echo: ${JSON.stringify(out).slice(0, 300)}`);
+});
+
+await test('11. an update without a description keeps the record; a new description gets a new one', async () => {
+    const kept = toolJson(await mcpRpc(declaring.session, 'tools/call', {
+        name: 'aimeat_company_update', arguments: { company_id: provCompany, city: 'Tampere' },
+    }, nextId()));
+    assert(kept.company.descriptionProvenanceId === firstRecord, `the record moved: ${kept.company.descriptionProvenanceId} vs ${firstRecord}`);
+    const changed = toolJson(await mcpRpc(declaring.session, 'tools/call', {
+        name: 'aimeat_company_update',
+        arguments: { company_id: provCompany, description: 'Quiet tools, now for offices too.', ai_provenance: { level: 'assisted' } },
+    }, nextId()));
+    assert(changed.company.descriptionProvenanceId && changed.company.descriptionProvenanceId !== firstRecord,
+        `a new description kept the old record: ${changed.company.descriptionProvenanceId}`);
+});
+
+await test('12. declaring without provenance:write is refused, and nothing is written', async () => {
+    const body = await mcpRpc(full.session, 'tools/call', {
+        name: 'aimeat_company_update',
+        arguments: { company_id: companyId, description: 'Should not land.', ai_provenance: { level: 'original' } },
+    }, nextId());
+    assert(body.result?.isError === true, `expected a refusal, got ${JSON.stringify(body).slice(0, 300)}`);
+    assert(/SCOPE_DENIED|provenance:write/.test(toolError(body)), `expected the scope named, got: ${toolError(body)}`);
+    const mine = toolJson(await mcpRpc(full.session, 'tools/call', { name: 'aimeat_company_list', arguments: {} }, nextId()));
+    const c = mine.companies.find((x: any) => x.id === companyId);
+    assert(c.description !== 'Should not land.', 'the refused description was written');
+});
+
+await test("13. an agent's undeclared description is still recorded (silence is model-written)", async () => {
+    const out = toolJson(await mcpRpc(full.session, 'tools/call', {
+        name: 'aimeat_company_update', arguments: { company_id: companyId, description: 'Written by an agent, said nothing.' },
+    }, nextId()));
+    assert(typeof out.company.descriptionProvenanceId === 'string' && out.company.descriptionProvenanceId, `no record: ${JSON.stringify(out.company).slice(0, 300)}`);
+});
+
+await test('14. the owner writing the description in person is not stamped', async () => {
+    const res = await json('/v1/companies', {
+        method: 'POST', headers: { Authorization: `Bearer ${declaring.ownerToken}` },
+        body: JSON.stringify({ name: `Owner Oy ${Date.now().toString(36).slice(-5)}`, description: 'I wrote this myself.' }),
+    });
+    assert(res.status === 201, `create ${res.status}: ${JSON.stringify(res.body).slice(0, 300)}`);
+    assert(res.body.data.company.descriptionProvenanceId === null, `an owner's own words were stamped: ${res.body.data.company.descriptionProvenanceId}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

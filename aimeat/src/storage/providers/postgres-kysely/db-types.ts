@@ -799,6 +799,7 @@ export interface Company {
   country: string | null;
   createdAt: string;
   description: string | null;
+  descriptionProvenanceId: string | null;
   einvoiceAddress: string | null;
   einvoiceOperator: string | null;
   email: string | null;

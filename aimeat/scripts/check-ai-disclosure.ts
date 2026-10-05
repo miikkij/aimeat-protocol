@@ -245,6 +245,12 @@ function checkOneLlmTransport(): void {
 
 /** Tools that MUST carry the optional `ai_provenance` input. Dropping it from one fails the build. */
 const AI_PROVENANCE_REQUIRED = [
+  // DECIDED 2026-10-05 by the developer: a company's description is one or two sentences the front
+  // page and the company tools show, and an agent writes it as often as a person does. The gate never
+  // saw the field until it read the registered schema (it sat in a shape constant beside the
+  // registration); the company service mints through provenanceForWrite, and the id is kept on the row.
+  'aimeat_company_create',
+  'aimeat_company_update',
   'aimeat_app_draft_publish',
   'aimeat_app_publish',
   // An app's own legal page (terms, privacy notice, imprint, …) is text a person reads and an AI
@@ -295,13 +301,6 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
-  // OPEN, listed 2026-10-05 (secaudit 2026-10, M3), and NOT decided: the developer decides. The
-  // company record's `description` is one or two sentences the front page and the company tools
-  // show. This gate never saw it, because the field sat in a shape constant beside the registration
-  // rather than in it; reading the registered schema found it. The company service has no
-  // provenance carrier, so the honest state is "not carried", named here instead of failing.
-  'aimeat_company_create',
-  'aimeat_company_update',
   // DECIDED, 2026-10-02 (package sale design, phase 4; the developer reviews it with the build). The
   // free text is the set's listing: a title, a description, one outcome sentence and up to three
   // example prompts, the same fields aimeat_package_compose takes. The apps it packages are copied

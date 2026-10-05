@@ -19,6 +19,8 @@
  * @structure CompanyFrontPage · CompanyRecord · CompanyQuery · NewCompanyInput
  * @usage import type { CompanyRecord } from '../models/company-schemas.js';
  * @version-history
+ *   v1.2.0 — 2026-10-05 — descriptionProvenanceId: the description carries AI provenance (secaudit
+ *     2026-10, M3 follow-up; the developer's decision).
  *   v1.1.0 — 2026-08-08 — Front page kind 'portfolio': a company's own HTML page.
  *   v1.0.0 — 2026-08-07 — Company-in-a-box: the company registry + co origin.
  */
@@ -57,6 +59,12 @@ export interface CompanyRecord {
   /** Trade name shown to people. */
   name: string;
   description: string | null;
+  /**
+   * The AI-provenance record of the current description (services/ai-provenance.ts), or null: none
+   * yet, a description written by the owner in person, or no description. The description is the
+   * sentence the front page and the company tools show, so a reader can ask how it was made.
+   */
+  descriptionProvenanceId: string | null;
   /** The organism this company's data lives in (workspaces, finance area, team). */
   organismId: string | null;
   frontPage: CompanyFrontPage;

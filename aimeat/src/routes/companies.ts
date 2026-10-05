@@ -13,6 +13,9 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-05 — POST and PUT /v1/companies[/:id] take ai_provenance and ai_provenance_id for the description;
+ *     the service records it, and the company answers descriptionProvenanceId (secaudit 2026-10, M3
+ *     follow-up; the developer's decision).
  *   2026-09-28 — /sendable leaves out a company whose organism does not admit the calling agent.
  *   v1.3.0 — 2026-08-31 — GET /v1/companies/:id/front-page/check: does the public face answer,
  *     probed server-side through safeFetch because the SPA's CSP cannot ask a foreign origin.
@@ -30,8 +33,9 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 import {
   CompanyError, createCompany, updateCompany, setFrontPage, deleteCompany,
-  requireOwnCompany, checkSlugAvailable, companyAddress, slugify,
+  requireOwnCompany, checkSlugAvailable, companyAddress, slugify, type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
+import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { CompanyRecord } from '../models/company-schemas.js';
 import {
   setCompanySmtp, getCompanySmtpPublic, deleteCompanySmtp,
@@ -60,15 +64,23 @@ const IdentitySchema = {
   einvoice_operator: z.string().max(35).nullish(),
 };
 
+/** How the description was made: checked by parseDeclaredProvenanceInput, recorded by the service. */
+const ProvenanceFields = {
+  ai_provenance: z.unknown().optional(),
+  ai_provenance_id: z.string().max(200).optional(),
+};
+
 const CreateSchema = z.object({
   name: z.string().min(2).max(140),
   slug: z.string().min(2).max(63).optional(),
   ...IdentitySchema,
+  ...ProvenanceFields,
 }).strict();
 
 const UpdateSchema = z.object({
   name: z.string().min(2).max(140).optional(),
   ...IdentitySchema,
+  ...ProvenanceFields,
 }).strict();
 
 const SmtpSchema = z.object({
@@ -164,6 +176,21 @@ function toInput(b: z.infer<typeof CreateSchema>): Record<string, unknown> {
 export function companiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
+
+  /**
+   * The description's provenance input: the WRITER (an agent's GAII, the owner's GHII in person),
+   * its session words and its declaration. Undefined when the declaration does not validate, which
+   * the caller answers 400.
+   */
+  const provenanceOf = (req: Request, body: { ai_provenance?: unknown; ai_provenance_id?: string }): CompanyProvenanceInput | { invalid: Array<{ path: string; message: string }> } => {
+    const declared = parseDeclaredProvenanceInput(body.ai_provenance);
+    if (!declared.ok) return { invalid: declared.violations };
+    return {
+      config, principal: resolveIdentity(req.auth!, config.nodeId), scopes: req.auth!.scopes, pipeline: 'rest.companies',
+      ...(declared.declared ? { declared: declared.declared } : {}),
+      ...(body.ai_provenance_id ? { declaredId: body.ai_provenance_id } : {}),
+    };
+  };
   // Claiming names is the amplification surface here (a squatter would want volume).
   const createLimit = rateLimit({ windowMs: 10 * 60 * 1000, max: 10 });
 
@@ -229,7 +256,12 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(400).json(error(config.nodeId, 'INVALID_COMPANY', parsed.error.message));
         return;
       }
-      const company = await createCompany(storage, resolve(req), toInput(parsed.data) as never);
+      const provenance = provenanceOf(req, parsed.data);
+      if ('invalid' in provenance) {
+        res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', 'The ai_provenance block does not validate.', undefined, { violations: provenance.invalid }));
+        return;
+      }
+      const company = await createCompany(storage, resolve(req), toInput(parsed.data) as never, provenance);
       emitChange('companies', resolve(req));
       res.status(201).json(success(config.nodeId, { company: withAddress(config, company) }, [
         { description: 'Set what the address serves', method: 'PUT', url: `/v1/companies/${company.id}/front-page` },
@@ -255,7 +287,12 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(400).json(error(config.nodeId, 'INVALID_COMPANY', parsed.error.message));
         return;
       }
-      const company = await updateCompany(storage, resolve(req), req.params.id as string, toUpdateInput(parsed.data) as never);
+      const provenance = provenanceOf(req, parsed.data);
+      if ('invalid' in provenance) {
+        res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', 'The ai_provenance block does not validate.', undefined, { violations: provenance.invalid }));
+        return;
+      }
+      const company = await updateCompany(storage, resolve(req), req.params.id as string, toUpdateInput(parsed.data) as never, provenance);
       emitChange('companies', resolve(req));
       res.json(success(config.nodeId, { company: withAddress(config, company) }));
     } catch (e) {
