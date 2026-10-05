@@ -27,6 +27,9 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   v1.8.0 — 2026-10-05 — A grant and a revoke change their own node with a compare-and-swap write
+ *     (record-cas.ts writeNode); they wrote the whole record from a copy read before the network
+ *     step, so concurrent grants wiped each other (secaudit 2026-10, PKG-7).
  *   v1.7.0 — 2026-10-05 — A grant refuses this node's own id, and registers a new node only on a node
  *     that runs the repository role (`repository` in the peer options; secaudit 2026-10, PKG-8).
  *   v1.6.0 — 2026-10-05 — A sale onto a grant another seller or the author made keeps the grant's
@@ -62,6 +65,7 @@ import { verifyPackageNode } from './package-node-auth.js';
 import { bundleOfPackage } from './install-set-spec.js';
 import { linkPackagePeer, adoptPendingPeer } from './package-peer-register.js';
 import { withdrawnVersions } from './package-withdrawals.js';
+import { updateRecord } from './record-cas.js';
 
 export const NS_PACKAGE_ENTITLEMENTS = 'package-entitlements';
 
@@ -103,20 +107,20 @@ export async function readEntitlements(storage: Storage, groupId: string): Promi
     return value?.nodes ? Object.values(value.nodes) : [];
 }
 
-async function write(storage: Storage, groupId: string, nodes: Record<string, PackageEntitlement>): Promise<void> {
-    const now = new Date().toISOString();
-    const existing = await storage.getMemory(NS_PACKAGE_ENTITLEMENTS, key(groupId));
-    await storage.setMemory({
-        key: key(groupId),
-        ownerGaii: NS_PACKAGE_ENTITLEMENTS,
-        value: { groupId, nodes } satisfies Record_,
-        visibility: 'private',
-        tags: ['package-entitlements'],
-        ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-    });
+/**
+ * Set one node's entitlement (null removes it) and leave every other node as it is NOW. The grant
+ * wrote the whole record from the copy it read before its network step, so a grant to one node
+ * wiped any other node granted in that window (secaudit 2026-10, PKG-7).
+ */
+async function writeNode(storage: Storage, groupId: string, nodeId: string, entitlement: PackageEntitlement | null): Promise<void> {
+    await updateRecord<Record_>(storage, NS_PACKAGE_ENTITLEMENTS, key(groupId),
+        v => ({ groupId, nodes: { ...((v as Record_ | undefined)?.nodes ?? {}) } }),
+        cur => {
+            const nodes = { ...cur.nodes };
+            if (entitlement) nodes[nodeId] = entitlement; else delete nodes[nodeId];
+            return { groupId, nodes };
+        },
+        { tag: 'package-entitlements' });
 }
 
 export type EntitlementResult =
@@ -235,7 +239,7 @@ export async function grantEntitlement(
         grantedBy: prev?.grantedBy ?? caller.owner,
         updatedAt: now,
     };
-    await write(storage, input.groupId, { ...current, [input.nodeId]: entitlement });
+    await writeNode(storage, input.groupId, input.nodeId, entitlement);
     return { ok: true, entitlement, peerRegistered, peerPending };
 }
 
@@ -250,8 +254,7 @@ export async function revokeEntitlement(
     if (!current[nodeId]) return { ok: false, status: 404, code: 'NOT_FOUND', message: `${nodeId} holds no entitlement to ${groupId}.` };
     const notYours = notYourGrant(current[nodeId], seller);
     if (notYours) return notYours as { ok: false; status: number; code: string; message: string };
-    delete current[nodeId];
-    await write(storage, groupId, current);
+    await writeNode(storage, groupId, nodeId, null);
     return { ok: true };
 }
 

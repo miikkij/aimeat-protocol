@@ -13,14 +13,14 @@
  * @structure CAS_ATTEMPTS · UNCHANGED · readSystem() · updateSystem()
  * @usage await updateSystem(storage, nodeId, key, parse, cur => ({ ...cur, n: cur.n + 1 }));
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The compare-and-swap loop moved to services/record-cas.ts unchanged, so other
+ *     services write their records the same way; updateSystem calls it (secaudit 2026-10, PKG-7).
  *   v1.0.0 — 2026-09-30 — Moved from classifier.ts (v2.0.0) for the exceptions list; the tag is a parameter.
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import { updateRecord, CAS_ATTEMPTS, UNCHANGED } from '../record-cas.js';
 
-export const CAS_ATTEMPTS = 10;
-
-/** What a `mutate` answers to write nothing. */
-export const UNCHANGED = Symbol('unchanged');
+export { CAS_ATTEMPTS, UNCHANGED };
 
 /** The one read of a record of system@<node>. */
 export async function readSystem(storage: Storage, nodeId: string, key: string): Promise<MemoryRecord | null> {
@@ -37,24 +37,5 @@ export async function updateSystem<T>(
   mutate: (cur: T) => T | typeof UNCHANGED | Promise<T | typeof UNCHANGED>, ttlHours: number | null = null,
   tag = 'classification-classifier',
 ): Promise<T> {
-  const owner = `system@${nodeId}`;
-  for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
-    const rec = await readSystem(storage, nodeId, key);
-    const cur = parse(rec?.value);
-    const next = await mutate(cur);
-    if (next === UNCHANGED) return cur;
-    const now = new Date().toISOString();
-    const record: MemoryRecord = {
-      key, ownerGaii: owner, value: next, visibility: 'private', tags: [tag], ttlHours,
-      version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
-    };
-    if (!rec) {
-      if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return next; }
-      if (await storage.createMemoryIfAbsent(record)) return next;
-    } else {
-      if (!storage.setMemoryIfVersion) { await storage.setMemory(record); return next; }
-      if (await storage.setMemoryIfVersion(record, rec.version)) return next;
-    }
-  }
-  throw new Error(`classification: ${key} changed under every one of ${CAS_ATTEMPTS} attempts; try again`);
+  return updateRecord(storage, `system@${nodeId}`, key, parse, mutate, { tag, ttlHours });
 }
