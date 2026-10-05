@@ -24,6 +24,11 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   v1.4.0 — 2026-10-05 — An account made from an invitation link starts with its email unverified,
+ *     and the address gets the usual verification code. Opening the link had marked the address
+ *     verified, and the inviter is handed the link when the mail does not go out, so the inviter
+ *     could claim somebody else's address (secaudit 2026-10, APP-2). A new account takes the app
+ *     invitation its link carries, and the address's other invitations wait for the verification.
  *   v1.3.0 — 2026-10-01 — The APP invitation joins the shared flow: GET answers kind 'app' with the
  *     app and the role, POST makes the member (or says no place is free and keeps the link usable)
  *     and returns the person to the app.
@@ -56,6 +61,8 @@ import { establishOwnerSession } from '../services/owner-session.js';
 import { hashInviteToken, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget } from '../services/invitations.js';
 import { appInviteMeta, type AppInviteMeta } from '../services/app-invite-link.js';
 import { findInvite, applyAppInvitesForVerifiedEmail } from '../services/app-member-invites.js';
+import { startRegistrationEmailVerification } from '../services/email-verification-start.js';
+import { createEmailService } from '../services/email.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { logger } from '../utils/logger.js';
 
@@ -237,8 +244,12 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
           displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : username,
           passwordHash,
           locale: typeof locale === 'string' ? locale : undefined,
-          verifiedEmail: inv.email, // the invite proves reachability → the new account's email is verified
-          enableMagicLink: true,
+          // The address is NOT verified by opening the link. The link can reach someone other than
+          // the address: when the mail does not go out, the inviter is handed it, and redeeming it
+          // here marked the address theirs (secaudit 2026-10, APP-2; Jouni: an account made from an
+          // invitation link starts with its email unverified). The address gets the usual code
+          // below, and what needs a verified address (other invitations to it, the sign-in link,
+          // being found by it) waits for that.
         }));
       } catch (e) {
         // The invited email already backs an account — accept from THAT account, don't fork it.
@@ -250,17 +261,24 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       ownerName = owner.name;
       createdAccount = true;
       emitChange('ghii');
+      // The invited address, unverified until its code comes back (POST /v1/ghii/email/verify).
+      await storage.updateGHII(`${ownerName}@${config.nodeId}`, { notificationEmail: inv.email.toLowerCase().trim() });
+      await startRegistrationEmailVerification(storage, createEmailService(config), ownerName, inv.email,
+        typeof locale === 'string' ? locale : undefined)
+        .catch(err => logger.warn('invite accept: the verification code could not be sent', { error: String(err) }));
     }
 
     const nowIso = new Date().toISOString();
 
-    // ── APP invitation: the membership comes from the app invitation itself. A new account was made
-    //    with the address confirmed, and provisionOwner applied the address's app invitations; a
-    //    signed-in account whose confirmed address matched is applied here. When the approval could
-    //    not run (every seat taken), the link stays usable and the person is told. ──
+    // ── APP invitation: the membership comes from the app invitation itself. When the approval
+    //    could not run (every seat taken), the link stays usable and the person is told. ──
     if (appInvite) {
       const ghii = `${ownerName}@${config.nodeId}`;
-      if (!createdAccount) await applyAppInvitesForVerifiedEmail(storage, config.nodeId, inv.emailHash, ghii);
+      // A signed-in account whose verified address matched takes every app invitation to it. A new
+      // account takes this one app's invitation, the one its link carries; the others wait for the
+      // address to be verified.
+      await applyAppInvitesForVerifiedEmail(storage, config.nodeId, inv.emailHash, ghii,
+        createdAccount ? { appId: appInvite.meta.appId } : undefined);
       const still = await openAppInvitation(inv);
       const joined = !still;
       if (joined) await storage.updateInvitation(inv.id, { status: 'accepted', acceptedAt: nowIso, acceptedBy: ownerName });

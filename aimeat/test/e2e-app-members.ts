@@ -1892,8 +1892,12 @@ await test('A2 link: an invitation answers a sign-up link when no email left, va
         `the address, the app and the role: ${JSON.stringify(card.body.data.invitation)}`);
 });
 
-await test('A2 link: opening it makes the account with the address confirmed, a member at once, and back in the app; used once', async () => {
+await test('A2 link: opening it makes the account, a member of this app at once, back in the app, the address still to verify; used once', async () => {
     const email = `r2acc.${Date.now()}@example.com`;
+    // A second app's invitation to the same address. The link proves only its own app, so this one
+    // waits for the address to be verified (secaudit 2026-10, APP-2).
+    const other = await json(`/v1/apps/${owner.name}/${APP}/members`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'member' }) });
+    assert(other.status === 201 && other.body.data.invited === true, `the other app's invitation ${other.status}: ${JSON.stringify(other.body?.error)}`);
     const inv = await json(r2(), { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ email, role: 'writer' }) });
     const token = tokenOf(inv.body.data.acceptUrl);
     const name = `amr2lnk${Date.now().toString(36)}`;
@@ -1906,7 +1910,12 @@ await test('A2 link: opening it makes the account with the address confirmed, a 
     assert(row?.role === 'writer', `a writer at once: ${JSON.stringify(row)}`);
     assert(!(roster.body.data.invites as any[]).some(i => i.id === inv.body.data.invite.id), 'and the invitation is used up');
     const me = await json('/v1/ghii/me', { headers: auth(ok.body.data.token) });
-    assert(me.status === 200 && !!me.body.data.email_verified_at && me.body.data.notification_email === email, `the address is confirmed: ${me.status} ${JSON.stringify(me.body?.data ?? me.body?.error).slice(0, 300)}`);
+    // Opening the link does not verify the address: the link reaches whoever holds it, the inviter
+    // too when no mail left. The address is kept and gets the usual code (secaudit 2026-10, APP-2).
+    assert(me.status === 200 && !me.body.data.email_verified_at && me.body.data.notification_email === email, `the address is kept, not verified: ${me.status} ${JSON.stringify(me.body?.data ?? me.body?.error).slice(0, 300)}`);
+    const otherRoster = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(owner.token) });
+    assert(!(otherRoster.body.data.members as any[]).some(m => m.owner === name), 'the other app\'s invitation did not apply');
+    assert((otherRoster.body.data.invites as any[]).some(i => i.id === other.body.data.invite.id), 'it stays open for the verified address');
     const twice = await json(`/v1/invitations/${token}/accept`, { method: 'POST', body: JSON.stringify({ username: `${name}b`, password: 'Sup3r-Secret-Pw!42' }) });
     assert(twice.status === 410 && twice.body.error.code === 'INVITE_USED', `a second use: ${twice.status} ${JSON.stringify(twice.body?.error)}`);
 });

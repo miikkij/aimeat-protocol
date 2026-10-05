@@ -27,6 +27,8 @@
  *   applyAppInvitesForVerifiedEmail
  * @usage await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii);
  * @version-history
+ *   v1.2.0 — 2026-10-05 — applyAppInvitesForVerifiedEmail takes `only`: the one app whose invitation
+ *     link a new account accepted, before its address is verified (secaudit 2026-10, APP-2).
  *   v1.1.0 — 2026-10-01 — The invitation carries a sign-up link and lives 7 days (was 30); a cancel
  *     stops the link too. sendAppInvite takes the config and answers the link.
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2, A2).
@@ -194,6 +196,8 @@ export function inviteView(inv: AppMemberInvite): Omit<AppMemberInvite, 'emailHa
  */
 export async function applyAppInvitesForVerifiedEmail(
   storage: Storage, nodeId: string, emailHash: string, ghii: string,
+  /** Only the invitation to this app: what one accepted invitation link proves, before the address is verified. */
+  only?: { appId: string },
 ): Promise<number> {
   if (!emailHash || !ghii) return 0;
   const account = accountOf(ghii);
@@ -203,6 +207,7 @@ export async function applyAppInvitesForVerifiedEmail(
   for (const row of items) {
     const inv = row.value as AppMemberInvite | null;
     if (!inv || inv.emailHash !== emailHash || !row.key.endsWith(`.${emailHash}`)) continue;
+    if (only && inv.appId !== only.appId) continue;
     const slash = inv.appId.indexOf('/');
     const owner = slash > 0 ? inv.appId.slice(0, slash) : '';
     const filename = slash > 0 ? inv.appId.slice(slash + 1) : '';

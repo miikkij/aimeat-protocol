@@ -158,18 +158,38 @@ await test('9. Cancel invalidates an invite before use', async () => {
 });
 
 // ── Recipient binding: a signed-in session may accept ONLY if its verified email == the invited
-//    address (invite-hijack guard). Registering via an invite records the invited email as verified,
-//    so we mint verified-email accounts by accepting a first invite, then test the accept-as-self path. ──
+//    address (invite-hijack guard). Since 2026-10-05 an account registered from an invitation link
+//    starts with its email UNVERIFIED (secaudit 2026-10, APP-2), so the verified-email accounts here
+//    are minted with an organism code key, which provisions the address as verified, as the roster
+//    suite does. ──
 
-/** Invite `email`, register a fresh account via the token, and return its session token + verified email. */
+/** A separate organism for the code keys, so the organism under test holds no invitation for the address. */
+let verOrgId = '';
+/** A fresh account whose email is verified (an organism code key), signed in: name, token, email. */
 async function registerVerified(email: string): Promise<{ name: string; token: string; email: string }> {
-    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email, orgRole: 'member' }) });
-    const tk = tokenFrom(c.body.data.accept_url);
+    if (!verOrgId) {
+        const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token),
+            body: JSON.stringify({ name: `Verified accounts ${Date.now()}`, type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+        assert(org.status === 201, `helper organism ${org.status}: ${JSON.stringify(org.body?.error)}`);
+        verOrgId = org.body.data.organism.id as string;
+    }
     const name = `ver${Date.now()}${Math.floor(Math.random() * 1e4)}`;
-    const acc = await json(`/v1/invitations/${tk}/accept`, { method: 'POST', body: JSON.stringify({ username: name, password: 'VerPass1234' }) });
-    assert(acc.status === 200 && typeof acc.body.data.token === 'string', `registerVerified accept ${acc.status}: ${JSON.stringify(acc.body.error)}`);
-    return { name, token: acc.body.data.token, email };
+    const code = 'VerCode12345';
+    const mint = await json(`/v1/organisms/${verOrgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email, username: name, code }) });
+    assert(mint.status === 201, `registerVerified code key ${mint.status}: ${JSON.stringify(mint.body?.error)}`);
+    const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: name, password: code }) });
+    assert(login.status === 200 && typeof login.body.data.token === 'string', `registerVerified login ${login.status}: ${JSON.stringify(login.body?.error)}`);
+    return { name, token: login.body.data.token, email };
 }
+
+await test('4b. An account made from an invitation link starts with its email unverified (secaudit 2026-10, APP-2)', async () => {
+    // The link reaches whoever holds it: when the mail does not go out, the inviter. Opening it must
+    // not make the address theirs.
+    const r = await json('/v1/ghii/me', { headers: auth(newUserToken) });
+    assert(r.status === 200, `profile ${r.status}`);
+    assert(!r.body.data.email_verified_at && r.body.data.verification_level === 0, `the address is not verified: ${JSON.stringify({ at: r.body.data.email_verified_at, level: r.body.data.verification_level })}`);
+    assert(r.body.data.notification_email === email1, `the invited address is kept, to be verified: ${r.body.data.notification_email}`);
+});
 
 let V: { name: string; token: string; email: string };
 await test('10. Logged-in account whose verified email MATCHES accepts as self (200)', async () => {
