@@ -18,16 +18,10 @@
  *   import { flexibleBoolean } from './schema-flags.js';
  *   owner_scope: flexibleBoolean.optional().describe('…'),
  * @version-history
+ *   v1.1.0 — 2026-10-05 — flexibleBoolean moved unchanged to src/tool-catalog/input-schemas.ts and is
+ *     re-exported (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-08 — Initial, after owner_scope was unusable from a real client.
  */
-import { z } from 'zod';
 
-/**
- * A boolean flag that also accepts the strings "true" and "false".
- *
- * Deliberately NOT `z.coerce.boolean()`: that maps the string "false" to TRUE, because a non-empty
- * string is truthy. For a flag whose job is to redirect a write into someone else's namespace, that
- * is the wrong direction to be lenient in.
- */
-export const flexibleBoolean = z.union([z.boolean(), z.enum(['true', 'false'])])
-    .transform(v => v === true || v === 'true');
+// The flag is the exact schema of catalog fields now, so it lives in the catalog and is re-exported here.
+export { flexibleBoolean } from '../tool-catalog/input-schemas.js';

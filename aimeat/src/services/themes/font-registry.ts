@@ -20,13 +20,17 @@
  *   themeFaceNames · faceStackOf · addedFamilyNames · fontsSheet · fontsSheetHref
  * @usage import { faceStackOf, themeFaceNames } from './font-registry.js';
  * @version-history
+ *   2026-10-05 — FONT_KINDS moved unchanged to models/tool-input-vocabulary.ts and is re-exported: the
+ *     tool catalog states it (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-03 — Initial (font manager).
  */
 import { createHash } from 'node:crypto';
 import { THEME_FACES } from './tokens.js';
 
 /** The generic family an added face falls back to, named as CSS names it. */
-export const FONT_KINDS = ['sans-serif', 'serif', 'monospace', 'cursive'] as const;
+// In models/ since 2026-10-05: the tool catalog states it (secaudit 2026-10, M3).
+import { FONT_KINDS } from '../../models/tool-input-vocabulary.js';
+export { FONT_KINDS };
 export type FontKind = typeof FONT_KINDS[number];
 
 export interface FontFile {
