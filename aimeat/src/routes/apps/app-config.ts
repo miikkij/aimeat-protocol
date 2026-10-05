@@ -12,19 +12,33 @@
  * @structure registerAppConfigRoutes(router, config, storage)
  *   GET /v1/apps/:owner/:filename/config · PUT /v1/apps/:owner/:filename/config
  * @version-history
+ *   v1.1.0 — 2026-10-05 — The read applies the app's own gates: an operator-hidden app is not found,
+ *     and an access-coded app's workspace ids need the code (?code or X-Access-Code), the unlock token
+ *     (?access), or the owner or an operator (secaudit 2026-10, APP-6).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 2).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { getAppConfig, setAppConfig } from '../../services/app-config.js';
 
 export function registerAppConfigRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
-    router.get('/v1/apps/:owner/:filename/config', async (req, res) => {
-        const out = await getAppConfig(storage, localAccountName(req.params.owner as string), req.params.filename as string);
+    router.get('/v1/apps/:owner/:filename/config', optionalAuth(), async (req, res) => {
+        const ownerName = localAccountName(req.params.owner as string);
+        // The app's own gates (secaudit 2026-10, APP-6): the owner, an agent of theirs and an operator
+        // pass them; anyone else brings the access code or the unlock token, as for the app itself.
+        const auth = req.auth && req.auth.anonymous !== true ? req.auth : null;
+        const ownerOrOperator = !!auth && (auth.roles?.includes('operator') === true
+            || localAccountName(ownerGhiiOf(resolveIdentity(auth, config.nodeId))) === ownerName);
+        const header = (name: string) => (typeof req.headers[name] === 'string' ? req.headers[name] as string : undefined);
+        const out = await getAppConfig(storage, ownerName, req.params.filename as string, {
+            ownerOrOperator,
+            code: typeof req.query.code === 'string' ? req.query.code : header('x-access-code'),
+            accessToken: typeof req.query.access === 'string' ? req.query.access : undefined,
+        });
         if (!out.ok) {
             res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
