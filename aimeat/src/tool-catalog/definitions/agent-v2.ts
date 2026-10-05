@@ -27,6 +27,9 @@ export const agentV2Tools = [
         description: 'Send one turn to another principal on this same account: an agent, an ecosystem app, or the owner. A turn carries an ordered list of parts, so one send can say something, point at a file and hand over a structured payload together. Group turns with context_id: pass the same one to continue an exchange, omit it to start a new one and the answer tells you the id it got. The recipient hears about it on its tunnel if it is connected and on its registered delivery target if it is not, and can always read it back with aimeat_v2_message_list whatever happened. To reach a PERSON, use aimeat_dm_send; to reach your own owner in the dashboard thread, aimeat_message_send.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Not openWorld: every one of these stays inside the account. The delivery target is the one
+        // thing that reaches outward, and it is a configuration, not a call — the outbound POST happens
+        // later, from the node, and goes through safeFetch.
         annotations: { title: 'Send a Turn', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         // Agent v2 messaging. Same words as the doors behind them, and the same words the DM tools take:
         // sending on this account's behalf is one permission however the turn is shaped. Registering a
@@ -34,6 +37,9 @@ export const agentV2Tools = [
         // what it configures is where this node makes an outbound call carrying a secret — the same
         // class of act as setting an agent's webhook.
         scope: 'messages:send',
+        // On `agent`: A turn between two principals of ONE account, beside the owner thread and the federated
+        // DM above it rather than instead of either. Agent surface only: the service surface carries
+        // no messaging at all, and the primitives surface reaches these through aimeat_invoke.
         surfaces: ['agent'],
         input: {
             to: { type: 'string', required: true, description: 'The recipient principal on this account: an agent GAII (claude#alice@node), an ecosystem app (eco:drum#alice@node) or the owner GHII (alice@node).' },

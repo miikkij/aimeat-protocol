@@ -153,7 +153,6 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { OPERATOR_TOOL_SCOPES } from './scopes-operator.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 import type { ToolScope } from './definitions/types.js';
 
@@ -170,42 +169,28 @@ export type { ToolScope };
 export const toolScopeWords = (entry: ToolScope | undefined): string[] =>
     entry === undefined ? [] : typeof entry === 'string' ? [entry] : [...entry];
 
-// The tools whose catalog entry does not carry its `scope` yet (secaudit 2026-10, M3: one catalog
-// group per commit moves its entries onto the definitions, and this list only shrinks).
-const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
-    // ── August 2026 audit, step 3a ───────────────────────────────────────────────────────────────
-    // 73 mutating tools had no entry here, and scopeAllowsTool() reads a missing entry as PERMISSION,
-    // so any agent holding any single scope could call all of them. These 55 now say what they need.
-    //
-    // Adding an entry does not start refusing a call — it REMOVES the tool from an agent whose
-    // scopes do not carry the word (mcp/index.ts wraps mcp.tool). Every agent that existed on
-    // 2026-08-10 was therefore granted the new words at boot, once, by
-    // services/scope-vocabulary-migration.ts. Without that this is changelog 1.33.1 again, where
-    // every agent tagging itself got ACCESS_DENIED and discovery broke fleet-wide.
-    //
-    // The words themselves are new and appear in the owner's agent editor
-    // (public/views/profile/agents/scope-model.js), so any of them can be taken away.
-    // Reconfigure ANOTHER of the owner's agents. An agent describing itself needs nothing;
-    // reaching sideways at a sibling principal with its own identity and trust score does.
-
-    // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
-    ...OPERATOR_TOOL_SCOPES,
-
-    // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it
-    // does not gate a TOOL — it gates one optional PARAMETER (`ai_provenance`) on nine of them.
-    // Listing a tool here would hide the whole tool from an agent that merely cannot assert how its
-    // content was made, when the honest default (the node records what it observed) is available to
-    // everyone and needs no permission at all. The check lives at the one place that mints from a
-    // declaration, services/ai-provenance.ts:provenanceForWrite, and mirrors requireScope() exactly
-    // — so this parameter and POST /v1/provenance cannot answer differently.
-
-};
-
-/** Tool -> the scope words it needs: each catalog entry's `scope`, and the list above. */
-export const TOOL_SCOPES: Record<string, ToolScope> = {
-    ...LISTED_TOOL_SCOPES,
-    ...Object.fromEntries(CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.scope !== undefined).map(d => [d.name, d.scope!])),
-};
+/**
+ * Tool -> the scope words it needs: each catalog entry's `scope`. Until 2026-10-05 a hand-kept table
+ * here, beside the catalog (secaudit 2026-10, M3); the entries carry their reasons on the definitions.
+ *
+ * August 2026 audit, step 3a. 73 mutating tools had no entry, and scopeAllowsTool() reads a missing
+ * entry as PERMISSION, so any agent holding any single scope could call all of them. Adding an entry
+ * does not start refusing a call: it REMOVES the tool from an agent whose scopes do not carry the word
+ * (mcp/index.ts wraps mcp.tool). Every agent that existed on 2026-08-10 was therefore granted the new
+ * words at boot, once, by services/scope-vocabulary-migration.ts. Without that this is changelog
+ * 1.33.1 again, where every agent tagging itself got ACCESS_DENIED and discovery broke fleet-wide.
+ * The words appear in the owner's agent editor (public/views/profile/agents/scope-model.js), so any
+ * of them can be taken away.
+ *
+ * `provenance:write` (TARGET-058) is on no tool, on purpose: it gates one optional PARAMETER
+ * (`ai_provenance`) on several of them. Naming a tool here would hide the whole tool from an agent
+ * that merely cannot assert how its content was made, when the honest default (the node records what
+ * it observed) needs no permission. The check lives where a declaration is minted,
+ * services/ai-provenance.ts provenanceForWrite, and mirrors requireScope() exactly.
+ */
+export const TOOL_SCOPES: Record<string, ToolScope> = Object.fromEntries(
+    CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.scope !== undefined).map(d => [d.name, d.scope!]),
+);
 
 /** The scopes required to use a tool, all of them; empty if the tool is not scope-gated. */
 export function requiredScopesForTool(toolName: string): string[] {

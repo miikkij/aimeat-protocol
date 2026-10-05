@@ -56,6 +56,10 @@ export const commerceTools = [
         // services/scope-vocabulary-migration.ts hands the word to agents already holding commerce:sell,
         // so nothing loses a tool it had and nothing gains one it did not.
         scope: 'exchange:beneficiary',
+        // On `commerce`: Beneficiary splits: a seller declares who else earns from a sale, releases what accrued
+        // and pays it out; the beneficiary reads its own earnings. Selling-side, same as the rest.
+        // On `service`: Beneficiary splits: a seller declares who else earns from a sale, releases what accrued
+        // and pays it out; the beneficiary reads its own earnings. Selling-side, same as the rest.
         surfaces: ['service', 'commerce'],
         input: {
             ext: { type: 'string', required: true, description: 'Metered coordinate: extension name, apptool:{owner}/{appId}, or agentwork:{owner}/{agent}', zod: z.string().min(1).max(200) },
@@ -184,6 +188,8 @@ export const commerceTools = [
         // The seller's payment credentials: an agent that can rewrite these can repoint the payouts.
         // PUT/DELETE /v1/commerce/payout/stripe are owner-only.
         scope: 'commerce:psp',
+        // On `service`: Commerce, both sides: a marketplace/provider agent sells (PSP credentials, app-tool
+        // manifests, offer pricing) and buys (checkout) on the same commerce core.
         surfaces: ['service', 'commerce'],
         input: {
             provider: { type: 'string', required: true, description: 'PSP identifier, e.g. "stripe"', zod: z.string().min(1).max(60) },
@@ -232,6 +238,7 @@ export const commerceTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read App Tool Manifest', readOnlyHint: true },
+        // On `agent`: Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
         surfaces: ['agent', 'service', 'commerce'],
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s published filename', zod: z.string().min(1).max(120) },

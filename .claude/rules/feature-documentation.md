@@ -16,7 +16,7 @@ of these and no single page said so.
 | # | Place | Who reads it | Gate that notices a miss |
 |---|---|---|---|
 | 1 | `openapi.yaml`, then `pnpm generate:types` | integrators, the typed client | `check:openapi-routes` |
-| 2 | MCP tools on all three surfaces (`src/mcp/`, `src/cli/connect/mcp/tools/`, `tool-call-defs-*.ts`), their catalog entry, annotations, scope, and `catalog/surfaces.ts` | every AI connected over MCP | `check:mcp-tools`, `check:mcp-schemas`, `check:field-reach` |
+| 2 | MCP tools on all three surfaces (`src/mcp/`, `src/cli/connect/mcp/tools/`, `tool-call-defs-*.ts`) and their catalog entry in `src/tool-catalog/definitions/`, which holds the input schema both MCP surfaces register (`zodShapeFor(name)`), the annotations, the scope and the v2 surfaces | every AI connected over MCP | `check:mcp-tools`, `check:mcp-schemas`, `check:field-reach` |
 | 3 | The surface handbooks (`src/services/handbooks/*.ts`) | an agent's first call, `aimeat_handbook_get` | `check:prompt-refs` (only that named tools exist) |
 | 4 | A served library's registry entry (`src/data/library-packs/`), its `aiDoc` and `promptLine` | the app-building prompt, `GET /v1/libs`, bootstrap, llms.txt | `check:sdk` (bundle only) |
 | 5 | `docs/AIMEAT-Feature-List.md`, then `pnpm build:everything` | anyone reading `/v1/everything` | `check:everything` (freshness only) |

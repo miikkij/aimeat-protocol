@@ -26,12 +26,13 @@
  *   cd aimeat && pnpm exec tsx scripts/inventory/build-inventory.ts
  *   cd aimeat && pnpm exec tsx scripts/inventory/build-inventory.ts --json-only
  * @version-history
+ *   v1.0.2 — 2026-10-05 — scopes-operator.ts is gone: every tool's scope is on its catalog definition
+ *     (secaudit 2026-10, M3).
  *   v1.0.1 — 2026-09-29 — tool-catalog/scopes-operator.ts counts as a definition file (the operator rows
  *     of the tool table, moved out of scopes.ts unchanged).
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1, analysis only).
  */
-import ts from 'typescript';
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectDoors, toRows, type Row } from './doors.js';
@@ -173,7 +174,7 @@ function main(): void {
     const rows = toRows(collectDoors(files));
     // The two files that DEFINE the vocabulary rather than demand it. Counting a definition as a
     // demand would make every word look asked-for, which is the opposite of what this measures.
-    const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['tool-catalog/scopes.ts', 'tool-catalog/scopes-operator.ts', 'utils/scope-coverage.ts']);
+    const mentions = scopeMentions(files, VOCABULARY, AIMEAT, ['tool-catalog/scopes.ts', 'utils/scope-coverage.ts']);
     mkdirSync(OUT_DIR, { recursive: true });
 
     writeFileSync(join(OUT_DIR, 'inventory.json'), JSON.stringify({

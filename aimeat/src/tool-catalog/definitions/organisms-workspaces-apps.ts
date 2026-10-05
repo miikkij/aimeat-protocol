@@ -80,6 +80,8 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Organisms', readOnlyHint: true },
+        // On `chat`: What their groups know. Writing to a workspace is found when it is needed: its description
+        // alone is 6 500 characters, which every round would pay for.
         surfaces: ['appdev', 'agent', 'service', 'chat'],
         input: {},
     },
@@ -371,6 +373,7 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Workspace', readOnlyHint: true },
+        // On `primitives`: Know things together.
         surfaces: ['appdev', 'agent', 'service', 'primitives', 'chat'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },

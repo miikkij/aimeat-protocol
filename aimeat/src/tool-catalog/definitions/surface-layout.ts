@@ -36,6 +36,7 @@ export const surfaceLayoutTools = [
         // what everyone sees on arrival. The read takes the same word: it carries the block vocabulary
         // the write needs, and it was open to every agent of the operator on the account role alone.
         scope: 'site:layout-write',
+        // On `admin`: Arranging this node's front page and the page its members land on.
         surfaces: ['admin'],
         input: {
             surface: { type: 'string', required: true, description: "Which page: 'portal', 'home' or 'home-onboarding'." },

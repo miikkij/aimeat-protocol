@@ -49,6 +49,7 @@ export const appPublishTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Apps', readOnlyHint: true },
+        // On `chat`: Their apps and skills.
         surfaces: ['appdev', 'chat'],
         input: {
             building: { type: 'boolean', description: 'List apps another owner lets you build; opt-in and separate from your own.' },
@@ -270,6 +271,7 @@ export const appPublishTools = [
         description: 'Operator-only. Mint morsels into an agent\'s owner balance (irreversible ledger credit). Enforces the node\'s daily mint cap. Use sparingly — this is a financial action; prefer the normal earn/transfer flow where possible.',
         caller: 'operator',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        // destructiveHint: mints morsels (irreversible ledger change, financial action)
         annotations: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
         scope: 'operator:admin',
         surfaces: ['admin'],

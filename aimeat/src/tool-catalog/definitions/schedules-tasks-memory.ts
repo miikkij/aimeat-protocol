@@ -232,6 +232,7 @@ export const schedulesTasksMemoryTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Tasks', readOnlyHint: true },
+        // On `primitives`: Take work, hand it back.
         surfaces: ['agent', 'primitives', 'chat'],
         input: {
             status: { type: 'string', description: 'Optional task status filter.', zod: z.enum(['draft', 'queued', 'active', 'stalled', 'done', 'failed', 'declined']) },
@@ -246,6 +247,8 @@ export const schedulesTasksMemoryTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Create Task', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'task:write',
+        // On `agent`: NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
+        // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
         surfaces: ['agent', 'chat'],
         input: {
             target_agent: { type: 'string', required: true, description: 'Name of the agent the task is FOR. Must be owned by the same owner as the calling agent.' },
@@ -299,6 +302,8 @@ export const schedulesTasksMemoryTools = [
         annotations: { title: 'Start a Waiting Task', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         // Starts work that was waiting for the owner's OK, on the owner's word.
         scope: 'task:write',
+        // On `agent`: The person's own AI starting a waiting task on their word, and setting whether an agent's
+        // tasks start on their own at all.
         surfaces: ['agent'],
         input: { task_id: { type: 'string', required: true, description: 'The waiting task to start.' } },
     },
@@ -416,6 +421,8 @@ export const schedulesTasksMemoryTools = [
         annotations: { title: 'Read Memory Entry', readOnlyHint: true },
         // Memory (GET /v1/memory/:key → memory:read; POST/PUT → memory:write)
         scope: 'memory:read',
+        // On `chat`: What the person knows.
+        // On `primitives`: Know things.
         surfaces: ['agent', 'service', 'commerce', 'primitives', 'chat'],
         supportsResponseFormat: true,
         conciseFields: ['key', 'value'],
