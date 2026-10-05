@@ -10350,6 +10350,9 @@
     "cfg_tasks_archive_after_hours": "Archive after",
     "cfg_ai_instance_key": "Server OpenRouter key",
     "cfg_ai_free_allowance_usd": "Free starting allowance",
+    "cfg_ai_node_key_when_spent": "When the allowance is spent",
+    "cfg_ai_node_key_account_daily_usd": "Daily cap per account",
+    "cfg_ai_node_key_node_daily_usd": "Daily cap for all accounts",
     "cfg_ai_model_free_fallback": "Model after the allowance",
     "cfg_ai_model_default_chat": "Default chat model",
     "cfg_ai_model_default_reasoning": "Default reasoning model",
@@ -10660,6 +10663,9 @@
     "cfgDesc_tasks_archive_after_hours": "Hours a completed task stays in Recent before auto-archiving",
     "cfgDesc_ai_instance_key": "The server's own OpenRouter key, spent by anyone who has not brought their own (metered per person by the allowance below)",
     "cfgDesc_ai_free_allowance_usd": "Free starting allowance in USD on the server's key, granted ONCE per person and never renewed. 0 grants nothing",
+    "cfgDesc_ai_node_key_when_spent": "What the server's key does when a person's AI allowance is spent: refuse (it pays for nothing more, whatever model a call names) or limits (it keeps paying up to the two daily caps).",
+    "cfgDesc_ai_node_key_account_daily_usd": "With limits: the most one account's calls may cost the server's key in one day (UTC), in US dollars.",
+    "cfgDesc_ai_node_key_node_daily_usd": "With limits: the most all accounts' calls together may cost the server's key in one day (UTC), in US dollars.",
     "cfgDesc_ai_model_free_fallback": "Model used when a person on the server's key has spent their allowance. Empty refuses instead of degrading",
     "cfgDesc_ai_model_default_chat": "Default chat model when the owner has not chosen one",
     "cfgDesc_ai_model_default_reasoning": "Default reasoning model when the owner has not chosen one",
@@ -23849,6 +23855,36 @@
           "ex2": "A model name: everyone on this server gets embeddings, and the server's key pays for them.",
           "ex3": "A different model later: search finds the new entries, but the older ones match badly.",
           "tip": "Pick the model once and keep it. A change splits the stored entries into two groups that search cannot compare."
+        },
+        "node_key_when_spent": {
+          "title": "When the allowance is spent",
+          "short": "What the server's key does for a person whose AI allowance is used up: it refuses, or it keeps paying up to daily caps.",
+          "what": "The server's key pays for the AI calls of people who have not set a key of their own. Each person gets an AI allowance, and the server's key pays until the allowance is used up. This setting says what happens next. With refuse, the server's key pays for nothing more. A call that names no model still gets the free model, if the person's model policy allows it. With limits, the server's key keeps paying, but only up to two daily caps: one for each account, and one for all accounts together. A day is a UTC day.",
+          "range": "refuse or limits. The default is refuse.",
+          "ex1": "refuse (the default): a person whose allowance is used up sets a key of their own, or gets more allowance.",
+          "ex2": "limits, with 1 USD per account and 10 USD for all accounts: each person can use about 1 USD more of the server's key each day, and the server pays at most 10 USD a day.",
+          "ex3": "limits, with 0 USD per account: the same as refuse.",
+          "tip": "Choose limits only if you are ready to pay for the people on this server. A person who sets a key of their own pays for their own calls."
+        },
+        "node_key_account_daily_usd": {
+          "title": "Daily cap per account",
+          "short": "With limits: the most one account's calls may cost the server's key in one day.",
+          "what": "This cap counts only when When the allowance is spent is set to limits. It is the most that the calls of one account may cost the server's key in one UTC day, in US dollars. The agents and apps of the account count toward the same cap. Calls that run at the same time can go past the cap by what they cost. The next call is then refused.",
+          "range": "0 to 1000 USD. The default is 1.",
+          "ex1": "1 (the default): about 1 USD of calls per account per day after the allowance is used up.",
+          "ex2": "0: no calls after the allowance is used up, the same as refuse.",
+          "ex3": "5: a person who uses AI a lot can work all day on the server's key.",
+          "tip": "Keep this low and the cap for all accounts high enough for the number of people on the server."
+        },
+        "node_key_node_daily_usd": {
+          "title": "Daily cap for all accounts",
+          "short": "With limits: the most the calls of all accounts together may cost the server's key in one day.",
+          "what": "This cap counts only when When the allowance is spent is set to limits. It is the most that the calls of all accounts together may cost the server's key in one UTC day, in US dollars, after their allowances are used up. When it is reached, the server's key refuses every such call until the next day. It is the most the server pays in a day for people whose allowance is used up.",
+          "range": "0 to 100000 USD. The default is 10.",
+          "ex1": "10 (the default): the server pays at most 10 USD a day past the allowances.",
+          "ex2": "0: no calls after an allowance is used up, the same as refuse.",
+          "ex3": "100: room for many people who each use their daily cap per account.",
+          "tip": "Set this to the most you are ready to pay in one day."
         }
       },
       "federation_sync": {

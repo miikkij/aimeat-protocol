@@ -31,6 +31,9 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.7.0 — 2026-10-05 — The node's key asks nodeKeyStanding (ai-allowance.ts): once it may not pay,
+ *     a call that names its model is refused like any other, instead of running on the node's key
+ *     with no limit but the caller's own budget (secaudit 2026-10, AI-1).
  *   v1.6.0 — 2026-10-02 — A rejected candidate carries the provider's title, so the person's sentence
  *     can name it; the refusal's AI-facing fix is `agentFix`, and `fix` is the person's
  *     (ai-fix-words.ts, added where prepareAiCall refuses).
@@ -51,6 +54,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
+import type { NodeKeyStanding } from '../ai-allowance.js';
 import { AiCompletionError } from './errors.js';
 import { chooseModel, freeModelAllowed, type LoadedPolicy, type PolicyCallContext } from './policy-gate.js';
 import { parseModelRef } from './policy.js';
@@ -123,8 +127,8 @@ export interface RoutePlanInput {
    * what every call used before providers existed (ai-model-defaults.ts).
    */
   legacyModel: (capability: AiCapability) => string | undefined;
-  /** The node's allowance for this owner, read at most once. */
-  nodeAllowance: () => Promise<{ remainingUsd: number }>;
+  /** Whether the node's key may pay for this owner (ai-allowance.ts nodeKeyStanding), read at most once. */
+  nodeAllowance: () => Promise<NodeKeyStanding>;
   /** What the call will use, for the owner's price ceiling: the prompt's tokens (a quarter of its
    *  length) and the answer's cap. Absent, a text call is estimated at 1024 tokens each way. */
   estimate?: { promptTokens?: number; maxTokens?: number };
@@ -300,7 +304,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
   const rejected: RejectedCandidate[] = [];
   const reject = (p: AiProvider, reason: RejectReason, message: string, extra: Partial<RejectedCandidate> = {}) =>
     rejected.push({ provider: p.id, title: p.title, reason, message, ...extra });
-  let allowance: { remainingUsd: number } | null = null;
+  let allowance: NodeKeyStanding | null = null;
   const deferred: Array<{ candidate: AiCandidate; message: string }> = [];
 
   for (const [p, by, sameModelRef] of list) {
@@ -381,19 +385,21 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       keyScope = 'node';
       allowance ??= await input.nodeAllowance();
       allowanceRemainingUsd = allowance.remainingUsd;
-      // A spent allowance on the node's key, as prepareAiCall decided it before providers existed:
-      // no free model makes a picture or a transcript, so those are refused; a text call that named
-      // no model gets the free model when the owner's policy allows it, and is refused otherwise
-      // (plan 05, section 4); a text call that named its model runs as named, because the node never
-      // re-chooses a model a caller named (ai-completion.ts, 2026-08-16).
-      if (allowance.remainingUsd <= 0 && (input.op !== 'text' || !input.requested)) {
+      // When the node's key may not pay any more (ai-allowance.ts nodeKeyStanding: a spent allowance
+      // in 'refuse' mode, or a daily limit reached in 'limits' mode): a text call that named no
+      // model gets the free model when the owner's policy allows it, a call that named the free model
+      // runs, and every other call is refused, the ones that name their model included. Until
+      // 2026-10-05 a text call that named its model ran as named and kept spending the node's key
+      // (secaudit 2026-10, AI-1); not re-choosing a model a caller named is kept, by refusing instead.
+      if (!allowance.mayPay) {
         const free = config.modelFreeFallback;
-        if (input.op === 'text' && free && freeModelAllowed(input.policy, free, p.type)) {
+        const freeAllowed = input.op === 'text' && !!free && freeModelAllowed(input.policy, free, p.type);
+        if (freeAllowed && !input.requested) {
           model = free; degradedToFree = true;
-        } else {
-          const message = input.op === 'text' && free
-            ? 'Your allowance on this node is used up, and your model policy does not allow the free model. Add your own key or more allowance.'
-            : 'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.';
+        } else if (!(freeAllowed && model === free)) {
+          const message = input.op === 'text' && free && !input.requested && !freeAllowed
+            ? `${allowance.message ?? 'Your allowance on this node is used up.'} Your model policy does not allow the free model either.`
+            : (allowance.message ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.');
           reject(p, 'allowance-spent', message, { error: new AiCompletionError('QUOTA_EXHAUSTED', 402, message) });
           continue;
         }

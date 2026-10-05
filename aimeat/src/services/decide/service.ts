@@ -56,6 +56,8 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.4 — 2026-10-05 — The node's key asks nodeKeyStanding (ai-allowance.ts), the one answer every
+ *     call on that key gets, with the operator's mode once an allowance is spent (secaudit 2026-10, AI-1).
  *   v1.4.3 — 2026-09-29 — strictScrub: the Content Classifier's calls scrub everything (TARGET-082 V3).
  *   v1.4.2 — 2026-09-29 — The decision's scrub record names the classes the owner allowed through.
  *   v1.4.1 — 2026-09-26 — A provider answer past the outbound ceiling (JEV_TOO_LARGE) is PROVIDER_ERROR
@@ -85,7 +87,7 @@ import type {
   AiDecisionKeyScope, AiDecisionOutcome, AiDecisionStatsGroup, AiDecisionStatsGroupBy,
 } from '../../storage/interface.js';
 import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError } from '../ai-completion.js';
-import { readAllowance, remainingOf, debitAllowance } from '../ai-allowance.js';
+import { nodeKeyStanding, debitAllowance } from '../ai-allowance.js';
 import { readProgramMap } from '../data-map/data-map-access.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
@@ -306,9 +308,12 @@ async function resolveDecideKey(
       ? `No TypeSafe key is set for this call. The owner sets one for the agent "${agent}" on the agent's page (Profile, Agents, ${agent}, AI keys), or their own under Settings, AI, Decision model, and tests it there. Then run this again.`
       : 'No TypeSafe key is set. Add your own under Settings, AI, Decision model and press Test, or ask the operator to give the node one.');
   }
-  if (remainingOf(await readAllowance(storage, config, gaii)) <= 0) {
+  // The same answer as every other call on the node's key: the allowance, then the operator's mode
+  // and daily limits once it is spent (ai-allowance.ts nodeKeyStanding; secaudit 2026-10, AI-1).
+  const standing = await nodeKeyStanding(storage, config, gaii);
+  if (!standing.mayPay) {
     throw new DecideError('QUOTA_EXHAUSTED', 402,
-      'Your allowance on this node is used up. Add more, or set your own TypeSafe key in AI settings.');
+      standing.message ?? 'Your allowance on this node is used up. Add more, or set your own TypeSafe key in AI settings.');
   }
   return { key: nodeKey, scope: 'node' };
 }

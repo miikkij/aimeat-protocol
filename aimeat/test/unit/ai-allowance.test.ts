@@ -8,6 +8,8 @@
  *   must behave exactly as it did before this file existed, because that is every node today.
  * @usage cd aimeat && pnpm vitest run test/unit/ai-allowance.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-05 — nodeKeyStanding: refuse pays nothing past the allowance; limits pays up to
+ *     the account's and the node's caps for the UTC day (secaudit 2026-10, AI-1).
  *   v1.1.0 — 2026-09-16 — the node key goes only to OpenRouter's own address; an own key still goes
  *     anywhere, localhost included.
  *   v1.0.0 — 2026-08-16 — initial: selection order, the free grant applied once, debit and grant,
@@ -18,7 +20,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import {
-  resolveAiKey, readAllowance, debitAllowance, grantAllowance, remainingOf,
+  resolveAiKey, readAllowance, debitAllowance, grantAllowance, remainingOf, nodeKeyStanding,
 } from '../../src/services/ai-allowance.js';
 import { encrypt } from '../../src/services/encryption.js';
 
@@ -215,6 +217,60 @@ describe('the allowance itself', () => {
     const storage = await freshStorage();
     await expect(grantAllowance(storage, cfg(), GAII, 0, 'oops')).rejects.toThrow();
     await expect(grantAllowance(storage, cfg(), GAII, -1, 'oops')).rejects.toThrow();
+    storage.close?.();
+  });
+});
+
+describe('nodeKeyStanding: what the node\'s key does once an allowance is spent (secaudit 2026-10, AI-1)', () => {
+  const BOB = `bob@${NODE}`;
+
+  it('pays while the allowance lasts, whatever the mode', async () => {
+    const storage = await freshStorage();
+    const s = await nodeKeyStanding(storage, cfg({ chatFreeAllowanceUsd: 1, aiNodeKeyWhenSpent: 'refuse' }), GAII);
+    assert(s.mayPay && Math.abs(s.remainingUsd - 1) < 1e-9, `pays with 1.00 left, got ${JSON.stringify(s)}`);
+    storage.close?.();
+  });
+
+  it('refuse (the default): a spent allowance pays for nothing more', async () => {
+    const storage = await freshStorage();
+    const config = cfg({ chatFreeAllowanceUsd: 0.5, aiNodeKeyWhenSpent: 'refuse', aiNodeKeyAccountDailyUsd: 100, aiNodeKeyNodeDailyUsd: 100 });
+    await debitAllowance(storage, config, GAII, 0.5);
+    const s = await nodeKeyStanding(storage, config, GAII);
+    assert(!s.mayPay && s.reason === 'allowance-spent', `refused, got ${JSON.stringify(s)}`);
+    storage.close?.();
+  });
+
+  it('limits: a spent allowance keeps paying until the account\'s cap for the day', async () => {
+    const storage = await freshStorage();
+    const config = cfg({ chatFreeAllowanceUsd: 0.5, aiNodeKeyWhenSpent: 'limits', aiNodeKeyAccountDailyUsd: 1, aiNodeKeyNodeDailyUsd: 100 });
+    await debitAllowance(storage, config, GAII, 0.5);
+    let s = await nodeKeyStanding(storage, config, GAII);
+    assert(s.mayPay && s.remainingUsd === 0, `pays past the allowance, got ${JSON.stringify(s)}`);
+    await debitAllowance(storage, config, GAII, 0.6);
+    s = await nodeKeyStanding(storage, config, GAII);
+    assert(!s.mayPay && s.reason === 'account-daily-limit', `the account's cap (1.10 of 1.00 today), got ${JSON.stringify(s)}`);
+    storage.close?.();
+  });
+
+  it('limits: the cap for all accounts stops a second account too', async () => {
+    const storage = await freshStorage();
+    const config = cfg({ chatFreeAllowanceUsd: 0, aiNodeKeyWhenSpent: 'limits', aiNodeKeyAccountDailyUsd: 100, aiNodeKeyNodeDailyUsd: 1 });
+    await debitAllowance(storage, config, GAII, 1.2);
+    const bob = await nodeKeyStanding(storage, config, BOB);
+    assert(!bob.mayPay && bob.reason === 'node-daily-limit', `the node's cap, got ${JSON.stringify(bob)}`);
+    storage.close?.();
+  });
+
+  it('limits: yesterday\'s spend does not count today', async () => {
+    const storage = await freshStorage();
+    const config = cfg({ chatFreeAllowanceUsd: 0, aiNodeKeyWhenSpent: 'limits', aiNodeKeyAccountDailyUsd: 1, aiNodeKeyNodeDailyUsd: 100 });
+    await debitAllowance(storage, config, GAII, 2);
+    const rec = await readAllowance(storage, config, GAII);
+    const now = new Date().toISOString();
+    await storage.setMemory({ key: `ai-usage.allowance.${GAII}`, ownerGaii: GAII, value: { ...rec, day: '2000-01-01' } as unknown as Record<string, unknown>,
+      visibility: 'private', tags: [], ttlHours: null, version: 99, createdAt: now, updatedAt: now });
+    const s = await nodeKeyStanding(storage, config, GAII);
+    assert(s.mayPay, `a new day, got ${JSON.stringify(s)}`);
     storage.close?.();
   });
 });

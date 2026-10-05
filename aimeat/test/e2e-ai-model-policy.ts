@@ -19,6 +19,8 @@
  *   - 1-11: the eleven cases of 09 section 2, in that order
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-model-policy.ts
  * @version-history
+ *   v1.1.0 — 2026-10-05 — 7b: a call that names its model on a spent allowance is refused too
+ *     (secaudit 2026-10, AI-1).
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
  */
 import * as ed from '@noble/ed25519';
@@ -278,6 +280,17 @@ const toolJson = (r: any) => JSON.parse(r?.result?.content?.[0]?.text ?? '{}');
       const r = await complete(c, {});
       assert(r.status === 402 && r.body.error?.code === 'QUOTA_EXHAUSTED', `got ${r.status} ${r.body.error?.code}: ${r.body.error?.message}`);
       assert(/model policy/.test(r.body.error.message), `the reason names the policy: ${r.body.error.message}`);
+      assert(provider.requests.length === before, 'nothing was sent anywhere');
+    });
+
+    await test('7b. the allowance is spent and the call names its model: 402 too, the node\'s key pays nothing (secaudit 2026-10, AI-1)', async () => {
+      // Until 2026-10-05 a text call that named its model ran on the node's key with no limit but
+      // the caller's own daily budget. A new node is in 'refuse' mode.
+      const s = await setPolicy(c, { mode: 'open' });
+      assert(s.status === 200, `policy ${s.status}`);
+      const before = provider.requests.length;
+      const r = await complete(c, { model: 'anthropic/claude-opus-5.5' });
+      assert(r.status === 402 && r.body.error?.code === 'QUOTA_EXHAUSTED', `got ${r.status} ${r.body.error?.code}: ${r.body.error?.message}`);
       assert(provider.requests.length === before, 'nothing was sent anywhere');
     });
 

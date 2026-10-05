@@ -77,6 +77,17 @@ export interface AiCapabilityConfig extends DecideConfig {
   /** Free starting allowance in USD, applied once per person. 0 (the default) grants nothing. */
   chatFreeAllowanceUsd: number;
   /**
+   * What the node's key does for a person whose allowance is spent (services/ai-allowance.ts
+   * nodeKeyStanding). 'refuse' (the default): it pays for nothing more, whatever model the call
+   * names; a call that names none still gets the free fallback model. 'limits': it keeps paying, up
+   * to the two daily ceilings below. The operator decides (Jouni, 2026-10-05; secaudit 2026-10 AI-1).
+   */
+  aiNodeKeyWhenSpent: 'refuse' | 'limits';
+  /** In 'limits' mode: the most one account's calls may cost the node's key in one day (UTC), USD. */
+  aiNodeKeyAccountDailyUsd: number;
+  /** In 'limits' mode: the most all accounts' calls together may cost the node's key in one day, USD. */
+  aiNodeKeyNodeDailyUsd: number;
+  /**
    * Model used when someone on the node's key has spent their allowance. Empty means refuse instead
    * of degrading. A free model is a worse answer, not a wrong one, as long as the person is told.
    */

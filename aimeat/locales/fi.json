@@ -10349,6 +10349,9 @@
     "cfg_tasks_archive_after_hours": "Arkistoi tämän jälkeen",
     "cfg_ai_instance_key": "Palvelimen OpenRouter-avain",
     "cfg_ai_free_allowance_usd": "Ilmainen aloitussaldo",
+    "cfg_ai_node_key_when_spent": "Kun tekoälysaldo on käytetty",
+    "cfg_ai_node_key_account_daily_usd": "Päiväraja tiliä kohden",
+    "cfg_ai_node_key_node_daily_usd": "Päiväraja kaikille tileille",
     "cfg_ai_model_free_fallback": "Malli saldon jälkeen",
     "cfg_ai_model_default_chat": "Chatin oletusmalli",
     "cfg_ai_model_default_reasoning": "Päättelyn oletusmalli",
@@ -10659,6 +10662,9 @@
     "cfgDesc_tasks_archive_after_hours": "Tunnit, jotka valmis tehtävä pysyy tuoreissa ennen automaattiarkistointia.",
     "cfgDesc_ai_instance_key": "Tämän palvelimen oma OpenRouter-avain, jota käyttävät kaikki, jotka eivät ole tuoneet omaansa. Kulutus lasketaan henkilöittäin alempana olevaa aloitussaldoa vasten.",
     "cfgDesc_ai_free_allowance_usd": "Ilmainen aloitussaldo dollareina palvelimen avaimella; myönnetään kerran henkilöä kohden eikä uusita. Nolla tarkoittaa, ettei saldoa myönnetä.",
+    "cfgDesc_ai_node_key_when_spent": "Mitä palvelimen avain tekee, kun henkilön tekoälysaldo on käytetty: refuse (avain ei maksa enää mitään, mitä mallia kutsu pyytääkin) tai limits (avain maksaa edelleen kahteen päivärajaan asti).",
+    "cfgDesc_ai_node_key_account_daily_usd": "Kun valinta on limits: enintään näin paljon yhden tilin kutsut saavat maksaa palvelimen avaimella yhden päivän (UTC) aikana, dollareina.",
+    "cfgDesc_ai_node_key_node_daily_usd": "Kun valinta on limits: enintään näin paljon kaikkien tilien kutsut yhteensä saavat maksaa palvelimen avaimella yhden päivän (UTC) aikana, dollareina.",
     "cfgDesc_ai_model_free_fallback": "Malli, jota käytetään, kun palvelimen avainta käyttävä henkilö on kuluttanut saldonsa. Jos tämä on tyhjä, vastauksia ei saldon loputtua enää anneta sen sijaan, että siirryttäisiin heikompaan malliin.",
     "cfgDesc_ai_model_default_chat": "Chatin oletusmalli, kun omistaja ei ole valinnut omaansa.",
     "cfgDesc_ai_model_default_reasoning": "Päättelyn oletusmalli, kun omistaja ei ole valinnut omaansa.",
@@ -23830,6 +23836,36 @@
           "ex2": "Mallin nimi: kaikki tämän palvelimen käyttäjät saavat upotuksia, ja palvelimen avain maksaa ne.",
           "ex3": "Myöhemmin eri malli: haku löytää uudet merkinnät, mutta vanhat vastaavat hakuihin huonosti.",
           "tip": "Valitse malli kerran ja pidä se. Muutos jakaa tallennetut merkinnät kahteen ryhmään, joita haku ei voi verrata."
+        },
+        "node_key_when_spent": {
+          "title": "Kun tekoälysaldo on käytetty",
+          "short": "Mitä palvelimen avain tekee, kun henkilön tekoälysaldo on käytetty: se kieltäytyy, tai se maksaa edelleen päivärajoihin asti.",
+          "what": "Palvelimen avain maksaa niiden ihmisten tekoälykutsut, joilla ei ole omaa avainta. Jokainen saa tekoälysaldon, ja palvelimen avain maksaa, kunnes saldo on käytetty. Tämä asetus kertoo, mitä sen jälkeen tapahtuu. Kun valinta on refuse, palvelimen avain ei maksa enää mitään. Kutsu, joka ei nimeä mallia, saa silti ilmaisen mallin, jos henkilön mallirajaus sen sallii. Kun valinta on limits, palvelimen avain maksaa edelleen, mutta vain kahteen päivärajaan asti. Toinen raja koskee jokaista tiliä, toinen kaikkia tilejä yhteensä. Päivä lasketaan UTC-ajan mukaan.",
+          "range": "refuse tai limits. Oletus on refuse.",
+          "ex1": "refuse (oletus): kun saldo on käytetty, henkilö asettaa oman avaimen tai saa lisää saldoa.",
+          "ex2": "limits, raja 1 dollari tiliä kohden ja 10 dollaria kaikille tileille: jokainen voi käyttää palvelimen avainta noin dollarin verran päivässä, ja palvelin maksaa enintään 10 dollaria päivässä.",
+          "ex3": "limits ja tilikohtainen raja 0 dollaria: sama kuin refuse.",
+          "tip": "Valitse limits vain, jos olet valmis maksamaan tämän palvelimen käyttäjien kutsut. Kun henkilö asettaa oman avaimen, hän maksaa omat kutsunsa."
+        },
+        "node_key_account_daily_usd": {
+          "title": "Päiväraja tiliä kohden",
+          "short": "Kun valinta on limits: enintään näin paljon yhden tilin kutsut saavat maksaa palvelimen avaimella päivässä.",
+          "what": "Raja on voimassa vain, kun asetuksen Kun tekoälysaldo on käytetty valinta on limits. Se on suurin summa, jonka yhden tilin kutsut saavat maksaa palvelimen avaimella yhden UTC-päivän aikana, dollareina. Tilin agenttien ja sovellusten kutsut lasketaan samaan rajaan. Samaan aikaan käynnissä olevat kutsut voivat ylittää rajan oman hintansa verran. Silloin seuraava kutsu hylätään.",
+          "range": "0–1000 dollaria. Oletus on 1.",
+          "ex1": "1 (oletus): noin dollarin verran kutsuja tiliä kohden päivässä sen jälkeen, kun saldo on käytetty.",
+          "ex2": "0: ei kutsuja sen jälkeen, kun saldo on käytetty, sama kuin refuse.",
+          "ex3": "5: paljon tekoälyä käyttävä henkilö voi tehdä palvelimen avaimella töitä koko päivän.",
+          "tip": "Pidä tämä raja pienenä ja kaikkien tilien raja riittävän suurena palvelimen käyttäjämäärään nähden."
+        },
+        "node_key_node_daily_usd": {
+          "title": "Päiväraja kaikille tileille",
+          "short": "Kun valinta on limits: enintään näin paljon kaikkien tilien kutsut yhteensä saavat maksaa palvelimen avaimella päivässä.",
+          "what": "Raja on voimassa vain, kun asetuksen Kun tekoälysaldo on käytetty valinta on limits. Se on suurin summa, jonka kaikkien tilien kutsut yhteensä saavat maksaa palvelimen avaimella yhden UTC-päivän aikana, dollareina, sen jälkeen kun saldot on käytetty. Kun raja täyttyy, palvelimen avain hylkää kaikki tällaiset kutsut seuraavaan päivään asti. Se on suurin summa, jonka palvelin maksaa päivässä niiden ihmisten kutsuista, joiden saldo on käytetty.",
+          "range": "0–100000 dollaria. Oletus on 10.",
+          "ex1": "10 (oletus): palvelin maksaa saldojen lisäksi enintään 10 dollaria päivässä.",
+          "ex2": "0: ei kutsuja sen jälkeen, kun saldo on käytetty, sama kuin refuse.",
+          "ex3": "100: tilaa monelle ihmiselle, joista jokainen käyttää tilikohtaisen päivärajansa.",
+          "tip": "Aseta tähän suurin summa, jonka olet valmis maksamaan yhdessä päivässä."
         }
       },
       "federation_sync": {

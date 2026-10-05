@@ -19,13 +19,19 @@
  *   allowance left, then nothing.
  * @structure
  *   - AiKeyChoice — which key pays, and whether the allowance is spent
+ *   - NodeKeyStanding / nodeKeyStanding() — may the node's key pay one more call: the allowance, then
+ *     the operator's mode and daily limits once it is spent
  *   - resolveAiKey() — the order above, with the free starter grant applied lazily
  *   - isOpenRouterHost() — the one address the node's key may be sent to
  *   - debitAllowance() / grantAllowance() / readAllowance()
  * @usage
- *   const choice = await resolveAiKey(storage, config, gaii, prefs, apiKeyRecord?.value);
- *   if (choice.scope === 'node' && choice.exhausted) { … degrade or refuse … }
+ *   const standing = await nodeKeyStanding(storage, config, gaii);
+ *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.3.0 — 2026-10-05 — nodeKeyStanding(): one answer to "may the node's key pay" for the AI planner
+ *     and the decision service, with the operator's mode once an allowance is spent (refuse by
+ *     default, or limits per account and per node per UTC day). debitAllowance counts the day's
+ *     spend per account and for the node (secaudit 2026-10, AI-1).
  *   v1.2.0 — 2026-09-28 — resolveAiKey takes `nodeKey: false` for an operation the node's key does
  *     not pay for: an image or a transcription pays from the node's key only when the operator named
  *     a node default model for it (Jouni, 2026-09-28). Text is unchanged.
@@ -39,6 +45,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { AiCompletionError, decryptOwnerKey } from './ai-completion.js';
 import { DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
+import { readSystem, updateSystem } from './classification/system-record.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -54,6 +61,26 @@ export interface AllowanceRecord {
   /** Whether the free starter grant has been applied, so it is applied once and not once per read. */
   free_granted: boolean;
   updated_at: string;
+  /** The UTC day `day_spent_usd` counts, for the operator's daily limit per account (nodeKeyStanding). */
+  day?: string;
+  /** What this account's calls cost the node's key on `day`. */
+  day_spent_usd?: number;
+}
+
+/**
+ * Whether the node's key may pay one more call for a person (nodeKeyStanding). One answer for every
+ * caller that spends the node's key: the AI planner (services/ai/route-plan.ts) and the decision
+ * service (services/decide/service.ts).
+ */
+export interface NodeKeyStanding {
+  /** What is left of the person's allowance, in USD. */
+  remainingUsd: number;
+  /** The node's key may pay. With an allowance left, always; once it is spent, by the operator's mode. */
+  mayPay: boolean;
+  /** Why it may not. */
+  reason?: 'allowance-spent' | 'account-daily-limit' | 'node-daily-limit';
+  /** The sentence the caller is told. */
+  message?: string;
 }
 
 export interface AiKeyChoice {
@@ -126,6 +153,52 @@ export function remainingOf(rec: AllowanceRecord): number {
   return Math.max(0, rec.granted_usd - rec.spent_usd);
 }
 
+/** The UTC day a spend counts toward. */
+function utcDay(at = new Date()): string {
+  return at.toISOString().slice(0, 10);
+}
+
+/** What all accounts' calls cost the node's key on one UTC day, under system@<node>. */
+const NODE_DAY_KEY = 'ai-usage.node-day';
+interface NodeDay { day: string; spent_usd: number }
+function parseNodeDay(v: unknown): NodeDay {
+  const o = (v && typeof v === 'object' ? v : {}) as Partial<NodeDay>;
+  return { day: typeof o.day === 'string' ? o.day : '', spent_usd: typeof o.spent_usd === 'number' && o.spent_usd > 0 ? o.spent_usd : 0 };
+}
+
+/**
+ * May the node's key pay one more call for `gaii`? While the person's allowance lasts, yes. Once it is
+ * spent the operator's mode decides (config.aiNodeKeyWhenSpent): 'refuse' pays for nothing more,
+ * whatever model the call names; 'limits' keeps paying while the account's spend today and all
+ * accounts' spend today stay under the operator's two daily limits. Before 2026-10-05 a text call
+ * that named its model kept spending the node's key with no limit but the person's own daily budget
+ * (secaudit 2026-10, AI-1; Jouni: "let operator to decide ... if limits then set limits").
+ *
+ * The daily figures are counted after each call (debitAllowance), so calls running side by side can
+ * pass the limit by what they cost together; the limit stops the next call, not one in flight.
+ */
+export async function nodeKeyStanding(storage: Storage, config: AimeatConfig, gaii: string): Promise<NodeKeyStanding> {
+  const rec = await readAllowance(storage, config, gaii);
+  const remaining = remainingOf(rec);
+  if (remaining > 0) return { remainingUsd: remaining, mayPay: true };
+  if (config.aiNodeKeyWhenSpent !== 'limits') {
+    return { remainingUsd: 0, mayPay: false, reason: 'allowance-spent',
+      message: 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.' };
+  }
+  const today = utcDay();
+  const mine = rec.day === today ? rec.day_spent_usd ?? 0 : 0;
+  if (mine >= config.aiNodeKeyAccountDailyUsd) {
+    return { remainingUsd: 0, mayPay: false, reason: 'account-daily-limit',
+      message: `Your allowance on this node is used up, and your account has reached today's limit on the node's key ($${config.aiNodeKeyAccountDailyUsd.toFixed(2)}). It opens again tomorrow (UTC), or set your own key in your AI settings.` };
+  }
+  const node = parseNodeDay((await readSystem(storage, config.nodeId, NODE_DAY_KEY))?.value);
+  if ((node.day === today ? node.spent_usd : 0) >= config.aiNodeKeyNodeDailyUsd) {
+    return { remainingUsd: 0, mayPay: false, reason: 'node-daily-limit',
+      message: 'Your allowance on this node is used up, and the node\'s shared key has reached today\'s limit. It opens again tomorrow (UTC), or set your own key in your AI settings.' };
+  }
+  return { remainingUsd: 0, mayPay: true };
+}
+
 /**
  * Decide which key pays.
  *
@@ -192,12 +265,19 @@ export async function debitAllowance(
   if (!(costUsd > 0)) return null;
   try {
     const rec = await readAllowance(storage, config, gaii);
+    const today = utcDay();
     const next: AllowanceRecord = {
       ...rec,
       spent_usd: rec.spent_usd + costUsd,
+      day: today,
+      day_spent_usd: (rec.day === today ? rec.day_spent_usd ?? 0 : 0) + costUsd,
       updated_at: new Date().toISOString(),
     };
     await writeAllowance(storage, gaii, next);
+    // All accounts together, for the node-wide daily limit. Compare-and-swap, because every account
+    // writes this one record.
+    await updateSystem(storage, config.nodeId, NODE_DAY_KEY, parseNodeDay,
+      cur => ({ day: today, spent_usd: (cur.day === today ? cur.spent_usd : 0) + costUsd }), null, 'ai-allowance');
     return next;
   } catch (err) {
     logger.warn('[allowance] debit failed; the node key was used and the balance will not show it', {
