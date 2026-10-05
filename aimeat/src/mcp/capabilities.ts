@@ -10,6 +10,7 @@
  * @usage Registered by mcp/index.ts per agent session; the shared write lives in
  *   services/capability-record.ts, which the REST routes call as well.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 - 2026-05-02 - Add create, update, delete, vouch tools
  *   v1.0.0 - 2026-05-02 - Initial: list, get, invoke
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -41,6 +42,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerCapabilitiesTools(
     mcp: McpServer,
@@ -79,13 +81,7 @@ export function registerCapabilitiesTools(
     mcp.tool(
         'aimeat_capabilities_list',
         descriptionFor('aimeat_capabilities_list'),
-        {
-            search: z.string().optional().describe('Full-text search on name and summary'),
-            tags: z.array(z.string()).optional().describe('Filter by tags'),
-            callable: z.boolean().optional().describe('Filter callable capabilities only'),
-            authRequired: z.string().optional().describe('Filter by auth level: none, anonymous, registered'),
-            source_type: z.string().optional().describe('Filter by source type: extension, action, cortex, manual'),
-        },
+        zodShapeFor('aimeat_capabilities_list'),
         annotationsFor('aimeat_capabilities_list'),
         async (args) => {
             const result = await storage.listCapabilities({
@@ -106,9 +102,7 @@ export function registerCapabilitiesTools(
     mcp.tool(
         'aimeat_capabilities_get',
         descriptionFor('aimeat_capabilities_get'),
-        {
-            id: z.string().describe('Capability ID'),
-        },
+        zodShapeFor('aimeat_capabilities_get'),
         annotationsFor('aimeat_capabilities_get'),
         async ({ id }) => {
             const cap = await storage.getCapability(id);
@@ -120,11 +114,7 @@ export function registerCapabilitiesTools(
     mcp.tool(
         'aimeat_capabilities_invoke',
         descriptionFor('aimeat_capabilities_invoke'),
-        {
-            id: z.string().describe('Capability ID to invoke'),
-            input: z.record(z.string(), z.unknown()).optional().describe('Input data for the capability'),
-            mode: z.enum(['normal', 'raw']).optional().describe('normal = normalized result, raw = original response'),
-        },
+        zodShapeFor('aimeat_capabilities_invoke'),
         annotationsFor('aimeat_capabilities_invoke'),
         async (args) => {
             const cap = await storage.getCapability(args.id);
@@ -257,9 +247,7 @@ export function registerCapabilitiesTools(
     mcp.tool(
         'aimeat_capabilities_delete',
         descriptionFor('aimeat_capabilities_delete'),
-        {
-            id: z.string().describe('Capability ID to delete'),
-        },
+        zodShapeFor('aimeat_capabilities_delete'),
         annotationsFor('aimeat_capabilities_delete'),
         async ({ id }) => {
             const removed = await deleteCapability({ storage, config }, await caller(), id);
@@ -273,10 +261,7 @@ export function registerCapabilitiesTools(
     mcp.tool(
         'aimeat_capabilities_vouch',
         descriptionFor('aimeat_capabilities_vouch'),
-        {
-            id: z.string().describe('Capability ID to vouch for'),
-            comment: z.string().optional().describe('Optional comment explaining why you vouch for this capability'),
-        },
+        zodShapeFor('aimeat_capabilities_vouch'),
         annotationsFor('aimeat_capabilities_vouch'),
         // The comment LANDS now: a vouch is a row per voucher (the audit's dead-counter finding,
         // fixed 2026-08-28), and the text is stored beside it.

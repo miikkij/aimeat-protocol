@@ -11,6 +11,7 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-21 — Initial creation: 4 tools + 1 resource for knowledge management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -49,6 +50,7 @@ import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.
 import {
     addKnowledgePackageEntry, type KnowledgeManifestValue,
 } from '../services/knowledge-package-entry.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -134,7 +136,7 @@ export function registerKnowledgeTools(
     mcp.tool(
         'aimeat_knowledge_list',
         descriptionFor('aimeat_knowledge_list'),
-        {},
+        zodShapeFor('aimeat_knowledge_list'),
         annotationsFor('aimeat_knowledge_list'),
         async () => {
             const entries = await listOwnerScopePackages();
@@ -167,9 +169,7 @@ export function registerKnowledgeTools(
     mcp.tool(
         'aimeat_knowledge_get',
         descriptionFor('aimeat_knowledge_get'),
-        {
-            package_id: z.string().describe('The knowledge package ID'),
-        },
+        zodShapeFor('aimeat_knowledge_get'),
         annotationsFor('aimeat_knowledge_get'),
         async ({ package_id }) => {
             const manifestKey = `packages/${package_id}/manifest`;
@@ -270,10 +270,7 @@ export function registerKnowledgeTools(
     mcp.tool(
         'aimeat_knowledge_links',
         descriptionFor('aimeat_knowledge_links'),
-        {
-            package_id: z.string().describe('The knowledge package ID'),
-            direction: z.enum(['outgoing', 'incoming', 'both']).optional().describe('Link direction (default: both)'),
-        },
+        zodShapeFor('aimeat_knowledge_links'),
         annotationsFor('aimeat_knowledge_links'),
         async ({ package_id, direction }) => {
             const manifestKey = `packages/${package_id}/manifest`;

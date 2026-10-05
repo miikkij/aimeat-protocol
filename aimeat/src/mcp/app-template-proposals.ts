@@ -10,6 +10,7 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-20 — _get and _list also answer for a genre that grew out of an app.
  *   v1.2.0 — 2026-09-19 — _get takes `part`, for a shipped template too large for one answer.
  *   v1.1.0 — 2026-09-18 — _get and _list also answer for the templates the node ships (shells,
@@ -31,6 +32,7 @@ import {
 } from '../services/app-template-proposals.js';
 import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 import { toolError } from './tool-error.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const errText = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });
@@ -77,7 +79,7 @@ export function registerAppTemplateProposalTools(
     mcp.tool(
         'aimeat_app_template_list',
         descriptionFor('aimeat_app_template_list'),
-        {},
+        zodShapeFor('aimeat_app_template_list'),
         annotationsFor('aimeat_app_template_list'),
         async () => {
             const proposals = await listTemplateProposals(storage, config, agentGaii);
@@ -99,10 +101,7 @@ export function registerAppTemplateProposalTools(
     mcp.tool(
         'aimeat_app_template_get',
         descriptionFor('aimeat_app_template_get'),
-        {
-            id: z.string().min(1).max(64),
-            part: z.number().int().min(1).optional().describe('Only for a template the node ships whose file is too large for one answer: which part to return (1-based). The first answer says how many parts there are.'),
-        },
+        zodShapeFor('aimeat_app_template_get'),
         annotationsFor('aimeat_app_template_get'),
         async ({ id, part }) => {
             const found = await getTemplateProposal(storage, config, agentGaii, id);
@@ -150,7 +149,7 @@ export function registerAppTemplateProposalTools(
     mcp.tool(
         'aimeat_app_template_delete',
         descriptionFor('aimeat_app_template_delete'),
-        { id: z.string().min(1).max(64) },
+        zodShapeFor('aimeat_app_template_delete'),
         annotationsFor('aimeat_app_template_delete'),
         async ({ id }) => {
             const ok = await deleteTemplateProposal(storage, config, agentGaii, id);

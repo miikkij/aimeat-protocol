@@ -10,6 +10,7 @@
  *   import { registerCatalogueTools } from './catalogue.js';
  *   registerCatalogueTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools for agent directory, public boards, and people directory
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -18,11 +19,11 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerCatalogueTools(
     mcp: McpServer,
@@ -37,10 +38,7 @@ export function registerCatalogueTools(
     mcp.tool(
         'aimeat_catalogue_agents',
         descriptionFor('aimeat_catalogue_agents'),
-        {
-            search: z.string().optional(),
-            category: z.string().optional(),
-        },
+        zodShapeFor('aimeat_catalogue_agents'),
         annotationsFor('aimeat_catalogue_agents'),
         async ({ search, category }) => {
             const agents = await storage.listAgents();
@@ -82,7 +80,7 @@ export function registerCatalogueTools(
     mcp.tool(
         'aimeat_catalogue_boards',
         descriptionFor('aimeat_catalogue_boards'),
-        {},
+        zodShapeFor('aimeat_catalogue_boards'),
         annotationsFor('aimeat_catalogue_boards'),
         async () => {
             const boards = await storage.listBoards();
@@ -106,10 +104,7 @@ export function registerCatalogueTools(
     mcp.tool(
         'aimeat_catalogue_directory',
         descriptionFor('aimeat_catalogue_directory'),
-        {
-            city: z.string().optional(),
-            interest: z.string().optional(),
-        },
+        zodShapeFor('aimeat_catalogue_directory'),
         annotationsFor('aimeat_catalogue_directory'),
         async ({ city, interest }) => {
             const ghiis = await storage.listGHIIs();

@@ -12,6 +12,7 @@
  *   import { registerFlagsTools } from './flags.js';
  *   registerFlagsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 1 tool for content moderation reporting via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -23,16 +24,12 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import {
-    FLAG_TARGET_TYPES,
-    FLAG_REASONS,
-    createModerationFlag,
-} from '../services/moderation-flags.js';
+import { createModerationFlag } from '../services/moderation-flags.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerFlagsTools(
     mcp: McpServer,
@@ -48,14 +45,7 @@ export function registerFlagsTools(
     mcp.tool(
         'aimeat_flag_report',
         descriptionFor('aimeat_flag_report'),
-        {
-            // The two lists come from the service, so the tool declares exactly what the capability
-            // accepts. They used to be written out here, two values and one reason short.
-            target_type: z.enum(FLAG_TARGET_TYPES).describe('Type of content being reported'),
-            target_id: z.string().describe('ID of the content to flag'),
-            reason: z.enum(FLAG_REASONS).describe('Reason for reporting'),
-            description: z.string().optional().describe('Optional additional context'),
-        },
+        zodShapeFor('aimeat_flag_report'),
         annotationsFor('aimeat_flag_report'),
         async ({ target_type, target_id, reason, description }) => {
             const out = await createModerationFlag({ storage, config }, agentGaii, {

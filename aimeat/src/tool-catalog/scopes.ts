@@ -196,11 +196,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // open items — and the same word the sibling ask-route takes. Creating the agent is a different
     // door with a different gate: the owner in person.
     aimeat_agent_propose:                     'memory:write',
-    // Rewriting an agent's PERMISSIONS is its own word, and no wildcard carries it. PATCH
-    // /v1/agents/:name/scopes is owner-only, and the propose-then-confirm dance here binds the
-    // token to the CALLER — so the same agent mints and redeems it in two consecutive calls, and
-    // the "show this diff to the owner" text is instruction rather than a gate.
-    aimeat_operator_agent_configure:          'agent:permissions',
 
     // The destructive half: delete an app. Split from write because shipping an update and
     // removing the thing are different risks.
@@ -226,25 +221,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
 
-    // A capability is how this account offers work to others, so writing one speaks in the
-    // owner's name.
-    aimeat_capabilities_create:               'capability:write',
-    aimeat_capabilities_delete:               'capability:write',
-    aimeat_capabilities_update:               'capability:write',
-
-    // A sharing group IS a consent boundary: who may read what.
-    // A sharing group IS the boundary of who reads the owner's memory. POST/PUT/DELETE
-    // /v1/sharing-groups are owner-only; here it costs an explicit tick instead of being shut.
-    aimeat_group_add_member:                  'consent:groups',
-    aimeat_group_create:                      'consent:groups',
-    aimeat_group_remove_member:               'consent:groups',
-
-    // A share is the other half, and a separate decision: the group is WHO, the share is WHAT they
-    // reach. Assembling an audience and handing it a key space are different acts, and only the
-    // second one gives anything away — so it costs its own tick and no wildcard carries it.
-    aimeat_share_create:                      'share:manage',
-    aimeat_share_revoke:                      'share:manage',
-
     // Removes a stored record.
     // Removes a record for good, no grace window: its own word since 2026-10-02, held on the
     // task-start floor (services/agent-task-rules.ts). memory:delete stays the undoable delete.
@@ -260,15 +236,8 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // handler also asks organism:write, as the REST DELETE routes do (mcp/workspace-rows.ts).
     aimeat_workspace_rows_delete:             'memory:purge',
 
-    // These write memory records underneath, whatever the tool is called: a workspace
-    // document, a skill manifest, a schedule report, a knowledge contribution.
-    aimeat_knowledge_contribute:              'memory:write',
     aimeat_schedule_delete:                   'memory:write',
     aimeat_schedule_report_internal:          'memory:write',
-    aimeat_skill_link:                        'memory:write',
-    aimeat_skill_publish:                     'memory:write',
-    aimeat_skill_unlink:                      'memory:write',
-    aimeat_skill_update:                      'memory:write',
     aimeat_workspace_publish:                 'memory:write',
     aimeat_workspace_revert_to_draft:         'memory:write',
     aimeat_workspace_write:                   'memory:write',
@@ -277,9 +246,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // organism:write their neighbours on that router use.
     aimeat_workspace_doc_append:              'memory:write',
     aimeat_workspace_doc_section_replace:     'memory:write',
-
-    // Writes keys the server itself trusts (openrouter.*, ai-usage.*, profile.*).
-    aimeat_operator_ai_config:                'memory:write-reserved',
 
     // Changes WHO ELSE can read the owner's knowledge. A different promise than changing
     // the knowledge, which is why it is not organism:write.
@@ -316,8 +282,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
     ...OPERATOR_TOOL_SCOPES,
 
-    // Writes something other people see under the owner's name.
-    aimeat_flag_report:                       'social:write',
     aimeat_organism_join:                     'social:write',
 
     aimeat_storage_upload:                    'storage:write',
@@ -341,9 +305,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // Takes an agent's * away for the words it used: changing a sibling's permissions, the word
     // POST /v1/agents/:name/scope-narrowing asks too.
     aimeat_agent_scope_narrow:                'agent:permissions',
-
-    // Asks somebody else to do work, which can cost.
-    aimeat_capabilities_invoke:               'work:request',
 
     // Changes something that runs on its own afterwards.
     aimeat_schedule_update:                   'workflow:write',
@@ -370,17 +331,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // everyone and needs no permission at all. The check lives at the one place that mints from a
     // declaration, services/ai-provenance.ts:provenanceForWrite, and mirrors requireScope() exactly
     // — so this parameter and POST /v1/provenance cannot answer differently.
-
-    // AppDev pitfall KB (learned entries are memory records under packages/appdev-pitfalls/).
-    // Delete gates on memory:write (not memory:delete) deliberately: it only removes the owner's
-    // OWN KB entries, report can already overwrite them, and no scope profile grants memory:delete
-    // — a stricter gate would just dead-end the tool for every appdev-profile agent.
-    aimeat_appdev_pitfall_report: 'memory:write',
-    aimeat_appdev_pitfall_delete: 'memory:write',
-    // Template proposals are owner-GHII memory records; same reasoning as above.
-    aimeat_app_template_propose: 'memory:write',
-    aimeat_app_template_delete: 'memory:write',
-    aimeat_appdev_proof_attach: 'memory:write',
 
     // Boards / social (mutations → social:write; subscribe → social:read).
     // NOTE: aimeat_board_read / aimeat_board_list are intentionally NOT gated — the REST
@@ -411,23 +361,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_work_accept: 'work:accept',
     aimeat_work_deliver: 'work:accept',
     aimeat_action_execute: 'work:request',
-
-    // Consent (POST/GET/DELETE /v1/consent* → consent:manage)
-    aimeat_consent_grant: 'consent:manage',
-    aimeat_consent_list: 'consent:manage',
-    aimeat_consent_revoke: 'consent:manage',
-    // The Access page's read (GET /v1/access/overview → owner, or account:security). Every key to the
-    // account in one answer, so the word that opens it is the one no wildcard carries.
-    aimeat_access_list: 'account:security',
-
-    // The owner's secrets vault (GET/PUT/DELETE /v1/secrets* → secrets:manage). The same word as
-    // the routes, because the tools ARE those doors: a permission enforced on one surface and not
-    // the other is a permission the owner was told they had (invariant 15). One word for all three:
-    // the list is names and dates, and an agent that could read a name and not set it has nothing
-    // it can act on. No wildcard carries it (utils/scope-coverage.ts).
-    aimeat_secret_list: 'secrets:manage',
-    aimeat_secret_set: 'secrets:manage',
-    aimeat_secret_delete: 'secrets:manage',
 
     // Agent Workflows (REST: PUT/run → workflow:write; GET → workflow:read)
     aimeat_workflow_save: 'workflow:write',
