@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-05 — Resources are registered through withResourceGate (mcp/resource-gate.ts): the scope
+ *     of the tool that reads the same thing, from the request's token, and the organism agent gate
+ *     (secaudit 2026-10, AUTH-2).
  *   2026-10-04 — A null sent for an optional field that refuses null is read as the field left out
  *     (null-as-absent.ts), on every tool of every surface.
  *   2026-10-02 — /v2/mcp/chat registers every permitted tool, switches off what the chat's list does
@@ -130,6 +133,7 @@ import { resolveSupportRoute } from '../services/message-alias.js';
 import { registerAllServerTools } from './register-all.js';
 import { registerRemoteTools } from './remote-tools.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
+import { withResourceGate } from './resource-gate.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { withOrganismAgentGate } from './organism-agent-gate.js';
 import { withErrorNextStep } from './error-next-step.js';
@@ -280,7 +284,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const surfaceTools = role === 'all' ? null : toolsRegisteredOn(role);
         const filteredTools: string[] = [];
         type ToolFn = (...args: unknown[]) => unknown;
-        const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
+        const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn; registerResource: ToolFn };
         const gate = (name: string): boolean => {
             // v2 surface filter: a tool not in this surface's purpose is simply not part of it
             // (hard skip, silent — not a scope denial). role='all' (v1) applies no surface filter.
@@ -309,6 +313,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const liveRegisterTool = withRequestPermission(measuredRegisterTool, liveGate);
         patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? liveTool(...args) : undefined;
         patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? liveRegisterTool(...args) : undefined;
+        // Resources answer under the tools' rules: the scope of the tool that reads the same thing,
+        // from this request's token, and the organism agent gate (mcp/resource-gate.ts, AUTH-2).
+        const originalRegisterResource = patchable.registerResource.bind(mcp) as ToolFn;
+        patchable.registerResource = withResourceGate(originalRegisterResource, { allows: liveGate, agentGaii: () => agentGaii, storage });
 
         // Every tool group, from the one list the schema audit registers against too
         // (mcp/register-all.ts). It used to stand here and the audit kept its own copy; the copies
@@ -323,6 +331,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Restore the original methods and report what scope enforcement did this session.
         patchable.tool = originalTool;
         patchable.registerTool = originalRegisterTool;
+        patchable.registerResource = originalRegisterResource;
         // A tool that became an action of another answers with the call that replaces it, and stays
         // out of tools/list (mcp/moved-tools-answer.ts).
         answerMovedTools(mcp);

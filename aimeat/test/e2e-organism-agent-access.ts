@@ -226,6 +226,15 @@ async function run() {
         assert(r.isError && r.text.startsWith('AGENT_NOT_ADMITTED'), `expected AGENT_NOT_ADMITTED, got: ${r.text.slice(0, 300)}`);
     });
 
+    // Secaudit 2026-10, AUTH-2: the MCP resource answered the organism, its admins and its members
+    // where every tool already refused.
+    await test('an unlisted agent reads nothing through the MCP resource aimeat://organisms/{id}', async () => {
+        const body = await rpc(A, 'resources/read', { uri: `aimeat://organisms/${orgId}` });
+        const text = body?.result?.contents?.[0]?.text ?? JSON.stringify(body?.error ?? body);
+        assert(!text.includes(orgId) || !text.includes('"members"'), `the resource answered an unlisted agent: ${text.slice(0, 300)}`);
+        assert(/admit|listed/i.test(text), `the refusal says why: ${text.slice(0, 300)}`);
+    });
+
     await test('an unlisted agent cannot write an organism key, and the organism leaves its list', async () => {
         const w = await callTool(A, 'aimeat_memory_write', { key: `organism.${orgId}.shared.note`, value: { t: 'x' } });
         assert(w.isError, `an unlisted agent wrote into the organism: ${w.text.slice(0, 300)}`);
