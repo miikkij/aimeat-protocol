@@ -29,6 +29,10 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.11.0 — 2026-10-05 — `capabilities` is required: ctx.fetch refuses without `network`, and
+ *     ctx.ai, ctx.email and ctx.buy are attached only with `ai`, `email` and `payments`. The approval
+ *     read the script text and the sandbox gave everything, so an aliased call got past it
+ *     (secaudit 2026-10, PKG-3).
  *   v1.10.0 — 2026-09-30 — TARGET-082 review, item 1: ctx.memory.getPublic reads an organism's public
  *     record as absent for a caller outside that organism when its label keeps it inside.
  *   v1.9.0 — 2026-09-29 — TARGET-082 review: ctx.memory.getPublic tells an AI caller that the record
@@ -106,6 +110,7 @@ import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { presentMemories, presentMemory, classificationWarningOf } from './classification/present-memory.js';
 import { readerForCaller, systemReader } from './classification/reader.js';
 import { shareCarriesKey } from './group-shares-classification.js';
+import { capabilityNotDeclared, type ExtensionCapabilitySet } from './extension-capability-declaration.js';
 
 /** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
 const FETCH_TIMEOUT_MS = 30_000;
@@ -125,6 +130,12 @@ export interface ExtensionCtxDeps {
     instance?: ExtensionCtx['instance'];
     /** Prefix for the sandbox's log lines, so a scheduled run is distinguishable from a request. */
     logPrefix: string;
+    /**
+     * What this extension may do beyond its memory: capabilitiesOfRecord(ext), the list its package
+     * approval showed. Required, so no road can build a ctx that forgets it. ctx.fetch refuses
+     * without `network`, and ai, email and buy stay undefined without theirs (secaudit 2026-10, PKG-3).
+     */
+    capabilities: ExtensionCapabilitySet;
 
     // ── Optional capabilities: present only on the roads that can honestly offer them ──
     wallet?: ExtensionCtx['wallet'];
@@ -735,13 +746,19 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     if (deps.instance) ctx.instance = deps.instance;
     if (deps.files) ctx.files = deps.files;
     if (deps.datapackage) ctx.datapackage = deps.datapackage;
-    if (deps.buy) ctx.buy = deps.buy;
+    // Buying, AI jobs and email exist only for an extension whose capabilities name them: the list
+    // the installer approved (services/extension-capability-declaration.ts).
+    const caps = deps.capabilities;
+    if (deps.buy && caps.payments) ctx.buy = deps.buy;
     // Never without `extension`: the job is billed to the installer, and `deps.extension` is the only
     // server-resolved answer to who that is. A road that omits the record gets no ctx.ai rather than
     // one that guesses.
-    if (deps.ai && deps.extension) ctx.ai = deps.ai;
+    if (deps.ai && deps.extension && caps.ai) ctx.ai = deps.ai;
     if (deps.notify) ctx.notify = deps.notify;
-    if (deps.email) ctx.email = deps.email;
+    if (deps.email && caps.email) ctx.email = deps.email;
+    // ctx.fetch has always existed, so a script without `network` meets a refusal that says why
+    // rather than a missing function.
+    if (!caps.network) ctx.fetch = async () => { throw capabilityNotDeclared('network'); };
     if (deps.workspace) ctx.workspace = deps.workspace;
 
     return ctx;

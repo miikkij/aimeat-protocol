@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.7.0 — 2026-10-05 — The action run passes the extension's capabilities to buildExtensionCtx
+ *     (secaudit 2026-10, PKG-3).
  *   v2.6.0 — 2026-10-01 — aimeat_iam_define takes default_role, version, author and ext_name and passes
  *     them to defineAppIam (audit 2026-10-01, defect B).
  *   v2.5.0 — 2026-09-29 — ctx.files is told the caller is this session's agent, so a file read
@@ -70,6 +72,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail, sandboxLimits } from '../services/extension-ctx.js';
+import { capabilitiesOfRecord } from '../services/extension-capability-declaration.js';
 import { attachExtensionWorkspace } from '../services/extension-workspace.js';
 import { maybeExtensionAi, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
@@ -307,6 +310,7 @@ export function registerExtensionsTools(
             const ctx: ExtensionCtx = buildExtensionCtx({
                 config, storage, extMemoryOwner,
                 extension: { name: ext.name, owner: ext.installedBy },
+                capabilities: capabilitiesOfRecord(ext),
                 workspace: wsCap.workspace,
                 caller: {
                     gaii: agentGaii,

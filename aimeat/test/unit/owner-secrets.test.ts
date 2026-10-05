@@ -259,7 +259,7 @@ describe('the host binding — made only once the call is accepted', () => {
     it('ctx.fetch binds nothing to an address it refuses to reach', async () => {
         const storage = new SqliteStorage(':memory:');
         expect((await putOwnerSecret(storage as never, cfg, owner, 'SECOND', 'second-value')).ok).toBe(true);
-        const ctx = buildExtensionCtx({
+        const ctx = buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
             config: cfg, storage: storage as never, extMemoryOwner: 'ext:probe',
             caller: { gaii: owner, owner: 'alice', roles: ['owner'] } as never, extConfig: {}, logPrefix: 'test',
         });

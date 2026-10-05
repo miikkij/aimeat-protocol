@@ -21,10 +21,16 @@
  *   - resourceMetadataUrl(req, config) — that origin's `/.well-known/oauth-protected-resource`
  *   - mcpResourceMetadata(config) — the `/v1/mcp` resource's own document (RFC 9728 §3.1 address)
  *   - buildProtectedResourceMetadata(req, config, storage) — the document to serve
+ *   - parseAppScopes(html) — the app's declared scopes; DEFAULT_APP_SCOPES and appScopesOf(html), the
+ *     same reading with the SDK's default when it declares none
  * @usage
  *   import { buildProtectedResourceMetadata } from '../services/protected-resource.js';
  *   res.json(await buildProtectedResourceMetadata(req, config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-05 — DEFAULT_APP_SCOPES and appScopesOf: the package approval and the install
+ *     set's grant read an app's scopes here, the way the grant does. The approval had a regex of its
+ *     own, which read the whole page and preferred a differently ordered tag, so the owner could
+ *     approve one list while the grant got another (secaudit 2026-10, PKG-4).
  *   v1.1.1 — 2026-09-26 — appOfSubdomain takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-04 — The apex names the ORIGIN at the bare well-known URL, and `/v1/mcp` gets
  *     its own document at the §3.1 address the 401 challenge now points at. Same defect as v1.0.0's,
@@ -123,6 +129,20 @@ export function parseAppScopes(html: string): string[] {
     return m[1].split(/\s+/).map(s => s.trim()).filter(Boolean);
   }
   return [];
+}
+
+/** What an app page asks for when it declares nothing (sdk-libs/auth/config.js APP_DEFAULT_SCOPES). */
+export const DEFAULT_APP_SCOPES: readonly string[] = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
+
+/**
+ * The scopes an app asks for: parseAppScopes, else DEFAULT_APP_SCOPES, sorted without repeats.
+ * `declared` says which. The one reading for every place that shows, approves or grants them.
+ */
+export function appScopesOf(html: string): { scopes: string[]; declared: boolean } {
+  const declared = parseAppScopes(html);
+  return declared.length
+    ? { scopes: [...new Set(declared)].sort(), declared: true }
+    : { scopes: [...DEFAULT_APP_SCOPES], declared: false };
 }
 
 /** Resolve the published app a mapped app subdomain serves, or null. */

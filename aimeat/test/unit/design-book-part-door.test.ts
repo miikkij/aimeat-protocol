@@ -50,7 +50,7 @@ async function store(): Promise<Storage> {
 describe('a Design Book part through the generic memory doors', () => {
   it('an extension\'s public read refuses it and names the Book\'s own door', async () => {
     const storage = await store();
-    const ctx = buildExtensionCtx({
+    const ctx = buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
       config, storage: storage as never, extMemoryOwner: 'ext:reader', extConfig: {}, logPrefix: 'test',
       caller: { gaii: ALICE, owner: 'alice', roles: ['owner'] } as never,
     });

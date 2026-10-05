@@ -36,7 +36,7 @@ const BUYER = 'bob@aimeat-local-001-dev';
 const LIMITS: ExtensionLimits = { memoryMb: 64, timeoutMs: 5000, maxApiCalls: 200 };
 
 function ctxFor(storage: SqliteStorage, gaii: string): ExtensionCtx {
-    return buildExtensionCtx({
+    return buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
         config: loadConfig().config,
         storage: storage as never,
         extMemoryOwner: EXT_OWNER,
@@ -79,7 +79,7 @@ describe('businesslauncher shop engine', () => {
     });
 
     it('an action that cannot tell who owns the shop refuses rather than assuming', async () => {
-        const blind = buildExtensionCtx({
+        const blind = buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
             config: loadConfig().config,
             storage: storage as never,
             extMemoryOwner: EXT_OWNER,

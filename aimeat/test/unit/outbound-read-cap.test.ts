@@ -93,7 +93,7 @@ const config = {
 const limits = { memoryMb: 64, timeoutMs: 10_000, maxApiCalls: 10 };
 const URL_BIG = 'https://feed.example/big';
 
-const extensionCtx = () => buildExtensionCtx({
+const extensionCtx = () => buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
     config, storage: {} as Storage, extMemoryOwner: 'ext:probe',
     caller: { gaii: 'alice@node-1', owner: 'alice', roles: ['owner'] }, extConfig: {}, logPrefix: '[ext:probe]',
 });
@@ -196,7 +196,7 @@ describe('living-hooks, the extension the node ships', () => {
     const hooksConfig = loadConfig().config;
     const run = (action: 'read' | 'send', input: Record<string, unknown>) => executeExtensionAction(
         LIVING_HOOKS.scripts[`${action}.js`],
-        buildExtensionCtx({
+        buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
             config: hooksConfig, storage: new SqliteStorage(':memory:') as never, extMemoryOwner: 'ext:living-hooks',
             caller: { gaii: 'alice@node-1', owner: 'alice', roles: ['owner'] },
             extConfig: { allow_hosts: ['feed.example'] }, logPrefix: '[ext:living-hooks]',

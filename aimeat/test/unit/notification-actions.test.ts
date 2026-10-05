@@ -109,7 +109,7 @@ describe('a notification record is written only by the node', () => {
   });
 
   it('an extension\'s ctx.memory.set refuses it too', async () => {
-    const ctx = buildExtensionCtx({
+    const ctx = buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
       config, storage: storage as never, extMemoryOwner: 'ext:probe',
       caller: { gaii: OWNER, owner: 'alice', roles: ['owner'] } as never, extConfig: {}, logPrefix: 'test',
     });

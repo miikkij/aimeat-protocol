@@ -8,6 +8,10 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.11.0 — 2026-10-05 — The prelude builds ctx first, takes every `__*` host function into a local
+ *     binding and deletes it from the global object, and only then evaluates the author's code. That
+ *     code ran first before, and could call `__fetch`, `__email` or `__ext_buy` directly, past what
+ *     the package approval showed (secaudit 2026-10, PKG-3).
  *   v2.10.0 — 2026-09-28 — System 2 plan, V6: executeExtensionAction takes an optional
  *     `opts.signal`. On abort the run rejects at once with `Extension run aborted`
  *     (EXTENSION_RUN_ABORTED), in-flight host calls are aborted through the fetch bridge's signal,
@@ -220,11 +224,21 @@ function transformScript(scriptContent: string): string {
     return transformed.endsWith(';') ? transformed : `${transformed};`;
 }
 
+/**
+ * The host functions the bridge sets on the global object. The prelude takes each into a local
+ * binding and deletes it from the global object BEFORE the author's code is evaluated, so a script
+ * reaches the host only through `ctx`, and the checks ctx makes (buildExtensionCtx) are the only road
+ * (secaudit 2026-10, PKG-3: the author's top-level code could call `__fetch` directly).
+ */
+const HOST_GLOBALS = [...Object.keys(GUEST_CALL_NAMES), '__log_info', '__log_warn', '__log_error'];
+
 function buildSandboxScript(userFnDecl: string): string {
     return `
-${userFnDecl}
+const __aimeatCtx = (() => {
+    const __host = {};
+    for (const name of ${JSON.stringify(HOST_GLOBALS)}) { __host[name] = globalThis[name]; delete globalThis[name]; }
+    const { ${HOST_GLOBALS.join(', ')} } = __host;
 
-(async () => {
     async function __call(fn, args) {
         const raw = await fn(...args);
         return JSON.parse(raw);
@@ -313,9 +327,14 @@ ${userFnDecl}
         notify: __notify ? (async (message, opts) => __call(__notify, [message, opts ? JSON.stringify(opts) : '{}'])) : undefined,
         email:  __email  ? (async (to, subject, body) => __call(__email, [to, subject, body]))                        : undefined,
     };
+    return ctx;
+})();
 
+${userFnDecl}
+
+(async () => {
     const input = JSON.parse(__inputJson);
-    const result = await __userFn(ctx, input);
+    const result = await __userFn(__aimeatCtx, input);
     return JSON.stringify(result ?? {});
 })()
 `;

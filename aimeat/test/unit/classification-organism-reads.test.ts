@@ -156,7 +156,7 @@ describe('TARGET-082 review, item 1: an organism record read by its visibility s
   });
 
   it('an extension\'s ctx.memory.getPublic reads the kept record as absent for a non-member caller', async () => {
-    const ctxFor = (gaii: string, owner: string) => buildExtensionCtx({ config, storage, extMemoryOwner: 'ext:x', caller: { gaii, owner, roles: ['agent'], scopes: [] }, extConfig: {}, logPrefix: '[t]' });
+    const ctxFor = (gaii: string, owner: string) => buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true }, config, storage, extMemoryOwner: 'ext:x', caller: { gaii, owner, roles: ['agent'], scopes: [] }, extConfig: {}, logPrefix: '[t]' });
     expect(await ctxFor(BOB_AGENT, 'bob').memory.getPublic(ALICE, PUBLIC_KEY)).toBeNull();
     expect(await ctxFor(BOB_AGENT, 'bob').memory.getPublic(ALICE, OPEN_KEY)).toEqual({ title: 'Open merger note' });
     expect(await ctxFor(ALICE_AGENT, 'alice').memory.getPublic(ALICE, PUBLIC_KEY)).toEqual({ title: 'Public merger note' });
