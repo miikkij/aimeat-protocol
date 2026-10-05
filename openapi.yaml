@@ -43624,6 +43624,10 @@ paths:
         `lib_urls`: each lib component's absolute address keyed by filename
         (`<baseUrl>/v1/cortex/<encoded name>/libs/<encoded filename>`), the exact script src an app
         loads once the cortex is active. The address follows the record's name, not its namespace.
+        With `mode: "presigned"` and no manifest the answer is an upload offer instead (200):
+        `upload_url`, `upload_method` PUT, `content_type` application/zip, `max_size_bytes`,
+        `expires_in_seconds`, `zip_structure`. PUT a ZIP with manifest.yaml at its root and the libs
+        in libs/ to the URL; a ZIP carrying the name of a cortex you installed replaces it in place.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -43633,11 +43637,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [manifest]
               properties:
-                manifest: { type: string, description: Cortex manifest YAML }
+                mode: { type: string, enum: [presigned], description: 'Answer an upload offer for a cortex ZIP instead of installing a manifest.' }
+                manifest: { type: string, description: 'Cortex manifest YAML. Required unless mode is presigned.' }
                 libs: { type: object, additionalProperties: { type: string }, description: 'Source of every lib component, keyed by its filename. A lib component with no entry here is refused.' }
       responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '400':

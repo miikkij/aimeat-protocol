@@ -9,6 +9,8 @@
  *   that B's own upload still installs and can still be replaced by B.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=cortex-upload-ownership
  * @version-history
+ *   2026-10-05 — POST /v1/cortex mode presigned answers an upload URL that installs, and the same gate
+ *     refuses a ZIP naming another owner's cortex. Both failed on the old route (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-26 — A ZIP redeploy of an ACTIVE cortex takes the old activation down and
  *     activates the new manifest: the replaced action and board are gone, the record names the new
  *     action and the uploader, and the cortex stays active.
@@ -501,7 +503,31 @@ await test('Owner B CAN install an inline cortex into their own namespace (the g
     assert(!r.isError, `own inline install was refused: ${r.text.slice(0, 300)}`);
 });
 
+// POST /v1/cortex with mode presigned answers the same offer the node MCP tool does, so the connector
+// and the CLI dispatch take the ZIP path through REST (secaudit 2026-10, M3). Same gate behind it.
+const restOwn = `c4-rest-own-${Date.now()}`;
+async function restUploadUrl(p: Party): Promise<string> {
+    const r = await json('/v1/cortex', { method: 'POST', headers: { Authorization: `Bearer ${p.ownerToken}` }, body: JSON.stringify({ mode: 'presigned' }) });
+    assert(r.status === 200 && typeof r.body.data?.upload_url === 'string', `REST offer: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+    return r.body.data.upload_url;
+}
+await test('POST /v1/cortex mode presigned answers an upload URL, and a ZIP put to it installs the cortex', async () => {
+    const { status, body } = await putZip(await restUploadUrl(B), await makeZip([
+        { name: 'manifest.yaml', data: manifestFor(restOwn, B.owner, LIB) },
+        { name: `libs/${LIB}`, data: "export function hello() { return 'over REST, from owner B'; }" },
+    ]));
+    assert(status === 200 && body.name === restOwn, `REST-offered install: ${status} ${JSON.stringify(body).slice(0, 300)}`);
+});
+await test("Owner B's REST-offered URL still cannot overwrite A's cortex (the upload gate is the same)", async () => {
+    const { status } = await putZip(await restUploadUrl(B), await makeZip([
+        { name: 'manifest.yaml', data: manifestFor(victimName, A.owner, LIB) },
+        { name: `libs/${LIB}`, data: EVIL_LIB },
+    ]));
+    assert(status >= 400, `expected a refusal, got ${status}`);
+});
+
 console.log('\nCleanup');
+await json(`/v1/cortex/${encodeURIComponent(restOwn)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
 await json(`/v1/cortex/${LIVE_ENC}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
 await json(`/v1/cortex/${encodeURIComponent(inlineOwn)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
 await json(`/v1/cortex/${VICTIM_ENC}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } });

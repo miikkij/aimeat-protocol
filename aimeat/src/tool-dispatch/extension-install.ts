@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared extension and cortex HTTP installation, independent of MCP registration.
  * @version-history
+ *   2026-10-05 — installCortexOverHttp without a manifest asks POST /v1/cortex for the upload offer,
+ *     and refuses update without one in the node's words (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-09-27 -- Pure extraction from connector MCP.
  */
 import { parseDocument } from 'yaml';
@@ -86,7 +88,8 @@ export function extensionDetailPath(name: string, includeSource?: boolean): stri
 }
 
 export interface CortexInstallInput {
-  manifest: string;
+  /** Absent: the presigned upload offer for a ZIP (POST /v1/cortex, mode presigned). */
+  manifest?: string;
   libs?: Record<string, unknown>;
   update?: boolean;
 }
@@ -96,6 +99,16 @@ export interface CortexInstallInput {
  * /v1/cortex/:name replaces the installed cortex without a delete, so the lib keeps being served.
  */
 export function installCortexOverHttp(client: AimeatClient, input: CortexInstallInput): Promise<ApiResponse> {
+  // No manifest: the upload offer, as the node MCP answers it. update:true belongs to the inline
+  // redeploy, so a call that sets it without a manifest is told which path does what (secaudit 2026-10, M3).
+  if (!input.manifest) {
+    if (input.update) {
+      return Promise.resolve({ ok: false, error: { code: 'INVALID_INPUT', message:
+        'update:true takes the inline manifest: send the manifest YAML and the libs map in this call. '
+        + 'To redeploy from a ZIP, call without update and upload the ZIP: one that carries the name of a cortex you installed replaces it in place.' } });
+    }
+    return client.post('/v1/cortex', { mode: 'presigned' });
+  }
   const body: Record<string, unknown> = { manifest: input.manifest };
   if (input.libs) body.libs = input.libs;
   const name = input.update ? manifestNameOf(input.manifest) : undefined;

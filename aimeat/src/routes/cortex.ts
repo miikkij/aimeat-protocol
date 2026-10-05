@@ -11,6 +11,8 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-10-05 — POST /v1/cortex with mode presigned answers the upload offer for a cortex ZIP
+ *     (services/cortex-upload-offer.ts), as POST /v1/extensions does (secaudit 2026-10, M3).
  *   v1.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.7.0 — 2026-09-27 — GET /v1/cortex/:name and its /export call services/cortex-read.ts, which
  *     aimeat_cortex_list calls too for `name` and `include_source`. The answers are unchanged.
@@ -60,6 +62,8 @@ import {
   installCortex, activateCortex, deactivateCortex, deleteCortex, canSeeCortex, visibleCortexes,
 } from '../services/cortex-lifecycle.js';
 import { upsertCortex } from './cortex/upsert.js';
+import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
@@ -142,6 +146,12 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── POST /v1/cortex — install a cortex extension from manifest ──
   // Owner role bypasses scope checks; agents need 'cortex:write' (or 'cortex:*' / '*').
   router.post('/v1/cortex', requireAuth(), requireScope('cortex:write'), async (req, res) => {
+    // PRESIGNED MODE, as POST /v1/extensions has it: the upload URL for a cortex ZIP, which the PUT
+    // installs. aimeat_cortex_install without a manifest answers the same offer on every MCP surface.
+    if ((req.body as { mode?: string } | undefined)?.mode === 'presigned') {
+      res.json(success(config.nodeId, await cortexUploadOffer(config, resolveIdentity(req.auth!, config.nodeId))));
+      return;
+    }
     const { manifest, libs } = req.body ?? {};
     const out = await installCortex({ storage, config }, await callerOf(req), { manifest, libs });
     if (!out.ok) {

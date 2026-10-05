@@ -8,7 +8,6 @@
     "aimeat_appdev_pitfall_list",
     "aimeat_capabilities_create",
     "aimeat_capabilities_update",
-    "aimeat_cortex_install",
     "aimeat_exchange_accept",
     "aimeat_exchange_need_post",
     "aimeat_handbook_get",

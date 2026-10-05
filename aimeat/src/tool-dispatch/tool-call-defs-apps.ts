@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.9.0 -- 2026-10-05 -- aimeat_cortex_install without a manifest answers the upload offer for a ZIP,
+ *     through POST /v1/cortex mode presigned, as the node MCP does (secaudit 2026-10, M3).
  *   v1.11.0 -- 2026-10-01 -- aimeat_iam_define forwards default_role, version, author and ext_name to
  *     defineAppIam, as both MCP tools do (audit 2026-10-01, defect B).
  *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
@@ -427,14 +429,14 @@ export const appTools: ConnectCliToolDefinition[] = [
     {
         // Same repair as the extension install above: the catalog's YAML manifest, no invented
         // `name`, and `update` sent to PUT /v1/cortex/:name, the redeploy route. POST /v1/cortex reads
-        // `manifest` as a YAML string and never replaces an installed cortex. This door has no upload
-        // mode, so a manifest is required here.
+        // `manifest` as a YAML string and never replaces an installed cortex. Without a manifest the
+        // answer is the upload offer for a ZIP (POST /v1/cortex, mode presigned), as on the node MCP.
         name: 'aimeat_cortex_install',
         input: {
-            manifest: { type: 'string', required: true, description: 'Cortex manifest in YAML format. Use @file:path to load it from disk.' },
+            manifest: { type: 'string', description: 'Cortex manifest in YAML format. Use @file:path to load it from disk. Omit it to get an upload_url for a ZIP.' },
         },
         handler: ({ client }, input) => installCortexOverHttp(client, {
-            manifest: requiredString(input, 'manifest'),
+            manifest: optionalString(input, 'manifest'),
             libs: optionalRecord(input, 'libs'),
             update: optionalBoolean(input, 'update'),
         }),

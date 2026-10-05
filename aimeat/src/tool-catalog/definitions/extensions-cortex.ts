@@ -171,7 +171,7 @@ export const extensionsCortexTools = [
         surfaces: ['appdev'],
         input: {
             manifest: { type: 'string', description: 'Cortex manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
-            libs: { type: 'object', description: 'Map of filename to JavaScript source code for lib files. Omit for upload mode.' },
+            libs: { type: 'object', description: 'Map of filename to JavaScript source code for lib files. Omit for upload mode.', zod: z.record(z.string(), z.string()) },
             update: { type: 'boolean', description: 'Replace your installed cortex of the manifest\'s metadata.name in place (inline mode). Without it an inline install of an existing name is refused; a ZIP upload replaces a cortex you installed either way.' },
         },
     },
