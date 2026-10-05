@@ -2,6 +2,19 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-06",
+      "version": "3.25.0",
+      "kind": "security",
+      "title": {
+        "en": "A security review, and what it changed for you",
+        "fi": "Tietoturva tarkistettiin: mitä muuttui sinulle"
+      },
+      "body": {
+        "en": "In October we reviewed the node's security and code, and fixed what we found. A sign-in link now checks your account again when you open it, works once, and opens only your own apps. An account made from an invitation link starts with its email unverified. When the person who runs this service makes a change in your account, the change is recorded and you are told about it. A package's extensions and apps get only what you approved, and a claim code or a purchase limit cannot be used twice. Every AI call records who asked, and a schedule or a workflow asks as the person it works for. When the server's AI allowance is spent, the person who runs this service decides what happens next, and a new server stops the calls. A file you share into an organism takes the organism's classification, and the name of an erased account leaves other people's records. A page the server opens to take a screenshot cannot reach the network. A company's description now says when an AI wrote it. The person who runs this service can now let their own AI agent run it over MCP, with the same rights they have on the web pages.",
+        "fi": "Kävimme lokakuussa läpi noden tietoturvan ja koodin ja korjasimme sen, mitä löysimme. Kirjautumislinkki tarkistaa nyt tilisi uudelleen, kun avaat sen. Linkki toimii vain kerran ja avaa vain omat sovelluksesi. Kun tili luodaan kutsulinkillä, sen sähköpostiosoite on aluksi vahvistamaton. Kun palvelun ylläpitäjä muuttaa jotakin tililläsi, muutos kirjataan ja sinulle kerrotaan siitä. Paketin laajennukset ja sovellukset saavat vain sen, minkä hyväksyit, eikä lunastuskoodia tai ostorajaa voi käyttää kahdesti. Jokainen tekoälykutsu kirjaa, kuka kysyi. Ajastus tai työnkulku kysyy sen ihmisen nimissä, jonka puolesta se toimii. Kun palvelimen tekoälysaldo on käytetty, palvelun ylläpitäjä päättää, mitä sitten tapahtuu. Uusi palvelin lopettaa silloin kutsut. Organismiin jakamasi tiedosto saa organismin luokituksen. Poistetun tilin nimi poistuu muiden ihmisten tiedoista. Palvelimen avaama sivu ei pääse verkkoon, kun palvelin ottaa siitä kuvakaappauksen. Yrityksen kuvaus kertoo nyt, jos tekoäly kirjoitti sen. Palvelun ylläpitäjä voi nyt antaa oman tekoälyagenttinsa ylläpitää palvelua MCP:n kautta samoin oikeuksin, jotka hänellä on verkkosivuilla."
+      }
+    },
+    {
       "date": "2026-10-05",
       "kind": "feature",
       "title": {
