@@ -9,6 +9,7 @@
  *   aimeat_organism_invitations_email, aimeat_organism_invitation_email_cancel.
  * @usage registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-30 — aimeat_organism_invite_email takes `locale` for the email's language and
  *     answers `email_locale`, as the REST route does.
  *   v1.2.0 — 2026-09-28 — aimeat_organism_invite_email takes return_url, as the REST route does, and
@@ -21,7 +22,6 @@
  */
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -29,6 +29,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
 import { emitChange } from '../services/event-bus.js';
 import { isOrganismOwner } from '../services/organism-ownership.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerOrganismEmailInviteTools(
     mcp: McpServer,
@@ -53,16 +54,7 @@ export function registerOrganismEmailInviteTools(
     mcp.tool(
         'aimeat_organism_invite_email',
         descriptionFor('aimeat_organism_invite_email'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            email: z.string().describe('Email address of the person to invite'),
-            org_role: z.enum(['member', 'admin']).optional().describe('Organism role granted on accept (default member)'),
-            workspaces: z.array(z.object({ ws: z.string(), role: z.enum(['viewer', 'contributor']) })).optional().describe('Optional per-workspace grants'),
-            message: z.string().optional().describe('Optional personal note included in the email'),
-            expires_in_days: z.number().optional().describe('Days until the invitation expires (1–30, default 7)'),
-            return_url: z.string().optional().describe('Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.'),
-            locale: z.string().optional().describe('Language of the invitation email: en, fi or es. Without it the email uses the recipient\'s account language when the address already has an account here, else yours. email_locale in the result says which one went out.'),
-        },
+        zodShapeFor('aimeat_organism_invite_email'),
         annotationsFor('aimeat_organism_invite_email'),
         async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {
             const gate = await orgForAdmin(organism_id);
@@ -94,7 +86,7 @@ export function registerOrganismEmailInviteTools(
     mcp.tool(
         'aimeat_organism_invitations_email',
         descriptionFor('aimeat_organism_invitations_email'),
-        { organism_id: z.string().describe('The organism ID') },
+        zodShapeFor('aimeat_organism_invitations_email'),
         annotationsFor('aimeat_organism_invitations_email'),
         async ({ organism_id }) => {
             const gate = await orgForAdmin(organism_id);
@@ -108,10 +100,7 @@ export function registerOrganismEmailInviteTools(
     mcp.tool(
         'aimeat_organism_invitation_email_cancel',
         descriptionFor('aimeat_organism_invitation_email_cancel'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            invitation_id: z.string().describe('The invitation id to cancel'),
-        },
+        zodShapeFor('aimeat_organism_invitation_email_cancel'),
         annotationsFor('aimeat_organism_invitation_email_cancel'),
         async ({ organism_id, invitation_id }) => {
             const gate = await orgForAdmin(organism_id);

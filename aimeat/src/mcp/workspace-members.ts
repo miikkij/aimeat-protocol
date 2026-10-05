@@ -11,6 +11,7 @@
  *   Access and grant live together because they are the two halves of ONE membership decision —
  *   someone asks, someone decides — and both were already reaching for the same role helpers.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-25 — aimeat_workspace_access decide runs the REST decision route's own function
  *     (services/workspace-access-decision.ts): it writes the decision on the request record and tells
  *     the requester, where it granted or revoked and stopped. `list` reads the written status, so a
@@ -20,7 +21,6 @@
  *   v1.0.0 — 2026-07-13 — Extracted from mcp/workspaces.ts (max-file-lines)
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -28,6 +28,7 @@ import { emitChange } from '../services/event-bus.js';
 import { granteeOwner, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
 import { decideAccessRequest, requestStatus } from '../services/workspace-access-decision.js';
 import type { Storage } from '../storage/interface.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -65,14 +66,7 @@ export function registerWorkspaceMemberTools(
     // lived in workspaces.ts. It belongs here rather than there: a request and a grant are the two
     // halves of one membership decision, and they were reaching for the same role helpers already.
     mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
-        {
-            organism_id: z.string(), ws: z.string(),
-            action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests + members · 'decide' = (creator/admin) approve/deny one"),
-            message: z.string().optional().describe("action='request': a note to the creator"),
-            requester: z.string().optional().describe("action='decide': the requester's owner name"),
-            decision: z.string().optional().describe("action='decide': 'approve' (default) or 'deny'"),
-            role: z.enum(['viewer', 'contributor']).optional().describe("action='decide' approve: the role to grant — 'viewer' (read) or 'contributor' (read+write). Omit to keep the current default (contributor, unless decision='viewer')."),
-        },
+        zodShapeFor('aimeat_workspace_access'),
         annotationsFor('aimeat_workspace_access'),
         async ({ organism_id, ws, action, message, requester, decision, role }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
@@ -130,13 +124,7 @@ export function registerWorkspaceMemberTools(
 
     // ── aimeat_workspace_member_grant ── (proactively add an existing member; no prior request needed)
     mcp.tool('aimeat_workspace_member_grant', descriptionFor('aimeat_workspace_member_grant'),
-        {
-            organism_id: z.string(),
-            ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
-            workspaces: z.array(z.string()).optional().describe('MANY workspace ids to grant in one call — e.g. every workspace in the organism (from aimeat_workspace_list).'),
-            grantee: z.string().describe('The member to grant: an owner name, GHII (owner@node), or GAII (agent#owner@node). The grant applies to the OWNER, so all their agents inherit it.'),
-            role: z.enum(['viewer', 'contributor']).describe("'viewer' = read only · 'contributor' = read + write."),
-        },
+        zodShapeFor('aimeat_workspace_member_grant'),
         annotationsFor('aimeat_workspace_member_grant'),
         async ({ organism_id, ws, workspaces, grantee, role }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
@@ -158,12 +146,7 @@ export function registerWorkspaceMemberTools(
 
     // ── aimeat_workspace_member_revoke ── (remove a member's role on one or many workspaces)
     mcp.tool('aimeat_workspace_member_revoke', descriptionFor('aimeat_workspace_member_revoke'),
-        {
-            organism_id: z.string(),
-            ws: z.string().optional().describe('A single workspace id. Use this OR `workspaces` (or both).'),
-            workspaces: z.array(z.string()).optional().describe('MANY workspace ids to revoke in one call.'),
-            grantee: z.string().describe('The member to revoke: owner name, GHII, or GAII (resolved to the owner). To DOWNGRADE instead of removing, call aimeat_workspace_member_grant with the lower role.'),
-        },
+        zodShapeFor('aimeat_workspace_member_revoke'),
         annotationsFor('aimeat_workspace_member_revoke'),
         async ({ organism_id, ws, workspaces, grantee }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
@@ -184,7 +167,7 @@ export function registerWorkspaceMemberTools(
 
     // ── aimeat_workspace_members ── (list a workspace's members with roles + grant provenance)
     mcp.tool('aimeat_workspace_members', descriptionFor('aimeat_workspace_members'),
-        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list).') },
+        zodShapeFor('aimeat_workspace_members'),
         annotationsFor('aimeat_workspace_members'),
         async ({ organism_id, ws }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);

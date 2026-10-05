@@ -10,6 +10,7 @@
  *   import { registerWalletExtendedTools } from './wallet-extended.js';
  *   registerWalletExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_wallet_transactions tool
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -19,12 +20,12 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerWalletExtendedTools(
     mcp: McpServer,
@@ -40,9 +41,7 @@ export function registerWalletExtendedTools(
     mcp.tool(
         'aimeat_wallet_transactions',
         descriptionFor('aimeat_wallet_transactions'),
-        {
-            limit: z.number().int().min(1).max(200).optional(),
-        },
+        zodShapeFor('aimeat_wallet_transactions'),
         annotationsFor('aimeat_wallet_transactions'),
         async ({ limit }) => {
             const effectiveLimit = limit ?? 20;

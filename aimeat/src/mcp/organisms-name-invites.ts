@@ -11,6 +11,7 @@
  *   aimeat_organism_invitations, aimeat_organism_invitation_respond.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-08-25 — aimeat_organism_member_remove: removal existed on the web door only, so an
  *     owner asking their own AI to take someone out of an organism had no tool for it while
  *     member_add had had one since July. Calls services/organism-member-remove.ts, as REST does.
@@ -20,7 +21,6 @@
  *   v1.0.0 — 2026-07-16 — Extracted from mcp/organisms.ts; tools now ride the shared name-invite core.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -31,6 +31,7 @@ import {
     acceptNameInvitation, declineNameInvitation, addOrganismMember,
 } from '../services/invitations.js';
 import { removeOrganismMember, MemberRemoveError } from '../services/organism-member-remove.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerOrganismNameInviteTools(
     mcp: McpServer,
@@ -54,23 +55,13 @@ export function registerOrganismNameInviteTools(
     const invitationErrText = (e: unknown): string =>
         e instanceof InvitationError ? e.message : ((e as Error)?.message || 'Invitation operation failed');
 
-    const wsGrantShape = z.array(z.object({
-        ws: z.string().describe('Workspace id'),
-        role: z.enum(['viewer', 'contributor']).describe('viewer = read only; contributor = read + write'),
-    })).optional().describe('Optional per-workspace grants applied when the invitee joins');
-
     // ── Tool: aimeat_organism_invite ──
     // Mirrors POST /v1/organisms/:id/invitations — shared core in services/invitations.ts. Carries
     // an org role + per-workspace grants chosen at invite time, applied on accept.
     mcp.tool(
         'aimeat_organism_invite',
         descriptionFor('aimeat_organism_invite'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            invitee: z.string().describe('Bare owner name to invite'),
-            role: z.enum(['member', 'admin']).optional().describe('Organism role granted on accept (default "member")'),
-            workspaces: wsGrantShape,
-        },
+        zodShapeFor('aimeat_organism_invite'),
         annotationsFor('aimeat_organism_invite'),
         async ({ organism_id, invitee, role, workspaces }) => {
             const gate = await inviteAdminGate(organism_id);
@@ -92,12 +83,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_member_add',
         descriptionFor('aimeat_organism_member_add'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            ghii: z.string().describe('Bare owner name to add as an active member'),
-            role: z.enum(['member', 'admin']).optional().describe('Organism role (default "member")'),
-            workspaces: wsGrantShape,
-        },
+        zodShapeFor('aimeat_organism_member_add'),
         annotationsFor('aimeat_organism_member_add'),
         async ({ organism_id, ghii, role, workspaces }) => {
             const gate = await inviteAdminGate(organism_id);
@@ -119,11 +105,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_member_remove',
         descriptionFor('aimeat_organism_member_remove'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            ghii: z.string().describe('Bare owner name to remove'),
-            ban: z.boolean().optional().describe('Also block them from being invited or added again'),
-        },
+        zodShapeFor('aimeat_organism_member_remove'),
         annotationsFor('aimeat_organism_member_remove'),
         async ({ organism_id, ghii, ban }) => {
             const gate = await inviteAdminGate(organism_id);
@@ -146,10 +128,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_owner_add',
         descriptionFor('aimeat_organism_owner_add'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            ghii: z.string().describe('Bare owner name of an active member to make a co-owner'),
-        },
+        zodShapeFor('aimeat_organism_owner_add'),
         annotationsFor('aimeat_organism_owner_add'),
         async ({ organism_id, ghii }) => {
             const organism = await storage.getOrganism(organism_id);
@@ -170,10 +149,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_owner_remove',
         descriptionFor('aimeat_organism_owner_remove'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            ghii: z.string().describe('Bare owner name to take off the owners; they stay as an admin'),
-        },
+        zodShapeFor('aimeat_organism_owner_remove'),
         annotationsFor('aimeat_organism_owner_remove'),
         async ({ organism_id, ghii }) => {
             const organism = await storage.getOrganism(organism_id);
@@ -193,12 +169,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_invitation_update',
         descriptionFor('aimeat_organism_invitation_update'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            invitee: z.string().describe('Bare owner name whose pending invitation to edit'),
-            role: z.enum(['member', 'admin']).optional().describe('New organism role'),
-            workspaces: wsGrantShape,
-        },
+        zodShapeFor('aimeat_organism_invitation_update'),
         annotationsFor('aimeat_organism_invitation_update'),
         async ({ organism_id, invitee, role, workspaces }) => {
             const gate = await inviteAdminGate(organism_id);
@@ -222,10 +193,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_invitation_cancel',
         descriptionFor('aimeat_organism_invitation_cancel'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            invitee: z.string().describe('Bare owner name whose pending invitation to withdraw'),
-        },
+        zodShapeFor('aimeat_organism_invitation_cancel'),
         annotationsFor('aimeat_organism_invitation_cancel'),
         async ({ organism_id, invitee }) => {
             const gate = await inviteAdminGate(organism_id);
@@ -245,7 +213,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_invitations',
         descriptionFor('aimeat_organism_invitations'),
-        {},
+        zodShapeFor('aimeat_organism_invitations'),
         annotationsFor('aimeat_organism_invitations'),
         async () => {
             const ownerName = getOwnerName();
@@ -263,10 +231,7 @@ export function registerOrganismNameInviteTools(
     mcp.tool(
         'aimeat_organism_invitation_respond',
         descriptionFor('aimeat_organism_invitation_respond'),
-        {
-            organism_id: z.string().describe('The organism ID you were invited to'),
-            decision: z.enum(['accept', 'decline']).describe('accept or decline'),
-        },
+        zodShapeFor('aimeat_organism_invitation_respond'),
         annotationsFor('aimeat_organism_invitation_respond'),
         async ({ organism_id, decision }) => {
             const organism = await storage.getOrganism(organism_id);

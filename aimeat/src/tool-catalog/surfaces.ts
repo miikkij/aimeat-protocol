@@ -169,7 +169,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Know things.
         
         // Know things together.
-        'aimeat_workspace_read', 'aimeat_workspace_write',
+        
         // Take work, hand it back.
         
         // Talk to the person.
@@ -200,7 +200,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         // What their groups know. Writing to a workspace is found when it is needed: its description
         // alone is 6 500 characters, which every round would pay for.
-        'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_workspace_read',
+        
         // Their apps and skills.
         'aimeat_app_list', 
         // Their agents, a new one, and work for them. A schedule is found when it is needed.
@@ -234,8 +234,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invite_email', 'aimeat_organism_invitations_email', 'aimeat_organism_invitation_email_cancel', 'aimeat_organism_member_add', 'aimeat_organism_member_remove', 'aimeat_organism_owner_add', 'aimeat_organism_owner_remove', 'aimeat_organism_invitation_update', 'aimeat_organism_invitation_cancel', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
-        'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments', 'aimeat_workspace_comment_delete',
+        
+        
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
@@ -252,7 +252,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_memory_read_public',
+        
         
         
         'aimeat_app_manage',
@@ -322,8 +322,8 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invite_email', 'aimeat_organism_invitations_email', 'aimeat_organism_invitation_email_cancel', 'aimeat_organism_member_add', 'aimeat_organism_member_remove', 'aimeat_organism_owner_add', 'aimeat_organism_owner_remove', 'aimeat_organism_invitation_update', 'aimeat_organism_invitation_cancel', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
-        'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments', 'aimeat_workspace_comment_delete',
+        
+        
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
@@ -360,7 +360,6 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
     service: [
         
         
-        'aimeat_memory_read_public',
         
         
         
@@ -369,11 +368,12 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_wallet_transactions',
         
         
-        'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_invite', 'aimeat_organism_invite_email', 'aimeat_organism_invitations_email', 'aimeat_organism_invitation_email_cancel', 'aimeat_organism_member_add', 'aimeat_organism_member_remove', 'aimeat_organism_owner_add', 'aimeat_organism_owner_remove', 'aimeat_organism_invitation_update', 'aimeat_organism_invitation_cancel', 'aimeat_organism_invitations', 'aimeat_organism_invitation_respond', 'aimeat_organism_search', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_create', 'aimeat_organism_update', 'aimeat_organism_archive', 'aimeat_organism_export', 'aimeat_organism_import',
-        'aimeat_workspace_create', 'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_overview', 'aimeat_organism_overview', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_revert_to_draft', 'aimeat_workspace_object_delete', 'aimeat_workspace_update', 'aimeat_workspace_access', 'aimeat_workspace_member_grant', 'aimeat_workspace_member_revoke', 'aimeat_workspace_members', 'aimeat_workspace_transfer', 'aimeat_workspace_comment', 'aimeat_workspace_comments', 'aimeat_workspace_comment_delete',
+        
+        
+        
+        
         'aimeat_workspace_rows_append', 'aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats', 'aimeat_workspace_rows_delete',
         'aimeat_workspace_doc_append', 'aimeat_workspace_doc_section_replace',
         'aimeat_workspace_space_add', 'aimeat_workspace_sections_set', 'aimeat_workspace_suggestions',
@@ -475,10 +475,10 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_memory_read_public',
         
         
-        'aimeat_wallet_transactions',
+        
+        
         
         
     ],
