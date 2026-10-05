@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
+ *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.15.0 -- 2026-10-04 -- aimeat_package_install takes `grant_apps` (GRANT_APPS_PARAM).
  *   v1.14.0 -- 2026-10-02 -- aimeat_package_withdraw (package sale design, phase 5: T6).
  *   v1.13.0 -- 2026-10-02 -- aimeat_package_compose_set; aimeat_package_install installs a set and takes
@@ -45,6 +47,7 @@
  *     catalog described was answered 400 INVALID_INPUT. The entry now says what the route takes.
  *   v1.0.0 -- 2026-08-16 -- Split out when the app tools were pointed back at apps.
  */
+import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
@@ -54,12 +57,14 @@ export const GRANT_APPS_PARAM = 'Approve the package\'s apps now, for the permis
 
 export const PACKAGE_CONFIG_PARAM = 'Each part\'s config, keyed by component id: { "<component id>": { "<field>": value } }. An app part takes the fields its config schema declares; an extension part takes its config fields, and a secret field there is stored encrypted and never shown. Run with dry_run first: the answer lists every part\'s fields and which required ones are still empty, so you can ask your owner for them. A required field left empty refuses the install with CONFIG_REQUIRED naming it.';
 
-export const packagesTools: AimeatToolDefinition[] = [
+export const packagesTools = [
     {
         name: 'aimeat_package_list',
         description: 'List component packages on this node. These are NOT the single-file web apps — for those use aimeat_app_list.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'List Packages', readOnlyHint: true },
+        surfaces: ['appdev', 'agent'],
         input: {
             search: { type: 'string', description: 'Optional search over name, description and tags.' },
             author: { type: 'string', description: 'Only this author\'s packages. Your own name also shows your private ones.' },
@@ -71,6 +76,8 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Get one component package by its group id.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Get Package', readOnlyHint: true },
+        surfaces: ['appdev', 'agent'],
         input: { group_id: { type: 'string', required: true, description: 'Package group identifier.' } },
     },
     {
@@ -78,6 +85,7 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: "List one component package's version history.",
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'List Package Versions', readOnlyHint: true },
         input: { group_id: { type: 'string', required: true, description: 'Package group identifier.' } },
     },
     {
@@ -85,6 +93,8 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Archive one version of a component package.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Delete Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        scope: 'app:manage',
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier.' },
             version: { type: 'string', required: true, description: 'Version to archive.' },
@@ -95,15 +105,23 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Publish a component package: one or more components (app, extension, cortex, translation) that install together.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'app:write',
         input: {
             name: { type: 'string', required: true, description: 'Package name. With the author it forms the group id, e.g. "company-brain::alice".' },
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
-            tags: { type: 'array', description: 'Tags for search.' },
+            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
             visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
             components: {
                 type: 'array', required: true,
-                description: 'The components, each { id, type: "app"|"extension"|"cortex"|"translation", label?, content, dependencies? }. At least one.',
+                description: 'The components, each { id, type: "app"|"extension"|"cortex"|"translation", label?, content, dependencies? }. At least one.', zod: z.array(z.object({
+      id: z.string().describe('Component id, unique within the package'),
+      type: z.string().describe('app | extension | cortex | translation'),
+      label: z.string().optional().describe('Human-readable name'),
+      content: z.string().optional().describe('The component source'),
+      dependencies: z.array(z.string()).optional().describe('Ids of components this one needs installed first'),
+    })).min(1),
             },
             manifest: { type: 'object', description: 'Package manifest: object types, schedules, the workspace it provisions.' },
         },
@@ -116,19 +134,24 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Make a package out of apps you already published, with the cortexes they load and your own skills bound to them. Names what the installing node must supply itself.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Not idempotent: composing twice under one name is refused as a conflict, and composing under
+        // another name makes a second package. It reads the owner's apps and writes nothing of theirs.
+        annotations: { title: 'Compose Package From Apps', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             name: { type: 'string', required: true, description: 'Package name. With your owner name it forms the group id.' },
-            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "admin.html"]. At least one.' },
+            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "admin.html"]. At least one.', zod: z.array(z.string()).min(1) },
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
-            tags: { type: 'array', description: 'Tags for search.' },
+            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
             visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published, so you can install it at once.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true. Node-shipped cortexes are never packaged.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps, so the installer\'s AI has their operating guides. Default true. Installing publishes each in the installer\'s skills, bound to their copy of the app, and never overwrites a skill of theirs.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry, recording it as a requirement instead.' },
             outcome: { type: 'string', description: 'What the package gives a person, in one sentence: the head of its "what you get" sheet. The description stands in when it is missing.' },
-            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed, in their words.' },
+            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed, in their words.', zod: z.array(z.string()) },
         },
     },
     {
@@ -136,21 +159,24 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Make a set to sell from apps you already published: one package per app (or its next version), and an install bundle that lists them, with the organism and workspaces the apps declare in their aimeat-workspace block (joined on the contract; one organism named after the set), the crews their aimeat-crews blocks carry, and your default config. Run dry_run first: it writes nothing and answers `questions` (what a buyer will be asked), `expects` (what the buyer\'s node must already have), `not_carried` (what stays behind), `capabilities` (what the parts can do), the `bundle`, and every `problem`. Without dry_run a set with any problem is refused and nothing is written. Composing again adds a version to each package and to the set. Then set its terms with aimeat_package_offer. The same as POST /v1/packages/compose-set.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Compose a Set to Sell', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             name: { type: 'string', required: true, description: 'The set\'s package name. With your owner name it forms the group id.' },
-            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].' },
+            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].', zod: z.array(z.string()).min(1) },
             title: { type: 'string', description: 'The name a buyer sees. Defaults to name.' },
-            organism: { type: 'object', description: '{ key, name }: the organism the declared workspaces go into, its key in the set and its default name.' },
-            defaults: { type: 'object', description: 'The set\'s default config, { <app filename>: { <field>: value } }. A field given here is not asked of the buyer.' },
+            organism: { type: 'object', description: '{ key, name }: the organism the declared workspaces go into, its key in the set and its default name.', zod: z.object({ key: z.string().optional(), name: z.string().optional() }) },
+            defaults: { type: 'object', description: 'The set\'s default config, { <app filename>: { <field>: value } }. A field given here is not asked of the buyer.', zod: z.record(z.string(), z.record(z.string(), z.unknown())) },
             description: { type: 'string', description: 'What the set is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
-            tags: { type: 'array', description: 'Tags for search.' },
+            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
             visibility: { type: 'string', enum: ['private', 'public'], description: 'Defaults to private: a set is made to be sold.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps. Default true.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension a package cannot carry.' },
             outcome: { type: 'string', description: 'What the set gives a person, in one sentence.' },
-            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed.' },
+            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed.', zod: z.array(z.string()) },
             dry_run: { type: 'boolean', description: 'Write nothing; answer what the set would be and every problem.' },
         },
     },
@@ -164,6 +190,11 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Move one package version between draft, published, beta and archived. Only the author may. A beta version is served only to the customer nodes whose entitlement follows the beta channel (aimeat_package_entitlements).',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Not destructive: it changes who may reach a version, never its bytes, and archiving is
+        // reversible by setting the status back.
+        annotations: { title: 'Set Package Status', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'app:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier.' },
             version: { type: 'string', description: 'Which version. Defaults to the latest one.' },
@@ -175,6 +206,9 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Withdraw a bad version of your package, with a reason. Nothing serves it again: not an install, not a pull, not a repository\'s customers. Every installed copy of it is told once and its extensions are switched off; on another node that happens at that node\'s daily check. Apps and records stay as they are. It cannot be undone: publish a fixed version, which managed copies receive as an ordinary update. The package\'s author, or an operator. The same as POST /v1/packages/:groupId/versions/:version/withdraw.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Withdraw a Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier.' },
             version: { type: 'string', required: true, description: 'The version to withdraw.' },
@@ -189,6 +223,11 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Bring a package published on another node onto this one, verifying that node\'s signature and every component digest before anything is written.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // openWorld: it reaches another node over the network, which is the one package tool that does.
+        // Idempotent: a source with nothing newer answers applied:false rather than writing again.
+        annotations: { title: 'Pull Package From Another Node', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', required: true, description: 'The package on the other node, e.g. "signage::alice".' },
             node_id: { type: 'string', description: 'A peer this node knows. Its address and key are read from the peer record.' },
@@ -205,6 +244,11 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Update a whole installed package to its latest version. Parts you have edited are left untouched and reported, never overwritten. A new version that writes into your owner\'s memory, when you lack memory:write and memory:write-as-owner, becomes a request your owner approves (status awaiting_owner).',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Idempotent: run twice and the second call finds nothing left to update. Not destructive,
+        // because a component the owner edited is refused rather than overwritten.
+        annotations: { title: 'Update Installed Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             instance_id: { type: 'string', required: true, description: 'The installed copy, from the instances list.' },
             dry_run: { type: 'boolean', description: 'Report what would change and change nothing.' },
@@ -218,14 +262,22 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Install a component package as your own copy. Each component is registered under your identity. With mode "editable" (the default) what you get is yours to edit; with mode "managed" the package owns the code and layout, an update replaces them, and you change only the settings (name, description, access code, parking, search visibility, legal texts) until you fork the install. A package that seeds memory records writes them into your owner\'s memory, which takes the memory:write and memory:write-as-owner permissions; without them the install becomes a request your owner approves (status awaiting_owner, with a request_id), and nothing is installed until then. A package that carries code (an app, an extension, a cortex, a skill) takes packages:install-code in the same way. Run dry_run first: it answers `capabilities` (what each part will be able to do) and `source` (who made it and where it came from), which is what you tell your owner before they approve. The package\'s apps: installing your owner\'s own package approves them, so they sign in with no question; for someone else\'s package, tell your owner what each app asks for (`capabilities.apps`) and pass `grant_apps` true to approve them now, or leave it out so each app asks on its first visit (`app_approval` in the dry run says which applies). A set (a package that carries an install bundle) installs all of it for your owner: each package of the set by these same rules, then its organisms and workspaces under your owner\'s names (`organism_names`), each app told where its workspace is; `config` is then { <package group id>: { <component id>: { <field>: value } } }. A set that makes organisms needs organism:write. If a package of the set waits for your owner, the set stops there, and installing it again continues and makes nothing twice.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Not idempotent: each install mints a fresh instance with its own component names, so calling
+        // it twice leaves two copies rather than one.
+        annotations: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+        // Installing registers an app, a cortex, an extension and any @activate cron the manifest
+        // declares, all under the owner's identity — a write with a long tail, and its own word on the
+        // consent screen. Same scope POST /v1/packages/:groupId/install requires.
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', required: true, description: 'Package group identifier, from aimeat_package_list.' },
             label: { type: 'string', description: 'What to call this copy, e.g. the company it is for.' },
             version: { type: 'string', description: 'A specific version. Defaults to the latest published one.' },
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
-            config: { type: 'object', description: PACKAGE_CONFIG_PARAM },
-            organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.' },
+            config: { type: 'object', description: PACKAGE_CONFIG_PARAM, zod: z.record(z.string(), z.record(z.string(), z.unknown())) },
+            organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.', zod: z.record(z.string(), z.string()) },
             grant_apps: { type: 'boolean', description: GRANT_APPS_PARAM },
         },
     },
@@ -235,6 +287,8 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'List your owner\'s installed package copies: each one\'s instance_id, package, version, whether it is managed (the package owns the code and layout) or editable, when it was forked, and the names its components were registered under.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'List Installed Packages', readOnlyHint: true },
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', description: 'Only the copies of this package.' },
             status: { type: 'string', enum: ['installed', 'paused', 'removed'], description: 'Only copies in this state.' },
@@ -245,6 +299,9 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Change your owner\'s choices about one installed package copy: its label, and whether the daily update check updates it by itself (auto_update true) or tells your owner that an update is ready (false). Managed installs start with auto_update on, editable ones with it off.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Set Installed Package Options', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             instance_id: { type: 'string', required: true, description: 'The installed copy, from aimeat_package_instances.' },
             label: { type: 'string', description: 'A new name for this copy.' },
@@ -257,6 +314,10 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Check your owner\'s installed packages against the nodes they came from, now. A newer version is pulled; a copy with auto_update on is updated (parts your owner edited are left alone and reported), and the rest are listed as ready to update with aimeat_package_update. A source whose updates ended (the monthly fee ran out) is reported as updates_ended. The node also runs this daily.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // openWorld: it reaches the nodes the packages came from. Not idempotent: it may pull and update.
+        annotations: { title: 'Check Package Updates', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {},
     },
     {
@@ -264,6 +325,9 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'List what a package repository serves this node: its public packages and the private ones this node is entitled to, each with the version its entitlement reaches and when its updates end. The repository must be a peer of this node. Take one with aimeat_package_pull (node_id and group_id), then install it with aimeat_package_install, usually with mode "managed".',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'List Repository Packages', readOnlyHint: true, openWorldHint: true },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             node_id: { type: 'string', required: true, description: 'The repository node, a peer of this node.' },
         },
@@ -274,13 +338,17 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'On a package repository: list, grant or revoke which customer nodes a private package of yours is served to. A grant with updates_until serves the node every version published up to that instant and nothing newer (the monthly updates ended); without it the updates run on. The node must be a peer of this one, or be registered with the grant by giving `node` (its address and the public key its /.well-known/aimeat publishes), and this node must be in the repository role (repository_role in the answer) for the grant to take effect. A node given with `node` is registered only when its own card answers with the same node id and key (PEER_ID_MISMATCH or PEER_KEY_MISMATCH otherwise, and nothing is granted). When the node does not answer, the grant is made anyway and `peer_pending` is true: the node is registered on its first signed request to this repository. A grant to an install bundle serves the packages the bundle lists as well.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Destructive: a revoke stops a customer node's pulls. Idempotent: the same grant twice is one grant.
+        annotations: { title: 'Package Entitlements', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', required: true, description: 'Your package group identifier.' },
             action: { type: 'string', required: true, enum: ['list', 'grant', 'revoke'], description: 'list the nodes, grant (or change) one, or revoke one.' },
             node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
-            updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node. Omit for updates that run on.' },
+            updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node. Omit for updates that run on.', zod: z.string().nullable() },
             channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.' },
-            node: { type: 'object', description: 'For grant: { url, public_key } of a node this repository does not know yet. It is registered with the grant as a packages-only peer (active, contact tier, messages off), which can pull only what it is entitled to. A peer of that id under another key, or switched off, is refused.' },
+            node: { type: 'object', description: 'For grant: { url, public_key } of a node this repository does not know yet. It is registered with the grant as a packages-only peer (active, contact tier, messages off), which can pull only what it is entitled to. A peer of that id under another key, or switched off, is refused.', zod: z.object({ url: z.string(), public_key: z.string() }) },
             note: { type: 'string', description: 'For grant: why, e.g. the order it came from.' },
         },
     },
@@ -290,10 +358,13 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'On a package repository: list, add or remove the nodes that sell your packages. A seller node (a shop\'s own AIMEAT, e.g. store.aimeat.io) then asks for a package\'s questions, grants a customer node, ends its updates and revokes it by requests signed with its own node key, with no token and no copied secret. A seller sells every package of yours and nothing of anyone else\'s. To add a node this repository does not know yet, give `node` ({ url, public_key }; the key is on its /.well-known/aimeat): it is registered as a packages-only peer once its card answers with the same node id and key, and refused with PEER_UNREACHABLE when it does not answer (try again when it is up). Only an author with a package on this repository, on a node in the repository role, names sellers (NOT_AN_AUTHOR, NOT_A_REPOSITORY). Removing a seller leaves the grants it made; revoke those with aimeat_package_entitlements. The same as GET, PUT and DELETE /v1/package-sellers.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Package Sellers', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             action: { type: 'string', required: true, enum: ['list', 'add', 'remove'], description: 'list your sellers, add (or change) one, or remove one.' },
             node_id: { type: 'string', description: 'For add and remove: the seller node, e.g. "aimeat-finland-003-store".' },
-            node: { type: 'object', description: 'For add: { url, public_key } of a node this repository does not know yet.' },
+            node: { type: 'object', description: 'For add: { url, public_key } of a node this repository does not know yet.', zod: z.object({ url: z.string(), public_key: z.string() }) },
             note: { type: 'string', description: 'For add: why, e.g. "the shop".' },
         },
     },
@@ -303,6 +374,9 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'The settings a package of yours, or every package of an install bundle of yours, needs the customer to give before it works: the questions to ask before a sale. Each question names its package, component and field, whether it is required, whether it is secret, and for an app field its JSON Schema (type, title, description, enum). A field the bundle already fills is not asked; its value is in `defaults`. Put the answers in the install set: `config.<package>.<component>.<field>`, and a secret in the secrets file with the same path, never in the set. A listed package this node does not hold is named in `problems`. For the author or an operator, and for anyone on this node when the package is public, so an installer answers the questions before installing. The same as GET /v1/packages/:groupId/config-needs.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Package Config Needs', readOnlyHint: true, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', required: true, description: 'The package or install bundle group id, e.g. "yrittajan-peruspaketti::happyadmin500001".' },
         },
@@ -314,6 +388,11 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Fork a managed package install: it becomes your own editable copy in place, keeping every address, every record and every schedule, and it receives no further updates from its package. Use it when your owner wants to change the code or layout of a managed install. It cannot be undone; to get the package\'s updates again, install the package again beside it.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
+        // call is refused because the copy is no longer managed.
+        annotations: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             instance_id: { type: 'string', required: true, description: 'The managed copy, from aimeat_package_instances.' },
         },
@@ -326,6 +405,15 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'List your owner\'s package install requests, read one, or approve or decline one. You may approve a request only when you did not file it yourself and you hold packages:write, memory:write and memory:write-as-owner; otherwise your owner approves it on their Notifications page. You may decline any request you did not file.',
         caller: 'agent',
         visibility: agentEverywhere,
+        // Lists and reads, and decides: approving installs what was asked, declining closes it. Idempotent:
+        // a second decision on a settled request is refused and changes nothing. Not destructive: it
+        // installs or updates, and a migration it approves checks every part before replacing any.
+        annotations: { title: 'Package Install Requests', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Reading and deciding the install requests. The same word /v1/package-install-requests asks on
+        // all three doors: approving an install is taking part in installing. The words the install itself
+        // needs are asked of the approving agent inside the service, not here.
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             request_id: { type: 'string', description: 'One request. Omit to list them all.' },
             decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
@@ -336,6 +424,9 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'On a package repository, for a package\'s author: the terms seller nodes sell it on. action "get" reads the offer; "set" appends new terms, changes the state, or both. Terms: `grant` "payment" (with `price` { amount, currency }, EUR or USD in micro-units, 1 EUR = 1000000), "approval" (the seller approves each request, no money) or "automatic" (granted at once, no money); `updates` { included_days, renewal: { amount, currency, period_days } or null }; `channel` stable or beta; `licence` { spdx, terms_url, text_sha256 }; `tax` { prices_include_tax, category }; `support` { email, security_email }, and a paid offer must name security_email. A price change is new terms: a buyer keeps the terms they accepted, so a new price reaches only new sales, and a new package version changes no price. `state` on_sale, paused (no new sales, renewals go on) or ended. Only a private package has an offer. Name your sellers with aimeat_package_sellers. The same as GET and PUT /v1/packages/:groupId/offer.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Package Offer', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+        scope: 'packages:write',
+        surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', required: true, description: 'The package group id on this repository.' },
             action: { type: 'string', required: true, enum: ['get', 'set'], description: 'get: the offer as it stands; set: new terms, a new state, or both.' },
@@ -348,13 +439,16 @@ export const packagesTools: AimeatToolDefinition[] = [
         description: 'Buy a package this node sells, for your owner. This node reads the author\'s terms from the package repository for you; you never need an account there. action "offer": what you would get and at what price (this node\'s price, the renewal price and period, how many days of updates come with it, the licence, how tax is to be read, the support and security contacts, the author and the seller of record). Tell your owner before buying. action "checkout": open the checkout; give `node` ({ node_id, url, public_key } from the receiving AIMEAT\'s /.well-known/aimeat) to have it granted at once, or leave it out to get a claim code the receiving node redeems with aimeat_package_claim; `auto_renew` true keeps the card for automatic renewals. action "renew": open the checkout of the next update period for `node_id`, at the renewal price your owner accepted. Then pay with aimeat_checkout_complete; the sale is carried out when it is paid, and a failure there refunds it. An offer granted on approval waits for the seller instead. action "subscriptions": what your owner holds here, and the requests they made. action "auto_renew": turn automatic renewal on or off for `node_id`. The same as GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions with a package line, and GET and PUT /v1/package-sales/subscriptions.',
         caller: 'agent',
         visibility: agentEverywhere,
+        annotations: { title: 'Buy a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        scope: 'commerce:buy',
+        surfaces: ['agent'],
         input: {
             action: { type: 'string', required: true, enum: ['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew'], description: 'offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.' },
             repository: { type: 'string', description: 'The package repository\'s node id.' },
             group_id: { type: 'string', description: 'The package group id on the repository.' },
-            node: { type: 'object', description: 'For checkout: { node_id, url, public_key } of the AIMEAT that is to receive the package. Leave out to get a claim code instead.' },
+            node: { type: 'object', description: 'For checkout: { node_id, url, public_key } of the AIMEAT that is to receive the package. Leave out to get a claim code instead.', zod: z.object({ node_id: z.string(), url: z.string(), public_key: z.string() }) },
             node_id: { type: 'string', description: 'For renew and auto_renew: the node the package was bought for.' },
             auto_renew: { type: 'boolean', description: 'For checkout: keep the card for automatic renewals. For auto_renew: on or off.' },
         },
     },
-];
+] as const satisfies readonly AimeatToolDefinition[];
