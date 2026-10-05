@@ -15,6 +15,8 @@
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
+ *   v1.4.0 -- 2026-10-06 -- aimeat_skill_list view=linked asks memory:read, as its route does (secaudit
+ *     2026-10 follow-up, A4).
  *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: the skill accessor carries the agent's ContentReader
  *     (readerForAgent), so the registry filters user and workspace skills through it.
  *   v1.2.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -44,6 +46,8 @@ import {
 } from '../services/skills.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { toolError } from './tool-error.js';
 
 export function registerSkillsTools(
     mcp: McpServer,
@@ -157,6 +161,9 @@ export function registerSkillsTools(
             }
             const mode = view ?? 'library';
             if (mode === 'linked') {
+                // The word GET /v1/agents/:name/skills/links asks; the other views ask none, as their
+                // route does (secaudit 2026-10 follow-up, A4).
+                if (!scopeIsCovered(scopes, 'memory:read')) return toolError('SCOPE_DENIED', 'view=linked needs the memory:read permission, as GET /v1/agents/:name/skills/links does.');
                 const agentName = agent_name ?? parsed!.agent;
                 const links = await getAgentSkillLinks(storage, config, ownerName, agentName);
                 return ok({ view: 'linked', agent: agentName, links });

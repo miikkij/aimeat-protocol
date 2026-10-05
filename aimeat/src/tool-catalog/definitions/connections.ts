@@ -129,7 +129,8 @@ export const connectionTools = [
         // Sending needs `connections:use` AND `outbound:send`; the tool is not registered without both,
         // so a session holding one never sees a control whose only possible answer is a refusal. This map
         // carries the mailbox half, because that is the surprising permission of the two.
-        scope: 'connections:use',
+        // The words POST /v1/outbound/send asks (secaudit 2026-10 follow-up, A4).
+        scope: ['connections:use', 'outbound:send'],
         surfaces: ['agent'],
         input: {
             contact_id: { type: 'string', required: true, description: 'A saved recipient. Never a free address.' },

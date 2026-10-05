@@ -7,6 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   2026-10-06 — aimeat_ai_policy_set and aimeat_ai_routing_set ask ai:use as well, the word the read
+ *     they make when given nothing asks (secaudit 2026-10 follow-up, A4).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.3.2 — 2026-10-02 — aimeat_ai_capabilities names agentFix, fix and settingsUrl.
@@ -35,7 +37,9 @@ export const aiModelTools = [
     visibility: agentEverywhere,
         annotations: { title: 'Set the AI Model Policy (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // Which models every AI call of the owner may use: a rule the owner set over their own apps and agents.
-        scope: 'memory:write-reserved',
+        // Given nothing, the tool reads the policy, which GET /v1/ai/policy gates on ai:use; both
+        // words, so it is offered only to an agent both of its calls admit (secaudit 2026-10 follow-up, A4).
+        scope: ['memory:write-reserved', 'ai:use'],
         surfaces: ['agent', 'admin'],
     description: 'Read or change which AI models the owner\'s calls may use, with PROPOSE-THEN-CONFIRM. '
       + 'With no policy: returns the current policy and the node\'s recommended models. With a policy and no confirm_token: '
@@ -92,7 +96,9 @@ export const aiModelTools = [
     visibility: agentEverywhere,
         annotations: { title: 'Set the AI Routing (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // Which provider answers first and whether a fallback may leave this machine: the owner's rule.
-        scope: 'memory:write-reserved',
+        // Given nothing, the tool reads the routing, which GET /v1/ai/routing gates on ai:use; both
+        // words, so it is offered only to an agent both of its calls admit (secaudit 2026-10 follow-up, A4).
+        scope: ['memory:write-reserved', 'ai:use'],
         surfaces: ['agent', 'admin'],
     description: 'Read or change which provider answers each AI capability and the rules for moving to the next, with '
       + 'PROPOSE-THEN-CONFIRM. With no routing: returns the current routing and the providers. With a routing and no '

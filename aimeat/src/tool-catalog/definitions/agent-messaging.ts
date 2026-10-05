@@ -448,7 +448,8 @@ export const agentMessagingTools = [
         // Delegated "reply as me": send a federated DM AS THE OWNER. Its own scope so the owner grants it
         // deliberately (it is part of the full '*' bundle; granular agents opt in separately). The sender is
         // still derived server-side from the agent's owner, so the scope never enables cross-owner sends.
-        scope: 'messages:send-as-owner',
+        // The words POST /v1/messages asks (secaudit 2026-10 follow-up, A4).
+        scope: ['messages:send-as-owner', 'messages:send'],
         surfaces: ['agent'],
         input: {
             ...aiProvenanceCatalogInput,

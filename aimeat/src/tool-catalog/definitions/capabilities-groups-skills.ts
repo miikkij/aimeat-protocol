@@ -158,6 +158,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Search People Directory', readOnlyHint: true },
+        // The words GET /v1/catalogue/directory asks (secaudit 2026-10 follow-up, A4).
+        scope: 'catalogue:read',
         surfaces: ['agent'],
         input: {
             city: { type: 'string', description: 'Filter by city.' },
@@ -281,6 +283,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Sharing Groups', readOnlyHint: true },
+        // The words GET /v1/groups asks (secaudit 2026-10 follow-up, A4).
+        scope: 'memory:read',
         surfaces: ['admin'],
         input: {},
     },
@@ -290,6 +294,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get Sharing Group', readOnlyHint: true },
+        // The words GET /v1/groups/:id asks (secaudit 2026-10 follow-up, A4).
+        scope: 'memory:read',
         surfaces: ['admin'],
         input: { group_id: { type: 'string', required: true, description: 'Group identifier.' } },
     },
@@ -415,6 +421,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get Chat Instance Status', readOnlyHint: true },
+        // The words GET /v1/chat-instances/:id asks (secaudit 2026-10 follow-up, A4).
+        scope: 'wallet:read',
         input: { instance_id: { type: 'string', required: true, description: 'Instance identifier.' } },
     },
     {
@@ -471,6 +479,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'AppDev Research Overview', readOnlyHint: true },
+        // The words GET /v1/appdev/overview asks (secaudit 2026-10 follow-up, A4).
+        scope: 'memory:read',
         surfaces: ['appdev', 'agent'],
         input: {
             model: { type: 'string', description: 'Your primary model (indicative), e.g. claude-haiku-4.5. Marks proven packs and orders learned pitfalls; filters nothing.', zod: z.string().max(64) },
@@ -509,6 +519,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List AppDev Pitfalls', readOnlyHint: true },
+        // The words GET /v1/appdev/pitfalls/learned asks (secaudit 2026-10 follow-up, A4).
+        scope: 'memory:read',
         surfaces: ['appdev', 'agent'],
         input: {
             scope: { type: 'string', enum: ['own', 'platform', 'all'], description: 'Default all.' },
@@ -564,6 +576,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List App Template Proposals', readOnlyHint: true },
+        // The words GET /v1/appdev/templates asks (secaudit 2026-10 follow-up, A4).
+        scope: 'memory:read',
         surfaces: ['appdev', 'agent'],
         input: {},
     },
@@ -573,6 +587,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read App Template Proposal', readOnlyHint: true },
+        // The words GET /v1/appdev/templates/:id asks (secaudit 2026-10 follow-up, A4).
+        scope: 'memory:read',
         surfaces: ['appdev', 'agent'],
         input: {
             id: { type: 'string', required: true, description: 'Template id: a proposal, or one the node ships.', zod: z.string().min(1).max(64) },
@@ -702,7 +718,8 @@ export const capabilitiesGroupsSkillsTools = [
         // /v1/agents/:name/scopes is owner-only, and the propose-then-confirm dance here binds the
         // token to the CALLER — so the same agent mints and redeems it in two consecutive calls, and
         // the "show this diff to the owner" text is instruction rather than a gate.
-        scope: 'agent:permissions',
+        // The words PATCH /v1/agents/:name/mode asks (secaudit 2026-10 follow-up, A4).
+        scope: ['agent:permissions', 'agent:write'],
         surfaces: ['agent', 'admin'],
         input: {
             agent_name: { type: 'string', required: true, description: 'Which same-owner agent to configure.' },

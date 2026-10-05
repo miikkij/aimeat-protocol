@@ -127,7 +127,8 @@ export const workspaceSpaceTools = [
         annotations: { title: 'Delete Workspace Rows', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         // Removes rows for good: memory:purge since 2026-10-02, held on the task-start floor. The
         // handler also asks organism:write, as the REST DELETE routes do (mcp/workspace-rows.ts).
-        scope: 'memory:purge',
+        // The words DELETE /v1/organisms/:id/workspace/rows/... asks (secaudit 2026-10 follow-up, A4).
+        scope: ['memory:purge', 'organism:write'],
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },

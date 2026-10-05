@@ -12,6 +12,9 @@
  *   import { scopesForProfile } from './scopes.js';
  *   const scopes = scopesForProfile('task-runner');
  * @version-history
+ *   v1.2.0 -- 2026-10-06 -- organism-knowledge holds organism:read and organism:write, the words the
+ *     workspace read and publish routes ask and their MCP tools now ask too (secaudit 2026-10
+ *     follow-up, A4). Without them the profile's agent could read no workspace over REST.
  *   v1.1.0 -- 2026-10-01 -- coordinator holds contacts:read, the word the contact list now asks for.
  *   v1.0.0 -- 2026-09-26 -- Moved unchanged from scopes.ts (v1.30.1), which had passed the 800-line
  *     limit.
@@ -30,7 +33,7 @@ export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     'task-runner': ['memory:read', 'memory:write', 'work:read', 'work:accept'],
     coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'messages:send', 'messages:read', 'contacts:read', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
     appdev: ['memory:read', 'memory:write'],
-    'organism-knowledge': ['memory:read', 'memory:write', 'social:read'],
+    'organism-knowledge': ['memory:read', 'memory:write', 'social:read', 'organism:read', 'organism:write'],
     interactive: ['*'],
     autonomous: ['*'],
     workstation: ['*'],

@@ -207,6 +207,8 @@ export const schedulesTasksMemoryTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Pending Workflow Inputs', readOnlyHint: true },
+        // The words GET /v1/workflows/pending-inputs asks (secaudit 2026-10 follow-up, A4).
+        scope: 'workflow:read',
         surfaces: ['agent'],
         input: {},
     },
