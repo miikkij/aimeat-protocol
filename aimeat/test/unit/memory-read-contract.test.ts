@@ -42,14 +42,16 @@ describe.each(names)('%s memory reads', name => {
     const full = vi.spyOn(storage, 'listAllMemory');
     const meta = vi.spyOn(storage, 'listAllMemoryMeta');
     try {
-      const page = await discoverMemory(storage, caller, { prefix, q: 'ääni', limit: 1, offset: 1 });
+      // Classification off: the organism leave check passes everything and reads no storage.
+      const config = { nodeId: 'test-node', classificationMode: 'off' } as never;
+      const page = await discoverMemory(storage, config, caller, { prefix, q: 'ääni', limit: 1, offset: 1 });
       expect(page.map(item => item.key)).toEqual([prefix + 'z2']);
       expect(page.every(item => !('value' in item))).toBe(true);
       expect(full).not.toHaveBeenCalled();
       expect(meta).toHaveBeenCalledTimes(1);
       const loaded = await meta.mock.results[0].value;
       expect(Buffer.byteLength(JSON.stringify(loaded))).toBeLessThan(oldBytes);
-      expect(await discoverMemory(storage, caller, { prefix, q: 'missing', limit: 50, offset: 0 })).toEqual([]);
+      expect(await discoverMemory(storage, config, caller, { prefix, q: 'missing', limit: 50, offset: 0 })).toEqual([]);
     } finally { vi.restoreAllMocks(); }
   }, 30_000);
 
