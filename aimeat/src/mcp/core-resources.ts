@@ -10,6 +10,7 @@
  * @structure registerCoreResources(mcp, storage, config, agentGaii)
  * @usage registerCoreResources(mcp, storage, config, agentGaii);  // from registerCoreTools
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-09-29 — Moved from mcp/core.ts (max-file-lines), with the classification reader.
  */
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -54,7 +55,7 @@ export function registerCoreResources(mcp: McpServer, storage: Storage, config: 
         new ResourceTemplate('aimeat://storage/{key}', {
             list: async () => {
                 const files = await readerForAgent({ storage, config }, agentGaii)
-                    .show(await storage.listStorageFiles(agentGaii), f => fileTarget(agentGaii, f.key));
+                    .show(await storage.listStorageFiles(agentGaii), f => fileTarget(agentGaii, f.key, f.workspaceRef));
                 return {
                     resources: files.map(f => ({
                         uri: `aimeat://storage/${encodeURIComponent(f.key)}`,
@@ -69,7 +70,7 @@ export function registerCoreResources(mcp: McpServer, storage: Storage, config: 
         async (uri, variables) => {
             const key = decodeURIComponent(variables.key as string);
             const stored = await storage.getStorageFile(agentGaii, key);
-            const [file] = stored ? await readerForAgent({ storage, config }, agentGaii).show([stored], () => fileTarget(agentGaii, key)) : [];
+            const [file] = stored ? await readerForAgent({ storage, config }, agentGaii).show([stored], () => fileTarget(agentGaii, key, stored.workspaceRef)) : [];
             if (!file) return { contents: [{ uri: uri.toString(), text: 'Not found' }] };
             return { contents: [{ uri: uri.toString(), blob: file.data.toString('base64'), mimeType: file.mimeType }] };
         },

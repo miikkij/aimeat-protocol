@@ -27,6 +27,7 @@
  * @usage const files = makeExtensionFiles({ config, storage, callerGaii, extName });
  *   const ctx: ExtensionCtx = { …, files };
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-07-26 — Initial: ctx.files.read/write so a capability can take a file REFERENCE
  *     instead of its bytes (image pipelines, MCP-safe handoff).
  *   v1.1.0 — 2026-07-26 — parseRef delegates to services/file-refs.ts: the same reference form now
@@ -126,7 +127,7 @@ export function makeExtensionFiles(deps: {
             }
             // And the classification check, as the same caller (TARGET-082): a file this caller may
             // not see is refused by name, and a warning label rides along on the answer.
-            const [shown] = await reader.show([file], () => fileTarget(gaii, key));
+            const [shown] = await reader.show([file], () => fileTarget(gaii, key, file.workspaceRef));
             if (!shown) {
                 throw new ClassificationError('CLASSIFIED', 403, `${gaii}/${key} is classified, and whoever invoked this action may not read it.`);
             }

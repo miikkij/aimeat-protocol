@@ -15,6 +15,7 @@
  * @usage
  *   const recs = await readAiRecords(deps, reader, ownerGhii, [{ key }], { capability: 'text' });
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
@@ -69,7 +70,7 @@ export async function readAiFile(
 ): Promise<StorageFileRecord | null> {
   const file = await storage.getStorageFile(ownerGaii, storageKey);
   if (!file) return null;
-  await reader.useForAi([fileTarget(ownerGaii, storageKey)], use);
-  const [shown] = await reader.show([file], () => fileTarget(ownerGaii, storageKey));
+  await reader.useForAi([fileTarget(ownerGaii, storageKey, file.workspaceRef)], use);
+  const [shown] = await reader.show([file], () => fileTarget(ownerGaii, storageKey, file.workspaceRef));
   return shown ?? null;
 }
