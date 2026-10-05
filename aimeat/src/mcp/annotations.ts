@@ -250,38 +250,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // between "our store said no" and "Google said no".
     // Remote MCP servers. `openWorldHint` is true on all but the list, because everything else here
     // reaches a server this node does not run.
-    aimeat_mcp_list: { title: 'Attached MCP Servers', readOnlyHint: true },
-    aimeat_mcp_tools: { title: 'What an Attached Server Can Do', readOnlyHint: true, openWorldHint: true },
-    // NOT read-only and NOT idempotent, whatever the tool behind it does. This node cannot know
-    // what somebody else's tool is: the honest hint is the widest one, because a client deciding
-    // whether to auto-run a call must not be told "safe" on our guess about a stranger's code.
-    aimeat_mcp_call: { title: 'Call a Tool on an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    // Idempotent: attaching a name that already exists is refused rather than duplicated.
-    aimeat_mcp_attach: { title: 'Attach an MCP Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    // Destructive, and the credential goes with it. Everything acting for this person loses those
-    // tools at once.
-    // Idempotent: setting enabled to the value it already has changes nothing. Not destructive:
-    // switching a server off keeps the setup and the credential, which is the whole difference
-    // between this and detaching.
-    // Idempotent in the sense that matters: starting twice produces two addresses and signs in
-    // to nothing on its own. openWorld, because the whole point is reaching somebody else's
-    // authorization server.
-    aimeat_mcp_authorize: { title: 'Sign In to an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    aimeat_mcp_update: { title: 'Change an Attached Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_mcp_registry_list: { title: "This Node's MCP Registry", readOnlyHint: true },
-    // Idempotent, and NOT destructive in the ordinary sense: switching a server off keeps it and
-    // its credential. What makes it worth a person's attention is the blast radius — every owner
-    // on the node is affected at once — and that is what the description says rather than the hint.
-    aimeat_mcp_registry_set: { title: "Set Who May Use a Node Server", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_mcp_grant_list: { title: 'Who May Use Which Server', readOnlyHint: true },
-    // Idempotent: writing the same grant twice leaves the same state. Not destructive, although
-    // it REPLACES an earlier grant for the same pair — what it replaces is a permission record,
-    // and the thing it might take away is itself recoverable by writing it again.
-    aimeat_mcp_grant_set: { title: 'Narrow an Agent to Named Tools', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // NOT destructive in the direction people expect: removing a narrowing WIDENS what the agent
-    // may do, back to whatever its permissions allow.
-    aimeat_mcp_grant_revoke: { title: 'Remove a Narrowing', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_mcp_detach: { title: 'Remove an MCP Server', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_space_add: { title: 'Add Workspace Space', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_sections_set: { title: 'Set Workspace Sections', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

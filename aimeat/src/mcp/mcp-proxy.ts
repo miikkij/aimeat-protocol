@@ -30,6 +30,7 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.1 — 2026-09-26 — Attaching to a group hands the service the owner GHII, not a name cut from it,
  *     the same identity POST /v1/mcp-servers/organism hands it (secaudit 2026-09, a0ecb62eafb3).
  *   v1.3.0 — 2026-09-24 — SECURITY (audit A8-1): the registry pair asks the operator:admin word as
@@ -42,7 +43,6 @@
  *     is used by the owners it admits and changed by none of them.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -65,6 +65,7 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/ow
 import {
   toPublicMcpServer, type McpTransport, type McpServerCredential,
 } from '../models/mcp-server-schemas.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -101,16 +102,12 @@ export function registerMcpProxyTools(
   // ── Using what is attached ──────────────────────────────────────────────────────────────────
 
   mcp.tool('aimeat_mcp_list', descriptionFor('aimeat_mcp_list'),
-    {},
+    zodShapeFor('aimeat_mcp_list'),
     annotationsFor('aimeat_mcp_list'),
     async (): Promise<TextResult> => ok({ servers: await listUsableServers(storage, ownerGhii()) }));
 
   mcp.tool('aimeat_mcp_tools', descriptionFor('aimeat_mcp_tools'),
-    {
-      server: z.string().describe("Which server, by the short name from aimeat_mcp_list (e.g. 'jira')."),
-      refresh: z.boolean().optional()
-        .describe('Ask the server again instead of using what was cached at the last look.'),
-    },
+    zodShapeFor('aimeat_mcp_tools'),
     annotationsFor('aimeat_mcp_tools'),
     async ({ server, refresh }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
@@ -128,12 +125,7 @@ export function registerMcpProxyTools(
     });
 
   mcp.tool('aimeat_mcp_call', descriptionFor('aimeat_mcp_call'),
-    {
-      server: z.string().describe("Which server, by the short name from aimeat_mcp_list."),
-      tool: z.string().describe('Which of its tools, by the name aimeat_mcp_tools gave.'),
-      arguments: z.record(z.string(), z.unknown()).optional()
-        .describe('The arguments that tool asks for, in the shape its own schema names.'),
-    },
+    zodShapeFor('aimeat_mcp_call'),
     annotationsFor('aimeat_mcp_call'),
     async ({ server, tool, arguments: args }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
@@ -162,25 +154,7 @@ export function registerMcpProxyTools(
   // `mcp:manage` sits outside the wildcard, so the audit's `scopes: ['*']` did not carry it.
 
   mcp.tool('aimeat_mcp_attach', descriptionFor('aimeat_mcp_attach'),
-    {
-      name: z.string()
-        .describe("A short name you will use instead of the address, e.g. 'jira'. Lowercase letters, digits and dashes."),
-      url: z.string().optional().describe('The server address, https. Give this or peer.'),
-      peer: z.string().optional()
-        .describe('The id of a peer AIMEAT node, instead of url. Its address is looked up on every call, so the link follows the peering rather than outliving it. The peering must carry routing.'),
-      organism_id: z.string().optional()
-        .describe("Attach it to a GROUP instead of to this person, so the group's members reach it without anybody handing out a token. Only an owner or an admin of the group may; using what is attached needs only membership."),
-      ws: z.string().optional()
-        .describe("With organism_id, bind it to ONE workspace inside that group. Then the workspace's own roles decide: a contributor may call it, a viewer only sees it is there, and a member of the group with no role in that workspace reaches nothing."),
-      title: z.string().optional().describe('What to call it on screen. Defaults to the name.'),
-      description: z.string().optional().describe('What it is for, in a sentence.'),
-      transport: z.enum(['http', 'sse']).optional()
-        .describe("How to speak to it. 'http' is the current transport and the default; 'sse' is the older one."),
-      token: z.string().optional()
-        .describe('A token or key the server needs. Held encrypted on this node and never given out again.'),
-      header: z.string().optional()
-        .describe("Which header the token belongs in, when the server does not take a bearer (e.g. 'X-API-Key')."),
-    },
+    zodShapeFor('aimeat_mcp_attach'),
     annotationsFor('aimeat_mcp_attach'),
     async ({ name, url, peer, organism_id: group, ws, title, description, transport, token, header }): Promise<TextResult> => {
       if (!url && !peer) {
@@ -230,11 +204,7 @@ export function registerMcpProxyTools(
     });
 
   mcp.tool('aimeat_mcp_authorize', descriptionFor('aimeat_mcp_authorize'),
-    {
-      server: z.string().describe('Which server, by its short name.'),
-      return_url: z.string().optional()
-        .describe('A path on this node the browser lands on afterwards, e.g. /spa.html#access.'),
-    },
+    zodShapeFor('aimeat_mcp_authorize'),
     annotationsFor('aimeat_mcp_authorize'),
     async ({ server, return_url }): Promise<TextResult> => {
       // A sign-in writes the credential onto the row, so it is a change like the two tools below.
@@ -260,15 +230,7 @@ export function registerMcpProxyTools(
     });
 
   mcp.tool('aimeat_mcp_update', descriptionFor('aimeat_mcp_update'),
-    {
-      server: z.string().describe('Which server, by its short name.'),
-      enabled: z.boolean().optional()
-        .describe('false switches it off at once without removing it; true switches it back on.'),
-      title: z.string().optional().describe('What to call it on screen.'),
-      description: z.string().optional().describe('What it is for, in a sentence.'),
-      exposure: z.enum(['gateway', 'flatten']).optional()
-        .describe("How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one."),
-    },
+    zodShapeFor('aimeat_mcp_update'),
     annotationsFor('aimeat_mcp_update'),
     async ({ server, enabled, title, description, exposure }): Promise<TextResult> => {
       const row = await manageable(server);
@@ -294,7 +256,7 @@ export function registerMcpProxyTools(
   // operator connected (security audit A8-1).
 
   mcp.tool('aimeat_mcp_registry_list', descriptionFor('aimeat_mcp_registry_list'),
-    {},
+    zodShapeFor('aimeat_mcp_registry_list'),
     annotationsFor('aimeat_mcp_registry_list'),
     async (): Promise<TextResult> => {
       const operator = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
@@ -311,23 +273,7 @@ export function registerMcpProxyTools(
     });
 
   mcp.tool('aimeat_mcp_registry_set', descriptionFor('aimeat_mcp_registry_set'),
-    {
-      server: z.string().describe("Which server on this node's registry, by its short name."),
-      availability: z.enum(['all-owners', 'allowlist']).optional()
-        .describe('Who may use it: everyone with an account here, or only the named owners.'),
-      allowlist: z.array(z.string()).optional()
-        .describe('The owners who may use it, when availability is allowlist. An empty list means nobody.'),
-      // No `unit`: a price is money, and morsels are a pacer that buys nothing, so there is nothing
-      // for an agent to choose between. Leaving the field out means a morsel price cannot be asked for.
-      price: z.object({
-        perCall: z.number(),
-        currency: z.string().optional(),
-      }).optional()
-        .describe('What one call costs the caller, in money: perCall in whole micro-units (1000000 is one unit of the currency), and currency as ISO 4217, such as EUR. perCall 0 makes it free again.'),
-      exposure: z.enum(['gateway', 'flatten']).optional()
-        .describe("How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one in every caller's own tool list."),
-      enabled: z.boolean().optional().describe('false takes it away from everybody at once.'),
-    },
+    zodShapeFor('aimeat_mcp_registry_set'),
     annotationsFor('aimeat_mcp_registry_set'),
     async ({ server, availability, allowlist, price, exposure, enabled }): Promise<TextResult> => {
       const operator = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
@@ -355,24 +301,13 @@ export function registerMcpProxyTools(
     });
 
   mcp.tool('aimeat_mcp_grant_list', descriptionFor('aimeat_mcp_grant_list'),
-    { server: z.string().optional().describe('Only for this server, by its short name.') },
+    zodShapeFor('aimeat_mcp_grant_list'),
     annotationsFor('aimeat_mcp_grant_list'),
     async ({ server }): Promise<TextResult> =>
       ok({ grants: await listMcpGrants(storage, ownerGhii(), server) }));
 
   mcp.tool('aimeat_mcp_grant_set', descriptionFor('aimeat_mcp_grant_set'),
-    {
-      server: z.string().describe('Which server, by its short name.'),
-      grantee: z.string()
-        .describe("Who this is for: an agent's full name, an app as app:owner/file, or * for everything."),
-      tools: z.union([z.literal('*'), z.array(z.string())])
-        .describe("Which tools it may use: a list of names, or '*' for all of them."),
-      locked_input: z.record(z.string(), z.unknown()).optional()
-        .describe('Arguments it may not choose, e.g. {"project":"SUPPORT"}. These win over what it sends.'),
-      call_cap: z.object({ count: z.number(), windowHours: z.number() }).optional()
-        .describe('At most this many calls in this many hours.'),
-      expires: z.string().optional().describe('An ISO date after which this stops applying.'),
-    },
+    zodShapeFor('aimeat_mcp_grant_set'),
     annotationsFor('aimeat_mcp_grant_set'),
     async ({ server, grantee, tools, locked_input, call_cap, expires }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
@@ -396,10 +331,7 @@ export function registerMcpProxyTools(
     });
 
   mcp.tool('aimeat_mcp_grant_revoke', descriptionFor('aimeat_mcp_grant_revoke'),
-    {
-      server: z.string().describe('Which server, by its short name.'),
-      grantee: z.string().describe('Whose narrowing to remove.'),
-    },
+    zodShapeFor('aimeat_mcp_grant_revoke'),
     annotationsFor('aimeat_mcp_grant_revoke'),
     async ({ server, grantee }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
@@ -414,7 +346,7 @@ export function registerMcpProxyTools(
     });
 
   mcp.tool('aimeat_mcp_detach', descriptionFor('aimeat_mcp_detach'),
-    { server: z.string().describe('Which server, by its short name.') },
+    zodShapeFor('aimeat_mcp_detach'),
     annotationsFor('aimeat_mcp_detach'),
     async ({ server }): Promise<TextResult> => {
       const row = await manageable(server);
