@@ -24,12 +24,16 @@
  *
  *   NOT FOR THE OPERATOR'S OWN DATA. An operator opening an entry of their own account has nobody to
  *   tell, and a principal that is not a person (no `owner@node` behind it) has no feed to tell.
- * @structure OperatorAccess · recordOperatorAccess(storage, config, access)
+ * @structure OperatorAccess · recordOperatorAccess(storage, config, access) · OperatorAction ·
+ *   recordOperatorAction(storage, config, act)
  * @usage
  *   await recordOperatorAccess(storage, config, {
  *     operatorGhii, actorGaii: operatorGhii, ownerOf: rec.ownerGaii, action: 'read', key: rec.key,
  *   });
  * @version-history
+ *   v1.1.0 — 2026-10-05 — recordOperatorAction(): the same trail for an operator's other acts in a
+ *     person's account (an install set applied to it first; secaudit 2026-10, S4), account event
+ *     `operator_acted`.
  *   v1.0.0 — 2026-09-24 — Initial (security audit A8-2), for the four admin memory doors.
  */
 import type { AimeatConfig } from '../config.js';
@@ -95,5 +99,57 @@ export async function recordOperatorAccess(
       ...(access.count !== undefined ? { count: String(access.count) } : {}),
     },
     subject: access.key ?? `memory.${access.action}`,
+  }, config);
+}
+
+/** Any other act of an operator in another person's account than reading their entries. */
+export interface OperatorAction {
+  /** The operator's GHII: whose usage stream the row lands in. */
+  operatorGhii: string;
+  /** The exact principal that acted: the operator in person, or their agent holding operator:admin. */
+  actorGaii: string;
+  /** Any principal of the account the act was in. */
+  ownerOf: string;
+  /** What kind of thing it was in: 'install-set', 'board', 'capability', 'account'. */
+  area: string;
+  /** What was done to it: 'apply', 'rules', 'delete'. */
+  action: string;
+  /** The thing's name, for the person's feed. */
+  subject?: string;
+  /** Short facts the feed sentence may name. */
+  data?: Record<string, string>;
+}
+
+/**
+ * Record an operator's act in another person's account: the same two records as
+ * recordOperatorAccess, with the usage coordinate `<area>.<action>` and the account event
+ * `operator_acted`. An operator may do in any account what they judge necessary, and the person
+ * reads afterwards what was done (Jouni, 2026-10-05; secaudit 2026-10, S4 and C2). Never throws.
+ */
+export async function recordOperatorAction(
+  storage: Storage,
+  config: Pick<AimeatConfig, 'accountEventWindow'>,
+  act: OperatorAction,
+): Promise<void> {
+  const ownerGhii = ownerGhiiOf(act.ownerOf);
+  if (!isValidGHII(ownerGhii) || ownerGhii === ownerGhiiOf(act.operatorGhii)) return;
+
+  recordUsageCall({
+    ownerGhii: act.operatorGhii,
+    actorGaii: act.actorGaii,
+    actorKind: 'operator',
+    surface: 'operator',
+    coordinate: `${act.area}.${act.action}`,
+    counterpartyGhii: ownerGhii,
+    outcome: 'ok',
+    meta: { inspected: ownerGhii, ...(act.subject !== undefined ? { subject: act.subject } : {}) },
+  });
+
+  await recordAccountEvent(storage, {
+    ownerGhii,
+    kind: 'operator_acted',
+    actorGaii: act.actorGaii,
+    data: { operator: act.operatorGhii, area: act.area, action: act.action, ...(act.data ?? {}) },
+    subject: act.subject ?? `${act.area}.${act.action}`,
   }, config);
 }
