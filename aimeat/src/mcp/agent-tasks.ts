@@ -9,6 +9,7 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.13.0 — 2026-10-04 — aimeat_task_decline: the agent refuses a task with its reason, and the task
  *     ends as 'declined'; aimeat_task_list filters by it.
  *   v1.12.0 — 2026-10-02 — aimeat_agent_scope_narrow: a `*` agent narrowed to what it used (ruling C).
@@ -76,7 +77,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
@@ -94,8 +94,9 @@ import { parseGAII, buildGAII, localAccountName, ownerGhiiOf } from '../utils/ga
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';
 import { completeTask, failTask, declineTask } from '../services/agent-task-fanout.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentTaskTools(
     mcp: McpServer,
@@ -139,24 +140,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_create',
         descriptionFor('aimeat_task_create'),
-        {
-            target_agent: z.string().describe('Name of the agent the task is FOR. Must be owned by the same owner as the calling agent.'),
-            title: z.string().describe('Short human-readable title for the task.'),
-            description: z.string().describe('The actual prompt / instruction for the target agent.'),
-            status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to target immediately).'),
-            files: z.array(z.string()).max(20).optional()
-                .describe('Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" (or a bare key for one of your own files). Upload first via aimeat_storage_upload, or pass the `ref` from a DM attachment. You must be able to read each file yourself; the target agent gets a presigned download_url from aimeat_task_get.'),
-            scope: z.array(z.object({
-                name: z.string().describe('Field name the receiving runner reads, e.g. "kind", "memory_key", "app_id".'),
-                value: z.string(),
-                type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']).optional()
-                    .describe('How to read the value. Defaults to "text".'),
-                description: z.string().optional().describe('What this field is for, for whoever reads the task.'),
-            })).max(20).optional()
-                .describe('Named parameters the receiving runner DISPATCHES on, as opposed to the description, which is prose for a model to read. A fleet runner recognises work by a `kind` entry here and takes its pointers (a memory key, an app id) from the others — putting those in the title instead is the standard way to build a task nothing picks up.'),
-            start: z.enum(['automatic', 'confirm']).optional()
-                .describe("How THIS task starts. 'confirm' = it waits for the owner's OK (\"check with me first\"); 'automatic' = the agent proposes its plan and goes on (\"just do it\"), which needs agent:write and is never allowed for your own task. Leave it out to use the agent's own setting."),
-        },
+        zodShapeFor('aimeat_task_create'),
         annotationsFor('aimeat_task_create'),
         async ({ target_agent, title, description, status, files, scope, start }) => {
             const callerParsed = parseGAII(agentGaii);
@@ -234,12 +218,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_list',
         descriptionFor('aimeat_task_list'),
-        {
-            status: z.enum(['draft', 'queued', 'active', 'stalled', 'done', 'failed', 'declined']).optional()
-                .describe('Filter by task status'),
-            page: z.number().optional().describe('Page number (default 1)'),
-            per_page: z.number().optional().describe('Results per page (default 20, max 100)'),
-        },
+        zodShapeFor('aimeat_task_list'),
         annotationsFor('aimeat_task_list'),
         async ({ status, page, per_page }) => {
             const pageNum = Math.max(1, page ?? 1);
@@ -285,9 +264,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_get',
         descriptionFor('aimeat_task_get'),
-        {
-            task_id: z.string().describe('The task ID'),
-        },
+        zodShapeFor('aimeat_task_get'),
         annotationsFor('aimeat_task_get'),
         async ({ task_id }) => {
             const task = await storage.getAgentTask(task_id);
@@ -349,17 +326,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_propose_todos',
         descriptionFor('aimeat_task_propose_todos'),
-        {
-            task_id: z.string().describe('The task ID'),
-            todos: z.array(z.object({
-                title: z.string().describe('TODO title'),
-                description: z.string().optional().describe('TODO details'),
-                verification: z.string().optional().describe('How completion can be verified'),
-                estimate_minutes: z.number().optional().describe('Estimated work time in minutes'),
-                effects: z.array(z.enum(['spend', 'send_as_owner', 'delete'])).optional()
-                    .describe("Declare what this step does that the owner must see first: 'spend' (money), 'send_as_owner' (mail or a message in the owner's name), 'delete' (removes the owner's data). A plan with any of these waits for the owner's OK."),
-            })).describe('Proposed TODO plan'),
-        },
+        zodShapeFor('aimeat_task_propose_todos'),
         annotationsFor('aimeat_task_propose_todos'),
         async ({ task_id, todos }) => {
             const task = await storage.getAgentTask(task_id);
@@ -422,9 +389,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_start',
         descriptionFor('aimeat_task_start'),
-        {
-            task_id: z.string().describe('The waiting task to start.'),
-        },
+        zodShapeFor('aimeat_task_start'),
         annotationsFor('aimeat_task_start'),
         async ({ task_id }) => {
             const out = await startWaitingTask({ storage, config }, startCaller, localAccountName(agentGaii), task_id);
@@ -440,11 +405,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_agent_task_start_set',
         descriptionFor('aimeat_agent_task_start_set'),
-        {
-            target_agent_name: z.string().describe('Agent whose tasks this is about (same owner as you, never yourself).'),
-            task_start: z.enum(['automatic', 'confirm']).nullable()
-                .describe("'automatic' = it proposes its plan and goes on; 'confirm' = each task waits for the owner's OK; null = leave it to the agent's mode."),
-        },
+        zodShapeFor('aimeat_agent_task_start_set'),
         annotationsFor('aimeat_agent_task_start_set'),
         async ({ target_agent_name, task_start }) => {
             const out = await setAgentTaskStart({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, task_start);
@@ -459,9 +420,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_agent_scope_narrow',
         descriptionFor('aimeat_agent_scope_narrow'),
-        {
-            target_agent_name: z.string().describe('The agent holding * to narrow (same owner as you).'),
-        },
+        zodShapeFor('aimeat_agent_scope_narrow'),
         annotationsFor('aimeat_agent_scope_narrow'),
         async ({ target_agent_name }) => {
             const owner = localAccountName(agentGaii);
@@ -476,16 +435,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_event',
         descriptionFor('aimeat_task_event'),
-        {
-            task_id: z.string().describe('The task ID'),
-            type: z.enum([
-                'started', 'progress', 'todo_completed', 'todo_failed',
-                'memory_write', 'extension_install', 'app_publish',
-                'verification', 'completed', 'failed', 'message',
-            ]).describe('Event type'),
-            message: z.string().describe('Event message'),
-            details: z.record(z.string(), z.unknown()).optional().describe('Optional event details (may include telemetry)'),
-        },
+        zodShapeFor('aimeat_task_event'),
         annotationsFor('aimeat_task_event'),
         async ({ task_id, type, message, details }) => {
             // The readiness bar POST /v1/agent-tasks/:id/events applies. It was middleware, so this
@@ -530,11 +480,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_todo',
         descriptionFor('aimeat_task_todo'),
-        {
-            task_id: z.string().describe('The task ID'),
-            todo_id: z.string().describe('The TODO item ID'),
-            status: z.enum(['pending', 'active', 'done', 'failed', 'skipped']).describe('New TODO status'),
-        },
+        zodShapeFor('aimeat_task_todo'),
         annotationsFor('aimeat_task_todo'),
         async ({ task_id, todo_id, status }) => {
             const task = await storage.getAgentTask(task_id);
@@ -573,19 +519,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_complete',
         descriptionFor('aimeat_task_complete'),
-        {
-            task_id: z.string().describe('The task ID to complete'),
-            message: z.string().optional().describe('Completion message'),
-            // ADDITIVE, and that is why it could simply be added: a tool's declared parameters are its
-            // published contract, so a new OPTIONAL one changes nothing for a caller that never sends
-            // it. What it closes is a capability that only existed on the HTTP door.
-            deliverable_key: z.string().max(256).optional().describe(
-                'The memory key, under YOUR OWN namespace, where you published the result. Write the '
-                + 'deliverable first (aimeat_memory_write), then name its key here: it is what the '
-                + "owner's task card links to, and a deliverable you wrote with visibility=public is "
-                + "put on the node's activity feed when it is named this way."),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_task_complete'),
         annotationsFor('aimeat_task_complete'),
         async ({ task_id, message, deliverable_key, ai_provenance, ai_provenance_id }) => {
             // The same readiness bar the event path answers to. requireReadiness('standard') sits on
@@ -642,10 +576,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_fail',
         descriptionFor('aimeat_task_fail'),
-        {
-            task_id: z.string().describe('The task ID to fail'),
-            reason: z.string().describe('Reason for failure'),
-        },
+        zodShapeFor('aimeat_task_fail'),
         annotationsFor('aimeat_task_fail'),
         async ({ task_id, reason }) => {
             const task = await storage.getAgentTask(task_id);
@@ -688,10 +619,7 @@ export function registerAgentTaskTools(
     mcp.tool(
         'aimeat_task_decline',
         descriptionFor('aimeat_task_decline'),
-        {
-            task_id: z.string().describe('The task ID to decline'),
-            reason: z.string().describe('Why you decline the request, in a sentence the owner reads'),
-        },
+        zodShapeFor('aimeat_task_decline'),
         annotationsFor('aimeat_task_decline'),
         async ({ task_id, reason }) => {
             const task = await storage.getAgentTask(task_id);

@@ -167,11 +167,11 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
      */
     primitives: [
         // Know things.
-        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_search',
+        
         // Know things together.
         'aimeat_workspace_read', 'aimeat_workspace_write',
         // Take work, hand it back.
-        'aimeat_task_list', 'aimeat_task_complete',
+        
         // Talk to the person.
         'aimeat_message_inbox', 'aimeat_message_send',
         // Carry bytes.
@@ -197,7 +197,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Where to start, what exists, and the door to everything else.
         'aimeat_handbook_get', 
         // What the person knows.
-        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_search', 'aimeat_memory_list',
+        
         // What their groups know. Writing to a workspace is found when it is needed: its description
         // alone is 6 500 characters, which every round would pay for.
         'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_workspace_read',
@@ -205,7 +205,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_app_list', 
         // Their agents, a new one, and work for them. A schedule is found when it is needed.
         'aimeat_agents_list', 'aimeat_agent_propose',
-        'aimeat_task_create', 'aimeat_task_get', 'aimeat_task_list',
+        
     ],
     appdev: [
         
@@ -252,7 +252,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
+        'aimeat_memory_read_public',
         
         
         'aimeat_app_manage',
@@ -267,14 +267,14 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
         // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
-        'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
-        'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail', 'aimeat_task_decline',
+        
+        
         // The person's own AI starting a waiting task on their word, and setting whether an agent's
         // tasks start on their own at all.
-        'aimeat_task_start', 'aimeat_agent_task_start_set', 'aimeat_agent_scope_narrow',
-        'aimeat_schedule_create', 'aimeat_schedule_list', 'aimeat_schedule_update',
-        'aimeat_schedule_delete', 'aimeat_schedule_trigger', 'aimeat_schedule_report_internal',
-        'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run', 'aimeat_workflow_answer', 'aimeat_workflow_pending_inputs',
+        
+        
+        
+        
         'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
         'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread', 'aimeat_notify',
         'aimeat_dm_inbox_as_owner', 'aimeat_dm_thread_as_owner',
@@ -360,7 +360,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
     service: [
         
         
-        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
+        'aimeat_memory_read_public',
         
         
         
@@ -475,7 +475,7 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         
         
         
-        'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
+        'aimeat_memory_read_public',
         
         
         'aimeat_wallet_transactions',

@@ -236,8 +236,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // handler also asks organism:write, as the REST DELETE routes do (mcp/workspace-rows.ts).
     aimeat_workspace_rows_delete:             'memory:purge',
 
-    aimeat_schedule_delete:                   'memory:write',
-    aimeat_schedule_report_internal:          'memory:write',
     aimeat_workspace_publish:                 'memory:write',
     aimeat_workspace_revert_to_draft:         'memory:write',
     aimeat_workspace_write:                   'memory:write',
@@ -284,36 +282,7 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
 
     aimeat_organism_join:                     'social:write',
 
-    // Creates work that will run.
-    aimeat_schedule_create:                   'task:write',
-    // Running a schedule now creates the same work its cron would, only sooner.
-    aimeat_schedule_trigger:                  'task:write',
-    aimeat_task_create:                       'task:write',
-    // Starts work that was waiting for the owner's OK, on the owner's word.
-    aimeat_task_start:                        'task:write',
-    // Changes whether an agent's work starts without asking: the agent:write word, like its mode.
-    aimeat_agent_task_start_set:              'agent:write',
-    // Takes an agent's * away for the words it used: changing a sibling's permissions, the word
-    // POST /v1/agents/:name/scope-narrowing asks too.
-    aimeat_agent_scope_narrow:                'agent:permissions',
-
-    // Changes something that runs on its own afterwards.
-    aimeat_schedule_update:                   'workflow:write',
-    aimeat_workflow_answer:                   'workflow:write',
-
-    // Memory (GET /v1/memory/:key → memory:read; POST/PUT → memory:write)
-    aimeat_memory_read: 'memory:read',
-    aimeat_memory_list: 'memory:read',
-    aimeat_memory_search: 'memory:read',
     aimeat_memory_read_public: 'memory:read',
-    aimeat_memory_write: 'memory:write',
-    // `memory:delete` finally reaches a tool. It was a scope an owner could grant that no tool
-    // anywhere asked for, so granting it did nothing for an agent using tools.
-    aimeat_memory_delete: 'memory:delete',
-    // RESTORE IS A WRITE, not a delete. Putting a record back into the working set is making it
-    // exist again, and an agent trusted to remove things is not automatically trusted to make
-    // them reappear under a name someone else may now be using.
-    aimeat_memory_restore: 'memory:write',
 
     // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it
     // does not gate a TOOL — it gates one optional PARAMETER (`ai_provenance`) on nine of them.
@@ -328,11 +297,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // because the tool IS that door: a permission enforced on one surface and not the other is a
     // permission the owner was told they had.
     aimeat_usage_report: 'wallet:read',
-
-    // Agent Workflows (REST: PUT/run → workflow:write; GET → workflow:read)
-    aimeat_workflow_save: 'workflow:write',
-    aimeat_workflow_run: 'workflow:write',
-    aimeat_workflow_get: 'workflow:read',
 
     // Federated direct messages / inbox (REST: POST /v1/messages → messages:send). Distinct from the
     // agent-dashboard aimeat_message_* tools, which are not scope-gated (agent↔own-owner only).

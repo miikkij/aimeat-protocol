@@ -6,6 +6,7 @@
  *   MCP (src/mcp/workflows.ts) so `aimeat connect serve --surface agent` exposes the same
  *   save/get/run tools locally. Thin REST wrappers over /v1/workflows.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.3 -- 2026-09-26 -- The definition's text says an ai step's call holds its share of
  *     maxCostUsd until it answers, the share is one attempt, and a step expected to cost more than
  *     the whole cap starts alone (secaudit 2026-09, A6-11).
@@ -29,6 +30,7 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -42,9 +44,7 @@ export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): 
     return out(await client.put(`/v1/workflows/${encodeURIComponent(id)}`, definition as Record<string, unknown>));
   });
 
-  mcp.tool('aimeat_workflow_get', descriptionFor('aimeat_workflow_get'), {
-    id: z.string().optional().describe('Omit to list all your workflows; pass an id for its definition + derived blueprint + recent runs.'),
-  }, annotationsFor('aimeat_workflow_get'), async ({ id }) => {
+  mcp.tool('aimeat_workflow_get', descriptionFor('aimeat_workflow_get'), zodShapeFor('aimeat_workflow_get'), annotationsFor('aimeat_workflow_get'), async ({ id }) => {
     if (!id) return out(await client.get('/v1/workflows'));
     const enc = encodeURIComponent(id);
     const [def, bp, runs] = await Promise.all([
@@ -59,17 +59,12 @@ export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): 
     };
   });
 
-  mcp.tool('aimeat_workflow_run', descriptionFor('aimeat_workflow_run'), {
-    id: z.string().describe('The workflow id.'),
-    mode: z.enum(['signals-only', 'full']).describe('signals-only = evaluate each step\'s signals against existing memory (no dispatch — an instant health check); full = execute the steps live.'),
-    vars: z.record(z.string(), z.string()).optional().describe('The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this. Anything it does not declare is ignored, and a declared var left out falls back to its default.'),
-    target: z.enum(['live', 'sandbox']).optional().describe('With mode="full": "sandbox" writes every key behind a per-run prefix so a trial cannot touch what a live run produced. Default "live".'),
-  }, annotationsFor('aimeat_workflow_run'), async ({ id, mode, vars, target }) => {
+  mcp.tool('aimeat_workflow_run', descriptionFor('aimeat_workflow_run'), zodShapeFor('aimeat_workflow_run'), annotationsFor('aimeat_workflow_run'), async ({ id, mode, vars, target }) => {
     return out(await client.post(`/v1/workflows/${encodeURIComponent(id)}/run`, { mode, ...(vars ? { vars } : {}), ...(target ? { target } : {}) }));
   });
 
   // → GET /v1/workflows/pending-inputs — runs paused awaiting human input.
-  mcp.tool('aimeat_workflow_pending_inputs', descriptionFor('aimeat_workflow_pending_inputs'), {},
+  mcp.tool('aimeat_workflow_pending_inputs', descriptionFor('aimeat_workflow_pending_inputs'), zodShapeFor('aimeat_workflow_pending_inputs'),
     annotationsFor('aimeat_workflow_pending_inputs'), async () => {
       return out(await client.get('/v1/workflows/pending-inputs'));
     });
@@ -79,13 +74,7 @@ export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): 
   // pinned at ask time, and this door sent { answer: {...} }, so WorkflowHumanAnswerSchema saw an
   // empty body: every human-input answer given through the connector left the run parked. `answer`
   // is gone rather than aliased — it never worked, so there is no caller to keep working.
-  mcp.tool('aimeat_workflow_answer', descriptionFor('aimeat_workflow_answer'), {
-    workflow_id: z.string().describe('The workflow id.'),
-    run_id: z.string().describe('The run id (from aimeat_workflow_pending_inputs).'),
-    step_id: z.string().describe('The paused step id awaiting input.'),
-    picks: z.array(z.string()).optional().describe('Option ids from the pinned question (may be empty when answering with `other` alone).'),
-    other: z.string().optional().describe('Free-text answer; only when the question allows it.'),
-  }, annotationsFor('aimeat_workflow_answer'), async ({ workflow_id, run_id, step_id, picks, other }) => {
+  mcp.tool('aimeat_workflow_answer', descriptionFor('aimeat_workflow_answer'), zodShapeFor('aimeat_workflow_answer'), annotationsFor('aimeat_workflow_answer'), async ({ workflow_id, run_id, step_id, picks, other }) => {
     const body: Record<string, unknown> = { picks: picks ?? [] };
     if (other !== undefined) body.other = other;
     return out(await client.post(`/v1/workflows/${encodeURIComponent(workflow_id)}/runs/${encodeURIComponent(run_id)}/steps/${encodeURIComponent(step_id)}/answer`, body));
