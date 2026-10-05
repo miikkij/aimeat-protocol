@@ -131,6 +131,17 @@ describe('TARGET-082 review, item 1: an organism record read by its visibility s
       expect(member.body.data?.value).toEqual({ title: 'Members merger note' });
     });
 
+    // Secaudit 2026-10, DATA-3: the record read refused these keys while the discovery listing named them.
+    it('GET /v1/memory/discover does not list an organism record kept inside to a non-member; one that may leave is listed', async () => {
+      const list = async (as: string) => {
+        const res = await fetch(`${base}/v1/memory/discover?prefix=${encodeURIComponent(`organism.${ORG}.`)}&limit=200`, { headers: { 'x-test-as': as } });
+        return ((await res.json()) as { data: { items: Array<{ key: string }> } }).data.items.map(i => i.key);
+      };
+      const bob = await list('bob');
+      expect(bob).toContain(OPEN_KEY);
+      expect(bob).not.toContain(PUBLIC_KEY);
+    });
+
     it('a public record: anonymous and a non-member get 403 CLASSIFIED; a label that may leave and a personal record are read', async () => {
       expect((await get(PUBLIC_KEY)).body.error?.code).toBe('CLASSIFIED');
       expect((await get(PUBLIC_KEY, 'bob')).status).toBe(403);

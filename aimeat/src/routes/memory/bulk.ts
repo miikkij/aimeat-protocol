@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.2 — 2026-10-05 — discover passes the config, so the listing leaves out an organism record
+ *     kept inside its organism (services/memory-discover.ts, secaudit 2026-10, DATA-3).
  *   v1.11.1 — 2026-10-02 — export takes the caller's identity from resolve(req), as bulk, import and
  *     bulk-delete do, instead of the raw `sub` (Semgrep owner-data-must-resolve-identity, alert 1683).
  *   v1.11.0 — 2026-09-29 —TARGET-082 review: export and bundle pass leave() with the destination
@@ -531,7 +533,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const callerGaii = resolve(req);
 
-    const items = await discoverMemory(storage, callerGaii, {
+    const items = await discoverMemory(storage, config, callerGaii, {
       prefix: prefix || undefined, owner: owner || undefined, q, limit, offset,
     });
 
