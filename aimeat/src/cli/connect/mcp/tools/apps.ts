@@ -53,7 +53,6 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { AI_ROLE_PARAM } from '../../../../tool-catalog/definitions/ai-models.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult, readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { envelopeResult, payloadResult } from './_registry.js';
@@ -233,15 +232,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // chose and edited crossed between two systems with nothing saying so.
   // Packages keep the capability under aimeat_package_* below.
   // ───────────────────────────────────────────────────────────────────────────────────────────────
-  mcp.tool('aimeat_app_list', descriptionFor('aimeat_app_list'), {
-    search: z.string().optional().describe('Free-text search over name and description'),
-    category: z.string().optional().describe('Filter by category'),
-    tag: z.string().optional().describe('Filter by tag'),
-    own: z.boolean().optional().describe("List only your own owner's apps"),
-    building: z.boolean().optional().describe('Apps somebody else asked you to help build, instead of your own. Needs a signed-in caller.'),
-    limit: z.number().int().min(1).max(200).optional().describe('How many to return (default 50, max 200)'),
-    offset: z.number().int().min(0).optional().describe('How many to skip; with has_more this reads the whole catalogue'),
-  }, annotationsFor('aimeat_app_list'), async ({ search, category, tag, own, building, limit, offset }) => {
+  mcp.tool('aimeat_app_list', descriptionFor('aimeat_app_list'), zodShapeFor('aimeat_app_list'), annotationsFor('aimeat_app_list'), async ({ search, category, tag, own, building, limit, offset }) => {
     const params = new URLSearchParams();
     // GET /v1/apps reads `q`, not `search`. Sent under the wrong name the filter was dropped and the
     // whole catalogue came back as though it had been searched.
@@ -257,10 +248,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_app_get', descriptionFor('aimeat_app_get'), {
-    owner: z.string().describe('Owner name of the app'),
-    filename: z.string().describe('App filename, e.g. "starwars.html"'),
-  }, annotationsFor('aimeat_app_get'), async ({ owner, filename }) => {
+  mcp.tool('aimeat_app_get', descriptionFor('aimeat_app_get'), zodShapeFor('aimeat_app_get'), annotationsFor('aimeat_app_get'), async ({ owner, filename }) => {
     // No REST route returns one app's DETAIL — GET /v1/apps/:owner/:filename serves the app's own
     // bytes — so it comes from the catalogue listing, which already carries manifest, version, size,
     // download count and public url per entry.
@@ -274,10 +262,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return payloadResult(readPayloadWithProvenance({ ...resp, data: { app } }), resp);
   });
 
-  mcp.tool('aimeat_app_delete', descriptionFor('aimeat_app_delete'), {
-    filename: z.string().describe("App filename to archive (your own owner's)"),
-    version: z.number().optional().describe('A specific version number. Omit to archive all versions.'),
-  }, annotationsFor('aimeat_app_delete'), async ({ filename, version }) => {
+  mcp.tool('aimeat_app_delete', descriptionFor('aimeat_app_delete'), zodShapeFor('aimeat_app_delete'), annotationsFor('aimeat_app_delete'), async ({ filename, version }) => {
     const qs = version !== undefined ? `?version=${encodeURIComponent(String(version))}` : '';
     const resp = await client.delete(`/v1/apps/${encodeURIComponent(filename)}${qs}`);
     return envelopeResult(resp);
@@ -365,12 +350,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // → POST /v1/apps/:owner/:filename/fork — sanctioned, provenance-recording fork (behind the forkable/paid gates).
-  mcp.tool('aimeat_app_fork', descriptionFor('aimeat_app_fork'), {
-    owner: z.string().describe('Owner name of the source app.'),
-    filename: z.string().describe('Filename of the source app.'),
-    new_filename: z.string().describe('Filename for the fork in your catalogue.'),
-    version: z.number().int().positive().optional().describe('Source version to fork (default: latest).'),
-  }, annotationsFor('aimeat_app_fork'), async ({ owner: srcOwner, filename, new_filename, version }) => {
+  mcp.tool('aimeat_app_fork', descriptionFor('aimeat_app_fork'), zodShapeFor('aimeat_app_fork'), annotationsFor('aimeat_app_fork'), async ({ owner: srcOwner, filename, new_filename, version }) => {
     const body: Record<string, unknown> = { new_filename };
     if (version !== undefined) body.version = version;
     return out(await client.post(`/v1/apps/${encodeURIComponent(srcOwner)}/${encodeURIComponent(filename)}/fork`, body));
@@ -398,15 +378,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
 
   // → POST /v1/apps/:owner/:filename/draft/write — append a piece of the draft, or replace it.
   //   Plain text rather than base64: the caller is composing HTML, not moving a file.
-  mcp.tool('aimeat_app_draft_write', descriptionFor('aimeat_app_draft_write'), {
-    filename: z.string().describe('App filename this draft stages (e.g. "pong.html").'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    content: z.string().describe('The text to write. Plain UTF-8, not base64.'),
-    mode: z.enum(['append', 'replace']).optional().describe('append (default) adds to the end; replace overwrites the whole draft.'),
-    expected_size_bytes: z.number().int().nonnegative().optional().describe('Refuse unless the draft is currently this many bytes.'),
-    name: z.string().optional().describe('Display name (defaults to the live app\'s, or the draft\'s once set).'),
-    description: z.string().optional().describe('Description (defaults to the live app\'s, or the draft\'s once set).'),
-  }, annotationsFor('aimeat_app_draft_write'), async ({ owner: targetOwner, filename, content, mode, expected_size_bytes, name, description }) => {
+  mcp.tool('aimeat_app_draft_write', descriptionFor('aimeat_app_draft_write'), zodShapeFor('aimeat_app_draft_write'), annotationsFor('aimeat_app_draft_write'), async ({ owner: targetOwner, filename, content, mode, expected_size_bytes, name, description }) => {
     const body: Record<string, unknown> = { content };
     if (mode) body.mode = mode;
     if (expected_size_bytes !== undefined) body.expected_size_bytes = expected_size_bytes;
@@ -416,25 +388,14 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // → POST /v1/apps/:owner/:filename/draft/replace — exact old → new inside the draft.
-  mcp.tool('aimeat_app_draft_replace', descriptionFor('aimeat_app_draft_replace'), {
-    filename: z.string().describe('App filename whose draft to edit.'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    old_string: z.string().describe('The exact text to replace, including indentation.'),
-    new_string: z.string().describe('What to put there instead.'),
-    replace_all: z.boolean().optional().describe('Replace every occurrence instead of requiring exactly one. Default false.'),
-  }, annotationsFor('aimeat_app_draft_replace'), async ({ owner: targetOwner, filename, old_string, new_string, replace_all }) => {
+  mcp.tool('aimeat_app_draft_replace', descriptionFor('aimeat_app_draft_replace'), zodShapeFor('aimeat_app_draft_replace'), annotationsFor('aimeat_app_draft_replace'), async ({ owner: targetOwner, filename, old_string, new_string, replace_all }) => {
     const body: Record<string, unknown> = { old_string, new_string };
     if (replace_all) body.replace_all = true;
     return out(await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft/replace`, body));
   });
 
   // → GET /v1/apps/:owner/:filename/draft/lines — a line range, not the whole slot.
-  mcp.tool('aimeat_app_draft_read', descriptionFor('aimeat_app_draft_read'), {
-    filename: z.string().describe('App filename whose draft to read.'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    offset: z.number().int().min(1).optional().describe('First line to return, 1-based. Default 1.'),
-    limit: z.number().int().min(1).optional().describe('How many lines to return. Default 400, maximum 2000.'),
-  }, annotationsFor('aimeat_app_draft_read'), async ({ owner: targetOwner, filename, offset, limit }) => {
+  mcp.tool('aimeat_app_draft_read', descriptionFor('aimeat_app_draft_read'), zodShapeFor('aimeat_app_draft_read'), annotationsFor('aimeat_app_draft_read'), async ({ owner: targetOwner, filename, offset, limit }) => {
     const qs = new URLSearchParams();
     if (offset !== undefined) qs.set('offset', String(offset));
     if (limit !== undefined) qs.set('limit', String(limit));
@@ -443,12 +404,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // → POST /v1/apps/:owner/:filename/draft/seed — copy a published version into the slot.
-  mcp.tool('aimeat_app_draft_seed', descriptionFor('aimeat_app_draft_seed'), {
-    filename: z.string().describe('The draft slot to write into.'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    from_filename: z.string().optional().describe('The published app to copy from. Defaults to filename.'),
-    version: z.number().int().min(1).optional().describe('Which published version. Defaults to the newest.'),
-  }, annotationsFor('aimeat_app_draft_seed'), async ({ owner: targetOwner, filename, from_filename, version }) => {
+  mcp.tool('aimeat_app_draft_seed', descriptionFor('aimeat_app_draft_seed'), zodShapeFor('aimeat_app_draft_seed'), annotationsFor('aimeat_app_draft_seed'), async ({ owner: targetOwner, filename, from_filename, version }) => {
     const body: Record<string, unknown> = {};
     if (from_filename) body.from_filename = from_filename;
     if (version !== undefined) body.version = version;
@@ -456,17 +412,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // → POST /v1/ai/image — make a picture on the owner's key; the bytes land in storage, not here.
-  mcp.tool('aimeat_image_generate', descriptionFor('aimeat_image_generate'), {
-    prompt: z.string().describe('What the picture should show.'),
-    size: z.string().optional().describe('Provider-specific size, e.g. "1024x1024".'),
-    storage_key: z.string().optional().describe('Where to store it.'),
-    public: z.boolean().optional().describe('Make it publicly readable so a model or page can fetch it.'),
-    model: z.string().optional().describe('Override the image model.'),
-    app_id: z.string().optional().describe('Attribution for the per-app quota and the spend report.'),
-    provider: z.string().optional().describe('One of the owner\'s AI providers, or a type. No fallback then.'),
-    fallback: z.boolean().optional().describe('false keeps the call on its first provider.'),
-    role: z.string().min(1).max(300).optional().describe(AI_ROLE_PARAM),
-  }, annotationsFor('aimeat_image_generate'), async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role }) => {
+  mcp.tool('aimeat_image_generate', descriptionFor('aimeat_image_generate'), zodShapeFor('aimeat_image_generate'), annotationsFor('aimeat_image_generate'), async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role }) => {
     const body: Record<string, unknown> = { prompt };
     if (size) body.size = size;
     if (storage_key) body.storage_key = storage_key;
@@ -480,14 +426,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // → POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a new live version.
-  mcp.tool('aimeat_app_draft_publish', descriptionFor('aimeat_app_draft_publish'), {
-    filename: z.string().describe('App filename whose draft to publish.'),
-    roadmap: z.string().optional().describe('One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is REQUIRED when somebody else helps build this app.'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    ...aiProvenanceInputs,
-    spec_token: z.string().optional().describe('Current app build spec digest.'),
-    spec_ack: z.string().optional().describe('Owner-declared build spec acknowledgement.'),
-  }, annotationsFor('aimeat_app_draft_publish'), async ({ owner: targetOwner, filename, roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+  mcp.tool('aimeat_app_draft_publish', descriptionFor('aimeat_app_draft_publish'), zodShapeFor('aimeat_app_draft_publish'), annotationsFor('aimeat_app_draft_publish'), async ({ owner: targetOwner, filename, roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
     const resp = await client.post(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/publish-draft`, { roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack });
     if (resp.ok === false) return out(resp);
     return provenanceEchoedResult(client,
@@ -495,25 +434,19 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // → DELETE /v1/apps/:owner/:filename/draft — discard the draft (live app untouched).
-  mcp.tool('aimeat_app_draft_discard', descriptionFor('aimeat_app_draft_discard'), {
-    filename: z.string().describe('App filename whose draft to discard.'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-  }, annotationsFor('aimeat_app_draft_discard'), async ({ owner: targetOwner, filename }) => {
+  mcp.tool('aimeat_app_draft_discard', descriptionFor('aimeat_app_draft_discard'), zodShapeFor('aimeat_app_draft_discard'), annotationsFor('aimeat_app_draft_discard'), async ({ owner: targetOwner, filename }) => {
     return out(await client.delete(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft`));
   });
 
   // → GET /v1/admin/seo/status — is this node findable, and what is left to do. Operator-only.
-  mcp.tool('aimeat_seo_status', descriptionFor('aimeat_seo_status'), {},
+  mcp.tool('aimeat_seo_status', descriptionFor('aimeat_seo_status'), zodShapeFor('aimeat_seo_status'),
     annotationsFor('aimeat_seo_status'), async () => {
       return out(await client.get('/v1/admin/seo/status'));
     });
 
   // → POST /v1/admin/seo/indexnow, or GET /v1/admin/seo/indexnow/plan with plan: true — the whole
   //   site to IndexNow, one batch per host. Operator-only.
-  mcp.tool('aimeat_seo_announce', descriptionFor('aimeat_seo_announce'), {
-    scope: z.enum(['all', 'pages']).optional().describe('"all" (default): the pages and every findable application. "pages": the pages alone.'),
-    plan: z.boolean().optional().describe('true lists what would be sent, host by host, and sends nothing.'),
-  }, annotationsFor('aimeat_seo_announce'), async (a) => {
+  mcp.tool('aimeat_seo_announce', descriptionFor('aimeat_seo_announce'), zodShapeFor('aimeat_seo_announce'), annotationsFor('aimeat_seo_announce'), async (a) => {
     const scope = a.scope ?? 'all';
     if (a.plan) return out(await client.get(`/v1/admin/seo/indexnow/plan?scope=${scope}`));
     return out(await client.post('/v1/admin/seo/indexnow', { scope }));

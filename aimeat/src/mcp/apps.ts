@@ -11,6 +11,7 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.19.0 — 2026-10-02 — design_spec_hint in the publish and draft-publish answers (services/app-design-spec.ts).
  *   v1.18.0 — 2026-09-27 — aimeat_app_versions moved into aimeat_app_manage (action "versions"), which
  *     calls services/app-versions.ts like the REST endpoint; this file read storage for it.
@@ -121,6 +122,7 @@ import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
 import { registerAppForkTool } from './apps-fork.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -411,15 +413,7 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_draft_publish',
         descriptionFor('aimeat_app_draft_publish'),
-        {
-            filename: z.string().describe('App filename whose saved draft should be promoted to a new live version.'),
-            roadmap: z.string().optional()
-                .describe('One sentence saying what this version changes, in your own words. It goes on the app\'s roadmap. REQUIRED when somebody else helps build this app: it is the only way they learn what happened.'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-            ...aiProvenanceInputs,
-            ...specGateInputs,
-        },
+        zodShapeFor('aimeat_app_draft_publish'),
         annotationsFor('aimeat_app_draft_publish'),
         async ({ filename, owner, roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
@@ -491,11 +485,7 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_draft_discard',
         descriptionFor('aimeat_app_draft_discard'),
-        {
-            filename: z.string().describe('App filename whose saved draft should be discarded (the live app is untouched).'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-        },
+        zodShapeFor('aimeat_app_draft_discard'),
         annotationsFor('aimeat_app_draft_discard'),
         async ({ filename, owner }) => {
             const agentGaii = getAgentGaii();
@@ -521,18 +511,7 @@ export function registerAppsTools(
         'aimeat_app_list',
         {
             description: descriptionFor('aimeat_app_list'),
-            inputSchema: {
-                category: z.string().optional().describe('Filter by category'),
-                search: z.string().optional().describe('Search query string'),
-                tag: z.string().optional().describe('Filter by tag'),
-                own: z.boolean().optional().describe('If true, list only apps owned by the current agent'),
-                building: z.boolean().optional()
-                    .describe('Apps somebody else asked you to help build, instead of your own. Yours are the other answer.'),
-                limit: z.number().int().min(1).max(200).optional()
-                    .describe('How many to return (default 50, max 200).'),
-                offset: z.number().int().min(0).optional()
-                    .describe('How many to skip. With `total` and `has_more` in the answer, this is how the whole catalogue is read: keep calling with offset += limit while has_more is true.'),
-            },
+            inputSchema: zodShapeFor('aimeat_app_list'),
             annotations: annotationsFor('aimeat_app_list'),
             // A host that renders MCP Apps shows the card grid; one that does not ignores this
             // field and shows the same JSON it always did. Nothing is lost either way.
@@ -634,10 +613,7 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_get',
         descriptionFor('aimeat_app_get'),
-        {
-            owner: z.string().describe('Owner name of the app'),
-            filename: z.string().describe('App filename'),
-        },
+        zodShapeFor('aimeat_app_get'),
         annotationsFor('aimeat_app_get'),
         async ({ owner, filename }) => {
             const app = await storage.getAppByOwnerName(owner, filename);
@@ -694,10 +670,7 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_delete',
         descriptionFor('aimeat_app_delete'),
-        {
-            filename: z.string().describe('App filename to delete'),
-            version: z.number().optional().describe('Specific version number to delete. Omit to delete all versions.'),
-        },
+        zodShapeFor('aimeat_app_delete'),
         annotationsFor('aimeat_app_delete'),
         async ({ filename, version }) => {
             const agentGaii = getAgentGaii();

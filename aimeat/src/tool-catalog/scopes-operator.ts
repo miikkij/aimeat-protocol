@@ -15,5 +15,4 @@
 
 export const OPERATOR_TOOL_SCOPES: Record<string, string> = {
 
-    aimeat_admin_mint:                        'operator:admin',
 };

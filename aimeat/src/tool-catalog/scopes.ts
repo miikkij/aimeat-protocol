@@ -188,29 +188,8 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // Reconfigure ANOTHER of the owner's agents. An agent describing itself needs nothing;
     // reaching sideways at a sibling principal with its own identity and trust score does.
 
-    // The destructive half: delete an app. Split from write because shipping an update and
-    // removing the thing are different risks.
-    aimeat_app_delete:                        'app:manage',
-
-    // Publish or update an app under the owner's account, including drafts.
-    aimeat_app_draft_discard:                 'app:write',
-    aimeat_app_draft_publish:                 'app:write',
-    aimeat_app_draft_save:                    'app:write',
-    aimeat_app_draft_write:                   'app:write',
-    aimeat_app_draft_replace:                 'app:write',
-    aimeat_app_draft_read:                    'app:write',
-    aimeat_app_draft_seed:                    'app:write',
-    // The node's discovery status and the announcement to search engines. Both refuse everyone but
-    // the operator in their handler, so the word is the operator's (security audit A8-1): on app:write,
-    // which every Full-access agent holds, any agent of the operator could tell the search engines
-    // about the whole node.
-    aimeat_seo_status:                        'operator:admin',
-    aimeat_seo_announce:                      'operator:admin',
-    aimeat_image_generate:                    'ai:use',
     aimeat_voice_reply:                       'ai:use',
     aimeat_voice_speak:                       'ai:use',
-    aimeat_app_fork:                          'app:write',
-    aimeat_app_publish:                       'app:write',
 
     // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
     ...OPERATOR_TOOL_SCOPES,
