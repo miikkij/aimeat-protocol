@@ -10,10 +10,10 @@
  *   is connected: the AI shows the owner the change, then calls again with the token.
  * @structure registerAiPolicyTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -22,6 +22,7 @@ import { toolError } from './tool-error.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { policyView, setOwnerAiPolicy } from '../services/ai/policy-store.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAiPolicyTools(
   mcp: McpServer,
@@ -34,10 +35,7 @@ export function registerAiPolicyTools(
   mcp.tool(
     'aimeat_ai_policy_set',
     descriptionFor('aimeat_ai_policy_set'),
-    {
-      policy: z.record(z.string(), z.unknown()).optional().describe('The policy to propose: { mode, allow?, appliesTo?, apps?, agents? }. Omit to read.'),
-      confirm_token: z.string().optional().describe('Token from the propose step; omit to propose.'),
-    },
+    zodShapeFor('aimeat_ai_policy_set'),
     annotationsFor('aimeat_ai_policy_set'),
     async ({ policy, confirm_token }) => {
       const principal = getAgentGaii();

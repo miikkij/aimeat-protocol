@@ -153,16 +153,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Operator config enactment ──
     aimeat_operator_agent_configure: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_operator_ai_config: { title: 'Configure AI Routing & Budget (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ai_policy_set: { title: 'Set the AI Model Policy (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ai_routing_set: { title: 'Set the AI Routing (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ai_providers: { title: 'List AI Providers', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ai_provider_test: { title: 'Test an AI Provider', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_ai_capabilities: { title: 'What AI Can Do Here', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ai_models: { title: 'List AI Models', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ai_transcribe: { title: 'Transcribe Audio', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_ai_embed: { title: 'Make Embeddings', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_ai_roles: { title: 'List AI Roles', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_ai_role_set: { title: 'Set the AI Roles (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },
