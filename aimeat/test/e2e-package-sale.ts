@@ -156,14 +156,14 @@ const peersOf = async (node: NodeState): Promise<Map<string, PeerInfo>> =>
     new Map((await node.storage.listFederationPeers()).map(p => [p.nodeId, p as unknown as PeerInfo]));
 
 /** Open a checkout for one package line on S and complete it with test money. */
-async function buy(line: { app: string; offer_id?: string; input?: Record<string, unknown> }, instrument = 'card-ok', currency = 'EUR') {
+async function buy(line: { app: string; offer_id?: string; input?: Record<string, unknown> }, instrument = 'card-ok', currency = 'EUR', token = buyerToken) {
     const create = await S.json('/v1/commerce/checkout-sessions', {
-        method: 'POST', headers: auth(buyerToken),
+        method: 'POST', headers: auth(token),
         body: JSON.stringify({ currency, items: [{ kind: 'package', agent: R.nodeId, app: line.app, offer_id: line.offer_id ?? 'buy', input: line.input ?? {} }] }),
     });
     if (create.status !== 201) return { create, done: null as any };
     const done = await S.json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, {
-        method: 'POST', headers: auth(buyerToken), body: JSON.stringify({ payment: { handler: 'test.money', instrument } }),
+        method: 'POST', headers: auth(token), body: JSON.stringify({ payment: { handler: 'test.money', instrument } }),
     });
     return { create, done };
 }
@@ -337,6 +337,18 @@ await test('The buyer buys for n1 with automatic renewal; R grants n1 with the t
     const sub = (await subscriptions()).subscriptions.find((x: any) => x.node_id === n1.node_id);
     assert(sub?.auto_renew === true && sub?.renewal.amount === 6_000_000 && sub?.payment?.handler === 'test.money'
         && sub?.payment?.payment_method === undefined && sub?.payment?.customer === undefined, `subscription: ${JSON.stringify(sub)}`);
+});
+
+// Secaudit 2026-10, PKG-2: R cannot tell S's buyers apart, so a second buyer naming n1 used to reach
+// R as S's own sale, and R wrote its date, channel and terms over the first buyer's grant.
+await test('Another buyer on S cannot buy for n1, which the first buyer holds; the payment is refunded and R\'s grant stays', async () => {
+    const otherToken = await signUp(S, `buyer2${ts}`);
+    const before = (await grantsOn(kit)).find(x => x.nodeId === n1.node_id);
+    const { done } = await buy({ app: kit, input: { node: n1 } }, 'card-ok', 'EUR', otherToken);
+    assert(done.status !== 200 && /another buyer/.test(done.body.error?.message ?? '') && /refunded/i.test(done.body.error?.message ?? ''),
+        `refused: ${done.status} ${JSON.stringify(done.body)}`);
+    const after = (await grantsOn(kit)).find(x => x.nodeId === n1.node_id);
+    assert(JSON.stringify(after) === JSON.stringify(before), `n1's grant is unchanged: ${JSON.stringify(after)}`);
 });
 
 console.log('\nPhase 5 — Price changes and a renewal by hand');
