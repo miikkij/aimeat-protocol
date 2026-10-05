@@ -6,7 +6,7 @@
  *   /v1/invite?token=<token>. Loads the invitation (GET /v1/invitations/:token) and shows what the
  *   recipient is being invited to (organism + workspace roles + inviter). A NOT-yet-registered
  *   visitor registers right here (username + password; the invited email is shown, locked, and
- *   recorded as verified) and is joined in one atomic POST /v1/invitations/:token/accept. An already
+ *   kept unverified until its code comes back) and is joined in one atomic POST /v1/invitations/:token/accept. An already
  *   registered / already logged-in visitor (including anyone returning from a social sign-in) accepts
  *   as their current account — BUT only when that account's verified email matches the invited
  *   address (recipient binding; the server enforces it and the page warns up front using the GET
@@ -37,6 +37,8 @@
  *     the invitation message (reported from a live invitation on originalmiskate.com).
  *   v1.4.0 — 2026-10-01 — An APP invitation (kind 'app'): the box names the app and the role, and
  *     "no free place" (status app_waiting) is shown on the page instead of leaving it.
+ *   v1.4.1 — 2026-10-05 — Comments only: the account made here keeps the invited address unverified
+ *     until its code comes back (secaudit 2026-10, APP-2).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -210,7 +212,7 @@ export default function InviteAccept() {
       <//>`;
   }
 
-  // Not signed in: register right here (email locked + recorded as verified) and join in one step.
+  // Not signed in: register right here (email locked, verified later by its code) and join in one step.
   return html`
     <${AskPage} tag=${tag} title=${tr('invite.acceptTitle', "You're invited")}
       doors=${html`
