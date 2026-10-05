@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.6 -- 2026-10-05 -- diagnose-a-workflow: a run's ai steps ask the model as its aiCaller, so
+ *     the owner's rules for that agent or app apply (secaudit 2026-10, AI-3).
  *   v1.23.5 -- 2026-10-05 -- diagnose-a-workflow: a 402 QUOTA_EXHAUSTED on the node's key names a
  *     spent allowance or an operator's daily cap (secaudit 2026-10, AI-1).
  *   v1.23.4 -- 2026-10-02 -- add-a-crew-agent: a resident proposal is stored as spawn where the connector
@@ -658,6 +660,9 @@ metadata:
    first provider failed and the attempts say why. A 402 \`QUOTA_EXHAUSTED\` on the node's key means
    the owner's allowance is spent and the operator's setting refuses, or a daily cap the operator
    set was reached; its message says which. The owner's own key, or more allowance, is the fix.
+   The run's ai steps ask the model as the run's \`aiCaller\`: the agent or app that started it, the
+   saver for a trigger's run, or the owner for "Run as me". So the owner's model rules and daily cap
+   for that agent or app apply, and they can refuse a step that the owner's own call would pass.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.

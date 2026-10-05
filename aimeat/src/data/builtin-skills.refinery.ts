@@ -16,6 +16,8 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.1.2 — 2026-10-05 — The extraction asks the model as whoever runs the batch, and an app's
+ *     schedule runs as the app and stops when its grant goes (secaudit 2026-10, AI-2 and AI-3).
  *   v1.1.1 — 2026-09-30 — "The queues": an attachment its classification keeps from every model is
  *     named on the row with a CLASSIFIED error and left out of the extraction (TARGET-082 review).
  *   v1.1.0 — 2026-09-29 — "In an app": aimeat-refinery.js and its console.
@@ -59,7 +61,8 @@ It **never sends** anything. Approving a record and sending it on is the person'
 - An organism workspace with two row spaces: one for the messages (default name \`viesti\`, indexed on
   \`queue\`, \`klass\` and \`status\`) and one for the log (default \`tapahtuma\`, indexed on \`kind\`).
 - The decision model and a model that reads PDFs must be available to the owner
-  (\`aimeat_decide_settings\`, \`aimeat_ai_capabilities\`).
+  (\`aimeat_decide_settings\`, \`aimeat_ai_capabilities\`). The extraction asks the model as you: the
+  owner's model rules for your agent or your app apply, and so does an agent's daily cap.
 
 ## The definition
 
@@ -128,6 +131,9 @@ schedules needs \`workflow:read\`). With aimeat-atelier.js on the page, \`AIMEAT
 target, prefix })\` draws the batch figure, the steps, the tallies and the batch rows from kit parts.
 The app asks for \`connections:read-through ai:use organism:rows memory:write\`, its data map names
 TypeSafe and the model provider under \`leaves\`, and the workspace's two row spaces name the app.
+The app's schedule runs as the app, with the permissions the owner's grant holds at each fire, and it
+stops when the owner removes the app's permission. A schedule an app made before 2026-10-05 does not
+run: make it again from the app.
 
 ## Teaching it
 
