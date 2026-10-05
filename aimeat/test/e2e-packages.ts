@@ -395,6 +395,43 @@ await test('Import package via ZIP upload (POST /v1/packages/import)', async () 
   });
 });
 
+// Secaudit 2026-10, PKG-5: a ZIP's signature file says who wrote the package, in another node's words.
+// One naming the installer made the package "theirs", and its apps signed in with no consent screen.
+await test('A signed ZIP that names the installer as its author is not the installer\'s own: its apps still ask (PKG-5)', async () => {
+  const name = `claimsown${Date.now()}`;
+  const manifest = {
+    'aimeat-package': '1.0', name, author: ownerName, description: 'Claims to be yours', category: 'other', tags: [],
+    version: '1.0.0', changelog: 'Initial import',
+    components: [{ id: 'app-main', type: 'app', label: 'App', file: 'components/app.html', dependencies: [] }],
+  };
+  const html = `<!DOCTYPE html><html><head><meta name="aimeat-app" content="${name}.html"><meta name="aimeat-scopes" content="memory:read memory:write"><title>x</title></head><body>x</body></html>`;
+  const attestation = {
+    descriptor: { name, author: ownerName, author_ghii: `${ownerName}@${NODE_ID}`, version: '1.0.0', published_at: new Date().toISOString(), source_node: 'aimeat-test-elsewhere-001' },
+    signature: 'not-checked-here',
+  };
+  const zipBuf = await new Promise<Buffer>((resolve, reject) => {
+    const archive = new ZipArchive({ zlib: { level: 6 } });
+    const chunks: Buffer[] = [];
+    archive.on('data', (chunk: Buffer) => chunks.push(chunk));
+    archive.on('end', () => resolve(Buffer.concat(chunks)));
+    archive.on('error', reject);
+    archive.append(YAML.stringify(manifest), { name: 'manifest.yaml' });
+    archive.append(html, { name: 'components/app.html' });
+    archive.append(JSON.stringify(attestation), { name: 'signature.json' });
+    archive.finalize();
+  });
+  const imported = await uploadZip('/v1/packages/import', zipBuf, ownerToken);
+  assert(imported.status === 201, `import: ${imported.status} ${JSON.stringify(imported.body)}`);
+  const group = encodeURIComponent(`${name}::${ownerName}`);
+  await json(`/v1/packages/${group}/versions/${imported.body.data.version}`, { method: 'PATCH', headers: authed(ownerToken), body: JSON.stringify({ status: 'published' }) });
+  const dry = await json(`/v1/packages/${group}/install`, { method: 'POST', headers: authed(ownerToken), body: JSON.stringify({ dry_run: true }) });
+  assert(dry.status === 200, `dry run: ${dry.status} ${JSON.stringify(dry.body)}`);
+  assert(dry.body.data.source?.upstream?.node === 'aimeat-test-elsewhere-001', `it came from elsewhere: ${JSON.stringify(dry.body.data.source)}`);
+  assert(dry.body.data.app_approval?.own_package === false && dry.body.data.app_approval?.grant_apps_default === false,
+    `the installer did not write it: ${JSON.stringify(dry.body.data.app_approval)}`);
+  await json(`/v1/packages/${group}`, { method: 'DELETE', headers: authed(ownerToken) });
+});
+
 // ═══════════════════════════════════════════════════════════════════════
 // Phase 2: Versioning
 // ═══════════════════════════════════════════════════════════════════════

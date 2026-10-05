@@ -27,6 +27,9 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   v1.6.0 — 2026-10-05 — A sale onto a grant another seller or the author made keeps the grant's
+ *     channel: a later date with `channel: beta` moved the customer to beta (secaudit 2026-10, PKG-2).
+ *     The second-buyer half is refused on the selling node (package-sale-checkout.ts, NODE_HELD).
  *   v1.5.0 — 2026-10-02 — The repository listing names each group's withdrawn versions (`withdrawn`, with
  *     the reason), for the customer node's daily check (package sale design, phase 5: T6).
  *   v1.4.0 — 2026-10-02 — An omitted `updates_until` keeps the grant's own date instead of resetting it
@@ -186,6 +189,12 @@ export async function grantEntitlement(
         if (!Number.isFinite(t)) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'updates_until is an ISO date-time, or null for updates that run on.' };
         updatesUntil = new Date(t).toISOString();
     }
+    // A SALE ONTO A GRANT ANOTHER SELLER (or the author) MADE (secaudit 2026-10, PKG-2). notYourGrant
+    // lets it through only with a later end of updates, as a new sale; it does not move the customer
+    // to another channel, which a sale with `channel: beta` and a later date did before. A seller's
+    // own grants it manages in full, and the selling node keeps one of its buyers from naming
+    // another buyer's node (package-sale-checkout.ts, NODE_HELD).
+    const othersGrant = !!peerOpts.seller && !!prev && sellerOf(prev) !== peerOpts.seller;
     let peerRegistered = false;
     let peerPending = false;
     if (input.node !== undefined && input.node !== null) {
@@ -203,10 +212,11 @@ export async function grantEntitlement(
     }
     const now = new Date().toISOString();
     const soldBy = peerOpts.seller ?? (prev ? sellerOf(prev) : undefined);
+    const channel = othersGrant ? prev!.channel : ((input.channel as PackageChannel | undefined) ?? prev?.channel ?? 'stable');
     const entitlement: PackageEntitlement = {
         nodeId: input.nodeId,
         updatesUntil,
-        channel: (input.channel as PackageChannel | undefined) ?? prev?.channel ?? 'stable',
+        channel,
         ...(typeof input.note === 'string' && input.note ? { note: input.note.slice(0, 500) } : prev?.note ? { note: prev.note } : {}),
         ...(soldBy ? { soldBy } : {}),
         ...(input.terms ? { terms: input.terms } : prev?.terms ? { terms: prev.terms } : {}),

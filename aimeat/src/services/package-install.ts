@@ -20,6 +20,10 @@
  *   import { installPackage } from '../services/package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.12.0 — 2026-10-05 — "The owner's own package" is isOwnPackage (package-approvals.ts): never a
+ *     pulled or signed package, whose author the other node's descriptor names. A remote descriptor
+ *     naming the installer as author approved the package's apps with no consent screen (secaudit
+ *     2026-10, PKG-5).
  *   v1.11.0 — 2026-10-04 — The input takes `grantApps`, the dry run answers `app_approval` (whether the
  *     install approves the apps by itself: yes for the owner's own package), and an install answers
  *     `ownPackage`. installOrRequest records the grants (Jouni: installing it is approving it).
@@ -77,7 +81,7 @@ import {
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { componentCollision } from './package-component-collisions.js';
 import { packageCapabilities, type PackageCapabilities } from './package-capabilities.js';
-import { codeInstallRefusal, combinedRefusal, packageSourceOf, recordApproval } from './package-approvals.js';
+import { codeInstallRefusal, combinedRefusal, packageSourceOf, recordApproval, isOwnPackage } from './package-approvals.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
 import { planPackageConfig, missingConfigMessage, configPreview } from './package-config.js';
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from './package-expects.js';
@@ -319,6 +323,8 @@ export async function installPackage(
     // and is tagged with this install so only this install replaces or removes it.
     const instanceId = randomUUID();
     const source = packageSourceOf(pkg, config.nodeId);
+    // Whether the installer wrote this package here; never for a pulled or signed one (isOwnPackage).
+    const ownPackage = isOwnPackage(pkg, ownerGaii);
     const packageContext = {
         groupId, instanceId,
         appNames: new Map(plannedComponents.filter(p => p.type === 'app').map(p => [p.componentId, p.registeredAs])),
@@ -445,7 +451,7 @@ export async function installPackage(
                 ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
                 ...(warnings.length ? { warnings } : {}),
                 // Whether the install approves the package's apps by itself (package-install-requests.ts).
-                ...(caps.capabilities.apps.length ? { app_approval: { own_package: source.author_ghii === ownerGaii, grant_apps_default: source.author_ghii === ownerGaii } } : {}),
+                ...(caps.capabilities.apps.length ? { app_approval: { own_package: ownPackage, grant_apps_default: ownPackage } } : {}),
             },
         };
     }
@@ -583,7 +589,7 @@ export async function installPackage(
             agentsProposed.push(...proposed);
             for (const s of skipped) warnings.push(`An agent of the package was not proposed: ${s}`);
         }
-        return { ok: true, kind: 'installed', instance: created, warnings, agentsProposed, ownPackage: source.author_ghii === ownerGaii };
+        return { ok: true, kind: 'installed', instance: created, warnings, agentsProposed, ownPackage };
     } catch (e) {
         // Instance record creation failed — rollback all registered components
         for (const reg of [...registeredComponents].reverse()) {

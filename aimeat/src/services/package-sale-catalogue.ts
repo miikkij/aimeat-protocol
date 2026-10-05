@@ -22,8 +22,10 @@
  *   for the seller of record.
  * @structure NS_PACKAGE_SALES · CatalogueEntry · readCatalogue() · catalogueEntry() · setCatalogueEntry()
  *   · Subscription · subscriptionsOf() · subscriptionFor() · putSubscription() · setAutoRenew() ·
- *   allSubscriptions() · SaleRequest · readRequests() · putRequest()
+ *   allSubscriptions() · nodeHolder() · putNodeHolder() · SaleRequest · readRequests() · putRequest()
  * @version-history
+ *   v1.2.0 — 2026-10-05 — nodeHolder and putNodeHolder: which buyer holds a node's grant, so a sale
+ *     naming another buyer's node is refused (secaudit 2026-10, PKG-2).
  *   v1.1.0 — 2026-10-02 — A catalogue entry keeps the operator's review (`reviewed`, recordReview());
  *     a price change keeps it (package sale design, phase 5).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
@@ -203,6 +205,26 @@ export async function setAutoRenew(
     }
     await putSubscription(storage, { ...sub, auto_renew: input.auto_renew, updatedAt: new Date().toISOString() });
     return { ok: true, auto_renew: input.auto_renew, updates_until: sub.updates_until };
+}
+
+// ── Node holders ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Which buyer on this node holds a node's grant of a package, one record for every sale that named a
+ * node. A sale naming a node another buyer holds is refused (secaudit 2026-10, PKG-2): the repository
+ * cannot tell this node's buyers apart, so the selling node is the one that can. A subscription
+ * exists only for a sale with a renewal, which is why the holder is a record of its own.
+ */
+const holderId = (repository: string, groupId: string, nodeId: string): string => `${repository}|${groupId}|${nodeId}`;
+
+export async function nodeHolder(storage: Storage, repository: string, groupId: string, nodeId: string): Promise<string | null> {
+    const { value } = await getRecord<{ nodes: Record<string, string> }>(storage, 'holders');
+    return value?.nodes?.[holderId(repository, groupId, nodeId)] ?? null;
+}
+
+export async function putNodeHolder(storage: Storage, repository: string, groupId: string, nodeId: string, buyer: string): Promise<void> {
+    const { value, prev } = await getRecord<{ nodes: Record<string, string> }>(storage, 'holders');
+    await putRecord(storage, 'holders', { nodes: { ...(value?.nodes ?? {}), [holderId(repository, groupId, nodeId)]: buyer } }, prev, 'package-sales-holders');
 }
 
 /** Every buyer's subscriptions, for the daily renewal job. */

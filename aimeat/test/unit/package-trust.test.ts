@@ -18,6 +18,9 @@ import {
 } from '../../src/services/extension-capability-declaration.js';
 import { packageCapabilities } from '../../src/services/package-capabilities.js';
 import { appScopesOf, parseAppScopes } from '../../src/services/protected-resource.js';
+import { grantEntitlement } from '../../src/services/package-entitlements.js';
+import { isOwnPackage } from '../../src/services/package-approvals.js';
+import type { PackageRecord } from '../../src/storage/interface.js';
 
 const config = {
     nodeId: 'test-node',
@@ -110,6 +113,51 @@ export default async function (ctx) {
             content: JSON.stringify({ manifest: manifest(), scripts: { 'run.js': script } }) } as unknown as PackageComponent;
         const ext = packageCapabilities([comp], config, 'alice').capabilities.extensions[0]!;
         expect(ext.network).toBe(false);
+    });
+});
+
+describe('PKG-2: a sale onto a grant another seller or the author made keeps its channel', () => {
+    /** The repository's storage, as much of it as grantEntitlement reads and writes. */
+    function repo(): Storage {
+        const mem = new Map<string, any>();
+        return {
+            listVersions: async () => ({ versions: [{ author: 'alice' }] }),
+            getMemory: async (ns: string, key: string) => mem.get(`${ns}/${key}`) ?? null,
+            setMemory: async (rec: any) => { mem.set(`${rec.ownerGaii}/${rec.key}`, rec); },
+        } as unknown as Storage;
+    }
+    const AUTHOR = { owner: 'alice', isOperator: false };
+    const G = 'com.example.kit';
+
+    it('another seller\'s later date is a new sale, and the customer stays on their channel', async () => {
+        const s = repo();
+        const first = await grantEntitlement(s, AUTHOR, { groupId: G, nodeId: 'aimeat-customer-001', updatesUntil: '2027-06-01T00:00:00.000Z', channel: 'stable' }, undefined, { seller: 'shop-a' });
+        expect(first.ok).toBe(true);
+        const other = await grantEntitlement(s, AUTHOR, { groupId: G, nodeId: 'aimeat-customer-001', updatesUntil: '2027-09-01T00:00:00.000Z', channel: 'beta' }, undefined, { seller: 'shop-b' });
+        expect(other.ok && other.entitlement).toMatchObject({ updatesUntil: '2027-09-01T00:00:00.000Z', channel: 'stable', soldBy: 'shop-b' });
+    });
+
+    it('a seller extending the author\'s own grant does not change its channel; an earlier date is refused', async () => {
+        const s = repo();
+        await grantEntitlement(s, AUTHOR, { groupId: G, nodeId: 'aimeat-customer-002', updatesUntil: '2027-01-01T00:00:00.000Z', channel: 'beta' });
+        const sale = await grantEntitlement(s, AUTHOR, { groupId: G, nodeId: 'aimeat-customer-002', updatesUntil: '2027-09-01T00:00:00.000Z', channel: 'stable' }, undefined, { seller: 'shop-a' });
+        expect(sale.ok && sale.entitlement.channel).toBe('beta');
+        const shorter = await grantEntitlement(s, AUTHOR, { groupId: G, nodeId: 'aimeat-customer-002', updatesUntil: '2026-11-01T00:00:00.000Z' }, undefined, { seller: 'shop-b' });
+        expect(shorter.ok).toBe(false);
+    });
+});
+
+describe('PKG-5: a package from another node is never the installer\'s own', () => {
+    const base = { authorGhii: 'alice@test-node' } as unknown as PackageRecord;
+
+    it('a package written here by the installer is theirs', () => {
+        expect(isOwnPackage(base, 'alice@test-node')).toBe(true);
+        expect(isOwnPackage(base, 'bob@test-node')).toBe(false);
+    });
+
+    it('a pulled or signed package is not, even when its descriptor names the installer as author', () => {
+        const pulled = { ...base, upstream: { node: 'other-node', authorGhii: 'alice@test-node' } } as unknown as PackageRecord;
+        expect(isOwnPackage(pulled, 'alice@test-node')).toBe(false);
     });
 });
 

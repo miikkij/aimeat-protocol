@@ -27,6 +27,9 @@
  * @structure packageSellableResolver() · carryOutSale() · parsePackageLine() · readOfferAsSeller() ·
  *   decideSaleRequest() · reviewSale()
  * @version-history
+ *   v1.2.0 — 2026-10-05 — A sale naming a node another buyer on this node holds is refused with
+ *     NODE_HELD, and the payment is refunded; the first sale to a node records its buyer (secaudit
+ *     2026-10, PKG-2).
  *   v1.1.0 — 2026-10-02 — Review on a selling node: a new sale waits until the operator reviewed what
  *     the version on sale can do (reviewSale; NEEDS_REVIEW), and the buyer's view says `needs_review`.
  *     A renewal goes on. Package sale design, phase 5.
@@ -41,7 +44,7 @@ import { CommerceError } from '../commerce/errors.js';
 import { listPaymentHandlers } from '../commerce/payment-handlers.js';
 import { saleOffer, saleGrant, saleClaim } from './package-sale-client.js';
 import {
-    catalogueEntry, subscriptionFor, putSubscription, putRequest, readRequests, recordReview,
+    catalogueEntry, subscriptionFor, putSubscription, putRequest, readRequests, recordReview, nodeHolder, putNodeHolder,
     type CatalogueEntry, type Subscription, type SaleRequest,
 } from './package-sale-catalogue.js';
 import { notify } from './notify.js';
@@ -197,11 +200,19 @@ export async function carryOutSale(
     let nodeId: string | null = null;
     if (input.node?.node_id) {
         nodeId = input.node.node_id;
+        // A node another buyer on this node holds is theirs: the repository cannot tell our buyers
+        // apart, so this is the one place that can refuse (secaudit 2026-10, PKG-2). A throw here
+        // refunds the payment.
+        const holder = await nodeHolder(deps.storage, entry.repository, entry.group_id, nodeId);
+        if (holder && holder !== buyer) {
+            throw new CommerceError('NODE_HELD', 409, `${nodeId} already holds this package through another buyer. Buy for a node of your own, or without a node for a claim code.`);
+        }
         const data = fromRepository(await saleGrant(deps, entry.repository, entry.group_id, nodeId, {
             node: { url: input.node.url, public_key: input.node.public_key },
             updates_until: until, channel: terms.channel, terms_id: terms.id, note: `order ${order}`,
         }), 'grant');
         granted = { entitlement: data.entitlement, peer_registered: data.peer_registered, peer_pending: data.peer_pending };
+        if (!holder) await putNodeHolder(deps.storage, entry.repository, entry.group_id, nodeId, buyer);
     } else {
         const data = fromRepository(await saleClaim(deps, entry.repository, entry.group_id, {
             updates_until: until, channel: terms.channel, terms_id: terms.id, note: `order ${order}`,

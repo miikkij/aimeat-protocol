@@ -22,8 +22,10 @@
  *   installed is somebody else's code under the owner's name, so packageAppOf() names it and the
  *   bridge asks for consent like for any other app.
  * @structure NS_PACKAGE_APPROVALS · INSTALL_CODE_SCOPE · codeInstallRefusal() · InstallApproval ·
- *   recordApproval() · approvalOf() · forgetApproval() · approvedItems() · installedFromPackage()
+ *   recordApproval() · approvalOf() · forgetApproval() · approvedItems() · isOwnPackage() · installedFromPackage()
  * @version-history
+ *   v1.1.0 — 2026-10-05 — isOwnPackage: only a package written on this node is the installer's own
+ *     (secaudit 2026-10, PKG-5).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 2).
  */
 import type { AimeatConfig } from '../config.js';
@@ -148,6 +150,16 @@ export function packageSourceOf(pkg: PackageRecord, nodeId: string): {
       ? { node: up.node, url: up.url, group_id: up.groupId, version: up.version, verified: !!up.verifiedAt, verified_at: up.verifiedAt }
       : null,
   };
+}
+
+/**
+ * Whether the installer is this package's author, which makes its apps approved at install. Only a
+ * package written on this node counts: a pulled one or a signed ZIP carries its author from the
+ * other node's descriptor (`upstream.authorGhii`), which that node writes as it likes, so it named
+ * the installer and skipped the consent screen (secaudit 2026-10, PKG-5).
+ */
+export function isOwnPackage(pkg: PackageRecord, installerGhii: string): boolean {
+  return !pkg.upstream && pkg.authorGhii === installerGhii;
 }
 
 /**
