@@ -325,13 +325,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // the write needs, and it was open to every agent of the operator on the account role alone.
     aimeat_surface_layout_get:                'site:layout-write',
     aimeat_surface_layout_set:                'site:layout-write',
-    // Making the node's themes: the look of every page. The same kind of word as the layout's, no
-    // wildcard carries it, and the handler also asks whether the account runs this node.
-    aimeat_theme_save:                        'site:theme-write',
-    aimeat_theme_style_save:                  'site:theme-write',
-    aimeat_theme_component_css_set:           'site:theme-write',
-    aimeat_theme_policy_set:                  'site:theme-write',
-    aimeat_theme_font_save:                   'site:theme-write',
     aimeat_storage_upload:                    'storage:write',
     aimeat_storage_delete:                    'storage:write',
 
