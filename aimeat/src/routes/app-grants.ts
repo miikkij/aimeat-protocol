@@ -20,6 +20,11 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.24.0 — 2026-10-05 — The silent bridge reads who is signed in with checkRefreshSession
+ *     (owner-session.ts), the refresh's own check: a session that outlived its account, or a
+ *     previous token replayed past its grace window, approved apps here (secaudit 2026-10, AUTH-1).
+ *   v1.23.0 — 2026-10-05 — `bytes=unpublished` on the silent bridge: a preview's bytes are never the
+ *     owner's own app, so they get the consent screen (secaudit 2026-10, WEB-2).
  *   v1.22.0 — 2026-10-04 — The visible consent flow knows a package-installed app is not the owner's
  *     own: authorize records `packageApp`, the request answers `package_app`, and authorize-consent
  *     never marks it own. The consent page had approved such an app for its owner with no screen,
@@ -126,7 +131,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
-import { readRefreshCookie } from '../services/owner-session.js';
+import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
@@ -597,17 +602,14 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       return reply({ ok: false, error: 'invalid_scope', app: grantTarget, app_name: grantName, unknown: unknownScopes.join(' ') });
     }
 
-    // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation.
+    // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation. The same check
+    // the refresh makes (checkRefreshSession: the account's age and a reused token too, AUTH-1).
     const raw = readRefreshCookie(req);
-    const session = raw ? await storage.getSessionByRefreshHash(hashToken(raw)) : null;
-    const now = Date.now();
-    const sessionValid = !!session && !session.revoked
-      && !(session.idleExpiresAt && now >= Date.parse(session.idleExpiresAt))
-      && !(session.absoluteExpiresAt && now >= Date.parse(session.absoluteExpiresAt));
+    const check = raw ? await checkRefreshSession(storage, hashToken(raw)) : null;
     // Include the resolved app so the SDK can open the consent popup (which prompts apex login) even
     // when no one is logged in — the user logs in there, then approves, in one flow.
-    if (!sessionValid) return reply({ ok: false, error: 'login_required', app: grantTarget, app_name: grantName });
-    const owner = session!.owner;
+    if (!check?.ok) return reply({ ok: false, error: 'login_required', app: grantTarget, app_name: grantName });
+    const owner = check.session.owner;
 
     // AUDIT H-9: a portfolio target gets the published ceiling and nothing more, before any branch
     // below decides whether to approve it — including the own-app branch, which asks the page what

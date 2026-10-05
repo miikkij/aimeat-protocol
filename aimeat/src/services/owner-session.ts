@@ -8,9 +8,13 @@
  *   cookie helpers, session establishment (login), and the refresh-with-rotation +
  *   reuse-detection logic used by POST /v1/auth/refresh.
  * @structure REFRESH_COOKIE constant; cookie helpers (read/set/clear/secure);
- *   establishOwnerSession() for login; refreshOwnerSession() for rotation.
+ *   establishOwnerSession() for login; checkRefreshSession() the read-only check;
+ *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ * v1.3.0 - 2026-10-05 - checkRefreshSession: the one read-only check of a refresh session (revoked,
+ *   the account's age, expiry, a reused previous token). The refresh runs it and keeps its answers;
+ *   the app-grant silent bridge runs it instead of its own shorter copy (secaudit 2026-10, AUTH-1).
  * v1.2.0 - 2026-09-26 - Refresh answers 401 SESSION_REVOKED and ends the session row when no account
  *   holds the session's owner name, or the account holding it was made after the session
  *   (auth/credential-age.ts ownerRefuses); a deactivated account still answers 403 ACCOUNT_DISABLED.
@@ -22,6 +26,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { SessionRecord } from '../storage/repositories/session.repository.js';
 import { issueJWT, AccountDisabledError } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 
@@ -152,6 +157,45 @@ export async function establishOwnerSession(
   return { token, sessionId, expiresIn: config.accessTtlSeconds };
 }
 
+/** Why a refresh session does not hold. */
+export type RefreshSessionRefusal = 'unknown' | 'revoked' | 'account-disabled' | 'account-gone' | 'expired' | 'reused';
+
+/**
+ * Whether the refresh session behind a presented token holds, read-only: the one check the refresh
+ * (refreshOwnerSession, which also rotates) and the app-grant silent bridge (routes/app-grants.ts,
+ * which only reads who is signed in) both make. The bridge had its own copy that checked revocation
+ * and expiry only, so a session outliving its account, or a stolen previous token past its grace
+ * window, still approved apps there (secaudit 2026-10, AUTH-1).
+ *
+ * `previous` is true when the token is the one just rotated away, inside the grace window.
+ */
+export async function checkRefreshSession(
+  storage: Storage, presentedHash: string, now = Date.now(),
+): Promise<{ ok: true; session: SessionRecord; previous: boolean } | { ok: false; session: SessionRecord | null; reason: RefreshSessionRefusal }> {
+  const session = await storage.getSessionByRefreshHash(presentedHash);
+  if (!session) return { ok: false, session: null, reason: 'unknown' };
+  if (session.revoked) return { ok: false, session, reason: 'revoked' };
+  // The account the session was made for: deleted, deactivated (BR-04), or newer than the session
+  // because the name was released and registered again (auth/credential-age.ts). The session ends
+  // with the account. revokeAllSessions already marked the rows of a deactivated account, so for
+  // that account this check covers a row created between the flag and the revocation.
+  const ownerRecord = await storage.getOwner(session.owner);
+  if (ownerRefuses(ownerRecord, recordIssuedAt(session.issuedAt))) {
+    return { ok: false, session, reason: ownerRecord?.disabledAt ? 'account-disabled' : 'account-gone' };
+  }
+  const idle = session.idleExpiresAt ? Date.parse(session.idleExpiresAt) : 0;
+  const absolute = session.absoluteExpiresAt ? Date.parse(session.absoluteExpiresAt) : 0;
+  if ((idle && now >= idle) || (absolute && now >= absolute)) return { ok: false, session, reason: 'expired' };
+  // Reuse detection: the presented token matched the PREVIOUS hash. Past the grace window that is a
+  // replay, which the refresh treats as theft and ends the whole session.
+  if (session.prevTokenHash && presentedHash === session.prevTokenHash) {
+    const graceUntil = session.prevValidUntil ? Date.parse(session.prevValidUntil) : 0;
+    if (!(graceUntil && now < graceUntil)) return { ok: false, session, reason: 'reused' };
+    return { ok: true, session, previous: true };
+  }
+  return { ok: true, session, previous: false };
+}
+
 export type RefreshResult =
   | { ok: true; token: string; expiresIn: number; rotated: boolean; displayName: string }
   | { ok: false; status: number; code: string; message: string };
@@ -183,46 +227,26 @@ export async function refreshOwnerSession(
   }
 
   const presentedHash = hashToken(rawToken);
-  const session = await storage.getSessionByRefreshHash(presentedHash);
-  if (!session) {
-    clearRefreshCookie(req, res);
-    return { ok: false, status: 401, code: 'INVALID_GRANT', message: 'Invalid refresh token' };
-  }
-  if (session.revoked) {
-    clearRefreshCookie(req, res);
-    return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'Session has been revoked' };
-  }
-
-  // The account the session was made for: deleted, deactivated (BR-04), or newer than the session
-  // because the name was released and registered again (auth/credential-age.ts). The refresh cookie
-  // ends with the account. revokeAllSessions already marked the rows of a deactivated account, so for
-  // that account this check covers a row created between the flag and the revocation.
-  const ownerRecord = await storage.getOwner(session.owner);
-  if (ownerRefuses(ownerRecord, recordIssuedAt(session.issuedAt))) {
-    await storage.revokeSession(session.sessionId);
-    clearRefreshCookie(req, res);
-    if (ownerRecord?.disabledAt) return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: 'This account has been deactivated' };
-    return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'The account this session was made for no longer exists' };
-  }
-
   const now = Date.now();
-  const idle = session.idleExpiresAt ? Date.parse(session.idleExpiresAt) : 0;
-  const absolute = session.absoluteExpiresAt ? Date.parse(session.absoluteExpiresAt) : 0;
-  if ((idle && now >= idle) || (absolute && now >= absolute)) {
-    await storage.revokeSession(session.sessionId);
+  const check = await checkRefreshSession(storage, presentedHash, now);
+  if (!check.ok) {
+    // A refusal that names a session ends it (the cookie's row), except one already revoked.
+    if (check.session && check.reason !== 'revoked') await storage.revokeSession(check.session.sessionId);
     clearRefreshCookie(req, res);
-    return { ok: false, status: 401, code: 'SESSION_EXPIRED', message: 'Session expired — please log in again' };
-  }
-
-  // Reuse detection: the presented token matched the PREVIOUS hash.
-  if (session.prevTokenHash && presentedHash === session.prevTokenHash) {
-    const graceUntil = session.prevValidUntil ? Date.parse(session.prevValidUntil) : 0;
-    if (!(graceUntil && now < graceUntil)) {
-      // Previous token replayed after the grace window → treat as theft, revoke the family.
-      await storage.revokeSession(session.sessionId);
-      clearRefreshCookie(req, res);
-      return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'Refresh token reuse detected' };
+    switch (check.reason) {
+      case 'unknown': return { ok: false, status: 401, code: 'INVALID_GRANT', message: 'Invalid refresh token' };
+      case 'revoked': return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'Session has been revoked' };
+      case 'account-disabled': return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: 'This account has been deactivated' };
+      case 'account-gone': return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'The account this session was made for no longer exists' };
+      case 'expired': return { ok: false, status: 401, code: 'SESSION_EXPIRED', message: 'Session expired — please log in again' };
+      case 'reused': return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'Refresh token reuse detected' };
     }
+  }
+  const session = check.session;
+  const absolute = session.absoluteExpiresAt ? Date.parse(session.absoluteExpiresAt) : 0;
+
+  // The presented token matched the PREVIOUS hash, inside the grace window.
+  if (check.previous) {
     // Within grace: an in-flight request carrying the just-rotated-away cookie. A sibling
     // request already rotated and set the new cookie, so DON'T rotate again — just issue a
     // fresh access token bound to the session.

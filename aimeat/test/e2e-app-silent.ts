@@ -77,6 +77,8 @@ async function startServer(): Promise<ChildProcess> {
         ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
         AIMEAT_APP_HOST: APP_HOST, AIMEAT_APP_ORIGIN_ENABLED: 'true',
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_DEFAULT_AGENT_SCOPES: '*',
+        // A short refresh grace, so a replayed previous token can be tested without a minute's wait.
+        AIMEAT_REFRESH_GRACE_MS: '1500',
     };
     const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
@@ -316,6 +318,18 @@ async function main() {
         await test('no session cookie → login_required (cannot authenticate silently)', async () => {
             const r = await silent(ORIGIN_A, 'memory:read', null);
             assert(r.ok === false && r.error === 'login_required', `expected login_required, got ${JSON.stringify(r)}`);
+        });
+        // Secaudit 2026-10, AUTH-1: the bridge had its own session check, which knew revocation and
+        // expiry and nothing else. A previous refresh token replayed after its grace window is theft
+        // to the refresh, and approved apps here.
+        await test('a refresh token replayed after its grace window → login_required, as the refresh says', async () => {
+            const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: a, password: 'SilentPw#2026' }) });
+            assert(login.status === 200 && !!login.rt, `login: ${login.status}`);
+            const rotated = await fetch(`${BASE}/v1/auth/refresh`, { method: 'POST', headers: { Cookie: `aimeat_rt=${encodeURIComponent(login.rt!)}`, 'X-AIMEAT-Refresh': '1' } });
+            assert(rotated.status === 200, `refresh: ${rotated.status}`);
+            await new Promise(r => setTimeout(r, 1800));
+            const r = await silent(ORIGIN_A, 'memory:read', login.rt!);
+            assert(r.ok === false && r.error === 'login_required', `a replayed token: ${JSON.stringify(r)}`);
         });
         await test('non-subdomain origin (bare app host) → bad_origin', async () => {
             const r = await silent(`https://${APP_HOST}`, 'memory:read', A.rt);
