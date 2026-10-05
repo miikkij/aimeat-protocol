@@ -43,9 +43,6 @@
     "aimeat_voice_speak",
     "aimeat_workflow_save",
     "aimeat_workspace_publish",
-    "aimeat_workspace_sections_set",
-    "aimeat_workspace_space_add",
-    "aimeat_workspace_suggestions",
     "aimeat_workspace_update"
   ]
 }

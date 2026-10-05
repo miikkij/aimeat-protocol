@@ -212,12 +212,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
 
-    // A member's change to a workspace and the decision on a member's suggestion: the word their
-    // REST doors ask (POST …/workspace/spaces, PUT …/workspace/sections/:space, POST …/suggestions/:sid).
-    aimeat_workspace_space_add:               'organism:write',
-    aimeat_workspace_sections_set:            'organism:write',
-    aimeat_workspace_suggestions:             'organism:write',
-
     // The operator tools: organism break-glass and operator:admin (scopes-operator.ts).
     ...OPERATOR_TOOL_SCOPES,
 

@@ -16,9 +16,9 @@
  * @structure registerWorkspaceMemberChangeTools(mcp, deps)
  * @usage registerWorkspaceMemberChangeTools(mcp, { storage, config, agentGaii, ownerName });
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
-import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -27,6 +27,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { addWorkspaceSpaces, setWorkspaceSections, isRefusal, type ChangeCaller } from '../services/workspace-member-changes.js';
 import { listSuggestions, decideSuggestion } from '../services/workspace-suggestions.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -52,11 +53,7 @@ export function registerWorkspaceMemberChangeTools(mcp: McpServer, deps: Workspa
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
 
     mcp.tool('aimeat_workspace_space_add', descriptionFor('aimeat_workspace_space_add'),
-        {
-            organism_id: z.string(), ws: z.string(),
-            spaces: z.any().describe('The space to add, { name, namespace, mode } (mode "document" for pages, "records" for a list; a ROW space is { name, namespace, backing:"rows", indexOn:[…] }), or an ARRAY of them. Defaults are filled.'),
-            schemas: z.any().optional().describe('Map of namespace → JSON Schema, only for records spaces added in this same call.'),
-        },
+        zodShapeFor('aimeat_workspace_space_add'),
         annotationsFor('aimeat_workspace_space_add'),
         async ({ organism_id, ws, spaces, schemas }): Promise<TextResult> => {
             const r = await addWorkspaceSpaces(svc, caller(), { orgId: organism_id, ws, spaces: parsed(spaces), schemas: parsed(schemas) });
@@ -64,11 +61,7 @@ export function registerWorkspaceMemberChangeTools(mcp: McpServer, deps: Workspa
         });
 
     mcp.tool('aimeat_workspace_sections_set', descriptionFor('aimeat_workspace_sections_set'),
-        {
-            organism_id: z.string(), ws: z.string(),
-            space: z.string().describe('The document space, by name or namespace.'),
-            sections: z.any().describe('The WHOLE section index for that space: [{ id, name, parentId, documents:[docId], color? }]. Read the current one from aimeat_workspace_read (`sections`), change it, send it back.'),
-        },
+        zodShapeFor('aimeat_workspace_sections_set'),
         annotationsFor('aimeat_workspace_sections_set'),
         async ({ organism_id, ws, space, sections }): Promise<TextResult> => {
             const r = await setWorkspaceSections(svc, caller(), { orgId: organism_id, ws, space, sections: parsed(sections) });
@@ -76,15 +69,7 @@ export function registerWorkspaceMemberChangeTools(mcp: McpServer, deps: Workspa
         });
 
     mcp.tool('aimeat_workspace_suggestions', descriptionFor('aimeat_workspace_suggestions'),
-        {
-            organism_id: z.string(),
-            action: z.enum(['list', 'decide']).describe("'list' = the suggestions you may see, each with can_decide · 'decide' = approve or decline one"),
-            ws: z.string().optional().describe("action='list': only this workspace. Omit for every workspace you can read."),
-            status: z.enum(['pending', 'approved', 'declined', 'expired', 'all']).optional().describe("action='list': which ones. Default 'pending'."),
-            suggestion_id: z.string().optional().describe("action='decide': the suggestion's id, from action='list'."),
-            decision: z.enum(['approve', 'decline']).optional().describe("action='decide': 'approve' applies the change now; 'decline' leaves the workspace as it is."),
-            note: z.string().optional().describe("action='decide': an optional note the member who suggested it reads."),
-        },
+        zodShapeFor('aimeat_workspace_suggestions'),
         annotationsFor('aimeat_workspace_suggestions'),
         async ({ organism_id, action, ws, status, suggestion_id, decision, note }): Promise<TextResult> => {
             if (action === 'list') {
