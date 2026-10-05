@@ -44,6 +44,7 @@
  *   const r = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
+ *   v1.3.1 — 2026-10-05 — A hook action's answer is read under a ceiling (secaudit 2026-10, C6).
  *   v1.3.0 — 2026-09-26 — SECURITY (audit A8-3): resolveHookRef(). When a hook runs, only an id#provider
  *     reference names an action. A bare id names none, whatever is published at that moment: the
  *     executor calls nobody and a gate refuses, and the page shows it with the id#provider of each
@@ -62,6 +63,11 @@ import type { Storage } from '../storage/interface.js';
 import type { ActionRecord } from '../storage/types/commerce.js';
 import { logger } from '../utils/logger.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
+import { readJson, readText } from '../utils/read-capped.js';
+
+/** A hook action answers allowed or not, with a reason: a small body, read under a ceiling so the
+ *  action does not decide how much memory a request takes (secaudit 2026-10, C6). */
+const HOOK_ANSWER_MAX_BYTES = 256 * 1024;
 import { recordHookRun, type HookAnswer } from './hook-log.js';
 
 /**
@@ -297,7 +303,7 @@ export async function executeHooks(
 
             if (!response.ok) {
                 // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-                const body = await response.text().catch(() => '');
+                const body = await readText(response, HOOK_ANSWER_MAX_BYTES).catch(() => '');
                 logger.info(`Extension hook ${hookName}: action "${actionRef}" rejected`, { status: response.status, body });
                 await record(storage, hookName, actionRef, action.displayName, 'refused', response.status,
                     Date.now() - started, kind !== 'gate', subject, body.slice(0, 200) || undefined);
@@ -312,7 +318,7 @@ export async function executeHooks(
             }
 
             // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-            const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+            const result = await readJson(response, HOOK_ANSWER_MAX_BYTES).catch(() => ({})) as Record<string, unknown>;
             if (result.allowed === false) {
                 const reason = (result.reason as string) ?? `Hook action "${actionRef}" denied`;
                 await record(storage, hookName, actionRef, action.displayName, 'refused', response.status,

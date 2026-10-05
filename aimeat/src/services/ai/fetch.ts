@@ -12,10 +12,15 @@
  * @usage
  *   createOpenAICompatible({ name, baseURL, apiKey, fetch: aiFetch() })
  * @version-history
+ *   v1.0.1 — 2026-10-05 — A JSON answer is read under a 64 MB ceiling (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-09-28 — Initial, with the gateway (V1 of the System 2 plan).
  */
 import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
+import { readText } from '../../utils/read-capped.js';
+
+/** The most of one JSON answer this wrapper reads to normalise it (secaudit 2026-10, C6). */
+const AI_ANSWER_MAX_BYTES = 64 * 1024 * 1024;
 
 /** Options a provider may need on its transport. V3 fills `allowOrigins` for an operator's local server. */
 export interface AiFetchOptions {
@@ -43,7 +48,8 @@ function urlOf(input: string | URL | Request): string {
  */
 async function normaliseErrorBody(resp: Response): Promise<Response> {
   if (!resp.ok || !(resp.headers.get('content-type') ?? '').includes('application/json')) return resp;
-  const text = await resp.text();
+  // Read under a ceiling: the provider does not decide how much memory one answer takes (C6).
+  const text = await readText(resp, AI_ANSWER_MAX_BYTES);
   const headers = new Headers(resp.headers);
   // The body below is the decoded text, so the transfer headers of the original no longer describe it.
   headers.delete('content-encoding');

@@ -17,7 +17,9 @@
  *
  *   OUTBOUND_READ_MAX_BYTES is the ceiling itself for the three reads of an answer from a service a
  *   person chose to call: a connected account, an extension's ctx.fetch and a decision provider.
- * @structure OUTBOUND_READ_MAX_BYTES · readBodyCapped(resp, maxBytes) · capResponseBody(resp, maxBytes) ·
+ * @structure OUTBOUND_READ_MAX_BYTES · readBodyCapped(resp, maxBytes) · readBodyPrefix(resp, maxBytes) ·
+ *   readJsonCapped(resp, maxBytes) · readTextCapped(resp, maxBytes) · readJson(resp, maxBytes) ·
+ *   readText(resp, maxBytes) · capResponseBody(resp, maxBytes) ·
  *   ResponseTooLargeError
  * @usage
  *   const body = await readBodyCapped(res, capBytes);
@@ -25,6 +27,9 @@
  *   const capped = capResponseBody(await safeFetch(url), 16 * 1024 * 1024);
  *   const answer = await readBodyCapped(res, OUTBOUND_READ_MAX_BYTES);
  * @version-history
+ *   v1.3.0 — 2026-10-05 — readBodyPrefix (a cut read, for a link preview's page head), readJsonCapped
+ *     and readTextCapped (answer the reason), readJson and readText (throw as json() and text() do):
+ *     the capped forms of json() and text() (secaudit 2026-10, C6).
  *   v1.2.0 — 2026-09-26 — OUTBOUND_READ_MAX_BYTES (4 MB): one ceiling for a connected account's read,
  *     an extension's ctx.fetch and a decision provider's answer (secaudit 2026-09, N3).
  *   v1.1.1 — 2026-09-26 — capResponseBody refuses a status outside 200 to 599 and cancels its body
@@ -66,6 +71,75 @@ export async function readBodyCapped(resp: Response, maxBytes: number): Promise<
         chunks.push(value);
     }
     return Buffer.concat(chunks);
+}
+
+/**
+ * The first `maxBytes` of the body, the rest cancelled unread: for a reader that needs only the
+ * beginning (a page's <head> for a link preview). A body over the cap is cut, never refused, so use
+ * readBodyCapped wherever a cut body would be wrong (an image, JSON).
+ */
+export async function readBodyPrefix(resp: Response, maxBytes: number): Promise<Buffer> {
+    if (!resp.body) return Buffer.alloc(0);
+    const reader = resp.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const room = maxBytes - total;
+        if (value.byteLength >= room) {
+            chunks.push(value.subarray(0, room));
+            await reader.cancel().catch(err => logger.warn('readBodyPrefix: cancel after the prefix failed', { error: String(err) }));
+            break;
+        }
+        total += value.byteLength;
+        chunks.push(value);
+    }
+    return Buffer.concat(chunks);
+}
+
+/** A JSON answer read under a ceiling, or why it could not be. */
+export type CappedJson =
+    | { ok: true; value: unknown }
+    | { ok: false; reason: 'too-large' }
+    | { ok: false; reason: 'not-json'; text: string };
+
+/**
+ * A response's JSON, read with readBodyCapped: `res.json()` holds the whole body in memory before
+ * anything can measure it, so a remote service decides how much this process reads. The text of a
+ * body that is not JSON comes back cut to 500 characters, for an error message.
+ */
+export async function readJsonCapped(resp: Response, maxBytes: number): Promise<CappedJson> {
+    const body = await readBodyCapped(resp, maxBytes);
+    if (body === null) return { ok: false, reason: 'too-large' };
+    const text = body.toString('utf8');
+    try { return { ok: true, value: JSON.parse(text) as unknown }; } catch {
+        return { ok: false, reason: 'not-json', text: text.slice(0, 500) };
+    }
+}
+
+/**
+ * `resp.json()` with a ceiling: the parsed body, or ResponseTooLargeError once more than `maxBytes`
+ * arrive, or the parse error as json() throws it. For a caller written against json() that should
+ * fail the same way, only bounded.
+ */
+export async function readJson(resp: Response, maxBytes: number): Promise<unknown> {
+    const body = await readBodyCapped(resp, maxBytes);
+    if (body === null) throw new ResponseTooLargeError(maxBytes);
+    return JSON.parse(body.toString('utf8')) as unknown;
+}
+
+/** `resp.text()` with a ceiling: the text, or ResponseTooLargeError once more than `maxBytes` arrive. */
+export async function readText(resp: Response, maxBytes: number): Promise<string> {
+    const body = await readBodyCapped(resp, maxBytes);
+    if (body === null) throw new ResponseTooLargeError(maxBytes);
+    return body.toString('utf8');
+}
+
+/** A response's text under a ceiling, or null once it passes the ceiling. */
+export async function readTextCapped(resp: Response, maxBytes: number): Promise<string | null> {
+    const body = await readBodyCapped(resp, maxBytes);
+    return body === null ? null : body.toString('utf8');
 }
 
 /** What a capped body errors with at its ceiling. `code` is how a caller tells it from a dropped socket. */

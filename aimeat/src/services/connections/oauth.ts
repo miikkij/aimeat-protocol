@@ -21,12 +21,18 @@
  * @structure startAuthorization · completeAuthorization · resolveClient · fetchAccountIdentity
  * @usage import { startAuthorization, completeAuthorization } from './oauth.js';
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The token and profile answers are read under a ceiling (readJson; secaudit 2026-10, C6).
  *   v1.1.0 — 2026-09-29 — The sandbox's `fake-mail` provider asks the same /me as `fake`.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1c.
  */
 
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { safeFetch } from '../../utils/url-validator.js';
+import { readJson } from '../../utils/read-capped.js';
+
+/** A token answer or a profile read is a few kilobytes; a provider never needs this node to read
+ *  more than this to sign a person in (secaudit 2026-10, C6). */
+const OAUTH_ANSWER_MAX_BYTES = 256 * 1024;
 import { sealCredential, openCredential } from './credential.js';
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
 import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
@@ -242,7 +248,7 @@ async function fetchAccountIdentity(
         headers: auth, signal: AbortSignal.timeout(15_000),
       });
       if (!r.ok) return { error: `instance rejected the token (HTTP ${r.status})` };
-      const j = await r.json() as { id?: unknown; acct?: unknown };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { id?: unknown; acct?: unknown };
       const id = typeof j.id === 'string' ? j.id : '';
       const acct = typeof j.acct === 'string' ? j.acct : '';
       if (!id) return { error: 'instance returned no account id' };
@@ -262,7 +268,7 @@ async function fetchAccountIdentity(
           ? 'Google accepted the sign-in but would not say which channel it is for. The connection was authorised before youtube.readonly was requested; disconnect and connect again.'
           : `Google rejected the token (HTTP ${r.status})` };
       }
-      const j = await r.json() as { items?: { id?: unknown; snippet?: { title?: unknown } }[] };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { items?: { id?: unknown; snippet?: { title?: unknown } }[] };
       const item = Array.isArray(j.items) ? j.items[0] : undefined;
       const id = typeof item?.id === 'string' ? item.id : '';
       // A Google account with no YouTube channel authorizes fine and then has nothing to publish to.
@@ -280,7 +286,7 @@ async function fetchAccountIdentity(
           ? 'X accepted the sign-in but would not say which account it is for. Check that the app requests the users.read scope.'
           : `X rejected the token (HTTP ${r.status})` };
       }
-      const j = await r.json() as { data?: { id?: unknown; username?: unknown } };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { data?: { id?: unknown; username?: unknown } };
       const id = typeof j.data?.id === 'string' ? j.data.id : '';
       if (!id) return { error: 'X returned no account id' };
       const handle = typeof j.data?.username === 'string' ? j.data.username : '';
@@ -297,7 +303,7 @@ async function fetchAccountIdentity(
           ? 'LinkedIn accepted the sign-in but would not say which member it is for. Check that the app has "Sign In with LinkedIn using OpenID Connect" enabled.'
           : `LinkedIn rejected the token (HTTP ${r.status})` };
       }
-      const j = await r.json() as { sub?: unknown; name?: unknown };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { sub?: unknown; name?: unknown };
       const sub = typeof j.sub === 'string' ? j.sub : '';
       if (!sub) return { error: 'LinkedIn returned no member id' };
       return { externalId: sub, accountLabel: typeof j.name === 'string' ? j.name : sub };
@@ -315,7 +321,7 @@ async function fetchAccountIdentity(
           ? 'Google accepted the sign-in but would not say which mailbox it is for. Disconnect and connect again so the read permission is granted.'
           : `Google rejected the token (HTTP ${r.status})` };
       }
-      const j = await r.json() as { emailAddress?: unknown };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { emailAddress?: unknown };
       const email = typeof j.emailAddress === 'string' ? j.emailAddress : '';
       if (!email) return { error: 'Google returned no mailbox address' };
       // The address IS the dedupe key here: one Google account is one mailbox, and the address is
@@ -334,7 +340,7 @@ async function fetchAccountIdentity(
           ? 'Google accepted the sign-in but would not say which account it is for. Check that the app requests the userinfo.email scope.'
           : `Google rejected the token (HTTP ${r.status})` };
       }
-      const j = await r.json() as { sub?: unknown; email?: unknown };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { sub?: unknown; email?: unknown };
       const sub = typeof j.sub === 'string' ? j.sub : '';
       if (!sub) return { error: 'Google returned no account id' };
       const email = typeof j.email === 'string' ? j.email : sub;
@@ -349,7 +355,7 @@ async function fetchAccountIdentity(
           ? 'Microsoft accepted the sign-in but would not say which mailbox it is for. Check that the app requests the User.Read permission.'
           : `Microsoft rejected the token (HTTP ${r.status})` };
       }
-      const j = await r.json() as { id?: unknown; mail?: unknown; userPrincipalName?: unknown };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { id?: unknown; mail?: unknown; userPrincipalName?: unknown };
       const id = typeof j.id === 'string' ? j.id : '';
       if (!id) return { error: 'Microsoft returned no account id' };
       // `mail` is empty on an account with no mailbox licence, and userPrincipalName is then all
@@ -366,7 +372,7 @@ async function fetchAccountIdentity(
       const base = provider.endpoints(null)?.token.replace(/\/token$/, '') ?? '';
       const r = await safeFetch(`${base}/me`, { headers: auth, signal: AbortSignal.timeout(15_000) });
       if (!r.ok) return { error: `test provider rejected the token (HTTP ${r.status})` };
-      const j = await r.json() as { id?: unknown; label?: unknown };
+      const j = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as { id?: unknown; label?: unknown };
       const id = typeof j.id === 'string' ? j.id : '';
       if (!id) return { error: 'test provider returned no account id' };
       return { externalId: id, accountLabel: typeof j.label === 'string' ? j.label : id };
@@ -432,7 +438,7 @@ export async function completeAuthorization(
       signal: AbortSignal.timeout(20_000),
     });
     if (!r.ok) return { ok: false, code: 'EXCHANGE_FAILED', reason: `the provider refused the code (HTTP ${r.status})` };
-    token = await r.json() as TokenResponse;
+    token = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as TokenResponse;
   } catch (err) {
     return { ok: false, code: 'EXCHANGE_FAILED', reason: `could not reach the provider: ${(err as Error).message}` };
   }

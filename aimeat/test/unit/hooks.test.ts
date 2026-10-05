@@ -36,6 +36,8 @@
  *      left, so no later publication or deletion decides what a stored binding names.
  *
  * @version-history
+ *   v1.5.1 — 2026-10-05 — The fake safeFetch answers a real Response: the hook reads the body under
+ *     a ceiling now (secaudit 2026-10, C6).
  *   v1.5.0 — 2026-09-26 — A binding stored as `id#<account name>` follows its action to the
  *     account's GHII at start, once per node, and stays as it was when nothing is published there
  *     (secaudit 2026-09: R3 row 5).
@@ -65,11 +67,8 @@ vi.mock('../../src/utils/url-validator.js', () => ({
     fetched.push(url);
     const a = answers[url] ?? { status: 200, ok: true };
     if (a.throws) throw new Error('connect ECONNREFUSED');
-    return {
-      ok: a.ok, status: a.status,
-      json: async () => a.body ?? {},
-      text: async () => JSON.stringify(a.body ?? {}),
-    } as unknown as Response;
+    // A real Response, as safeFetch answers: the hook reads its body as a stream under a ceiling.
+    return new Response(JSON.stringify(a.body ?? {}), { status: a.status });
   }),
 }));
 vi.mock('../../src/utils/logger.js', () => ({

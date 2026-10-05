@@ -34,12 +34,13 @@
  *     answers here (secaudit 2026-09, N3).
  *   v1.2.0 -- 2026-09-28 -- readResource takes opts.maxBytes, so storing a mail attachment can read
  *     up to the node's per-file limit; every other caller keeps the 4 MB cap.
+ *   v1.2.1 -- 2026-10-05 -- A refusal's body, kept for the log line, is read under 64 kB (secaudit 2026-10, C6).
  */
 import type { ConnectContext } from './oauth.js';
 import { ensureFreshCredential } from './refresh.js';
 import { findProvider } from './providers.js';
 import { safeFetch } from '../../utils/url-validator.js';
-import { readBodyCapped, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
+import { readBodyCapped, readText, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 
 // How much one read may bring back is OUTBOUND_READ_MAX_BYTES (utils/read-capped.ts). A mailbox is
@@ -122,7 +123,7 @@ export async function readResource(
         if (!resp.ok) {
             // The body is EVIDENCE for the log line below, never the answer, so a body that
             // cannot be read leaves the status to speak and is said as much.
-            const detail = (await resp.text().catch((err) => `<body unreadable: ${String(err)}>`)).slice(0, 400);
+            const detail = (await readText(resp, 64 * 1024).catch((err) => `<body unreadable: ${String(err)}>`)).slice(0, 400);
             logger.warn(`[connections:read] ${provider.id}/${resourceName} answered ${resp.status}: ${detail}`);
             return {
                 ok: false, status: resp.status,

@@ -13,6 +13,7 @@
  *   - chatCompletionRaw / speechRaw / generationCost — the proxy's and the voice stream's transport
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
  * @version-history
+ *   v4.0.1 — 2026-10-05 — Every answer is read under a ceiling (readJson, readText; secaudit 2026-10, C6).
  *   v4.0.0 — 2026-09-28 — complete() is gone: text completions run through the System 2 gateway on
  *     the AI SDK (services/ai/gateway.ts), which keeps its empty-answer retry, its reasoning
  *     pass-through and its finish reason. generateImage() and listModels() reach the provider
@@ -59,6 +60,14 @@
  */
 import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { readJson, readText } from '../utils/read-capped.js';
+
+/** The most of one answer this node reads from the AI provider: a model list, a transcript, images
+ *  as base64. Read under a ceiling so the provider does not decide how much memory a call takes
+ *  (secaudit 2026-10, C6). */
+const ANSWER_MAX_BYTES = 64 * 1024 * 1024;
+/** An error body, or a small status read: enough for the message, never more. */
+const ERROR_BODY_MAX_BYTES = 64 * 1024;
 
 export interface OpenRouterModel {
   id: string;
@@ -121,7 +130,7 @@ export async function generateImage(
 
       if (!resp.ok) {
         // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable body is honestly reported as empty
-        const body = await resp.text().catch(() => '');
+        const body = await readText(resp, ERROR_BODY_MAX_BYTES).catch(() => '');
         const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
         err.status = resp.status;
         if (!/moderat/i.test(body) || attempt === IMAGE_MODERATION_ATTEMPTS) throw err;
@@ -130,7 +139,7 @@ export async function generateImage(
         continue;
       }
 
-      const json = await resp.json() as {
+      const json = await readJson(resp, ANSWER_MAX_BYTES) as {
         data?: Array<{ b64_json?: string; url?: string }>;
         usage?: { cost?: number };
         error?: { message?: string };
@@ -336,7 +345,7 @@ export async function generationCost(apiKey: string | undefined, baseUrl: string
     headers: providerHeaders(apiKey, baseUrl), signal: AbortSignal.timeout(5000),
   });
   if (!response.ok) return undefined;
-  const value = await response.json() as { data?: { total_cost?: number } };
+  const value = await readJson(response, ERROR_BODY_MAX_BYTES) as { data?: { total_cost?: number } };
   const cost = value.data?.total_cost;
   return typeof cost === 'number' && Number.isFinite(cost) && cost >= 0 ? cost : undefined;
 }
@@ -373,13 +382,13 @@ export async function transcribe(
 
     if (!resp.ok) {
       // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable body is honestly reported as empty
-      const body = await resp.text().catch(() => '');
+      const body = await readText(resp, ERROR_BODY_MAX_BYTES).catch(() => '');
       const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
       err.status = resp.status;
       throw err;
     }
 
-    const data = await resp.json() as {
+    const data = await readJson(resp, ANSWER_MAX_BYTES) as {
       text?: string;
       language?: string;
       model?: string;
@@ -443,7 +452,7 @@ export async function listModels(
     owned_by?: string;
     architecture?: { input_modalities?: string[]; output_modalities?: string[] };
   };
-  const data = await resp.json() as { data?: RawModel[] };
+  const data = await readJson(resp, ANSWER_MAX_BYTES) as { data?: RawModel[] };
   return (data.data ?? [])
     .filter((m): m is RawModel => !!m && typeof m.id === 'string')
     .map(m => ({
