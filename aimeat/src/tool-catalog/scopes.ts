@@ -223,7 +223,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     // The destructive half: delete an app. Split from write because shipping an update and
     // removing the thing are different risks.
     aimeat_app_delete:                        'app:manage',
-    aimeat_package_delete:                    'app:manage',
 
     // Publish or update an app under the owner's account, including drafts.
     aimeat_app_draft_discard:                 'app:write',
@@ -252,31 +251,6 @@ const LISTED_TOOL_SCOPES: Record<string, ToolScope> = {
     aimeat_decide_rule_propose:               'ai:use',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
-    aimeat_package_publish:                   'app:write',
-    aimeat_package_status_set:                'app:write',
-    aimeat_package_compose:                   'packages:write',
-    aimeat_package_compose_set:               'packages:write',
-    aimeat_package_withdraw:                  'packages:write',
-    aimeat_package_update:                    'packages:write',
-    aimeat_package_fork:                      'packages:write',
-    aimeat_package_instance_set:              'packages:write',
-    aimeat_package_check_updates:             'packages:write',
-    aimeat_package_repository:                'packages:write',
-    aimeat_package_entitlements:              'packages:write',
-    aimeat_package_config_needs:              'packages:write',
-    aimeat_package_sellers:                   'packages:write',
-    aimeat_package_offer:                     'packages:write',
-    aimeat_package_buy:                       'commerce:buy',
-    aimeat_package_pull:                      'packages:write',
-
-    // Installing registers an app, a cortex, an extension and any @activate cron the manifest
-    // declares, all under the owner's identity — a write with a long tail, and its own word on the
-    // consent screen. Same scope POST /v1/packages/:groupId/install requires.
-    aimeat_package_install:                   'packages:write',
-    // Reading and deciding the install requests. The same word /v1/package-install-requests asks on
-    // all three doors: approving an install is taking part in installing. The words the install itself
-    // needs are asked of the approving agent inside the service, not here.
-    aimeat_package_install_requests:          'packages:write',
 
     // A capability is how this account offers work to others, so writing one speaks in the
     // owner's name.

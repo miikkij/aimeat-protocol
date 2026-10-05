@@ -355,46 +355,6 @@ const LISTED_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // Component packages (/v1/packages). A different thing from an app, and named so since
     // 2026-08-16 — these five were called aimeat_app_* on the connector doors while the node's MCP
     // used the same names for the web apps at /v1/apps.
-    aimeat_package_list: { title: 'List Packages', readOnlyHint: true },
-    aimeat_package_get: { title: 'Get Package', readOnlyHint: true },
-    aimeat_package_versions: { title: 'List Package Versions', readOnlyHint: true },
-    aimeat_package_publish: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_package_delete: { title: 'Delete Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    // Not destructive: it changes who may reach a version, never its bytes, and archiving is
-    // reversible by setting the status back.
-    aimeat_package_status_set: { title: 'Set Package Status', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_package_withdraw: { title: 'Withdraw a Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
-    // Not idempotent: composing twice under one name is refused as a conflict, and composing under
-    // another name makes a second package. It reads the owner's apps and writes nothing of theirs.
-    aimeat_package_compose: { title: 'Compose Package From Apps', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_package_compose_set: { title: 'Compose a Set to Sell', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    // Idempotent: run twice and the second call finds nothing left to update. Not destructive,
-    // because a component the owner edited is refused rather than overwritten.
-    aimeat_package_update: { title: 'Update Installed Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    aimeat_package_instances: { title: 'List Installed Packages', readOnlyHint: true },
-    aimeat_package_instance_set: { title: 'Set Installed Package Options', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-    // openWorld: it reaches the nodes the packages came from. Not idempotent: it may pull and update.
-    aimeat_package_check_updates: { title: 'Check Package Updates', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    aimeat_package_repository: { title: 'List Repository Packages', readOnlyHint: true, openWorldHint: true },
-    // Destructive: a revoke stops a customer node's pulls. Idempotent: the same grant twice is one grant.
-    aimeat_package_entitlements: { title: 'Package Entitlements', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_package_config_needs: { title: 'Package Config Needs', readOnlyHint: true, openWorldHint: false },
-    aimeat_package_sellers: { title: 'Package Sellers', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    aimeat_package_offer: { title: 'Package Offer', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_package_buy: { title: 'Buy a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    // Destructive: the updates it gives up do not come back to this copy. Not idempotent: a second
-    // call is refused because the copy is no longer managed.
-    aimeat_package_fork: { title: 'Fork Managed Package Install', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-    // openWorld: it reaches another node over the network, which is the one package tool that does.
-    // Idempotent: a source with nothing newer answers applied:false rather than writing again.
-    aimeat_package_pull: { title: 'Pull Package From Another Node', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-    // Not idempotent: each install mints a fresh instance with its own component names, so calling
-    // it twice leaves two copies rather than one.
-    aimeat_package_install: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    // Lists and reads, and decides: approving installs what was asked, declining closes it. Idempotent:
-    // a second decision on a settled request is refused and changes nothing. Not destructive: it
-    // installs or updates, and a migration it approves checks every part before replacing any.
-    aimeat_package_install_requests: { title: 'Package Install Requests', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_list: { title: 'List Apps', readOnlyHint: true },
     aimeat_app_get: { title: 'Get App', readOnlyHint: true },
     // Destructive because some actions are: ui_set replaces a layout, subdomain_delete and

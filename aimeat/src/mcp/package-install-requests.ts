@@ -18,12 +18,12 @@
  * @structure registerPackageInstallRequestTools(mcp, storage, config, getAgentGaii, sessionScopes)
  * @usage registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes);  // register-all.ts
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -32,6 +32,7 @@ import { toolError } from './tool-error.js';
 import { listRequestsFor, readRequestFor, decideInstallRequest } from '../services/packages/install/package-install-requests.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { localAccountName } from '../utils/gaii.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerPackageInstallRequestTools(
     mcp: McpServer,
@@ -40,10 +41,7 @@ export function registerPackageInstallRequestTools(
     getAgentGaii: () => string,
     sessionScopes: string[] = [],
 ): void {
-    mcp.tool('aimeat_package_install_requests', descriptionFor('aimeat_package_install_requests'), {
-        request_id: z.string().optional().describe('One request. Omit to list them all.'),
-        decision: z.enum(['approve', 'decline']).optional().describe('Decide the request named by request_id.'),
-    }, annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
+    mcp.tool('aimeat_package_install_requests', descriptionFor('aimeat_package_install_requests'), zodShapeFor('aimeat_package_install_requests'), annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
         const gaii = getAgentGaii();
         // Every MCP session is an agent's. The owner it acts for comes from its identity, never input.
         const who = { sub: gaii, owner: localAccountName(gaii), roles: ['agent'], scopes: sessionScopes };

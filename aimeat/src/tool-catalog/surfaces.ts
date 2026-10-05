@@ -216,12 +216,12 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // Four of them are registered on this node's /v1/mcp (mcp/packages.ts) and the v2 surface
         // must list exactly what is registered. Authoring by hand (publish) and pruning history
         // (versions, delete) stay on the connector doors; see V2_EXCLUDED for why.
-        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose', 'aimeat_package_compose_set', 'aimeat_package_withdraw',
-        'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
-        'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
-        'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
-        'aimeat_package_config_needs', 'aimeat_package_sellers', 'aimeat_package_offer',
-        'aimeat_package_pull', 'aimeat_package_install_requests',
+        
+        
+        
+        
+        
+        
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_seo_status',
         'aimeat_seo_announce',
@@ -293,16 +293,16 @@ const LISTED_SURFACES: Record<SurfaceRole, string[]> = {
         // turning something this node ships into a copy they own, which is this surface's business.
         // Finding and reading one comes with it, because an agent that cannot list cannot name the
         // group id install requires, and publishing because a package is created private.
-        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_compose', 'aimeat_package_compose_set', 'aimeat_package_withdraw',
-        'aimeat_package_status_set', 'aimeat_package_install', 'aimeat_package_update',
-        'aimeat_package_instances', 'aimeat_package_fork', 'aimeat_package_instance_set',
-        'aimeat_package_check_updates', 'aimeat_package_repository', 'aimeat_package_entitlements',
-        'aimeat_package_config_needs', 'aimeat_package_sellers', 'aimeat_package_offer',
-        'aimeat_package_pull',
+        
+        
+        
+        
+        
+        
         // An install that lacked the words becomes a request; the person's own agent answers it here.
-        'aimeat_package_install_requests',
+        
         // Buying a package this node sells, for the person: the offer, the checkout, the renewals.
-        'aimeat_package_buy',
+        
         // The person's own welcome page, beside the company one: same act, different owner.
         
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email', 'aimeat_contact_invite',

@@ -5,6 +5,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-02 — aimeat_package_withdraw (POST /v1/packages/:groupId/versions/:version/withdraw).
  *   2026-10-02 — aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
  *     forwards `organism_names` (a set's organisms).
@@ -53,10 +54,10 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { AI_ROLE_PARAM } from '../../../../tool-catalog/definitions/ai-models.js';
-import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../../../../tool-catalog/definitions/packages.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult, readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { envelopeResult, payloadResult } from './_registry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
@@ -103,21 +104,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // declared {name, description, content} from the day it was split out, so every call it described
   // was answered 400 INVALID_INPUT ("components must be an array with at least 1 item") — the tool
   // was published, callable, and could not succeed. The parameters below are the route's own.
-  mcp.tool('aimeat_package_publish', descriptionFor('aimeat_package_publish'), {
-    name: z.string().describe('Package name. With your owner name it forms the group id, e.g. "company-brain::alice".'),
-    description: z.string().optional().describe('What the package is for'),
-    category: z.string().optional().describe('Category for the package gallery'),
-    tags: z.array(z.string()).optional().describe('Tags for search'),
-    visibility: z.enum(['private', 'public']).optional().describe('Who may install it (default private)'),
-    components: z.array(z.object({
-      id: z.string().describe('Component id, unique within the package'),
-      type: z.string().describe('app | extension | cortex | translation'),
-      label: z.string().optional().describe('Human-readable name'),
-      content: z.string().optional().describe('The component source'),
-      dependencies: z.array(z.string()).optional().describe('Ids of components this one needs installed first'),
-    })).min(1).describe('The components that install together. At least one.'),
-    manifest: z.record(z.string(), z.unknown()).optional().describe('Package manifest: object types, schedules, the workspace it provisions'),
-  }, annotationsFor('aimeat_package_publish'), async ({ name, description, category, tags, visibility, components, manifest }) => {
+  mcp.tool('aimeat_package_publish', descriptionFor('aimeat_package_publish'), zodShapeFor('aimeat_package_publish'), annotationsFor('aimeat_package_publish'), async ({ name, description, category, tags, visibility, components, manifest }) => {
     const body: Record<string, unknown> = { name, components };
     if (description !== undefined) body.description = description;
     if (category !== undefined) body.category = category;
@@ -127,16 +114,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.post('/v1/packages', body));
   });
 
-  mcp.tool('aimeat_package_install', descriptionFor('aimeat_package_install'), {
-    group_id: z.string().describe('Package group identifier, from aimeat_package_list'),
-    label: z.string().optional().describe('What to call this copy, e.g. the company it is for'),
-    version: z.string().optional().describe('A specific version (default: the latest published one)'),
-    dry_run: z.boolean().optional().describe('Report what would be registered and register nothing'),
-    mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout. "editable" (default): you may edit everything'),
-    config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
-    organism_names: z.record(z.string(), z.string()).optional().describe('For a set: your own names for its organisms, by the set\'s organism key'),
-    grant_apps: z.boolean().optional().describe(GRANT_APPS_PARAM),
-  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode, config, organism_names, grant_apps }) => {
+  mcp.tool('aimeat_package_install', descriptionFor('aimeat_package_install'), zodShapeFor('aimeat_package_install'), annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run, mode, config, organism_names, grant_apps }) => {
     const body: Record<string, unknown> = {};
     if (label !== undefined) body.label = label;
     if (version !== undefined) body.version = version;
@@ -150,10 +128,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
 
   // An install that needed words this agent lacked came back as a request (202, awaiting_owner).
   // This lists the owner's requests and lets an agent of theirs answer one, on the node's own rule.
-  mcp.tool('aimeat_package_install_requests', descriptionFor('aimeat_package_install_requests'), {
-    request_id: z.string().optional().describe('One request. Omit to list them all.'),
-    decision: z.enum(['approve', 'decline']).optional().describe('Decide the request named by request_id.'),
-  }, annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
+  mcp.tool('aimeat_package_install_requests', descriptionFor('aimeat_package_install_requests'), zodShapeFor('aimeat_package_install_requests'), annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
     if (decision !== undefined) {
       if (!request_id) {
         return { content: [{ type: 'text' as const, text: 'INVALID_INPUT: Name the request to decide with request_id. List them by calling this tool with no arguments.' }], isError: true };
@@ -165,10 +140,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // The installed copies, which update and fork both address by id.
-  mcp.tool('aimeat_package_instances', descriptionFor('aimeat_package_instances'), {
-    group_id: z.string().optional().describe('Only the copies of this package'),
-    status: z.enum(['installed', 'paused', 'removed']).optional().describe('Only copies in this state'),
-  }, annotationsFor('aimeat_package_instances'), async ({ group_id, status }) => {
+  mcp.tool('aimeat_package_instances', descriptionFor('aimeat_package_instances'), zodShapeFor('aimeat_package_instances'), annotationsFor('aimeat_package_instances'), async ({ group_id, status }) => {
     const qs = new URLSearchParams();
     if (group_id !== undefined) qs.set('packageGroupId', group_id);
     if (status !== undefined) qs.set('status', status);
@@ -176,34 +148,20 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.get(`/v1/instances${q ? `?${q}` : ''}`));
   });
 
-  mcp.tool('aimeat_package_instance_set', descriptionFor('aimeat_package_instance_set'), {
-    instance_id: z.string().describe('The installed copy, from aimeat_package_instances'),
-    label: z.string().optional().describe('A new name for this copy'),
-    auto_update: z.boolean().optional().describe('true: the daily check updates this copy by itself. false: it tells your owner an update is ready'),
-  }, annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
+  mcp.tool('aimeat_package_instance_set', descriptionFor('aimeat_package_instance_set'), zodShapeFor('aimeat_package_instance_set'), annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
     const body: Record<string, unknown> = {};
     if (label !== undefined) body.label = label;
     if (auto_update !== undefined) body.auto_update = auto_update;
     return out(await client.patch(`/v1/instances/${encodeURIComponent(instance_id)}`, body));
   });
 
-  mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), {},
+  mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), zodShapeFor('aimeat_package_check_updates'),
     annotationsFor('aimeat_package_check_updates'), async () => out(await client.post('/v1/instances/check-updates', {})));
 
-  mcp.tool('aimeat_package_repository', descriptionFor('aimeat_package_repository'), {
-    node_id: z.string().describe('The repository node, a peer of this node'),
-  }, annotationsFor('aimeat_package_repository'), async ({ node_id }) =>
+  mcp.tool('aimeat_package_repository', descriptionFor('aimeat_package_repository'), zodShapeFor('aimeat_package_repository'), annotationsFor('aimeat_package_repository'), async ({ node_id }) =>
     out(await client.get(`/v1/federation/peers/${encodeURIComponent(node_id)}/packages`)));
 
-  mcp.tool('aimeat_package_entitlements', descriptionFor('aimeat_package_entitlements'), {
-    group_id: z.string().describe('Your package group identifier'),
-    action: z.enum(['list', 'grant', 'revoke']).describe('list the nodes, grant (or change) one, or revoke one'),
-    node_id: z.string().optional().describe('For grant and revoke: the customer node'),
-    updates_until: z.string().optional().describe('For grant: versions published after this ISO date-time are not served to the node'),
-    channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable (published versions, the default) or beta (beta versions too)'),
-    note: z.string().optional().describe('For grant: why'),
-    node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For grant: an unknown node registered with the grant as a packages-only peer'),
-  }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
+  mcp.tool('aimeat_package_entitlements', descriptionFor('aimeat_package_entitlements'), zodShapeFor('aimeat_package_entitlements'), annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
     const base = `/v1/packages/${encodeURIComponent(group_id)}/entitlements`;
     if (action === 'list') return out(await client.get(base));
     if (!node_id) return { content: [{ type: 'text' as const, text: `INVALID_INPUT: action "${action}" needs node_id.` }], isError: true };
@@ -217,12 +175,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.put(nodePath, body));
   });
 
-  mcp.tool('aimeat_package_sellers', descriptionFor('aimeat_package_sellers'), {
-    action: z.enum(['list', 'add', 'remove']).describe('list your sellers, add (or change) one, or remove one'),
-    node_id: z.string().optional().describe('For add and remove: the seller node'),
-    node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For add: { url, public_key } of a node this repository does not know yet'),
-    note: z.string().optional().describe('For add: why'),
-  }, annotationsFor('aimeat_package_sellers'), async ({ action, node_id, node, note }) => {
+  mcp.tool('aimeat_package_sellers', descriptionFor('aimeat_package_sellers'), zodShapeFor('aimeat_package_sellers'), annotationsFor('aimeat_package_sellers'), async ({ action, node_id, node, note }) => {
     if (action === 'list') return out(await client.get('/v1/package-sellers'));
     if (!node_id) return { content: [{ type: 'text' as const, text: `INVALID_INPUT: action "${action}" needs node_id.` }], isError: true };
     const path = `/v1/package-sellers/${encodeURIComponent(node_id)}`;
@@ -234,12 +187,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // The author's terms on a repository (GET, PUT /v1/packages/:groupId/offer).
-  mcp.tool('aimeat_package_offer', descriptionFor('aimeat_package_offer'), {
-    group_id: z.string().describe('The package group id on this repository.'),
-    action: z.enum(['get', 'set']).describe('get: the offer as it stands; set: new terms, a new state, or both.'),
-    terms: z.record(z.string(), z.unknown()).optional().describe('For set: { grant, price, updates: { included_days, renewal }, channel, licence, tax, support }. Appended; buyers keep the terms they accepted.'),
-    state: z.enum(['on_sale', 'paused', 'ended']).optional().describe('For set: on_sale, paused (renewals only) or ended.'),
-  }, annotationsFor('aimeat_package_offer'), async ({ group_id, action, terms, state }) => {
+  mcp.tool('aimeat_package_offer', descriptionFor('aimeat_package_offer'), zodShapeFor('aimeat_package_offer'), annotationsFor('aimeat_package_offer'), async ({ group_id, action, terms, state }) => {
     if (action === 'get') return out(await client.get(`/v1/packages/${encodeURIComponent(group_id)}/offer`));
     const body: Record<string, unknown> = {};
     if (terms !== undefined) body.terms = terms;
@@ -249,14 +197,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
 
   // A purchase on the node that sells (GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions,
   // GET /v1/package-sales/subscriptions, PUT /v1/package-sales/subscriptions/auto-renew).
-  mcp.tool('aimeat_package_buy', descriptionFor('aimeat_package_buy'), {
-    action: z.enum(['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew']).describe('offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.'),
-    repository: z.string().optional().describe('The package repository\'s node id.'),
-    group_id: z.string().optional().describe('The package group id on the repository.'),
-    node: z.object({ node_id: z.string(), url: z.string(), public_key: z.string() }).optional().describe('For checkout: the AIMEAT that is to receive the package (its /.well-known/aimeat). Leave out to get a claim code instead.'),
-    node_id: z.string().optional().describe('For renew and auto_renew: the node the package was bought for.'),
-    auto_renew: z.boolean().optional().describe('For checkout: keep the card for automatic renewals. For auto_renew: on or off.'),
-  }, annotationsFor('aimeat_package_buy'), async (input) => {
+  mcp.tool('aimeat_package_buy', descriptionFor('aimeat_package_buy'), zodShapeFor('aimeat_package_buy'), annotationsFor('aimeat_package_buy'), async (input) => {
     const repository = input.repository ?? '';
     const groupId = input.group_id ?? '';
     if (input.action === 'subscriptions') return out(await client.get('/v1/package-sales/subscriptions'));
@@ -276,15 +217,11 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     }));
   });
 
-  mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), {
-    group_id: z.string().describe('The package or install bundle group id'),
-  }, annotationsFor('aimeat_package_config_needs'), async ({ group_id }) =>
+  mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), zodShapeFor('aimeat_package_config_needs'), annotationsFor('aimeat_package_config_needs'), async ({ group_id }) =>
     out(await client.get(`/v1/packages/${encodeURIComponent(group_id)}/config-needs`)));
 
   // Releasing a managed install: it becomes editable in place and its updates stop.
-  mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), {
-    instance_id: z.string().describe('The managed copy, from aimeat_package_instances'),
-  }, annotationsFor('aimeat_package_fork'), async ({ instance_id }) =>
+  mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), zodShapeFor('aimeat_package_fork'), annotationsFor('aimeat_package_fork'), async ({ instance_id }) =>
     out(await client.post(`/v1/instances/${encodeURIComponent(instance_id)}/fork`, {})));
 
   // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -350,11 +287,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // The search parameter was `query` sent as `?q=`, against a route that reads `?search=`. A
   // filtered call therefore returned the unfiltered list and reported success. Both halves now use
   // the route's own names.
-  mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), {
-    search: z.string().optional().describe('Search over name, description and tags'),
-    author: z.string().optional().describe("Only this author's packages. Your own name also shows your private ones."),
-    status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published'),
-  }, annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
+  mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), zodShapeFor('aimeat_package_list'), annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (author) params.set('author', author);
@@ -365,20 +298,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // Making a package out of apps that already exist, instead of pasting every component by hand.
-  mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), {
-    name: z.string().describe('Package name. With your owner name it forms the group id.'),
-    apps: z.array(z.string()).min(1).describe('Filenames of your own apps'),
-    description: z.string().optional().describe('What the package is for'),
-    category: z.string().optional().describe('Category for the package gallery'),
-    tags: z.array(z.string()).optional().describe('Tags for search'),
-    visibility: z.enum(['private', 'public']).optional().describe('Who may install it. Defaults to private.'),
-    status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published'),
-    include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
-    include_skills: z.boolean().optional().describe('Package your own skills bound to these apps. Default true.'),
-    allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry'),
-    outcome: z.string().optional().describe('What the package gives a person, in one sentence (the head of its sheet)'),
-    prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed'),
-  }, annotationsFor('aimeat_package_compose'), async (args) => {
+  mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), zodShapeFor('aimeat_package_compose'), annotationsFor('aimeat_package_compose'), async (args) => {
     const body: Record<string, unknown> = { name: args.name, apps: args.apps };
     for (const key of ['description', 'category', 'tags', 'visibility', 'status', 'include_cortex', 'include_skills', 'allow_expectations', 'outcome', 'prompts'] as const) {
       if (args[key] !== undefined) body[key] = args[key];
@@ -388,31 +308,11 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // Taking a bad version back (POST /v1/packages/:groupId/versions/:version/withdraw).
-  mcp.tool('aimeat_package_withdraw', descriptionFor('aimeat_package_withdraw'), {
-    group_id: z.string().describe('Package group identifier'),
-    version: z.string().describe('The version to withdraw'),
-    reason: z.string().describe('Why, in 10 to 1000 characters: every owner who has the version reads it'),
-  }, annotationsFor('aimeat_package_withdraw'), async ({ group_id, version, reason }) =>
+  mcp.tool('aimeat_package_withdraw', descriptionFor('aimeat_package_withdraw'), zodShapeFor('aimeat_package_withdraw'), annotationsFor('aimeat_package_withdraw'), async ({ group_id, version, reason }) =>
     envelopeResult(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/versions/${encodeURIComponent(version)}/withdraw`, { reason })));
 
   // A set to sell: one package per app and the install bundle (POST /v1/packages/compose-set).
-  mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), {
-    name: z.string().describe('The set\'s package name. With your owner name it forms the group id.'),
-    apps: z.array(z.string()).min(1).describe('Filenames of your own apps'),
-    title: z.string().optional().describe('The name a buyer sees. Defaults to name.'),
-    organism: z.object({ key: z.string().optional(), name: z.string().optional() }).optional().describe('The organism the declared workspaces go into'),
-    defaults: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe('The set\'s default config, { <app filename>: { <field>: value } }'),
-    description: z.string().optional().describe('What the set is for'),
-    category: z.string().optional().describe('Category for the package gallery'),
-    tags: z.array(z.string()).optional().describe('Tags for search'),
-    visibility: z.enum(['private', 'public']).optional().describe('Defaults to private'),
-    include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
-    include_skills: z.boolean().optional().describe('Package your own skills bound to these apps. Default true.'),
-    allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension a package cannot carry'),
-    outcome: z.string().optional().describe('What the set gives a person, in one sentence'),
-    prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed'),
-    dry_run: z.boolean().optional().describe('Write nothing; answer what the set would be and every problem'),
-  }, annotationsFor('aimeat_package_compose_set'), async (args) => {
+  mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), zodShapeFor('aimeat_package_compose_set'), annotationsFor('aimeat_package_compose_set'), async (args) => {
     const body: Record<string, unknown> = { name: args.name, apps: args.apps };
     for (const key of ['title', 'organism', 'defaults', 'description', 'category', 'tags', 'visibility', 'include_cortex', 'include_skills', 'allow_expectations', 'outcome', 'prompts', 'dry_run'] as const) {
       if (args[key] !== undefined) body[key] = args[key];
@@ -421,13 +321,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // Bringing a package in from another node, signature and digests checked before anything lands.
-  mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), {
-    group_id: z.string().describe('The package on the other node, e.g. "signage::alice"'),
-    node_id: z.string().optional().describe('A peer this node knows'),
-    source_url: z.string().optional().describe('A node that is not a peer. Operator only, with trust:"tofu"'),
-    trust: z.enum(['tofu']).optional().describe('Accept and pin the key that node publishes'),
-    version: z.string().optional().describe('A specific version. Defaults to the latest one there.'),
-  }, annotationsFor('aimeat_package_pull'), async (args) => {
+  mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), zodShapeFor('aimeat_package_pull'), annotationsFor('aimeat_package_pull'), async (args) => {
     const body: Record<string, unknown> = { group_id: args.group_id };
     for (const key of ['node_id', 'source_url', 'trust', 'version'] as const) {
       if (args[key] !== undefined) body[key] = args[key];
@@ -437,10 +331,7 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   });
 
   // One act for a whole installed package. What the owner edited is reported, never overwritten.
-  mcp.tool('aimeat_package_update', descriptionFor('aimeat_package_update'), {
-    instance_id: z.string().describe('The installed copy, from the instances list'),
-    dry_run: z.boolean().optional().describe('Report what would change and change nothing'),
-  }, annotationsFor('aimeat_package_update'), async ({ instance_id, dry_run }) => {
+  mcp.tool('aimeat_package_update', descriptionFor('aimeat_package_update'), zodShapeFor('aimeat_package_update'), annotationsFor('aimeat_package_update'), async ({ instance_id, dry_run }) => {
     const body: Record<string, unknown> = {};
     if (dry_run !== undefined) body.dry_run = dry_run;
     const resp = await client.post(`/v1/instances/${encodeURIComponent(instance_id)}/update`, body);
@@ -449,35 +340,24 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
 
   // A package is created private; this is the act that makes it installable. It existed on no MCP
   // or CLI surface until now, so publishing left a package its own author could not see.
-  mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
-    group_id: z.string().describe('Package group identifier'),
-    version: z.string().optional().describe('Which version. Defaults to the newest one.'),
-    status: z.enum(['draft', 'published', 'beta', 'archived']).describe('The status to set'),
-  }, annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
+  mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), zodShapeFor('aimeat_package_status_set'), annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
     const body: Record<string, unknown> = { status };
     if (version !== undefined) body.version = version;
     const resp = await client.patch(`/v1/packages/${encodeURIComponent(group_id)}/status`, body);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), {
-    group_id: z.string().describe('Package group identifier'),
-  }, annotationsFor('aimeat_package_get'), async ({ group_id }) => {
+  mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), zodShapeFor('aimeat_package_get'), annotationsFor('aimeat_package_get'), async ({ group_id }) => {
     const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}`);
     return payloadResult(readPayloadWithProvenance(resp), resp);
   });
 
-  mcp.tool('aimeat_package_versions', descriptionFor('aimeat_package_versions'), {
-    group_id: z.string().describe('Package group identifier'),
-  }, annotationsFor('aimeat_package_versions'), async ({ group_id }) => {
+  mcp.tool('aimeat_package_versions', descriptionFor('aimeat_package_versions'), zodShapeFor('aimeat_package_versions'), annotationsFor('aimeat_package_versions'), async ({ group_id }) => {
     const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}/versions`);
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_package_delete', descriptionFor('aimeat_package_delete'), {
-    group_id: z.string().describe('Package group identifier'),
-    version: z.string().describe('Version to archive'),
-  }, annotationsFor('aimeat_package_delete'), async ({ group_id, version }) => {
+  mcp.tool('aimeat_package_delete', descriptionFor('aimeat_package_delete'), zodShapeFor('aimeat_package_delete'), annotationsFor('aimeat_package_delete'), async ({ group_id, version }) => {
     const resp = await client.delete(
       `/v1/packages/${encodeURIComponent(group_id)}/versions/${encodeURIComponent(version)}`,
     );

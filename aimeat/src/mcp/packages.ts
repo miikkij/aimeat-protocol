@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.15.0 — 2026-10-05 — aimeat_package_instance_set turns automatic updates on only with
  *     packages:install-code (secaudit 2026-10, PKG-12).
  *   v1.14.0 — 2026-10-04 — aimeat_package_install takes `grant_apps` and answers `app_grants`.
@@ -64,7 +65,6 @@
  *   v1.0.0 — 2026-08-23 — Initial: install, so a chat can turn a shipped package into an owned copy.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -79,7 +79,6 @@ import { packageSheet } from '../services/packages/compose/package-sheet.js';
 import { listSellers, addSeller, removeSeller } from '../services/packages/sale/package-sellers.js';
 import { installSetRepositories } from '../services/install-set-trust.js';
 import { toolError } from './tool-error.js';
-import { PACKAGE_CONFIG_PARAM, GRANT_APPS_PARAM } from '../tool-catalog/definitions/packages.js';
 import { setPackageVersionStatus } from '../services/packages/compose/package-create.js';
 import { composePackageFromApps } from '../services/packages/compose/package-compose.js';
 import { pullPackage, listRepositoryPackages } from '../services/packages/peer/package-pull.js';
@@ -96,6 +95,7 @@ import { composeSet } from '../services/packages/compose/package-compose-set.js'
 import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
 import { INSTALL_CODE_SCOPE } from '../services/packages/install/package-approvals.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 /** A package row as a conversation needs it: what it is, not every byte it holds. */
 function packageSummary(pkg: { packageGroupId: string; name: string; author: string; version: string; status: string; visibility: string; description: string; category: string; tags: string[]; components: { id: string; type: string; label: string }[] }) {
@@ -124,12 +124,7 @@ function registerPackageSaleTools(
 ): void {
     const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
-    mcp.tool('aimeat_package_offer', descriptionFor('aimeat_package_offer'), {
-        group_id: z.string().describe('The package group id on this repository.'),
-        action: z.enum(['get', 'set']).describe('get: the offer as it stands; set: new terms, a new state, or both.'),
-        terms: z.record(z.string(), z.unknown()).optional().describe('For set: { grant, price, updates: { included_days, renewal }, channel, licence, tax, support }. Appended; buyers keep the terms they accepted.'),
-        state: z.enum(['on_sale', 'paused', 'ended']).optional().describe('For set: on_sale, paused (renewals only) or ended.'),
-    }, annotationsFor('aimeat_package_offer'), async ({ group_id, action, terms, state }) => {
+    mcp.tool('aimeat_package_offer', descriptionFor('aimeat_package_offer'), zodShapeFor('aimeat_package_offer'), annotationsFor('aimeat_package_offer'), async ({ group_id, action, terms, state }) => {
         if (action === 'get') {
             // The author's own read, as on GET /v1/packages/:groupId/offer: anyone else learns nothing.
             const offer = await readOffer(storage, group_id);
@@ -140,14 +135,7 @@ function registerPackageSaleTools(
         return text({ ...publicOffer(out.offer), all_terms: out.offer.terms });
     });
 
-    mcp.tool('aimeat_package_buy', descriptionFor('aimeat_package_buy'), {
-        action: z.enum(['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew']).describe('offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.'),
-        repository: z.string().optional().describe('The package repository\'s node id.'),
-        group_id: z.string().optional().describe('The package group id on the repository.'),
-        node: z.object({ node_id: z.string(), url: z.string(), public_key: z.string() }).optional().describe('For checkout: the AIMEAT that is to receive the package (its /.well-known/aimeat). Leave out to get a claim code instead.'),
-        node_id: z.string().optional().describe('For renew and auto_renew: the node the package was bought for.'),
-        auto_renew: z.boolean().optional().describe('For checkout: keep the card for automatic renewals. For auto_renew: on or off.'),
-    }, annotationsFor('aimeat_package_buy'), async (input) => {
+    mcp.tool('aimeat_package_buy', descriptionFor('aimeat_package_buy'), zodShapeFor('aimeat_package_buy'), annotationsFor('aimeat_package_buy'), async (input) => {
         const deps = { storage, config, peers };
         const owner = ownerOf();
         const repository = input.repository ?? '';
@@ -203,11 +191,7 @@ export function registerPackageTools(
     /** What this session answers for when a component writes into the owner's memory. */
     const grant = { roles: ['agent'], scopes: sessionScopes };
 
-    mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), {
-        search: z.string().optional().describe('Search over name, description and tags.'),
-        author: z.string().optional().describe('Only this author\'s packages. Your own name also shows your private ones.'),
-        status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published.'),
-    }, annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
+    mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), zodShapeFor('aimeat_package_list'), annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
         const result = await listPackagesFor(storage, ownerOf(), { search, author, status });
         return {
             content: [{
@@ -220,9 +204,7 @@ export function registerPackageTools(
         };
     });
 
-    mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), {
-        group_id: z.string().describe('Package group identifier, e.g. "digital-signage::system". Get it from aimeat_package_list.'),
-    }, annotationsFor('aimeat_package_get'), async ({ group_id }) => {
+    mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), zodShapeFor('aimeat_package_get'), annotationsFor('aimeat_package_get'), async ({ group_id }) => {
         const pkg = await getPackageFor(storage, group_id, ownerOf());
         if (!pkg) {
             return {
@@ -234,20 +216,7 @@ export function registerPackageTools(
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config) }, null, 2) }] };
     });
 
-    mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), {
-        name: z.string().describe('Package name. With your owner name it forms the group id.'),
-        apps: z.array(z.string()).min(1).describe('Filenames of your own apps, e.g. ["shop.html", "admin.html"].'),
-        description: z.string().optional().describe('What the package is for.'),
-        category: z.string().optional().describe('Category for the package gallery.'),
-        tags: z.array(z.string()).optional().describe('Tags for search.'),
-        visibility: z.enum(['private', 'public']).optional().describe('Who may install it. Defaults to private.'),
-        status: z.enum(['draft', 'published', 'archived']).optional().describe('Defaults to published.'),
-        include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
-        include_skills: z.boolean().optional().describe('Package your own skills bound to these apps, so the installer\'s AI gets the operating guides. Default true.'),
-        allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension the package cannot carry.'),
-        outcome: z.string().optional().describe('What the package gives a person, in one sentence. The head of its "what you get" sheet; the description stands in when it is missing.'),
-        prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed, in their words.'),
-    }, annotationsFor('aimeat_package_compose'), async (args) => {
+    mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), zodShapeFor('aimeat_package_compose'), annotationsFor('aimeat_package_compose'), async (args) => {
         const owner = ownerOf();
         const out = await composePackageFromApps({ storage, config },
             { owner, ownerGhii: await resolveGhii(storage, owner, config) },
@@ -277,23 +246,7 @@ export function registerPackageTools(
     });
 
     // A set to sell: the same service POST /v1/packages/compose-set calls.
-    mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), {
-        name: z.string().describe('The set\'s package name. With your owner name it forms the group id.'),
-        apps: z.array(z.string()).min(1).describe('Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].'),
-        title: z.string().optional().describe('The name a buyer sees. Defaults to name.'),
-        organism: z.object({ key: z.string().optional(), name: z.string().optional() }).optional().describe('The organism the declared workspaces go into: its key in the set and its default name.'),
-        defaults: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe('The set\'s default config, { <app filename>: { <field>: value } }. A field given here is not asked of the buyer.'),
-        description: z.string().optional().describe('What the set is for.'),
-        category: z.string().optional().describe('Category for the package gallery.'),
-        tags: z.array(z.string()).optional().describe('Tags for search.'),
-        visibility: z.enum(['private', 'public']).optional().describe('Defaults to private: a set is made to be sold.'),
-        include_cortex: z.boolean().optional().describe('Package the cortexes you installed yourself. Default true.'),
-        include_skills: z.boolean().optional().describe('Package your own skills bound to these apps. Default true.'),
-        allow_expectations: z.boolean().optional().describe('Compose even when an app calls an extension a package cannot carry.'),
-        outcome: z.string().optional().describe('What the set gives a person, in one sentence.'),
-        prompts: z.array(z.string()).optional().describe('Up to three things a person can ask their AI once it is installed.'),
-        dry_run: z.boolean().optional().describe('Write nothing: answer the questions a buyer will be asked, what the set expects, what stays behind, what the parts can do, the bundle and every problem.'),
-    }, annotationsFor('aimeat_package_compose_set'), async (args) => {
+    mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), zodShapeFor('aimeat_package_compose_set'), annotationsFor('aimeat_package_compose_set'), async (args) => {
         const owner = ownerOf();
         const out = await composeSet({ storage, config }, { owner, ownerGhii: await resolveGhii(storage, owner, config) }, {
             name: args.name, apps: args.apps, title: args.title, organism: args.organism, defaults: args.defaults,
@@ -307,13 +260,7 @@ export function registerPackageTools(
         return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
     });
 
-    mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), {
-        group_id: z.string().describe('The package on the other node, e.g. "signage::alice".'),
-        node_id: z.string().optional().describe('A peer this node knows. Its address and key come from the peer record.'),
-        source_url: z.string().optional().describe('A node that is not a peer. Operator only, and only with trust:"tofu".'),
-        trust: z.enum(['tofu']).optional().describe('Accept and pin the key that node publishes.'),
-        version: z.string().optional().describe('A specific version. Defaults to the latest one there.'),
-    }, annotationsFor('aimeat_package_pull'), async (args) => {
+    mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), zodShapeFor('aimeat_package_pull'), annotationsFor('aimeat_package_pull'), async (args) => {
         const out = await pullPackage({ storage, config, peers }, {
             owner: ownerOf(),
             // An agent acts within its own grant; the operator branch of a pull is a person's
@@ -348,10 +295,7 @@ export function registerPackageTools(
         };
     });
 
-    mcp.tool('aimeat_package_update', descriptionFor('aimeat_package_update'), {
-        instance_id: z.string().describe('The installed copy, from the instances list.'),
-        dry_run: z.boolean().optional().describe('Report what would change and change nothing.'),
-    }, annotationsFor('aimeat_package_update'), async ({ instance_id, dry_run: dryRun }) => {
+    mcp.tool('aimeat_package_update', descriptionFor('aimeat_package_update'), zodShapeFor('aimeat_package_update'), annotationsFor('aimeat_package_update'), async ({ instance_id, dry_run: dryRun }) => {
         const owner = ownerOf();
         const gaii = getAgentGaii();
         const out = await updateOrRequest({ storage, config },
@@ -369,21 +313,13 @@ export function registerPackageTools(
     });
 
     // Taking a bad version back: the same service POST /v1/packages/:groupId/versions/:version/withdraw calls.
-    mcp.tool('aimeat_package_withdraw', descriptionFor('aimeat_package_withdraw'), {
-        group_id: z.string().describe('Package group identifier.'),
-        version: z.string().describe('The version to withdraw.'),
-        reason: z.string().describe('Why, in 10 to 1000 characters: every owner who has the version reads it.'),
-    }, annotationsFor('aimeat_package_withdraw'), async ({ group_id, version, reason }) => {
+    mcp.tool('aimeat_package_withdraw', descriptionFor('aimeat_package_withdraw'), zodShapeFor('aimeat_package_withdraw'), annotationsFor('aimeat_package_withdraw'), async ({ group_id, version, reason }) => {
         const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() }, { owner: ownerOf(), isOperator: false }, { groupId: group_id, version, reason });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ withdrawal: out.withdrawal, copies_here: out.copies_here, next_step: 'Publish a fixed version; managed copies receive it as an update.' }, null, 2) }] };
     });
 
-    mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), {
-        group_id: z.string().describe('Package group identifier.'),
-        version: z.string().optional().describe('Which version. Defaults to the newest one.'),
-        status: z.enum(['draft', 'published', 'beta', 'archived']).describe('The status to set. Only a published version can be installed here; a beta version goes to beta-channel customer nodes.'),
-    }, annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
+    mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), zodShapeFor('aimeat_package_status_set'), annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
         const owner = ownerOf();
         const out = await setPackageVersionStatus({ storage, config },
             { owner }, { groupId: group_id, version, status });
@@ -395,16 +331,7 @@ export function registerPackageTools(
         }
         return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(out.package), null, 2) }] };
     });
-    mcp.tool('aimeat_package_install', descriptionFor('aimeat_package_install'), {
-        group_id: z.string().describe('Package group identifier, e.g. "digital-signage::system". Get it from aimeat_package_list.'),
-        label: z.string().optional().describe('What to call this copy, e.g. the company it is for. Defaults to "<package> instance".'),
-        version: z.string().optional().describe('A specific version to install. Defaults to the latest published one.'),
-        dry_run: z.boolean().optional().describe('Report what would be registered and register nothing.'),
-        mode: z.enum(['managed', 'editable']).optional().describe('"managed": the package owns the code and layout, updates replace them, and only settings are yours to change. "editable" (default): you may edit everything.'),
-        config: z.record(z.string(), z.record(z.string(), z.unknown())).optional().describe(PACKAGE_CONFIG_PARAM),
-        organism_names: z.record(z.string(), z.string()).optional().describe('For a set: your own names for its organisms, by the set\'s organism key.'),
-        grant_apps: z.boolean().optional().describe(GRANT_APPS_PARAM),
-    }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames, grant_apps: grantApps }) => {
+    mcp.tool('aimeat_package_install', descriptionFor('aimeat_package_install'), zodShapeFor('aimeat_package_install'), annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames, grant_apps: grantApps }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
         const owner = localAccountName(gaii);
@@ -471,10 +398,7 @@ export function registerPackageTools(
 
     // The installed copies. aimeat_package_update and aimeat_package_fork both take an instance id,
     // and without this list a conversation could not name one.
-    mcp.tool('aimeat_package_instances', descriptionFor('aimeat_package_instances'), {
-        group_id: z.string().optional().describe('Only the copies of this package.'),
-        status: z.enum(['installed', 'paused', 'removed']).optional().describe('Only copies in this state.'),
-    }, annotationsFor('aimeat_package_instances'), async ({ group_id, status }) => {
+    mcp.tool('aimeat_package_instances', descriptionFor('aimeat_package_instances'), zodShapeFor('aimeat_package_instances'), annotationsFor('aimeat_package_instances'), async ({ group_id, status }) => {
         const result = await listInstancesFor(storage, ownerOf(), { packageGroupId: group_id, status, limit: 200 });
         return {
             content: [{
@@ -500,11 +424,7 @@ export function registerPackageTools(
     });
 
     // The owner's own choices about an install: its label, and whether the daily check updates it.
-    mcp.tool('aimeat_package_instance_set', descriptionFor('aimeat_package_instance_set'), {
-        instance_id: z.string().describe('The installed copy, from aimeat_package_instances.'),
-        label: z.string().optional().describe('A new name for this copy.'),
-        auto_update: z.boolean().optional().describe('true: the daily check updates this copy by itself. false: it tells your owner an update is ready.'),
-    }, annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
+    mcp.tool('aimeat_package_instance_set', descriptionFor('aimeat_package_instance_set'), zodShapeFor('aimeat_package_instance_set'), annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
         // A session is always an agent: auto-update on takes packages:install-code (PKG-12).
         const out = await setPackageInstance(storage, { owner: ownerOf(), mayInstallCode: scopeIsCovered(sessionScopes, INSTALL_CODE_SCOPE) }, instance_id, { label, autoUpdate: auto_update });
         if (!out.ok) return { ...toolError(out.code, out.message) };
@@ -512,7 +432,7 @@ export function registerPackageTools(
     });
 
     // What POST /v1/instances/check-updates does, for this owner's installs.
-    mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), {},
+    mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), zodShapeFor('aimeat_package_check_updates'),
         annotationsFor('aimeat_package_check_updates'), async () => {
             // With federation off, the repository an install set named is still a source (install-set-trust.ts).
             if (!config.packageFederationEnabled && (await installSetRepositories(storage)).size === 0) {
@@ -523,24 +443,14 @@ export function registerPackageTools(
         });
 
     // What a repository peer serves this node, before pulling one of them.
-    mcp.tool('aimeat_package_repository', descriptionFor('aimeat_package_repository'), {
-        node_id: z.string().describe('The repository node, a peer of this node.'),
-    }, annotationsFor('aimeat_package_repository'), async ({ node_id }) => {
+    mcp.tool('aimeat_package_repository', descriptionFor('aimeat_package_repository'), zodShapeFor('aimeat_package_repository'), annotationsFor('aimeat_package_repository'), async ({ node_id }) => {
         const out = await listRepositoryPackages({ storage, config, peers }, node_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ node: out.node, packages: out.packages }, null, 2) }] };
     });
 
     // On a repository: which nodes a private package is served to, and up to when.
-    mcp.tool('aimeat_package_entitlements', descriptionFor('aimeat_package_entitlements'), {
-        group_id: z.string().describe('Your package group identifier.'),
-        action: z.enum(['list', 'grant', 'revoke']).describe('list the nodes, grant (or change) one, or revoke one.'),
-        node_id: z.string().optional().describe('For grant and revoke: the customer node.'),
-        updates_until: z.string().nullable().optional().describe('For grant: versions published after this ISO date-time are not served to the node. null or omitted: the updates run on.'),
-        channel: z.enum(['stable', 'beta']).optional().describe('For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.'),
-        note: z.string().optional().describe('For grant: why, e.g. the order it came from.'),
-        node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For grant: a node this repository does not know yet, registered with the grant as a packages-only peer: its address and the public key its /.well-known/aimeat publishes.'),
-    }, annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
+    mcp.tool('aimeat_package_entitlements', descriptionFor('aimeat_package_entitlements'), zodShapeFor('aimeat_package_entitlements'), annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
         const caller = { owner: ownerOf(), isOperator: false };
         if (action === 'list') {
             const out = await listEntitlements(storage, caller, group_id);
@@ -559,12 +469,7 @@ export function registerPackageTools(
     });
 
     // The nodes that sell this author's packages with no token: the same service /v1/package-sellers calls.
-    mcp.tool('aimeat_package_sellers', descriptionFor('aimeat_package_sellers'), {
-        action: z.enum(['list', 'add', 'remove']).describe('list your sellers, add (or change) one, or remove one.'),
-        node_id: z.string().optional().describe('For add and remove: the seller node.'),
-        node: z.object({ url: z.string(), public_key: z.string() }).optional().describe('For add: { url, public_key } of a node this repository does not know yet.'),
-        note: z.string().optional().describe('For add: why.'),
-    }, annotationsFor('aimeat_package_sellers'), async ({ action, node_id, node, note }) => {
+    mcp.tool('aimeat_package_sellers', descriptionFor('aimeat_package_sellers'), zodShapeFor('aimeat_package_sellers'), annotationsFor('aimeat_package_sellers'), async ({ action, node_id, node, note }) => {
         const owner = ownerOf();
         const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
         if (action === 'list') return text({ sellers: await listSellers(storage, owner), repository_role: config.packageRepository });
@@ -580,9 +485,7 @@ export function registerPackageTools(
     });
 
     // The questions a shop asks before payment: the same service GET /v1/packages/:groupId/config-needs calls.
-    mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), {
-        group_id: z.string().describe('The package or install bundle group id.'),
-    }, annotationsFor('aimeat_package_config_needs'), async ({ group_id }) => {
+    mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), zodShapeFor('aimeat_package_config_needs'), annotationsFor('aimeat_package_config_needs'), async ({ group_id }) => {
         const out = await packageConfigNeeds(storage, config, { owner: ownerOf(), isOperator: false }, group_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         const { group_id: g, version, bundle, name, questions, defaults, problems } = out;
@@ -590,9 +493,7 @@ export function registerPackageTools(
     });
 
     // Releasing a managed install: the same service POST /v1/instances/:id/fork calls.
-    mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), {
-        instance_id: z.string().describe('The managed copy, from aimeat_package_instances.'),
-    }, annotationsFor('aimeat_package_fork'), async ({ instance_id }) => {
+    mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), zodShapeFor('aimeat_package_fork'), annotationsFor('aimeat_package_fork'), async ({ instance_id }) => {
         const out = await forkPackageInstance(storage, { owner: ownerOf() }, instance_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return {
