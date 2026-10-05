@@ -8,6 +8,7 @@
  *   provider lineage locally. Thin REST proxies over the /v1/exchange/* routes (src/routes/exchange.ts +
  *   exchange-market.ts) — server-side authz + authoritative pricing unchanged.
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 11: aimeat_exchange_work_deliver carries
  *     `ai_provenance` / `ai_provenance_id` and echoes what was recorded.
  *   v1.1.0 — 2026-07-21 — Act-on-exchange parity (tunnelled fleet agents get the same generic tools as the
@@ -21,8 +22,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -35,18 +36,11 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     return out ? `?${out}` : '';
   };
 
-  mcp.tool('aimeat_exchange_offerings', descriptionFor('aimeat_exchange_offerings'), {
-    q: z.string().optional().describe('Free-text match over title/description/ext/action/tags.'),
-    ext: z.string().optional().describe('Exact extension name (pair with action).'),
-    action: z.string().optional().describe('Exact action id (pair with ext).'),
-    stats: z.boolean().optional().describe('Fold in per-offering usage/reputation stats.'),
-  }, annotationsFor('aimeat_exchange_offerings'), async ({ q, ext, action, stats }) => {
+  mcp.tool('aimeat_exchange_offerings', descriptionFor('aimeat_exchange_offerings'), zodShapeFor('aimeat_exchange_offerings'), annotationsFor('aimeat_exchange_offerings'), async ({ q, ext, action, stats }) => {
     return out(await client.get(`/v1/exchange/offerings${qs({ q, ext, action, stats: stats ? '1' : undefined })}`));
   });
 
-  mcp.tool('aimeat_exchange_offering_get', descriptionFor('aimeat_exchange_offering_get'), {
-    offering_id: z.string().describe('The offering id (e.g. "off-…").'),
-  }, annotationsFor('aimeat_exchange_offering_get'), async ({ offering_id }) => {
+  mcp.tool('aimeat_exchange_offering_get', descriptionFor('aimeat_exchange_offering_get'), zodShapeFor('aimeat_exchange_offering_get'), annotationsFor('aimeat_exchange_offering_get'), async ({ offering_id }) => {
     return out(await client.get(`/v1/exchange/offerings/${encodeURIComponent(offering_id)}`));
   });
 
@@ -66,22 +60,15 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     return out(await client.post('/v1/exchange/entitlements', body));
   });
 
-  mcp.tool('aimeat_exchange_contracts', descriptionFor('aimeat_exchange_contracts'), {}, annotationsFor('aimeat_exchange_contracts'), async () => {
+  mcp.tool('aimeat_exchange_contracts', descriptionFor('aimeat_exchange_contracts'), zodShapeFor('aimeat_exchange_contracts'), annotationsFor('aimeat_exchange_contracts'), async () => {
     return out(await client.get('/v1/exchange/entitlements'));
   });
 
-  mcp.tool('aimeat_exchange_contract_off', descriptionFor('aimeat_exchange_contract_off'), {
-    ext: z.string().describe('The contracted extension name.'),
-    action: z.string().describe('The contracted action id.'),
-    mode: z.enum(['pause', 'revoke']).describe('pause (reversible) or revoke (terminal).'),
-  }, annotationsFor('aimeat_exchange_contract_off'), async ({ ext, action, mode }) => {
+  mcp.tool('aimeat_exchange_contract_off', descriptionFor('aimeat_exchange_contract_off'), zodShapeFor('aimeat_exchange_contract_off'), annotationsFor('aimeat_exchange_contract_off'), async ({ ext, action, mode }) => {
     return out(await client.post('/v1/exchange/entitlements/off', { ext, action, mode }));
   });
 
-  mcp.tool('aimeat_exchange_needs', descriptionFor('aimeat_exchange_needs'), {
-    open: z.boolean().optional().describe('Only open needs.'),
-    mine: z.boolean().optional().describe('Only needs you posted.'),
-  }, annotationsFor('aimeat_exchange_needs'), async ({ open, mine }) => {
+  mcp.tool('aimeat_exchange_needs', descriptionFor('aimeat_exchange_needs'), zodShapeFor('aimeat_exchange_needs'), annotationsFor('aimeat_exchange_needs'), async ({ open, mine }) => {
     return out(await client.get(`/v1/exchange/needs${qs({ open: open ? '1' : undefined, mine: mine ? '1' : undefined })}`));
   });
 
@@ -106,14 +93,7 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     return out(await client.post('/v1/exchange/needs', body));
   });
 
-  mcp.tool('aimeat_exchange_bid', descriptionFor('aimeat_exchange_bid'), {
-    need_id: z.string().describe('The open need id.'),
-    ext: z.string().describe('Your extension name (you must own it).'),
-    action: z.string().describe('The action id on your extension.'),
-    plan_id: z.string().optional().describe('A plan id declared on your action.'),
-    note: z.string().optional().describe('A note to the requester.'),
-    offering_id: z.string().optional().describe('Link an existing offering of yours.'),
-  }, annotationsFor('aimeat_exchange_bid'), async ({ need_id, ext, action, plan_id, note, offering_id }) => {
+  mcp.tool('aimeat_exchange_bid', descriptionFor('aimeat_exchange_bid'), zodShapeFor('aimeat_exchange_bid'), annotationsFor('aimeat_exchange_bid'), async ({ need_id, ext, action, plan_id, note, offering_id }) => {
     const body: Record<string, unknown> = { ext, action };
     if (plan_id) body.plan_id = plan_id;
     if (note) body.note = note;
@@ -121,50 +101,30 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     return out(await client.post(`/v1/exchange/needs/${encodeURIComponent(need_id)}/bids`, body));
   });
 
-  mcp.tool('aimeat_exchange_bid_accept', descriptionFor('aimeat_exchange_bid_accept'), {
-    need_id: z.string().describe('Your need id.'),
-    bid_id: z.string().describe('The open bid to accept.'),
-    cap_units: z.number().int().nonnegative().optional().describe('Budget ceiling for the minted contract.'),
-  }, annotationsFor('aimeat_exchange_bid_accept'), async ({ need_id, bid_id, cap_units }) => {
+  mcp.tool('aimeat_exchange_bid_accept', descriptionFor('aimeat_exchange_bid_accept'), zodShapeFor('aimeat_exchange_bid_accept'), annotationsFor('aimeat_exchange_bid_accept'), async ({ need_id, bid_id, cap_units }) => {
     const body: Record<string, unknown> = {};
     if (cap_units !== undefined) body.cap_units = cap_units;
     return out(await client.post(`/v1/exchange/needs/${encodeURIComponent(need_id)}/bids/${encodeURIComponent(bid_id)}/accept`, body));
   });
 
-  mcp.tool('aimeat_exchange_consumers', descriptionFor('aimeat_exchange_consumers'), {
-    offering_id: z.string().describe('One of your own offering ids.'),
-  }, annotationsFor('aimeat_exchange_consumers'), async ({ offering_id }) => {
+  mcp.tool('aimeat_exchange_consumers', descriptionFor('aimeat_exchange_consumers'), zodShapeFor('aimeat_exchange_consumers'), annotationsFor('aimeat_exchange_consumers'), async ({ offering_id }) => {
     return out(await client.get(`/v1/exchange/offerings/${encodeURIComponent(offering_id)}/consumers`));
   });
 
   // ── Act-on-exchange (generic, tunnelled fleet parity with the server MCP) ──────────────────────────
-  mcp.tool('aimeat_app_tool_invoke', descriptionFor('aimeat_app_tool_invoke'), {
-    owner: z.string().describe('The provider app\'s owner (bare name or GHII).'),
-    app: z.string().describe('The provider app filename (e.g. "company-brief").'),
-    tool: z.string().describe('The tool name to call (e.g. "getCompanyBrief").'),
-    input: z.record(z.string(), z.unknown()).optional().describe('The tool input object (matching the offering input_schema).'),
-  }, annotationsFor('aimeat_app_tool_invoke'), async ({ owner, app, tool, input }) => {
+  mcp.tool('aimeat_app_tool_invoke', descriptionFor('aimeat_app_tool_invoke'), zodShapeFor('aimeat_app_tool_invoke'), annotationsFor('aimeat_app_tool_invoke'), async ({ owner, app, tool, input }) => {
     const o = owner.split('@')[0];
     return out(await client.post(`/v1/apps/${encodeURIComponent(o)}/${encodeURIComponent(app)}/webmcp/tools/${encodeURIComponent(tool)}`, { input: input ?? {} }));
   });
 
-  mcp.tool('aimeat_exchange_work', descriptionFor('aimeat_exchange_work'), {
-    offering_id: z.string().describe('The agent-work offering id you hold a contract for.'),
-    input: z.record(z.string(), z.unknown()).optional().describe('The task input.'),
-    note: z.string().optional().describe('An optional note to the provider.'),
-  }, annotationsFor('aimeat_exchange_work'), async ({ offering_id, input, note }) => {
+  mcp.tool('aimeat_exchange_work', descriptionFor('aimeat_exchange_work'), zodShapeFor('aimeat_exchange_work'), annotationsFor('aimeat_exchange_work'), async ({ offering_id, input, note }) => {
     const body: Record<string, unknown> = { offering_id };
     if (input) body.input = input;
     if (note) body.note = note;
     return out(await client.post('/v1/exchange/work', body));
   });
 
-  mcp.tool('aimeat_exchange_work_deliver', descriptionFor('aimeat_exchange_work_deliver'), {
-    work_id: z.string().describe('The open work item to deliver.'),
-    output: z.unknown().optional().describe('The delivered result.'),
-    note: z.string().optional().describe('An optional delivery note.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_exchange_work_deliver'), async ({ work_id, output, note, ai_provenance, ai_provenance_id }) => {
+  mcp.tool('aimeat_exchange_work_deliver', descriptionFor('aimeat_exchange_work_deliver'), zodShapeFor('aimeat_exchange_work_deliver'), annotationsFor('aimeat_exchange_work_deliver'), async ({ work_id, output, note, ai_provenance, ai_provenance_id }) => {
     const body: Record<string, unknown> = {};
     if (output !== undefined) body.output = output;
     if (note) body.note = note;
@@ -174,20 +134,15 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
       { tool: 'aimeat_exchange_work_deliver', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_exchange_work_list', descriptionFor('aimeat_exchange_work_list'), {
-    role: z.enum(['consumer', 'provider']).optional().describe('consumer (default) or provider.'),
-  }, annotationsFor('aimeat_exchange_work_list'), async ({ role }) => {
+  mcp.tool('aimeat_exchange_work_list', descriptionFor('aimeat_exchange_work_list'), zodShapeFor('aimeat_exchange_work_list'), annotationsFor('aimeat_exchange_work_list'), async ({ role }) => {
     return out(await client.get(`/v1/exchange/work${role ? `?role=${encodeURIComponent(role)}` : ''}`));
   });
 
-  mcp.tool('aimeat_exchange_proposals', descriptionFor('aimeat_exchange_proposals'), {}, annotationsFor('aimeat_exchange_proposals'), async () => {
+  mcp.tool('aimeat_exchange_proposals', descriptionFor('aimeat_exchange_proposals'), zodShapeFor('aimeat_exchange_proposals'), annotationsFor('aimeat_exchange_proposals'), async () => {
     return out(await client.get('/v1/exchange/proposals'));
   });
 
-  mcp.tool('aimeat_exchange_proposal_decide', descriptionFor('aimeat_exchange_proposal_decide'), {
-    proposal_id: z.string().describe('The pending proposal id.'),
-    decision: z.enum(['accept', 'decline', 'withdraw']).describe('accept / decline (counterparty) or withdraw (proposer).'),
-  }, annotationsFor('aimeat_exchange_proposal_decide'), async ({ proposal_id, decision }) => {
+  mcp.tool('aimeat_exchange_proposal_decide', descriptionFor('aimeat_exchange_proposal_decide'), zodShapeFor('aimeat_exchange_proposal_decide'), annotationsFor('aimeat_exchange_proposal_decide'), async ({ proposal_id, decision }) => {
     return out(await client.post(`/v1/exchange/proposals/${encodeURIComponent(proposal_id)}/${decision}`, {}));
   });
 }

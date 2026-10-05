@@ -18,6 +18,7 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 4: aimeat_exchange_offering_get returns the offering
@@ -55,6 +56,7 @@ import {
     offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 function ownerOf(gaii: string): string {
     return localAccountName(gaii);
@@ -109,12 +111,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_offerings',
         descriptionFor('aimeat_exchange_offerings'),
-        {
-            q: z.string().max(400).optional(),
-            ext: z.string().max(120).optional(),
-            action: z.string().max(120).optional(),
-            stats: z.boolean().optional(),
-        },
+        zodShapeFor('aimeat_exchange_offerings'),
         annotationsFor('aimeat_exchange_offerings'),
         async ({ q, ext, action, stats }) => {
             const offerings = (ext && action) || q
@@ -132,9 +129,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_offering_get',
         descriptionFor('aimeat_exchange_offering_get'),
-        {
-            offering_id: z.string().min(1).max(120),
-        },
+        zodShapeFor('aimeat_exchange_offering_get'),
         annotationsFor('aimeat_exchange_offering_get'),
         async ({ offering_id }) => {
             const found = await getOfferingWithMeta(storage, offering_id);
@@ -261,7 +256,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_contracts',
         descriptionFor('aimeat_exchange_contracts'),
-        {},
+        zodShapeFor('aimeat_exchange_contracts'),
         annotationsFor('aimeat_exchange_contracts'),
         async () => {
             const mine = await listEntitlementsByConsumer(storage, consumerGaii);
@@ -273,11 +268,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_contract_off',
         descriptionFor('aimeat_exchange_contract_off'),
-        {
-            ext: z.string().min(1).max(120),
-            action: z.string().min(1).max(120),
-            mode: z.enum(['pause', 'revoke']),
-        },
+        zodShapeFor('aimeat_exchange_contract_off'),
         annotationsFor('aimeat_exchange_contract_off'),
         async ({ ext, action, mode }) => {
             const ent = await readContractForCall(storage, consumerGaii, ext, action);
@@ -295,10 +286,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_needs',
         descriptionFor('aimeat_exchange_needs'),
-        {
-            open: z.boolean().optional(),
-            mine: z.boolean().optional(),
-        },
+        zodShapeFor('aimeat_exchange_needs'),
         annotationsFor('aimeat_exchange_needs'),
         async ({ open, mine }) => {
             const needs = await enrichNeeds(storage, await listNeeds(storage, { openOnly: !!open, owner: mine ? owner : undefined }));
@@ -348,14 +336,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_bid',
         descriptionFor('aimeat_exchange_bid'),
-        {
-            need_id: z.string().min(1).max(120),
-            ext: z.string().min(1).max(120),
-            action: z.string().min(1).max(120),
-            plan_id: z.string().max(120).optional(),
-            note: z.string().max(2000).optional(),
-            offering_id: z.string().max(120).optional(),
-        },
+        zodShapeFor('aimeat_exchange_bid'),
         annotationsFor('aimeat_exchange_bid'),
         async ({ need_id, ext, action, plan_id, note, offering_id }) => {
             const n = await getNeed(storage, need_id);
@@ -380,11 +361,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_bid_accept',
         descriptionFor('aimeat_exchange_bid_accept'),
-        {
-            need_id: z.string().min(1).max(120),
-            bid_id: z.string().min(1).max(120),
-            cap_units: z.number().int().nonnegative().optional(),
-        },
+        zodShapeFor('aimeat_exchange_bid_accept'),
         annotationsFor('aimeat_exchange_bid_accept'),
         async ({ need_id, bid_id, cap_units }) => {
             const n = await getNeed(storage, need_id);
@@ -410,9 +387,7 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_consumers',
         descriptionFor('aimeat_exchange_consumers'),
-        {
-            offering_id: z.string().min(1).max(120),
-        },
+        zodShapeFor('aimeat_exchange_consumers'),
         annotationsFor('aimeat_exchange_consumers'),
         async ({ offering_id }) => {
             const o: Offering | null = await getOffering(storage, offering_id);
