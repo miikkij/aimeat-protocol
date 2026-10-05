@@ -18,6 +18,9 @@
  *     agent and one for several.
  *   2026-09-25: package_installed, a package somebody asked for and the owner approved, filed under
  *     made: one sentence for an install and one for an update, each naming who asked.
+ *   2026-10-05: operator_acted, filed under access: an install set an operator applied to your account
+ *     says which set, how many packages and how many apps got permissions; any other act is named by
+ *     its area and action (secaudit 2026-10, S4).
  *   2026-09-24: memory_accessed_by_operator, one sentence per action (opened, searched, deleted,
  *     restored), filed under access: the operator reaching into your entries is news you read here.
  *   2026-09-23: Composed from components/Timeline.js (Timeline, TimelineRow), which emits the
@@ -133,6 +136,13 @@ export function line(item) {
       if (d.action === 'delete') return tr('home.feed.operatorDeletedEntry', 'An operator deleted your entry {key}.').replace('{key}', d.key || '');
       if (d.action === 'restore') return tr('home.feed.operatorRestoredEntry', 'An operator restored your entry {key}.').replace('{key}', d.key || '');
       return tr('home.feed.operatorOpenedEntry', 'An operator opened your entry {key}.').replace('{key}', d.key || '');
+    case 'operator_acted':
+      if (d.area === 'install-set') {
+        return tr('home.feed.operatorInstalledSet', 'An operator installed the install package {set} in your account: {packages} packages, and {apps} apps got permissions. You can see and change the permissions of your apps in your settings.')
+          .replace('{set}', d.set || '').replace('{packages}', d.packages || '0').replace('{apps}', d.apps || '0');
+      }
+      return tr('home.feed.operatorActed', 'An operator made a change in your account ({area}: {action}).')
+        .replace('{area}', d.area || '').replace('{action}', d.action || '');
     case 'operator_admin_granted':
       return d.count === '1'
         ? tr('home.feed.operatorAdminGrantedOne', '{name} got the permission to administer this installation because it had full access. You can take it away in the agent\'s settings.').replace('{name}', d.names || '')
@@ -249,7 +259,7 @@ export function kindCategory(kind) {
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_admin_granted'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted'].includes(k)) return 'access';
   return 'system';
 }
 

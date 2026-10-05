@@ -34,6 +34,10 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.9.0 — 2026-10-05 — An apply into an account that existed before writes the operator trail in
+ *     that account (recordOperatorAction, area install-set): its holder reads in their feed which set
+ *     was installed and how many apps were given permissions (secaudit 2026-10, S4; Jouni: "this
+ *     exception should be just logged and user notified about this change by operator").
  *   v1.8.1 — 2026-10-05 — The record keeps `landing_path`, the path the owner's welcome link opens
  *     (no token), so a test can check the landing without reading the mail (aimeat-commercial).
  *   v1.8.0 — 2026-10-04 — After the apps are linked to their workspaces, the owner's grant for each
@@ -83,6 +87,8 @@ import { recordPeerOrigin } from './peer-origin.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
 import { writeAppWorkspaceLinks, type AppWorkspaceLink } from './app-workspaces.js';
 import { grantInstalledApps, landingPath, type AppGrantStep } from './install-set-grants.js';
+import { recordOperatorAction } from './operator-access-audit.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 
 // The namespace lives with the trust check (install-set-trust.ts), which package-pull.ts reads
 // without importing this file back.
@@ -387,6 +393,19 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     // An owner the shop created before the set is welcomed as well, once, at its verified address.
     const ownerWelcome = !owner.created && await ownerToWelcome(storage, config, set.owner);
 
+    // An existing account is the operator's to install into, and its holder reads afterwards what was
+    // done: the operator trail in their feed, on both exits below (Jouni, 2026-10-05; secaudit 2026-10,
+    // S4). An account this apply created is the person's welcome, not news of a change.
+    const trail = async (): Promise<void> => {
+        if (owner.created) return;
+        const granted = Object.values(record.app_grants ?? {}).filter(g => g.result === 'granted').length;
+        await recordOperatorAction(storage, config, {
+            operatorGhii: ownerGhiiOf(input.appliedBy), actorGaii: input.appliedBy, ownerOf: `${ownerName}@${config.nodeId}`,
+            area: 'install-set', action: 'apply', subject: bundle.name,
+            data: { set: bundle.name, packages: String(Object.keys(record.packages).length), apps: String(granted) },
+        });
+    };
+
     // A step that fails part-way stops the apply, and what was made before it is still recorded, so
     // applying the set again continues from there instead of making it twice.
     try {
@@ -403,6 +422,7 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     } catch (err) {
         record.accounts_created = [...created];
         await writeRecord(storage, key, record);
+        await trail();
         return { ok: false, status: 500, code: 'APPLY_FAILED', message: `The set was applied in part: ${String(err instanceof Error ? err.message : err)}. What was made is recorded, and applying the set again continues from there.` };
     }
     // The welcome goes out once everything the person was given exists.
@@ -415,6 +435,7 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     record.landing_path = landing;
     record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [], landingByEmail)];
     await writeRecord(storage, key, record);
+    await trail();
     return { ok: true, dry_run: false, record, owner_created: owner.created, warnings: setWarnings(record) };
 }
 

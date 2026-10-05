@@ -11079,6 +11079,8 @@
       "operatorSearchedEntries": "La búsqueda de un operador mostró fragmentos de {count} de tus entradas.",
       "operatorDeletedEntry": "Un operador eliminó tu entrada {key}.",
       "operatorRestoredEntry": "Un operador restauró tu entrada {key}.",
+      "operatorInstalledSet": "Un operador instaló el paquete de instalación {set} en tu cuenta: {packages} paquetes, y {apps} apps recibieron permisos. Puedes ver y cambiar los permisos de tus apps en tus ajustes.",
+      "operatorActed": "Un operador hizo un cambio en tu cuenta ({area}: {action}).",
       "operatorAdminGrantedOne": "{name} recibió el permiso para administrar esta instalación porque tenía acceso total. Puedes quitárselo en la configuración del agente.",
       "operatorAdminGrantedMany": "{names} recibieron el permiso para administrar esta instalación porque tenían acceso total. Puedes quitárselo en la configuración de cada agente.",
       "appPublished": "Publicaste {name}.",

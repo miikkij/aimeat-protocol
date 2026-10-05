@@ -21,6 +21,9 @@
  *     it lacks, and a grant_apps that is not a boolean is refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-set-grants
  * @version-history
+ *   v1.2.0 — 2026-10-05 — Phase 3: an apply into an account that existed before leaves the operator
+ *     trail (operator_acted) in its feed, and the first apply, which created it, leaves none
+ *     (secaudit 2026-10, S4).
  *   v1.1.0 — 2026-10-04 — Phase 6: the owner's own install (Jouni: installing it is approving it).
  *   v1.0.0 — 2026-10-04 — Initial.
  */
@@ -252,6 +255,16 @@ await test('A grant the owner revoked stays revoked when the set is applied agai
     assert(!(await storage.getAppGrantByOwnerAndApp(ACME, appTarget)), 'no live grant came back');
     const r = await silent(appOrigin, SCOPES, acmeRt);
     assert(r.ok === false && r.error === 'consent_required', `asks again: ${JSON.stringify(r)}`);
+});
+
+await test('An apply into an account that existed before leaves the operator trail in its feed; the first apply, which made it, did not (secaudit 2026-10, S4)', async () => {
+    // The first apply created ACME's account, so it welcomed them and wrote no trail; the second apply
+    // above was into an account that existed, and the operator acting there is news for its holder.
+    const events = await storage.listAccountEvents({ ownerGhii: `${ACME}@${NODE_ID}`, limit: 200 });
+    const acted = events.filter((e: any) => e.kind === 'operator_acted' && e.data?.area === 'install-set');
+    assert(acted.length === 1, `one operator_acted event for the second apply, got ${acted.length}: ${JSON.stringify(events.map((e: any) => e.kind))}`);
+    assert(acted[0].data.action === 'apply' && !!acted[0].data.set && acted[0].data.apps === '1',
+        `it names the set and the app given permissions: ${JSON.stringify(acted[0].data)}`);
 });
 
 await test('A set with grant_apps:false records no grant', async () => {
