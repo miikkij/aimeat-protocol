@@ -115,6 +115,32 @@ describe('the storage providers agree on the classification tables (TARGET-082)'
     }
   });
 
+  // Secaudit 2026-10, STO-1: the erased person's name stayed as the reader in somebody else's audit.
+  it('deleting an account keeps the rows where it read somebody else\'s content, under the erasure\'s pseudonym', async () => {
+    for (const { name, storage } of provs) {
+      const node = 'aimeat-conformance-001';
+      const reader = `erasedrdr${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      const ghii = `${reader}@${node}`;
+      const gaii = `bot#${reader}@${node}`;
+      const now = new Date().toISOString();
+      await storage.createOwner({ name: reader, displayName: reader, publicKey: 'pk', roles: ['owner'], createdAt: now });
+      await storage.createGHII({ username: reader, nodeId: node, ghii, displayName: reader, verificationLevel: 0, ownerName: reader, totpEnabled: false, morselBalance: 0, loginCount: 0, createdAt: now, updatedAt: now } as never);
+      await storage.createAgent({ name: 'bot', owner: reader, gaii, publicKey: 'pk', trustScore: 50, morselBalance: 0, capabilities: [], createdAt: now, lastSeen: now } as never);
+      // Somebody else's content, read by the person and by their agent at the same address.
+      const scope = newScope();
+      await storage.addClassificationAudit([auditRow(scope, { reader: ghii, readerKind: 'human' }), auditRow(scope, { reader: gaii })]);
+
+      await storage.deleteOwner(reader);
+
+      const rows = await storage.listClassificationAudit({ scope });
+      expect(rows.length, name).toBe(2);
+      for (const r of rows) {
+        expect(r.reader.startsWith('erased:'), `${name}: ${r.reader}`).toBe(true);
+        expect(r.reader.includes(reader), `${name}: ${r.reader}`).toBe(false);
+      }
+    }
+  }, 60_000);
+
   it('getContentLabelsUnder reads exactly the keys under each prefix, of one kind and one scope', async () => {
     for (const { name, storage } of provs) {
       const scope = newScope();

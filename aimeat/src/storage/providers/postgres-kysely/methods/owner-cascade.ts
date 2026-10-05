@@ -36,6 +36,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.16.0 — 2026-10-05 — deleteOwner gives the classification audit rows where the person was the
+ *     reader of somebody else's content the erasure's pseudonym (secaudit 2026-10, STO-1).
  *   v1.15.0 — 2026-09-26 — The app grants, the personal access tokens and the sessions go through
  *     identity-erasure.ts deleteAccountCredentialsDb, which the start step and the operator's decision
  *     on a held name call too. Exported again here.
@@ -188,6 +190,13 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   const actors = [...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
   const pseudonym = erasedPartyPseudonym();
   await settleErasedPartyWorkDb(db, name, ghiis.map(g => g.ghii), pseudonym, actors);
+  // The classification audit of OTHER people's content, where this person was the reader: the row is
+  // the content owner's record and stays, under the erasure's pseudonym (secaudit 2026-10, STO-1).
+  // One value per identity, so two of them cannot meet on the audit's unique address.
+  const readers = [...ghiis.map(g => g.ghii), ...actors];
+  for (let i = 0; i < readers.length; i++) {
+    await db.updateTable('ClassificationAudit').set({ reader: i ? `${pseudonym}.${i}` : pseudonym }).where('reader', '=', readers[i]!).execute();
+  }
 
   // Per-identity data: agents first, then the ecosystem apps, then the person's own GHIIs.
   for (const a of agents) await cascadeDeleteIdentityData(db, a.gaii);
