@@ -75,6 +75,8 @@ function runWith(keyPrefix: string): WorkflowRun {
         runId: RUN_ID, workflowId: 'probability', vars: {}, keyPrefix,
         mode: keyPrefix ? 'full-sandbox' : 'full-live', status: 'running', steps: {},
         startedAt: '2026-08-30T00:00:00.000Z',
+        // Who the run asks as, which engine.startRun records on every run (secaudit 2026-10, S5).
+        aiCaller: { caller: 'owner' },
     } as unknown as WorkflowRun;
 }
 

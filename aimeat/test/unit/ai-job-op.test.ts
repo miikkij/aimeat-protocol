@@ -251,7 +251,8 @@ describe('the workflow ai step', () => {
         expect(WorkflowDefInputSchema.safeParse(def({ op: 'sing', prompt: 'x' })).success).toBe(false);
     });
 
-    const run = { runId: 'r1', workflowId: 'wf', vars: { day: 'mon' }, keyPrefix: '', mode: 'full-live', status: 'running', steps: {}, startedAt: '' } as unknown as WorkflowRun;
+    // aiCaller: who the run asks as, which engine.startRun records on every run (secaudit 2026-10, S5).
+    const run = { runId: 'r1', workflowId: 'wf', vars: { day: 'mon' }, keyPrefix: '', mode: 'full-live', status: 'running', steps: {}, startedAt: '', aiCaller: { caller: 'owner' } } as unknown as WorkflowRun;
     const step = { id: 's1', description: 'd' } as unknown as WorkflowStep;
 
     async function fire(w: Watched, action: Record<string, unknown>): Promise<{ ok: boolean; cost?: number }> {
