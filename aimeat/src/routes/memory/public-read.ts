@@ -16,6 +16,8 @@
  * @structure registerPublicReadRoute(router, ctx)
  * @usage registerPublicReadRoute(router, ctx);   // from registerKeyRoutes, last
  * @version-history
+ *   v1.1.2 — 2026-10-05 — The public and members reads audit the resolved reader (accessorGaii), not
+ *     the raw `sub`, so an owner session's audit row names the full identity (secaudit 2026-10, CHK-1).
  *   v1.1.1 — 2026-09-30 — The CLASSIFIED refusal is refuseClassified(): a plain sentence and the way
  *     forward, the label and the reason in details (check:plain-language).
  *   v1.1.0 — 2026-09-30 — TARGET-082 review, item 1: a public or members record under
@@ -89,7 +91,7 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       // Shared guard: audits the public read when the consent layer is enabled.
       await authorizeRead(storage, config, {
         ownerGaii: stored.ownerGaii,
-        accessorGaii: req.auth?.sub ?? 'anonymous',
+        accessorGaii,
         resourceKey: key,
         visibility: 'public',
         action: 'read',
@@ -105,7 +107,7 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       if (!req.auth || req.auth.anonymous === true) { miss(); return; }
       await authorizeRead(storage, config, {
         ownerGaii: stored.ownerGaii,
-        accessorGaii: req.auth.sub,
+        accessorGaii,
         resourceKey: key,
         visibility: 'members',
         action: 'read',
