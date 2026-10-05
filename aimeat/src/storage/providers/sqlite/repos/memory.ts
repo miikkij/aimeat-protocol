@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: MIT
  * @description The SQLite memory helpers that do NOT fit as prototype methods: the shared archive-filter
  *   SQL fragment, the DB-side byte/row aggregates behind the quota + stats, and the FTS5 full-text
- *   search path. Every export here is called from methods/owner.ts or methods/owner-memory-scope.ts.
+ *   search path. Every export here is called from methods/memory.ts.
  *
  *   THIS IS NOT A PARALLEL MEMORY IMPLEMENTATION, and the header used to say it was. Until
  *   2026-08-01 the module also carried get/set/list/listAll/delete/search/history copies of the core
  *   memory methods, with a note telling the reader to "keep the two in sync". Nothing imported them —
- *   the live CRUD is methods/owner.ts — and predictably the two did NOT stay in sync: the copies here
+ *   the live CRUD was methods/owner.ts, now methods/memory.ts — and predictably the two did NOT stay in sync: the copies here
  *   never learned `workspaceRef` or `groupId`. A duplicate that nothing calls cannot be kept honest by
  *   a comment, so the copies were deleted rather than repaired. If you need memory CRUD, it lives in
- *   methods/owner.ts; do not reintroduce a second one here.
+ *   methods/memory.ts; do not reintroduce a second one here.
  * @structure archivedSql · sumMemoryBytes / sumMemoryBytesForOwners / countMemory / countMemoryWithOrigins ·
  *   searchTextMemory (+ its private FTS helpers) · archive/unarchive/countArchivedByKeyPrefix
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   v2.1.1 — 2026-10-05 — The memory methods are in methods/memory.ts now (secaudit 2026-10, M8).
  *   v2.1.0 — 2026-09-08 — countMemoryWithOrigins, for the operator's CORS page.
  *   v2.0.0 — 2026-08-01 — Removed nine dead exports (getMemory, setMemory, listMemory, listAllMemory,
  *     deleteMemory, deleteAllMemory, listMemoryHistory, incrementMemoryFlagCount, searchMemory) and the

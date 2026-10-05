@@ -6,6 +6,7 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.12.1 — 2026-10-05 — Test mode's re-registration wipes the old account with eraseOwner, the one
  *     account deletion (secaudit 2026-10, C7).
  *   v1.12.0 — 2026-10-05 — Secaudit 2026-10, D1 and C1. The password and the second factor are
@@ -71,7 +72,7 @@ import { createHash } from 'node:crypto';
 import { hashPassword } from '../../services/password.js';
 import { checkPassword, checkSecondFactor } from '../../services/password-check.js';
 import { federationAuthPayload } from '../../services/federation-auth-payload.js';
-import { readBodyCapped } from '../../utils/read-capped.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
 import { completeOwnerLogin } from './owner-session.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
@@ -394,7 +395,7 @@ export function registerRegisterLoginRoutes(
 
             // Send verification request to the home node, signed with this node's key (the home node
             // verifies it, secaudit 2026-10 D1). The address is the peer record's, which the operator
-            // approved; `redirect: 'error'` keeps the password from following a redirect anywhere else.
+            // approved; peerFetch refuses a redirect, so the password does not follow one anywhere else.
             try {
                 const nodeKey = await storage.getNodeKey();
                 if (!nodeKey) {
@@ -404,7 +405,7 @@ export function registerRegisterLoginRoutes(
                 const timestamp = new Date().toISOString();
                 const signature = await sign(nodeKey.privateKey,
                     federationAuthPayload({ username: loginName, requesting_node: config.nodeId, timestamp }));
-                const verifyResp = await fetch(`${homePeer.url}/v1/federation/auth/verify`, {
+                const verifyResp = await peerFetch(`${homePeer.url}/v1/federation/auth/verify`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -417,15 +418,23 @@ export function registerRegisterLoginRoutes(
                         ...(typeof totp_code === 'string' && totp_code ? { totp_code } : {}),
                         ...(typeof backup_code === 'string' && backup_code ? { backup_code } : {}),
                     }),
-                    redirect: 'error',
-                    signal: AbortSignal.timeout(10_000),
-                });
-
                 // The home node's answer is read up to 64 kB: an attestation is a few hundred bytes.
-                const raw = await readBodyCapped(verifyResp, 64 * 1024);
-                let parsed: unknown = null;
-                try { parsed = raw ? JSON.parse(raw.toString('utf8')) : null; } catch { parsed = null; }   // eslint-disable-line aimeat/no-silent-catch -- an unreadable answer is refused just below
+                }, { timeoutMs: 10_000, maxBytes: 64 * 1024 });
                 if (!verifyResp.ok) {
+                    if (verifyResp.reason === 'timeout') {
+                        res.status(504).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
+                            `Home node ${federatedNodeId} did not respond in time`));
+                        return;
+                    }
+                    // Unreachable, a redirect or an answer over 64 kB.
+                    logger.warn('Federation auth error', { node: federatedNodeId, error: verifyResp.message });
+                    res.status(502).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
+                        `Failed to reach home node ${federatedNodeId}`));
+                    return;
+                }
+                // A body that is not JSON is null here, and refused just below.
+                const parsed: unknown = verifyResp.json ?? null;
+                if (verifyResp.status < 200 || verifyResp.status >= 300) {
                     const body = (parsed ?? {}) as Record<string, unknown>;
                     const errCode = (body as { error?: { code?: string } }).error?.code ?? 'FEDERATION_AUTH_FAILED';
                     const errMsg = (body as { error?: { message?: string } }).error?.message ?? 'Remote authentication failed';

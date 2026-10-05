@@ -2,7 +2,7 @@
  * @file src/storage/providers/sqlite/repos/cortex-erasure.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description SQLite SQL for the cortexes an erased account installed. deleteOwner (methods/owner.ts)
+ * @description SQLite SQL for the cortexes an erased account installed. deleteOwner (methods/identity.ts)
  *   calls it inside its own transaction, after the per-identity passes and the actions published
  *   under the bare account name. A free function over the connection, like the other erasure repos,
  *   so there is no import cycle through the provider class. The rule is ../../../erased-cortex.ts; the
@@ -10,6 +10,7 @@
  * @structure deleteInstalledCortexes(db, name, ghiis, opts)
  * @usage deleteInstalledCortexes(this.db, name, ghiiRows.map(r => r.ghii));
  * @version-history
+ *   v1.1.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  *   v1.1.0 — 2026-09-26 — `names`, for the operator's decision on a held name (repos/held-names.ts);
  *     the start step and that decision call this same function.
  *   v1.0.0 — 2026-09-26 — Initial: an account deletion takes the cortexes it installed (secaudit

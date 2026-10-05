@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SQLite SQL for the purchase receipts an erased person leaves behind. deleteOwner
- *   (methods/owner.ts) calls it inside its own transaction. A free function over the connection,
+ *   (methods/identity.ts) calls it inside its own transaction. A free function over the connection,
  *   like pseudonymiseWriter in repos/memory-tally.ts, so the owner methods can call it without an
  *   import cycle through the provider class.
  * @structure pseudonymisePurchaseParties(db, name, ghiis, pseudonym)
@@ -11,6 +11,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-24 — Initial: the kept receipts, rewritten to a pseudonym no account can hold
  *     (audit A8-4). The Postgres twin is pseudonymisePurchasePartiesDb in its owner-cascade.ts.
+ *   v1.0.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  */
 import type Database from 'better-sqlite3';
 import { partyIdentities } from '../../../erased-party.js';

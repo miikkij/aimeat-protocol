@@ -9,16 +9,19 @@
  *   is the same rule the node's own locales follow.
  *
  *   THE LANGUAGE IS THE PLATFORM'S, not a second one invented here: the Atelier kit's choice when
- *   the kit is on the page, then the auth library, then the browser. An app that wants to override
- *   it calls library.lang('fi') and is obeyed.
+ *   the kit is on the page, then the platform's one resolver (_core/lang.js: ?lang=, the stored
+ *   choice, the cookie, the browser). An app that wants to override it calls library.lang('fi')
+ *   and is obeyed.
  * @structure detectLang() · fill(text, vars) · lookup(texts, lang, key, vars) · languages(texts)
  * @usage
  *   import { lookup } from './texts.js';
  *   lookup(man.texts, 'fi', 'coins', { n: 3 });   // "3 kolikkoa"
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.0.0 — 2026-09-02 — Initial: the platform language, {var} substitution and the English
  *     fallback.
  */
+import { pageLang } from '../_core/lang.js';
 
 /** The variable form a text may carry: {n}, {name}. */
 const VAR_RE = /\{(\w+)\}/g;
@@ -35,17 +38,10 @@ export function detectLang() {
       const kit = root.atelier.i18n.lang();
       if (kit) return String(kit).slice(0, 2);
     }
-    if (root && root.auth && typeof root.auth.getLang === 'function') {
-      const auth = root.auth.getLang();
-      if (auth) return String(auth).slice(0, 2);
-    }
-    const stored = localStorage.getItem('aimeat-lang');
-    if (stored) return stored.slice(0, 2);
   } catch {
-    /* storage blocked, or no AIMEAT on the page: the browser's own language answers below */
+    /* no AIMEAT on the page: the shared resolver answers below */
   }
-  if (typeof navigator !== 'undefined' && navigator.language) return navigator.language.slice(0, 2);
-  return 'en';
+  return pageLang();
 }
 
 /**

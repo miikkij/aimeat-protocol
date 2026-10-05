@@ -37,12 +37,14 @@
  *   v1.2.0 — 2026-06-28 — Node-run system agents (Secretary/specialist) report liveness from their OWN
  *     usability via systemAgentLiveness (available/away/offline) instead of falling through to 'offline':
  *     they never open a tunnel or refresh lastSeen, so presence now reads their configured state.
+ *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from './event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
@@ -420,13 +422,13 @@ export class PresenceTracker {
       if (!check.valid) return false;
       const timestamp = new Date().toISOString();
       const signature = privateKey ? await sign(privateKey, presenceSignString(this.config.nodeId, timestamp, updates)) : undefined;
-      const resp = await fetch(`${peer.url}/v1/federation/presence`, {
+      const resp = await peerFetch(`${peer.url}/v1/federation/presence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from_node_id: this.config.nodeId, timestamp, updates, signature }),
-        signal: AbortSignal.timeout(this.config.federationTimeoutMs ?? 5_000),
-      });
-      return resp.ok;
+      }, { timeoutMs: this.config.federationTimeoutMs ?? 5_000 });
+      if (!resp.ok) throw new Error(resp.message);
+      return resp.status >= 200 && resp.status < 300;
     } catch (err) {
       logger.warn('presence: suppressed failure, continuing', { error: String(err) });
       return false; // peer health is tracked by the federation heartbeat, not here

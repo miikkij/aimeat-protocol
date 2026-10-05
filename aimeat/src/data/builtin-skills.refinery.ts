@@ -16,6 +16,8 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.1.3 — 2026-10-05 — Without all four permissions the run tool is not offered, and a batch's model
+ *     calls do not count toward the account's AI call limit (secaudit 2026-10, C3 and C5).
  *   v1.1.2 — 2026-10-05 — The extraction asks the model as whoever runs the batch, and an app's
  *     schedule runs as the app and stops when its grant goes (secaudit 2026-10, AI-2 and AI-3).
  *   v1.1.1 — 2026-09-30 — "The queues": an attachment its classification keeps from every model is
@@ -58,6 +60,7 @@ It **never sends** anything. Approving a record and sending it on is the person'
   belongs to whoever made it**: a refinery you run reads only a mailbox YOU connected, never the one
   your owner connected in their browser.
 - Your permissions: \`connections:read-through\`, \`ai:use\`, \`organism:rows\` and \`memory:write\`, all four.
+  Without all four, \`aimeat_refinery_run\` is not in your tool list: ask the owner for the missing ones.
 - An organism workspace with two row spaces: one for the messages (default name \`viesti\`, indexed on
   \`queue\`, \`klass\` and \`status\`) and one for the log (default \`tapahtuma\`, indexed on \`kind\`).
 - The decision model and a model that reads PDFs must be available to the owner
@@ -107,7 +110,8 @@ that file's classification (\`aimeat_classification\`) and you rerun the message
 2. \`aimeat_refinery_status { run_id }\` until \`status\` is \`done\` or \`failed\`: \`counts\` per queue and
    the rows filed.
 3. Tell the person what was filed, then ask before running more: **every message costs their decision
-   and model allowance**.
+   and model allowance**. The model calls inside a batch do not count toward the account's limit of AI
+   calls a minute.
 
 The next batch starts where the last stopped (\`<prefix>.cursor\`); \`<prefix>.runs\` keeps the last fifty.
 \`message_ids\` runs exactly those messages again, for example after a rule was added. One batch per

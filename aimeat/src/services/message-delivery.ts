@@ -12,6 +12,7 @@
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
  * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
  * @version-history
+ *   v1.3.0 -- 2026-10-05 -- Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.2.0 -- 2026-10-01 -- Messages and read receipts go only to a peer that is active or degraded
  *     (peerTakesMessages); a pending, approved, leaving or parked peer waits in the queue (incident
  *     outbound-federated-dm-read-receipt-and-attachment-grant-use--muptilp4). The plain fetch to the
@@ -36,6 +37,7 @@ import { deliveryTargetFor } from '../utils/messaging.js';
 import { logger } from '../utils/logger.js';
 import { sweepReferenceAttachments } from './attachment-duplication.js';
 import { peerTakesMessages } from './federation-peer-gate.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 
 export interface DeliveryCtx {
   config: AimeatConfig;
@@ -112,21 +114,21 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
   const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
 
   try {
-    const resp = await fetch(`${peer.url}/v1/federation/message`, {
+    const resp = await peerFetch(`${peer.url}/v1/federation/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-source-node': config.nodeId },
       body: JSON.stringify({ ...payload, signature }),
-      signal: AbortSignal.timeout(config.federationTimeoutMs),
-    });
-    if (resp.ok) {
+    }, { timeoutMs: config.federationTimeoutMs });
+    // Unreachable, a redirect, a timeout or an answer over the ceiling: kept queued, as a failed fetch was.
+    if (!resp.ok) throw new Error(resp.message);
+    if (resp.status >= 200 && resp.status < 300) {
       await storage.updateMessageDeliveryStatus(record.id, 'delivered', { deliveredAt: new Date().toISOString() });
       await log('delivered', { httpStatus: resp.status });
       return 'delivered';
     }
     if (resp.status === 403) {
       // Recipient blocked the sender (or policy denied) — terminal, do not retry.
-      let reason = 'rejected';
-      try { reason = ((await resp.json()) as { error?: { code?: string } })?.error?.code ?? 'rejected'; } catch (err) { logger.warn('log: ignore', { error: String(err) }); }
+      const reason = (resp.json as { error?: { code?: string } } | undefined)?.error?.code ?? 'rejected';
       await storage.updateMessageDeliveryStatus(record.id, 'undeliverable', { error: reason });
       await log('undeliverable', { httpStatus: resp.status, errorMessage: reason });
       return 'undeliverable';
@@ -168,12 +170,12 @@ export async function propagateReadReceipt(ctx: DeliveryCtx, message: DirectMess
   const payload = { source_node: config.nodeId, message_id: message.id, kind: 'read' as const, timestamp: readAt };
   try {
     const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
-    await fetch(`${peer.url}/v1/federation/message/receipt`, {
+    const sent = await peerFetch(`${peer.url}/v1/federation/message/receipt`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-source-node': config.nodeId },
       body: JSON.stringify({ ...payload, signature }),
-      signal: AbortSignal.timeout(config.federationTimeoutMs),
-    });
+    }, { timeoutMs: config.federationTimeoutMs });
+    if (!sent.ok) throw new Error(sent.message);
   } catch (err) {
     /* best-effort: a lost read receipt only affects the sender's UI, not correctness */
     logger.warn('propagateReadReceipt: continuing after a suppressed failure', { error: String(err) });

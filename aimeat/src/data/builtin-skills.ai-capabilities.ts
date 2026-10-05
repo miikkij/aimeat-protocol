@@ -18,6 +18,8 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.3.0 — 2026-10-05 — A direct AI call counts against the account's limit of AI calls a minute
+ *     (RATE_LIMITED); a schedule, a workflow step or a job's run does not (secaudit 2026-10, C5).
  *   v1.1.0 — 2026-10-02 — `fix` is the person's sentence, `settingsUrl` the link to where it is
  *     fixed, `agentFix` the AI's; for UNTESTED, offer to run the test with the person's yes.
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
@@ -106,8 +108,13 @@ and do not promise a feature the node cannot run for them.
    The price is in the capabilities answer; \`confirm: true\` on \`AIMEAT.ai.image()\` and \`speak()\` shows it.
 
 Errors carry \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\`), AI_MODEL_NOT_ALLOWED
-(with the \`allowed\` list), QUOTA_EXHAUSTED. A refusal the person can fix carries \`err.fix\` and
-\`err.settingsUrl\`, as a capability does: show the sentence and the link; never an empty result.
+(with the \`allowed\` list), QUOTA_EXHAUSTED, and RATE_LIMITED (429). A refusal the person can fix carries
+\`err.fix\` and \`err.settingsUrl\`, as a capability does: show the sentence and the link; never an empty result.
+
+**Calls are counted per account.** Every AI call a person, an app or an agent starts directly (complete,
+image, transcribe, speech, embed, a provider test, a job start) counts against one limit for the whole
+account, 30 a minute unless the operator set another number. Over it, the call answers RATE_LIMITED and
+says in how many seconds to try again (\`Retry-After\` on REST): wait that long, then call again.
 
 ## 2b. Roles: what a model is for
 
@@ -141,6 +148,9 @@ with \`+\` (\`role.illustrator=text+image\`), and its fine-tuning (\`temperature
 - Something every morning: \`aimeat_schedule_create\` or a scheduled workflow.
 - A capability that goes off while a run is under way stops that step with its refusal, and the owner is
   told. A spent budget stops it the same way. Check capabilities when you set the automation up.
+- The calls a schedule, a workflow step or a running job makes do not count against the account's limit
+  of AI calls a minute; starting a job counts once. Work over many items belongs there, not in a loop
+  of direct calls.
 
 ## 4. Embeddings: rarely, and only when the person decides
 

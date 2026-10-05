@@ -1762,8 +1762,18 @@
     return out;
   }
 
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  function storedLang() {
+    try {
+      return localStorage.getItem(LANG_KEY) || null;
+    } catch {
+      return null;
+    }
+  }
+
   // src/static/sdk-libs/living/i18n.js
-  var LANG_KEY = /^[a-z]{2}(?:-[A-Za-z0-9]{2,8})?$/;
+  var LANG_KEY2 = /^[a-z]{2}(?:-[A-Za-z0-9]{2,8})?$/;
   var TEXT_KEYS = [
     "title",
     "sub",
@@ -1802,11 +1812,8 @@
       if (l) return String(l);
     } catch {
     }
-    try {
-      const stored = localStorage.getItem("aimeat-lang");
-      if (stored) return String(stored);
-    } catch {
-    }
+    const stored = storedLang();
+    if (stored) return String(stored);
     try {
       return String(navigator.language || "en");
     } catch {
@@ -1843,7 +1850,7 @@
   }
   function langKeysOf(v) {
     if (!isPlainObject(v)) return [];
-    return Object.keys(v).filter((k) => LANG_KEY.test(k));
+    return Object.keys(v).filter((k) => LANG_KEY2.test(k));
   }
   function langMapError(v) {
     if (v == null || typeof v === "string") return null;
@@ -1851,7 +1858,7 @@
     if (!isPlainObject(v)) return "is neither a line of text nor a language map";
     const keys = Object.keys(v);
     if (!keys.length) return "is an empty language map — it carries no language at all";
-    const bad = keys.filter((k) => !LANG_KEY.test(k));
+    const bad = keys.filter((k) => !LANG_KEY2.test(k));
     if (bad.length === keys.length) {
       return "is a language map with no language in it (" + bad.join(", ") + '); a key is a language tag such as "fi" or "en"';
     }

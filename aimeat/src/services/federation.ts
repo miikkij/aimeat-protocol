@@ -11,6 +11,7 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.6.0 — 2026-10-05 — peerCarriesAgents: agent resolution asks, and names a GAII to, only peers
  *     with routing or messaging on, never a packages-only peer (secaudit 2026-10, PKG-8).
  *   v1.5.0 — 2026-10-01 — A peer purged at the end of its de-peering grace takes its recorded origin
@@ -40,6 +41,7 @@ import { getSoftwareVersion } from '../utils/version.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 import { forgetPeer } from './peer-origin.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 
 /** Cache of resolved GAIIs to their hosting node URL. TTL: 5 minutes. Expiry used to be
  * checked only on read, so every GAII ever resolved kept a permanent entry (memory audit
@@ -189,10 +191,8 @@ export async function resolveGaii(
     const activePeers = [...peers.values()].filter(peerCarriesAgents);
     for (const peer of activePeers) {
         try {
-            const resp = await fetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {
-                signal: AbortSignal.timeout(5_000),
-            });
-            if (resp.ok) {
+            const resp = await peerFetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {}, { timeoutMs: 5_000 });
+            if (resp.ok && resp.status >= 200 && resp.status < 300) {
                 gaiiCache.set(gaii, { nodeId: peer.nodeId, nodeUrl: peer.url, expiresAt: Date.now() + CACHE_TTL_MS });
                 return { nodeId: peer.nodeId, nodeUrl: peer.url, local: false };
             }
@@ -313,14 +313,15 @@ export function startHeartbeatJob(
                     ? await sign(nodeKey.privateKey, payloadJson)
                     : undefined;
 
-                const resp = await fetch(`${peer.url}/v1/federation/ping`, {
+                const resp = await peerFetch(`${peer.url}/v1/federation/ping`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ...payload, signature }),
-                    signal: AbortSignal.timeout(TIMEOUT_MS),
-                });
+                }, { timeoutMs: TIMEOUT_MS });
+                // Unreachable, a redirect, a timeout or an answer over the ceiling: counted as a failed heartbeat below.
+                if (!resp.ok) throw new Error(resp.message);
 
-                if (resp.ok) {
+                if (resp.status >= 200 && resp.status < 300) {
                     const previousStatus = peer.status;
                     peer.lastSeen = new Date().toISOString();
                     peer.status = 'active';
@@ -338,9 +339,9 @@ export function startHeartbeatJob(
                     // ── Network directory: detect service summary hash changes ──
                     if (networkDirectory && peer.shareCatalogue && peer.peerMode !== 'private') {
                         try {
-                            const pingBody = await resp.json() as {
+                            const pingBody = resp.json as {
                                 data?: { service_summary_hash?: string };
-                            };
+                            } | undefined;
                             const remoteSummaryHash = pingBody?.data?.service_summary_hash;
 
                             if (remoteSummaryHash) {
@@ -350,21 +351,22 @@ export function startHeartbeatJob(
                                     // Hash changed or first time -- fetch full summary
                                     logger.info(`Service summary hash changed for peer ${peer.nodeId}, fetching summary`);
                                     try {
-                                        const summaryResp = await fetch(
+                                        const summaryResp = await peerFetch(
                                             `${peer.url}/v1/federation/service-summary`,
                                             {
                                                 headers: {
                                                     'Accept': 'application/json',
                                                     'x-source-node': config.nodeId,
                                                 },
-                                                signal: AbortSignal.timeout(TIMEOUT_MS),
                                             },
+                                            { timeoutMs: TIMEOUT_MS },
                                         );
+                                        if (!summaryResp.ok) throw new Error(summaryResp.message);
 
-                                        if (summaryResp.ok) {
-                                            const summaryBody = await summaryResp.json() as {
+                                        if (summaryResp.status >= 200 && summaryResp.status < 300) {
+                                            const summaryBody = summaryResp.json as {
                                                 data?: ServiceSummary;
-                                            };
+                                            } | undefined;
 
                                             if (summaryBody?.data) {
                                                 networkDirectory.set(key, summaryBody.data);

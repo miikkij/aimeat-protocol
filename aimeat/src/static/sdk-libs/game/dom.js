@@ -12,52 +12,15 @@
  * @usage  import { el, $, injectStyle } from './dom.js';
  *   el('div', { class: 'ag-card', vars: { '--ag-fill': '42%' }, on: { click: fn } }, ['text']);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — el and append come from _core/dom.js, shared with the Atelier kit
+ *     (secaudit 2026-10, M7).
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
  */
 
-/** Attribute names handled specially by `el` rather than being set as attributes. */
-const SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };
+/** The element builder, shared with the Atelier kit. */
+export { el, append } from '../_core/dom.js';
 
 let seq = 0;
-
-/**
- * Build an element.
- * @param {string} tag
- * @param {Record<string, any>} [attrs]  Attributes, plus `text` (textContent), `on`
- *   (event map), `vars` (CSS custom properties). A null/undefined/false value is skipped.
- * @param {any} [kids]  A string, a Node, or an array of either (nullish entries skipped).
- * @returns {HTMLElement}
- */
-export function el(tag, attrs, kids) {
-  const node = document.createElement(tag);
-  if (attrs) {
-    for (const k in attrs) {
-      const v = attrs[k];
-      if (v == null || v === false) continue;
-      if (k === 'text') { node.textContent = String(v); continue; }
-      if (k === 'on') { for (const type in v) node.addEventListener(type, v[type]); continue; }
-      if (k === 'vars') { for (const name in v) node.style.setProperty(name, String(v[name])); continue; }
-      if (SPECIAL[k]) continue;
-      node.setAttribute(k, v === true ? '' : String(v));
-    }
-    if (attrs.children != null) append(node, attrs.children);
-  }
-  if (kids != null) append(node, kids);
-  return node;
-}
-
-/**
- * Append a string / Node / array of them to a parent.
- * @param {Node} parent
- * @param {any} kids
- */
-export function append(parent, kids) {
-  const list = Array.isArray(kids) ? kids : [kids];
-  for (const c of list) {
-    if (c == null || c === false) continue;
-    parent.appendChild(typeof c === 'object' ? /** @type {Node} */ (c) : document.createTextNode(String(c)));
-  }
-}
 
 /**
  * First match, like `document.querySelector` but rooted where you say.

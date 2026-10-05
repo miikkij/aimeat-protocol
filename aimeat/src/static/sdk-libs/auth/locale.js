@@ -20,6 +20,7 @@
  * @usage import { langSwitchHtml, wireLangSwitch } from './locale.js';
  *   In the app: window.addEventListener('aimeat-lang-change', e => render(e.detail.lang));
  * @version-history
+ *   v2.1.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v2.1.0 — 2026-10-01 — aimeatRestoreLang: <html lang> names the starting language at load. It
  *     was set only by aimeatApplyLang, so after a reload with Finnish or Spanish stored the page
  *     drew those words under lang="en".
@@ -30,48 +31,21 @@
  */
 import { escHtml } from './theme.js';
 import { clampPopover } from './cluster.js';
+import { LANG_KEY, readLocales, readLang, writeLang } from '../_core/lang.js';
 
-/** The one locale key on this platform. Same as public/js/utils.js and auth/i18n.js. */
-export var AIMEAT_LANG_KEY = 'aimeat-lang';
+/** The one locale key on this platform. Same as public/js/utils.js and _core/lang.js. */
+export var AIMEAT_LANG_KEY = LANG_KEY;
 
 /** Two-letter codes the APP says it supports. Order matters: it is the cycle order. */
-export function readLocales(opts) {
-  var list = (opts && Array.isArray(opts.locales)) ? opts.locales : null;
-  if (!list) {
-    try {
-      var m = /** @type {HTMLMetaElement|null} */ (document.querySelector('meta[name="aimeat-locales"]'));
-      if (m && m.content) list = m.content.split(/[\s,]+/);
-    } catch { /* no document */ }
-  }
-  if (!list) return [];
-  var seen = {}, out = [];
-  for (var i = 0; i < list.length; i++) {
-    var c = String(list[i] || '').trim().toLowerCase();
-    if (/^[a-z]{2}$/.test(c) && !seen[c]) { seen[c] = 1; out.push(c); }
-  }
-  return out.length > 1 ? out : [];   // one language needs no switch
-}
+export { readLocales };
 
-/** Current locale, resolved the same way the SPA resolves it. */
+/** Current locale, resolved the same way the SPA resolves it (_core/lang.js). */
 export function aimeatReadLang(locales) {
-  var ok = function (v) { return v && locales.indexOf(v) >= 0 ? v : null; };
-  try {
-    var u = ok(new URLSearchParams(location.search).get('lang'));
-    if (u) return u;
-    var s = ok(localStorage.getItem(AIMEAT_LANG_KEY));
-    if (s) return s;
-    var c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
-    if (c && ok(c[1])) return c[1];
-  } catch { /* storage blocked */ }
-  var nav = ok((navigator.language || '').slice(0, 2).toLowerCase());
-  return nav || locales[0];
+  return readLang(locales);
 }
 
 export function aimeatApplyLang(lang) {
-  try {
-    localStorage.setItem(AIMEAT_LANG_KEY, lang);
-    document.cookie = 'aimeat-lang=' + lang + ';path=/;max-age=31536000;SameSite=Lax';
-  } catch { /* storage blocked */ }
+  writeLang(lang);
   try { document.documentElement.setAttribute('lang', lang); } catch { /* no document */ }
   try { window.dispatchEvent(new CustomEvent('aimeat-lang-change', { detail: { lang: lang } })); } catch { /* no window */ }
 }

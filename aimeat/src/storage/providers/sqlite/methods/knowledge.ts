@@ -1,25 +1,21 @@
 /**
- * @file src/storage/providers/sqlite/methods/knowledge-links.ts
+ * @file src/storage/providers/sqlite/methods/knowledge.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Knowledge memory-link methods for the SQLite provider: the rows that say a memory
- *   record was contributed to a knowledge base, and who contributed it.
- *
- *   Extracted from methods/apps.ts unchanged when that file passed the 800-line ceiling. A pure
- *   move: same bodies, same comments, same behaviour, merged onto SqliteStorage by the same
- *   prototype merge. Knowledge links were never an app-catalog concern; they lived there because
- *   the original extraction from index.ts cut by file size rather than by subject.
- * @structure knowledgeLinkMethods — createLink, listLinks, deleteLink, and the contributor sweep
- *   the erasure path uses.
- * @usage merged into SqliteStorage alongside appsMethods (providers/sqlite/index.ts)
+ * @description SQLite methods for the domain of postgres-kysely/methods/knowledge.ts (knowledgeMethods), so a
+ *   fix in one provider finds its twin by file name. Bodies moved verbatim from the files named in the
+ *   version history; bound to SqliteStorage via the prototype merge in ../index.ts.
+ * @structure knowledgeMethods
+ * @usage Object.assign(SqliteStorage.prototype, knowledgeMethods) in ../index.ts
  * @version-history
- *   v1.1.0 — 2026-09-09 — getLink deleted: no caller.
- *   v1.0.0 — 2026-08-25 — Extracted from methods/apps.ts (max-file-lines)
+ *   v1.0.0 — 2026-10-05 — createLink, listLinks, deleteLink, findBrokenLinks, deleteLinksByContributor moved
+ *     here from knowledge-links.ts; createReview, listReviews, deleteReviewsByOperator moved here from
+ *     federation-oauth.ts so the file mirrors postgres-kysely/methods/knowledge.ts (secaudit 2026-10, M8).
  */
-import type { MemoryLinkRecord } from '../../../interface.js';
+import type { MemoryLinkRecord, OperatorReviewRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 
-export const knowledgeLinkMethods = {
+export const knowledgeMethods = {
 
   async createLink(this: SqliteStorage, record: MemoryLinkRecord): Promise<MemoryLinkRecord> {
     this.db.prepare(`
@@ -76,5 +72,23 @@ export const knowledgeLinkMethods = {
     const result = this.db.prepare('DELETE FROM knowledge_links WHERE linked_by = ?').run(gaii);
     return result.changes;
   },
+  // ── Knowledge: Operator Reviews ──
+  // ══════════════════════════════════════════════════════════
 
+  async createReview(this: SqliteStorage, record: OperatorReviewRecord): Promise<OperatorReviewRecord> {
+    this.db.prepare(`
+      INSERT INTO knowledge_reviews (id, packageId, operatorGaii, reason, customText, action, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(record.id, record.packageId, record.operatorGaii, record.reason, record.customText ?? null, record.action, record.timestamp);
+    return record;
+  },
+
+  async listReviews(this: SqliteStorage, packageId: string): Promise<OperatorReviewRecord[]> {
+    return this.db.prepare('SELECT * FROM knowledge_reviews WHERE packageId = ? ORDER BY timestamp ASC').all(packageId) as OperatorReviewRecord[];
+  },
+
+  async deleteReviewsByOperator(this: SqliteStorage, gaii: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM knowledge_reviews WHERE operatorGaii = ?').run(gaii);
+    return result.changes;
+  },
 };

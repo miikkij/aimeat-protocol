@@ -1,27 +1,18 @@
 /**
- * @file src/storage/providers/sqlite/methods/storage-files.ts
+ * @file src/storage/providers/sqlite/methods/files.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Stored-file methods for the SQLite backend: create, read (whole / metadata / one byte
- *   range), list, delete, and the tag + visibility updates.
- *
- *   A PURE EXTRACTION from methods/identity-nodes.ts, which had grown past the 800-line limit. The
- *   bodies moved unchanged; the only thing that is new here is the file itself, and the grouping is
- *   the one the Storage interface already draws — FileRepository is a segment of its own.
- *
- *   THE ONE RULE THAT LIVES IN THIS FILE RATHER THAN ABOVE IT. `createStorageFile` settles the
- *   UTF-8 verdict, because the provider is the single door every write goes through: sixteen call
- *   sites create files and none of them should have to know the rule exists. Everything else here is
- *   about reading only what was asked for — metadata without bytes, a range as a range.
- * @structure fileRowToRecord() — the one row-to-record mapping · storageFileMethods — the interface
- *   segment, merged onto SqliteStorage's prototype
- * @usage merged in providers/sqlite/index.ts alongside the other method groups
+ * @description SQLite methods for the domain of postgres-kysely/methods/files.ts (fileMethods), so a fix in
+ *   one provider finds its twin by file name. Bodies moved verbatim from the files named in the version
+ *   history; bound to SqliteStorage via the prototype merge in ../index.ts.
+ * @structure fileMethods
+ * @usage Object.assign(SqliteStorage.prototype, fileMethods) in ../index.ts
  * @version-history
- *   v1.1.0 — 2026-10-03 — listFontFilesAcrossOwners: font files of every owner, one bounded query.
- *   v1.0.0 — 2026-08-15 — Extracted from methods/identity-nodes.ts (max-file-lines), carrying
- *     TARGET-063's getStorageFileMeta, readStorageFileRange and the UTF-8 verdict.
+ *   v1.0.0 — 2026-10-05 — createChunkedUpload, getChunkedUpload, addChunk, deleteChunkedUpload moved here
+ *     from identity-nodes.ts; 11 methods (createStorageFile, getStorageFile, getStorageFileMeta, …) moved
+ *     here from storage-files.ts so the file mirrors postgres-kysely/methods/files.ts (secaudit 2026-10, M8).
  */
-import type { StorageFileRecord } from '../../../interface.js';
+import type { ChunkedUploadRecord, StorageFileRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { sumStorageBytesForOwners as sumStorageBytesForOwnersRepo } from '../repos/storage-file.js';
 import { utf8VerdictFor } from '../../../../utils/app-content-type.js';
@@ -58,7 +49,40 @@ const FONT_FILE_WHERE =
   "lower(mimeType) LIKE 'font/%' OR lower(mimeType) LIKE 'application/font%' OR lower(mimeType) LIKE 'application/x-font%'"
   + " OR lower(key) LIKE '%.woff2' OR lower(key) LIKE '%.woff' OR lower(key) LIKE '%.ttf' OR lower(key) LIKE '%.otf'";
 
-export const storageFileMethods = {
+export const fileMethods = {
+
+  // ══════════════════════════════════════════════════════════
+  // ── Chunked Uploads (in-memory, same as MongoDB adapter) ──
+  // ══════════════════════════════════════════════════════════
+
+  async createChunkedUpload(this: SqliteStorage, record: ChunkedUploadRecord): Promise<ChunkedUploadRecord> {
+    this.chunkedUploads.set(record.uploadId, record);
+    return record;
+  },
+
+  async getChunkedUpload(this: SqliteStorage, uploadId: string): Promise<ChunkedUploadRecord | null> {
+    const record = this.chunkedUploads.get(uploadId) ?? null;
+    if (record && new Date(record.expiresAt).getTime() < Date.now()) {
+      this.chunkedUploads.delete(uploadId);
+      return null;
+    }
+    return record;
+  },
+
+  async addChunk(this: SqliteStorage, uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean> {
+    const record = this.chunkedUploads.get(uploadId);
+    if (!record) return false;
+    if (new Date(record.expiresAt).getTime() < Date.now()) {
+      this.chunkedUploads.delete(uploadId);
+      return false;
+    }
+    record.receivedChunks.set(chunkIndex, data);
+    return true;
+  },
+
+  async deleteChunkedUpload(this: SqliteStorage, uploadId: string): Promise<boolean> {
+    return this.chunkedUploads.delete(uploadId);
+  },
   async createStorageFile(this: SqliteStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
     // Settled here, in the provider, because it is the one door every write goes through: sixteen
     // call sites create files and not one of them should have to know this rule exists.

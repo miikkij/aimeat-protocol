@@ -26,6 +26,8 @@
  *   on <html> win over the kit's own :root values (aimeat-atelier.css). Inside an app frame the
  *   frame's own look still wins.
  * @version-history
+ *   v0.65.2 — 2026-10-05 — el and append come from _core/dom.js, shared with the game kit
+ *     (secaudit 2026-10, M7).
  *   v0.65.1 — 2026-10-03 — injectStyle arms added-faces.js: once the kit's stylesheet has loaded, a
  *     look that names a face the operator added to the node gets /v1/themes/fonts.css linked once.
  *   v0.62.0 — 2026-10-02 — wearLook reads the page's own look, data-ak-look on <body> or <html>,
@@ -59,6 +61,7 @@
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
 import { loadAddedFaces } from './added-faces.js';
+import { el, append } from '../_core/dom.js';
 
 /**
  * The look a layer outside the app frame wears. The kit appends a dialog, a menu, a toast, a drawer
@@ -88,9 +91,6 @@ export function wearLook(node, from) {
   return node;
 }
 
-/** Attribute names handled specially by `el` rather than being set as attributes. */
-const SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };
-
 /** The most children one entrance choreographs; later ones appear instantly (the game-kit lesson:
  *  a fifty-row stagger reads as lag, not delight). */
 const ENTER_MAX = 12;
@@ -104,44 +104,8 @@ const DEFAULTS_ATTR = 'data-ak-motion-defaults';
 
 let seq = 0;
 
-/**
- * Build an element.
- * @param {string} tag
- * @param {Record<string, any>} [attrs]  Attributes, plus `text` (textContent), `on`
- *   (event map), `vars` (CSS custom properties). A null/undefined/false value is skipped.
- * @param {any} [kids]  A string, a Node, or an array of either (nullish entries skipped).
- * @returns {HTMLElement}
- */
-export function el(tag, attrs, kids) {
-  const node = document.createElement(tag);
-  if (attrs) {
-    for (const k in attrs) {
-      const v = attrs[k];
-      if (v == null || v === false) continue;
-      if (k === 'text') { node.textContent = String(v); continue; }
-      if (k === 'on') { for (const type in v) node.addEventListener(type, v[type]); continue; }
-      if (k === 'vars') { for (const name in v) node.style.setProperty(name, String(v[name])); continue; }
-      if (SPECIAL[k]) continue;
-      node.setAttribute(k, v === true ? '' : String(v));
-    }
-    if (attrs.children != null) append(node, attrs.children);
-  }
-  if (kids != null) append(node, kids);
-  return node;
-}
-
-/**
- * Append a string / Node / array of them to a parent.
- * @param {Node} parent
- * @param {any} kids
- */
-export function append(parent, kids) {
-  const list = Array.isArray(kids) ? kids : [kids];
-  for (const c of list) {
-    if (c == null || c === false) continue;
-    parent.appendChild(typeof c === 'object' ? /** @type {Node} */ (c) : document.createTextNode(String(c)));
-  }
-}
+/** The element builder, shared with the game kit. */
+export { el, append };
 
 /**
  * First match, like `document.querySelector` but rooted where you say.

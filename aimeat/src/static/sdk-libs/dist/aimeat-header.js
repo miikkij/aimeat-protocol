@@ -2,6 +2,42 @@
 // Rebuild: pnpm build:sdk  ·  Served at /v1/libs/aimeat-header.js (with a per-node config prelude).
 "use strict";
 (() => {
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  var COOKIE_MAX_AGE = 31536e3;
+  function readLang(locales) {
+    const list = Array.isArray(locales) ? locales : null;
+    const pick = list ? function(v) {
+      return v && list.indexOf(v) >= 0 ? v : null;
+    } : function(v) {
+      return v ? String(v).slice(0, 2) : null;
+    };
+    try {
+      const u = pick(new URLSearchParams(location.search).get("lang"));
+      if (u) return u;
+      const s = pick(localStorage.getItem(LANG_KEY));
+      if (s) return s;
+      const c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+      const cv = c ? pick(c[1]) : null;
+      if (cv) return cv;
+    } catch {
+    }
+    let nav = null;
+    try {
+      nav = pick(String(navigator.language || "").slice(0, 2).toLowerCase());
+    } catch {
+    }
+    if (nav) return nav;
+    return list ? list[0] : "en";
+  }
+  function writeLang(lang) {
+    try {
+      localStorage.setItem(LANG_KEY, lang);
+      document.cookie = LANG_KEY + "=" + lang + ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
+    } catch {
+    }
+  }
+
   // src/static/sdk-libs/header/index.js
   if (!window.__AIMEAT_HEADER_MOUNTED__) {
     window.__AIMEAT_HEADER_MOUNTED__ = true;
@@ -9,7 +45,6 @@
   }
   function main() {
     var THEME_KEY = "aimeat-theme";
-    var LANG_KEY = "aimeat-lang";
     var LANGS = ["en", "fi", "es"];
     var NAV_FALLBACK = {
       "nav.howItWorks": "How it works",
@@ -21,16 +56,11 @@
       "nav.themeToDark": "Switch to dark mode",
       "nav.themeToLight": "Switch to light mode"
     };
-    function readLang() {
-      try {
-        var u = new URLSearchParams(location.search).get("lang");
-        if (LANGS.indexOf(u) !== -1) return u;
-        var s = localStorage.getItem(LANG_KEY);
-        if (LANGS.indexOf(s) !== -1) return s;
-      } catch {
-      }
-      var nav = (navigator.language || "en").slice(0, 2).toLowerCase();
-      return LANGS.indexOf(nav) !== -1 ? nav : "en";
+    function readLang2() {
+      return (
+        /** @type {string} */
+        readLang(LANGS)
+      );
     }
     function readTheme() {
       try {
@@ -195,12 +225,7 @@
       nav.querySelectorAll("[data-lang]").forEach(function(b) {
         if (b.getAttribute("data-lang") === lang) b.classList.add("active");
         b.addEventListener("click", function() {
-          var next = b.getAttribute("data-lang");
-          try {
-            localStorage.setItem(LANG_KEY, next);
-            document.cookie = "aimeat-lang=" + next + ";path=/;max-age=31536000;SameSite=Lax";
-          } catch {
-          }
+          writeLang(b.getAttribute("data-lang"));
           location.reload();
         });
       });
@@ -260,7 +285,7 @@
     async function init() {
       applyTheme(readTheme());
       ensureThemeCss();
-      var lang = readLang();
+      var lang = readLang2();
       document.documentElement.lang = lang;
       var t = await loadTranslations(lang);
       var nav = buildMarkup(t);

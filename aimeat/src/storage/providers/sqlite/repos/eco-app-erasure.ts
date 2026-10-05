@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SQLite SQL for the ecosystem apps an account connected: they go as its agents go. The
- *   account deletion (deleteOwner in methods/owner.ts), the start step and the operator's decision on
+ *   account deletion (deleteOwner in methods/identity.ts), the start step and the operator's decision on
  *   a held name (repos/held-names.ts) call this one function. A free function over the connection,
  *   like the other erasure repos, so there is no import cycle through the provider class; the
  *   per-identity cascade is handed in by the caller, which owns it. The Postgres twin is
@@ -12,6 +12,7 @@
  * @usage deleteEcosystemApps(this.db, name, geais, g => this.cascadeDeleteAgentData(g), { everyRecipe: true });
  * @version-history
  *   v1.0.0 — 2026-09-26 — What deleteOwner did for the ecosystem apps inline.
+ *   v1.0.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  */
 import type Database from 'better-sqlite3';
 

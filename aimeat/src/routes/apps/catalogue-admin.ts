@@ -6,6 +6,7 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.13.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.12.1 — 2026-09-26 — The app owner in the moderate and delete doors comes from localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
@@ -49,6 +50,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import { publicAppManifest } from '../../services/app-public-manifest.js';
@@ -250,12 +252,10 @@ export function registerCatalogueAdminRoutes(
                 activePeers.map(async (peer) => {
                     const ssrfCheck = await validateOutboundUrl(peer.url);
                     if (!ssrfCheck.valid) return [];
-                    const resp = await fetch(`${peer.url}/v1/apps?${qs}`, {
-                        signal: AbortSignal.timeout(5_000),
-                    });
-                    if (!resp.ok) return [];
-                    const json = await resp.json() as { data?: { apps?: Record<string, unknown>[] } };
-                    const apps = json.data?.apps ?? [];
+                    const resp = await peerFetch(`${peer.url}/v1/apps?${qs}`, {}, { timeoutMs: 5_000 });
+                    if (!resp.ok || resp.status < 200 || resp.status >= 300) return [];
+                    const json = resp.json as { data?: { apps?: Record<string, unknown>[] } } | undefined;
+                    const apps = json?.data?.apps ?? [];
                     return apps.map(a => ({ ...a, _peer_node: peer.nodeId, _peer_url: peer.url }));
                 })
             );

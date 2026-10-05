@@ -13,6 +13,9 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Join form — 2026-10-05 — The join form's three requests to the URL the operator typed go through
+ *     safeFetch, which checks every redirect hop, and read their answers under a ceiling; they were
+ *     bare fetch() calls that followed redirects after one check (secaudit 2026-10, C6).
  *   Operator agent — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   Join keys first — 2026-10-01 — completeJoin exchanges keys before it saves the peer, saves nothing
  *     when the exchange fails, and never replaces a peer this node already has: the id came from the
@@ -40,7 +43,11 @@ import { RoleGrantSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { emitChange } from '../services/event-bus.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
+import { readJson } from '../utils/read-capped.js';
+
+/** A node card, an introduction answer or a join status: a few kilobytes (secaudit 2026-10, C6). */
+const JOIN_ANSWER_MAX_BYTES = 256 * 1024;
 import { isOperatorAccount } from '../utils/operator-account.js';
 import type { PeerInfo } from '../services/federation.js';
 import { deriveTierFlags } from '../services/federation-tiers.js';
@@ -123,9 +130,11 @@ export function adminMonitoringRouter(
         // 1. Discovery
         let targetInfo: { node_id?: string; type?: string; protocol?: string; version?: string | number; capabilities?: string[] };
         try {
-            const disc = await fetch(`${targetUrl}/.well-known/aimeat`, { signal: AbortSignal.timeout(10_000) });
+            // safeFetch, not fetch: the URL is the one the operator typed, checked above, and every
+            // redirect hop is checked again (secaudit 2026-10, C6). The answer is read under a ceiling.
+            const disc = await safeFetch(`${targetUrl}/.well-known/aimeat`, { signal: AbortSignal.timeout(10_000) });
             if (!disc.ok) throw new Error(`HTTP ${disc.status}`);
-            const body = await disc.json() as { data?: typeof targetInfo };
+            const body = await readJson(disc, JOIN_ANSWER_MAX_BYTES) as { data?: typeof targetInfo };
             targetInfo = body.data!;
             if (!targetInfo?.protocol || targetInfo.protocol !== 'aimeat') {
                 res.status(502).json(error(config.nodeId, 'NOT_AIMEAT', 'Target is not an AIMEAT node'));
@@ -154,7 +163,7 @@ export function adminMonitoringRouter(
         const signature = await sign(privateKey, messageToSign);
 
         try {
-            const introResp = await fetch(`${targetUrl}/v1/federation/peer/introduce`, {
+            const introResp = await safeFetch(`${targetUrl}/v1/federation/peer/introduce`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -170,7 +179,7 @@ export function adminMonitoringRouter(
                 signal: AbortSignal.timeout(15_000),
             });
 
-            const introBody = await introResp.json() as { data?: { request_id: string; status: string; message?: string }; error?: { message?: string } };
+            const introBody = await readJson(introResp, JOIN_ANSWER_MAX_BYTES) as { data?: { request_id: string; status: string; message?: string }; error?: { message?: string } };
             if (!introResp.ok) {
                 const msg = introBody?.error?.message ?? `HTTP ${introResp.status}`;
                 res.status(introResp.status).json(error(config.nodeId, 'INTRODUCTION_FAILED', msg));
@@ -671,12 +680,12 @@ function pollForApprovalAndComplete(
             return;
         }
         try {
-            const resp = await fetch(
+            const resp = await safeFetch(
                 `${targetUrl}/v1/federation/peer/introduce/${requestId}/status`,
                 { signal: AbortSignal.timeout(10_000) },
             );
             if (!resp.ok) return;
-            const body = await resp.json() as { data?: { status: string } };
+            const body = await readJson(resp, JOIN_ANSWER_MAX_BYTES) as { data?: { status: string } };
             const status = body.data?.status;
 
             if (status === 'approved' || status === 'auto_approved') {

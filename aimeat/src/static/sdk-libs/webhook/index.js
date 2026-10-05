@@ -26,9 +26,11 @@
  *     headers: { Authorization: 'Bearer {{secret:EXAMPLE_TOKEN}}' } });
  *   if (r.refusal) show(AIMEAT.webhook.words(r.refusal)); else show(r.status);
  * @version-history
+ *   v1.0.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.0.0 — 2026-09-28 — Initial: the living-hooks send and read for any app.
  */
 import { makeSession } from '../_core/session.js';
+import { storedLang } from '../_core/lang.js';
 import { attach } from '../_core/namespace.js';
 import { createHooks } from '../living/hooks.js';
 const { authFetch } = makeSession('aimeat-webhook.js');
@@ -43,10 +45,8 @@ function langs() {
     const attr = document.documentElement.getAttribute('lang');
     if (attr) out.push(attr.slice(0, 2).toLowerCase());
   } catch { /* no document */ }
-  try {
-    const saved = window.localStorage.getItem('aimeat-lang');
-    if (saved) out.push(saved.slice(0, 2).toLowerCase());
-  } catch { /* storage blocked */ }
+  const saved = storedLang();
+  if (saved) out.push(saved.slice(0, 2).toLowerCase());
   return out;
 }
 

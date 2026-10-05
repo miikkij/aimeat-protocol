@@ -56,13 +56,6 @@ const VERIFIERS = ['verify', 'verifyDetached', 'verifyPeerSignature'];
 
 /** A door with neither an owner gate nor a signature check, and the sentence that makes it safe. */
 const ALLOWED: Record<string, string> = {
-    'src/routes/federation-auth.ts:POST:/v1/federation/auth/verify':
-        'The cross-node password login itself: a remote node asks this node, the home node, whether '
-        + 'someone signing in there as username@thisNode gave the right password. The credential IS '
-        + 'the password in the body, compared by verifyPassword against the stored hash, so no '
-        + 'session and no peer relationship can exist yet by construction. Bounded by the login rate '
-        + 'limit and a five-minute timestamp window, and it answers the same FEDERATION_AUTH_FAILED '
-        + 'whether the account is missing, has no password or gave the wrong one.',
     'src/routes/federation-sync/routing.ts:POST:/v1/federation/route':
         'Both credentials, one per caller, and this script can read neither. A person starting a route '
         + 'meets requireAuth then requireOwnerPrincipal inside requireOwnerPrincipalOrVerifiedRelay. A '

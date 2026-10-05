@@ -3,8 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SQLite SQL for the work a party leaves behind: an erased account (deleteOwner in
- *   methods/owner.ts, with the pseudonym the purchase receipts get) or one agent its owner deletes
- *   (deleteAgent in methods/agents.ts). Each caller runs it inside its own transaction, before the
+ *   methods/identity.ts, with the pseudonym the purchase receipts get) or one agent its owner deletes
+ *   (deleteAgent in methods/identity.ts). Each caller runs it inside its own transaction, before the
  *   per-identity cascade. A free function over the connection for the reason
  *   repos/app-purchase-erasure.ts gives: no import cycle through the provider class.
  * @structure
@@ -14,6 +14,8 @@
  *   - settleDeletedAgentWork(db, gaii, resolvePayer) — one deleted agent
  * @usage settleErasedPartyWork(this.db, name, ghiis, pseudonym, id => this.resolveGhii(id));
  * @version-history
+ *   v1.3.1 — 2026-10-05 — deleteOwner and deleteAgent are in methods/identity.ts now (secaudit 2026-10,
+ *     M8).
  *   v1.3.0 — 2026-09-26 — The payer resolver gets the time the row was written (PayerResolver), so the
  *     boot migration gives held morsels back only to an account that existed then (secaudit 2026-09:
  *     R3 7b). The deletions keep the resolver that debited them.

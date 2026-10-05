@@ -22,6 +22,11 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.6.0 — 2026-10-05 — The audit archive and the keep setting's logic (the owner test, the
+ *     refusals, the account-holder test for a limit that deletes) moved to services/app-audit-keep.ts;
+ *     a non-owner operator's archive of a hidden app answers the same 404 without writing an operator
+ *     trail row for a read that never happened. aimeat_app_manage calls the service in place of the
+ *     route over loopback HTTP (secaudit 2026-10, M6).
  *   v1.5.1 — 2026-10-05 — The owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-10-01 — Keeping the audit log (IAM round 2 leftover 7): the read names the archived
@@ -48,7 +53,7 @@
 import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
-import { optionalAuth, requireAuth, requireScope, isOwnerPrincipal } from '../../auth/middleware.js';
+import { optionalAuth, requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { detectLocale } from '../../i18n.js';
 import { sandboxedCsp } from './inline-frame.js';
@@ -56,8 +61,10 @@ import {
   appLegalState, legalReadiness, renderLegalPage, isLegalKind, LEGAL_KIND_INFO, legalLinksFor, apexLegalBase,
   appSellsForMoney,
 } from '../../services/app-legal.js';
-import { readAppAudit, archiveAppAuditBefore, setOwnerAuditKeep } from '../../services/app-audit.js';
-import { listArchives, readArchiveYear, effectiveKeep, KEEP_MAX } from '../../services/app-audit-archive.js';
+import { readAppAudit } from '../../services/app-audit.js';
+import { listArchives, readArchiveYear, effectiveKeep } from '../../services/app-audit-archive.js';
+import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../../services/app-audit-keep.js';
+import { sendAppOp } from '../app-op-answer.js';
 import { auditAppWithPlaytest } from '../../services/app-playtest.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
@@ -240,47 +247,20 @@ export function registerLegalRoutes(
     const { owner } = await canonicalOwner(req);
     res.redirect(307, `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(req.params.filename as string)}/audit/archive`);
   });
-  router.post('/v1/apps/:owner/:filename/audit/archive', requireAuth(), requireScope('app:write'), async (req, res) => {
-    const app = await visibleApp(req, req.params.owner as string, req.params.filename as string);
-    if (!app || app === 'hidden' || !(await isOwnerOf(req, app))) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${req.params.filename as string}" not found in your uploads`));
-      return;
-    }
-    const before = (req.body ?? {}).before;
-    if (typeof before !== 'string' || !Number.isFinite(Date.parse(before))) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'before must be a date, e.g. "2026-01-01" or an ISO time.'));
-      return;
-    }
-    const moved = await archiveAppAuditBefore(storage, app.ownerGaii, app.filename, new Date(before).toISOString());
-    res.json(success(config.nodeId, {
-      moved, before: new Date(before).toISOString(), archives: await listArchives(storage, app.ownerGaii, app.filename),
-    }));
-  });
+  // The owner test, the refusals and the move are services/app-audit-keep.ts, which the
+  // aimeat_app_manage MCP tool (audit_archive) calls too.
+  router.post('/v1/apps/:owner/:filename/audit/archive', requireAuth(), requireScope('app:write'), async (req, res) =>
+    sendAppOp(res, config.nodeId, await archiveAuditFor(storage, config, req.auth!, {
+      owner: req.params.owner as string, filename: req.params.filename as string,
+    }, (req.body ?? {}).before)));
 
   // ── How much of each app's audit log the owner keeps. `keep` 0 or "all" keeps everything; a
   //    number keeps that many newest entries per app and deletes the rest at once. Deleting audit
   //    entries is the person's own act: an app or an agent may read the setting and set "all", and
-  //    only the signed-in person sets a number (the `audit.` prefix exists so the log of their
-  //    changes is not theirs to rewrite). `keep: null` returns to the node default. ──
-  router.get('/v1/audit/apps/settings', requireAuth(), requireScope('app:write'), async (req, res) => {
-    const { ownerGhii } = await canonicalOwner(req);
-    res.json(success(config.nodeId, { ...(await effectiveKeep(storage, ownerGhii)), nodeDefault: config.appAuditKeepDefault }));
-  });
-  router.put('/v1/audit/apps/settings', requireAuth(), requireScope('app:write'), async (req, res) => {
-    const { ownerGhii } = await canonicalOwner(req);
-    const raw = (req.body ?? {}).keep;
-    const keep = raw === null ? null : raw === 'all' ? 0 : raw;
-    if (keep !== null && (typeof keep !== 'number' || !Number.isInteger(keep) || keep < 0 || keep > KEEP_MAX)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `keep must be "all", 0 (all), a whole number up to ${KEEP_MAX}, or null for the node default.`));
-      return;
-    }
-    // Refuse before anything is written: a limit deletes, and that is the person's own decision.
-    const deletes = keep === null ? config.appAuditKeepDefault > 0 : keep > 0;
-    if (deletes && !isOwnerPrincipal(req.auth)) {
-      res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
-        'A limit deletes audit entries, so only the account holder, signed in, can set one. An app or an assistant may keep everything (keep: "all").'));
-      return;
-    }
-    res.json(success(config.nodeId, { ...(await setOwnerAuditKeep(storage, ownerGhii, keep)), nodeDefault: config.appAuditKeepDefault }));
-  });
+  //    only the signed-in person sets a number (services/app-audit-keep.ts, which the
+  //    aimeat_app_manage MCP tool's audit_keep calls too). `keep: null` returns to the node default. ──
+  router.get('/v1/audit/apps/settings', requireAuth(), requireScope('app:write'), async (req, res) =>
+    sendAppOp(res, config.nodeId, await readAuditKeep(storage, config, req.auth!)));
+  router.put('/v1/audit/apps/settings', requireAuth(), requireScope('app:write'), async (req, res) =>
+    sendAppOp(res, config.nodeId, await setAuditKeep(storage, config, req.auth!, (req.body ?? {}).keep)));
 }

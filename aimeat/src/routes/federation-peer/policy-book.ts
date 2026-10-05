@@ -5,6 +5,7 @@
  * @description Network-policy (genesis-defined federation rules) + federation-book (operator phone-book)
  *   routes — policy get/put/pull with signature verification, node-card, book get/rebuild/pull. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-10-05 — The policy pull goes through safeFetch and reads under a ceiling (secaudit 2026-10, C6).
  *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
  */
@@ -16,7 +17,8 @@ import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { sign, verify } from '../../auth/keypair.js';
-import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
+import { readJson } from '../../utils/read-capped.js';
 import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
 import { logger } from '../../utils/logger.js';
@@ -71,9 +73,11 @@ export function registerPolicyBookRoutes(router: Router, config: AimeatConfig, s
         }
         let doc: NetworkPolicyDoc;
         try {
-            const resp = await fetch(`${source.replace(/\/+$/, '')}/v1/federation/network-policy`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
+            // safeFetch: the source URL comes from the request or the config, is checked above, and every
+            // redirect hop is checked again; the policy is read under a ceiling (secaudit 2026-10, C6).
+            const resp = await safeFetch(`${source.replace(/\/+$/, '')}/v1/federation/network-policy`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
             if (!resp.ok) { res.status(502).json(error(config.nodeId, 'FETCH_FAILED', `Source returned ${resp.status}`)); return; }
-            const body = await resp.json() as { data?: { policy?: unknown } };
+            const body = await readJson(resp, 1024 * 1024) as { data?: { policy?: unknown } };
             doc = coercePolicy(body?.data?.policy);
         } catch (e) {
             res.status(502).json(error(config.nodeId, 'FETCH_FAILED', e instanceof Error ? e.message : 'fetch failed'));

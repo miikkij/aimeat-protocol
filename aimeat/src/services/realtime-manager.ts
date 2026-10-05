@@ -24,6 +24,7 @@
  *   v1.3.0 — 2026-09-26 — The frame, close and error handlers of a peer's socket run as this node
  *     (runAsNode, utils/gaii.ts), also in a process that serves more than one node. One node per
  *     process in production, so nothing there changes.
+ *   v1.4.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  */
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
@@ -31,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { runAsNode } from '../utils/gaii.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 import type {
   RealtimeMessage,
   PeerConnection,
@@ -629,9 +631,10 @@ export class RealtimeManager {
     if (filter?.appType) url.searchParams.set('app_type', filter.appType);
 
     try {
-      const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(5_000) });
-      if (!resp.ok) return [];
-      const body = await resp.json() as { data?: { rooms?: Array<Record<string, unknown>> } };
+      const resp = await peerFetch(url.toString(), {}, { timeoutMs: 5_000 });
+      if (!resp.ok) throw new Error(resp.message);
+      if (resp.status < 200 || resp.status >= 300) return [];
+      const body = resp.json as { data?: { rooms?: Array<Record<string, unknown>> } } | undefined;
       const rooms = body?.data?.rooms;
       if (!Array.isArray(rooms)) return [];
       // Tag each room with origin node

@@ -5,6 +5,7 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.6.0 — 2026-10-05 — POST /v1/federation/cross-node/work goes only to a peer with routing on
  *     (gatePeer 'allowRouting'); a packages-only or contact peer is refused (secaudit 2026-10, PKG-8).
  *   v1.5.0 — 2026-09-26 — The routing fee is routingFee (services/morsel.ts) on both endpoints, taken
@@ -39,6 +40,7 @@ import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { sign } from '../../auth/keypair.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { peerFetch } from '../../utils/peer-fetch.js';
 import type { RouteHop, RouteManifest } from '../../types/route-manifest.js';
 import { buildHopSigningMessage } from '../../types/route-manifest.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -198,7 +200,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 const claim = await buildRelayClaim(storage, config, {
                     audience: target_node, method: method ?? 'GET', path, caller: requesterGaii,
                 });
-                const response = await fetch(targetUrl, {
+                const response = await peerFetch(targetUrl, {
                     method: method ?? 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -210,12 +212,18 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     ...(reqBody && ['POST', 'PUT', 'PATCH'].includes((method ?? 'GET').toUpperCase())
                         ? { body: JSON.stringify(reqBody) }
                         : {}),
-                    signal: AbortSignal.timeout(30_000),
-                });
+                }, { timeoutMs: 30_000 });
+                if (!response.ok) {
+                    // Unreachable, a redirect, a timeout or an answer over the ceiling: the route failed, so the fee goes back.
+                    await fee.giveBack();
+                    res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
+                        `Failed to reach peer ${target_node}: ${response.message}`));
+                    return;
+                }
 
-                const data = await response.json().catch(err => { logger.warn('buildLocalHop: continuing after a suppressed failure', { error: String(err) }); return null; });
+                const data = response.json ?? null;
                 // An error answer is no route made, so the fee goes back.
-                if (!response.ok) await fee.giveBack();
+                if (response.status < 200 || response.status >= 300) await fee.giveBack();
 
                 // F.2: Add hop signing for direct peer routing
                 const hop = await buildLocalHop(target_node, inboundManifest.hops.length > 0 ? inboundManifest.hops[inboundManifest.hops.length - 1].signature : '');
@@ -267,7 +275,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 const hopClaim = await buildRelayClaim(storage, config, {
                     audience: relay.nodeId, method: 'POST', path: '/v1/federation/route', caller: requesterGaii,
                 });
-                const response = await fetch(relayUrl, {
+                const response = await peerFetch(relayUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -288,11 +296,15 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                         body: reqBody,
                         max_hops: hops - 1,
                     }),
-                    signal: AbortSignal.timeout(30_000),
-                });
+                }, { timeoutMs: 30_000 });
+                if (!response.ok) {
+                    // This relay was not reached: try the next one.
+                    logger.warn('POST /v1/federation/route: relay peer not reached', { peer: relay.nodeId, reason: response.reason });
+                    continue;
+                }
 
-                if (response.ok) {
-                    const data = await response.json().catch(err => { logger.warn('buildLocalHop: continuing after a suppressed failure', { error: String(err) }); return null; });
+                if (response.status >= 200 && response.status < 300) {
+                    const data = response.json ?? null;
 
                     // F.2: Add hop signing for multi-hop relay routing
                     const relayHop = await buildLocalHop(relay.nodeId, inboundManifest.hops.length > 0 ? inboundManifest.hops[inboundManifest.hops.length - 1].signature : '');
@@ -362,10 +374,8 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     logger.warn(`Blocked outbound resolve to peer ${peer.nodeId}: ${peerResolveCheck.reason}`);
                     continue;
                 }
-                const resp = await fetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {
-                    signal: AbortSignal.timeout(5_000),
-                });
-                if (resp.ok) {
+                const resp = await peerFetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {}, { timeoutMs: 5_000 });
+                if (resp.ok && resp.status >= 200 && resp.status < 300) {
                     res.json(success(config.nodeId, {
                         gaii,
                         node_id: peer.nodeId,
@@ -445,7 +455,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             const workClaim = await buildRelayClaim(storage, config, {
                 audience: target_node, method: 'POST', path: '/v1/work/request', caller: requester,
             });
-            const response = await fetch(`${peer.url}/v1/work/request`, {
+            const response = await peerFetch(`${peer.url}/v1/work/request`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -457,12 +467,18 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     ...workPayload,
                     signature: workSignature,
                 }),
-                signal: AbortSignal.timeout(30_000),
-            });
+            }, { timeoutMs: 30_000 });
+            if (!response.ok) {
+                // The call failed, so the fee goes back.
+                await fee.giveBack();
+                res.status(502).json(error(config.nodeId, 'FEDERATION_ERROR',
+                    `Failed to submit cross-node work: ${response.message}`));
+                return;
+            }
 
-            const data = await response.json().catch(err => { logger.warn('POST /v1/federation/cross-node/work: continuing after a suppressed failure', { error: String(err) }); return null; });
+            const data = response.json ?? null;
             // An error answer is no route made, so the fee goes back.
-            if (!response.ok) await fee.giveBack();
+            if (response.status < 200 || response.status >= 300) await fee.giveBack();
 
             res.status(response.status).json(success(config.nodeId, {
                 routed_to: target_node,

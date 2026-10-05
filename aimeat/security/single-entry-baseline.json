@@ -39,10 +39,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/cli/federation-join.ts": {
-        "count": 4,
-        "why": "UNREVIEWED"
-      },
       "src/cli/screenshot-worker.ts": {
         "count": 2,
         "why": "UNREVIEWED"
@@ -63,20 +59,12 @@
         "count": 3,
         "why": "The command line's backup, restore and seed commands read this node's own admin answers over localhost."
       },
-      "src/routes/admin-monitoring.ts": {
-        "count": 3,
-        "why": "UNREVIEWED"
-      },
       "src/routes/admin-seo.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
       "src/routes/admin/setup-html.ts": {
         "count": 2,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/apps/catalogue-admin.ts": {
-        "count": 1,
         "why": "UNREVIEWED"
       },
       "src/routes/bootstrap.ts": {
@@ -87,24 +75,8 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/routes/federation-genesis.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/routes/federation-peer/introduce.ts": {
         "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/federation-peer/policy-book.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/federation-settlements.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/federation-sync/routing.ts": {
-        "count": 3,
         "why": "UNREVIEWED"
       },
       "src/routes/federation-sync/templates.ts": {
@@ -113,10 +85,6 @@
       },
       "src/routes/llm-proxy.ts": {
         "count": 2,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/memory/federation.ts": {
-        "count": 9,
         "why": "UNREVIEWED"
       },
       "src/routes/portal-spa.ts": {
@@ -148,10 +116,6 @@
         "why": "UNREVIEWED"
       },
       "src/services/capability-invoke.ts": {
-        "count": 2,
-        "why": "UNREVIEWED"
-      },
-      "src/services/catalogue-sync.ts": {
         "count": 2,
         "why": "UNREVIEWED"
       },
@@ -195,31 +159,11 @@
         "count": 2,
         "why": "UNREVIEWED"
       },
-      "src/services/federation.ts": {
-        "count": 2,
-        "why": "UNREVIEWED"
-      },
       "src/services/finance/finvoice-operator.ts": {
         "count": 2,
         "why": "UNREVIEWED"
       },
-      "src/services/genesis-sync.ts": {
-        "count": 2,
-        "why": "UNREVIEWED"
-      },
-      "src/services/memory-replication.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/services/message-delivery.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/services/prompt-defaults/platform.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/services/realtime-manager.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

@@ -13,6 +13,7 @@
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
  *
  * @version-history
+ *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.2.0 — 2026-09-29 — syncSubscribedMemory sends only what leaveToPeer lets leave (TARGET-082
  *     V4) and logs the keys that stayed behind, with the reason.
  *   v1.1.0 — 2026-09-08 — The stale-entry prune leaves the operator's subscription record and the
@@ -24,6 +25,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GenesisPeerRecord } from '../storage/interface.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 import { sign } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
 import { leaveToPeer } from './classification/egress.js';
@@ -72,17 +74,18 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
         return { entries: [], error: `SSRF blocked: ${urlCheck.reason}` };
       }
 
-      const resp = await fetch(`${peer.genesisUrl}/v1/federation/cross-catalogue`, {
+      const resp = await peerFetch(`${peer.genesisUrl}/v1/federation/cross-catalogue`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(config.federationTimeoutMs),
-      });
+      }, { timeoutMs: config.federationTimeoutMs });
+      if (!resp.ok) return { entries: [], error: resp.message };
 
-      if (!resp.ok) {
+      if (resp.status < 200 || resp.status >= 300) {
         return { entries: [], error: `HTTP ${resp.status}` };
       }
+      if (resp.json === undefined) return { entries: [], error: 'The answer is not JSON.' };
 
-      const body = await resp.json() as {
+      const body = resp.json as {
         data?: {
           entries?: Array<Record<string, unknown>>;
           catalogue_hash?: string;
@@ -154,22 +157,20 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
         pushSignature = await sign(nodeKey.privateKey, JSON.stringify(payload));
       }
 
-      const resp = await fetch(`${peer.genesisUrl}/v1/federation/genesis-catalogue-ingest`, {
+      const resp = await peerFetch(`${peer.genesisUrl}/v1/federation/genesis-catalogue-ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...payload, signature: pushSignature }),
-        signal: AbortSignal.timeout(config.federationTimeoutMs),
-      });
+      }, { timeoutMs: config.federationTimeoutMs });
+      if (!resp.ok) return { success: false, error: resp.message };
 
       // 404 is acceptable — peer may not support ingest endpoint yet
       if (resp.status === 404) {
         return { success: true }; // graceful degradation
       }
 
-      if (!resp.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-        const body = await resp.text().catch(() => '');
-        return { success: false, error: `HTTP ${resp.status}: ${body}` };
+      if (resp.status < 200 || resp.status >= 300) {
+        return { success: false, error: `HTTP ${resp.status}: ${resp.text}` };
       }
 
       return { success: true };
@@ -335,12 +336,12 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
                 memSig = await sign(nodeKey.privateKey, JSON.stringify(payload));
               }
 
-              await fetch(`${peer.genesisUrl}/v1/federation/replicate`, {
+              const sent = await peerFetch(`${peer.genesisUrl}/v1/federation/replicate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...payload, signature: memSig }),
-                signal: AbortSignal.timeout(config.federationTimeoutMs),
-              });
+              }, { timeoutMs: config.federationTimeoutMs });
+              if (!sent.ok) throw new Error(sent.message);
 
               totalSent++;
             } catch (err) {

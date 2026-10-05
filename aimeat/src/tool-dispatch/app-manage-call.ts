@@ -4,16 +4,17 @@
  * SPDX-License-Identifier: MIT
  * @description aimeat_app_manage for the connector MCP server and the CLI dispatch: one function
  *   both call, which checks the call against its action's field list and sends it to the node's own
- *   REST endpoint. The node MCP server calls the services those endpoints call (src/mcp/app-manage.ts),
- *   except for the member actions: their logic lives in the route handlers of routes/app-members.ts,
- *   so the node MCP server sends those through this function too, over loopback with the caller's
- *   own bearer.
+ *   REST endpoint. The node MCP server calls the services those endpoints call (src/mcp/app-manage.ts
+ *   and src/mcp/app-manage-members.ts), every action included, and never this function.
  *
  *   A `switch` with literal client calls, not a lookup table: check:field-reach pairs a tool with a
  *   route by the REST calls it can see, and it does not follow a table.
- * @structure appManageCall · MEMBER_ACTIONS
+ * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-05 -- MEMBER_ACTIONS removed: the node MCP server calls the member, plan, audit-keeping,
+ *     builder and spec services directly; aimeat_app_manage calls the service in place of the route
+ *     over loopback HTTP (secaudit 2026-10, M6). The connector and the CLI still send every action here.
  *   2026-10-02 -- spec, spec_set and spec_clear over GET, PUT and DELETE .../design-spec, with the
  *     member actions (the route decides who is inside the build).
  *   2026-10-02 -- builders, builder_set and builder_remove over GET, PUT and DELETE
@@ -50,22 +51,6 @@ function query(input: Input, fields: string[]): string {
         .map(f => `${f}=${enc(String(input[f]))}`);
     return parts.length ? `?${parts.join('&')}` : '';
 }
-
-/**
- * The actions over the member routes. The node MCP server sends these through appManageCall()
- * with a loopback client, because the routes hold the logic and there is no service to share.
- */
-export const MEMBER_ACTIONS: ReadonlySet<string> = new Set([
-    'members', 'member_set', 'member_remove', 'member_decline', 'member_dismiss',
-    'member_plan_get', 'member_plan_set', 'member_sweep', 'member_me', 'member_request',
-    'member_audit', 'member_invite_cancel',
-    // Keeping the audit log: the route decides who may set a limit that deletes (the account holder).
-    'audit_archive', 'audit_keep',
-    // The development right: the dev-grants routes hold the owner test, the notification and the audit row.
-    'builders', 'builder_set', 'builder_remove',
-    // The design spec: the design-spec routes decide who is inside the build and stamp the manifest.
-    'spec', 'spec_set', 'spec_clear',
-]);
 
 /**
  * Run one aimeat_app_manage call over REST. `owner` is the caller's own account, the default for

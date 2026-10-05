@@ -8,6 +8,7 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.7.0 — 2026-09-29 — TARGET-082 review: push-home answers 403 CLASSIFIED with the label and why
  *     when the visitor's record may not leave, instead of NOT_FOUND for a record that is here.
  *   v1.6.0 — 2026-09-29 — push-home asks leaveToPeer before the record leaves (TARGET-082).
@@ -32,6 +33,7 @@ import type { Router, Request, Response, RequestHandler } from 'express';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { peerFetch, type PeerAnswer } from '../../utils/peer-fetch.js';
 import { homeIdentityOf, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { logger } from '../../utils/logger.js';
@@ -105,6 +107,21 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
   }
 
   /**
+   * A peer answer that arrived: the transport refusals (unreachable, a redirect, a timeout, an answer
+   * over the ceiling) throw, so each route's catch answers them with the 502 a failed fetch got.
+   */
+  function arrived(out: PeerAnswer): Extract<PeerAnswer, { ok: true }> {
+    if (!out.ok) throw new Error(out.message);
+    return out;
+  }
+
+  /** The parsed JSON body of a peer answer; a body that is not JSON throws, as response.json() did. */
+  function jsonOf(out: Extract<PeerAnswer, { ok: true }>): unknown {
+    if (out.json === undefined) throw new Error('The answer is not JSON.');
+    return out.json;
+  }
+
+  /**
    * Which kind of session a pull door is for, answered before the scope: a session of the wrong
    * kind is told the door is not its own, whatever words it carries.
    */
@@ -166,24 +183,21 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     const fetchUrl = `${resolvedUrl.replace(/\/+$/, '')}/v1/memory/${encodeURIComponent(ownerGhii)}/${encodeURIComponent(key)}`;
 
     try {
-      const response = await fetch(fetchUrl, {
+      const response = arrived(await peerFetch(fetchUrl, {
         method: 'GET',
         headers: {
           'X-Source-Node': config.nodeId,
           'Accept': 'application/json',
         },
-        signal: AbortSignal.timeout(config.federationTimeoutMs),
-      });
+      }, { timeoutMs: config.federationTimeoutMs }));
 
-      if (!response.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-        const body = await response.text().catch(() => '');
+      if (response.status < 200 || response.status >= 300) {
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_PULL_FAILED',
-          `Home node returned ${response.status}: ${body.slice(0, 200)}`));
+          `Home node returned ${response.status}: ${response.text.slice(0, 200)}`));
         return;
       }
 
-      const remoteData = await response.json() as { data?: { value?: unknown; tags?: string[] } };
+      const remoteData = jsonOf(response) as { data?: { value?: unknown; tags?: string[] } };
       const value = remoteData?.data?.value;
       const remoteTags = remoteData?.data?.tags ?? [];
 
@@ -286,21 +300,18 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
         }));
       }
 
-      const response = await fetch(replicateUrl, {
+      const response = arrived(await peerFetch(replicateUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Source-Node': config.nodeId,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(config.federationTimeoutMs),
-      });
+      }, { timeoutMs: config.federationTimeoutMs }));
 
-      if (!response.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-        const body = await response.text().catch(() => '');
+      if (response.status < 200 || response.status >= 300) {
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_PUSH_FAILED',
-          `Home node returned ${response.status}: ${body.slice(0, 200)}`));
+          `Home node returned ${response.status}: ${response.text.slice(0, 200)}`));
         return;
       }
 
@@ -348,25 +359,22 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     const fetchUrl = `${resolvedUrl.replace(/\/+$/, '')}/v1/federation/memory/list`;
 
     try {
-      const response = await fetch(fetchUrl, {
+      const response = arrived(await peerFetch(fetchUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Source-Node': config.nodeId,
         },
         body: JSON.stringify(await signedListBody(ownerGhii)),
-        signal: AbortSignal.timeout(config.federationTimeoutMs),
-      });
+      }, { timeoutMs: config.federationTimeoutMs }));
 
-      if (!response.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-        const body = await response.text().catch(() => '');
+      if (response.status < 200 || response.status >= 300) {
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_LIST_FAILED',
-          `Home node returned ${response.status}: ${body.slice(0, 200)}`));
+          `Home node returned ${response.status}: ${response.text.slice(0, 200)}`));
         return;
       }
 
-      const remoteData = await response.json() as { data?: { entries?: unknown[]; total?: number } };
+      const remoteData = jsonOf(response) as { data?: { entries?: unknown[]; total?: number } };
       res.json(success(config.nodeId, {
         entries: remoteData?.data?.entries ?? [],
         total: remoteData?.data?.total ?? 0,
@@ -414,25 +422,22 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     const fetchUrl = `${peer.url.replace(/\/+$/, '')}/v1/federation/memory/list`;
 
     try {
-      const response = await fetch(fetchUrl, {
+      const response = arrived(await peerFetch(fetchUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Source-Node': config.nodeId,
         },
         body: JSON.stringify(await signedListBody(gaii)),
-        signal: AbortSignal.timeout(config.federationTimeoutMs),
-      });
+      }, { timeoutMs: config.federationTimeoutMs }));
 
-      if (!response.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-        const body = await response.text().catch(() => '');
+      if (response.status < 200 || response.status >= 300) {
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_LIST_FAILED',
-          `Peer node returned ${response.status}: ${body.slice(0, 200)}`));
+          `Peer node returned ${response.status}: ${response.text.slice(0, 200)}`));
         return;
       }
 
-      const remoteData = await response.json() as { data?: { entries?: unknown[]; total?: number } };
+      const remoteData = jsonOf(response) as { data?: { entries?: unknown[]; total?: number } };
       res.json(success(config.nodeId, {
         entries: remoteData?.data?.entries ?? [],
         total: remoteData?.data?.total ?? 0,
@@ -485,24 +490,21 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     const fetchUrl = `${peer.url.replace(/\/+$/, '')}/v1/memory/${encodeURIComponent(gaii)}/${encodeURIComponent(key)}`;
 
     try {
-      const response = await fetch(fetchUrl, {
+      const response = arrived(await peerFetch(fetchUrl, {
         method: 'GET',
         headers: {
           'X-Source-Node': config.nodeId,
           'Accept': 'application/json',
         },
-        signal: AbortSignal.timeout(config.federationTimeoutMs),
-      });
+      }, { timeoutMs: config.federationTimeoutMs }));
 
-      if (!response.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-        const body = await response.text().catch(() => '');
+      if (response.status < 200 || response.status >= 300) {
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_PULL_FAILED',
-          `Peer node returned ${response.status}: ${body.slice(0, 200)}`));
+          `Peer node returned ${response.status}: ${response.text.slice(0, 200)}`));
         return;
       }
 
-      const remoteData = await response.json() as { data?: { value?: unknown; tags?: string[] } };
+      const remoteData = jsonOf(response) as { data?: { value?: unknown; tags?: string[] } };
       const value = remoteData?.data?.value;
       const remoteTags = remoteData?.data?.tags ?? [];
 

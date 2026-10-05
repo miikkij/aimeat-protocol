@@ -8,18 +8,21 @@
  *   Each language is written in that language, not as translated English.
  *
  *   It follows the PLATFORM language choice rather than inventing a second one: the current
- *   language is read from AIMEAT.auth.getLang() when the auth library is present, else the
- *   `aimeat-lang` storage key, else the browser, and it re-renders on the platform's
+ *   language is resolved by _core/lang.js (pageLang), the same resolver AIMEAT.auth.getLang() uses:
+ *   ?lang=, the `aimeat-lang` storage key, the cookie, then the browser, kept to the page's
+ *   declared languages when it declares two or more. It re-renders on the platform's
  *   `aimeat-lang-change` event. There is no language switch in this kit — the login pill has one.
  * @structure BASE (en/fi/es) · lang/setLang · use(dict) · t(key, vars) · onChange
  * @usage  AIMEAT.game.i18n.use({ fi: { play: 'Pelaa' }, en: { play: 'Play' } });
  *         AIMEAT.game.i18n.t('play');
  * @version-history
+ *   v1.2.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.2.0 — 2026-10-01 — Finnish says murunen for morsel ("12 murusta"), the word the locales use
  *     (Jouni, 2026-10-01); it said morselia.
  *   v1.1.0 — 2026-08-12 — Spanish (es) added to BASE, HOST and langs.
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
  */
+import { pageLang, writeLang } from '../_core/lang.js';
 
 /** The kit's own strings. A host dictionary of the same shape is merged over this. */
 const BASE = {
@@ -123,18 +126,9 @@ const listeners = [];
 
 let current = detect();
 
-/** Resolve the platform language: auth library → storage key → browser → 'en'. */
+/** Resolve the platform language, the one way every served library does (_core/lang.js). */
 function detect() {
-  try {
-    const ns = /** @type {any} */ (window).AIMEAT;
-    if (ns && ns.auth && typeof ns.auth.getLang === 'function') {
-      const l = ns.auth.getLang();
-      if (l) return String(l).slice(0, 2);
-    }
-    const stored = localStorage.getItem('aimeat-lang');
-    if (stored) return stored.slice(0, 2);
-  } catch { /* storage blocked — fall through to the browser */ }
-  return (navigator.language || 'en').slice(0, 2);
+  return pageLang();
 }
 
 /** @param {string} lang */
@@ -172,7 +166,7 @@ export const i18n = {
     try {
       const ns = /** @type {any} */ (window).AIMEAT;
       if (ns && ns.auth && typeof ns.auth.setLang === 'function') ns.auth.setLang(next);
-      else localStorage.setItem('aimeat-lang', next);
+      else writeLang(next);
     } catch { /* storage blocked — the in-memory language still changed */ }
     announce(current);
   },

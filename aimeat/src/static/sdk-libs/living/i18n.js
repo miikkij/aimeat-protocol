@@ -30,9 +30,11 @@
  *   import { textOf, preference } from './i18n.js';
  *   textOf({ fi: 'Lämpötila', en: 'Temperature' }, preference(doc));   // 'Lämpötila'
  * @version-history
+ *   v0.4.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v0.4.0 — 2026-09-06 — Initial (the living document, stage 4): the record carries its own
  *     words, in every language it was written for.
  */
+import { storedLang } from '../_core/lang.js';
 
 /** A key that names a language: `fi`, `en`, `pt-BR`. Anything else is not one, and is refused. */
 export const LANG_KEY = /^[a-z]{2}(?:-[A-Za-z0-9]{2,8})?$/;
@@ -79,10 +81,8 @@ export function pageLanguage() {
     const l = document.documentElement.getAttribute('lang');
     if (l) return String(l);
   } catch { /* no document */ }
-  try {
-    const stored = localStorage.getItem('aimeat-lang');
-    if (stored) return String(stored);
-  } catch { /* storage blocked */ }
+  const stored = storedLang();
+  if (stored) return String(stored);
   try { return String(navigator.language || 'en'); } catch { return 'en'; }
 }
 

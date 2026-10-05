@@ -85,8 +85,11 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * is the memory and storage resource templates moved out of core.ts, which had reached
  * max-file-lines when TARGET-082 gave them the classification reader. The same four reads, counted in
  * two files instead of one; clearing core.ts's resources clears this one with it.
+ *
+ * 38 on 2026-10-05: aimeat_app_manage's member actions call the services the routes call, and the new
+ * mcp/app-manage-members.ts reads no storage (secaudit 2026-10, M6).
  */
-const SEED = 39;
+const SEED = 38;
 
 /**
  * The number that actually matters. A READ through storage is the same read whichever door asks;

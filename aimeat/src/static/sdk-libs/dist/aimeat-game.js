@@ -13,9 +13,8 @@
     return ns;
   }
 
-  // src/static/sdk-libs/game/dom.js
+  // src/static/sdk-libs/_core/dom.js
   var SPECIAL = { text: 1, on: 1, vars: 1, children: 1 };
-  var seq = 0;
   function el(tag, attrs, kids) {
     const node = document.createElement(tag);
     if (attrs) {
@@ -52,6 +51,9 @@
       ) : document.createTextNode(String(c)));
     }
   }
+
+  // src/static/sdk-libs/game/dom.js
+  var seq = 0;
   function $(sel, root) {
     return (
       /** @type {HTMLElement|null} */
@@ -169,6 +171,73 @@
     );
   }
 
+  // src/static/sdk-libs/_core/lang.js
+  var LANG_KEY = "aimeat-lang";
+  var COOKIE_MAX_AGE = 31536e3;
+  function readLocales(opts) {
+    let list = opts && Array.isArray(opts.locales) ? opts.locales : null;
+    if (!list) {
+      try {
+        const m = (
+          /** @type {HTMLMetaElement|null} */
+          document.querySelector('meta[name="aimeat-locales"]')
+        );
+        if (m && m.content) list = m.content.split(/[\s,]+/);
+      } catch {
+      }
+    }
+    if (!list) return [];
+    const seen = {};
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const c = String(list[i] || "").trim().toLowerCase();
+      if (/^[a-z]{2}$/.test(c) && !seen[c]) {
+        seen[c] = 1;
+        out.push(c);
+      }
+    }
+    return out.length > 1 ? out : [];
+  }
+  function readLang(locales) {
+    const list = Array.isArray(locales) ? locales : null;
+    const pick = list ? function(v) {
+      return v && list.indexOf(v) >= 0 ? v : null;
+    } : function(v) {
+      return v ? String(v).slice(0, 2) : null;
+    };
+    try {
+      const u = pick(new URLSearchParams(location.search).get("lang"));
+      if (u) return u;
+      const s = pick(localStorage.getItem(LANG_KEY));
+      if (s) return s;
+      const c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+      const cv = c ? pick(c[1]) : null;
+      if (cv) return cv;
+    } catch {
+    }
+    let nav = null;
+    try {
+      nav = pick(String(navigator.language || "").slice(0, 2).toLowerCase());
+    } catch {
+    }
+    if (nav) return nav;
+    return list ? list[0] : "en";
+  }
+  function pageLang() {
+    const list = readLocales();
+    return (
+      /** @type {string} */
+      readLang(list.length ? list : null)
+    );
+  }
+  function writeLang(lang) {
+    try {
+      localStorage.setItem(LANG_KEY, lang);
+      document.cookie = LANG_KEY + "=" + lang + ";path=/;max-age=" + COOKIE_MAX_AGE + ";SameSite=Lax";
+    } catch {
+    }
+  }
+
   // src/static/sdk-libs/game/i18n.js
   var BASE = {
     en: {
@@ -266,20 +335,7 @@
   var listeners = [];
   var current = detect();
   function detect() {
-    try {
-      const ns = (
-        /** @type {any} */
-        window.AIMEAT
-      );
-      if (ns && ns.auth && typeof ns.auth.getLang === "function") {
-        const l = ns.auth.getLang();
-        if (l) return String(l).slice(0, 2);
-      }
-      const stored = localStorage.getItem("aimeat-lang");
-      if (stored) return stored.slice(0, 2);
-    } catch {
-    }
-    return (navigator.language || "en").slice(0, 2);
+    return pageLang();
   }
   function announce(lang) {
     for (const cb of listeners.slice()) {
@@ -322,7 +378,7 @@
           window.AIMEAT
         );
         if (ns && ns.auth && typeof ns.auth.setLang === "function") ns.auth.setLang(next);
-        else localStorage.setItem("aimeat-lang", next);
+        else writeLang(next);
       } catch {
       }
       announce(current);

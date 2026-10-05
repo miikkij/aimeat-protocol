@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.15.0 (2026-10-05): check:storage-file-parity, the SQLite methods files mirror the Postgres ones (secaudit 2026-10, M8).
  *  - 1.14.0 (2026-10-05): check:single-entry, a password check, an account deletion and an operator check each through their one function.
  *  - 1.13.0 (2026-10-01): check:peer-paths, every federation peer writer and reader says on what proof.
  *  - 1.12.0 (2026-09-29): check:classification-reach, stored content reaches a caller through the classification reader.
@@ -72,6 +73,9 @@ export const FAST_CHECKS = [
     // reader, or through a listed read that says why it is the node's own.
     { script: 'check:classification-reach', label: 'Every content read passes the classification reader or is listed with its reason' },
     { script: 'check:storage-parity', label: 'Owner-scoped tables are in both deletion cascades' },
+    // Secaudit 2026-10, M8: claimScheduledFire lived in postgres-kysely/methods/schedules.ts and in
+    // sqlite/methods/federation-oauth.ts, so a fix in one provider could not find its twin.
+    { script: 'check:storage-file-parity', label: 'A storage method lives in the methods file of the same name in both providers' },
     // From round 6 of the September 2026 security work: the runner records only a migration file's
     // name, so a file changed after main had it left databases with two results under one name.
     { script: 'check:migration-hashes', label: 'A migration file on main never changes, and a new one is listed in the same commit' },

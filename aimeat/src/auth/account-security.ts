@@ -7,6 +7,10 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.3.2 — 2026-10-05 — isOwnerPrincipal takes the caller as data ({ roles, scopes, federated }), a
+ *     verified token included, so services/app-audit-keep.ts asks the same test for a route's token
+ *     and for an MCP session; aimeat_app_manage calls the service in place of the route over loopback
+ *     HTTP (secaudit 2026-10, M6).
  *   v1.3.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question.
  *   v1.3.0 — 2026-09-24 — isOwnerPrincipal returns false for a federated session: a visitor from
  *     another node whose name matches a local account is never the account holder, so every
@@ -75,7 +79,9 @@ import { deny401, deny403 } from './deny.js';
  * a near-copy costs: three copies of the scope test once lived in this file and none of them knew
  * about the exception the vocabulary module was written to hold.
  */
-export function isOwnerPrincipal(auth: Request['auth'] | undefined): boolean {
+export function isOwnerPrincipal(
+  auth: { roles: string[]; scopes?: string[]; federated?: boolean } | null | undefined,
+): boolean {
   if (!auth) return false;
   // A federated session is a visitor from another node whose `owner` is the local part of their home
   // name and may equal a LOCAL account's name (routes/ghii/register-login.ts). It is never the local

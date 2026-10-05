@@ -14,6 +14,7 @@
  *   - load/save/clearPendingJoin: resumable pending-request state on disk
  *
  * @version-history
+ *   v1.1.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -25,6 +26,7 @@ import { createT, type Locale, type TFunction } from '../i18n.js';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { peerFetch } from '../utils/peer-fetch.js';
 
 // Package root: from dist/src/cli/federation-join.js -> go up 3 levels to aimeat/
 const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -221,11 +223,11 @@ export async function runFederationJoin(
   s.start(t('join.discovering'));
   let targetInfo: DiscoveryInfo;
   try {
-    const resp = await fetch(`${targetUrl}/.well-known/aimeat`, {
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const body = await resp.json() as { data?: DiscoveryInfo };
+    const resp = await peerFetch(`${targetUrl}/.well-known/aimeat`, {}, { timeoutMs: 10_000 });
+    if (!resp.ok) throw new Error(resp.message);
+    if (resp.status < 200 || resp.status >= 300) throw new Error(`HTTP ${resp.status}`);
+    if (resp.json === undefined) throw new Error('The answer is not JSON.');
+    const body = resp.json as { data?: DiscoveryInfo };
     targetInfo = body.data!;
     if (!targetInfo || targetInfo.protocol !== 'aimeat') {
       s.stop(t('join.discoveryFailed'));
@@ -280,7 +282,7 @@ export async function runFederationJoin(
     const messageToSign = `${config.nodeId}${config.baseUrl}${timestamp}`;
     const signature = await sign(keys.privateKey, messageToSign);
 
-    const introResp = await fetch(`${targetUrl}/v1/federation/peer/introduce`, {
+    const introResp = await peerFetch(`${targetUrl}/v1/federation/peer/introduce`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -293,14 +295,14 @@ export async function runFederationJoin(
         signature,
         timestamp,
       }),
-      signal: AbortSignal.timeout(15_000),
-    });
+    }, { timeoutMs: 15_000 });
+    if (!introResp.ok) throw new Error(introResp.message);
 
-    if (!introResp.ok) {
+    if (introResp.status < 200 || introResp.status >= 300) {
       const contentType = introResp.headers.get('content-type') ?? '';
       let msg = `HTTP ${introResp.status}`;
       if (contentType.includes('json')) {
-        const errBody = await introResp.json().catch(err => { logger.warn('validate: continuing after a suppressed failure', { error: String(err) }); return null; }) as { error?: { code?: string; message?: string } } | null;
+        const errBody = (introResp.json ?? null) as { error?: { code?: string; message?: string } } | null;
         msg = errBody?.error?.message ?? msg;
         if (errBody?.error?.code === 'MAINTENANCE') {
           msg = t('join.targetMaintenance');
@@ -315,7 +317,8 @@ export async function runFederationJoin(
       return;
     }
 
-    const introBody = await introResp.json() as { data: { request_id: string; status: string } };
+    if (introResp.json === undefined) throw new Error('The answer is not JSON.');
+    const introBody = introResp.json as { data: { request_id: string; status: string } };
     introData = introBody.data;
   } catch (e) {
     introSpinner.stop(t('join.sendFailed', {
@@ -385,13 +388,15 @@ async function pollApproval(
       if (interrupted) break;
 
       try {
-        const statusResp = await fetch(
+        const statusResp = await peerFetch(
           `${targetUrl}/v1/federation/peer/introduce/${requestId}/status`,
-          { signal: AbortSignal.timeout(10_000) },
+          {},
+          { timeoutMs: 10_000 },
         );
-        if (statusResp.ok) {
-          const body = await statusResp.json() as { data: { status: string } };
-          const status = body.data.status;
+        if (!statusResp.ok) throw new Error(statusResp.message);
+        if (statusResp.status >= 200 && statusResp.status < 300) {
+          const body = statusResp.json as { data?: { status?: string } } | undefined;
+          const status = body?.data?.status;
           if (status === 'approved') {
             s.stop(t('join.approved'));
             return 'approved';
@@ -426,7 +431,7 @@ async function doKeyExchange(
   s.start(t('join.keyExchange'));
 
   try {
-    const resp = await fetch(`${targetUrl}/v1/federation/key-exchange`, {
+    const resp = await peerFetch(`${targetUrl}/v1/federation/key-exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -434,10 +439,10 @@ async function doKeyExchange(
         public_key: keys.publicKey,
         capabilities: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
       }),
-      signal: AbortSignal.timeout(15_000),
-    });
+    }, { timeoutMs: 15_000 });
+    if (!resp.ok) throw new Error(resp.message);
 
-    if (!resp.ok) {
+    if (resp.status < 200 || resp.status >= 300) {
       s.stop(t('join.keyExchangeFailed', { error: `HTTP ${resp.status}` }));
       return;
     }

@@ -1,7 +1,9 @@
 /**
  * @file app-record-keys.ts
  * @description Collision-free app record identities and verified legacy migration.
- * @version-history v1.0.0 - 2026-09-08 - Keep owner boundaries and filename case.
+ * @version-history
+ *   2026-10-05 - tokenOfThisApp moved here from auth/app-own-gate.ts (which re-exports it), so the roster services ask it; aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
+ *   v1.0.0 - 2026-09-08 - Keep owner boundaries and filename case.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 
@@ -12,6 +14,15 @@ export function canonicalAppId(appId: string): string {
 export const appKeySegment = (id: string): string => `v2-${Buffer.from(canonicalAppId(id)).toString('hex')}`;
 const legacySegment = (id: string): string => id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 export const equalAppId = (a: string, b: string): boolean => typeof a === 'string' && typeof b === 'string' && canonicalAppId(a) === canonicalAppId(b);
+
+/**
+ * Was this token minted for the app `appId` ("owner/filename")? A role-'app' token carries the app
+ * it was minted for in its `app` claim; on that app's own routes it is the app acting on itself
+ * (auth/app-own-gate.ts requireScopeOrOwnApp).
+ */
+export function tokenOfThisApp(auth: { roles: string[]; app?: string } | undefined, appId: string): boolean {
+  return !!auth && auth.roles.includes('app') && typeof auth.app === 'string' && equalAppId(auth.app, appId);
+}
 
 /** Copy only an identity-verified legacy row, then retire it in the same transaction. */
 export async function readAppRecord(storage: Storage, ns: string, key: string, appId: string): Promise<MemoryRecord | null> {

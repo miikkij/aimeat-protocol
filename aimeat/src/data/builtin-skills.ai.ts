@@ -9,6 +9,9 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   v1.4.1 — 2026-10-05 — ai-transparency: a declaration needs provenance:write in the session as well
+ *     as the grant (secaudit 2026-10, C3). configure-routing: a provider test counts against the
+ *     account's AI call limit (C5).
  *   v1.4.0 — 2026-09-28 — configure-routing names the AI roles, aimeat_ai_roles and aimeat_ai_role_set.
  *   v1.3.0 — 2026-09-28 — configure-routing names the extension provider type (System 2 plan, V6).
  *   v1.2.0 — 2026-09-28 — configure-routing and aimeat-ai-model-policy point to the model catalogue
@@ -72,8 +75,9 @@ served the model (\`provider\`), and an app publish answers with the \`provenanc
 hint.
 
 Declaring needs the \`provenance:write\` scope, because a declaration can assert that a
-person wrote or reviewed something. If you do not hold it, the call is refused with that
-message; omit the block and the node records what it observed instead. Recording is never
+person wrote or reviewed something. You must hold it in your grant AND in the session you write
+with: a session the owner gave fewer permissions does not get it from your grant. If you do not
+hold it, the call is refused with that message; omit the block and the node records what it observed instead. Recording is never
 gated — only asserting is.
 
 ## \`level\` — how much of the content a model made
@@ -167,7 +171,8 @@ Three separate "routing" layers — identify which one the owner means:
    what each serves with which model, whether each capability is tested and working, and the
    routing. A provider is added and its key set by the owner on the web page, never through a tool:
    guide, don't do. What you do: test a provider (\`aimeat_ai_provider_test\`; an image test costs
-   one picture, so ask first) and propose the routing (\`aimeat_ai_routing_set\`, propose-then-
+   one picture, so ask first, and each test counts as one call against the account's limit of AI
+   calls a minute) and propose the routing (\`aimeat_ai_routing_set\`, propose-then-
    confirm): the ordered providers per capability, and the rules (fallback on or off, at most how
    many attempts, only tested providers, never away from this machine when the first was local).
    Every answer carries \`route\`: who chose, who answered, each attempt. Spend history is
