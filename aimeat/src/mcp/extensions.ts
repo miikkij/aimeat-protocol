@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v2.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v2.7.0 — 2026-10-05 — The action run passes the extension's capabilities to buildExtensionCtx
  *     (secaudit 2026-10, PKG-3).
@@ -65,7 +66,6 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields } from '../services/extension-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
@@ -95,6 +95,7 @@ import { annotationsFor } from './annotations.js';
 import { dependencyIndex, dependentsOf, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -184,7 +185,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_extension_list',
         descriptionFor('aimeat_extension_list'),
-        {},
+        zodShapeFor('aimeat_extension_list'),
         annotationsFor('aimeat_extension_list'),
         async () => {
             const extensions = await storage.listExtensions();
@@ -221,20 +222,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_iam_define',
         descriptionFor('aimeat_iam_define'),
-        {
-            app_id: z.string().optional().describe('owner/file.html of the app the gate protects; a name without a slash generates no extension'),
-            levels: z.array(z.object({
-                level: z.number(), key: z.string(), label: z.string(), capabilities: z.array(z.string()),
-            })).describe('Level schema: BBS ordinal levels (lower = more power; level 0 must hold "*") → app capabilities'),
-            commands: z.array(z.object({
-                id: z.string(), description: z.string(), capability: z.string(),
-                tier: z.enum(['read', 'write', 'irreversible']),
-            })).describe('Command manifest: commands → required capability + mutation tier'),
-            default_role: z.string().optional().describe('Level key a signed-in caller not on the member list holds in the generated gate'),
-            version: z.string().optional().describe('Manifest version of the generated gate, x.y.z (default 1.0.0)'),
-            author: z.string().optional().describe('Manifest author of the generated gate (default "generated")'),
-            ext_name: z.string().optional().describe('Extension name of the generated gate (default: slug of app_id plus -iam)'),
-        },
+        zodShapeFor('aimeat_iam_define'),
         annotationsFor('aimeat_iam_define'),
         async ({ app_id, levels, commands, default_role, version, author, ext_name }) => {
             const result = defineAppIam({
@@ -248,12 +236,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_extension_invoke',
         descriptionFor('aimeat_extension_invoke'),
-        {
-            extension_name: z.string().describe('Name of the extension to invoke'),
-            action_id: z.string().describe('ID of the action to execute'),
-            input: z.record(z.string(), z.unknown()).optional(),
-            instance_id: z.string().optional(),
-        },
+        zodShapeFor('aimeat_extension_invoke'),
         annotationsFor('aimeat_extension_invoke'),
         async ({ extension_name, action_id, input, instance_id }) => {
             const ext = await storage.getExtension(extension_name);
@@ -414,12 +397,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_extension_install',
         descriptionFor('aimeat_extension_install'),
-        {
-            manifest: z.string().optional().describe('Extension manifest in YAML format. Omit to get an upload URL for a ZIP bundle.'),
-            scripts: z.record(z.string(), z.string()).optional().describe('Map of script filename to JavaScript source code. Omit for upload mode.'),
-            update: z.boolean().optional().describe('Upsert an already-installed extension in place (same validation; activation status, lifecycle fields and its ext: memory are preserved). Without this flag an existing name is an error.'),
-            activate: z.boolean().optional().describe('Activate immediately after install/update — skips the separate aimeat_extension_activate call.'),
-        },
+        zodShapeFor('aimeat_extension_install'),
         annotationsFor('aimeat_extension_install'),
         async ({ manifest: manifestYaml, scripts, update, activate }) => {
             // A caller who sent scripts plainly meant to install inline. Falling through to upload
@@ -577,9 +555,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_extension_activate',
         descriptionFor('aimeat_extension_activate'),
-        {
-            name: z.string().describe('Name of the extension to activate'),
-        },
+        zodShapeFor('aimeat_extension_activate'),
         annotationsFor('aimeat_extension_activate'),
         async ({ name }) => {
             const ext = await storage.getExtension(name);
@@ -633,9 +609,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_extension_deactivate',
         descriptionFor('aimeat_extension_deactivate'),
-        {
-            name: z.string().describe('Name of the extension to deactivate'),
-        },
+        zodShapeFor('aimeat_extension_deactivate'),
         annotationsFor('aimeat_extension_deactivate'),
         async ({ name }) => {
             const ext = await storage.getExtension(name);
@@ -676,9 +650,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_extension_delete',
         descriptionFor('aimeat_extension_delete'),
-        {
-            name: z.string().describe('Name of the extension to delete'),
-        },
+        zodShapeFor('aimeat_extension_delete'),
         annotationsFor('aimeat_extension_delete'),
         async ({ name }) => {
             const ext = await storage.getExtension(name);
@@ -721,10 +693,7 @@ export function registerExtensionsTools(
     mcp.tool(
         'aimeat_extension_get',
         descriptionFor('aimeat_extension_get'),
-        {
-            name: z.string().describe('Name of the extension to retrieve'),
-            include_source: z.boolean().optional().describe('Also return each action\'s installed script. Refused unless your own owner installed it and this session holds ext:write.'),
-        },
+        zodShapeFor('aimeat_extension_get'),
         annotationsFor('aimeat_extension_get'),
         async ({ name, include_source }) => {
             const ext = await storage.getExtension(name);
