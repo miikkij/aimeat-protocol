@@ -28,25 +28,9 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { knowledgeContributeUnreachable, KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE } from '../../../../tool-dispatch/tool-call-defs-core.js';
-import { envelopeResult, payloadResult } from './_registry.js';
-import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
-export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry): void {
-  const { client } = registry.resolve();
-
-  mcp.tool('aimeat_knowledge_list', descriptionFor('aimeat_knowledge_list'), zodShapeFor('aimeat_knowledge_list'), annotationsFor('aimeat_knowledge_list'), async () => {
-    const resp = await client.get('/v1/catalogue/knowledge');
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_knowledge_get', descriptionFor('aimeat_knowledge_get'), zodShapeFor('aimeat_knowledge_get'), annotationsFor('aimeat_knowledge_get'), async ({ package_id }) => {
-    const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}`);
-    // The package manifest read serves its record on meta.provenance — see core.ts memory_read.
-    return payloadResult(readPayloadWithProvenance(resp), resp);
-  });
-
+export function registerKnowledgeTools(mcp: McpServer, _registry: AgentRegistry): void {
   // The parameters stay as the catalog declares them, so an agent reading the tool list sees the same
   // capability it sees on the node. The call refuses, because the node keeps this one behind MCP and
   // the connector has no route to forward it to. The description says so before an agent spends a call.
@@ -60,9 +44,4 @@ export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(refusal, null, 2) }], isError: true };
   });
 
-  mcp.tool('aimeat_knowledge_links', descriptionFor('aimeat_knowledge_links'), zodShapeFor('aimeat_knowledge_links'), annotationsFor('aimeat_knowledge_links'), async ({ package_id, direction }) => {
-    const query = direction ? `?direction=${encodeURIComponent(direction)}` : '';
-    const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}/links${query}`);
-    return envelopeResult(resp);
-  });
 }

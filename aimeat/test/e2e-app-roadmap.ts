@@ -10,6 +10,8 @@
  *   shared app the person who loses by the silence is somebody else.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-roadmap
  * @version-history
+ *   2026-10-05 — The connector case takes aimeat_app_draft_publish from the whole connector (registerAllTools):
+ *     it runs its CLI dispatch definition now (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-24 — A6-16: one account holds at most ten open wishes on one app, another
  *     account can still leave one, the owner is not counted, and a withdrawn wish frees its place.
  *   v1.0.0 — 2026-09-08 — Initial. Phases 4, 5 and 6 of the shared-app work.
@@ -18,7 +20,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { registerAppsTools } from '../src/cli/connect/mcp/tools/apps.js';
+import { registerAllTools } from '../src/cli/connect/mcp/tools/index.js';
 import { appTools } from '../src/tool-dispatch/tool-call-defs-apps.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -405,8 +407,10 @@ await test('connector and CLI draft publication reach the real authorized REST r
         post: async (path: string, body?: unknown) => (await json(path, { method: 'POST', headers: auth(builder.token), body: JSON.stringify(body) })).body,
     };
     const callbacks = new Map<string, (input: Record<string, unknown>) => Promise<any>>();
-    registerAppsTools({ tool: (name: string, ...args: unknown[]) => callbacks.set(name, args.at(-1) as never) } as never,
-        { resolve: () => ({ owner: builder.name, client: liveClient }) } as never);
+    // The whole connector: aimeat_app_draft_publish runs its CLI dispatch definition since 2026-10-05.
+    const agent = { owner: builder.name, agent: 'probe', config: { node_url: BASE }, client: liveClient };
+    registerAllTools({ tool: (name: string, ...args: unknown[]) => callbacks.set(name, args.at(-1) as never) } as never,
+        { resolve: () => agent, list: () => [agent], size: () => 1 } as never);
     for (const surface of ['connector', 'CLI']) {
         const staged = await json(`/v1/apps/${owner.name}/${APP}/draft`, {
             method: 'PUT', headers: auth(builder.token), body: JSON.stringify({ content: html(surface) }),

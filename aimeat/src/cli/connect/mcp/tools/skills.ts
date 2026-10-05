@@ -89,9 +89,4 @@ export function registerSkillsTools(mcp: McpServer, registry: AgentRegistry): vo
     return envelopeResult(resp);
   });
 
-  mcp.tool('aimeat_skill_update', descriptionFor('aimeat_skill_update'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_skill_update') }, annotationsFor('aimeat_skill_update'), async ({ name, visibility, scope, agent_name }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const resp = await client.patch(`/v1/skills/${encodeURIComponent(name)}?scope=${scope ?? 'user'}`, { visibility });
-    return envelopeResult(resp);
-  });
 }

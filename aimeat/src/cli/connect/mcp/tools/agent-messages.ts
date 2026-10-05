@@ -19,20 +19,13 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
+import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
-
-  mcp.tool('aimeat_message_inbox', descriptionFor('aimeat_message_inbox'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_message_inbox') }, annotationsFor('aimeat_message_inbox'), async ({ agent_name }) => {
-    const { client, agent } = pickAgent(registry, agent_name);
-    const enc = encodeURIComponent(agent);
-    const resp = await client.get(`/v1/agents/${enc}/messages/inbox`);
-    return envelopeResult(resp);
-  });
 
   mcp.tool('aimeat_message_send', descriptionFor('aimeat_message_send'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_message_send') }, annotationsFor('aimeat_message_send'), async ({ agent_name, content, thread_id, linked_task_id, metadata, ai_provenance, ai_provenance_id }) => {
     const { client, agent } = pickAgent(registry, agent_name);
@@ -51,15 +44,4 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
       { tool: 'aimeat_message_send', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_message_history', descriptionFor('aimeat_message_history'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_message_history') }, annotationsFor('aimeat_message_history'), async ({ agent_name, thread_id, page, per_page }) => {
-    const { client, agent } = pickAgent(registry, agent_name);
-    const enc = encodeURIComponent(agent);
-    const params = new URLSearchParams();
-    if (thread_id) params.set('thread_id', thread_id);
-    if (page) params.set('page', String(page));
-    if (per_page) params.set('per_page', String(per_page));
-    const qs = params.toString();
-    const resp = await client.get(`/v1/agents/${enc}/messages${qs ? '?' + qs : ''}`);
-    return envelopeResult(resp);
-  });
 }

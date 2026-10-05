@@ -9,7 +9,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
-import { voiceReplySchema, voiceSpeechSchema } from '../../../../models/ai-voice-contract.js';
+import { voiceSpeechSchema } from '../../../../models/ai-voice-contract.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 
@@ -19,8 +19,6 @@ export function registerAiVoiceTools(mcp: McpServer, registry: AgentRegistry): v
     content: [{ type: 'text' as const, text: JSON.stringify(response.data ?? response) }],
     ...(response.ok === false ? { isError: true } : {}),
   });
-  mcp.tool('aimeat_voice_reply', descriptionFor('aimeat_voice_reply'), zodShapeFor('aimeat_voice_reply'),
-    annotationsFor('aimeat_voice_reply'), async input => out(await client.post('/v1/ai/stream?json=1', voiceReplySchema.parse(input))));
   mcp.tool('aimeat_voice_speak', descriptionFor('aimeat_voice_speak'), zodShapeFor('aimeat_voice_speak'),
     annotationsFor('aimeat_voice_speak'), async input => out(await client.post('/v1/ai/speak?json=1', voiceSpeechSchema.parse(input))));
 }

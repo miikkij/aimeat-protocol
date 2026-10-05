@@ -32,130 +32,15 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
 import type { ApiResponse } from '../../api-client.js';
-import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegistry): void {
 
-  mcp.tool('aimeat_agent_statistics', descriptionFor('aimeat_agent_statistics'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_statistics') }, annotationsFor('aimeat_agent_statistics'), async ({ agent_name }) => {
-    const { client, agent } = pickAgent(registry, agent_name);
-    const resp = await client.get(`/v1/agents/${encodeURIComponent(agent)}/statistics`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  // Read-only: what the one-press basic agents would give this account, and whether the owner's
-  // connector is up. Creating them is the owner's own press, so there is no write half here.
-  mcp.tool('aimeat_agent_basics_get', descriptionFor('aimeat_agent_basics_get'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_basics_get') }, annotationsFor('aimeat_agent_basics_get'), async ({ agent_name }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const resp = await client.get('/v1/agents/v2/basic-agents');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_agent_basics_request', descriptionFor('aimeat_agent_basics_request'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_basics_request') }, annotationsFor('aimeat_agent_basics_request'), async ({ agent_name, note }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const resp = await client.post('/v1/agents/v2/basic-agents/request', { note });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  // A NEW agent, put in front of the owner. Creates nothing here either: the approve door is the
-  // owner in person, and this writes the proposal and one line on their open items.
-  mcp.tool('aimeat_agent_propose', descriptionFor('aimeat_agent_propose'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_propose') }, annotationsFor('aimeat_agent_propose'), async ({ agent_name, ...body }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const resp = await client.post('/v1/agents/v2/agent-proposals', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool(
-    'aimeat_agent_tags_set',
-    descriptionFor('aimeat_agent_tags_set'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_tags_set') },
-    async ({ agent_name, target_agent_name, tags }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/tags`, { tags });
-      return envelopeResult(resp);
-    },
-  );
-
-  mcp.tool(
-    'aimeat_agent_mode_set',
-    descriptionFor('aimeat_agent_mode_set'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_mode_set') },
-    async ({ agent_name, target_agent_name, mode }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/mode`, { mode });
-      return envelopeResult(resp);
-    },
-  );
-
-  mcp.tool(
-    'aimeat_agent_description_set',
-    descriptionFor('aimeat_agent_description_set'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_description_set') },
-    async ({ agent_name, target_agent_name, description }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/description`, { description });
-      return envelopeResult(resp);
-    },
-  );
-
-  mcp.tool(
-    'aimeat_agent_run_mode_set',
-    descriptionFor('aimeat_agent_run_mode_set'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_run_mode_set') },
-    async ({ agent_name, target_agent_name, run_mode }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/run-mode`, { run_mode });
-      return envelopeResult(resp);
-    },
-  );
-
-  mcp.tool(
-    'aimeat_agent_runtime_report',
-    descriptionFor('aimeat_agent_runtime_report'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_runtime_report') },
-    async ({ agent_name, target_agent_name, ...src }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/runtime-source`, { runtime_source: src });
-      return envelopeResult(resp);
-    },
-  );
-
-  mcp.tool(
-    'aimeat_agent_console_set',
-    descriptionFor('aimeat_agent_console_set'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_console_set') },
-    async ({ agent_name, target_agent_name, console_url }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/console-url`, { console_url });
-      return envelopeResult(resp);
-    },
-  );
-
   // ── Crew definition tools: thin proxies onto /v1/agents/:name/crew*, the same routes the Crew
   // tab and the node MCP use. `agent_name` here picks the REGISTERED agent that makes the call
   // (the connector convention); the definition's agent is `target_agent_name`.
   const text = (resp: ApiResponse) => envelopeResult(resp);
-
-  mcp.tool(
-    'aimeat_crew_get',
-    descriptionFor('aimeat_crew_get'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_get') },
-    async ({ agent_name, target_agent_name }) => {
-      const { client } = pickAgent(registry, agent_name);
-      return text(await client.get(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew`));
-    },
-  );
-
-  mcp.tool(
-    'aimeat_crew_validate',
-    descriptionFor('aimeat_crew_validate'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_validate') },
-    async ({ agent_name, target_agent_name, doc }) => {
-      const { client } = pickAgent(registry, agent_name);
-      return text(await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/validate`, { doc }));
-    },
-  );
 
   mcp.tool(
     'aimeat_crew_try',
@@ -182,17 +67,6 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
   );
 
   mcp.tool(
-    'aimeat_crew_draft',
-    descriptionFor('aimeat_crew_draft'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_draft') },
-    async ({ agent_name, target_agent_name, doc }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const path = `/v1/agents/${encodeURIComponent(target_agent_name)}/crew/draft`;
-      return text(doc ? await client.put(path, { doc }) : await client.delete(path));
-    },
-  );
-
-  mcp.tool(
     'aimeat_crew_publish',
     descriptionFor('aimeat_crew_publish'),
     { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_publish') },
@@ -205,40 +79,4 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     },
   );
 
-  mcp.tool(
-    'aimeat_crew_seed',
-    descriptionFor('aimeat_crew_seed'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_seed') },
-    async ({ agent_name, target_agent_name, doc, validate_with }) => {
-      const { client } = pickAgent(registry, agent_name);
-      return text(await client.post(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/seed`, { doc, validate_with }));
-    },
-  );
-
-  // What the runtime offers, and which model it thinks with. Read the menu before writing a `tools`
-  // list: this node's own fixed list has been behind the runtime's registry.
-  mcp.tool(
-    'aimeat_crew_menu',
-    descriptionFor('aimeat_crew_menu'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_menu') },
-    annotationsFor('aimeat_crew_menu'),
-    async ({ agent_name, target_agent_name }) => {
-      const { client } = pickAgent(registry, agent_name);
-      return text(await client.get(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/menu`));
-    },
-  );
-
-  mcp.tool(
-    'aimeat_crew_llm_set',
-    descriptionFor('aimeat_crew_llm_set'),
-    { agent_name: agentNameSchema, ...zodShapeFor('aimeat_crew_llm_set') },
-    annotationsFor('aimeat_crew_llm_set'),
-    async ({ agent_name, target_agent_name, choice }) => {
-      const { client } = pickAgent(registry, agent_name);
-      const body = { choice: choice ?? null };
-      return text(target_agent_name
-        ? await client.put(`/v1/agents/${encodeURIComponent(target_agent_name)}/crew/llm`, body)
-        : await client.put('/v1/agents/llm-default', body));
-    },
-  );
 }

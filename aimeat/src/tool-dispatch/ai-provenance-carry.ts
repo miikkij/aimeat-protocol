@@ -56,6 +56,7 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.0 — 2026-10-05 — aimeat_datapackage_publish: recorded-by-route (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-08-02 — Carry `provider` (who SERVED the model). It was added to the node's own MCP
  *     surface and to this file's shared schema, but not to toDeclareBody — so it parsed, typed and
  *     validated here and was dropped on the last line before the POST. Same two-surface split as the
@@ -128,6 +129,10 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // The two actions that take a declaration, legal and ui_set, send it in the body of
   // PATCH /v1/apps/:filename and PUT /v1/apps/:owner/:filename/ui, and both routes record it.
   aimeat_app_manage: { kind: 'recorded-by-route', route: 'PATCH /v1/apps/:filename (legal), PUT /v1/apps/:owner/:filename/ui (ui_set)' },
+  // The dispatch handler posts the whole input, and the route records the declaration against the
+  // published bytes (routes/datapackages.ts parseDeclaredProvenanceInput). Listed 2026-10-05, when
+  // the catalog entry gained the two fields the node tool had always taken (secaudit 2026-10, M3).
+  aimeat_datapackage_publish: { kind: 'recorded-by-route', route: 'POST /v1/datapackages' },
   aimeat_designbook_propose: { kind: 'not-carried', route: 'POST /v1/designbook' },
   aimeat_designbook_adopt: { kind: 'not-carried', route: 'POST /v1/designbook/:id/adopt' },
   aimeat_board_post: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts' },

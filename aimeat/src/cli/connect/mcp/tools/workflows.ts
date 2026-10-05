@@ -30,7 +30,6 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -44,39 +43,4 @@ export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): 
     return out(await client.put(`/v1/workflows/${encodeURIComponent(id)}`, definition as Record<string, unknown>));
   });
 
-  mcp.tool('aimeat_workflow_get', descriptionFor('aimeat_workflow_get'), zodShapeFor('aimeat_workflow_get'), annotationsFor('aimeat_workflow_get'), async ({ id }) => {
-    if (!id) return out(await client.get('/v1/workflows'));
-    const enc = encodeURIComponent(id);
-    const [def, bp, runs] = await Promise.all([
-      client.get(`/v1/workflows/${enc}`),
-      client.get(`/v1/workflows/${enc}/blueprint`),
-      client.get(`/v1/workflows/${enc}/runs`),
-    ]);
-    const recentRuns = (((runs.data as { runs?: unknown[] } | undefined)?.runs) ?? []).slice(0, 5);
-    return {
-      content: [{ type: 'text' as const, text: JSON.stringify({ definition: def.data ?? def, blueprint: bp.ok === false ? null : (bp.data ?? null), recentRuns }, null, 2) }],
-      ...(def.ok === false ? { isError: true } : {}),
-    };
-  });
-
-  mcp.tool('aimeat_workflow_run', descriptionFor('aimeat_workflow_run'), zodShapeFor('aimeat_workflow_run'), annotationsFor('aimeat_workflow_run'), async ({ id, mode, vars, target }) => {
-    return out(await client.post(`/v1/workflows/${encodeURIComponent(id)}/run`, { mode, ...(vars ? { vars } : {}), ...(target ? { target } : {}) }));
-  });
-
-  // → GET /v1/workflows/pending-inputs — runs paused awaiting human input.
-  mcp.tool('aimeat_workflow_pending_inputs', descriptionFor('aimeat_workflow_pending_inputs'), zodShapeFor('aimeat_workflow_pending_inputs'),
-    annotationsFor('aimeat_workflow_pending_inputs'), async () => {
-      return out(await client.get('/v1/workflows/pending-inputs'));
-    });
-
-  // → POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer — answer a paused human-input step.
-  // THE SAME BROKEN TOOL THE CLI DISPATCH HAD. The route reads { picks, other } against the question
-  // pinned at ask time, and this door sent { answer: {...} }, so WorkflowHumanAnswerSchema saw an
-  // empty body: every human-input answer given through the connector left the run parked. `answer`
-  // is gone rather than aliased — it never worked, so there is no caller to keep working.
-  mcp.tool('aimeat_workflow_answer', descriptionFor('aimeat_workflow_answer'), zodShapeFor('aimeat_workflow_answer'), annotationsFor('aimeat_workflow_answer'), async ({ workflow_id, run_id, step_id, picks, other }) => {
-    const body: Record<string, unknown> = { picks: picks ?? [] };
-    if (other !== undefined) body.other = other;
-    return out(await client.post(`/v1/workflows/${encodeURIComponent(workflow_id)}/runs/${encodeURIComponent(run_id)}/steps/${encodeURIComponent(step_id)}/answer`, body));
-  });
 }

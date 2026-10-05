@@ -33,7 +33,6 @@ import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { defineAppIam } from '../../../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../../../services/iam/model.js';
 import type { CommandDef } from '../../../../services/iam/app-commands.js';
-import { attachProofOverHttp } from '../../../../tool-dispatch/tool-call-defs-apps.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -54,47 +53,6 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
     include_shared: z.boolean().optional().describe('Also include other owners\' public-shared entries.'),
   }, annotationsFor('aimeat_appdev_pitfall_list'), async ({ include_shared }) => {
     return out(await client.get(`/v1/appdev/pitfalls/learned${include_shared ? '?include_shared=1' : ''}`));
-  });
-
-  mcp.tool('aimeat_appdev_pitfall_delete', descriptionFor('aimeat_appdev_pitfall_delete'), zodShapeFor('aimeat_appdev_pitfall_delete'), annotationsFor('aimeat_appdev_pitfall_delete'), async ({ category, slug }) => {
-    return out(await client.delete(`/v1/appdev/pitfalls/learned/${encodeURIComponent(category)}/${encodeURIComponent(slug)}`));
-  });
-
-  // Report/upsert a learned pitfall — the server MCP writes the knowledge record + manifest directly;
-  // the connector writes the same owner memory record via POST /v1/memory (manifest side-index skipped).
-  mcp.tool('aimeat_appdev_pitfall_report', descriptionFor('aimeat_appdev_pitfall_report'), zodShapeFor('aimeat_appdev_pitfall_report'), annotationsFor('aimeat_appdev_pitfall_report'), async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
-    // The node's own function behind POST /v1/appdev/pitfalls/learned: manifest, upsert into the
-    // identity that already holds the entry, and the verification stamp. This door used to write
-    // POST /v1/memory itself and got none of the three.
-    return out(await client.post('/v1/appdev/pitfalls/learned', {
-      model, category, title, symptom, resolution,
-      ...(slug ? { slug } : {}),
-      ...(applies_to ? { applies_to } : {}),
-      ...(severity ? { severity } : {}),
-      ...(status ? { status } : {}),
-      ...(app_ref ? { app_ref } : {}),
-      ...(share !== undefined ? { share } : {}),
-    }));
-  });
-
-  // Attach a self-reported acceleration proof. The capability is services/contribution-proofs.ts and
-  // has no REST route, so both connector doors run the same append over /v1/memory: attachProofOverHttp().
-  mcp.tool('aimeat_appdev_proof_attach', descriptionFor('aimeat_appdev_proof_attach'), zodShapeFor('aimeat_appdev_proof_attach'), annotationsFor('aimeat_appdev_proof_attach'), async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
-    return out(await attachProofOverHttp(client, {
-      subjectType: subject_type, subjectId: subject_id, model, verdict, evidence, testSet: test_set, tokens,
-    }));
-  });
-
-  mcp.tool('aimeat_app_template_list', descriptionFor('aimeat_app_template_list'), zodShapeFor('aimeat_app_template_list'), annotationsFor('aimeat_app_template_list'), async () => {
-    return out(await client.get('/v1/appdev/templates'));
-  });
-
-  mcp.tool('aimeat_app_template_get', descriptionFor('aimeat_app_template_get'), zodShapeFor('aimeat_app_template_get'), annotationsFor('aimeat_app_template_get'), async ({ id, part }) => {
-    return out(await client.get(`/v1/appdev/templates/${encodeURIComponent(id)}${part ? `?part=${part}` : ''}`));
-  });
-
-  mcp.tool('aimeat_app_template_delete', descriptionFor('aimeat_app_template_delete'), zodShapeFor('aimeat_app_template_delete'), annotationsFor('aimeat_app_template_delete'), async ({ id }) => {
-    return out(await client.delete(`/v1/appdev/templates/${encodeURIComponent(id)}`));
   });
 
   // Propose/upsert an app template — server MCP validates + writes template.catalog.{id}.manifest;

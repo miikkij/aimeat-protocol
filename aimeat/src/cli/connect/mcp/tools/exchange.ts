@@ -29,20 +29,6 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
-  const qs = (params: Record<string, string | number | boolean | undefined>): string => {
-    const s = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') s.set(k, String(v));
-    const out = s.toString();
-    return out ? `?${out}` : '';
-  };
-
-  mcp.tool('aimeat_exchange_offerings', descriptionFor('aimeat_exchange_offerings'), zodShapeFor('aimeat_exchange_offerings'), annotationsFor('aimeat_exchange_offerings'), async ({ q, ext, action, stats }) => {
-    return out(await client.get(`/v1/exchange/offerings${qs({ q, ext, action, stats: stats ? '1' : undefined })}`));
-  });
-
-  mcp.tool('aimeat_exchange_offering_get', descriptionFor('aimeat_exchange_offering_get'), zodShapeFor('aimeat_exchange_offering_get'), annotationsFor('aimeat_exchange_offering_get'), async ({ offering_id }) => {
-    return out(await client.get(`/v1/exchange/offerings/${encodeURIComponent(offering_id)}`));
-  });
 
   mcp.tool('aimeat_exchange_accept', descriptionFor('aimeat_exchange_accept'), {
     ext: z.string().describe('The provider extension name.'),
@@ -58,18 +44,6 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     if (plan_id) body.plan_id = plan_id;
     if (app_id) body.app_id = app_id;
     return out(await client.post('/v1/exchange/entitlements', body));
-  });
-
-  mcp.tool('aimeat_exchange_contracts', descriptionFor('aimeat_exchange_contracts'), zodShapeFor('aimeat_exchange_contracts'), annotationsFor('aimeat_exchange_contracts'), async () => {
-    return out(await client.get('/v1/exchange/entitlements'));
-  });
-
-  mcp.tool('aimeat_exchange_contract_off', descriptionFor('aimeat_exchange_contract_off'), zodShapeFor('aimeat_exchange_contract_off'), annotationsFor('aimeat_exchange_contract_off'), async ({ ext, action, mode }) => {
-    return out(await client.post('/v1/exchange/entitlements/off', { ext, action, mode }));
-  });
-
-  mcp.tool('aimeat_exchange_needs', descriptionFor('aimeat_exchange_needs'), zodShapeFor('aimeat_exchange_needs'), annotationsFor('aimeat_exchange_needs'), async ({ open, mine }) => {
-    return out(await client.get(`/v1/exchange/needs${qs({ open: open ? '1' : undefined, mine: mine ? '1' : undefined })}`));
   });
 
   mcp.tool('aimeat_exchange_need_post', descriptionFor('aimeat_exchange_need_post'), {
@@ -91,24 +65,6 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     if (app_id) body.app_id = app_id;
     if (autonomy) body.autonomy = autonomy;
     return out(await client.post('/v1/exchange/needs', body));
-  });
-
-  mcp.tool('aimeat_exchange_bid', descriptionFor('aimeat_exchange_bid'), zodShapeFor('aimeat_exchange_bid'), annotationsFor('aimeat_exchange_bid'), async ({ need_id, ext, action, plan_id, note, offering_id }) => {
-    const body: Record<string, unknown> = { ext, action };
-    if (plan_id) body.plan_id = plan_id;
-    if (note) body.note = note;
-    if (offering_id) body.offering_id = offering_id;
-    return out(await client.post(`/v1/exchange/needs/${encodeURIComponent(need_id)}/bids`, body));
-  });
-
-  mcp.tool('aimeat_exchange_bid_accept', descriptionFor('aimeat_exchange_bid_accept'), zodShapeFor('aimeat_exchange_bid_accept'), annotationsFor('aimeat_exchange_bid_accept'), async ({ need_id, bid_id, cap_units }) => {
-    const body: Record<string, unknown> = {};
-    if (cap_units !== undefined) body.cap_units = cap_units;
-    return out(await client.post(`/v1/exchange/needs/${encodeURIComponent(need_id)}/bids/${encodeURIComponent(bid_id)}/accept`, body));
-  });
-
-  mcp.tool('aimeat_exchange_consumers', descriptionFor('aimeat_exchange_consumers'), zodShapeFor('aimeat_exchange_consumers'), annotationsFor('aimeat_exchange_consumers'), async ({ offering_id }) => {
-    return out(await client.get(`/v1/exchange/offerings/${encodeURIComponent(offering_id)}/consumers`));
   });
 
   // ── Act-on-exchange (generic, tunnelled fleet parity with the server MCP) ──────────────────────────

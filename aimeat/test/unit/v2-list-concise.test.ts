@@ -14,8 +14,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import type { AgentRegistry } from '../../src/cli/connect/agent-registry.js';
 import { registerAgentV2MessagingTools as nodeMessaging } from '../../src/mcp/agent-v2-messaging.js';
 import { registerAgentV2TaskTools as nodeTasks } from '../../src/mcp/agent-v2-tasks.js';
-import { registerAgentV2MessagingTools as connMessaging } from '../../src/cli/connect/mcp/tools/agent-v2-messaging.js';
-import { registerAgentV2TaskTools as connTasks } from '../../src/cli/connect/mcp/tools/agent-v2-tasks.js';
+import { registerAllTools as connectorTools } from '../../src/cli/connect/mcp/tools/index.js';
 
 type Handler = (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }>;
 
@@ -70,10 +69,11 @@ describe('connector MCP', () => {
                 : { ok: true, data: { messages: [TURN], count: 1 } };
         },
     };
-    const registry = { resolve: () => ({ client, agent: 'a', owner: 'o' }), list: () => [{ client, agent: 'a', owner: 'o' }], size: () => 1 } as unknown as AgentRegistry;
+    // The connector serves both lists over their CLI dispatch definitions (dispatch-tools.ts).
+    const agent = { client, agent: 'a', owner: 'o', config: { node_url: 'http://node.test' } };
+    const registry = { resolve: () => agent, list: () => [agent], size: () => 1 } as unknown as AgentRegistry;
     const { mcp, handlers } = fakeMcp();
-    connMessaging(mcp, registry);
-    connTasks(mcp, registry);
+    connectorTools(mcp, registry);
 
     it('task list: concise is projected, and response_format does not travel to the node', async () => {
         const concise = parse(await handlers.get('aimeat_v2_task_list')!({ response_format: 'concise' }));

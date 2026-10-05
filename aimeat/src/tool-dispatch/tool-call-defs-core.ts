@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-05 — aimeat_discover writes both of its paths in the call, so check:field-reach's CodeQL query
+ *     sees them; the connector MCP serves it through here now (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-09-29 -- aimeat_storage_upload, _download and _delete moved to
  *     tool-call-defs-storage.ts, unchanged, when the upload took workspace_refs and this file reached
  *     the 800-line limit.
@@ -218,8 +220,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
                 per_page: optionalNumber(input, 'limit'),
             });
             // mode=map → facet counts only; mode=find (default) → ranked entries.
-            const path = optionalString(input, 'mode') === 'map' ? '/v1/discover/facets' : '/v1/discover';
-            return client.get(`${path}${q}`);
+            // Two calls with their paths written out, so check:field-reach's CodeQL query sees both routes.
+            return optionalString(input, 'mode') === 'map' ? client.get(`/v1/discover/facets${q}`) : client.get(`/v1/discover${q}`);
         },
     },
     {

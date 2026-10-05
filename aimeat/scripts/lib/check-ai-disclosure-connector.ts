@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Connector provenance checks extracted unchanged from the disclosure gate.
  * @version-history
+ *   v1.2.0 -- 2026-10-05 -- Both surfaces' carrying of ai_provenance is read from their registered schemas
+ *     (keysOf); a connector tool served over its CLI dispatch definition folds read provenance inside
+ *     withProvenanceCarrying() (secaudit 2026-10, M3).
  *   v1.1.0 -- 2026-09-30 -- aimeat_memory_read_public joins CONNECTOR_META_READS: the connector
  *     tool folds meta.provenance now, and the check holds it to that.
  *   v1.0.1 -- 2026-09-30 -- ENVELOPE_PROVENANCE_ROUTES names src/routes/memory/public-read.ts, the
@@ -23,12 +26,15 @@ interface CheckContext {
   read(file: string): string;
   stripComments(source: string): string;
   fail(assertion: string, what: string, fix: string): void;
-  mcpToolBlocks(): Array<{ name: string; file: string; block: string }>;
+  /** A tool's registered input keys on one MCP surface. */
+  keysOf(surface: 'node' | 'connector', name: string): Set<string>;
+  /** Every tool the connector MCP registers. */
+  connectorNames(): Set<string>;
   notes: string[];
 }
 
 export function createConnectorChecks(context: CheckContext): { check(): void; catalogProvenanceTools(): string[] } {
-  const { root, walk, stripped, rel, read, stripComments, fail, mcpToolBlocks, notes } = context;
+  const { root, walk, stripped, rel, read, stripComments, fail, keysOf, notes } = context;
 // ── 2b. THE CONNECTOR'S SURFACES CARRY WHAT THE CATALOG PROMISES ────────────────────────────────
 // Assertion 2 scanned `src/mcp/` and reported green on the half of the estate it could not see. The
 // OTHER half — `src/cli/connect/`, what `aimeat connect serve` exposes and what every crewaimeat crew
@@ -84,12 +90,14 @@ function checkSurfaces(): void {
 
   // (a) The node's own surface. Same list, derived rather than hand-maintained: a tool the catalog
   //     promises the parameter on and src/mcp/ does not carry is the Phase 4 bug returning.
-  const nodeCarrying = new Set(mcpToolBlocks().filter(b => /aiProvenanceInputs?\b/.test(b.block)).map(b => b.name));
+  const nodeCarrying = new Set(promised.filter(n => keysOf('node', n).has('ai_provenance')));
 
   // (b) The connector's MCP surface — the one nothing was checking.
+  //     Its registered schema answers, as for the node: most of its tools run their CLI dispatch
+  //     definition since 2026-10-05 (dispatch-tools.ts), and have no source block of their own.
   const connectorBlocks = connectorMcpToolBlocks();
-  const connectorNames = new Set(connectorBlocks.map(b => b.name));
-  const connectorCarrying = new Set(connectorBlocks.filter(b => /aiProvenanceInputs?\b/.test(b.block)).map(b => b.name));
+  const connectorNames = context.connectorNames();
+  const connectorCarrying = new Set([...connectorNames].filter(n => keysOf('connector', n).has('ai_provenance')));
 
   // (c) The shell-callable surface. It carries provenance through ONE wrapper over the whole dispatch
   //     table rather than per handler, so what is checked is that the wrapper is still applied and
@@ -131,8 +139,9 @@ function checkSurfaces(): void {
 
   // The two MCP surfaces must not drift APART either: a tool carrying it on the node and not on the
   // connector is the state Phase 11 found, and the reverse would be just as invisible.
-  const nodeOnly = [...nodeCarrying].filter(n => connectorNames.has(n) && !connectorCarrying.has(n));
-  const connectorOnly = [...connectorCarrying].filter(n => !nodeCarrying.has(n));
+  const nodeAll = new Set([...connectorNames, ...nodeCarrying].filter(n => keysOf('node', n).has('ai_provenance')));
+  const nodeOnly = [...nodeAll].filter(n => connectorNames.has(n) && !connectorCarrying.has(n));
+  const connectorOnly = [...connectorCarrying].filter(n => keysOf('node', n).size && !nodeAll.has(n));
   for (const n of nodeOnly) {
     fail('connector-provenance', `${n} carries ai_provenance on the node surface but not on the connector surface`,
       `add \`...aiProvenanceInputs\` in ${CONNECTOR_MCP_DIR}/. Crews call through the connector; the `
@@ -144,7 +153,7 @@ function checkSurfaces(): void {
       + 'the same tool is the drift this assertion exists to stop.');
   }
 
-  checkConnectorReadDirection(carrierSrc, connectorBlocks);
+  checkConnectorReadDirection(carrierSrc, connectorBlocks, connectorNames);
 
   const notCarried = [...carrierSrc.matchAll(/^\s{2}(aimeat_[a-z0-9_]+):\s*\{\s*kind:\s*'not-carried'/gm)].map(m => m[1]);
   if (notCarried.length) {
@@ -188,12 +197,16 @@ const CONNECTOR_META_READS = ['aimeat_memory_read', 'aimeat_memory_read_public',
 const READ_FOLD = 'readPayloadWithProvenance';
 
 function checkConnectorReadDirection(
-  carrierSrc: string, connectorBlocks: Array<{ name: string; file: string; block: string }>,
+  carrierSrc: string, connectorBlocks: Array<{ name: string; file: string; block: string }>, connectorNames: Set<string>,
 ): void {
   // The shell surface folds UNCONDITIONALLY inside withProvenanceCarrying — no list to forget. That
   // property is what is asserted; deleting the fold from inside the wrapper would otherwise pass the
   // `.map(withProvenanceCarrying)` check above while losing every record on the shell path.
-  if (!carrierSrc.includes(READ_FOLD)) {
+  // The wrapper's own body, not the file: the helper's definition names itself, so a file-wide search
+  // stayed green with the call taken out of the wrapper. Most connector reads run through it since
+  // 2026-10-05 (dispatch-tools.ts), so this call is what folds their provenance.
+  const wrapperBody = carrierSrc.match(/export function withProvenanceCarrying[\s\S]*?\n\}\n/)?.[0] ?? '';
+  if (!new RegExp(`\\b${READ_FOLD}\\(`).test(wrapperBody)) {
     fail('connector-provenance', `${CONNECTOR_CARRIERS} no longer folds meta.provenance onto read payloads`,
       `restore ${READ_FOLD}() and its use inside withProvenanceCarrying(). Without it every `
       + 'shell-callable read drops the record the node served on the envelope, and a crew sees a '
@@ -202,12 +215,14 @@ function checkConnectorReadDirection(
 
   const byName = new Map(connectorBlocks.map(b => [b.name, b]));
   for (const name of CONNECTOR_META_READS) {
-    const b = byName.get(name);
-    if (!b) {
+    if (!connectorNames.has(name)) {
       fail('connector-provenance', `${name} is listed in CONNECTOR_META_READS but is not registered on the connector MCP surface`,
         'either it was renamed — update the list — or it was removed, in which case delete the entry.');
       continue;
     }
+    // Served over its CLI dispatch definition: withProvenanceCarrying() folds, asserted above.
+    const b = byName.get(name);
+    if (!b) continue;
     if (!b.block.includes(READ_FOLD)) {
       fail('connector-provenance', `connector MCP tool ${name} unwraps the envelope without folding meta.provenance`,
         `use ${READ_FOLD}(resp) instead of \`resp.data ?? resp\`. Its node route serves the whole `

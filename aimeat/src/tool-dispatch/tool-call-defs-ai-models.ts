@@ -7,6 +7,9 @@
  *   test/unit/cli-tool-param-forwarding.test.ts proves each one leaves the process.
  * @structure aiModelCliTools[] — registered by tool-dispatch/index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-05 — Each definition writes its `name` literally beside the catalog spread, so
+ *     check:field-reach's CodeQL query sees these tools; the connector serves them through here now
+ *     (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-28 — AI roles: aimeat_ai_roles and aimeat_ai_role_set over GET and PUT /v1/ai/roles;
  *     aimeat_ai_transcribe and aimeat_ai_embed forward `role`.
  *   v1.2.0 — 2026-09-28 — aimeat_ai_capabilities, aimeat_ai_models, aimeat_ai_transcribe and
@@ -24,6 +27,8 @@ const def = (name: string) => catalog.find((t) => t.name === name)!;
 export const aiModelCliTools: ConnectCliToolDefinition[] = [
   {
     ...def('aimeat_ai_policy_set'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_policy_set',
     handler: ({ client }, input) => {
       const policy = optionalRecord(input, 'policy');
       const token = optionalString(input, 'confirm_token');
@@ -35,10 +40,14 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
   },
   {
     ...def('aimeat_ai_providers'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_providers',
     handler: ({ client }) => client.get('/v1/ai/providers'),
   },
   {
     ...def('aimeat_ai_provider_test'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_provider_test',
     handler: ({ client }, input) => {
       const capability = optionalString(input, 'capability');
       const accept = optionalBoolean(input, 'accept_cost');
@@ -49,6 +58,8 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
   },
   {
     ...def('aimeat_ai_routing_set'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_routing_set',
     handler: ({ client }, input) => {
       const routing = optionalRecord(input, 'routing');
       const token = optionalString(input, 'confirm_token');
@@ -58,6 +69,8 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
   },
   {
     ...def('aimeat_ai_capabilities'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_capabilities',
     handler: ({ client }, input) => {
       const app = optionalString(input, 'app_id');
       return client.get(`/v1/ai/capabilities${app !== undefined ? `?app_id=${encodeURIComponent(app)}` : ''}`);
@@ -65,6 +78,8 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
   },
   {
     ...def('aimeat_ai_models'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_models',
     handler: ({ client }, input) => {
       const q = new URLSearchParams();
       for (const k of ['capability', 'type', 'status'] as const) {
@@ -78,6 +93,8 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
   },
   {
     ...def('aimeat_ai_transcribe'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_transcribe',
     handler: ({ client }, input) => {
       const body: Record<string, unknown> = { storage_key: requiredString(input, 'storage_key') };
       for (const k of ['filename', 'language', 'model', 'provider', 'app_id', 'role'] as const) {
@@ -89,6 +106,8 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
   },
   {
     ...def('aimeat_ai_embed'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_embed',
     handler: ({ client }, input) => {
       const body: Record<string, unknown> = { input: requiredArray(input, 'input') };
       for (const k of ['model', 'provider', 'app_id', 'role'] as const) {
@@ -100,10 +119,14 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
   },
   {
     ...def('aimeat_ai_roles'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_roles',
     handler: ({ client }) => client.get('/v1/ai/roles'),
   },
   {
     ...def('aimeat_ai_role_set'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_role_set',
     handler: ({ client }, input) => {
       const roles = optionalRecord(input, 'roles');
       const bindings = optionalRecord(input, 'bindings');

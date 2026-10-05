@@ -68,94 +68,11 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return payloadResult({ organisms, total: organisms.length }, { ok: mine.ok !== false || pub.ok !== false });
   });
 
-  mcp.tool('aimeat_organism_get', descriptionFor('aimeat_organism_get'), zodShapeFor('aimeat_organism_get'), annotationsFor('aimeat_organism_get'), async ({ organism_id }) => {
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}`);
-    return envelopeResult(resp);
-  });
-
   mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'), {
     organism_id: z.string().describe('Organism identifier.'),
   }, annotationsFor('aimeat_organism_overview'), async ({ organism_id }) => {
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/overview`);
     return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_organism_update', descriptionFor('aimeat_organism_update'), zodShapeFor('aimeat_organism_update'), annotationsFor('aimeat_organism_update'), async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access }) => {
-    const body: Record<string, unknown> = {};
-    if (name !== undefined) body.name = name;
-    if (description !== undefined) body.description = description;
-    if (readme !== undefined) body.readme = readme;
-    if (interests !== undefined) body.interests = interests;
-    if (join_policy !== undefined) body.join_policy = join_policy;
-    if (visibility !== undefined) body.visibility = visibility;
-    if (agent_access !== undefined) body.agent_access = agent_access;
-    const resp = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}`, body);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_organism_join', descriptionFor('aimeat_organism_join'), zodShapeFor('aimeat_organism_join'), annotationsFor('aimeat_organism_join'), async ({ organism_id, message }) => {
-    const body: Record<string, unknown> = {};
-    if (message != null) body.message = message;
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/join`, body);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_organism_leave', descriptionFor('aimeat_organism_leave'), zodShapeFor('aimeat_organism_leave'), annotationsFor('aimeat_organism_leave'), async ({ organism_id }) => {
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/leave`);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_organism_members', descriptionFor('aimeat_organism_members'), zodShapeFor('aimeat_organism_members'), annotationsFor('aimeat_organism_members'), async ({ organism_id, role, status }) => {
-    const params = new URLSearchParams();
-    if (role) params.set('role', role);
-    if (status) params.set('status', status);
-    const qs = params.toString();
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/members${qs ? `?${qs}` : ''}`);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_organism_create', descriptionFor('aimeat_organism_create'), zodShapeFor('aimeat_organism_create'), annotationsFor('aimeat_organism_create'), async ({ name, description, type, join_policy, visibility, shape, lang }) => {
-    const body: Record<string, unknown> = { name };
-    if (description != null) body.description = description;
-    if (type != null) body.type = type;
-    if (join_policy != null) body.join_policy = join_policy;
-    if (visibility != null) body.visibility = visibility;
-    if (shape != null) body.shape = shape;
-    if (lang != null) body.lang = lang;
-    const resp = await client.post('/v1/organisms', body);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'), zodShapeFor('aimeat_organism_export'), annotationsFor('aimeat_organism_export'), async ({ organism_id }) => {
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/export?format=base64`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_organism_import', descriptionFor('aimeat_organism_import'), zodShapeFor('aimeat_organism_import'), annotationsFor('aimeat_organism_import'), async ({ zip_base64 }) => {
-    const resp = await client.post('/v1/organisms/import', { zip_base64 });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_organism_invite', descriptionFor('aimeat_organism_invite'), zodShapeFor('aimeat_organism_invite'), annotationsFor('aimeat_organism_invite'), async ({ organism_id, invitee, role, workspaces }) => {
-    const body: Record<string, unknown> = { invitee };
-    if (role) body.role = role;
-    if (workspaces) body.workspaces = workspaces;
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_organism_member_add', descriptionFor('aimeat_organism_member_add'), zodShapeFor('aimeat_organism_member_add'), annotationsFor('aimeat_organism_member_add'), async ({ organism_id, ghii, role, workspaces }) => {
-    const body: Record<string, unknown> = { ghii };
-    if (role) body.role = role;
-    if (workspaces) body.workspaces = workspaces;
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/members`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_organism_member_remove', descriptionFor('aimeat_organism_member_remove'), zodShapeFor('aimeat_organism_member_remove'), annotationsFor('aimeat_organism_member_remove'), async ({ organism_id, ghii, ban }) => {
-    const path = `/v1/organisms/${encodeURIComponent(organism_id)}/members/${encodeURIComponent(ghii)}${ban ? '?ban=1' : ''}`;
-    const resp = await client.delete(path);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
   // Ownership is plural: adding is additive, and the LAST owner cannot be removed. Both mirror the
@@ -167,30 +84,6 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
 
   mcp.tool('aimeat_organism_owner_remove', descriptionFor('aimeat_organism_owner_remove'), zodShapeFor('aimeat_organism_owner_remove'), annotationsFor('aimeat_organism_owner_remove'), async ({ organism_id, ghii }) => {
     const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/owners/${encodeURIComponent(ghii)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_organism_invitation_update', descriptionFor('aimeat_organism_invitation_update'), zodShapeFor('aimeat_organism_invitation_update'), annotationsFor('aimeat_organism_invitation_update'), async ({ organism_id, invitee, role, workspaces }) => {
-    const body: Record<string, unknown> = {};
-    if (role) body.role = role;
-    if (workspaces) body.workspaces = workspaces;
-    const resp = await client.patch(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${encodeURIComponent(invitee)}`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_organism_invitation_cancel', descriptionFor('aimeat_organism_invitation_cancel'), zodShapeFor('aimeat_organism_invitation_cancel'), annotationsFor('aimeat_organism_invitation_cancel'), async ({ organism_id, invitee }) => {
-    const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${encodeURIComponent(invitee)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_organism_invitations', descriptionFor('aimeat_organism_invitations'), zodShapeFor('aimeat_organism_invitations'), annotationsFor('aimeat_organism_invitations'), async () => {
-    const resp = await client.get('/v1/organisms/invitations/mine');
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_organism_invitation_respond', descriptionFor('aimeat_organism_invitation_respond'), zodShapeFor('aimeat_organism_invitation_respond'), annotationsFor('aimeat_organism_invitation_respond'), async ({ organism_id, decision }) => {
-    const path = decision === 'accept' ? 'accept' : 'decline';
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${path}`, {});
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
@@ -216,18 +109,6 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
       { tool: 'aimeat_workspace_comment', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_workspace_comments', descriptionFor('aimeat_workspace_comments'), zodShapeFor('aimeat_workspace_comments'), annotationsFor('aimeat_workspace_comments'), async ({ organism_id, ws, space, instance_id }) => {
-    const params = new URLSearchParams({ ws, space, instance_id });
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/comments?${params.toString()}`);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_workspace_comment_delete', descriptionFor('aimeat_workspace_comment_delete'), zodShapeFor('aimeat_workspace_comment_delete'), annotationsFor('aimeat_workspace_comment_delete'), async ({ organism_id, ws, space, instance_id, comment_id }) => {
-    const params = new URLSearchParams({ ws, space, instance_id });
-    const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/comments/${encodeURIComponent(comment_id)}?${params.toString()}`);
-    return envelopeResult(resp);
-  });
-
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
@@ -238,29 +119,6 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   const rowsPath = (organism_id: string, space: string, ws: string, extra: Record<string, string> = {}) =>
     `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/rows/${encodeURIComponent(space)}`
     + `?${new URLSearchParams({ ws, ...extra }).toString()}`;
-
-  mcp.tool('aimeat_workspace_rows_append', descriptionFor('aimeat_workspace_rows_append'), zodShapeFor('aimeat_workspace_rows_append'), annotationsFor('aimeat_workspace_rows_append'), async ({ organism_id, ws, space, body, row_id, occurred_at, rows }) => {
-    const payload = rows?.length ? { rows } : { body, row_id, occurred_at };
-    return out(await client.post(rowsPath(organism_id, space, ws), payload));
-  });
-
-  mcp.tool('aimeat_workspace_rows_read', descriptionFor('aimeat_workspace_rows_read'), zodShapeFor('aimeat_workspace_rows_read'), annotationsFor('aimeat_workspace_rows_read'), async ({ organism_id, ws, space, where, since, until, changed_since, limit, cursor, order }) => {
-    // A declared field rides the query string as itself, which is the shape the route reads: every
-    // parameter that is not reserved is a filter.
-    const extra: Record<string, string> = {};
-    for (const [k, v] of Object.entries(where ?? {})) if (v != null) extra[k] = String(v);
-    if (since) extra.since = since;
-    if (until) extra.until = until;
-    if (changed_since) extra.changed_since = changed_since;
-    if (limit) extra.limit = String(limit);
-    if (cursor) extra.cursor = cursor;
-    if (order) extra.order = order;
-    return out(await client.get(rowsPath(organism_id, space, ws, extra)));
-  });
-
-  mcp.tool('aimeat_workspace_rows_stats', descriptionFor('aimeat_workspace_rows_stats'), zodShapeFor('aimeat_workspace_rows_stats'), annotationsFor('aimeat_workspace_rows_stats'), async ({ organism_id, ws, space }) => out(
-    await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/rows/${encodeURIComponent(space)}/stats?${new URLSearchParams({ ws }).toString()}`),
-  ));
 
   mcp.tool('aimeat_workspace_rows_delete', descriptionFor('aimeat_workspace_rows_delete'), zodShapeFor('aimeat_workspace_rows_delete'), annotationsFor('aimeat_workspace_rows_delete'), async ({ organism_id, ws, space, row_id, before }) => {
     if (!!row_id === !!before) {
@@ -277,27 +135,6 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   // reaches through services/workspace-doc-edit.ts, so the section lookup, the byte-identical
   // splice and the compare-and-swap retry are the node's answer on this door too — which matters
   // here more than anywhere, because a retry loop implemented twice is a retry loop that differs.
-  const docPath = (organism_id: string, space: string, docId: string, ws: string, op: string) =>
-    `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/documents/${encodeURIComponent(space)}/${encodeURIComponent(docId)}/${op}`
-    + `?${new URLSearchParams({ ws }).toString()}`;
-
-  mcp.tool('aimeat_workspace_doc_append', descriptionFor('aimeat_workspace_doc_append'), zodShapeFor('aimeat_workspace_doc_append'), annotationsFor('aimeat_workspace_doc_append'), async ({ organism_id, ws, space, id, markdown, section }) => out(
-    await client.post(docPath(organism_id, space, id, ws, 'append'), { markdown, ...(section ? { section } : {}) }),
-  ));
-
-  mcp.tool('aimeat_workspace_doc_section_replace', descriptionFor('aimeat_workspace_doc_section_replace'), zodShapeFor('aimeat_workspace_doc_section_replace'), annotationsFor('aimeat_workspace_doc_section_replace'), async ({ organism_id, ws, space, id, section, markdown }) => out(
-    await client.post(docPath(organism_id, space, id, ws, 'section'), { section, markdown }),
-  ));
-
-  // → POST /v1/organisms/:id/(archive|unarchive) — archive/restore an organism or a scoped subtree.
-  mcp.tool('aimeat_organism_archive', descriptionFor('aimeat_organism_archive'), zodShapeFor('aimeat_organism_archive'), annotationsFor('aimeat_organism_archive'), async ({ organism_id, level, action, ws, namespace, key }) => {
-    const act = action === 'unarchive' ? 'unarchive' : 'archive';
-    const body: Record<string, unknown> = { level };
-    if (ws) body.ws = ws;
-    if (namespace) body.namespace = namespace;
-    if (key) body.key = key;
-    return out(await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/${act}`, body));
-  });
 
   // → POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin).
   mcp.tool('aimeat_organism_invite_email', descriptionFor('aimeat_organism_invite_email'), zodShapeFor('aimeat_organism_invite_email'), annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {

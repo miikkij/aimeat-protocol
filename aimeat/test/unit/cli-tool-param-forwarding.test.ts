@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-10-05 — The connector cases take their tool from the whole connector (registerAllTools): most
+ *     connector tools run their CLI dispatch definition now (dispatch-tools.ts; secaudit 2026-10, M3).
  *   2026-10-02 — aimeat_package_sale is probed on its grant branch and aimeat_package_buy on its renew
  *     branch; the sale's price and decide branches are measured in package-sale-dispatch.test.ts.
  *   2026-09-29 — aimeat_classification: every field of every action reaches its /v1/classification
@@ -52,6 +54,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
+import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
 import type { JsonObject } from '../../src/tool-dispatch/tool-call-helpers.js';
 
@@ -409,7 +412,9 @@ describe('the redeploy, source and board-rules parameters reach the route that r
     };
 
     /** The connector's MCP tools, registered against a fake server and a recording client. */
-    function connectorTools(register: (mcp: never, registry: never) => void, sent: Sent[]) {
+    // Every connector tool, wherever it lives: a module of its own, or its CLI dispatch definition
+    // (dispatch-tools.ts) since 2026-10-05. The module argument names where the tool used to live.
+    function connectorTools(_module: unknown, sent: Sent[]) {
         const tools = new Map<string, { shape: Record<string, unknown>; handler: (args: Record<string, unknown>) => Promise<{ isError?: boolean }> }>();
         const mcp = {
             tool: (...args: unknown[]) => {
@@ -418,7 +423,8 @@ describe('the redeploy, source and board-rules parameters reach the route that r
             },
         };
         const client = recordingClient(sent);
-        register(mcp as never, { resolve: () => ({ client, agent: 'probe', owner: 'prober' }) } as never);
+        const agent = { client, agent: 'probe', owner: 'prober', config: { node_url: 'http://node.test' } };
+        registerAllTools(mcp as never, { resolve: () => agent, list: () => [agent], size: () => 1 } as never);
         return tools;
     }
 
@@ -461,11 +467,11 @@ describe('the redeploy, source and board-rules parameters reach the route that r
     });
 
     it('connector MCP aimeat_extension_install declares and routes update, activate and upload mode', async () => {
-        const { registerExtensionsTools } = await import('../../src/cli/connect/mcp/tools/extensions.js');
         const sent: Sent[] = [];
-        const tools = connectorTools(registerExtensionsTools as never, sent);
+        const tools = connectorTools('extensions', sent);
         const install = tools.get('aimeat_extension_install')!;
-        expect(Object.keys(install.shape).sort()).toEqual(['activate', 'manifest', 'scripts', 'update']);
+        // agent_name only picks which registered agent makes the call, as on every connector tool.
+        expect(Object.keys(install.shape).filter(k => k !== 'agent_name').sort()).toEqual(['activate', 'manifest', 'scripts', 'update']);
         await install.handler({ manifest, scripts: { a: 'x' }, update: true, activate: true });
         expect(wire(sent)).toContain('PUT /v1/extensions/probe-ext');
         expect(wire(sent)).toContain('POST /v1/extensions/probe-ext/activate');
@@ -483,9 +489,8 @@ describe('the redeploy, source and board-rules parameters reach the route that r
     // The connector's restore declared `owner_scope` and dropped it, so an owner-scoped restore went out
     // as a plain one and reached only the caller's own bin: the node's tool and the CLI both send it.
     it('connector MCP aimeat_memory_restore sends owner_scope, as the node tool and the CLI do', async () => {
-        const { registerCoreTools } = await import('../../src/cli/connect/mcp/tools/core.js');
         const sent: Sent[] = [];
-        const tools = connectorTools(registerCoreTools as never, sent);
+        const tools = connectorTools('core', sent);
         const restore = tools.get('aimeat_memory_restore')!;
         expect(Object.keys(restore.shape)).toContain('owner_scope');
         await restore.handler({ key: 'notes.one', owner_scope: true });
@@ -517,9 +522,8 @@ describe('the redeploy, source and board-rules parameters reach the route that r
             [{ action: 'scan', keys: ['a', 'b'], prefix: 'notes.' }, { method: 'POST', path: '/v1/classification/scan', body: { keys: ['a', 'b'], prefix: 'notes.' } }],
             [{ action: 'scan', key: 'a' }, { method: 'POST', path: '/v1/classification/scan', body: { keys: ['a'] } }],
         ];
-        const { registerClassificationTools } = await import('../../src/cli/connect/mcp/tools/classification.js');
         const sent: Sent[] = [];
-        const tool = connectorTools(registerClassificationTools as never, sent).get('aimeat_classification')!;
+        const tool = connectorTools('classification', sent).get('aimeat_classification')!;
         for (const [input, expected] of cases) {
             const viaCli = await record(cli('aimeat_classification'), input);
             expect(viaCli.sent, `CLI ${JSON.stringify(input)}`).toEqual([expected]);
@@ -539,9 +543,8 @@ describe('the redeploy, source and board-rules parameters reach the route that r
     });
 
     it('connector MCP aimeat_board_create declares rules, and aimeat_board_rules_set exists', async () => {
-        const { registerBoardsTools } = await import('../../src/cli/connect/mcp/tools/boards.js');
         const sent: Sent[] = [];
-        const tools = connectorTools(registerBoardsTools as never, sent);
+        const tools = connectorTools('boards', sent);
         const rules = { default_ttl_hours: 8760 };
         expect(Object.keys(tools.get('aimeat_board_create')!.shape)).toContain('rules');
         await tools.get('aimeat_board_create')!.handler({ name: 'b', visibility: 'public', rules });

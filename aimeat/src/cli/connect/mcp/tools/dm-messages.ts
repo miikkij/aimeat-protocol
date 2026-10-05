@@ -24,11 +24,10 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent, envelopeResult } from './_registry.js';
+import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
-import { organizePatchBody } from '../../../../tool-dispatch/tool-call-helpers-organize.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -97,62 +96,4 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
       { tool: 'aimeat_dm_send_as_owner', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
-  mcp.tool('aimeat_dm_inbox', descriptionFor('aimeat_dm_inbox'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_inbox') }, annotationsFor('aimeat_dm_inbox'), async ({ agent_name, page, per_page }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const params = new URLSearchParams();
-    if (page) params.set('page', String(page));
-    if (per_page) params.set('per_page', String(per_page));
-    const qs = params.toString();
-    const resp = await client.get(`/v1/messages/agent-inbox${qs ? '?' + qs : ''}`);
-    return envelopeResult(resp);
-  });
-
-  // The owner's mailbox, on one explicit word. Thin over DELETE /v1/messages/:id, which is where the
-  // scope is enforced and where the mailbox is resolved — this surface adds no rule of its own.
-  mcp.tool('aimeat_dm_delete_as_owner', descriptionFor('aimeat_dm_delete_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_delete_as_owner') }, annotationsFor('aimeat_dm_delete_as_owner'), async ({ agent_name, message_id }) => {
-    const { client } = pickAgent(registry, agent_name);
-    return envelopeResult(await client.delete(`/v1/messages/${encodeURIComponent(message_id)}`));
-  });
-
-  // Reading the owner's mailbox, on messages:read-as-owner. Thin over GET /v1/messages/overview and
-  // /conversations/:id, which is where the word is enforced and the mailbox resolved.
-  mcp.tool('aimeat_dm_inbox_as_owner', descriptionFor('aimeat_dm_inbox_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_inbox_as_owner') }, annotationsFor('aimeat_dm_inbox_as_owner'), async ({ agent_name, limit, unread_only }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const params = new URLSearchParams({ limit: String(limit ?? 30) });
-    if (unread_only) params.set('unread', 'true');
-    return envelopeResult(await client.get(`/v1/messages/overview?${params}`));
-  });
-
-  mcp.tool('aimeat_dm_thread_as_owner', descriptionFor('aimeat_dm_thread_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_thread_as_owner') }, annotationsFor('aimeat_dm_thread_as_owner'), async ({ agent_name, conversation_id, page, per_page }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const params = new URLSearchParams();
-    if (page) params.set('page', String(page));
-    if (per_page) params.set('per_page', String(per_page));
-    const qs = params.toString();
-    return envelopeResult(await client.get(`/v1/messages/conversations/${encodeURIComponent(conversation_id)}${qs ? '?' + qs : ''}`));
-  });
-
-  // Organising the owner's Messages list, on messages:organize-as-owner. Thin over
-  // POST /v1/messages/organize/archive and GET/PUT /v1/messages/organize, where the word is enforced
-  // and the mailbox resolved.
-  mcp.tool('aimeat_dm_archive_as_owner', descriptionFor('aimeat_dm_archive_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_archive_as_owner') }, annotationsFor('aimeat_dm_archive_as_owner'), async ({ agent_name, conversation_ids, restore }) => {
-    const { client } = pickAgent(registry, agent_name);
-    return envelopeResult(await client.post('/v1/messages/organize/archive', { conversation_ids, ...(restore !== undefined ? { restore } : {}) }));
-  });
-
-  mcp.tool('aimeat_dm_organize_as_owner', descriptionFor('aimeat_dm_organize_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_organize_as_owner') }, annotationsFor('aimeat_dm_organize_as_owner'), async ({ agent_name, auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const body = organizePatchBody({ auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules });
-    return envelopeResult(Object.keys(body).length ? await client.put('/v1/messages/organize', body) : await client.get('/v1/messages/organize'));
-  });
-
-  mcp.tool('aimeat_dm_thread', descriptionFor('aimeat_dm_thread'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_thread') }, annotationsFor('aimeat_dm_thread'), async ({ agent_name, conversation_id, page, per_page }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const params = new URLSearchParams();
-    if (page) params.set('page', String(page));
-    if (per_page) params.set('per_page', String(per_page));
-    const qs = params.toString();
-    const resp = await client.get(`/v1/messages/agent-thread/${encodeURIComponent(conversation_id)}${qs ? '?' + qs : ''}`);
-    return envelopeResult(resp);
-  });
 }

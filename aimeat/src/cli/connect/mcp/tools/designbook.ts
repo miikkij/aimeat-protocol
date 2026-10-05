@@ -59,32 +59,6 @@ export function registerDesignbookTools(mcp: McpServer, registry: AgentRegistry)
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_designbook_search', descriptionFor('aimeat_designbook_search'), zodShapeFor('aimeat_designbook_search'), annotationsFor('aimeat_designbook_search'), async ({ kind, status, q, limit, view }) => {
-    // A view other than the map is sent on as it is: the route decides what a view means.
-    if (view && view !== 'map') return out(await client.get(`/v1/designbook?view=${encodeURIComponent(view)}`));
-    const params = new URLSearchParams();
-    if (kind) params.set('kind', kind);
-    if (status) params.set('status', status);
-    if (q) params.set('q', q);
-    if (limit != null) params.set('limit', String(limit));
-    // No word, no kind: the whole published shelf on one page (parity with the server MCP).
-    if (view === 'map' || ![...params.keys()].length) {
-      const resp = await client.get('/v1/designbook?view=map') as { data?: { map?: string; note?: string }; ok?: boolean };
-      if (resp.ok === false || !resp.data?.map) return out(resp);
-      return { content: [{ type: 'text' as const, text: `${resp.data.map}${resp.data.note ?? ''}` }] };
-    }
-    const qs = params.toString();
-    return out(await client.get(`/v1/designbook${qs ? `?${qs}` : ''}`));
-  });
-
-  mcp.tool('aimeat_designbook_get', descriptionFor('aimeat_designbook_get'), zodShapeFor('aimeat_designbook_get'), annotationsFor('aimeat_designbook_get'), async ({ id }) => {
-    return out(await client.get(`/v1/designbook/${encodeURIComponent(id)}`));
-  });
-
-  mcp.tool('aimeat_designbook_keep', descriptionFor('aimeat_designbook_keep'), zodShapeFor('aimeat_designbook_keep'), annotationsFor('aimeat_designbook_keep'), async ({ filename, kept }) => {
-    return out(await client.post('/v1/designbook/keep', { filename, kept: kept !== false }));
-  });
-
   mcp.tool('aimeat_designbook_propose', descriptionFor('aimeat_designbook_propose'), zodShapeFor('aimeat_designbook_propose'), annotationsFor('aimeat_designbook_propose'), async ({ part, ai_provenance, ai_provenance_id }) => {
     return out(await client.post('/v1/designbook', {
       part,
