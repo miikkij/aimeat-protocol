@@ -13,24 +13,22 @@
  * @structure registerPortfolioTools(mcp, registry) — portfolio_publish
  * @usage import { registerPortfolioTools } from './portfolio.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-10-03 — `enable`, forwarded to the upload: switches the page on, as on the node MCP.
  *   v1.0.0 — 2026-08-10 — Initial: connector-surface coverage for the personal welcome page.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
+import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerPortfolioTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
-  mcp.tool('aimeat_portfolio_publish', descriptionFor('aimeat_portfolio_publish'), {
-    html: z.string().describe('The complete HTML document to serve as this person\'s welcome page. It replaces the current one.'),
-    enable: z.boolean().optional().describe('true when the person approved the page and wants it public now: switches their page on, unless they switched it off themselves. Without it the page is stored and stays as switched as it was.'),
-  }, annotationsFor('aimeat_portfolio_publish'), async ({ html, enable }) => {
+  mcp.tool('aimeat_portfolio_publish', descriptionFor('aimeat_portfolio_publish'), zodShapeFor('aimeat_portfolio_publish'), annotationsFor('aimeat_portfolio_publish'), async ({ html, enable }) => {
     return out(await client.put('/v1/portfolio/upload', enable === undefined ? { html } : { html, enable }));
   });
 }

@@ -14,12 +14,12 @@
  *   aimeat_company_list, _create, _update, _front_page, _portfolio_publish.
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-08 — Initial: the company setup an AI chat can drive end to end.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CompanyRecord } from '../models/company-schemas.js';
@@ -31,33 +31,10 @@ import {
     CompanyError, createCompany, updateCompany, setFrontPage, requireOwnCompany, companyAddress,
 } from '../services/company/company-service.js';
 import { publishCompanyPortfolio } from '../services/company/company-portfolio.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { IDENTITY_FIELDS } from '../tool-catalog/definitions/companies.js';
 
-/**
- * The optional fields create and update share. All but one are the seller party an invoice reads.
- *
- * `organism_id` is the exception and it is here because REST takes it: a tool that does not declare
- * a field its own route accepts SUCCEEDS while writing nothing, which is what a peer operator hit
- * on 2026-09-14 following our own package instructions. Nothing compares a tool against the route
- * it fronts, only the two MCP surfaces against each other.
- */
-const identityShape = {
-    description: z.string().optional().describe('One or two sentences about what the company does'),
-    organism_id: z.string().optional().describe('The organism this company keeps its knowledge in. Empty string unlinks it.'),
-    business_id: z.string().optional().describe('Company registration number (Finnish Y-tunnus)'),
-    vat_id: z.string().optional().describe('VAT number'),
-    street_address: z.string().optional().describe('Street address'),
-    postal_code: z.string().optional().describe('Postal code'),
-    city: z.string().optional().describe('City'),
-    country: z.string().optional().describe('ISO 3166-1 alpha-2 country code (two letters)'),
-    email: z.string().optional().describe('Contact email'),
-    phone: z.string().optional().describe('Contact phone'),
-    iban: z.string().optional().describe('Bank account (IBAN) an invoice tells the buyer to pay'),
-    bic: z.string().optional().describe('Bank BIC/SWIFT'),
-    einvoice_address: z.string().optional().describe('E-invoice address (OVT identifier)'),
-    einvoice_operator: z.string().optional().describe('E-invoice operator id (often a bank BIC)'),
-};
-
-type IdentityInput = { [K in keyof typeof identityShape]?: string };
+type IdentityInput = { [K in keyof typeof IDENTITY_FIELDS]?: string };
 
 /**
  * Wire names → record names. Only keys the caller actually sent are returned, so an update
@@ -113,10 +90,7 @@ export function registerCompanyTools(
     mcp.tool(
         'aimeat_company_list',
         descriptionFor('aimeat_company_list'),
-        {
-            page: z.number().optional().describe('Page number (default 1)'),
-            per_page: z.number().optional().describe('Companies per page (default 50, max 100)'),
-        },
+        zodShapeFor('aimeat_company_list'),
         annotationsFor('aimeat_company_list'),
         async ({ page, per_page }) => {
             const p = Math.max(1, page ?? 1);
@@ -134,11 +108,7 @@ export function registerCompanyTools(
     mcp.tool(
         'aimeat_company_create',
         descriptionFor('aimeat_company_create'),
-        {
-            name: z.string().describe('Trade name as it should appear on invoices'),
-            slug: z.string().optional().describe('Address label; defaults to a normalised form of the name'),
-            ...identityShape,
-        },
+        zodShapeFor('aimeat_company_create'),
         annotationsFor('aimeat_company_create'),
         async ({ name, slug, ...identity }) => {
             try {
@@ -158,11 +128,7 @@ export function registerCompanyTools(
     mcp.tool(
         'aimeat_company_update',
         descriptionFor('aimeat_company_update'),
-        {
-            company_id: z.string().describe('Company id from aimeat_company_list'),
-            name: z.string().optional().describe('Trade name (the address is not renamed by this)'),
-            ...identityShape,
-        },
+        zodShapeFor('aimeat_company_update'),
         annotationsFor('aimeat_company_update'),
         async ({ company_id, name, ...identity }) => {
             try {
@@ -191,11 +157,7 @@ export function registerCompanyTools(
     mcp.tool(
         'aimeat_company_front_page',
         descriptionFor('aimeat_company_front_page'),
-        {
-            company_id: z.string().describe('Company id from aimeat_company_list'),
-            kind: z.enum(['app', 'portfolio', 'redirect', 'none']).describe('What the address serves'),
-            target: z.string().optional().describe('"owner/file.html" for app; an absolute URL for redirect'),
-        },
+        zodShapeFor('aimeat_company_front_page'),
         annotationsFor('aimeat_company_front_page'),
         async ({ company_id, kind, target }) => {
             try {
@@ -209,10 +171,7 @@ export function registerCompanyTools(
     mcp.tool(
         'aimeat_company_portfolio_publish',
         descriptionFor('aimeat_company_portfolio_publish'),
-        {
-            company_id: z.string().describe('Company id from aimeat_company_list'),
-            html: z.string().describe('The complete HTML document to serve at the company address'),
-        },
+        zodShapeFor('aimeat_company_portfolio_publish'),
         annotationsFor('aimeat_company_portfolio_publish'),
         async ({ company_id, html }) => {
             try {

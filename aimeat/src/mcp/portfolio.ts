@@ -21,6 +21,7 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-10-03 — `enable: true` switches the page on, as the welcome-mat paste does, unless
  *     the person switched it off; the answer carries `served`. A card published here for a person who
  *     never pasted a mat was stored and answered 404 at the address the tool handed back.
@@ -34,7 +35,6 @@
  *   v1.0.0 — 2026-08-09 — Initial (P23).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -44,6 +44,7 @@ import {
     portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml, switchPortfolioOnUnlessTurnedOff,
 } from '../routes/portfolio.js';
 import { emitChange } from '../services/event-bus.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -68,10 +69,7 @@ export function registerPortfolioTools(
     mcp.tool(
         'aimeat_portfolio_publish',
         descriptionFor('aimeat_portfolio_publish'),
-        {
-            html: z.string().describe('The complete HTML document to serve as this person\'s welcome page. It replaces the current one.'),
-            enable: z.boolean().optional().describe('true when the person approved the page and wants it public now: switches their page on, unless they switched it off themselves. Without it the page is stored and stays as switched as it was.'),
-        },
+        zodShapeFor('aimeat_portfolio_publish'),
         annotationsFor('aimeat_portfolio_publish'),
         async ({ html, enable }): Promise<TextResult> => {
             const owner = parseGAII(getAgentGaii()) ? localAccountName(getAgentGaii()) : '';

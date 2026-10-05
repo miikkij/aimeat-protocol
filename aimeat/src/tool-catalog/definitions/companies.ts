@@ -15,6 +15,8 @@
  * @structure companyTools: AimeatToolDefinition[]
  * @usage import { companyTools } from './definitions/companies.js';
  * @version-history
+ *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
+ *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-10-03 — aimeat_portfolio_publish takes `enable`: switches the person's page on.
  *   v1.0.0 — 2026-08-08 — Initial: list/get/create/update/front_page/portfolio_publish.
  */
@@ -25,7 +27,7 @@ import type { AimeatToolDefinition } from './types.js';
  * reads; that one is here because the REST route takes it, and a tool missing a field its own route
  * accepts answers "done" while writing nothing.
  */
-const IDENTITY_FIELDS: AimeatToolDefinition['input'] = {
+export const IDENTITY_FIELDS = {
     organism_id: { type: 'string', description: 'The organism this company keeps its knowledge in. An empty string unlinks it.' },
     business_id: { type: 'string', description: 'Company registration number (Finnish Y-tunnus, e.g. "1234567-8").' },
     vat_id: { type: 'string', description: 'VAT number (e.g. "FI12345678").' },
@@ -40,14 +42,23 @@ const IDENTITY_FIELDS: AimeatToolDefinition['input'] = {
     einvoice_address: { type: 'string', description: 'E-invoice address (Finnish OVT identifier) if the company receives e-invoices.' },
     einvoice_operator: { type: 'string', description: 'E-invoice operator/intermediary id (often a bank BIC, e.g. "NDEAFIHH").' },
     description: { type: 'string', description: 'One or two sentences about what the company does.' },
-};
+} as const satisfies AimeatToolDefinition['input'];
 
-export const companyTools: AimeatToolDefinition[] = [
+export const companyTools = [
     {
         name: 'aimeat_company_list',
         description: "The owner's registered companies, each with its id, slug, public address ({slug}.co.<apex>), front-page setting, and legal-identity fields. Start here: every other company tool takes the id from this list. An empty list means the owner has not registered a company yet — aimeat_company_create is the first step.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        annotations: { title: 'List Companies', readOnlyHint: true },
+        // Contacts (address book) — the owner's messaging graph, so the messaging scopes gate it:
+        // reading the list / resolving an email rides messages:read; editing the book (save/remove)
+        // rides messages:send (the same trust level as opening conversations on the owner's behalf).
+        // The company registry: reading the owner's companies rides company:read; registering one,
+        // filling in its legal identity, choosing its front page and publishing its page all write
+        // to a PUBLIC address, so they ride company:write.
+        scope: 'company:read',
+        surfaces: ['agent'],
         input: {
             page: { type: 'number', description: 'Page number (default 1).' },
             per_page: { type: 'number', description: 'Companies per page (default 50, max 100).' },
@@ -58,6 +69,9 @@ export const companyTools: AimeatToolDefinition[] = [
         description: "Register a company, which immediately reserves its public address {slug}.co.<apex> — the same way publishing an app reserves an apps subdomain. The slug is derived from the name unless given; a taken name answers SLUG_TAKEN and a reserved infrastructure label answers SLUG_RESERVED, so pick another and retry rather than treating it as a failure. Supplying the legal-identity fields here saves a follow-up aimeat_company_update, and they are what every later invoice prefills its seller party from.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        annotations: { title: 'Register Company', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+        scope: 'company:write',
+        surfaces: ['agent'],
         input: {
             name: { type: 'string', required: true, description: 'Trade name as it should appear on invoices (e.g. "Perustaja Oy").' },
             slug: { type: 'string', description: 'Address label. Defaults to a normalised form of the name (ä→a, ö→o, spaces→hyphens).' },
@@ -69,6 +83,9 @@ export const companyTools: AimeatToolDefinition[] = [
         description: "Fill in or correct a company's details. Every field is optional and only the ones passed are written, so this is safe to call repeatedly as a conversation gathers information — ask the owner for what is missing, then write just that. Passing an empty string clears a field. These values become the seller party on every invoice and the supplier block in the Finvoice e-invoice, so they must be the real registered details rather than plausible-looking ones: leave a field out when the owner has not stated it.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        annotations: { title: 'Update Company Details', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'company:write',
+        surfaces: ['agent'],
         input: {
             company_id: { type: 'string', required: true, description: 'Company id from aimeat_company_list.' },
             name: { type: 'string', description: 'Trade name (the address is not renamed by this).' },
@@ -80,6 +97,9 @@ export const companyTools: AimeatToolDefinition[] = [
         description: "Choose what the company's address serves: 'app' serves one of the OWNER'S OWN published apps (target \"owner/file.html\"; someone else's answers FRONT_PAGE_NOT_YOURS), 'portfolio' serves the page published with aimeat_company_portfolio_publish, 'redirect' sends visitors to an absolute http(s) URL, and 'none' keeps the address reserved while serving nothing. Choosing 'portfolio' before a page exists answers NO_PORTFOLIO — publish first.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        annotations: { title: 'Set Company Front Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'company:write',
+        surfaces: ['agent'],
         input: {
             company_id: { type: 'string', required: true, description: 'Company id from aimeat_company_list.' },
             kind: { type: 'string', required: true, enum: ['app', 'portfolio', 'redirect', 'none'], description: 'What the address serves.' },
@@ -91,6 +111,9 @@ export const companyTools: AimeatToolDefinition[] = [
         description: "Publish a standalone HTML page as the company's public front page and point the address at it in one act. Send the WHOLE document (doctype through </html>) — it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode, and keep it under the node's portfolio size limit (512KB by default). Re-publishing replaces the previous page.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        annotations: { title: 'Publish Company Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'company:write',
+        surfaces: ['agent'],
         input: {
             company_id: { type: 'string', required: true, description: 'Company id from aimeat_company_list.' },
             html: { type: 'string', required: true, description: 'The complete HTML document to serve at the company address.' },
@@ -101,9 +124,13 @@ export const companyTools: AimeatToolDefinition[] = [
         description: "Publish this person's own welcome page — the page at their address, which is also their portfolio. Use it when they ask you to make their page, improve it, or change what it says: you write the HTML and publish it, they never copy or paste anything. Send the WHOLE document (doctype through </html>); it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode. Re-publishing replaces the previous page, so read what is there first if they asked for a change rather than a rewrite. This is the person's page; the company equivalent is aimeat_company_portfolio_publish.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        annotations: { title: 'Publish Your Welcome Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Stores a file, or takes one back — the same permission over the same namespace.
+        scope: 'storage:write',
+        surfaces: ['agent'],
         input: {
             html: { type: 'string', required: true, description: "The complete HTML document to serve as this person's welcome page." },
             enable: { type: 'boolean', required: false, description: 'true when the person approved the page and wants it public now: switches their page on, unless they switched it off themselves. Without it the page is stored and stays as switched as it was.' },
         },
     },
-];
+] as const satisfies readonly AimeatToolDefinition[];
