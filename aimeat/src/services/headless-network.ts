@@ -28,13 +28,16 @@
  *   that read its own intranet. Empty by default. On the localhost profile safeFetch already allows
  *   loopback (AIMEAT_ALLOW_PRIVATE_EGRESS); other private ranges need the list.
  * @structure HEADLESS_NO_NETWORK_ARGS · HEADLESS_CONTEXT_OPTIONS · MAX_RESOURCE_BYTES ·
- *   headlessRequestHandler(config) · guardHeadlessContext(ctx, config) · serveDocumentOnce(page, html, type)
+ *   headlessRequestHandler(config) · headlessRequestHandlerFor(rule) · guardHeadlessContext(ctx, config) ·
+ *   serveDocumentOnce(page, html, type)
  * @usage
  *   const ctx = await browser.newContext({ viewport, ...HEADLESS_CONTEXT_OPTIONS });
  *   await guardHeadlessContext(ctx, config);
  *   const page = await ctx.newPage();
  *   await serveDocumentOnce(page, html);
  * @version-history
+ *   v1.1.0 — 2026-10-06 — headlessRequestHandlerFor(rule): the same handler for a browser outside the
+ *     node, which `aimeat screenshot-worker` now installs (secaudit 2026-10 follow-up, Part C).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, SSRF-1, plan S9).
  */
 import type { AimeatConfig } from '../config.js';
@@ -89,9 +92,29 @@ function ownOrigins(config: AimeatConfig): string[] {
  * drives it with recorded routes; the renderers install it with guardHeadlessContext.
  */
 export function headlessRequestHandler(config: AimeatConfig): (route: HeadlessRoute) => Promise<void> {
-  const own = ownOrigins(config);
-  const loopback = `http://127.0.0.1:${config.port}`;
-  const egress = egressOriginsOf(config.screenshotEgress, 'headless', 'AIMEAT_SCREENSHOT_EGRESS');
+  return headlessRequestHandlerFor({
+    own: ownOrigins(config),
+    ownFetchBase: `http://127.0.0.1:${config.port}`,
+    egress: egressOriginsOf(config.screenshotEgress, 'headless', 'AIMEAT_SCREENSHOT_EGRESS'),
+  });
+}
+
+/**
+ * The same handler for a browser that runs outside the node: `aimeat screenshot-worker` renders the
+ * node's apps on the operator's machine, so the node is a remote origin there and is fetched at its
+ * own address rather than on a loopback. Everything else is the node's rule: only GET and HEAD,
+ * private and metadata addresses refused, the body capped.
+ */
+export function headlessRequestHandlerFor(rule: {
+  /** The node's origins: fetched from `ownFetchBase` with no credential. */
+  own: string[];
+  /** Where the node's own pages are fetched from. */
+  ownFetchBase: string;
+  /** Exact origins of private servers a page may reach besides the node. */
+  egress: string[];
+}): (route: HeadlessRoute) => Promise<void> {
+  const { own, egress } = rule;
+  const loopback = rule.ownFetchBase.replace(/\/+$/, '');
   return async (route) => {
     const req = route.request();
     const method = req.method().toUpperCase();
