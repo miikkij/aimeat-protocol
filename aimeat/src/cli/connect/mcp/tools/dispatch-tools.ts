@@ -20,6 +20,10 @@
  * @structure registerDispatchTools(mcp, registry, registered)
  * @usage registerDispatchTools(mcp, registry, namesTheModulesRegistered)
  * @version-history
+ *   v1.1.0 — 2026-10-06 — `response_format` is taken as the view only on a tool whose catalog entry
+ *     supports one; on any other it is the tool's own input and reaches its handler. aimeat_voice_speak
+ *     names its audio format so, and would have lost an mp3 request when it moved here (secaudit
+ *     2026-10 follow-up, Part B).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M3).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -39,15 +43,21 @@ export function registerDispatchTools(mcp: McpServer, registry: AgentRegistry, r
         // Every shell-callable tool is on the connector MCP too (audit-mcp-tools, cliFallbackWithoutConnectorMcp).
         if (!getAimeatToolDefinition(tool.name)) continue;
         const shape = { agent_name: agentNameSchema, ...zodShapeFor(tool.name) };
+        // `response_format` is the concise/detailed view only on a tool that supports one; on any other
+        // it is the tool's own input (aimeat_voice_speak's audio format) and goes to the handler.
+        const viewParam = getAimeatToolDefinition(tool.name)?.supportsResponseFormat === true;
         mcp.tool(tool.name, descriptionFor(tool.name), shape, annotationsFor(tool.name), async (args: Record<string, unknown>) => {
-            const { agent_name, response_format, ...input } = args;
+            const { agent_name, ...rest } = args;
+            const { response_format, ...viewless } = rest;
+            const input = viewParam ? viewless : rest;
             const picked = pickAgent(registry, agent_name as string | undefined);
             const resp = await tool.handler({
                 client: picked.client,
                 config: { node_url: picked.config.node_url, agent: picked.agent, owner: picked.owner },
                 agentPath: encodeURIComponent(picked.agent),
             }, input);
-            return payloadResult(shapeResponse(tool.name, response_format as ResponseFormat | undefined, resp.data ?? resp), resp);
+            const view = viewParam ? response_format as ResponseFormat | undefined : undefined;
+            return payloadResult(shapeResponse(tool.name, view, resp.data ?? resp), resp);
         });
         added.push(tool.name);
     }
