@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 -- 2026-10-06 -- POST /v1/memory takes expected_version, the optimistic lock the write
+ *     service and the node's MCP already had (secaudit 2026-10 follow-up, Part B).
  *   v1.10.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.10.0 -- 2026-09-29 -- TARGET-082 review: every list and search item an AI is shown with a
@@ -74,7 +76,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
-    const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, workspace_refs, agent: agentParam, ai_provenance_id } = req.body ?? {};
+    const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, workspace_refs, agent: agentParam, ai_provenance_id, expected_version } = req.body ?? {};
 
     // Phase 2.3 — the organism.* access rule. It used to be run here by hand-driving the Express
     // middleware through a promise, because the key arrives in the body rather than in :key. The
@@ -192,6 +194,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ttlHours: ttl_hours ?? null,
       ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
       ...(vis === 'workspace' ? { workspaceRef: normalizeWorkspaceRefs(workspace_refs, workspace_ref) } : {}),
+      // The service's version check, the one the node's MCP has used since 2026-08-09.
+      ...(typeof expected_version === 'number' ? { expectedVersion: expected_version } : {}),
       declaredProvenanceId: ai_provenance_id,
       pipeline: 'memory.write',
       // No `ownerScoped`. This said "there is no owner copy to shadow", which is true for an owner

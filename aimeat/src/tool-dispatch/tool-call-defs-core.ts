@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-06 — aimeat_memory_write forwards expected_version, which POST /v1/memory now reads
+ *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — aimeat_discover writes both of its paths in the call, so check:field-reach's CodeQL query
  *     sees them; the connector MCP serves it through here now (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-09-29 -- aimeat_storage_upload, _download and _delete moved to
@@ -147,6 +149,10 @@ export const coreTools: ConnectCliToolDefinition[] = [
             // meant it, and the owner's own tools could not see it. The route still decides:
             // resolveWriteTarget() refuses without memory:write-as-owner.
             if (optionalBoolean(input, 'owner_scope')) body.owner_scope = true;
+            // The optimistic lock, which POST /v1/memory reads since 2026-10-06 (secaudit 2026-10
+            // follow-up, Part B); before that this door dropped it and the write went through.
+            const expectedVersion = optionalNumber(input, 'expected_version');
+            if (expectedVersion !== undefined) body.expected_version = expectedVersion;
             // POST /v1/memory takes a pre-minted record id directly (it checks the record belongs to
             // this owner). An inline `ai_provenance` DECLARATION cannot ride here — the route has no
             // field for it — so withProvenanceCarrying() records that one after the write, against

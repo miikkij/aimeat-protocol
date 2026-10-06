@@ -5,6 +5,9 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-06 — aimeat_memory_write carries the bounds the node's MCP wrote by hand (value, tags,
+ *     owner_scope, expected_version) and aimeat_workflow_save the node's fuller definition text, so
+ *     every surface registers one schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-10-04 — aimeat_task_decline; aimeat_task_fail points to it for a refusal.
@@ -171,7 +174,7 @@ export const schedulesTasksMemoryTools = [
         surfaces: ['agent'],
         input: {
             id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
-            definition: { type: 'object', required: true, description: 'The descriptor: { title, description, trigger, vars[], steps[], on_step_fail:"inspect", llm?{approved}, notify_on_finish?, resume?, fresh?, skip_done?, parallel?, maxCostUsd? }. parallel:true lets two or more live runs of this workflow overlap; use it when the keys carry a run-distinguishing var (a case reference in vars, or the built-in {run}); without it a second start while one is in flight is skipped and says so. Refused together with fresh. maxCostUsd (US dollars, per run) caps what a run spends on AI, its ai steps and the judging of its llm signals together: an ai step\'s model call starts only when what one attempt is expected to cost fits in what is left, and holds that share until the call answers, also after a timeout or a retry; otherwise the step waits for the open calls or stops the run. A step expected to cost more than the whole cap starts alone while the run has spent less.' },
+            definition: { type: 'object', required: true, description: 'The workflow descriptor: { title, description (both localized string | {locale:text}), trigger {kind:"schedule"|"manual"|"event", cron?, timezone?, on?, match?}, vars[], steps[{id, agent, offer, after?, description, required_to_function?, success_signal?, retry?, timeout_min}], on_step_fail:"inspect", llm?{approved}, maxCostUsd? }. Signals/deliverable.location are inherited from each step\'s offer; a step using an `llm` signal leaf requires llm.approved=true. maxCostUsd (US dollars, per run) caps what a run spends on AI, its ai steps and the judging of its llm signals together: an ai step\'s model call starts only when what one attempt is expected to cost fits in what is left, and holds that share until the call answers, also after a timeout or a retry; otherwise the step waits for the open calls or stops the run. A step expected to cost more than the whole cap starts alone while the run has spent less. Rejected if the graph is not a DAG or an offer is not workflow-compatible.' },
             propose: { type: 'boolean', description: 'Operator flow (server MCP only): return a diff vs the current definition + a single-use confirm_token WITHOUT saving.' },
             confirm_token: { type: 'string', description: 'Token from the propose step — applies exactly the proposed definition.' },
         },
@@ -444,13 +447,13 @@ export const schedulesTasksMemoryTools = [
         input: {
             ...aiProvenanceCatalogInput,
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
-            value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.' },
+            value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.', zod: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
             visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Who can read it (members = any logged-in user of this node). Default: private.' },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
-            tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.' },
+            tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string()) },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },
-            owner_scope: { type: 'boolean', description: 'Write under the OWNER instead of yourself. Requires the memory:write-as-owner scope.' },
-            expected_version: { type: 'number', description: 'Optimistic lock: the version you read. Refused with VERSION_CONFLICT if the record changed since. Pass 0 to assert the key does not exist yet. Omit for last-write-wins.' },
+            owner_scope: { type: 'boolean', description: 'Write under the OWNER instead of yourself. Requires the memory:write-as-owner scope.', zod: flexibleBoolean },
+            expected_version: { type: 'number', description: 'Optimistic lock: the version you read. Refused with VERSION_CONFLICT if the record changed since. Pass 0 to assert the key does not exist yet. Omit for last-write-wins.', zod: z.number().int().nonnegative() },
         },
     },
     {

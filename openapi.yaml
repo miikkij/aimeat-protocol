@@ -1812,6 +1812,13 @@ components:
           type: integer
           nullable: true
           description: Time-to-live in hours (null = permanent)
+        expected_version:
+          type: integer
+          minimum: 0
+          description: >
+            Optimistic lock: the `version` you read from this record. The write is refused with 409
+            VERSION_CONFLICT if the record has changed since; 0 asserts that the key does not exist
+            yet. Omit it and the write proceeds as before (last write wins).
         owner_scope:
           type: boolean
           description: >

@@ -343,6 +343,26 @@ await test('PUT with wrong version returns 409 VERSION_CONFLICT', async () => {
     });
     assert(status === 409, `expected 409, got ${status}`);
     assert(body.error?.code === 'VERSION_CONFLICT', `error code: ${body.error?.code}`);
+});
+
+// Secaudit 2026-10 follow-up, Part B: aimeat_memory_write publishes expected_version on every surface,
+// and the connector and the shell write through POST /v1/memory, which took no lock and dropped it.
+// Failed on the old route (200, the stale write went through).
+await test('POST with a stale expected_version returns 409 VERSION_CONFLICT and writes nothing; a current one writes', async () => {
+    const { body: readBody } = await json('/v1/memory/test.create', { headers: auth1() });
+    const current = readBody.data?.version as number;
+    const stale = await json('/v1/memory', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ key: 'test.create', value: { stale: 'post' }, expected_version: current - 1 }),
+    });
+    assert(stale.status === 409 && stale.body.error?.code === 'VERSION_CONFLICT', `stale: ${stale.status} ${JSON.stringify(stale.body.error)}`);
+    const after = await json('/v1/memory/test.create', { headers: auth1() });
+    assert(after.body.data?.version === current, `nothing written: ${after.body.data?.version} vs ${current}`);
+    const fresh = await json('/v1/memory', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ key: 'test.create', value: { fresh: 'post' }, expected_version: current }),
+    });
+    assert(fresh.status === 200 || fresh.status === 201, `current: ${fresh.status} ${JSON.stringify(fresh.body.error)}`);
     assert(typeof body.error?.details?.current_version === 'number', 'includes current_version in details');
 });
 

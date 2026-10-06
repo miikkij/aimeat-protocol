@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-10-06 — aimeat_memory_write.expected_version is measured: POST /v1/memory reads it (secaudit
+ *     2026-10 follow-up, Part B).
  *   2026-10-05 — The connector cases take their tool from the whole connector (registerAllTools): most
  *     connector tools run their CLI dispatch definition now (dispatch-tools.ts; secaudit 2026-10, M3).
  *   2026-10-02 — aimeat_package_sale is probed on its grant branch and aimeat_package_buy on its renew
@@ -167,15 +169,12 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
             + 'directly in test/unit/compliance-snapshot-dispatch.test.ts, because the two parameters here '
             + 'are mutually exclusive and one probe run cannot exercise both.',
     },
-    aimeat_memory_write: {
-        expected_version: 'POST /v1/memory has no optimistic lock; the node MCP calls the write service directly and PUT /v1/memory/:key spells it `version`.',
-    },
     aimeat_memory_search: {
         include_versions: 'GET /v1/memory/search does not read it; the node MCP applies that filter itself after the query.',
     },
     aimeat_workflow_save: {
-        propose: 'Server-MCP only by design (workflows.ts v1.1.0): the propose-then-confirm flow is an operator path, and PUT /v1/workflows/:id takes the definition as its whole body with no field for it.',
-        confirm_token: 'Same flow, same reason. A connector caller saves directly or not at all.',
+        propose: 'Server-MCP only by design (workflows.ts v1.1.0): the propose-then-confirm flow is an operator path, and PUT /v1/workflows/:id takes the definition as its whole body with no field for it. The shell and the connector refuse it with NOT_ON_THIS_SURFACE (2026-10-06).',
+        confirm_token: 'Same flow, same reason, the same refusal.',
     },
     aimeat_crew_try: {
         try_id: 'Conditional, not dropped: the probe sets doc as well, which STARTS a trial and gets its own id; try_id is only read when there is no doc (continue waiting). Both branches reach the node in test/e2e-agent-crew.ts.',
