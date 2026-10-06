@@ -23,7 +23,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 2. **A test or a measurement that cannot fail.** A test nobody saw red, a fixture smaller than the limit it tests, a comparison two empty results satisfy, a concurrency test run on sqlite only, a flag tested switched on only, a sweep total read as a regression. *Ask which line of the change turns the test red when it is reverted.* §12, 17, 18, 19, 21, 26, 34, 35, 37, 38, 45, 46, 50, 51, 54, 56, 57, 69, 72, 79, 89, 90, 91, 94, 99, 100, 115
 3. **One rule, N doors, and one forgets.** A rule changed in one place while other doors reach the same capability: the REST route, the node MCP tool, the connector MCP tool, the CLI dispatch, an operator door, a second writer of the same record, a second backend. *Grep the capability's name and ask whether every door goes through the changed code.* §3, 7, 8b, 25, 33, 41, 44, 47, 48, 52, 58, 78, 81, 97, 110, 116
 4. **A name is not a principal.** A comparison or a storage key built from `req.auth.owner`, `sub`, a bare account name, a delivery target or a display identity where the holder or the addressed principal is meant. *Ask what the value holds for an agent, an app grant, a federated session and a namesake.* §6, 22, 43, 53, 66, 83, 103
-5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b, 105, 112
+5. **Parallel sessions and the machine.** A hardcoded port, a probe that binds narrower than the server, a file or a log used as state, a path from the other shell's world, a recursive delete near a link. *Ask what happens when a second session runs the same thing on this machine at the same moment.* §13, 14, 23, 32, 38b, 39, 60, 71, 77b, 105, 112, 121
 
 ## Symptom index
 
@@ -150,6 +150,8 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 117 | A tool's own `agent_name` or `response_format` vanishes on the connector | 1 |
 | 118 | A tool call answers ok, and the route never saw one of its parameters | 1 |
 | 119 | After a deploy, agents no longer see tools they used yesterday; every test is green | 2 |
+| 120 | A replay window on a signed message refuses every record older than five minutes | · |
+| 121 | An E2E suite's server dies at start with a ReferenceError from a file you are editing | 5 |
 
 ---
 
@@ -1322,3 +1324,19 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** The secaudit 2026-10 follow-up (A4, `65d3c5b36`) made each MCP tool ask the scope words its REST route asks. The node MCP registers a tool only when the session holds every word on it (`scopeAllowsTool`), so a new word does not refuse a call, it REMOVES the tool. `organism:read` went onto the workspace read tools, and neither `config.defaultAgentScopes` nor the "standard" consent preset carries it: on aimeat.io every agent approved with them lost workspace read, overview, organism search and export at the deploy. Four E2E suites failed and were fixed by adding the word to their test agents, which is the one fix a real agent never gets. The same shape broke production in changelog 1.33.1. Fixed by `services/tool-scope-words-migration.ts`.
 - **The rule.** A word added to a tool's `scope` ships in the same commit as a once-per-node migration that hands the word to the agents approved before it, on positive evidence only (the word they already held that reached the tool), and never a word that opens more than the reach they had (`services/scope-vocabulary-migration.ts` and `tool-scope-words-migration.ts` say which words never go in). Check the default scopes and the consent presets as well: an agent approved tomorrow gets the same lists.
 - **The tell.** A test fixed by giving its agent a new scope word. Ask what happens to the agents in production that hold yesterday's words.
+
+## 120. A replay window on a signed message refuses every record older than five minutes
+
+*Symptoms: after a freshness check is added to a federation receiver, replication of older memory stops; new records still replicate; the receiver answers 400 STALE_TIMESTAMP to a message that was sent a second ago.*
+
+- **The case.** The secaudit 2026-10 last items (D3) put the five-minute window and single use on the four federation messages that had none. `/v1/federation/replicate` signs a field called `timestamp`, and every sender fills it with the RECORD's `updatedAt` (`services/memory-replication.ts`, `routes/memory/federation.ts`, `services/genesis-sync.ts`), which the receiver then uses for last-writer-wins. Holding that field to five minutes would have refused every record not edited in the last five minutes. The read receipt has the same shape: its `timestamp` is when the message was read. Found by reading the senders before the receiver was changed.
+- **The rule.** Before a window is applied to a signed time, read every sender of the message and say what the field holds. When it is not the send time, the send time travels separately and signed: `deliveryProof` / `deliveryRefusal` in `services/signed-node-request.ts` add `sent_at` under a second signature with its own prefix, and the window and the single use apply to that.
+- **The tell.** A field named `timestamp` on a message that carries a record. Ask whose moment it is.
+
+## 121. An E2E suite's server dies at start with a ReferenceError from a file you are editing
+
+*Symptoms: one suite in a background run fails with "Test server exited during startup" and a ReferenceError (for example `rateLimit is not defined`) in a route file; the same suite passes when run again; the code in the file is correct now.*
+
+- **The case.** 2026-10-06, session cc-jouni-secaudit-last: a run of targeted suites went on in the background while the next change was written in the same worktree. The runner starts a fresh server for each suite from `src/` through tsx, so a suite that started between two edits (the route line written, its import not yet) loaded half a change. The failure belonged to neither change.
+- **The rule.** While suites run in a worktree, edit only files no server loads (tests not in the run, notes, the scratchpad), or run the suites from a second worktree at the commit under test. A red suite whose error names a line you were editing at that moment is run again before anything else is concluded (§18).
+- **The tell.** A startup failure in a file with an uncommitted change, from a run that began before the change was finished.
