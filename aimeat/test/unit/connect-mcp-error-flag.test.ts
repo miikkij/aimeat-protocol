@@ -22,6 +22,8 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-10-06 — PROBE_SETUP entries for seven tools that run their dispatch definition on the
+ *     connector now (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — PROBE_SETUP conversation ids for aimeat_dm_thread, aimeat_dm_thread_as_owner and
  *     aimeat_dm_archive_as_owner: the connector registers the node's id pattern now (secaudit 2026-10, M3).
  *   2026-09-27 — aimeat_app_manage gets a PROBE_SETUP entry (action versions).
@@ -94,6 +96,16 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   // is refused before anything is called. A setup entry keeps the tool inside the probe's
   // reach, which is the whole point: an exemption would stop measuring it.
   aimeat_mcp_grant_set: { grantee: 'probe#someone@node-id', tools: ['probe'] },
+  // These run their CLI dispatch definition on the connector since secaudit 2026-10 follow-up Part B,
+  // and the definition asks for the field the catalog marks optional because another one can stand
+  // in for it (a rule for questions, ext for offering_id, an upload for content).
+  aimeat_dm_send: { to: 'someone@node-id', body: 'probe' },
+  aimeat_app_draft_save: { content: 'PGh0bWw+PC9odG1sPg==' },
+  aimeat_app_template_propose: { reuse_notes: 'probe probe probe' },
+  aimeat_decide: { questions: { q1: { type: 'noul', instructions: 'probe' } } },
+  aimeat_exchange_accept: { offering_id: 'off-probe' },
+  aimeat_admin_install_set: { install_set: { spec: 'aimeat.install-set/1' } },
+  aimeat_package_sale: { repository: 'repo-probe', group_id: 'grp-probe' },
 };
 
 /**

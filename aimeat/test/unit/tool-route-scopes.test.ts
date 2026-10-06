@@ -16,6 +16,8 @@
  *   entry that no longer differs.
  * @usage pnpm test -- tool-route-scopes
  * @version-history
+ *   v1.1.1 — 2026-10-06 — aimeat_skill_list leaves KNOWN: its first dispatch call no longer reaches a
+ *     route that asks a word (secaudit 2026-10 follow-up, Part B).
  *   v1.1.0 — 2026-10-06 — The UNREVIEWED pairs are triaged: each tool asks its route's words, and
  *     aimeat_skill_list carries its answer (secaudit 2026-10 follow-up, A4).
  *   v1.0.1 — 2026-10-05 — Two pairs the AI-model dispatch definitions hid behind a spread name are listed
@@ -129,9 +131,10 @@ const KNOWN: Record<string, string> = {
   aimeat_workspace_write: 'LOOKUP: reads the workspace to find the section before it writes.',
   aimeat_workspace_object_delete: 'LOOKUP: lists the memory keys of the object before it deletes them.',
   aimeat_offer_price_set: 'LOOKUP: reads the agent\'s offers before it sets the price.',
-  // The 30 UNREVIEWED pairs were triaged on 2026-10-06 (secaudit 2026-10 follow-up, A4): 29 tools now
-  // ask the words their route asks, and this one is answered.
-  aimeat_skill_list: 'BRANCH: only view=linked calls GET /v1/agents/:name/skills/links (memory:read), and on the node\'s MCP that view asks memory:read too; the library, mine and workspace views call GET /v1/skills, which asks no word.',
+  // The 30 UNREVIEWED pairs were triaged on 2026-10-06 (secaudit 2026-10 follow-up, A4): the tools
+  // ask the words their route asks. aimeat_skill_list left this list in Part B: its first call is now
+  // the binding filter on GET /v1/skills, which asks no word, and only view=linked calls
+  // GET /v1/agents/:name/skills/links (memory:read), which the node's MCP asks for that view too.
 };
 
 describe('an MCP tool asks the scope words of the route it runs on', () => {

@@ -1,24 +1,10 @@
 {
   "description": "Connector MCP tools that have a CLI dispatch definition (src/tool-dispatch/) and still register a handler of their own in src/cli/connect/mcp/tools/. Every other connector tool runs its dispatch definition (dispatch-tools.ts). Seeded 2026-10-05 (secaudit 2026-10, M3): each one listed here was measured to differ from its dispatch definition in the HTTP request it sends or the result it answers, against a node that answers and one that refuses, or it is one of the tools whose connector takes other parameters than the node (security/mcp-schema-single-source.json). Not yet reviewed: which side is right is decided per tool by reading its route. Settling one means making the two the same and deleting the handler. scripts/audit-mcp-schemas.ts (pnpm check:mcp-schemas) refuses a new handler and a listed one that is gone. The list only shrinks.",
   "tools": [
-    "aimeat_app_template_propose",
-    "aimeat_appdev_overview",
-    "aimeat_appdev_pitfall_list",
-    "aimeat_capabilities_create",
-    "aimeat_capabilities_invoke",
-    "aimeat_capabilities_update",
-    "aimeat_flag_report",
     "aimeat_knowledge_contribute",
-    "aimeat_operator_agent_configure",
-    "aimeat_operator_ai_config",
     "aimeat_organism_list",
     "aimeat_organism_overview",
     "aimeat_organism_search",
-    "aimeat_skill_get",
-    "aimeat_skill_link",
-    "aimeat_skill_list",
-    "aimeat_skill_publish",
-    "aimeat_skill_unlink",
     "aimeat_workspace_access",
     "aimeat_workspace_comment",
     "aimeat_workspace_create",
@@ -34,5 +20,8 @@
     "aimeat_workspace_transfer",
     "aimeat_workspace_update",
     "aimeat_workspace_write"
-  ]
+  ],
+  "reasons": {
+    "aimeat_knowledge_contribute": "Adding an entry to a knowledge package has no HTTP route (services/knowledge-package-entry.ts is reached only through the node MCP), so the connector and the shell refuse it. The connector keeps its own registration for one thing the dispatch path cannot give: a description that says the call refuses before an agent spends one (KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE). Whether to add the route is the developer's call (secaudit 2026-10 follow-up, Part B)."
+  }
 }

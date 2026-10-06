@@ -36,7 +36,6 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
     createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
 } from '../services/capability-record.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -166,23 +165,7 @@ export function registerCapabilitiesTools(
     mcp.tool(
         'aimeat_capabilities_create',
         descriptionFor('aimeat_capabilities_create'),
-        {
-            id: z.string().optional().describe('Custom capability ID (auto-generated UUID if omitted)'),
-            name: z.string().describe('Human-readable capability name'),
-            summary: z.string().describe('Brief description of what this capability does'),
-            callable: z.boolean().optional().describe('Whether this capability can be invoked directly'),
-            status: z.enum(['draft', 'active']).optional().describe(
-                'draft = created but listed to nobody; active = listed. Default draft, the same as POST /v1/capabilities — '
-                + 'so nothing reaches the catalogue that the owner did not mean to put there. Publish it later with '
-                + 'aimeat_capabilities_update({ id, status: "active" }). On a moderated node a PUBLIC capability goes to '
-                + 'pending_review whichever you ask for; that gate is not this field.'),
-            visibility: z.enum(['private', 'public']).optional().describe('Visibility: private (default) or public'),
-            tags: z.array(z.string()).optional().describe('Tags for discovery and filtering'),
-            inputSchema: z.record(z.string(), z.unknown()).optional().describe('JSON Schema for input validation'),
-            outputSchema: z.record(z.string(), z.unknown()).optional().describe('JSON Schema for output format'),
-            usage: z.string().optional().describe('Usage instructions for consumers'),
-            whenToUse: z.string().optional().describe('Guidance on when this capability is appropriate'),
-        },
+        zodShapeFor('aimeat_capabilities_create'),
         annotationsFor('aimeat_capabilities_create'),
         async (args) => {
             try {
@@ -209,22 +192,10 @@ export function registerCapabilitiesTools(
     mcp.tool(
         'aimeat_capabilities_update',
         descriptionFor('aimeat_capabilities_update'),
-        {
-            id: z.string().describe('Capability ID to update'),
-            name: z.string().optional().describe('Updated capability name'),
-            summary: z.string().optional().describe('Updated summary'),
-            tags: z.array(z.string()).optional().describe('Updated tags'),
-            visibility: z.enum(['private', 'public']).optional().describe('Updated visibility'),
-            status: z.enum(['draft', 'active', 'deprecated', 'disabled']).optional().describe(
-                'Publish a draft with "active", take it out of the catalogue with "draft", or retire it with '
-                + '"deprecated" / "disabled". Without this an agent could create a capability and never publish it.'),
-            usage: z.string().optional().describe('Updated usage instructions'),
-            whenToUse: z.string().optional().describe('Updated guidance on when to use'),
-            whenNotToUse: z.string().optional().describe('Updated guidance on when NOT to use'),
-        },
+        zodShapeFor('aimeat_capabilities_update'),
         annotationsFor('aimeat_capabilities_update'),
         async (args) => {
-            // Which fields this door accepts is its own declaration, above. What happens to them —
+            // Which fields this tool accepts is the catalog's declaration. What happens to them —
             // ownership, the moderation rule on a status change, the updatedAt stamp — is shared.
             const updates: Record<string, unknown> = {};
             if (args.name !== undefined) updates.name = args.name;

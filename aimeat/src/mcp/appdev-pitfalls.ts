@@ -12,6 +12,8 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes, caller);
  * @version-history
+ *   2026-10-06 — The list is services/appdev-kb.ts pitfallIndex(), which GET /v1/appdev/pitfalls/index
+ *     answers with too, and takes the catalog's schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: the list reads own and shared learned entries through
@@ -36,50 +38,20 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
 import {
     PITFALL_PACKAGE_ID,
-    ownPitfallRecords, sharedPitfallRecords,
-    pitfallEntryKey, deletePitfallEntry, filterPitfalls, reportLearnedPitfall,
-    type LearnedPitfallValue, type PitfallLike,
+    pitfallEntryKey, deletePitfallEntry, pitfallIndex, reportLearnedPitfall,
 } from '../services/appdev-kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerForAgent } from '../services/classification/reader.js';
-import { classificationWarningOf } from '../services/classification/present-memory.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 
 export { PITFALL_PACKAGE_ID };
-
-type PitfallEntryValue = LearnedPitfallValue;
-
-function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): Record<string, unknown> {
-    const v = rec.value as Partial<PitfallEntryValue> | null;
-    const warning = classificationWarningOf(rec);
-    return {
-        source,
-        key: rec.key,
-        title: v?.title ?? rec.key,
-        category: v?.category ?? null,
-        slug: v?.slug ?? null,
-        model: v?.model ?? null,
-        applies_to: v?.applies_to ?? [],
-        severity: v?.severity ?? 'warn',
-        status: v?.status ?? 'active',
-        updated: v?.updated ?? rec.updatedAt,
-        verified_at: v?.verified_at ?? null,
-        verified_version: v?.verified_version ?? null,
-        shared: rec.visibility === 'public',
-        // Another owner's entry is read by naming its holder (aimeat_memory_read_public {gaii, key}).
-        ...(source === 'learned-shared' ? { owner: rec.ownerGaii } : {}),
-        ...(warning ? { classificationWarning: warning } : {}),
-    };
-}
 
 export function registerAppdevPitfallTools(
     mcp: McpServer,
@@ -135,67 +107,14 @@ export function registerAppdevPitfallTools(
     mcp.tool(
         'aimeat_appdev_pitfall_list',
         descriptionFor('aimeat_appdev_pitfall_list'),
-        {
-            scope: z.enum(['own', 'platform', 'all']).optional().describe('own = your owner bubble; platform = curated registry + other owners\' shared entries; all = both (default)'),
-            category: z.string().max(40).optional(),
-            model: z.string().max(64).optional().describe('Filter learned entries to one model (e.g. claude-haiku-4.5)'),
-            applies_to: z.string().max(20).optional().describe('Filter by area (app, auth, ext, cortex, iam, realtime, ai, mobile, publish)'),
-            status: z.enum(['active', 'outdated', 'all']).optional().describe('Default active (outdated hidden)'),
-            limit: z.number().int().min(1).max(100).optional().describe('Page size, default 25'),
-            offset: z.number().int().min(0).optional().describe('Page start, default 0'),
-        },
+        zodShapeFor('aimeat_appdev_pitfall_list'),
         annotationsFor('aimeat_appdev_pitfall_list'),
-        async ({ scope, category, model, applies_to, status, limit, offset }) => {
-            const effScope = scope ?? 'all';
-            const wantStatus = status ?? 'active';
-            const normModel = model?.trim().toLowerCase();
-            const entries: Array<Record<string, unknown>> = [];
-            // Learned entries are user-written memory records, so what this agent is shown is the
-            // classification reader's decision (services/classification/reader.ts, TARGET-082).
-            const reader = readerForAgent({ storage, config }, agentGaii, sessionScopes);
-
-            if (effScope === 'own' || effScope === 'all') {
-                for (const rec of await ownPitfallRecords(storage, config, reader)) {
-                    entries.push(asIndexEntry('learned', rec));
-                }
-            }
-            if (effScope === 'platform' || effScope === 'all') {
-                // Curated node registry — platform-level knowledge, always available.
-                for (const p of getAppdevPitfalls({ includeOutdated: wantStatus !== 'active' })) {
-                    entries.push({
-                        source: 'curated', id: p.id, title: p.title, category: null, slug: p.id,
-                        model: null, applies_to: p.appliesTo, severity: p.severity,
-                        status: p.status ?? 'active', updated: p.updatedAt, shared: true,
-                        verified_at: p.verifiedAt ?? null, verified_version: p.verifiedVersion ?? null,
-                        detail_url: `/v1/appdev/pitfalls/${p.id}`,
-                    });
-                }
-                // Other owners' public-shared learned entries (own entries come from the own branch).
-                for (const rec of await sharedPitfallRecords(storage, config, reader)) {
-                    entries.push(asIndexEntry('learned-shared', rec));
-                }
-            }
-
-            // The filter, sort, facet and page step is filterPitfalls(), the same one the profile
-            // page's REST route calls. Facets here count what the filter left, as they always did.
-            const page = filterPitfalls(entries as PitfallLike[], {
-                status: wantStatus, category, model: normModel, applies_to, sort: 'severity', limit, offset,
-            });
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        pitfalls: page.pitfalls,
-                        total: page.total,
-                        offset: page.offset,
-                        limit: page.limit,
-                        facets: page.filtered_facets,
-                        // aimeat_knowledge_get was named here and answers "Package not found" for any
-                        // agent that did not write the package manifest itself: it reads one namespace.
-                        hint: 'One full learned entry: aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one. Curated detail: GET /v1/appdev/pitfalls/{id}.',
-                    }, null, 2),
-                }],
-            };
+        async (query) => {
+            // The merge, filter and page is services/appdev-kb.ts pitfallIndex(), which
+            // GET /v1/appdev/pitfalls/index answers with too. Learned entries are user-written memory
+            // records, so what this agent is shown is the classification reader's decision.
+            const index = await pitfallIndex(storage, config, readerForAgent({ storage, config }, agentGaii, sessionScopes), query);
+            return { content: [{ type: 'text' as const, text: JSON.stringify(index, null, 2) }] };
         },
     );
 

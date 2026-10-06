@@ -10,6 +10,9 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-06 — aimeat_capabilities_invoke sends its arguments as body.input, which is where the
+ *     route reads them; create and update forward status; aimeat_flag_report sends targetType and
+ *     targetId, the names POST /v1/flags reads (secaudit 2026-10 follow-up, Part B).
  *   2026-10-06 — aimeat_memory_write forwards expected_version, which POST /v1/memory now reads
  *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — aimeat_discover writes both of its paths in the call, so check:field-reach's CodeQL query
@@ -560,7 +563,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_capabilities_invoke',
         handler: ({ client }, input) => client.post(
             `/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/invoke${query({ mode: optionalString(input, 'mode') })}`,
-            optionalRecord(input, 'input') ?? {},
+            // The route reads the capability's arguments from body.input, as the node's MCP passes them.
+            { input: optionalRecord(input, 'input') ?? {} },
         ),
     },
     {
@@ -573,6 +577,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const id = optionalString(input, 'id'); if (id) body.id = id;
             const callable = optionalBoolean(input, 'callable'); if (callable !== undefined) body.callable = callable;
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
+            const status = optionalString(input, 'status'); if (status) body.status = status;
             const tags = optionalArray(input, 'tags'); if (tags) body.tags = tags;
             const inputSchema = optionalRecord(input, 'inputSchema'); if (inputSchema) body.inputSchema = inputSchema;
             const outputSchema = optionalRecord(input, 'outputSchema'); if (outputSchema) body.outputSchema = outputSchema;
@@ -586,7 +591,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const body: JsonObject = {};
             // Every optional field the catalog publishes, not the two this door happened to read.
-            for (const field of ['name', 'description', 'summary', 'visibility', 'usage', 'whenToUse', 'whenNotToUse'] as const) {
+            for (const field of ['name', 'summary', 'visibility', 'status', 'usage', 'whenToUse', 'whenNotToUse'] as const) {
                 const v = optionalString(input, field);
                 if (v) body[field] = v;
             }
@@ -659,9 +664,10 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_flag_report',
         handler: ({ client }, input) => {
+            // POST /v1/flags reads targetType and targetId; the snake_case names never reached it.
             const body: JsonObject = {
-                target_type: requiredString(input, 'target_type'),
-                target_id: requiredString(input, 'target_id'),
+                targetType: requiredString(input, 'target_type'),
+                targetId: requiredString(input, 'target_id'),
                 reason: requiredString(input, 'reason'),
             };
             const description = optionalString(input, 'description');

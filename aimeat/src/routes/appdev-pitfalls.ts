@@ -10,6 +10,9 @@
  * @structure appdevPitfallsRouter(config, storage) → Router
  * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.5.0 — 2026-10-06 — GET /index: the merged index (own, curated and shared, by scope) that the
+ *     node's MCP list tool answers with, through services/appdev-kb.ts pitfallIndex(), so the
+ *     connector's tool reaches the curated registry too (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The pitfall report's caller is the request's CallerContext (middleware/caller.ts; secaudit 2026-10, C9).
  *   v1.4.0 — 2026-09-29 — TARGET-082 V4: GET /learned hands queryLearnedPitfalls() the caller's
  *     classification reader (readerFor), so an entry the caller may not see is left out.
@@ -37,7 +40,7 @@ import {
   getAppdevPitfalls, getAppdevPitfallFacets,
 } from '../data/appdev-pitfalls.js';
 import {
-  queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry, reportLearnedPitfall,
+  queryLearnedPitfalls, setPitfallFlags, deletePitfallEntry, reportLearnedPitfall, pitfallIndex,
 } from '../services/appdev-kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerFor } from '../services/classification/reader.js';
@@ -50,6 +53,31 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
 
   // ── LEARNED entries (the profile UI's management surface) — MUST be registered before
   // the parameterized /v1/appdev/pitfalls/:id route or "learned" would match as an id. ──
+
+  // GET /v1/appdev/pitfalls/index[?scope=own|platform|all&status=&category=&model=&applies_to=
+  //   &limit=&offset=] — the merged index an agent reads before it builds: own learned entries, the
+  // curated registry and other owners' shared entries, without bodies. services/appdev-kb.ts
+  // pitfallIndex(), the same answer aimeat_appdev_pitfall_list gives on the node's MCP.
+  router.get('/v1/appdev/pitfalls/index', requireAuth(), requireScope('memory:read'), async (req, res) => {
+    const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+    const num = (v: unknown) => { const n = Number.parseInt(String(v ?? ''), 10); return Number.isFinite(n) ? n : undefined; };
+    const scope = str(req.query.scope, 10);
+    const status = str(req.query.status, 10);
+    if ((scope && !['own', 'platform', 'all'].includes(scope)) || (status && !['active', 'outdated', 'all'].includes(status))) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scope is own, platform or all; status is active, outdated or all'));
+      return;
+    }
+    const index = await pitfallIndex(storage, config, readerFor({ storage, config }, req.auth), {
+      scope: scope as 'own' | 'platform' | 'all' | undefined,
+      status: status as 'active' | 'outdated' | 'all' | undefined,
+      category: str(req.query.category, 40),
+      model: str(req.query.model, 64),
+      applies_to: str(req.query.applies_to, 20),
+      limit: num(req.query.limit),
+      offset: num(req.query.offset),
+    });
+    res.json(success(config.nodeId, index));
+  });
 
   // GET /v1/appdev/pitfalls/learned[?include_shared=1&status=&severity=&category=&model=
   //   &applies_to=&shared=&q=&sort=&limit=&offset=] — one page of the caller's own learned

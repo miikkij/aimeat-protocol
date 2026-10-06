@@ -17,6 +17,8 @@
  *   pnpm check:mcp-schemas               # pre-commit + CI gate (input drift only)
  *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
+ *   v1.4.1 -- 2026-10-06 -- agent_name is compared on a tool whose catalog entry declares it, and
+ *     thirteen entries leave KNOWN_INPUT_DRIFT (secaudit 2026-10 follow-up, Part B).
  *   v1.4.0 -- 2026-10-05 -- The whole-schema comparison with the catalog (inventory/mcp-single-source.ts,
  *     secaudit 2026-10, M3). aimeat_checkout_list leaves KNOWN_INPUT_DRIFT: both surfaces register the
  *     catalog's schema, response_format included.
@@ -107,9 +109,7 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // aimeat_memory_write RESOLVED 2026-10-06: POST /v1/memory takes expected_version.
     // aimeat_extension_install RESOLVED 2026-09-13: the connector declares update and activate and
     // sends them to the doors that read them (PUT /v1/extensions/:name, then the activate route).
-    'aimeat_knowledge_contribute', // model
-    'aimeat_capabilities_create',  // status
-    'aimeat_capabilities_update',  // status
+    // aimeat_knowledge_contribute, aimeat_capabilities_create and _update RESOLVED 2026-10-06: one schema.
     // aimeat_app_draft_save RESOLVED 2026-10-06: `content` and `content_base64` on every surface.
 
     // ── Seventeen the audit could not see until 2026-09-03. ──
@@ -125,27 +125,23 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     'aimeat_workspace_publish',        // expected_version — the optimistic lock, so a connector publish cannot refuse to overwrite an edit made in between
     'aimeat_workspace_update',         // apps
     'aimeat_organism_overview',        // include_archived
-    'aimeat_skill_list',               // binding, organism_id, workspace_id — a connector caller cannot filter the registry, only list it
-    'aimeat_skill_link',               // (agent_name only: the connector routes by agent, so this one is probably intentional and needs confirming, not fixing)
-    'aimeat_skill_unlink',             // as skill_link
+    // aimeat_skill_list, _link and _unlink RESOLVED 2026-10-06: one schema, and agent_name names the target agent on every surface.
     // RESOLVED 2026-09-06: not a naming difference, a broken door. The connector sent
     // { answer: {...} } at a route reading { picks, other } against the question pinned at ask time,
     // so WorkflowHumanAnswerSchema saw an empty body and every answer given there left the run
     // parked. Both doors take picks/other now; `answer` is deleted, not aliased.
     // aimeat_workflow_save RESOLVED 2026-10-06: one schema; the shell and the connector refuse propose and confirm_token by name.
-    'aimeat_operator_agent_configure', // confirm_token, and agent_name vs target_agent_name
-    'aimeat_operator_ai_config',       // confirm_token
-    'aimeat_app_template_propose',     // composes, derived_from, model_notes, packs, start_mode_rationale
-    'aimeat_appdev_pitfall_list',      // applies_to, category, limit, model, offset, scope, status — the connector can only list, not query
-    'aimeat_app_tools_publish',        // odps, provenance
-    'aimeat_offer_price_set',          // (agent_name only — routing, likely intentional)
-    'aimeat_exchange_accept',          // offering_id
-    'aimeat_exchange_need_post',       // usage_intent
+    // RESOLVED 2026-10-06 (secaudit 2026-10 follow-up, Part B), one schema on both surfaces:
+    // aimeat_operator_agent_configure, aimeat_operator_ai_config, aimeat_app_template_propose,
+    // aimeat_appdev_pitfall_list, aimeat_app_tools_publish, aimeat_offer_price_set,
+    // aimeat_exchange_accept and aimeat_exchange_need_post.
 ]);
 
-function diffKeys(serverKeys: string[], connectorKeys: string[]): { onlyServer: string[]; onlyConnector: string[] } {
+/** A tool whose catalog entry declares agent_name takes it as its own field (whose offer, which
+ *  agent to link a skill to), so on such a tool it is compared, not set aside as routing. */
+function diffKeys(serverKeys: string[], connectorKeys: string[], ownKeys: string[] = []): { onlyServer: string[]; onlyConnector: string[] } {
     const s = new Set(serverKeys);
-    const c = new Set(connectorKeys.filter(k => !CONNECTOR_EXTRA.has(k)));
+    const c = new Set(connectorKeys.filter(k => !CONNECTOR_EXTRA.has(k) || ownKeys.includes(k)));
     return {
         onlyServer: [...s].filter(k => !c.has(k)).sort(),
         onlyConnector: [...c].filter(k => !s.has(k)).sort(),
@@ -168,7 +164,7 @@ function main(): void {
     for (const name of shared) {
         const sv = server.get(name)!;
         const cn = connector.get(name)!;
-        const d = diffKeys(sv.inputKeys, cn.inputKeys);
+        const d = diffKeys(sv.inputKeys, cn.inputKeys, catalog.get(name) ?? []);
         if (d.onlyServer.length || d.onlyConnector.length) {
             driftDetail.set(name, `  ${name}: server-only [${d.onlyServer.join(', ')}] | connector-only [${d.onlyConnector.join(', ')}]`);
         }

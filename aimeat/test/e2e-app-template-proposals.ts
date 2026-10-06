@@ -8,7 +8,11 @@
  *   (aimeat_discover type=template scope=own finds a proposal; public scope stays empty).
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-template-proposals).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
+ * @version-history
+ *   v1.1.0 — 2026-10-06 — POST /v1/appdev/templates and GET /v1/appdev/pitfalls/index, the routes the
+ *     connector's tools call now: the same answer as the MCP tools, and their refusals
+ *     (secaudit 2026-10 follow-up, Part B).
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -271,6 +275,81 @@ await test('delete removes the proposal', async () => {
     assert(JSON.parse(list.result.content[0].text).total === 0, 'proposal still listed');
     const again = await A.call('aimeat_app_template_delete', { id: 'demo-dashboard' });
     assert(again.result?.isError === true, 'double delete should error');
+});
+
+// ── The HTTP routes the connector and the shell call (secaudit 2026-10 follow-up, Part B) ──
+//
+// aimeat_app_template_propose and aimeat_appdev_pitfall_list run their CLI dispatch definition on the
+// connector. The first wrote a memory record itself under tags the list does not read, so a proposal
+// made there was never listed; the second read GET /learned, which has no curated entries. Each now
+// calls a route that runs the node MCP tool's own function, and these tests hold the two to the same
+// answer.
+
+const rest = (s: McpSession, path: string, opts: RequestInit = {}) =>
+    json(path, { ...opts, headers: { Authorization: `Bearer ${s.token}`, ...opts.headers } });
+
+await test('POST /v1/appdev/templates proposes through the same function, and the MCP list shows it', async () => {
+    const { status, body } = await rest(A, '/v1/appdev/templates', {
+        method: 'POST',
+        body: JSON.stringify({
+            id: 'rest-proposal', title: 'Proposed over HTTP', description: 'what the connector sends',
+            derived_from: { owner: ownerA, filename: FILENAME }, tier: 'T1',
+            reuse_notes: 'Keep the shell; this one came in through the route.', model: 'Claude-Opus-5.5',
+        }),
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body).slice(0, 250)}`);
+    assert(body.data?.id === 'rest-proposal' && body.data?.updated === false, `unexpected: ${JSON.stringify(body.data)}`);
+    const list = JSON.parse((await A.call('aimeat_app_template_list', {})).result.content[0].text);
+    const row = list.templates.find((t: any) => t.id === 'rest-proposal');
+    assert(!!row, `the route's proposal is not listed: ${JSON.stringify(list).slice(0, 250)}`);
+    assert(row.model === 'claude-opus-5.5', `model not normalized: ${row.model}`);
+});
+
+await test('POST /v1/appdev/templates → 400 for another owner\'s app, 400 out of bounds, 401 without a credential', async () => {
+    const foreign = await rest(B, '/v1/appdev/templates', {
+        method: 'POST',
+        body: JSON.stringify({
+            id: 'b-claims-a', title: 'Not mine', description: 'derived from owner A',
+            derived_from: { owner: ownerA, filename: FILENAME }, tier: 'T1',
+            reuse_notes: 'should be refused: the app is not mine', model: 'claude-opus-5.5',
+        }),
+    });
+    assert(foreign.status === 400 && foreign.body.error?.code === 'INVALID_INPUT', `foreign derived_from answered ${foreign.status}`);
+    const listB = JSON.parse((await B.call('aimeat_app_template_list', {})).result.content[0].text);
+    assert(listB.total === 0, 'B gained a proposal over A\'s app');
+    const short = await rest(A, '/v1/appdev/templates', {
+        method: 'POST',
+        body: JSON.stringify({
+            id: 'too-short', title: 'Short', description: 'reuse notes too short',
+            derived_from: { owner: ownerA, filename: FILENAME }, tier: 'T1', reuse_notes: 'tiny', model: 'm',
+        }),
+    });
+    assert(short.status === 400, `out-of-bounds body answered ${short.status}`);
+    const anon = await json('/v1/appdev/templates', { method: 'POST', body: '{}' });
+    assert(anon.status === 401, `no credential answered ${anon.status}`);
+    const del = await A.call('aimeat_app_template_delete', { id: 'rest-proposal' });
+    assert(!del.result?.isError, 'cleanup delete failed');
+});
+
+await test('GET /v1/appdev/pitfalls/index answers what aimeat_appdev_pitfall_list answers', async () => {
+    for (const args of [{}, { scope: 'own' }, { scope: 'platform', limit: 5, offset: 2 }, { status: 'all', applies_to: 'auth' }]) {
+        const q = new URLSearchParams(Object.entries(args).map(([k, v]) => [k, String(v)])).toString();
+        const { status, body } = await rest(A, `/v1/appdev/pitfalls/index${q ? `?${q}` : ''}`);
+        assert(status === 200, `index ${q} answered ${status}`);
+        const tool = JSON.parse((await A.call('aimeat_appdev_pitfall_list', args)).result.content[0].text);
+        assert(JSON.stringify(body.data) === JSON.stringify(tool), `index ${q} differs from the MCP tool`);
+    }
+    const all = await rest(A, '/v1/appdev/pitfalls/index');
+    assert(all.body.data.pitfalls.some((p: any) => p.source === 'curated'), 'the curated registry is missing from the index');
+    const own = await rest(A, '/v1/appdev/pitfalls/index?scope=own');
+    assert(!own.body.data.pitfalls.some((p: any) => p.source === 'curated'), 'scope=own carries curated entries');
+});
+
+await test('GET /v1/appdev/pitfalls/index → 400 for an unknown scope, 401 without a credential', async () => {
+    const bad = await rest(A, '/v1/appdev/pitfalls/index?scope=everyone');
+    assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `unknown scope answered ${bad.status}`);
+    const anon = await json('/v1/appdev/pitfalls/index');
+    assert(anon.status === 401, `no credential answered ${anon.status}`);
 });
 
 console.log('\n' + '─'.repeat(40));
