@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.22.0 — 2026-10-06 — SHIPPED_DEFAULT_AGENT_SCOPES carries organism:read (secaudit 2026-10 last
+ *     items, D4).
  *   v1.21.1 — 2026-10-06 — isPrivateHost moved to config-private-host.ts (max-file-lines), unchanged.
  *   v1.21.0 — 2026-10-02 — packagePeerCap (AIMEAT_PACKAGE_PEER_CAP, default 500).
  *   v1.20.0 — 2026-10-01 — appAuditKeepDefault (AIMEAT_APP_AUDIT_KEEP, default 0 = keep all).
@@ -120,6 +122,13 @@ import { isPrivateHost } from './config-private-host.js';
 // modules that import it from here keep working; the move was not meant to be visible.
 export { securityPostureWarnings } from './config-posture.js';
 import { assertEudiwNotHalfBuilt } from './config-eudiw-guard.js';
+
+/**
+ * The scopes an agent is approved with when nobody names any (AIMEAT_DEFAULT_AGENT_SCOPES unset).
+ * organism:read is in it because the workspace read tools ask it since 2026-10-06; organism:write is
+ * not, and comes with the "standard" consent preset the owner sees (Jouni 2026-10-06, D4).
+ */
+export const SHIPPED_DEFAULT_AGENT_SCOPES = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read';
 
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const { configPath, cliOverrides } = options ?? {};
@@ -594,7 +603,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     metricsAccess: (process.env.AIMEAT_METRICS_ACCESS as 'public' | 'authenticated' | 'operator') ?? 'operator',
 
     // Scoped Agent Capabilities (REQ-006)
-    defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? 'memory:read,memory:write,memory:delete,catalogue:read').split(',').map(s => s.trim()),
+    defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? SHIPPED_DEFAULT_AGENT_SCOPES).split(',').map(s => s.trim()),
     maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
     // Same-owner device-auth auto-approval (Agent-Bundled Apps): a device-authorize call
     // authenticated as the SAME owner it registers for (owner session, or one of that owner's

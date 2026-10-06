@@ -9172,7 +9172,7 @@
     "cfgDesc_metrics_access": "Visibilidad de las métricas: public, authenticated u operator.",
     "cfgDesc_mcp_session_idle_minutes": "Cerrar una sesión MCP tras estos minutos sin solicitudes (se admiten fracciones; un cliente cerrado se reinicializa).",
     "cfgDesc_registration_mode": "Quién puede tener cuenta nueva: open (todos), oauth (primer inicio por un proveedor de identidad, o invitación — sin registro por contraseña), invite (solo invitaciones de miembros), closed (nadie). Las cuentas existentes siempre entran.",
-    "cfgDesc_scopes_default_agent_scopes": "Ámbitos por defecto de un agente (separados por comas).",
+    "cfgDesc_scopes_default_agent_scopes": "Los permisos que recibe un agente cuando nadie elige ninguno, separados por comas. De serie puede leer y escribir la memoria de su dueño, leer el catálogo y leer los espacios de trabajo de los organismos de su dueño.",
     "cfgDesc_scopes_max_agent_scopes": "Ámbitos de agente disponibles (separados por comas; * = todos).",
     "cfgDesc_sso_enabled": "Puertas de inicio de sesión de organización (SAML) y aprovisionamiento (SCIM) activadas.",
     "cfgDesc_sso_connections_locked": "Congelar la gestión de conexiones SSO (toda escritura administrativa responde 403).",

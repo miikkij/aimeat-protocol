@@ -10629,7 +10629,7 @@
     "cfgDesc_metrics_access": "Metrics endpoint visibility: public, authenticated, or operator",
     "cfgDesc_mcp_session_idle_minutes": "Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
-    "cfgDesc_scopes_default_agent_scopes": "Default agent capability scopes (comma-separated)",
+    "cfgDesc_scopes_default_agent_scopes": "The permissions an agent gets when nobody chooses any, separated by commas. Out of the box it may read and write its owner's memory, read the catalogue and read the workspaces of its owner's organisms.",
     "cfgDesc_scopes_max_agent_scopes": "Max available agent scopes (comma-separated, * = all)",
     "cfgDesc_sso_enabled": "Enable organisation sign-in (SAML) and provisioning (SCIM) doors",
     "cfgDesc_sso_connections_locked": "Freeze SSO connection management (every admin write answers 403)",
