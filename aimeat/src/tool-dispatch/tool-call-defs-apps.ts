@@ -8,6 +8,10 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.10.1 -- 2026-10-06 -- aimeat_appdev_overview takes sections as the list the catalog publishes
+ *     and sends the route its comma-separated string; aimeat_appdev_pitfall_list reads
+ *     GET /v1/appdev/pitfalls/index and aimeat_app_template_propose posts to
+ *     POST /v1/appdev/templates, the node MCP tools' own functions (secaudit 2026-10 follow-up, Part B).
  *   v1.10.0 -- 2026-10-06 -- aimeat_app_list sends its search as `q`, the name GET /v1/apps reads;
  *     aimeat_app_publish forwards ai_provenance and ai_provenance_id, which POST /v1/apps records;
  *     aimeat_app_draft_save takes content or content_base64 (secaudit 2026-10 follow-up, Part B).
@@ -589,28 +593,33 @@ export const appTools: ConnectCliToolDefinition[] = [
         description: 'One-call AppDev research tool: your apps, library packs (with proofs), templates, learned pitfalls.',
         input: {
             model: { type: 'string', description: 'Your own model (indicative): marks proven packs and orders learned pitfalls; filters nothing.' },
-            sections: { type: 'string', description: 'Comma-separated section filter (apps,library_packs,templates,pitfalls,...).' },
+            sections: { type: 'array', description: 'Section filter: apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals.' },
         },
-        handler: ({ client }, input) => client.get(`/v1/appdev/overview${query({ model: optionalString(input, 'model'), sections: optionalString(input, 'sections') })}`),
+        // The catalog publishes sections as a list; the route reads one comma-separated string. A
+        // list was dropped by optionalString, so every filtered call answered with every section.
+        handler: ({ client }, input) => {
+            const list = optionalArray(input, 'sections');
+            const sections = list ? list.filter((s): s is string => typeof s === 'string').join(',') || undefined : optionalString(input, 'sections');
+            return client.get(`/v1/appdev/overview${query({ model: optionalString(input, 'model'), sections })}`);
+        },
     },
     {
-        // → GET /v1/appdev/pitfalls/learned[?include_shared=1] — the caller's learned pitfall entries.
+        // → GET /v1/appdev/pitfalls/index — own learned entries, the curated registry and other
+        // owners' shared entries by scope, the answer the node's MCP tool gives (pitfallIndex()).
+        // This definition read GET /learned, which has no curated entries and no scope, and sent it an
+        // include_shared the catalog never published.
         name: 'aimeat_appdev_pitfall_list',
-        description: 'List learned appdev-pitfall entries in your owner scope (optionally including others\' shared entries).',
+        description: 'List appdev pitfalls: your own learned entries, the curated registry and other owners\' shared entries.',
         input: {
-            include_shared: { type: 'boolean', description: 'Also include other owners\' public-shared entries.' },
-            scope: { type: 'string', description: 'Filter by scope.' },
+            scope: { type: 'string', enum: ['own', 'platform', 'all'], description: 'own, platform (curated + shared) or all (default).' },
             category: { type: 'string', description: 'Filter by category.' },
-            model: { type: 'string', description: 'Filter by the model that reported it.' },
-            applies_to: { type: 'string', description: 'Filter by what the entry applies to.' },
-            status: { type: 'string', description: 'Filter by entry status.' },
-            limit: { type: 'number', description: 'Max entries to return.' },
-            offset: { type: 'number', description: 'Offset into the result set.' },
+            model: { type: 'string', description: 'Filter learned entries to one model.' },
+            applies_to: { type: 'string', description: 'Filter by area.' },
+            status: { type: 'string', enum: ['active', 'outdated', 'all'], description: 'Default active.' },
+            limit: { type: 'number', description: 'Page size, default 25 (max 100).' },
+            offset: { type: 'number', description: 'Page start, default 0.' },
         },
-        // Every filter the catalog published arrived here and stopped: the listing was always the
-        // whole thing, and a caller asking for one category got everything and had to filter twice.
-        handler: ({ client }, input) => client.get(`/v1/appdev/pitfalls/learned${query({
-            include_shared: optionalBoolean(input, 'include_shared') ? '1' : undefined,
+        handler: ({ client }, input) => client.get(`/v1/appdev/pitfalls/index${query({
             scope: optionalString(input, 'scope'),
             category: optionalString(input, 'category'),
             model: optionalString(input, 'model'),
@@ -733,52 +742,18 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.delete(`/v1/appdev/templates/${encodeURIComponent(requiredString(input, 'id'))}`),
     },
     {
-        // Propose/upsert an app-template. No dedicated REST route (the server MCP validates + builds the
-        // manifest, then writes template.catalog.{id}.manifest), so the shell proxy writes that same owner
-        // memory record via POST /v1/memory (memory:write authz unchanged).
+        // → POST /v1/appdev/templates, which runs proposeTemplate(), the node MCP tool's own function:
+        // the source app must be the caller's own and exist, and the record carries the tags the list
+        // reads. This definition wrote the memory record itself, under tags the list never read, so a
+        // proposal made here was never listed. The input is the catalog's.
         name: 'aimeat_app_template_propose',
-        description: 'Propose/upsert an app template distilled from an app you published (call after a successful publish).',
-        input: {
-            id: { type: 'string', required: true, description: 'Stable kebab-case template id (re-proposing updates it).' },
-            title: { type: 'string', required: true, description: 'Template title.' },
-            description: { type: 'string', required: true, description: 'What this template is for.' },
-            owner: { type: 'string', required: true, description: 'Your own owner name (source app owner).' },
-            filename: { type: 'string', required: true, description: 'The published app this template distills.' },
-            tier: { type: 'string', enum: ['T1', 'T2', 'T3'], description: 'T1 pure client · T2 +cortex · T3 +extension.' },
-            reuse_notes: { type: 'string', required: true, description: 'What generalizes — the parts a next build should keep.' },
-            model: { type: 'string', required: true, description: 'YOUR OWN model id (self-identify; indicative).' },
-            tags: { type: 'array', description: 'Optional tags.' },
-            start_mode: { type: 'string', enum: ['fork', 'scaffold', 'either'], description: 'How the next build should start (default either).' },
-            start_mode_rationale: { type: 'string', description: 'Why that start mode, for whoever picks the template up.' },
-            model_notes: { type: 'string', description: 'What the reporting model found hard or easy here.' },
-            packs: { type: 'array', description: 'Library packs the template needs.' },
-            composes: { type: 'array', description: 'Other templates this one composes with.' },
-            derived_from: { type: 'object', description: 'Explicit { owner, filename } source, when it is not the owner/filename pair above.' },
-        },
         handler: ({ client }, input) => {
-            const id = requiredString(input, 'id');
-            const value: JsonObject = {
-                id, title: requiredString(input, 'title'), description: requiredString(input, 'description'),
-                derivedFrom: optionalRecord(input, 'derived_from')
-                    ?? { owner: requiredString(input, 'owner'), filename: requiredString(input, 'filename') },
-                tier: optionalString(input, 'tier') ?? 'T1',
-                reuseNotes: requiredString(input, 'reuse_notes'),
-                model: requiredString(input, 'model').trim().toLowerCase(),
-                tags: optionalArray(input, 'tags') ?? [],
-                startMode: optionalString(input, 'start_mode') ?? 'either',
-                updatedAt: new Date().toISOString(),
-            };
-            // The five fields a template is actually chosen by. Dropped, every proposal looked
-            // identical to the next one in the catalogue.
-            const rationale = optionalString(input, 'start_mode_rationale');
-            const modelNotes = optionalString(input, 'model_notes');
-            const packs = optionalArray(input, 'packs');
-            const composes = optionalArray(input, 'composes');
-            if (rationale) value.startModeRationale = rationale;
-            if (modelNotes) value.modelNotes = modelNotes;
-            if (packs) value.packs = packs;
-            if (composes) value.composes = composes;
-            return client.post('/v1/memory', { key: `template.catalog.${id}.manifest`, value, visibility: 'owner', tags: ['app-template'] });
+            const body: JsonObject = {};
+            for (const field of ['id', 'title', 'description', 'derived_from', 'tier', 'reuse_notes', 'model', 'tags',
+                'start_mode', 'start_mode_rationale', 'model_notes', 'packs', 'composes'] as const) {
+                if (input[field] !== undefined) body[field] = input[field];
+            }
+            return client.post('/v1/appdev/templates', body);
         },
     },
 ];

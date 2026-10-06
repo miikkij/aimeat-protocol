@@ -9,6 +9,10 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.4.0 — 2026-10-06 — POST /v1/appdev/templates proposes (upserts) a template through
+ *     proposeTemplate(), the node MCP tool's own function, with the catalog's schema. The connector's
+ *     aimeat_app_template_propose wrote a memory record itself, under tags the list does not read,
+ *     so a proposal made there was never listed (secaudit 2026-10 follow-up, Part B).
  *   v1.3.1 — 2026-09-29 — TARGET-082 V4: GET /v1/appdev/overview hands buildAppdevOverview() the
  *     caller's classification reader (readerFor) instead of the resolved identity.
  *   v1.3.0 — 2026-09-20 — The two template routes also answer for a genre that grew out of an app.
@@ -19,6 +23,7 @@
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
 import { Router } from 'express';
+import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -28,9 +33,14 @@ import { buildAppdevOverview } from '../services/appdev-overview.js';
 import { readerFor } from '../services/classification/reader.js';
 import { logger } from '../utils/logger.js';
 import {
-  listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
+  listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate,
+  type ProposeTemplateInput,
 } from '../services/app-template-proposals.js';
 import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+
+/** The body POST /v1/appdev/templates takes: the MCP tool's input, from its catalog entry. */
+const ProposeTemplateBody = z.object(zodShapeFor('aimeat_app_template_propose'));
 
 export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -59,6 +69,21 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     // `node_templates`: what the node ships, without content, beside the owner's proposals, so
     // the tool that lists templates can name the shell a build starts from.
     res.json(success(config.nodeId, { templates, total: templates.length, node_templates: await templateIndex(storage, config) }));
+  });
+
+  // POST /v1/appdev/templates — propose or update one template (same id replaces).
+  router.post('/v1/appdev/templates', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const parsed = ProposeTemplateBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')));
+      return;
+    }
+    const result = await proposeTemplate(storage, config, resolveIdentity(req.auth!, config.nodeId), parsed.data as ProposeTemplateInput);
+    if ('error' in result) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', result.error));
+      return;
+    }
+    res.json(success(config.nodeId, { id: result.manifest.id, updated: result.updated, key: `template.catalog.${result.manifest.id}.manifest` }));
   });
 
   // GET /v1/appdev/templates/:id — one proposal + the source app's live state.

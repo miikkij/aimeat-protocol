@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-06 -- aimeat_operator_agent_configure and aimeat_operator_ai_config report a refused write
+ *     as a refusal; both read 'ok' whatever the route answered (secaudit 2026-10 follow-up, Part B).
  *   2026-10-06 -- aimeat_handbook_get reads an interface's handbook from its own route; aimeat_message_send
  *     forwards thread_id, which the send service reads (secaudit 2026-10 follow-up, Part B).
  *   2026-10-04 -- aimeat_task_decline → POST …/decline, `reason` required.
@@ -46,6 +48,7 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
+import type { ApiResponse } from './api-client.js';
 import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
 import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
 import { query, optionalString, requiredString, optionalArray, requiredArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload } from './tool-call-helpers.js';
@@ -732,15 +735,24 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const target = requiredString(input, 'agent_name');
             const applied: JsonObject = {};
             const unsupported: string[] = [];
+            // A refused write is reported as the node's refusal and makes the whole answer a refusal:
+            // it read 'ok' whatever the route answered (secaudit 2026-10 follow-up, Part B; pitfalls §115).
+            let refused = false;
+            const step = async (field: string, call: Promise<ApiResponse>) => {
+                const resp = await call;
+                if (resp.ok === false) { refused = true; applied[field] = (resp.error ?? { code: 'REFUSED', message: 'The node refused this change.' }) as JsonObject; }
+                else applied[field] = (resp.data ?? 'ok') as JsonObject;
+            };
             const mode = optionalString(input, 'mode');
-            if (mode !== undefined) applied.mode = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/mode`, { mode })).data ?? 'ok';
+            if (mode !== undefined) await step('mode', client.patch(`/v1/agents/${encodeURIComponent(target)}/mode`, { mode }));
             const tags = optionalArray(input, 'tags');
-            if (tags !== undefined) applied.tags = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/tags`, { tags })).data ?? 'ok';
+            if (tags !== undefined) await step('tags', client.patch(`/v1/agents/${encodeURIComponent(target)}/tags`, { tags }));
             const scopes = optionalArray(input, 'scopes');
-            if (scopes !== undefined) applied.scopes = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/scopes`, { scopes })).data ?? 'ok';
+            if (scopes !== undefined) await step('scopes', client.patch(`/v1/agents/${encodeURIComponent(target)}/scopes`, { scopes }));
             if (optionalString(input, 'display_name') !== undefined) unsupported.push('display_name');
             if (optionalString(input, 'description') !== undefined) unsupported.push('description');
-            return { ok: true as const, data: { agent: target, applied, ...(unsupported.length ? { unsupported, note: 'These fields have no REST route — use the server MCP tool or the profile UI.' } : {}) } };
+            const data = { agent: target, applied, ...(unsupported.length ? { unsupported, note: 'These fields have no REST route — use the server MCP tool or the profile UI.' } : {}) };
+            return refused ? { ok: false as const, data, error: { code: 'PARTLY_REFUSED', message: 'The node refused at least one change; `applied` names which.' } } : { ok: true as const, data };
         },
     },
     {
@@ -751,9 +763,16 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const applied: JsonObject = {};
             const unsupported: string[] = [];
             const budget = optionalNumber(input, 'daily_budget_usd');
-            if (budget !== undefined) applied.ai_settings = (await client.post('/v1/ai/settings', { daily_budget_usd: budget })).data ?? 'ok';
+            // A refused budget write is the node's refusal, not 'ok' (secaudit 2026-10 follow-up, Part B; pitfalls §115).
+            let refused = false;
+            if (budget !== undefined) {
+                const resp = await client.post('/v1/ai/settings', { daily_budget_usd: budget });
+                refused = resp.ok === false;
+                applied.ai_settings = (refused ? resp.error ?? { code: 'REFUSED', message: 'The node refused this change.' } : resp.data ?? 'ok') as JsonObject;
+            }
             for (const k of ['model', 'reasoning_model', 'execution_model']) if (optionalString(input, k) !== undefined) unsupported.push(k);
-            return { ok: true as const, data: { applied, ...(unsupported.length ? { unsupported, note: 'Model routing has no REST route — set it via the profile UI or the server MCP tool.' } : {}) } };
+            const data = { applied, ...(unsupported.length ? { unsupported, note: 'Model routing has no REST route — set it via the profile UI or the server MCP tool.' } : {}) };
+            return refused ? { ok: false as const, data, error: { code: 'REFUSED', message: 'The node refused the budget change; `applied` says why.' } } : { ok: true as const, data };
         },
     },
     ...agentCrewCliTools,

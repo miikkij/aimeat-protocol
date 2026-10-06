@@ -9,11 +9,14 @@
  *   (routes/appdev-pitfalls.ts) can never drift. Owner scope = the owner GHII + every
  *   same-owner agent GAII, deduped by key GHII-first.
  * @structure listOwnerScopeMemory · listOwnerScopeShown · findOwnEntry · ownPitfallRecords ·
- *   sharedPitfallRecords · listLearnedPitfalls · queryLearnedPitfalls · filterPitfalls ·
+ *   sharedPitfallRecords · listLearnedPitfalls · queryLearnedPitfalls · pitfallIndex · filterPitfalls ·
  *   pitfallFacets · setPitfallFlags · deletePitfallEntry · upsertPitfallManifest · pitfallEntryKey ·
  *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-06 -- pitfallIndex(): the merged index (own, curated, shared by scope) that
+ *     aimeat_appdev_pitfall_list built inline, moved here so GET /v1/appdev/pitfalls/index answers
+ *     the same thing and the connector's tool can call it (secaudit 2026-10 follow-up, Part B).
  *   v1.4.0 -- 2026-09-29 -- TARGET-082 V4: every listing that returns entries to a caller takes the
  *     caller's classification reader (services/classification/reader.ts) instead of an identity and
  *     passes the records through presentMemories: listOwnerScopeShown, ownPitfallRecords,
@@ -49,6 +52,7 @@ import { emitChange } from './event-bus.js';
 import { writeMemoryRecord } from './memory-write.js';
 import type { ContentReader } from './classification/reader.js';
 import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
+import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
 
 export const PITFALL_PACKAGE_ID = 'appdev-pitfalls';
 export const PITFALL_PREFIX = `packages/${PITFALL_PACKAGE_ID}/`;
@@ -414,6 +418,83 @@ export async function queryLearnedPitfalls(
     const shared = await listSharedByOthers(storage, config, reader);
     const scope = query.includeShared ? [...own, ...shared] : own;
     return { ...filterPitfalls(scope, query), community: shared.length };
+}
+
+/** One row of the merged index: no bodies, enough to choose which entry to open. */
+function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): PitfallLike & Record<string, unknown> {
+    const v = rec.value as Partial<LearnedPitfallValue> | null;
+    const warning = classificationWarningOf(rec);
+    return {
+        source,
+        key: rec.key,
+        title: v?.title ?? rec.key,
+        category: v?.category ?? null,
+        slug: v?.slug ?? null,
+        model: v?.model ?? null,
+        applies_to: v?.applies_to ?? [],
+        severity: v?.severity ?? 'warn',
+        status: v?.status ?? 'active',
+        updated: v?.updated ?? rec.updatedAt,
+        verified_at: v?.verified_at ?? null,
+        verified_version: v?.verified_version ?? null,
+        shared: rec.visibility === 'public',
+        // Another owner's entry is read by naming its holder (aimeat_memory_read_public {gaii, key}).
+        ...(source === 'learned-shared' ? { owner: rec.ownerGaii } : {}),
+        ...(warning ? { classificationWarning: warning } : {}),
+    };
+}
+
+export interface PitfallIndexQuery {
+    /** own = the caller's owner scope; platform = the curated registry and other owners' shared entries; all = both. */
+    scope?: 'own' | 'platform' | 'all';
+    status?: 'active' | 'outdated' | 'all';
+    category?: string;
+    model?: string;
+    applies_to?: string;
+    limit?: number;
+    offset?: number;
+}
+
+/**
+ * The merged index an agent reads before it builds: its own learned entries, the curated registry
+ * (data/appdev-pitfalls.ts) and other owners' shared entries, chosen by scope, then filtered,
+ * ranked by severity and paged by filterPitfalls(). aimeat_appdev_pitfall_list on the node's MCP
+ * and GET /v1/appdev/pitfalls/index both answer with this; the connector's tool calls the route.
+ */
+export async function pitfallIndex(
+    storage: Storage, config: AimeatConfig, reader: ContentReader, query: PitfallIndexQuery,
+): Promise<Record<string, unknown>> {
+    const scope = query.scope ?? 'all';
+    const wantStatus = query.status ?? 'active';
+    const entries: PitfallLike[] = [];
+    if (scope === 'own' || scope === 'all') {
+        for (const rec of await ownPitfallRecords(storage, config, reader)) entries.push(asIndexEntry('learned', rec));
+    }
+    if (scope === 'platform' || scope === 'all') {
+        for (const p of getAppdevPitfalls({ includeOutdated: wantStatus !== 'active' })) {
+            entries.push({
+                source: 'curated', id: p.id, title: p.title, category: null, slug: p.id,
+                model: null, applies_to: p.appliesTo as string[], severity: p.severity,
+                status: p.status ?? 'active', updated: p.updatedAt, shared: true,
+                verified_at: p.verifiedAt ?? null, verified_version: p.verifiedVersion ?? null,
+                detail_url: `/v1/appdev/pitfalls/${p.id}`,
+            } as PitfallLike);
+        }
+        for (const rec of await sharedPitfallRecords(storage, config, reader)) entries.push(asIndexEntry('learned-shared', rec));
+    }
+    // Facets count what the filter left, as the MCP tool always did.
+    const page = filterPitfalls(entries, {
+        status: wantStatus, category: query.category, model: query.model?.trim().toLowerCase(),
+        applies_to: query.applies_to, sort: 'severity', limit: query.limit, offset: query.offset,
+    });
+    return {
+        pitfalls: page.pitfalls,
+        total: page.total,
+        offset: page.offset,
+        limit: page.limit,
+        facets: page.filtered_facets,
+        hint: 'One full learned entry: aimeat_memory_read {key, owner_scope: true} for your own, aimeat_memory_read_public {gaii: owner, key} for a shared one. Curated detail: GET /v1/appdev/pitfalls/{id}.',
+    };
 }
 
 /**

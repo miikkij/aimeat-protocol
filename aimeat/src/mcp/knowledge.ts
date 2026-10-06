@@ -13,6 +13,7 @@
  * @version-history
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
+ *   2026-10-06 — aimeat_knowledge_contribute takes the catalog's schema too.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-21 — Initial creation: 4 tools + 1 resource for knowledge management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -41,12 +42,11 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { listOwnerScopeShown } from '../services/appdev-kb.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { presentMemory, presentMemories, classificationWarningOf } from '../services/classification/present-memory.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import {
     addKnowledgePackageEntry, type KnowledgeManifestValue,
@@ -226,13 +226,7 @@ export function registerKnowledgeTools(
     mcp.tool(
         'aimeat_knowledge_contribute',
         descriptionFor('aimeat_knowledge_contribute'),
-        {
-            package_id: z.string().describe('The knowledge package ID'),
-            entry_key: z.string().describe('Entry key (short name, e.g. "summary" or "chapter-1")'),
-            content: z.string().describe('Entry content as a string (plain text or JSON)'),
-            model: z.string().max(64).optional().describe('Optional: the LLM model this knowledge came from (stored as a model: tag; indicative attribution)'),
-            ...aiProvenanceInputs,
-        },
+        zodShapeFor('aimeat_knowledge_contribute'),
         annotationsFor('aimeat_knowledge_contribute'),
         async ({ package_id, entry_key, content, model, ai_provenance, ai_provenance_id }) => {
             // ONE implementation (services/knowledge-package-entry.ts). The tool declares its

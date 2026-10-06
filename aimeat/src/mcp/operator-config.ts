@@ -16,6 +16,8 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   2026-10-06 — aimeat_operator_agent_configure and aimeat_operator_ai_config register the catalog's
+ *     schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 -- The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   v1.4.0 -- 2026-09-28 -- aimeat_operator_ai_config shows the node's recommended models (read-only) and points to aimeat_ai_policy_set.
  *   v1.3.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -49,7 +51,7 @@
  *     "show the owner" step is instruction text). Coverage now comes from utils/scope-coverage.ts.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
+import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -130,15 +132,8 @@ export function registerOperatorConfigTools(
     mcp.tool(
         'aimeat_operator_agent_configure',
         descriptionFor('aimeat_operator_agent_configure'),
-        {
-            agent_name: z.string().describe('Which same-owner agent to configure.'),
-            display_name: z.string().optional().describe('New display name.'),
-            description: z.string().optional().describe('New description.'),
-            mode: z.enum(['interactive', 'autonomous', 'task-runner', 'coordinator', 'workstation']).optional().describe('New agent mode.'),
-            tags: z.array(z.string()).optional().describe('Replacement tag list.'),
-            scopes: z.array(z.string()).optional().describe('Replacement scope list — may only NARROW the currently granted set (adding scopes stays an owner-UI approval).'),
-            confirm_token: z.string().optional().describe('Token from the propose step. Omit to get a proposal + diff without applying anything.'),
-        },
+        // The catalog's schema, which carries the bounds this tool wrote (secaudit 2026-10 follow-up, Part B).
+        zodShapeFor('aimeat_operator_agent_configure'),
         annotationsFor('aimeat_operator_agent_configure'),
         async ({ agent_name, display_name, description, mode, tags, scopes, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
@@ -247,13 +242,8 @@ export function registerOperatorConfigTools(
     mcp.tool(
         'aimeat_operator_ai_config',
         descriptionFor('aimeat_operator_ai_config'),
-        {
-            daily_budget_usd: z.number().min(0).max(1000).optional().describe('Daily AI spend cap in USD (0-1000).'),
-            model: z.string().optional().describe('Default model id.'),
-            reasoning_model: z.string().optional().describe('Model routed for modelRole "reasoning".'),
-            execution_model: z.string().optional().describe('Model routed for modelRole "execution".'),
-            confirm_token: z.string().optional().describe('Token from the propose step. Omit to get a proposal + diff without applying anything.'),
-        },
+        // The catalog's schema, which carries the bounds this tool wrote (secaudit 2026-10 follow-up, Part B).
+        zodShapeFor('aimeat_operator_ai_config'),
         annotationsFor('aimeat_operator_ai_config'),
         async ({ daily_budget_usd, model, reasoning_model, execution_model, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');

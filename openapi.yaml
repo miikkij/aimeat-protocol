@@ -14784,6 +14784,52 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/appdev/pitfalls/index:
+    get:
+      operationId: appdevPitfallIndex
+      summary: The merged appdev pitfall index an agent reads before it builds
+      description: >-
+        The caller's own learned entries, the curated registry and other owners' shared entries,
+        chosen by scope, without bodies, ranked by severity and paged. The same answer as the
+        aimeat_appdev_pitfall_list MCP tool. data.facets count what the filter left; data.hint names
+        how to open one entry.
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: scope
+          in: query
+          description: own = the caller's owner scope; platform = the curated registry and other owners' shared entries; all = both.
+          schema: { type: string, enum: [own, platform, all], default: all }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, outdated, all], default: active }
+        - name: category
+          in: query
+          schema: { type: string, maxLength: 40 }
+        - name: model
+          in: query
+          description: A curated entry carries no model and passes any model filter.
+          schema: { type: string, maxLength: 64 }
+        - name: applies_to
+          in: query
+          schema: { type: string, maxLength: 20 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: data.pitfalls, data.total, data.offset, data.limit, data.facets and data.hint.
+        '400':
+          description: INVALID_INPUT — an unknown scope or status.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller lacks memory:read.
+
   /v1/appdev/pitfalls/learned:
     get:
       operationId: listLearnedAppdevPitfalls
@@ -14946,6 +14992,60 @@ paths:
             (shells, components, use cases) by id, kind and title.
         '401':
           $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: proposeAppdevTemplate
+      summary: Propose or update an app template distilled from one of the caller's own apps
+      description: >-
+        The same function as the aimeat_app_template_propose MCP tool, with the same input. The
+        source app (derived_from) must belong to the caller's owner and exist. Proposing the same id
+        again replaces the proposal and keeps its proofs.
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, title, description, derived_from, tier, reuse_notes, model]
+              properties:
+                id: { type: string, minLength: 1, maxLength: 64, description: Kebab-case template id. }
+                title: { type: string, minLength: 3, maxLength: 160 }
+                description: { type: string, minLength: 5, maxLength: 10000 }
+                derived_from:
+                  type: object
+                  required: [owner, filename]
+                  properties:
+                    owner: { type: string, description: The caller's own owner name. }
+                    filename: { type: string }
+                tier: { type: string, enum: [T1, T2, T3] }
+                reuse_notes: { type: string, minLength: 10, maxLength: 40000 }
+                model: { type: string, minLength: 1, maxLength: 64, description: The model that built the source app (indicative). }
+                tags: { type: array, maxItems: 12, items: { type: string, maxLength: 30 } }
+                start_mode: { type: string, enum: [fork, scaffold, either] }
+                start_mode_rationale: { type: string, maxLength: 10000 }
+                model_notes:
+                  type: array
+                  maxItems: 10
+                  items:
+                    type: object
+                    required: [model, notes]
+                    properties:
+                      model: { type: string, maxLength: 64 }
+                      notes: { type: string, maxLength: 10000 }
+                      evidence: { type: string, maxLength: 10000 }
+                packs: { type: array, maxItems: 20, items: { type: string, maxLength: 40 } }
+                composes: { type: array, maxItems: 20, items: { type: string, maxLength: 40 } }
+      responses:
+        '200':
+          description: data.id, data.updated (true when the id already existed) and data.key, the memory key it is stored under.
+        '400':
+          description: INVALID_INPUT — a field out of bounds, an id that is not kebab-case, or a source app that is not the caller's or does not exist.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The caller lacks memory:write.
 
   /v1/appdev/templates/{id}:
     get:

@@ -15,6 +15,7 @@
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
+ *   2026-10-06 — skill_list, skill_link and skill_unlink take the catalog's schema too.
  *   v1.4.0 -- 2026-10-06 -- aimeat_skill_list view=linked asks memory:read, as its route does (secaudit
  *     2026-10 follow-up, A4).
  *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: the skill accessor carries the agent's ContentReader
@@ -30,7 +31,6 @@
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry tools (node + user scopes).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -144,13 +144,7 @@ export function registerSkillsTools(
     mcp.tool(
         'aimeat_skill_list',
         descriptionFor('aimeat_skill_list'),
-        {
-            view: z.enum(['library', 'linked', 'mine', 'workspace']).optional().describe('library (default): everything you can load, grouped by scope (node + user + workspace memberships). linked: skills attached to an agent. mine: your owner\'s user-scope registry only. workspace: one workspace\'s skills (requires organism_id + workspace_id).'),
-            agent_name: z.string().optional().describe('For view=linked: which same-owner agent (default: yourself).'),
-            organism_id: z.string().optional().describe('For view=workspace: the organism id.'),
-            workspace_id: z.string().optional().describe('For view=workspace: the workspace id.'),
-            binding: z.string().optional().describe('Filter to skills bound to one app: app:{owner}/{filename}. Overrides view.'),
-        },
+        zodShapeFor('aimeat_skill_list'),
         annotationsFor('aimeat_skill_list'),
         async ({ view, agent_name, organism_id, workspace_id, binding }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
@@ -215,10 +209,7 @@ export function registerSkillsTools(
     mcp.tool(
         'aimeat_skill_link',
         descriptionFor('aimeat_skill_link'),
-        {
-            ref: z.string().describe('Skill ref to attach: node:{name} or user:{owner}/{name}.'),
-            agent_name: z.string().optional().describe('Which same-owner agent to attach to (default: yourself).'),
-        },
+        zodShapeFor('aimeat_skill_link'),
         annotationsFor('aimeat_skill_link'),
         async ({ ref, agent_name }) => {
             if (!ownerName || !parsed) return err('Could not resolve the calling agent\'s owner');
@@ -241,10 +232,7 @@ export function registerSkillsTools(
     mcp.tool(
         'aimeat_skill_unlink',
         descriptionFor('aimeat_skill_unlink'),
-        {
-            ref: z.string().describe('Skill ref to detach.'),
-            agent_name: z.string().optional().describe('Which same-owner agent to detach from (default: yourself).'),
-        },
+        zodShapeFor('aimeat_skill_unlink'),
         annotationsFor('aimeat_skill_unlink'),
         async ({ ref, agent_name }) => {
             if (!ownerName || !parsed) return err('Could not resolve the calling agent\'s owner');
