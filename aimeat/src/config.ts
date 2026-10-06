@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.21.1 — 2026-10-06 — isPrivateHost moved to config-private-host.ts (max-file-lines), unchanged.
  *   v1.21.0 — 2026-10-02 — packagePeerCap (AIMEAT_PACKAGE_PEER_CAP, default 500).
  *   v1.20.0 — 2026-10-01 — appAuditKeepDefault (AIMEAT_APP_AUDIT_KEEP, default 0 = keep all).
  *   v1.19.0 — 2026-09-30 — updateCheckDefaults(): the npm version check (config-update-check.ts).
@@ -112,22 +113,8 @@ import type {
   LoadConfigResult,
 } from './config-types.js';
 
-/**
- * True if `baseUrl` points at localhost / loopback / RFC1918 / link-local / IPv6-ULA — i.e. NOT a
- * public host. Drives the default security profile (private host → `local`, public host → `public`).
- * A host-less or unparseable baseUrl is treated as private (fail safe toward localhost-flexible dev).
- */
-function isPrivateHost(baseUrl: string): boolean {
-  let host: string;
-  try { host = new URL(baseUrl).hostname.toLowerCase(); } catch { return true; }
-  if (!host || host === 'localhost' || host.endsWith('.localhost')) return true;
-  if (host === '::1' || host === '::') return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return true;
-  if (/^169\.254\./.test(host)) return true;      // link-local (incl. cloud metadata)
-  if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique-local
-  return false;
-}
+// isPrivateHost moved to config-private-host.ts when this file reached the line limit (2026-10-06).
+import { isPrivateHost } from './config-private-host.js';
 
 // Moved to config-posture.ts when this file hit the line limit. Re-exported so the dozen
 // modules that import it from here keep working; the move was not meant to be visible.
