@@ -21,6 +21,8 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-06 — Unpriced cross-owner app tools use the REST price predicate and an unpriced
+ *     internal pass. Existing contract refusals and action-level prices remain enforced.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 — 2026-10-01 — aimeat_exchange_run refuses MEMBERS_ONLY before it settles a tool whose backing
  *     extension serves members only, as its REST twin does.
@@ -76,7 +78,7 @@ import { authoriseMeteredCall } from '../services/metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../routes/extensions/metered-response.js';
-import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput } from '../models/app-tool-schemas.js';
+import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
@@ -155,7 +157,7 @@ export function registerExchangeRunTools(
         async ({ owner: appOwner, app, tool, input }) => {
             const ownerName = localAccountName(appOwner);
             const manifestRec = await storage.getMemory(`${ownerName}@${config.nodeId}`, appToolsKey(app));
-            if (!manifestRec) {
+            if (!manifestRec || manifestRec.visibility !== 'public') {
                 // An app id is a FILENAME and carries its extension; the app's own subdomain does not.
                 // Naming what this owner actually publishes turns a dead end into a one-step correction,
                 // instead of sending the caller off to read the app's source to guess.
@@ -198,10 +200,10 @@ export function registerExchangeRunTools(
                 config, storage, caller: callerGaii,
                 product: { ext: coordExt, action: tool, label, providerOwner: ownerName },
             });
-            if (outcome.kind === 'no_right') {
+            if (outcome.kind === 'no_right' && isToolPriced(toolDef)) {
                 return fail(`NO_CONTRACT: accept a contract for "${ownerName}/${app}/${tool}" first (aimeat_exchange_accept with its offering_id)`);
             }
-            if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
+            if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner' && outcome.kind !== 'no_right') {
                 const r = meteredRefusalText(outcome, label);
                 return fail(`${r.code}: ${r.message}`);
             }
@@ -228,8 +230,10 @@ export function registerExchangeRunTools(
                 // so it billed the same contract a second time. One call, one settlement, whichever twin
                 // of this route the caller reached (the REST WebMCP path carries the same pass).
                 const startedAt = Date.now();
+                // As on the REST route, a missing contract permits only an unpriced tool. That
+                // pass retires sibling app-tool prices, while the action's own price still applies.
                 const invoked = await invokeCapability(config, storage, cap, toolInput,
-                    callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool), { scopes });
+                    callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool, outcome.kind === 'no_right' ? 'unpriced' : 'settled'), { scopes });
                 // Measured, so the provider can propose a service commitment from evidence rather
                 // than from a guess (services/call-timing.ts). The REST twin has recorded this since
                 // it was written, so a capability's published p50/p95 described its HTTP traffic only
@@ -239,7 +243,7 @@ export function registerExchangeRunTools(
                 // Delivered → book whoever the provider owes a share of this call, out of their own cut.
                 const shared = takeDesignations(invoked.result);
                 if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
-                return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: true, result: shared.result });
+                return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: outcome.kind === 'settled', result: shared.result });
             } catch (err) {
                 if (outcome.kind === 'settled') await outcome.refund();
                 const e = err as { code?: string; message?: string };
