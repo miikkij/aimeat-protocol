@@ -669,6 +669,7 @@
       "/components/SoloWindow.js": "/components/SoloWindow.js",
       "/components/QuickFind.js": "/components/QuickFind.js",
       "/components/OwnAimeat.js": "/components/OwnAimeat.js",
+      "/components/StoreDoor.js": "/components/StoreDoor.js",
       "/components/Figure.js": "/components/Figure.js",
       "/components/FoldSection.js": "/components/FoldSection.js",
       "/components/SettingsPage.js": "/components/SettingsPage.js",
@@ -1641,8 +1642,12 @@
           <div class="site-footer-row">
             ${/* The store is the one price door, and it is an address this node is told, not a page
                   it has: no store, no link. The pricing page it replaced is gone. */''}
+            ${/* While the store does not take orders (site.store_status "soon") the footer names it
+                  and does not link into it. */''}
             ${(window.__SITE && window.__SITE.store)
-              ? html`<a href=${window.__SITE.store} target="_blank" rel="noopener">${tr('footer.store', 'Store')}</a>`
+              ? (window.__SITE.storeStatus === 'soon'
+                ? html`<span>${tr('footer.storeSoon', 'Store opens soon')}</span>`
+                : html`<a href=${window.__SITE.store} target="_blank" rel="noopener">${tr('footer.store', 'Store')}</a>`)
               : ''}
             ${/* The EXCHANGE is an app of this node's operator, like the store: a door a person
                   opens now and then, so it lives here rather than on the bar (moved 2026-08-29).

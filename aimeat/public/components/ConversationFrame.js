@@ -20,6 +20,8 @@
  *   - ConversationCopy({ text, head, label, copiedLabel, title, ariaLabel }) — copy it all as text
  * @usage html`<${ConversationFrame} list=${open}><${ThreadList} …/><${ConversationMain}>…<//><//>`
  * @version-history
+ *   v1.3.0 — 2026-10-06 — A ConversationCap way may be `soon`: its label without a link, for a store
+ *     that does not take orders yet.
  *   v1.2.0 — 2026-09-27 — ConversationCopy (the rail's copy link and the head's copy icon) and
  *     ConversationCap `ways`, so the chat page passes data and writes no class; the markup is the
  *     chat's, unchanged (additive, page group G9).
@@ -114,7 +116,8 @@ export function ConversationJump({ onClick, children }) {
 /**
  * `ways` (added by page group G9): the ways forward as data, [{ label, href, newTab, loud }]: the
  * loud one is the dark block (.poster-slab), the others the outlined button (.btn-outline), as the
- * chat drew them. Children still stand after them.
+ * chat drew them. Children still stand after them. A way with `soon` is not open yet: its label in the
+ * same shape, leading nowhere (.store-soon).
  */
 export function ConversationCap({ title, body, ways = [], children }) {
     return html`
@@ -122,7 +125,9 @@ export function ConversationCap({ title, body, ways = [], children }) {
                         <p class="poster-conversation-cap-title">${title}</p>
                         <p class="poster-conversation-cap-body">${body}</p>
                         <div class="poster-conversation-cap-actions">
-                            ${ways.filter(Boolean).map((w) => html`<a key=${w.href} class=${w.loud ? 'poster-slab' : 'btn-outline'} href=${w.href}
+                            ${ways.filter(Boolean).map((w) => w.soon
+                                ? html`<span key=${w.label} class=${(w.loud ? 'poster-slab' : 'btn-outline') + ' store-soon'}>${w.label}</span>`
+                                : html`<a key=${w.href} class=${w.loud ? 'poster-slab' : 'btn-outline'} href=${w.href}
                                 target=${w.newTab ? '_blank' : undefined} rel=${w.newTab ? 'noopener' : undefined}>${w.label}</a>`)}
                             ${children}
                         </div>

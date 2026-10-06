@@ -13,6 +13,8 @@
  * @structure EyeMark · fmtPublished · WALL_FIRST_PAGE · Gallery · StatsPanel
  * @usage import { Gallery, StatsPanel } from './landing-wall.js';
  * @version-history
+ *   v1.1.3 -- 2026-10-06 -- "Get your own" is a StoreDoor: "Opens soon" while the store does not take
+ *     orders (site.store_status "soon").
  *   v1.1.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text itself, so an
  *     app name, icon, description or author with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.1.1 -- 2026-09-24 -- The screenshots carry an alt that names the app.
@@ -25,7 +27,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
-import { storeHref } from '/js/site.js';
+import { StoreDoor } from '/components/StoreDoor.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 
@@ -63,7 +65,7 @@ export function StatsPanel() {
       <div class="ld-stats-own">
         ${tr('landing.ownLine', 'The same could run for you. Your own node, your data, your agents.')}
         ${/* The store is the one price door, so this line names no price of its own any more. */''}
-        ${storeHref() ? html`<a class="ld-stats-cta" href=${storeHref()} target="_blank" rel="noopener">${tr('landing.ownCta', 'Get your own →')}</a>` : ''}
+        <${StoreDoor} class="ld-stats-cta" label=${tr('landing.ownCta', 'Get your own →')} />
       </div>
     </div>
   `;

@@ -19,6 +19,8 @@
  * @structure StoreSection · parseTiers · Star · TrustList · Rooms
  * @usage import { StoreSection, TrustList, Rooms } from '/views/landing-showroom-rooms.js';
  * @version-history
+ *   2026-10-06 -- The store section says when the marketplace opens soon (site.store_status "soon")
+ *     and its door says "Opens soon" instead of leading in (components/StoreDoor.js); the prices stay.
  *   2026-09-17 - TARGET-078: qualify ownership and data-location statements.
  *   2026-09-13 -- V2: compose the safety band and named sun/coral room frames.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
@@ -33,6 +35,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { siteLink, hasSite, storeHref } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
+import { StoreDoor, StoreSoonNote } from '/components/StoreDoor.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -99,6 +102,7 @@ export function StoreSection({ fromPrice, tiers }) {
           <span>${tr('landing.storeTitle1', 'Loved the demo?')}</span>
           <span class="ld-sh-accent">${tr('landing.storeTitle2', 'Take one home.')}</span>
         </h2>
+        <${StoreSoonNote} class="ld-sh-text" />
         <p class="ld-sh-text">
           ${tr('landing.storeText', 'Everything you just tried is the display model. Your own AIMEAT is the same whole place on an address with your name on it, kept running and updated for a monthly fee, and every bit of it yours the way your house is yours.')}
         </p>
@@ -116,7 +120,7 @@ export function StoreSection({ fromPrice, tiers }) {
                 <span class="ld-sh-tier-unit">${tr('landing.storePerMonth', 'per month')}</span>
               </div>`)}
           </div>` : ''}
-        ${store ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" href=${store} target="_blank" rel="noopener">${tr('landing.storeCta', 'Step into the store →')}</a>` : ''}
+        <${StoreDoor} class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label=${tr('landing.storeCta', 'Step into the store →')} />
       </div>
     </section>`;
 }

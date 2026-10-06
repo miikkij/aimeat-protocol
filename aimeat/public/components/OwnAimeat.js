@@ -7,9 +7,11 @@
  *   it to a demo site's home; no built-in home has it. A page passes the words and the store's
  *   address; it never writes a class. Its look is css/components/own-aimeat.css and the record and
  *   slab shapes of css/poster.css.
- * @structure OwnAimeat({ label, title, text, cta, href })
+ * @structure OwnAimeat({ label, title, text, cta, href, soonLabel? })
  * @usage html`<${OwnAimeat} href=${store} label=${…} title=${…} text=${…} cta=${…} />`
  * @version-history
+ *   v1.1.0 — 2026-10-06 — soonLabel: a store that does not take orders yet gets those words on the
+ *     slab and no link (site.store_status "soon").
  *   v1.0.0 — 2026-09-27 — The markup views/surface/blocks-home.js OwnAimeatBlock wrote, moved here
  *     unchanged so the block passes data (page group G9, a move).
  */
@@ -18,8 +20,11 @@ import htm from 'htm';
 
 const html = htm.bind(h);
 
-/** Nothing without an address: a stored layout can outlive the store it was made under. */
-export function OwnAimeat({ label, title, text, cta, href }) {
+/**
+ * Nothing without an address: a stored layout can outlive the store it was made under. `soonLabel`
+ * set means the store does not take orders yet: the slab carries those words and leads nowhere.
+ */
+export function OwnAimeat({ label, title, text, cta, href, soonLabel = '' }) {
   if (!href) return null;
   return html`
     <section class="poster-own-aimeat poster-record">
@@ -30,9 +35,11 @@ export function OwnAimeat({ label, title, text, cta, href }) {
       <p class="poster-own-aimeat-text">
         ${text}
       </p>
-      <a class="poster-own-aimeat-cta poster-slab" href=${href} target="_blank" rel="noopener">
+      ${soonLabel
+        ? html`<span class="poster-own-aimeat-cta poster-slab store-soon">${soonLabel}</span>`
+        : html`<a class="poster-own-aimeat-cta poster-slab" href=${href} target="_blank" rel="noopener">
         ${cta}
-      </a>
+      </a>`}
     </section>`;
 }
 

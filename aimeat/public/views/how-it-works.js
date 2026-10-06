@@ -9,6 +9,8 @@
  *   vertical variant renders on mobile. No protocol terms in body copy.
  * @usage routed at /v1/how-it-works by spa.html
  * @version-history
+ *   2026-10-06 -- "See pricing" is a StoreDoor: "Opens soon" while the store does not take orders
+ *     (site.store_status "soon").
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v2.1.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): the diagram's boxes
  *     are square with a 3px ink frame and a solid offset shadow (coral on the hot ones), the human
@@ -29,7 +31,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
-import { siteLink, hasSite, storeHref } from '/js/site.js';
+import { siteLink, hasSite } from '/js/site.js';
+import { StoreDoor } from '/components/StoreDoor.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -196,7 +199,7 @@ export default function HowItWorks({ navigate }) {
         ${hasSite('learn')
           ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href=${siteLink('learn')} target="_blank" rel="noopener">${tr('hiw.ctaLearn', 'Learn it hands-on, free →')}</a>`
           : html`<a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>`}
-        ${storeHref() ? html`<a class="ld-sh-door showroom-door" href=${storeHref()} target="_blank" rel="noopener">${tr('hiw.ctaPricing', 'See pricing →')}</a>` : ''}
+        <${StoreDoor} class="ld-sh-door showroom-door" label=${tr('hiw.ctaPricing', 'See pricing →')} />
         <a class="ld-sh-door showroom-door" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('hiw.ctaBusiness', 'For your business →')}</a>
       </div>
     </div>

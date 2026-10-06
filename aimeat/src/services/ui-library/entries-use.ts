@@ -10,6 +10,7 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.74.0 — 2026-10-06 — StoreDoor: navigate, status.
  *   v1.73.0 — 2026-10-03 — PageStart: explain, copy, open.
  *   v1.72.0 — 2026-09-30 — NodeUpdateNotice: notify, explain, copy.
  *   v1.71.0 — 2026-09-27 — The catalogue family's words (appcat): IndexFrame, Overlay, Stops, SlotBars, WorldMap and
@@ -122,6 +123,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'image-deliverable': ['view'], 'install-cta': ['notify', 'act'], 'managed-env': ['explain'], 'mcp-install': ['copy', 'explain'],
     'instruction-block': ['explain', 'copy'], 'contact-picker': ['pick', 'search'], tags: ['pick', 'list'], 'app-sandbox': ['view', 'open'],
     'own-aimeat': ['explain', 'navigate'],
+    'store-door': ['navigate', 'status'],
     // The shell and the parts catalogued on 2026-09-24
     'page-base': ['layout'], 'top-bar': ['navigate', 'notify'], button: ['act'], 'copy-button': ['copy'], card: ['layout', 'view'],
     badge: ['status'], pill: ['status'], seg: ['pick'], 'start-page': ['pick', 'edit'], 'status-dot': ['status'],

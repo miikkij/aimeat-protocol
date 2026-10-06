@@ -19,6 +19,8 @@
  * @structure storeWish · hasStoredWish · hasJwt · WishBox · ConnectInvite · BuildHero
  * @usage import { WishBox, ConnectInvite, BuildHero, storeWish, hasStoredWish } from './landing-doors.js';
  * @version-history
+ *   v1.0.2 — 2026-10-06 — The hero's "Pricing" link is a StoreDoor: "Opens soon" while the store does
+ *     not take orders (site.store_status "soon").
  *   v1.0.1 — 2026-08-29 — The connect block's button leads to the connect story (/v1/connect-your-ai).
  *   v1.0.0 — 2026-08-26 — Pure extraction from landing.js v5.3.0. No behaviour change.
  */
@@ -27,7 +29,8 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { siteLink, hasSite, storeHref } from '/js/site.js';
+import { siteLink, hasSite } from '/js/site.js';
+import { StoreDoor } from '/components/StoreDoor.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { swallowed } from '/js/swallowed.js';
@@ -141,7 +144,7 @@ export function BuildHero({ onNavigate }) {
              /js/desktop-download.js decides. -->
         <a href=${desktopDownloadUrl()}>${tr('landing.heroGetApp', 'Put it on your computer →')}</a>
         ${hasSite('learn') ? html`<a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('landing.ecLinkShort', 'Learn it hands-on, free →')}</a>` : ''}
-        ${storeHref() ? html`<a href=${storeHref()} target="_blank" rel="noopener">${tr('landing.heroPricing', 'Pricing →')}</a>` : ''}
+        <${StoreDoor} label=${tr('landing.heroPricing', 'Pricing →')} />
       </div>
     </section>
   `;

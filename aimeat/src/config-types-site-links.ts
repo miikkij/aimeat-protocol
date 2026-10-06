@@ -9,6 +9,8 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.2.0 — 2026-10-06 — storeStatus ('open' | 'soon') and the per-language storeNote*: the front
+ *     page can show the store and its prices while the store does not take orders yet.
  *   v1.1.0 — 2026-09-29 — signage and signageAdmin: the front page's signage example.
  *   v1.0.0 — 2026-08-28 — Pure extraction from config-types.ts v1.6.0. No field changed.
  */
@@ -73,6 +75,16 @@ export interface SiteLinksConfig {
    * there; this node never states one on its own.
    */
   store: string;
+  /**
+   * Whether the store takes orders: 'open' (the default) or 'soon'. With 'soon' the front page keeps
+   * the store section and its prices, says the marketplace opens soon, and every "get your own"
+   * control is an "Opens soon" label instead of a link to the store. Means nothing without `store`.
+   */
+  storeStatus: 'open' | 'soon';
+  /** The sentence that replaces the default "opens soon" notice, per language; empty keeps the default. */
+  storeNoteEn: string;
+  storeNoteFi: string;
+  storeNoteEs: string;
   /** The agent incubator: where a visitor adopts a ready-made helper. Empty hides its card's door. */
   incubator: string;
   /**

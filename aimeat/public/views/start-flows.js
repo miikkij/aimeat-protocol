@@ -13,6 +13,8 @@
  *   buildPlaybook(), playbookToMarkdown()
  * @usage import { ENTRANCES, ... } from './start-flows.js' (relative — no importmap entry)
  * @version-history
+ *   v1.2.0 — 2026-10-06 — The help path's pricing step says the marketplace opens soon, with no link,
+ *     while the store does not take orders (site.store_status "soon").
  *   v1.1.0 — 2026-07-17 — Every playbook ends with an Experience Center section
  *     (the hands-on academy at experience-center.apps.aimeat.io) so the path
  *     continues past the first task.
@@ -193,11 +195,15 @@ export function buildPlaybook(answers, mcpUrl) {
     const site = /** @type {any} */ (window).__SITE;
     const store = (site && typeof site.store === 'string') ? site.store : '';
     if (store) {
+      // While the store does not take orders (site.store_status "soon") the step says so, unlinked.
+      const soon = site.storeStatus === 'soon';
       sections.push({
         title: { k: 'start.pb.h2.title', f: 'Step 2: See the pricing' },
         items: [
-          { text: { k: 'start.pb.h2.a', f: 'Self-serve tiers and done-for-you packages:' },
-            link: { href: store, label: { k: 'start.pb.h2.link', f: 'See pricing →' } } },
+          soon
+            ? { text: { k: 'landing.storeSoonNote', f: 'The marketplace opens soon.' } }
+            : { text: { k: 'start.pb.h2.a', f: 'Self-serve tiers and done-for-you packages:' },
+              link: { href: store, label: { k: 'start.pb.h2.link', f: 'See pricing →' } } },
         ],
       });
     }

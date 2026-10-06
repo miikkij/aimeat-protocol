@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-06: The cap box's "Get your own place" way says it opens soon and leads nowhere while the
+ *     store does not take orders (site.store_status "soon").
  *   2026-10-03: The empty screen says what this chat does with the person's things here, not "Your
  *     first agent"; the first starter is the person's next stage on their path (a newcomer's is "Let's
  *     make your profile", an interview that becomes their business card), and the welcome-page
@@ -91,7 +93,7 @@ import {
     ConversationCopy,
 } from '/components/ConversationFrame.js';
 import { InstallCta } from '/components/InstallCta.js';
-import { storeHref } from '/js/site.js';
+import { storeHref, storeOpensSoon } from '/js/site.js';
 import { useJourney } from './home/journey-steps.js';
 
 const html = htm.bind(h);
@@ -717,7 +719,10 @@ export default function ChatView() {
                         ways=${[
                             { loud: true, href: '/v1/profile?tab=ai', label: tr('chat.capOwnKey', 'Bring your own key →') },
                             // The store is the one price door; a node without one offers only the key.
-                            storeHref() ? { href: storeHref(), newTab: true, label: tr('chat.capOwnPlace', 'Get your own place →') } : null,
+                            // While the store does not take orders the way is named, and leads nowhere.
+                            storeHref() ? (storeOpensSoon()
+                                ? { soon: true, label: tr('chat.capOwnPlaceSoon', 'Your own place: opens soon') }
+                                : { href: storeHref(), newTab: true, label: tr('chat.capOwnPlace', 'Get your own place →') }) : null,
                         ]} />` : html`
                 <${Composer}
                     value=${draft}
