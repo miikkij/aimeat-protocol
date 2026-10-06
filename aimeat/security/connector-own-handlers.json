@@ -87,9 +87,6 @@
     "aimeat_workspace_read",
     "aimeat_workspace_revert_to_draft",
     "aimeat_workspace_rows_delete",
-    "aimeat_workspace_sections_set",
-    "aimeat_workspace_space_add",
-    "aimeat_workspace_suggestions",
     "aimeat_workspace_transfer",
     "aimeat_workspace_update",
     "aimeat_workspace_write"
