@@ -11,9 +11,11 @@
  *   IN-PROCESS. The record lives in this process for one window and is pruned as it goes, the way
  *   the rate limiter keeps its counts. A restart forgets it, and the timestamp window is what holds
  *   a request older than the restart.
- * @structure NONCE_WINDOW_MS · newNonce() · nonceAccepted(source, nonce, now)
+ * @structure NONCE_WINDOW_MS · newNonce() · nonceAccepted(source, nonce, now, rememberUntil?)
  * @usage if (!nonceAccepted(sourceNode, nonce)) return refuse('REPLAYED');
  * @version-history
+ *   v1.1.0 — 2026-10-06 — rememberUntil: a record can outlive one window from now, for a message
+ *     signed ahead of this node's clock (secaudit 2026-10 follow-up audit, finding 3).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, PKG-10).
  */
 import { randomBytes } from 'node:crypto';
@@ -30,10 +32,12 @@ export function newNonce(): string {
 }
 
 /**
- * True the first time `source` presents `nonce` inside the window, and records it; false for a
- * malformed nonce or one already accepted.
+ * True the first time `source` presents `nonce` inside the window, and records it until
+ * `rememberUntil`; false for a malformed nonce or one already accepted. A caller whose message stays
+ * valid past one window from now (signed ahead of this node's clock) passes the time it stops being
+ * valid, so the record outlives the message.
  */
-export function nonceAccepted(source: string, nonce: string, now = Date.now()): boolean {
+export function nonceAccepted(source: string, nonce: string, now = Date.now(), rememberUntil = now + NONCE_WINDOW_MS): boolean {
   if (!NONCE_RE.test(nonce)) return false;
   if (seen.size > 50_000) {
     for (const [k, until] of seen) if (until <= now) seen.delete(k);
@@ -41,6 +45,6 @@ export function nonceAccepted(source: string, nonce: string, now = Date.now()): 
   const id = `${source}\u0000${nonce}`;
   const until = seen.get(id);
   if (until !== undefined && until > now) return false;
-  seen.set(id, now + NONCE_WINDOW_MS);
+  seen.set(id, Math.max(rememberUntil, now + NONCE_WINDOW_MS));
   return true;
 }
