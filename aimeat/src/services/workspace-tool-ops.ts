@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.8.1 — 2026-10-06 — The caller carries the session's scopes; a declaration the session may not
+ *     make is refused 403 SCOPE_DENIED before any write (secaudit 2026-10 last items, F2).
  *   v1.8.0 — 2026-10-06 — publishRecordsBatchOp and deleteRecordsBatchOp: the bodies of the batch
  *     publish route (routes/organisms/gates.ts) and the batch delete route
  *     (routes/organisms/workspace-ops.ts), moved here so ctx.workspace.publishRecords and
@@ -107,7 +109,7 @@ import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem } from '.
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
 import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
-import { provenanceForWrite, stampAutonomousOutput, storeHeldProvenance, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput, storeHeldProvenance, type DeclaredProvenance } from './ai-provenance.js';
 import type { AiProvenanceLevel, AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes } from '../routes/memory/shared.js';
 import { logger } from '../utils/logger.js';
@@ -129,6 +131,9 @@ export interface WorkspaceOpsCaller {
     writerGaii: string;
     /** The session's roles, for the organism namespace rule. */
     roles: string[];
+    /** The session's own scope words, when the door has them: a provenance declaration needs
+     *  provenance:write there as well as on the grant. Absent for the extension sandbox. */
+    scopes?: readonly string[];
 }
 
 /** A refusal, with the status and code the HTTP doors send for the same thing. */
@@ -145,7 +150,7 @@ const refuse = (status: number, code: string, message: string, details?: Record<
  * to cut one itself when none was given, and no door relied on that.
  */
 export function workspaceCallerOf(
-    args: { principal: string; ownerName: string; roles: string[] },
+    args: { principal: string; ownerName: string; roles: string[]; scopes?: readonly string[] },
     config: AimeatConfig,
 ): WorkspaceOpsCaller {
     const parsed = parseGAII(args.principal);
@@ -155,6 +160,7 @@ export function workspaceCallerOf(
         principal: args.principal, ownerName, ownerGhii,
         writerGaii: parsed ? args.principal : ownerGhii,
         roles: args.roles,
+        ...(args.scopes ? { scopes: args.scopes } : {}),
     };
 }
 
@@ -423,6 +429,15 @@ export async function writeWorkspaceDraftsOp(
     }
     const overLimit = await checkWorkspaceWriteLimits(storage, config, caller.ownerGhii, planned, i => (batch ? `items[${i}]: ` : ''));
     if (overLimit) return refuse(413, 'LIMIT_EXCEEDED', overLimit);
+    // A declaration the caller may not make, asked of the grant and the session, is refused before
+    // any write; it was thrown inside the loop and answered 500 on HTTP (F2).
+    if (!args.nodeStamp) {
+        const declarationRefusal = await provenanceDeclarationRefusal(storage, {
+            principal: caller.principal, declaredId: args.aiProvenanceId, declared: args.aiProvenance,
+            enabled: config.aiProvenance, scopes: caller.scopes,
+        });
+        if (declarationRefusal) return refuse(403, 'SCOPE_DENIED', declarationRefusal.message);
+    }
 
     // The embedded files are opened to the workspace's members in the loop below, each document's
     // right after ITS write has landed, and never before. Above this line a batch's second item
@@ -455,7 +470,7 @@ export async function writeWorkspaceDraftsOp(
                 ...provenanceSurface, held,
             })
             : await provenanceForWrite(storage, {
-                principal: caller.principal, content: memoryContentBytes(v),
+                principal: caller.principal, scopes: caller.scopes, content: memoryContentBytes(v),
                 declaredId: args.aiProvenanceId, declared: args.aiProvenance, pipeline: args.pipeline,
                 ...provenanceSurface, held,
             });

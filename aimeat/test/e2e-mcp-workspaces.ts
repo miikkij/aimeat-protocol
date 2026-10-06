@@ -33,6 +33,9 @@
  *   v1.9.0 — 2026-10-06 — Test 47: an agent holding memory:write and not organism:write writes a
  *     draft through POST /workspace/drafts, as it does with aimeat_workspace_write, and is refused the
  *     publish (secaudit 2026-10 follow-up audit, finding 2). Fails on the tree before the fix (403).
+ *   v1.10.0 — 2026-10-06 — Test 48: a provenance declaration without provenance:write answers 403
+ *     SCOPE_DENIED on the drafts route (it answered 500) and on the tool, also from a session narrower
+ *     than its grant (secaudit 2026-10 last items, F2).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -1000,6 +1003,58 @@ await test('47. an agent with memory:write and no organism:write writes a draft 
         method: 'POST', body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'narrow-1' }),
     });
     assert(p.status === 403, `publish without organism:write answered ${p.status}`);
+});
+
+await test('48. a provenance declaration without provenance:write → 403 SCOPE_DENIED on the route and on the tool, also when only the grant holds the word', async () => {
+    // The route let ProvenanceScopeError reach the global handler (500), and both doors asked the
+    // word of the grant alone, so a session narrower than its grant still declared (secaudit
+    // 2026-10 last items, F2).
+    const name = `wsprov${Date.now()}`;
+    const ag = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ name, owner: A.ownerName, capabilities: ['social'], model: 'gpt-4o' }) });
+    assert(ag.status === 201, `agent ${ag.status}`);
+    const setScopes = (scopes: string[]) => json(`/v1/agents/${name}/scopes`, { method: 'PATCH', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ scopes }) });
+    assert((await setScopes(['memory:read', 'memory:write'])).status === 200, 'narrow the grant');
+    const gaii = ag.body.data.agent.gaii, priv = ag.body.data.private_key;
+    const mint = async (): Promise<string> => {
+        const cl = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'WS prov', redirect_uris: [] }) });
+        const ts = new Date().toISOString();
+        const params = new URLSearchParams({ response_type: 'code', client_id: cl.body.client_id, gaii, signature: await signMsg(priv, gaii + NODE_ID + ts), timestamp: ts });
+        const auth = await json(`/v1/mcp/authorize?${params}`);
+        const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret }) });
+        assert(!!tk.body.access_token, `no token: ${JSON.stringify(tk.body).slice(0, 200)}`);
+        return tk.body.access_token as string;
+    };
+    const token = await mint();
+    const client = mcpClient(); client.setToken(token);
+    await client.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'WS prov', version: '1.0.0' } });
+    const declared = { level: 'ai-generated', model: 'test-model' };
+    const restWrite = (t: string, id: string) => restAs(t, `/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', body: JSON.stringify({ ws: WS, space: 'note', id, value: { title: 'Declared' }, ai_provenance: declared }),
+    });
+    const toolWrite = async (id: string, rpcId: number) => (await client.call('aimeat_workspace_write',
+        { organism_id: orgId, ws: WS, space: 'note', id, value: { title: 'Declared' }, ai_provenance: declared }, rpcId)).result;
+    const missing = async (id: string, rpcId: number) => {
+        const r = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: [id] }, rpcId)).result.content[0].text);
+        return (r.missing ?? []).includes(id);
+    };
+
+    // Neither the grant nor the session holds the word.
+    const r1 = await restWrite(token, 'prov-1');
+    assert(r1.status === 403 && r1.body.error?.code === 'SCOPE_DENIED', `route answered ${r1.status} ${r1.body.error?.code}`);
+    const t1 = await toolWrite('prov-2', 481);
+    assert(t1?.isError === true && /^SCOPE_DENIED/.test(t1.content?.[0]?.text ?? ''), `tool answered ${JSON.stringify(t1).slice(0, 300)}`);
+    assert(await missing('prov-1', 482) && await missing('prov-2', 483), 'a refused declaration wrote a draft');
+
+    // The grant holds the word now, the session's token does not: still refused on both doors.
+    assert((await setScopes(['memory:read', 'memory:write', 'provenance:write'])).status === 200, 'widen the grant');
+    const r2 = await restWrite(token, 'prov-3');
+    assert(r2.status === 403 && r2.body.error?.code === 'SCOPE_DENIED', `narrowed session, route answered ${r2.status} ${r2.body.error?.code}`);
+    const t2 = await toolWrite('prov-4', 484);
+    assert(t2?.isError === true && /^SCOPE_DENIED/.test(t2.content?.[0]?.text ?? ''), `narrowed session, tool answered ${JSON.stringify(t2).slice(0, 300)}`);
+
+    // A token minted after the grant carries the word, and declares.
+    const r3 = await restWrite(await mint(), 'prov-5');
+    assert(r3.status === 200, `a session holding provenance:write was refused: ${r3.status} ${JSON.stringify(r3.body.error)}`);
 });
 
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
