@@ -265,6 +265,7 @@
     "no-twin:POST /v1/organisms/:id/comments/batch": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (instances) and no agent tool does the same job.",
     "no-twin:POST /v1/organisms/:id/workspace-access": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (message) and no agent tool does the same job.",
     "no-twin:POST /v1/organisms/:id/workspace/records/publish": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (instances, namespace) and no agent tool does the same job.",
+    "no-twin:POST /v1/organisms/:id/workspace/records/delete": "Reviewed 2026-10-06. An agent reaches the same operation (deleteRecordsBatchOp) through an app's own tool, as ctx.workspace.deleteRecords in the extension sandbox, and removes one record with aimeat_workspace_object_delete. Jouni ruled on 2026-10-06 that bulk records get no MCP tool of their own: the app tools are the interface (wish bulk-records-for-ai). The route surfaced here when its body moved into the service and CodeQL could name the namespace read.",
     "no-twin:POST /v1/outbound/contacts": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (email, links, notes, relation) and no agent tool does the same job.",
     "no-twin:POST /v1/outbound/contacts/:id/opt-out": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (opted_out) and no agent tool does the same job.",
     "no-twin:POST /v1/owners": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (display_name) and no agent tool does the same job.",
