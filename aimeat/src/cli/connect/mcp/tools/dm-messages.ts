@@ -7,6 +7,7 @@
  *   the node REST API (POST /v1/messages, GET /v1/messages/agent-inbox|agent-thread). Distinct from the
  *   agent↔owner dashboard tools in agent-messages.ts. Mirrors the server MCP surface (src/mcp/dm-messages.ts).
  * @version-history
+ *   2026-10-06 — aimeat_dm_send, _broadcast, _ask and _send_as_owner run their dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 -- 2026-09-13 -- aimeat_dm_archive_as_owner / aimeat_dm_organize_as_owner: organising the
  *     owner's Messages list on messages:organize-as-owner, parity with the node MCP.
@@ -24,10 +25,8 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
-import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -38,62 +37,6 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     const { client } = registry.resolve();
     const resp = await client.post('/v1/notifications', { title, body, link, type });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_dm_send', descriptionFor('aimeat_dm_send'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_send') }, annotationsFor('aimeat_dm_send'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const payload: Record<string, unknown> = { to };
-    if (body) payload.body = body;
-    if (reply_to) payload.reply_to = reply_to;
-    if (subject) payload.subject = subject;
-    if (conversation_id) payload.conversation_id = conversation_id;
-    if (attachments) payload.attachments = attachments;
-    const resp = await client.post('/v1/messages', payload);
-    return provenanceEchoedResult(client,
-      { tool: 'aimeat_dm_send', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
-  });
-
-  mcp.tool('aimeat_dm_broadcast', descriptionFor('aimeat_dm_broadcast'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_broadcast') }, annotationsFor('aimeat_dm_broadcast'), async ({ agent_name, to, group_id, audience, mode, subject, body, attachments, interactive, ai_provenance, ai_provenance_id }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const payload: Record<string, unknown> = {};
-    if (to) payload.to = to;
-    if (group_id) payload.group_id = group_id;
-    if (audience) payload.audience = audience;
-    if (mode) payload.mode = mode;
-    if (subject) payload.subject = subject;
-    if (body) payload.body = body;
-    if (attachments) payload.attachments = attachments;
-    if (interactive) payload.interactive = interactive;
-    const resp = await client.post('/v1/messages/broadcast', payload);
-    return provenanceEchoedResult(client,
-      { tool: 'aimeat_dm_broadcast', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
-  });
-
-  mcp.tool('aimeat_dm_ask', descriptionFor('aimeat_dm_ask'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_ask') }, annotationsFor('aimeat_dm_ask'), async ({ agent_name, to, questions, body, subject, conversation_id, submit_label, ai_provenance, ai_provenance_id }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const payload: Record<string, unknown> = {
-      to,
-      interactive: { role: 'questions', v: 1, questions, ...(submit_label ? { submitLabel: submit_label } : {}) },
-    };
-    if (body) payload.body = body;
-    if (subject) payload.subject = subject;
-    if (conversation_id) payload.conversation_id = conversation_id;
-    const resp = await client.post('/v1/messages', payload);
-    return provenanceEchoedResult(client,
-      { tool: 'aimeat_dm_ask', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
-  });
-
-  mcp.tool('aimeat_dm_send_as_owner', descriptionFor('aimeat_dm_send_as_owner'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_dm_send_as_owner') }, annotationsFor('aimeat_dm_send_as_owner'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const payload: Record<string, unknown> = { to };
-    if (body) payload.body = body;
-    if (reply_to) payload.reply_to = reply_to;
-    if (subject) payload.subject = subject;
-    if (conversation_id) payload.conversation_id = conversation_id;
-    if (attachments) payload.attachments = attachments;
-    const resp = await client.post('/v1/messages', payload);
-    return provenanceEchoedResult(client,
-      { tool: 'aimeat_dm_send_as_owner', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
 }
