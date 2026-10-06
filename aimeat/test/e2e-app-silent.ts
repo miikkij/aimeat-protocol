@@ -28,6 +28,10 @@
  *   v1.6.0 — 2026-10-02 — Phase 6: an app a package installed for the owner asks for consent instead of
  *     approving itself (package sale design, T2).
  *   v1.7.0 — 2026-10-04 — Phase 6: the grant made by name carries the app's own name, not its file name.
+ *   v1.9.0 — 2026-10-06 — Phase 9: on an app's own origin GET /v1/apps/... runs that app and no
+ *     other. A draft preview through it answers 404, another app and the draft origin are redirected
+ *     to the app's own origin. Three of the four failed before the fix (200) (audit of the secaudit
+ *     last items, findings 1 and 2).
  *   v1.8.0 — 2026-10-06 — Phase 8: an app's draft runs at `<sub>--draft.<appHost>`. The preview link
  *     names it, the app's own origin redirects a preview there, the owner's silent sign-in there asks
  *     for anything wider than the grant, its authorize request is not bound, and a `--draft` subdomain
@@ -677,6 +681,36 @@ async function main() {
             const otherApp = await authorize(`${bn}/app-b.html`, 'memory:read', `${ORIGIN_A_DRAFT}/callback`);
             assert(otherApp.status === 400, `another app's flow accepted a draft origin it does not own: ${otherApp.status}`);
         });
+        // GET /v1/apps/:owner/:filename answers on every host. On an app's own origin it served the
+        // draft by its preview token, and any other published app inline, so code that was not the
+        // origin's own app ran where that app's silent sign-in answers (audit of the secaudit last
+        // items, findings 1 and 2).
+        console.log('\nPhase 9: on an app\'s own origin, /v1/apps/... runs that app and no other');
+        const onOrigin = (sub: string, path: string) =>
+            hostRequest(BASE, path, `${sub}.${APP_HOST}:${PORT}`, { headers: { 'x-app-origin': '1', 'x-subdomain': sub } });
+        await test('a draft preview through /v1/apps/... is refused on the app\'s own origin', async () => {
+            const tok = new URL(previewUrl).searchParams.get('preview') ?? '';
+            const r = await onOrigin('aaa', `/v1/apps/${a}/app-a.html?preview=${encodeURIComponent(tok)}`);
+            assert(r.status === 404, `the app's own origin served the draft through /v1/apps: ${r.status}`);
+            assert(!r.body.includes('DRAFT-MARKER'), 'the draft bytes were sent');
+        });
+        await test('another app\'s inline HTML is not served on this app\'s origin, it moves to its own', async () => {
+            const r = await onOrigin('aaa', `/v1/apps/${bn}/app-b.html?mode=inline`);
+            assert(r.status === 301 || r.status === 302, `app-b ran on app-a's origin: ${r.status}`);
+            // app-b's own origin, whichever of its labels appOriginUrl names; never app-a's.
+            const host = new URL(String(r.header('location'))).hostname;
+            assert(host.endsWith(`.${APP_HOST}`) && !host.startsWith('aaa'), `moved elsewhere: ${r.header('location')}`);
+        });
+        await test('the draft origin serves no published app through /v1/apps/...', async () => {
+            const r = await onOrigin('aaa--draft', `/v1/apps/${a}/app-a.html?mode=inline`);
+            assert(r.status === 301 || r.status === 302, `a published app ran on the draft origin: ${r.status}`);
+            assert(String(r.header('location')).includes(`//aaa.${APP_HOST}`), `moved elsewhere: ${r.header('location')}`);
+        });
+        await test('the origin\'s own app is still served inline through /v1/apps/...', async () => {
+            const r = await onOrigin('aaa', `/v1/apps/${a}/app-a.html?mode=inline`);
+            assert(r.status === 200, `the origin's own app: ${r.status}`);
+        });
+
         await test('a subdomain ending in --draft cannot be registered', async () => {
             const r = await json('/v1/admin/subdomains', { method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
                 body: JSON.stringify({ subdomain: 'bbb--draft', kind: 'app', target: `${a}/app-a.html` }) });

@@ -13,10 +13,12 @@
  *
  *   The single-label rule is load-bearing in both families: `a.b.apps.example` must NOT resolve, or
  *   a nested subdomain could stand in for the app one level up.
- * @structure PORTFOLIO_TARGET_PREFIX · isPortfolioTarget · appOriginHostFamily · resolveAppOriginTarget ·
- *   resolveFrameAppTarget
+ * @structure PORTFOLIO_TARGET_PREFIX · isPortfolioTarget · appOriginHostFamily · appOfRequestOrigin ·
+ *   resolveAppOriginTarget · resolveFrameAppTarget
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   v1.7.0 — 2026-10-06 — appOfRequestOrigin: the app a request's per-app origin serves, and whether
+ *     it is the draft origin, for a route that runs app code there (audit of the secaudit last items).
  *   v1.6.0 — 2026-10-06 — An app's draft origin (`<sub>--draft.<appHost>`) resolves to its app with
  *     `unpublished: true` and the app's own origin, so a caller grants the draft's code nothing
  *     silently (secaudit 2026-10 follow-up, A2).
@@ -98,6 +100,24 @@ export type AppOriginTarget =
     appOrigin?: string;
   }
   | { ok: false; error: 'app_origin_disabled' | 'bad_origin' | 'unknown_app' };
+
+/**
+ * The app a request's per-app origin serves, by the label the subdomain middleware read off the Host:
+ * `owner/filename` (null when the label names no enabled app), and whether it is that app's draft
+ * origin. Null on any host that is not a per-app origin: the apex, the bare app host, the portfolio
+ * and company families. A route that runs app code on an app origin asks this before it serves, so
+ * only the origin's own app runs where that app's silent sign-in answers (audit of the secaudit last
+ * items, findings 1 and 2).
+ */
+export async function appOfRequestOrigin(
+  storage: Storage, req: { appOrigin?: boolean; subdomain?: string | null },
+): Promise<{ target: string | null; draft: boolean } | null> {
+  if (!req.appOrigin || !req.subdomain) return null;
+  const draftOf = draftBaseLabel(req.subdomain);
+  const site = await storage.getSubdomainSite(draftOf ?? req.subdomain);
+  const target = site && site.enabled && site.kind === 'app' ? site.target : null;
+  return { target, draft: draftOf !== null };
+}
 
 /**
  * Resolve a caller-supplied origin to the app (or portfolio) it serves.

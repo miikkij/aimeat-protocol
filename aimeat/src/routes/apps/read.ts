@@ -10,6 +10,11 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.17.0 — 2026-10-06 — SECURITY: on a per-app origin GET /v1/apps/:owner/:filename runs only that
+ *     origin's own app. A draft preview through it is refused there (the draft origin serves it at
+ *     `/`), and a runnable request for another app, or on a draft origin, is redirected to the app's
+ *     own origin; both had served code where another app's silent sign-in answers (audit of the
+ *     secaudit last items, findings 1 and 2).
  *   v1.16.2 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.16.1 — 2026-10-05 — The owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.16.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -87,6 +92,7 @@ import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
 import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
+import { appOfRequestOrigin } from '../../services/app-origin-target.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appContentType } from '../../utils/app-content-type.js';
 import { detectLocale } from '../../i18n.js';
@@ -409,6 +415,13 @@ export function registerReadRoutes(
                 return;
             }
             const draftOwnerGhii = claim.sub;
+            // On a per-app origin a draft never runs through this route: on the app's own origin its
+            // code reached the silent sign-in the published app gets. A draft link names the draft
+            // origin, which serves it at `/` (routes/subdomains.ts; audit of the secaudit last items).
+            if (await appOfRequestOrigin(storage, req)) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'A draft runs only at its own draft address.'));
+                return;
+            }
             // H-2: never execute runnable draft HTML on the authenticated apex origin.
             // When the app origin is provisioned and this request is on the apex, 301 to
             // the isolated origin, preserving the preview token so the draft is served there.
@@ -565,7 +578,13 @@ export function registerReadRoutes(
         // not execute the HTML it fetched. The access-code half WAS a problem: the unlock page is
         // served as HTML to an unauthenticated browser, so after the right code the app ran on the
         // apex, which is the one origin an author asking for protection least wants it on.
-        if (runnable && config.appOriginEnabled && config.appHost && !req.appOrigin) {
+        //
+        // The same redirect moves a runnable request on ANOTHER app's origin, or on a draft origin, to
+        // this app's own: there the code would run where that other app's silent sign-in answers
+        // (audit of the secaudit last items, finding 2).
+        const here = runnable ? await appOfRequestOrigin(storage, req) : null;
+        const foreignOrigin = !!here && (here.draft || here.target !== `${app.ownerName}/${app.filename}`);
+        if (runnable && config.appOriginEnabled && config.appHost && (!req.appOrigin || foreignOrigin)) {
             const target = await appOriginUrl(config, storage, owner, filename);
             const gated = !!app.accessCode
                 || (config.marketplaceEnabled && !!app.manifest.priceMorsels && app.manifest.priceMorsels > 0);
