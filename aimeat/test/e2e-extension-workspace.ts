@@ -21,6 +21,8 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.3.0 — 2026-10-06 — The surface lists publishRecords and deleteRecords (the batch, proved in
+ *     e2e-extension-workspace-batch.ts).
  *   v1.2.0 — 2026-09-24 — A write that loses its compare-and-swap leaves no provenance record, and the
  *     write that lands leaves one, counted through GET /v1/ai-transparency/mine. Failed on the old
  *     code first (5 → 6).
@@ -210,7 +212,7 @@ await test('Install + activate: declared, undeclared, read-only and budget-cappe
     assert(none.body?.data?.extension?.workspace === null, `undeclared reads back null: ${JSON.stringify(none.body?.data?.extension?.workspace)}`);
 });
 
-await test('Declaration: without it ctx.workspace is undefined; with it the five methods exist', async () => {
+await test('Declaration: without it ctx.workspace is undefined; with it the seven methods exist', async () => {
     const none = await invoke(EXT_NONE, 'probe', B.token);
     assert(none.status === 200, `probe none ${none.status}: ${JSON.stringify(none.body?.error)}`);
     // GUARD, not hole: the old tree had no ctx.workspace on any extension, so this held trivially.
@@ -219,7 +221,7 @@ await test('Declaration: without it ctx.workspace is undefined; with it the five
     assert(some.status === 200, `probe ${some.status}: ${JSON.stringify(some.body?.error)}`);
     // HOLE: before this capability `has` was false here too.
     assert(some.body.data.has === true, 'a declared extension sees ctx.workspace');
-    assert(JSON.stringify(some.body.data.keys) === JSON.stringify(['get', 'index', 'publish', 'write', 'writeDoc']), `surface: ${JSON.stringify(some.body.data.keys)}`);
+    assert(JSON.stringify(some.body.data.keys) === JSON.stringify(['deleteRecords', 'get', 'index', 'publish', 'publishRecords', 'write', 'writeDoc']), `surface: ${JSON.stringify(some.body.data.keys)}`);
 });
 
 await test('Happy path: B\'s agent writes a claim through A\'s extension, reads it back, publishes it', async () => {

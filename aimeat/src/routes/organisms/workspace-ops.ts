@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 -- 2026-10-06 -- POST .../workspace/records/delete runs deleteRecordsBatchOp
+ *     (services/workspace-batch-ops.ts), the function ctx.workspace.deleteRecords runs. An id given
+ *     twice is decided once.
  *   v1.12.0 -- 2026-10-02 -- DELETE /v1/organisms/:id/workspace asks memory:purge beside organism:write:
  *     it removes every record and its history for good (Jouni, 2026-10-02).
  *   v1.11.0 -- 2026-10-02 -- POST .../workspace/records/delete asks memory:purge: it removes for good.
@@ -54,7 +57,9 @@ import { provisionWorkspace, WorkspaceProvisionError } from '../../services/work
 import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
 import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../../services/workspace-engagements.js';
 import { isKeyArchived } from '../../services/archive.js';
-import { checkDeleteGuard } from '../../services/write-guards.js';
+import { callerOf } from '../../middleware/caller.js';
+import { workspaceCallerOf } from '../../services/workspace-tool-ops.js';
+import { deleteRecordsBatchOp } from '../../services/workspace-batch-ops.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -643,75 +648,20 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * DELETE /v1/memory/:key. App grants that held memory:delete were given the word once
    * (services/task-start-migrations.ts). ── */
   router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:purge'), async (req, res) => {
-    const id = req.params.id as string;
+    // The body is deleteRecordsBatchOp (services/workspace-batch-ops.ts), which
+    // ctx.workspace.deleteRecords runs too: membership, the append-only guard, the caller-owned family.
+    const who = callerOf(req, config.nodeId, storage);
+    if (who.visitor) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node is not a member of this organism.')); return; }
     const body = req.body ?? {};
-    const namespace = body.namespace;
-    const rawIds = Array.isArray(body.ids) ? body.ids : null;
-    if (typeof namespace !== 'string' || !namespace || !rawIds || rawIds.length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace (string) and ids (non-empty array) are required'));
-      return;
-    }
-    if (rawIds.length > 2000) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'At most 2000 ids per request'));
-      return;
-    }
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
-
-    const ws = typeof body.ws === 'string' && body.ws ? body.ws : undefined;
-    const wsRoot = ws ? `organism.${id}.w.${ws}` : `organism.${id}`;
-    const callerGhii = resolveIdentity(req.auth!, config.nodeId);
-    const ids = rawIds.filter((x: unknown): x is string => typeof x === 'string' && !!x);
-
-    // Append-only guard ONCE (per-namespace policy): a create_only namespace refuses record deletion on
-    // every path — existing events can never be erased. If it's append-only, refuse the whole batch.
-    const guard = await checkDeleteGuard(`${wsRoot}.${namespace}.${ids[0]}.latest`, storage);
-    if (!guard.valid) {
-      res.status(409).json(error(config.nodeId, 'WRITE_CONFLICT', guard.errors?.[0]?.message ?? 'namespace is append-only', 409, { violations: guard.errors }));
-      return;
-    }
-
-    // A key's role suffix must be the RECORD itself (bare), its .draft/.latest, or a .version.N — never a
-    // sibling instance (`${base}0`) or unrelated child. Mirrors object_delete's per-row guard.
-    const roleOk = (base: string, key: string): boolean => {
-      const role = key === base ? '' : key.slice(base.length + 1);
-      return role === '' || role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role);
-    };
-
-    const refs: { ownerGaii: string; key: string }[] = [];
-    const deleted: { id: string; keys: number }[] = [];
-    const failed: { id: string; reason: string }[] = [];
-    // ONE value-free (ownerGaii, key) scan of the namespace — the delete needs only addresses, so it
-    // never loads a single value (a per-record listAllMemory scan loaded every record's value, which
-    // dominated the delete cost). Fall back to per-record value scans only if the backend lacks the
-    // key-only primitive. Then filter each requested id's family in memory (own/same-owner + role).
-    const nsPrefix = `${wsRoot}.${namespace}.`;
-    const nsKeys = storage.listMemoryKeysByPrefix
-      ? await storage.listMemoryKeysByPrefix(nsPrefix)
-      : (await storage.listAllMemory({ prefix: nsPrefix, limit: 100000 })).items.map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
-    for (const rid of ids) {
-      const base = `${wsRoot}.${namespace}.${rid}`;
-      const family = nsKeys.filter(r =>
-        (r.key === base || r.key.startsWith(`${base}.`)) && roleOk(base, r.key)
-        && (r.ownerGaii === callerGhii || isSameOwner(r.ownerGaii, callerGhii)));
-      if (family.length === 0) { failed.push({ id: rid, reason: 'nothing to delete (or not owned by you)' }); continue; }
-      for (const r of family) refs.push({ ownerGaii: r.ownerGaii, key: r.key });
-      deleted.push({ id: rid, keys: family.length });
-    }
-
-    // ONE batched delete of every collected ref (SQLite: one transaction; Prisma: chunked deleteMany).
-    let removed = 0;
-    if (refs.length) {
-      if (storage.bulkDeleteMemory) removed = await storage.bulkDeleteMemory(refs);
-      else for (const r of refs) { if (await storage.deleteMemory(r.ownerGaii, r.key)) removed++; }
-    }
-
-    if (removed > 0) {
-      emitChange('organisms');
-      void updateOrganismStructure(storage, config, id, { event: `deleted ${deleted.length} record(s) in ${namespace}`, actor: callerGhii }).catch(err => { logger.warn('roleOk: timeline best-effort', { error: String(err) }); });
-    }
-    res.json(success(config.nodeId, { deleted, failed, rows_removed: removed }));
+    const r = await deleteRecordsBatchOp({ storage, config },
+      workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles] }, config), {
+        organismId: req.params.id as string,
+        ws: typeof body.ws === 'string' && body.ws ? body.ws : undefined,
+        namespace: body.namespace,
+        ids: Array.isArray(body.ids) ? body.ids : [],
+      });
+    if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details)); return; }
+    res.json(success(config.nodeId, r.data));
   });
 
   /* ── Archive / Unarchive ──────────────────────────────────────────────────────────────────────

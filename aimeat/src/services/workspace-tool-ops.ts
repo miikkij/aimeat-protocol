@@ -28,6 +28,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.7.1 — 2026-10-06 — denyReason and memberRoleOf are exported, so the batch operations
+ *     (services/workspace-batch-ops.ts) decide membership with the same two functions.
  *   v1.7.0 — 2026-09-29 — TARGET-082 review: readWorkspaceOp tells an AI which records carry a
  *     warning classification: `classification_warning` on each index entry and opened item, and
  *     `classification_warnings` over the whole read (the manifest and meta records included).
@@ -148,7 +150,7 @@ export function workspaceCallerOf(
 const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 
 /** Membership gate — an organism agent, or the owner is an active member. Null when allowed. */
-async function denyReason(storage: Storage, caller: WorkspaceOpsCaller, orgId: string): Promise<WorkspaceOpRefusal | null> {
+export async function denyReason(storage: Storage, caller: WorkspaceOpsCaller, orgId: string): Promise<WorkspaceOpRefusal | null> {
     const org = await storage.getOrganism(orgId);
     if (!org) return refuse(404, 'NOT_FOUND', 'Organism not found');
     if (org.agentGaiis?.includes(caller.principal)) return null;
@@ -157,7 +159,7 @@ async function denyReason(storage: Storage, caller: WorkspaceOpsCaller, orgId: s
 }
 
 /** The caller's role for the meta.* rule; an organism agent is a member and nothing more. */
-async function memberRoleOf(storage: Storage, caller: WorkspaceOpsCaller, orgId: string): Promise<'creator' | 'admin' | 'member' | null> {
+export async function memberRoleOf(storage: Storage, caller: WorkspaceOpsCaller, orgId: string): Promise<'creator' | 'admin' | 'member' | null> {
     const m = await storage.getMembership(orgId, caller.ownerName);
     if (m && m.status === 'active') return m.role;
     const org = await storage.getOrganism(orgId);

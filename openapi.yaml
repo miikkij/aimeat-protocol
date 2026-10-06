@@ -37503,8 +37503,20 @@ paths:
         change-guard (returns skipped), version/latest attribution and draft consumption — but the
         namespace/manifest reads are amortised and the writes are committed together. Same authorization
         as the single publish (active member; `meta.*` needs admin/creator; archived is read-only). When
-        the publish REVIEW gate is enabled this batch path is refused (409) — publish one at a time via
-        POST /v1/organisms/{id}/publish.
+        the publish REVIEW gate is enabled this batch path is refused (409 GATE_ENABLED): write drafts
+        (POST /v1/organisms/{id}/workspace/drafts) for a reviewer, or ask an admin to turn the gate off.
+
+        `records` (direct values) are a write of new bytes, so an agent or app token of a member who
+        did not create the workspace needs the creator's contributor grant (403 CONSENT_REQUIRED), as a
+        draft write does. Each record is decided alone and named in `results`; a record without an id
+        or with an unknown visibility is named there as INVALID. `dry_run: true` decides every record
+        and writes nothing, with the same answer shape and `dry_run: true` in it. `create_only: true`
+        refuses an id that already has a published version (code EXISTS). An entry in
+        `expected_versions` is a compare-and-swap in any space: 0 means the record must not exist yet,
+        N means it must be at version N (code VERSION_CONFLICT); null names no expectation. An id given
+        twice is refused the second time (code DUPLICATE_ID).
+
+        Extensions run the same operation as `ctx.workspace.publishRecords` (one host call).
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -37539,11 +37551,17 @@ paths:
                       visibility: { type: string, enum: [private, owner, group, members, public, workspace] }
                 expected_versions:
                   type: object
-                  additionalProperties: { type: integer }
-                  description: 'Optional per-instance optimistic lock (required by requires_expected_version namespaces): { <instance>: <version> }'
+                  additionalProperties: { type: integer, nullable: true }
+                  description: 'Optional per-instance optimistic lock { <instance>: <version> }, held in every space and required by requires_expected_version namespaces. 0 = must not exist yet; null = no expectation.'
+                create_only:
+                  type: boolean
+                  description: Refuse an id that already has a published version (result code EXISTS).
+                dry_run:
+                  type: boolean
+                  description: Decide every record and write nothing. The answer has the same shape plus `dry_run`.
       responses:
         '200':
-          description: 'Result: { published, skipped, failed, results: [{ instance, ok, version?, skipped?, code?, violations?: [{ path, message, schema_rule, params }] }] }. A violation message names the property it is about.'
+          description: 'Result: { published, skipped, failed, results: [{ instance, ok, version?, skipped?, code?: NO_DRAFT | INVALID | EXISTS | VERSION_CONFLICT | DUPLICATE_ID, violations?: [{ path, message, schema_rule, params }] }], dry_run? }. A violation message names the property it is about. On a dry run, `published` counts the records that would be published.'
           content:
             application/json:
               schema:
@@ -37553,7 +37571,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: not an active member, or meta.* without admin/creator
+          description: not an active member, meta.* without admin/creator, or (records) an agent or app token without the workspace creator's contributor grant (CONSENT_REQUIRED)
         '404':
           description: organism not found
         '409':

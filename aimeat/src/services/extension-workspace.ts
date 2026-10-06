@@ -24,7 +24,8 @@
  *     2. There is a real caller. A scheduled run and a workflow step have nobody present, so those
  *        roads attach nothing (services/extension-system-run.ts).
  *     3. The caller's own authority. An owner session may. An agent, app-grant or ecosystem token
- *        holds `memory:write` to write or publish and `organism:read` to read — the words the
+ *        holds `memory:write` to write or publish, `memory:purge` to remove records for good
+ *        (deleteRecords) and `organism:read` to read — the words the
  *        REST routes and aimeat_workspace_write enforce for the same acts — and the test is the
  *        same scopeIsCovered() requireScope asks, so a wildcard is read the same way on this door.
  *     4. Every call counts against the sandbox's maxApiCalls, like a fetch (extension-runtime.ts).
@@ -43,6 +44,10 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.2.0 — 2026-10-06 — publishRecords and deleteRecords: a batch in ONE host call, through
+ *     services/workspace-batch-ops.ts, the functions the two batch routes run. 500 records were 1000
+ *     calls through write() + publish() and could not fit the 500-call ceiling. A token needs
+ *     memory:write to publish the batch and memory:purge to delete it, as on the routes.
  *   v1.1.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.1.0 — 2026-09-29 — index and get pass the caller's classification reader to readWorkspaceOp
@@ -61,6 +66,7 @@ import {
     workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp,
     type WorkspaceOpRefusal, type WorkspaceOpsCaller,
 } from './workspace-tool-ops.js';
+import { publishRecordsBatchOp, deleteRecordsBatchOp } from './workspace-batch-ops.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)
 // is the leaf module extension-workspace-declaration.ts, so the manifest builder and the CRUD
@@ -72,6 +78,9 @@ export { WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf, type WorkspaceDeclar
 export const WORKSPACE_WRITE_SCOPE = 'memory:write';
 /** The scope such a token needs to READ a workspace: what GET /v1/organisms/:id/workspace asks. */
 export const WORKSPACE_READ_SCOPE = 'organism:read';
+/** The scope such a token needs to REMOVE records for good (deleteRecords): what
+ *  POST /v1/organisms/:id/workspace/records/delete asks since 2026-10-02. */
+export const WORKSPACE_PURGE_SCOPE = 'memory:purge';
 
 /** A refusal the capability made, kept so the road can answer with the service's status and code
  *  rather than a generic EXTENSION_ERROR 500. */
@@ -116,20 +125,21 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         return refuse(r.status, r.code, r.message);
     };
 
-    /** Guard 1 and 3 for a call of the given kind. */
-    const allow = (kind: 'read' | 'write'): void => {
+    /** Guard 1 and 3 for a call of the given kind. A purge is a write the manifest declares as write. */
+    const allow = (kind: 'read' | 'write' | 'purge'): void => {
         if (kind === 'read' && !declaration.read) {
             refuse(403, 'PERMISSION', `Extension "${extName}" does not declare workspace read access (manifest workspace.read).`);
         }
-        if (kind === 'write' && !declaration.write) {
+        if (kind !== 'read' && !declaration.write) {
             refuse(403, 'PERMISSION', `Extension "${extName}" does not declare workspace write access (manifest workspace.write).`);
         }
         // The test requireScope makes before it asks for a word: an owner in person bypasses scopes;
         // an agent, an app grant or an ecosystem app does not.
         if (isOwnerInPerson(caller)) return;
-        const scope = kind === 'write' ? WORKSPACE_WRITE_SCOPE : WORKSPACE_READ_SCOPE;
+        const scope = kind === 'write' ? WORKSPACE_WRITE_SCOPE : kind === 'purge' ? WORKSPACE_PURGE_SCOPE : WORKSPACE_READ_SCOPE;
         if (!scopeIsCovered(caller.scopes, scope)) {
-            refuse(403, 'SCOPE_DENIED', `Scope "${scope}" required to ${kind} a workspace through extension "${extName}". Caller scopes: [${caller.scopes.join(', ')}]`);
+            const act = kind === 'purge' ? 'remove records from' : kind;
+            refuse(403, 'SCOPE_DENIED', `Scope "${scope}" required to ${act} a workspace through extension "${extName}". Caller scopes: [${caller.scopes.join(', ')}]`);
         }
     };
 
@@ -174,6 +184,23 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         publish: async (organismId, ws, namespace, id, opts) => {
             allow('write');
             return settle(await publishWorkspaceOp(ops, opsCaller, { organismId, ws, namespace, id, expectedVersion: opts?.expectedVersion ?? null }));
+        },
+        // The batch: ONE host call, one bulk write, the function POST .../workspace/records/publish
+        // runs. Every direct value gets the node's provenance stamp, as write() gives a draft.
+        publishRecords: async (organismId, ws, namespace, records, opts) => {
+            allow('write');
+            if (!Array.isArray(records) || records.length === 0) refuse(400, 'INVALID_INPUT', 'publishRecords() needs a non-empty array of { id, value, visibility? }');
+            return settle(await publishRecordsBatchOp(ops, opsCaller, {
+                organismId, ws, namespace, records,
+                expectedVersions: opts?.expectedVersions, createOnly: opts?.createOnly === true, dryRun: opts?.dryRun === true,
+                nodeStamp: { pipeline, level: provenance.level, method: provenance.method },
+            }));
+        },
+        // Removing records for good asks memory:purge of a token, as POST .../workspace/records/delete does.
+        deleteRecords: async (organismId, ws, namespace, ids) => {
+            allow('purge');
+            if (!Array.isArray(ids) || ids.length === 0) refuse(400, 'INVALID_INPUT', 'deleteRecords() needs a non-empty array of instance ids');
+            return settle(await deleteRecordsBatchOp(ops, opsCaller, { organismId, ws, namespace, ids }));
         },
     };
 

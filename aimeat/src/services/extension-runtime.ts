@@ -8,6 +8,8 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.12.0 — 2026-10-06 — `ctx.workspace.publishRecords` and `deleteRecords`, one host call each
+ *     whatever the record count (services/extension-workspace.ts).
  *   v2.11.0 — 2026-10-05 — The prelude builds ctx first, takes every `__*` host function into a local
  *     binding and deletes it from the global object, and only then evaluates the author's code. That
  *     code ran first before, and could call `__fetch`, `__email` or `__ext_buy` directly, past what
@@ -117,6 +119,7 @@ const GUEST_CALL_NAMES: Record<string, string> = {
     __dp_rows: 'ctx.datapackage.rows', __dp_fail: 'ctx.datapackage.fail',
     __ws_index: 'ctx.workspace.index', __ws_get: 'ctx.workspace.get', __ws_write: 'ctx.workspace.write',
     __ws_writeDoc: 'ctx.workspace.writeDoc', __ws_publish: 'ctx.workspace.publish',
+    __ws_publishRecords: 'ctx.workspace.publishRecords', __ws_deleteRecords: 'ctx.workspace.deleteRecords',
     __wallet_consume: 'ctx.wallet.consume', __wallet_balance: 'ctx.wallet.getBalance',
     __ext_buy: 'ctx.buy', __ai_start: 'ctx.ai.start',
     __consent_check: 'ctx.consent.check', __consent_require: 'ctx.consent.require',
@@ -288,6 +291,9 @@ const __aimeatCtx = (() => {
             write:    async (org, ws, space, id, value, opts) => __call(__ws_write,  [org, ws, space, id, JSON.stringify(value === undefined ? null : value), JSON.stringify(opts || {})]),
             writeDoc: async (org, ws, space, doc, opts)     => __call(__ws_writeDoc, [org, ws, space, JSON.stringify(doc ?? {}), JSON.stringify(opts || {})]),
             publish:  async (org, ws, ns, id, opts)         => __call(__ws_publish,  [org, ws, ns, id, JSON.stringify(opts || {})]),
+            // A batch is ONE host call: one count against maxApiCalls, whatever the record count.
+            publishRecords: async (org, ws, ns, records, opts) => __call(__ws_publishRecords, [org, ws, ns, JSON.stringify(records ?? []), JSON.stringify(opts || {})]),
+            deleteRecords:  async (org, ws, ns, ids)           => __call(__ws_deleteRecords,  [org, ws, ns, JSON.stringify(ids ?? [])]),
         } : undefined,
         wallet: {
             // The reason is optional; an omitted one arrives as '' rather than being refused.
@@ -576,6 +582,14 @@ async function runInSandbox(
             counter, limits.maxApiCalls, inflight);
         registerAsyncHostFn(vm, '__ws_publish',
             wsCap ? async (org, ws, ns, id, optsJson) => wsCap.publish(org, ws, ns, id, JSON.parse(optsJson || '{}') as { expectedVersion?: number }) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ws_publishRecords',
+            wsCap ? async (org, ws, ns, recordsJson, optsJson) => wsCap.publishRecords(org, ws, ns,
+                JSON.parse(recordsJson || '[]') as Array<{ id: string; value: unknown; visibility?: string }>,
+                JSON.parse(optsJson || '{}') as { expectedVersions?: Record<string, number | null>; createOnly?: boolean; dryRun?: boolean }) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ws_deleteRecords',
+            wsCap ? async (org, ws, ns, idsJson) => wsCap.deleteRecords(org, ws, ns, JSON.parse(idsJson || '[]') as string[]) : null,
             counter, limits.maxApiCalls, inflight);
 
         // ── Wallet API ────────────────────────────────────────

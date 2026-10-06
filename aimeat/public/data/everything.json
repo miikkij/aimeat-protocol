@@ -955,10 +955,10 @@
      "slug": "g-6-extensions-in-a-workspace",
      "cells": [
       "<strong>Extensions in a workspace</strong>",
-      "An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node.",
-      "extension manifest"
+      "An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removing records asks the agent for the permission to remove for good.",
+      "extension manifest, <code>ctx.workspace.publishRecords</code>, <code>ctx.workspace.deleteRecords</code>, <code>POST /v1/organisms/:id/workspace/records/publish</code> (<code>dry_run</code>, <code>create_only</code>)"
      ],
-     "plain": "Extensions in a workspace An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. extension manifest"
+     "plain": "Extensions in a workspace An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removing records asks the agent for the permission to remove for good. extension manifest, ctx.workspace.publishRecords, ctx.workspace.deleteRecords, POST /v1/organisms/:id/workspace/records/publish (dry_run, create_only)"
     },
     {
      "slug": "g-6-organism-export-and-import",
