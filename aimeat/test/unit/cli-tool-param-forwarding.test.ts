@@ -26,6 +26,8 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-10-06 — aimeat_organism_search's archived is probed with `include`, the scope that reaches
+ *     the wire as includeArchived (secaudit 2026-10 follow-up, Part B).
  *   2026-10-06 — aimeat_memory_write.expected_version is measured: POST /v1/memory reads it (secaudit
  *     2026-10 follow-up, Part B).
  *   2026-10-05 — The connector cases take their tool from the whole connector (registerAllTools): most
@@ -110,6 +112,9 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // normalizeWriteItems takes `space` + `value` together, or `items`. Holding the pair constant is
     // the only way a single-parameter probe reaches the workspace read that precedes the write.
     aimeat_workspace_write: { always: { space: 'probe', value: { title: 'probe' } } },
+    // `archived` is a scope whose default, exclude, is sent as nothing; the route reads `only` and
+    // includeArchived, so the probe asks for one that has to reach the wire.
+    aimeat_organism_search: { shaped: { archived: 'include' } },
     // Two directions, two different second arguments. `direction` is held at 'export' so `ws` is
     // read at all; the import branch is exercised when `direction` is itself the parameter on test.
     aimeat_workspace_transfer: { always: { direction: 'export', zip_base64: 'cHJvYmU=' } },

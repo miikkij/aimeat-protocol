@@ -5,6 +5,10 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-06 — aimeat_organism_overview takes include_archived, aimeat_workspace_publish
+ *     expected_version and aimeat_workspace_update apps, as the node's MCP always did; the loose
+ *     update fields keep z.any(), because both surfaces accept them as a JSON string too
+ *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-10-01 — aimeat_organism_create takes `shape` and `lang` (starting shapes with their workspaces).
@@ -398,7 +402,10 @@ export const organismsWorkspacesAppsTools = [
         // The words GET /v1/organisms/:id/overview asks (secaudit 2026-10 follow-up, A4).
         scope: 'organism:read',
         surfaces: ['appdev', 'agent', 'service'],
-        input: { organism_id: { type: 'string', required: true, description: 'Organism identifier.' } },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            include_archived: { type: 'boolean', description: 'Include archived workspaces. Default false: archived workspaces are summarised as a count.' },
+        },
     },
     {
         name: 'aimeat_workspace_overview',
@@ -447,6 +454,7 @@ export const organismsWorkspacesAppsTools = [
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             namespace: { type: 'string', required: true, description: 'The instance namespace.' },
             id: { type: 'string', required: true, description: 'The instance id whose .draft to publish.' },
+            expected_version: { type: 'number', description: 'The optimistic lock: the version you read. Required by a namespace whose manifest sets requires_expected_version; a publish over an edit made in between is refused.' },
         },
     },
     {
@@ -497,9 +505,10 @@ export const organismsWorkspacesAppsTools = [
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             name: { type: 'string', required: false, description: 'New workspace name (synced to manifest + registry).' },
             readme: { type: 'string', required: false, description: 'New markdown readme/intro (replaces the current one).' },
-            add_spaces: { type: 'array', required: false, description: 'ADDITIVE: objectTypes to UNION into the manifest (skip-if-exists). Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. A ROW space is { name, namespace, backing:"rows", indexOn:[…] } and takes no mode: rows keep no version history and are neither records nor documents, and those defaults are filled for you too. Preferred over `manifest` for adding spaces. Returns { added, skipped }. Cannot remove/rename.' },
-            manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings) — for restructuring (rename/remove a space, change the gate). The id is preserved and the manifest is schema-validated. To only ADD spaces, prefer add_spaces. May also carry an optional top-level objectives[] (the measurability convention: why the organism exists + KPIs with kind value/cost/roi/outcome/quality and a source that can sum/count the organism\'s own records) and an objectType servesObjective linking a space to an objective; both optional — see "Recording purpose & value" in docs/agent-workspace-contracts.md.' },
-            schemas: { type: 'object', required: false, description: "Map of namespace → JSON Schema (object) to lock (strict) for a records space. READ THE CURRENT SCHEMAS FIRST: this REPLACES the locked schema, it does not merge into it, so a schema you write without having read drops whatever else the old one said. aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. And do not invent a maxLength: the real ceiling is the memory value budget the node enforces on the whole record (1024 kB by default), and a field cap smaller than that is a number somebody guessed, which is how a notes field filled up at 4000 characters for no reason anyone could name." },
+            add_spaces: { type: 'array', required: false, description: 'ADDITIVE: objectTypes to UNION into the manifest (skip-if-exists). Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. A ROW space is { name, namespace, backing:"rows", indexOn:[…] } and takes no mode: rows keep no version history and are neither records nor documents, and those defaults are filled for you too. Preferred over `manifest` for adding spaces. Returns { added, skipped }. Cannot remove/rename.', zod: z.any() },
+            manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings) — for restructuring (rename/remove a space, change the gate). The id is preserved and the manifest is schema-validated. To only ADD spaces, prefer add_spaces. May also carry an optional top-level objectives[] (the measurability convention: why the organism exists + KPIs with kind value/cost/roi/outcome/quality and a source that can sum/count the organism\'s own records) and an objectType servesObjective linking a space to an objective; both optional — see "Recording purpose & value" in docs/agent-workspace-contracts.md.', zod: z.any() },
+            schemas: { type: 'object', required: false, description: "Map of namespace → JSON Schema (object) to lock (strict) for a records space. READ THE CURRENT SCHEMAS FIRST: this REPLACES the locked schema, it does not merge into it, so a schema you write without having read drops whatever else the old one said. aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. And do not invent a maxLength: the real ceiling is the memory value budget the node enforces on the whole record (1024 kB by default), and a field cap smaller than that is a number somebody guessed, which is how a notes field filled up at 4000 characters for no reason anyone could name.", zod: z.any() },
+            apps: { type: 'array', required: false, description: 'FULL replacement list of apps pinned to this workspace ([] clears): an array of { owner, filename, label? } naming published apps. Pinning is launch context only; access to the workspace data is still checked on every call. Creator or admin only.', zod: z.any() },
             member_changes: { type: 'string', required: false, enum: ['direct', 'suggest'], description: "How this workspace takes a change from a member who is neither its creator nor an organism admin (aimeat_workspace_space_add, aimeat_workspace_sections_set): 'direct' = it lands at once with their name on it; 'suggest' = it waits until the creator or an admin approves it (the default)." },
         },
     },

@@ -217,8 +217,16 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const orgId = requiredString(input, 'organism_id');
             const direction = requiredString(input, 'direction');
-            if (direction === 'export') return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/export${query({ ws: requiredString(input, 'ws'), format: 'base64' })}`);
-            if (direction === 'import') return client.post(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/import`, { zip_base64: requiredString(input, 'zip_base64') });
+            if (direction === 'export') {
+                const ws = optionalString(input, 'ws');
+                if (!ws) throw new Error("direction='export' needs a ws.");
+                return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/export${query({ ws, format: 'base64' })}`);
+            }
+            if (direction === 'import') {
+                const zip = optionalString(input, 'zip_base64');
+                if (!zip) throw new Error("direction='import' needs zip_base64.");
+                return client.post(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/import`, { zip_base64: zip });
+            }
             throw new Error("direction must be 'export' or 'import'.");
         },
     },

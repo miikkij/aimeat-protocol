@@ -28,9 +28,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalArray, optionalBoolean, requiredArray, coerceObject, stampValue, genWsId, wsRoot } from './tool-call-helpers.js';
-import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem, type WriteObjectType } from '../services/workspace-write-items.js';
-import { fileThroughDoor, unfileThroughDoor, sectionsFromRead } from './workspace-section-filing.js';
+import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalBoolean, requiredArray, coerceObject, wsRoot } from './tool-call-helpers.js';
+import { unfileThroughDoor, sectionsFromRead } from './workspace-section-filing.js';
 
 export const organismTools: ConnectCliToolDefinition[] = [
     {
@@ -64,7 +63,10 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_overview',
-        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/overview`),
+        // The route spells it includeArchived.
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/overview${query({
+            includeArchived: optionalBoolean(input, 'include_archived') ? 'true' : undefined,
+        })}`),
     },
     {
         name: 'aimeat_organism_update',
@@ -172,12 +174,15 @@ export const organismTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_organism_search',
         handler: ({ client }, input) => {
             const ws = optionalString(input, 'ws');
+            // An archive SCOPE — "exclude" (default), "only", "include" — not a flag. The route reads
+            // `archived=only` and `includeArchived=true`; `archived=include` reached it as nothing, so
+            // a search asked to include the archive searched without it.
+            const archived = optionalString(input, 'archived');
             return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/search${query({
                 q: requiredString(input, 'q'),
                 ...(ws ? { ws } : {}),
-                // An archive SCOPE — "exclude" (default), "only", "include" — not a flag. Read as a
-                // boolean it would have collapsed three answers into two.
-                archived: optionalString(input, 'archived'),
+                archived: archived === 'only' ? 'only' : undefined,
+                includeArchived: archived === 'include' ? 'true' : undefined,
             })}`);
         },
     },
@@ -348,12 +353,12 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_read',
-        // `ids` and `space` are how a caller reads ONE document instead of the whole workspace.
-        // Dropped, every read was a full listing, which is the difference between opening a page and
-        // downloading the book.
+        // → GET /v1/organisms/:id/workspace/index: readWorkspaceOp(), the index or the named ids,
+        // as the node's MCP answers. This definition read GET /v1/organisms/:id/workspace, which reads
+        // none of ids, space or include_archived, so every read was the whole workspace.
         handler: ({ client }, input) => {
             const ids = optionalArray(input, 'ids')?.filter((i): i is string => typeof i === 'string');
-            return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({
+            return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/index${query({
                 ws: requiredString(input, 'ws'),
                 ids: ids?.length ? ids.join(',') : undefined,
                 space: optionalString(input, 'space'),
@@ -367,47 +372,27 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_write',
-        handler: async ({ client }, input) => {
-            const orgId = requiredString(input, 'organism_id');
-            const ws = requiredString(input, 'ws');
-            const norm = normalizeWriteItems({
-                space: input.space, value: input.value, id: input.id, section: input.section, items: input.items,
-            });
-            if ('error' in norm) return { ok: false, error: { code: 'INVALID_INPUT', message: norm.error } };
-            const batch = input.items !== undefined && input.items !== null;
-            const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace${query({ ws })}`);
-            if (!wsResp.ok) return wsResp;
-            const types = (wsResp.data as { manifest?: { objectTypes?: WriteObjectType[] } } | undefined)?.manifest?.objectTypes ?? [];
-            // Resolve every item before writing any: a document with no id gets a generated one, so a
-            // half-written batch the caller retries would duplicate whatever already landed.
-            const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
-            for (const [i, want] of norm.items.entries()) {
-                const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined, { organismId: orgId, ws });
-                if ('error' in item) {
-                    return { ok: false, error: { code: item.refusal?.code ?? 'NO_SPACE', message: item.error, ...(item.refusal ? { details: item.refusal.details } : {}) } };
-                }
-                const key = `${wsRoot(orgId, ws)}.${item.namespace}.${item.instanceId}.draft`;
-                planned.push({ key, v: stampValue(coerceObject(item.value), item.instanceId), item });
+        // → POST /v1/organisms/:id/workspace/drafts: writeWorkspaceDraftsOp(), the node MCP tool's own
+        // function. Every item is resolved and schema-validated before any is written, each is filed
+        // under its section by the node, and one declaration is recorded per item. This definition
+        // wrote each draft with POST /v1/memory and filed it with a second call, a copy of all three.
+        handler: ({ client }, input) => {
+            const body: JsonObject = { ws: requiredString(input, 'ws') };
+            for (const field of ['space', 'value', 'id', 'section', 'items', 'ai_provenance', 'ai_provenance_id'] as const) {
+                if (input[field] !== undefined) body[field] = input[field];
             }
-            const written: JsonObject[] = [];
-            const sectionsCache = sectionsFromRead(wsResp.data);
-            for (const { key, v, item } of planned) {
-                const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
-                if (!wr.ok) return wr;
-                // Filed through the node's section door, under the workspace's rule; the answer says how.
-                const filing = item.isDoc && item.section
-                    ? await fileThroughDoor(client, { orgId, ws, space: item.space, doc: item.instanceId, section: item.section }, sectionsCache)
-                    : undefined;
-                written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null, ...(filing ? { section_filing: filing as unknown as JsonObject } : {}) });
-            }
-            return { ok: true, data: batch ? { count: written.length, items: written } : written[0] };
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/drafts`, body);
         },
     },
     {
         name: 'aimeat_workspace_publish',
-        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/publish`, {
-            ws: requiredString(input, 'ws'), namespace: requiredString(input, 'namespace'), id: requiredString(input, 'id'),
-        }),
+        handler: ({ client }, input) => {
+            const body: JsonObject = { ws: requiredString(input, 'ws'), namespace: requiredString(input, 'namespace'), id: requiredString(input, 'id') };
+            // The optimistic lock the route reads; a namespace that requires it refused every publish
+            // made here.
+            const expected = optionalNumber(input, 'expected_version'); if (expected !== undefined) body.expected_version = expected;
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/publish`, body);
+        },
     },
     {
         name: 'aimeat_workspace_revert_to_draft',
@@ -424,41 +409,27 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const add = coerceObject(input.add_spaces); if (Array.isArray(add)) body.add_spaces = add;
             if (input.manifest !== undefined) body.manifest = coerceObject(input.manifest);
             if (input.schemas !== undefined) body.schemas = coerceObject(input.schemas);
+            const apps = coerceObject(input.apps); if (Array.isArray(apps)) body.apps = apps;
             const memberChanges = optionalString(input, 'member_changes'); if (memberChanges !== undefined) body.member_changes = memberChanges;
-            if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, add_spaces, manifest, schemas and/or member_changes.');
+            if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, add_spaces, manifest, schemas, apps and/or member_changes.');
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`, body);
         },
     },
     {
         name: 'aimeat_workspace_create',
-        handler: async ({ client }, input) => {
-            const orgId = requiredString(input, 'organism_id');
-            const name = requiredString(input, 'name');
-            const man = coerceObject(input.manifest) as JsonObject | undefined;
-            if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) return { ok: false, error: { code: 'INVALID_MANIFEST', message: 'manifest must be an object with an objectTypes array.' } };
-            const schemaMap = (coerceObject(input.schemas) ?? {}) as Record<string, Record<string, unknown>>;
-            const wsId = genWsId();
-            const base = wsRoot(orgId, wsId);
-            const now = new Date().toISOString();
-            // PUT schema is owner/operator-only — an agent token may lack permission, so failures are
-            // reported (not fatal); the owner can lock schemas later, matching the appdev MCP behavior.
-            const schemaResults: { namespace: string; locked: boolean; error?: string }[] = [];
-            for (const [namespace, schema] of Object.entries(schemaMap)) {
-                if (!schema || typeof schema !== 'object') continue;
-                const r = await client.put(`/v1/memory/${encodeURIComponent(`${base}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
-                schemaResults.push({ namespace, locked: r.ok, ...(r.ok ? {} : { error: r.error?.message }) });
-            }
-            const manifestValue = { ...man, id: orgId, status: man.status || 'active' };
-            const mr = await client.post('/v1/memory', { key: `${base}.meta.manifest`, value: manifestValue, visibility: 'private' });
-            if (!mr.ok) return mr;
-            const summary = man.summary;
-            const readme = optionalString(input, 'readme');
-            await client.post('/v1/memory', { key: `${base}.meta.readme`, value: readme || `# ${String(man.name || name)}\n\n${typeof summary === 'string' ? summary : ''}`, visibility: 'private' });
-            const regKey = `organism.${orgId}.meta.workspaces`;
-            const regResp = await client.get(`/v1/memory${query({ prefix: regKey })}`);
-            const workspaces = ((regResp.data as { items?: { key: string; value?: { workspaces?: unknown[] } }[] } | undefined)?.items?.find(i => i.key === regKey)?.value?.workspaces) ?? [];
-            await client.post('/v1/memory', { key: regKey, value: { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now }] }, visibility: 'private' });
-            return { ok: true, data: { created: true, ws: wsId, types: (man.objectTypes as { name: string }[]).map(o => o.name), schemas: schemaResults } };
+        // → POST /v1/organisms/:id/workspaces: provisionWorkspace(), which the node's MCP tool runs too
+        // (manifest envelope, space normalisation, schema locks, readme and the registry entry, under
+        // the owner). This definition wrote those records itself with POST /v1/memory, without the
+        // envelope backfill or the space check, and registered the workspace under whichever
+        // identity made the call.
+        handler: ({ client }, input) => {
+            const body: JsonObject = {
+                name: requiredString(input, 'name'),
+                manifest: coerceObject(input.manifest) as JsonObject,
+            };
+            if (input.schemas !== undefined) body.schemas = coerceObject(input.schemas) as JsonObject;
+            const readme = optionalString(input, 'readme'); if (readme !== undefined) body.readme = readme;
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspaces`, body);
         },
     },
     {
@@ -533,7 +504,11 @@ export const organismTools: ConnectCliToolDefinition[] = [
                 const r = await client.post(orgPath, { ws: w, grantee, role });
                 results.push(r.ok === false ? { ws: w, status: 'forbidden_or_not_found' } : { ws: w, status: 'granted', role });
             }
-            return { ok: true, data: { grantee, role, granted: results.filter(r => r.status === 'granted').length, total: targets.length, results } };
+            const data = { grantee, role, granted: results.filter(r => r.status === 'granted').length, total: targets.length, results };
+            // Refused on every workspace is a refusal, not a grant of nothing.
+            return results.every(r => r.status === 'forbidden_or_not_found')
+                ? { ok: false, data, error: { code: 'ACCESS_DENIED', message: 'Every workspace refused the grant: the workspace does not exist, or you are neither its creator nor an organism admin.' } }
+                : { ok: true, data };
         },
     },
     {
@@ -554,15 +529,22 @@ export const organismTools: ConnectCliToolDefinition[] = [
                 const n = Number((r.data as { revoked?: number } | undefined)?.revoked ?? 0);
                 results.push({ ws: w, status: n > 0 ? 'revoked' : 'not_a_member', revoked: n });
             }
-            return { ok: true, data: { grantee, revoked: results.filter(r => r.status === 'revoked').length, total: targets.length, results } };
+            const data = { grantee, revoked: results.filter(r => r.status === 'revoked').length, total: targets.length, results };
+            // `not_a_member` is an answer; refused on every workspace is a refusal.
+            return results.every(r => r.status === 'forbidden_or_not_found')
+                ? { ok: false, data, error: { code: 'ACCESS_DENIED', message: 'Every workspace refused the revoke: the workspace does not exist, or you are neither its creator nor an organism admin.' } }
+                : { ok: true, data };
         },
     },
     {
         name: 'aimeat_workspace_members',
-        handler: ({ client }, input) => {
+        // The route answers the access panel ({ ws, requests, members }); this tool answers the members.
+        handler: async ({ client }, input) => {
             const orgId = requiredString(input, 'organism_id');
             const ws = requiredString(input, 'ws');
-            return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access${query({ ws })}`);
+            const resp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access${query({ ws })}`);
+            if (!resp.ok) return resp;
+            return { ...resp, data: { ws, members: (resp.data as { members?: unknown[] } | undefined)?.members ?? [] } };
         },
     },
     // ── A member's change to a workspace, and the decision on a member's suggestion: the node's REST

@@ -26,6 +26,10 @@
  *   v1.7.0 — 2026-09-25 — Test 34b: aimeat_workspace_access decide over MCP writes the decision on
  *     the request record and tells the requester, as the REST decision route does. Fails on the tree
  *     before the fix: the request read 'pending' after an MCP denial and B heard nothing.
+ *   v1.8.0 — 2026-10-06 — Test 32 asserts that a grant or revoke refused on every workspace answers as
+ *     a refusal. Tests 44–46: GET /workspace/index and POST /workspace/drafts, the routes the
+ *     connector calls, answer what the MCP tools answer, and refuse another owner, a missing
+ *     credential and a missing ws (secaudit 2026-10 follow-up, Part B).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -750,6 +754,10 @@ await test('32. a non-manager (B) cannot grant or list members (authorization)',
     const g = await B.client.call('aimeat_workspace_member_grant', { organism_id: bootOrgId, ws: bootWs.id, grantee: A.ownerName, role: 'viewer' }, 132);
     const gd = JSON.parse(g.result.content[0].text);
     assert(gd.granted === 0 && gd.results.every((r: any) => r.status === 'forbidden_or_not_found'), `B (member, not manager) grant refused per-ws: ${JSON.stringify(gd)}`);
+    // Refused on every workspace is a refusal, flagged as one (secaudit 2026-10 follow-up, Part B).
+    assert(g.result.isError === true, 'a grant refused on every workspace answered as a success');
+    const rv = await B.client.call('aimeat_workspace_member_revoke', { organism_id: bootOrgId, ws: bootWs.id, grantee: A.ownerName }, 1322);
+    assert(rv.result.isError === true, 'a revoke refused on every workspace answered as a success');
     const m = await B.client.call('aimeat_workspace_members', { organism_id: bootOrgId, ws: bootWs.id }, 1321);
     assert(m.result.isError === true, 'B cannot list members (not creator/admin)');
 });
@@ -915,6 +923,53 @@ await test('43. workspace_create refuses a blank name, as the REST door always h
         manifest: { objectTypes: [{ name: 'item', namespace: 'shared.items', mode: 'records' }] } }, 143);
     assert(b.result.isError === true, 'rejected');
     assert(b.result.content[0].text.toLowerCase().includes('name'), `says which field: ${b.result.content[0].text}`);
+});
+
+// ── The routes the connector and the shell call (secaudit 2026-10 follow-up, Part B) ──
+// aimeat_workspace_read and _write run their CLI dispatch definition on the connector, which calls
+// these two routes; both run services/workspace-tool-ops.ts, the functions the MCP tools above run.
+
+const restAs = (token: string, path: string, opts: RequestInit = {}) =>
+    json(path, { ...opts, headers: { Authorization: `Bearer ${token}`, ...(opts.headers as Record<string, string> | undefined) } });
+
+await test('44. GET /workspace/index answers what aimeat_workspace_read answers, index and opened ids', async () => {
+    const idx = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index?ws=${WS}`);
+    assert(idx.status === 200, `index ${idx.status}: ${JSON.stringify(idx.body.error)}`);
+    const tool = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 144)).result.content[0].text);
+    assert(JSON.stringify(idx.body.data) === JSON.stringify(tool), 'the index differs from the MCP tool');
+    const opened = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index?ws=${WS}&ids=n1,no-such-id&space=note`);
+    const toolOpened = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['n1', 'no-such-id'], space: 'note' }, 1441)).result.content[0].text);
+    assert(opened.status === 200 && JSON.stringify(opened.body.data) === JSON.stringify(toolOpened), `opened ids differ: ${JSON.stringify(opened.body).slice(0, 300)}`);
+    assert((opened.body.data.missing ?? []).includes('no-such-id'), 'an unknown id is reported missing');
+});
+
+await test('45. POST /workspace/drafts writes through the same function, and the MCP read sees the draft', async () => {
+    const w = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', body: JSON.stringify({ ws: WS, space: 'note', id: 'rest-1', value: { title: 'Over HTTP', body: 'x' } }),
+    });
+    assert(w.status === 200, `drafts ${w.status}: ${JSON.stringify(w.body.error)}`);
+    assert(String(w.body.data?.written ?? '').endsWith('shared.notes.rest-1.draft'), `written key: ${JSON.stringify(w.body.data)}`);
+    const read = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['rest-1'] }, 145)).result.content[0].text);
+    assert(read.items?.[0]?.id === 'rest-1', `the MCP read does not see it: ${JSON.stringify(read).slice(0, 300)}`);
+    // The schema the workspace locks applies here too: title is required.
+    const bad = await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', body: JSON.stringify({ ws: WS, space: 'note', id: 'rest-bad', value: { body: 'no title' } }),
+    });
+    assert(bad.status >= 400 && bad.status < 500, `a schema-invalid draft answered ${bad.status}`);
+});
+
+await test('46. both routes → 403 for another owner\'s organism, 401 without a credential, 400 without ws', async () => {
+    const readOther = await restAs(B.agentToken, `/v1/organisms/${orgId}/workspace/index?ws=${WS}`);
+    assert(readOther.status === 403, `owner 2 read owner 1's workspace: ${readOther.status}`);
+    const writeOther = await restAs(B.agentToken, `/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', body: JSON.stringify({ ws: WS, space: 'note', id: 'b-was-here', value: { title: 'B' } }),
+    });
+    assert(writeOther.status === 403, `owner 2 wrote into owner 1's workspace: ${writeOther.status}`);
+    const after = JSON.parse((await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['b-was-here'] }, 146)).result.content[0].text);
+    assert((after.missing ?? []).includes('b-was-here'), 'the refused write landed anyway');
+    assert((await json(`/v1/organisms/${orgId}/workspace/index?ws=${WS}`)).status === 401, 'index without a credential');
+    assert((await json(`/v1/organisms/${orgId}/workspace/drafts`, { method: 'POST', body: '{}' })).status === 401, 'drafts without a credential');
+    assert((await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index`)).status === 400, 'index without ws');
 });
 
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });

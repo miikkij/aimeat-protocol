@@ -17,6 +17,9 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-06 — aimeat_organism_overview, aimeat_workspace_publish and aimeat_workspace_update take the
+ *     catalog's schema too; include_archived, expected_version and apps are on the catalog entry now
+ *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The row, document and member-change tools receive it too.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.27.0 -- 2026-10-02 -- Takes the session's scopes and hands them to the row tools.
@@ -149,7 +152,6 @@
  *     defaults to match, so a row space added here died on a `versioned: true` nobody had asked for.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { canWriteNamespaceRule, createOrganismHelpers } from '../routes/organisms/shared.js';
@@ -345,8 +347,7 @@ export function registerWorkspaceTools(
 
     // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)
     mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'),
-        { organism_id: z.string().describe('Organism id'),
-          include_archived: z.boolean().optional().describe('Include archived workspaces. Default false — archived workspaces are summarised as a count.') },
+        zodShapeFor('aimeat_organism_overview'),
         annotationsFor('aimeat_organism_overview'),
         async ({ organism_id, include_archived }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
@@ -383,9 +384,7 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_publish ──
     mcp.tool('aimeat_workspace_publish', descriptionFor('aimeat_workspace_publish'),
-        // expected_version: the publisher's optimistic lock — REQUIRED by namespaces whose manifest
-        // sets requires_expected_version (TARGET-009 S1); pass the version you read.
-        { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string(), expected_version: z.number().optional() },
+        zodShapeFor('aimeat_workspace_publish'),
         annotationsFor('aimeat_workspace_publish'),
         async ({ organism_id, ws, namespace, id, expected_version }): Promise<TextResult> => {
             // services/workspace-tool-ops.ts: membership, the meta.* role, the archive flag, the
@@ -432,17 +431,7 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_update ──
     mcp.tool('aimeat_workspace_update', descriptionFor('aimeat_workspace_update'),
-        {
-            organism_id: z.string(),
-            ws: z.string(),
-            name: z.string().optional().describe('New workspace name (synced to the manifest + the registry)'),
-            readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
-            add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. A ROW space is { name, namespace, backing:"rows", indexOn:[…] } and takes no mode. Use this to provision spaces instead of sending the whole manifest. Cannot remove/rename — use `manifest` for that.'),
-            manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved. To only ADD spaces, prefer `add_spaces`.'),
-            schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space. REPLACES the locked schema rather than merging into it, so read the current ones first: aimeat_workspace_read (the default index call) returns them as `schemas`, keyed by namespace, in exactly this shape — read, edit the one entry, send the map back. Do not invent a maxLength — the real ceiling is the memory value budget the node enforces on the whole record.'),
-            apps: z.any().optional().describe('FULL replacement list of apps pinned to this workspace ([] clears). ARRAY of { owner, filename, label? } referencing published apps (/v1/apps). Pinning is launch-context/presentation only — workspace data access stays gated per call. Creator/admin only.'),
-            member_changes: z.enum(['direct', 'suggest']).optional().describe("How this workspace takes a change from a member who is neither its creator nor an organism admin (adding a space, changing sections): 'direct' = it lands at once with their name on it; 'suggest' = it waits until the creator or an admin approves it (the default). Creator/admin only."),
-        },
+        zodShapeFor('aimeat_workspace_update'),
         annotationsFor('aimeat_workspace_update'),
         async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps, member_changes }): Promise<TextResult> => {
             const role = await roleOf(organism_id);

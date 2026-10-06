@@ -56,6 +56,8 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.2 — 2026-10-06 — aimeat_workspace_write: recorded-by-route, POST /v1/organisms/:id/workspace/drafts
+ *     (secaudit 2026-10 follow-up, Part B).
  *   v1.3.1 — 2026-10-06 — aimeat_app_publish: recorded-by-route, POST /v1/apps (secaudit 2026-10
  *     follow-up, Part B).
  *   v1.3.0 — 2026-10-05 — aimeat_datapackage_publish, aimeat_company_create and aimeat_company_update:
@@ -161,10 +163,11 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // asserting it. Only a free-form passage carries prose at all; the rest of a layout is block names.
   aimeat_surface_layout_set: { kind: 'not-carried', route: 'PUT /v1/site/layout/:surface' },
   aimeat_workspace_comment: { kind: 'not-carried', route: 'POST /v1/organisms/:id/comments' },
-  // The batch is the reason, not the route: workspace_write DOES land in POST /v1/memory, which
-  // could carry a declaration — but one declaration cannot honestly describe N separately-authored
-  // records, and per-item declaration was never designed. Carrying it would need that design first.
-  aimeat_workspace_write: { kind: 'not-carried', route: 'aimeat_workspace_write (a batch of POST /v1/memory writes)' },
+  // POST /v1/organisms/:id/workspace/drafts runs writeWorkspaceDraftsOp, the node MCP tool's own
+  // function, which records the declaration once per item and names the records in its answer. The
+  // entry said not-carried while this tool wrote its batch with POST /v1/memory itself
+  // (secaudit 2026-10 follow-up, Part B).
+  aimeat_workspace_write: { kind: 'recorded-by-route', route: 'POST /v1/organisms/:id/workspace/drafts' },
 };
 
 /**

@@ -1,10 +1,7 @@
 {
   "description": "Tools whose MCP input schema, on the node or the connector, is still written by hand instead of built from the catalog by zodShapeFor (src/tool-catalog/zod-shape.ts). scripts/audit-mcp-schemas.ts (pnpm check:mcp-schemas) refuses a new one and a listed one that matches. Secaudit 2026-10, M3: the list only shrinks, one catalog group per commit.",
   "tools": [
-    "aimeat_handbook_get",
-    "aimeat_organism_overview",
-    "aimeat_workspace_publish",
-    "aimeat_workspace_update"
+    "aimeat_handbook_get"
   ],
   "reasons": {
     "aimeat_handbook_get": "The node's MCP answers with the handbook of the interface the agent is connected to (surface, tier); it has no `module`. A module is one of the REST tier-1 feature handbooks, written for an agent that works over HTTP, which is what the connector and the shell reach. The connector registers the catalog's schema; the node's stays its own (secaudit 2026-10 follow-up, Part B)."
