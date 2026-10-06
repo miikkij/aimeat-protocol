@@ -16,6 +16,9 @@
  * @structure registerOrganismWorkspaceToolRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceToolRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.0.1 — 2026-10-06 — POST /workspace/drafts asks memory:write, as aimeat_workspace_write does on
+ *     the node's MCP; it asked organism:write, so an agent wrote drafts on one surface and was refused
+ *     on the other (secaudit 2026-10 follow-up audit, finding 2).
  *   v1.0.0 — 2026-10-06 — Initial: GET /workspace/index and POST /workspace/drafts.
  */
 import type { Router, Request, Response } from 'express';
@@ -74,9 +77,11 @@ export function registerOrganismWorkspaceToolRoutes(
     });
 
     /** POST /v1/organisms/:id/workspace/drafts — one draft ({ ws, space, value, id?, section? }) or a
-     *  batch ({ ws, items: [...] }), all resolved and validated before any is written. */
+     *  batch ({ ws, items: [...] }), all resolved and validated before any is written. It asks
+     *  memory:write, the word aimeat_workspace_write asks on the node's MCP and the word POST /v1/memory
+     *  asked when the connector wrote drafts through it; publishing a draft asks organism:write. */
     router.post('/v1/organisms/:id/workspace/drafts',
-        requireAuth(), requireScope('organism:write'), rateLimit({ windowMs: 60_000, max: 120 }),
+        requireAuth(), requireScope('memory:write'), rateLimit({ windowMs: 60_000, max: 120 }),
         async (req: Request, res: Response) => {
             const caller = opsCallerOf(req);
             if (!caller) { visitorRefusal(res); return; }

@@ -30,6 +30,9 @@
  *     a refusal. Tests 44–46: GET /workspace/index and POST /workspace/drafts, the routes the
  *     connector calls, answer what the MCP tools answer, and refuse another owner, a missing
  *     credential and a missing ws (secaudit 2026-10 follow-up, Part B).
+ *   v1.9.0 — 2026-10-06 — Test 47: an agent holding memory:write and not organism:write writes a
+ *     draft through POST /workspace/drafts, as it does with aimeat_workspace_write, and is refused the
+ *     publish (secaudit 2026-10 follow-up audit, finding 2). Fails on the tree before the fix (403).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -970,6 +973,33 @@ await test('46. both routes → 403 for another owner\'s organism, 401 without a
     assert((await json(`/v1/organisms/${orgId}/workspace/index?ws=${WS}`)).status === 401, 'index without a credential');
     assert((await json(`/v1/organisms/${orgId}/workspace/drafts`, { method: 'POST', body: '{}' })).status === 401, 'drafts without a credential');
     assert((await restAs(A.agentToken, `/v1/organisms/${orgId}/workspace/index`)).status === 400, 'index without ws');
+});
+
+await test('47. an agent with memory:write and no organism:write writes a draft over REST, and is refused the publish', async () => {
+    // The node's MCP offers aimeat_workspace_write for memory:write; the route the connector calls
+    // asked organism:write, so the same agent wrote on one surface and was refused on the other.
+    const name = `wsnarrow${Date.now()}`;
+    const ag = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ name, owner: A.ownerName, capabilities: ['social'], model: 'gpt-4o' }) });
+    assert(ag.status === 201, `agent ${ag.status}`);
+    const narrowed = await json(`/v1/agents/${name}/scopes`, { method: 'PATCH', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ scopes: ['memory:read', 'memory:write'] }) });
+    assert(narrowed.status === 200, `scopes ${narrowed.status}: ${JSON.stringify(narrowed.body.error)}`);
+    const gaii = ag.body.data.agent.gaii, priv = ag.body.data.private_key;
+    const cl = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'WS narrow', redirect_uris: [] }) });
+    const ts = new Date().toISOString();
+    const params = new URLSearchParams({ response_type: 'code', client_id: cl.body.client_id, gaii, signature: await signMsg(priv, gaii + NODE_ID + ts), timestamp: ts });
+    const auth = await json(`/v1/mcp/authorize?${params}`);
+    const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret }) });
+    const token = tk.body.access_token as string;
+    assert(!!token, `no token: ${JSON.stringify(tk.body).slice(0, 200)}`);
+
+    const w = await restAs(token, `/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', body: JSON.stringify({ ws: WS, space: 'note', id: 'narrow-1', value: { title: 'memory:write only' } }),
+    });
+    assert(w.status === 200, `drafts with memory:write answered ${w.status}: ${JSON.stringify(w.body.error)}`);
+    const p = await restAs(token, `/v1/organisms/${orgId}/publish`, {
+        method: 'POST', body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'narrow-1' }),
+    });
+    assert(p.status === 403, `publish without organism:write answered ${p.status}`);
 });
 
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
