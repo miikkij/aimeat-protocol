@@ -165,9 +165,9 @@
       "count": 1,
       "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
     },
-    "src/config.ts": {
+    "src/config-private-host.ts": {
       "count": 1,
-      "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+      "reason": "READ 2026-10-06 and right. isPrivateHost moved here from config.ts unchanged (max-file-lines), with this entry. An unparseable base URL answers 'private', which picks the local security profile: the documented fail-safe of a node with no usable public address, not a guess presented as fact. [triaged 2026-10-06]"
     },
     "src/routes/openrouter.ts": {
       "count": 1,
