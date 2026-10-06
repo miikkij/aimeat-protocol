@@ -9,6 +9,8 @@
  *   Tool names/descriptions/annotations come from the shared catalog, so they stay in lockstep with
  *   the server and the v2 surface allowlists (appdev/agent/service).
  * @version-history
+ *   2026-10-06 — aimeat_workspace_space_add, _sections_set and _suggestions run their dispatch
+ *     definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.0 -- 2026-09-03 -- _read passes the REST answer's `schemas` (the locked JSON Schemas, keyed
  *     by namespace) through onto the index. This door RESHAPES the REST response rather than
@@ -402,42 +404,6 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       if (resp.ok === false) return text(resp.error ?? resp, true);
       const members = (resp.data as { members?: unknown[] } | undefined)?.members ?? [];
       return text({ ws, members });
-    });
-
-  // ── A member's change to a workspace, and the decision on a member's suggestion: the node's REST
-  //    doors, which apply the workspace's rule and decide who may decide. ──
-  mcp.tool('aimeat_workspace_space_add', descriptionFor('aimeat_workspace_space_add'),
-    zodShapeFor('aimeat_workspace_space_add'),
-    annotationsFor('aimeat_workspace_space_add'),
-    async ({ organism_id, ws, spaces, schemas }) => {
-      const body: Record<string, unknown> = { spaces: parseObj(spaces) };
-      if (schemas !== undefined) body.schemas = parseObj(schemas);
-      const r = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/spaces?ws=${encodeURIComponent(ws)}`, body);
-      return text(r.ok === false ? (r.error ?? r) : (r.data ?? r), r.ok === false);
-    });
-
-  mcp.tool('aimeat_workspace_sections_set', descriptionFor('aimeat_workspace_sections_set'),
-    zodShapeFor('aimeat_workspace_sections_set'),
-    annotationsFor('aimeat_workspace_sections_set'),
-    async ({ organism_id, ws, space, sections }) => {
-      const r = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/sections/${encodeURIComponent(space)}?ws=${encodeURIComponent(ws)}`, { sections: parseObj(sections) });
-      return text(r.ok === false ? (r.error ?? r) : (r.data ?? r), r.ok === false);
-    });
-
-  mcp.tool('aimeat_workspace_suggestions', descriptionFor('aimeat_workspace_suggestions'),
-    zodShapeFor('aimeat_workspace_suggestions'),
-    annotationsFor('aimeat_workspace_suggestions'),
-    async ({ organism_id, action, ws, status, suggestion_id, decision, note }) => {
-      const base = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/suggestions`;
-      let r;
-      if (action === 'list') {
-        const qs = new URLSearchParams({ ...(ws ? { ws } : {}), ...(status ? { status } : {}) }).toString();
-        r = await client.get(qs ? `${base}?${qs}` : base);
-      } else {
-        if (!suggestion_id) return text({ error: "action='decide' needs a suggestion_id: list them with action='list'." }, true);
-        r = await client.post(`${base}/${encodeURIComponent(suggestion_id)}`, { decision, ...(note !== undefined ? { note } : {}) });
-      }
-      return text(r.ok === false ? (r.error ?? r) : (r.data ?? r), r.ok === false);
     });
 
   mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
