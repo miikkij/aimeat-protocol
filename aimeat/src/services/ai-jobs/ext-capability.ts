@@ -26,6 +26,8 @@
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.4.1 — 2026-10-06 — Only the first start in an on_done callback is exempt; the rest are counted
+ *     (secaudit 2026-10 last items, F1).
  *   v1.4.0 — 2026-10-06 — `start` draws on the installer's AI call limit; only a chain's continuation
  *     passes `limit: 'exempt'` (secaudit 2026-10 follow-up, A5).
  *   v1.3.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -97,9 +99,15 @@ const CHAIN_STOPS: Record<string, AiJobChainStop> = {
 
 export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCtx['ai']> {
     const { service, extName, ownerGhii, createdBy, chain } = deps;
+    // One callback continues its chain once. The first start in it is exempt; every further start
+    // is counted, so one counted start cannot fan out to F + F^2 + ... jobs over the chain's depth
+    // (secaudit 2026-10 last items, F1). Taken before the await, so starts made together share it.
+    let continuationLeft = chain !== undefined;
 
     return {
         start: async (opts) => {
+            const exempt = continuationLeft;
+            continuationLeft = false;
             const input: StartAiJobInput = {
                 ...(typeof opts?.prompt === 'string' ? { prompt: opts.prompt } : {}),
                 ...(typeof opts?.prompt_key === 'string' ? { prompt_key: opts.prompt_key } : {}),
@@ -131,13 +139,16 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                     // The installer's AI call limit (services/account-limits.ts), the allowance
                     // POST /v1/ai/jobs draws on: an action is a request anyone the extension admits
                     // can make, so its start is counted. A refusal comes back as a decision the
-                    // extension can degrade on. A start that continues a chain is exempt: the chain's
-                    // first start was counted, as a job's run is not counted again (run-op.ts).
-                    ...(chain ? { limit: 'exempt' as const, parentJob: chain.parentJob, chainDepth: chain.parentDepth + 1 } : {}),
-                    ...(chain ? { onRefused: chain.onRefused } : {}),
+                    // extension can degrade on. The start that continues a chain is exempt: the chain's
+                    // first start was counted, as a job's run is not counted again (run-op.ts). Every
+                    // start in a callback stays in the chain, so the depth bound holds for all of them.
+                    ...(exempt ? { limit: 'exempt' as const } : {}),
+                    ...(chain ? { parentJob: chain.parentJob, chainDepth: chain.parentDepth + 1, onRefused: chain.onRefused } : {}),
                 });
                 return { ok: true, job_id: started.job_id, queue_position: started.queue_position };
             } catch (err) {
+                // A continuation the node refused started nothing, so the callback keeps it.
+                if (exempt) continuationLeft = true;
                 if (err instanceof AiJobError) {
                     // A refusal the PARENT has to know about. The extension is told too, so it can
                     // degrade, but the parent job is what decides whether the chain was completed —
