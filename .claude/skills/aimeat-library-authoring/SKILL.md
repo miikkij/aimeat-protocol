@@ -99,7 +99,10 @@ guest receives is missing from that table, so change the table in the same commi
   token, the locked schema, `ifVersion`, the publish gate) thrown as `CODE: message`. It is absent on
   a scheduled run and absent without the declaration; check `if (!ctx.workspace)`. Do not reach a
   workspace through `ctx.fetch` or `ctx.memory`: the first cannot reach the node and the second is
-  fenced to `ext:`.
+  fenced to `ext:`. Many records go through `publishRecords` (up to 1000, with `dryRun` and
+  `createOnly`) and come out through `deleteRecords` (up to 2000, needs `memory:purge` on a token),
+  ONE call each: a run has 500 calls and 5 seconds by default, and `write` + `publish` per record
+  cannot finish 500 records.
 - **A collector writes one key per PERIOD, never one per item fetched.** The namespace carries the
   same budget as any principal: 1024 kB per value, 1000 keys by default. `ext:halytyskartta-ext` keeps
   a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; `ext:luotain` kept one
