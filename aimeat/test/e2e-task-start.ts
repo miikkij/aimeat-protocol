@@ -15,6 +15,8 @@
  *   The wake on Start is held by e2e-connect-tunnel-delivery (test 8).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=task-start
  * @version-history
+ *   v1.0.1 — 2026-10-06 — 6d: an agent holding memory:purge alone is not offered rows_delete, since
+ *     the catalog asks organism:write beside it (secaudit 2026-10 follow-up, A4).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -382,15 +384,16 @@ await test('6c. Removing rows or a whole workspace needs memory:purge beside org
   }
 });
 
-await test('6d. Over MCP, rows_delete is not offered without memory:purge and asks organism:write beside it', async () => {
+await test('6d. Over MCP, rows_delete is offered only with memory:purge and organism:write both', async () => {
   const args = { organism_id: 'no-such-organism', ws: 'ws-none', space: 'notes', row_id: 'r1' };
   const writerMcp = await mcpSessionFor(await newAgent(owner, 'ws-writer-mcp', ['organism:read', 'organism:write']));
   const hidden = await callTool(writerMcp, 'aimeat_workspace_rows_delete', args);
   assert(hidden.isError, `organism:write alone reached the tool: ${hidden.text}`);
-  // `purger` holds memory:purge and no organism:write (6a).
+  // `purger` holds memory:purge and no organism:write (6a). Since the secaudit 2026-10 follow-up (A4)
+  // the catalog asks both words, so the tool is not offered to it rather than refusing inside.
   const purgerMcp = await mcpSessionFor(purgerAgent);
   const denied = await callTool(purgerMcp, 'aimeat_workspace_rows_delete', args);
-  assert(denied.isError && denied.text.startsWith('SCOPE_DENIED') && denied.text.includes('organism:write'), `purge alone: ${denied.text}`);
+  assert(denied.isError, `memory:purge alone reached the tool: ${denied.text}`);
   const bothMcp = await mcpSessionFor(wsPurger);
   const passed = await callTool(bothMcp, 'aimeat_workspace_rows_delete', args);
   assert(passed.isError && !passed.text.startsWith('SCOPE_DENIED'), `both words: past the permission check, ${passed.text}`);

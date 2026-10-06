@@ -17,6 +17,8 @@
  *   - Phase 4: grants, backup, cost, bundled agents, subdomains, cortex source
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-manage
  * @version-history
+ *   v1.1.1 — 2026-10-06 — The agents hold catalogue:read, which aimeat_cortex_list asks since the
+ *     secaudit 2026-10 follow-up (A4); test 20 measures the source refusal on an agent offered the list.
  *   v1.1.0 — 2026-09-27 — Phase 5: the ten old tool names answer TOOL_MOVED with the new call, on the node MCP server and through aimeat_invoke.
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
@@ -160,17 +162,22 @@ const APP = `am${STAMP}.html`;
 const FORK = `am${STAMP}-fork.html`;
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 const WORDS = ['app:write', 'app:manage', 'memory:read', 'memory:write', 'signals:read', 'signals:write',
-    'exchange:read', 'task:write', 'consent:manage', 'cortex:write'];
+    'exchange:read', 'task:write', 'consent:manage', 'cortex:write', 'catalogue:read'];
 
 // The first owner on the runner's emptied database is the operator.
 const A = await makeOwner('amop');
 const B = await makeOwner('amother');
 const agent = await makeAgent(A, WORDS);
 const narrow = await makeAgent(A, ['memory:read']);
+// aimeat_cortex_list asks catalogue:read, the word GET /v1/cortex asks, since 2026-10-06 (secaudit
+// 2026-10 follow-up, A4): an agent without it is not offered the tool, so the source refusal is
+// measured on one that is offered the list and lacks cortex:write.
+const reader = await makeAgent(A, ['memory:read', 'catalogue:read']);
 const opAgent = await makeAgent(A, [...WORDS, 'operator:admin']);
 const otherAgent = await makeAgent(B, WORDS);
 const s = await openSession(agent);
 const sNarrow = await openSession(narrow);
+const sReader = await openSession(reader);
 const sOp = await openSession(opAgent);
 const sOther = await openSession(otherAgent);
 const manage = (session: McpSession, args: Record<string, unknown>) => callTool(session, 'aimeat_app_manage', args);
@@ -370,7 +377,7 @@ await test('19. aimeat_cortex_list reads one cortex in full, and its source for 
 });
 
 await test('20. …and refuses the source without cortex:write, and to another owner\'s agent', async () => {
-    const narrowSrc = await callTool(sNarrow, 'aimeat_cortex_list', { name: cxName, include_source: true });
+    const narrowSrc = await callTool(sReader, 'aimeat_cortex_list', { name: cxName, include_source: true });
     assert(narrowSrc.isError && narrowSrc.text.startsWith('SCOPE_DENIED'), `without the word: ${narrowSrc.text}`);
     // A cortex another owner may see (public) refuses its source as FORBIDDEN; one they may not see
     // is NOT_FOUND on both reads, so probing names confirms nothing. Which one it is here is read first.

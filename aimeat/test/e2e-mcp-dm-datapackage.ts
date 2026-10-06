@@ -35,6 +35,8 @@
  *   - Phase 9: the account's send limit on the tool door
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-dm-datapackage
  * @version-history
+ *   v1.2.1 — 2026-10-06 — The sending agent holds memory:write, which aimeat_datapackage_publish asks
+ *     since the secaudit 2026-10 follow-up (A4).
  *   v1.2.0 — 2026-09-24 — Test 29 (security audit A5-3): the 31st send in a minute through
  *     aimeat_dm_send is refused, aimeat_dm_broadcast and the owner's REST send count against the same
  *     account, and another account is not held back.
@@ -216,6 +218,9 @@ await test('1. A sender owner with a fully worded agent, a recipient owner, and 
     recipientOwner = await makeOwner('dmrecv');
     bot = await makeAgent(senderOwner, [
         'messages:send', 'messages:read', 'messages:send-as-owner', 'storage:write', 'storage:read',
+        // aimeat_datapackage_publish asks memory:write beside its own word since the secaudit 2026-10
+        // follow-up (A4): POST /v1/memory, which it runs on, asks it.
+        'memory:write',
     ]);
     mute = await makeAgent(senderOwner, ['memory:read']);
     assert(bot.gaii.endsWith(`@${NODE_ID}`), `agent gaii: ${bot.gaii}`);
