@@ -55,8 +55,7 @@ membership, the creator's contributor grant, the caller's scopes (`memory:write`
 `memory:purge` to remove records with `deleteRecords`, `organism:read` to read; an owner session
 needs none of them), the space's locked schema and the publish gate all apply exactly as they do on
 the MCP tools and the REST routes, and every refusal reaches the script as a thrown `CODE: message`.
-The services are `src/services/workspace-tool-ops.ts` and `src/services/workspace-batch-ops.ts`; the
-sandbox binding is `src/services/extension-workspace.ts`. A batch of records goes through
+The service is `src/services/workspace-tool-ops.ts`, the batch included; the sandbox binding is `src/services/extension-workspace.ts`. A batch of records goes through
 `publishRecords` in one call: 500 records as `write` + `publish` would be 1000 calls, past the
 default ceiling of 500.
 

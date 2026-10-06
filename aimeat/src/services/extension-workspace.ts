@@ -45,7 +45,7 @@
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
  *   v1.2.0 — 2026-10-06 — publishRecords and deleteRecords: a batch in ONE host call, through
- *     services/workspace-batch-ops.ts, the functions the two batch routes run. 500 records were 1000
+ *     services/workspace-tool-ops.ts, the functions the two batch routes run. 500 records were 1000
  *     calls through write() + publish() and could not fit the 500-call ceiling. A token needs
  *     memory:write to publish the batch and memory:purge to delete it, as on the routes.
  *   v1.1.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
@@ -64,9 +64,9 @@ import { readerForCaller } from './classification/reader.js';
 import { workspaceDeclarationOf, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import {
     workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp,
+    publishRecordsBatchOp, deleteRecordsBatchOp,
     type WorkspaceOpRefusal, type WorkspaceOpsCaller,
 } from './workspace-tool-ops.js';
-import { publishRecordsBatchOp, deleteRecordsBatchOp } from './workspace-batch-ops.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)
 // is the leaf module extension-workspace-declaration.ts, so the manifest builder and the CRUD

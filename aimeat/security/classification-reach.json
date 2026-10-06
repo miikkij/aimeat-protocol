@@ -557,10 +557,9 @@
     },
     "src/routes/organisms/workspace-ops.ts": {
       "reads": {
-        "listAllMemory": 7,
-        "listMemoryKeysByPrefix": 1
+        "listAllMemory": 6
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; the other reads serve a write or the node's own bookkeeping (the key-only scan finds the addresses a delete removes)."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; the other reads serve a write or the node's own bookkeeping. The batch delete's key-only scan moved to services/workspace-tool-ops.ts on 2026-10-06."
     },
     "src/routes/organisms/workspace-read.ts": {
       "reads": {
@@ -2164,9 +2163,10 @@
     },
     "src/services/workspace-tool-ops.ts": {
       "reads": {
-        "listAllMemory": 1
+        "listAllMemory": 2,
+        "listMemoryKeysByPrefix": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-06: the batch delete's key-only scan and its value-scan fallback moved here from routes/organisms/workspace-ops.ts; they find the addresses a delete removes, and no value reaches the caller."
     },
     "src/services/workspace-versions.ts": {
       "reads": {

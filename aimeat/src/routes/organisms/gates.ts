@@ -7,7 +7,7 @@
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
  *   v1.5.0 — 2026-10-06 — The batch publish route runs publishRecordsBatchOp
- *     (services/workspace-batch-ops.ts), the function ctx.workspace.publishRecords runs, and takes
+ *     (services/workspace-tool-ops.ts), the function ctx.workspace.publishRecords runs, and takes
  *     `dry_run` and `create_only`. Its GATE_ENABLED refusal says what to do instead.
  *   v1.4.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
@@ -46,8 +46,7 @@ import { roleSatisfies, type OrganismHelpers } from './shared.js';
 import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace-suggestions.js';
 import { logger } from '../../utils/logger.js';
 import { callerOf } from '../../middleware/caller.js';
-import { workspaceCallerOf } from '../../services/workspace-tool-ops.js';
-import { publishRecordsBatchOp } from '../../services/workspace-batch-ops.js';
+import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace-tool-ops.js';
 
 /**
  * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
@@ -285,7 +284,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // so when it's enabled this batch path is refused (use POST /v1/organisms/:id/publish one at a time).
   // Body: { ws?, namespace, instances: [] | records: [], expected_versions?: { <instance>: <version> },
   // create_only?, dry_run? }. The body of the operation is publishRecordsBatchOp
-  // (services/workspace-batch-ops.ts), which ctx.workspace.publishRecords runs too.
+  // (services/workspace-tool-ops.ts), which ctx.workspace.publishRecords runs too.
   // A17 (E2E test-quality audit). `requireAuth()` alone here meant the batch door asked less than the
   // single-record door it amortises, and less than the memory door the records land in — so an app
   // grant carrying any one scope could publish a workspace's records in bulk. organism:write is the
