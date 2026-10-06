@@ -137,6 +137,16 @@ await test('A work item is asked for, and it is pending from the first moment', 
     assert(asker.morsel_balance === 0, `an agent holds no balance of its own: ${asker.morsel_balance}`);
 });
 
+// Secaudit 2026-10 follow-up, Part B: aimeat_admin_agents publishes `limit`, the node's MCP applied it
+// and the route ignored it, so the connector, which calls the route, listed every agent. Failed on the
+// old route (2 agents with limit=1).
+await test('The agent listing takes a limit, and the total still counts every agent', async () => {
+    const all = await json('/v1/admin/agents', { headers: auth(opToken) });
+    const one = await json('/v1/admin/agents?limit=1', { headers: auth(opToken) });
+    assert(one.status === 200 && one.body.data.agents.length === 1, `limit=1 lists one: ${one.body.data?.agents?.length}`);
+    assert(one.body.data.total === all.body.data.total && all.body.data.total >= 2, `total counts every agent: ${one.body.data.total} vs ${all.body.data.total}`);
+});
+
 await test('An owner who is not an operator cannot read the listing the page is built on', async () => {
     const r = await json('/v1/admin/work', { headers: auth(reqTok) });
     assert(r.status === 403, `expected 403, got ${r.status}`);

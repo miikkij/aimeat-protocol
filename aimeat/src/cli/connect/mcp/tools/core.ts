@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   2026-10-06 — The board post, storage, data package and admin tools run their dispatch definition
+ *     (secaudit 2026-10 follow-up, Part B); only the memory tools keep a handler here.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.20.0 -- 2026-10-01 -- aimeat_admin_federation_peer_remove (DELETE /v1/federation/peers/:nodeId,
  *     ?emergency=true).
@@ -72,8 +74,7 @@ import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor, jsonContent } from '../../../../tool-catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
 import { carrierAttach, provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
-import { agentNameSchema, pickAgent, envelopeResult, payloadResult, flagged } from './_registry.js';
-import type { ApiResponse } from '../../api-client.js';
+import { agentNameSchema, pickAgent, envelopeResult, flagged } from './_registry.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -149,118 +150,4 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     const resp = await client.get(`/v1/memory/search?${params.toString()}`);
     return envelopeResult(resp);
   });
-
-  // ── Catalogue ───────────────────────────────────────────────────────
-
-  // ── Master directory (cross-domain discovery) ───────────────────────
-
-  // ── Invoke: the other half of discover ───────────────────────
-
-  // ── Agent profile ──────────────────────────────────────────────────
-
-  // ── Work ────────────────────────────────────────────────────────────
-
-  // ── Wallet ──────────────────────────────────────────────────────────
-
-  // ── Boards (basic read/post) ────────────────────────────────────────
-
-  mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_board_post') }, annotationsFor('aimeat_board_post'), async ({ agent_name, board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const reqBody: Record<string, unknown> = { title, body };
-    if (category) reqBody.category = category;
-    const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/posts`, reqBody);
-    return provenanceEchoedResult(client,
-      { tool: 'aimeat_board_post', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
-  });
-
-  // ── Storage ─────────────────────────────────────────────────────────
-
-  mcp.tool('aimeat_storage_upload', descriptionFor('aimeat_storage_upload'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_storage_upload') }, annotationsFor('aimeat_storage_upload'), async ({ agent_name, key, data_base64, mime_type, visibility, group_id, workspace_refs }) => {
-    const { client } = pickAgent(registry, agent_name);
-    // REST POST /v1/storage reads the base64 payload as `data`.
-    const body: Record<string, unknown> = { key, data: data_base64 };
-    if (mime_type) body.mime_type = mime_type;
-    if (visibility) body.visibility = visibility;
-    if (group_id) body.group_id = group_id;
-    if (workspace_refs?.length) body.workspace_refs = workspace_refs;
-    const resp = await client.post('/v1/storage', body);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_storage_download', descriptionFor('aimeat_storage_download'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_storage_download') }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key, owner, inline }) => {
-    const { client } = pickAgent(registry, agent_name);
-    // F11: never pull raw bytes through the model context — request a handle (presigned
-    // download_url + metadata), or inline only for small text files.
-    const mode = inline ? 'inline' : 'handle';
-    // Two doors, by design: /v1/storage reads the agent's OWN namespace, /v1/pub reads a file
-    // someone else owns through the consent/visibility guard. A bare key with an owner-shaped
-    // head ("alice@node/report.pdf") is treated as a reference, matching the server tool.
-    const slash = key.indexOf('/');
-    const head = slash > 0 ? key.slice(0, slash) : '';
-    const refOwner = owner ?? (head.includes('@') || head.startsWith('ext:') ? head : '');
-    const refKey = owner ? key : (refOwner ? key.slice(slash + 1) : key);
-    const path = refOwner
-      ? `/v1/pub/${encodeURIComponent(refOwner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`
-      : `/v1/storage/${encodeURIComponent(refKey)}?mode=${mode}`;
-    const resp = await client.get(path);
-    return flagged(jsonContent(resp.data ?? resp), resp);
-  });
-
-  mcp.tool('aimeat_datapackage_publish', descriptionFor('aimeat_datapackage_publish'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_datapackage_publish') }, annotationsFor('aimeat_datapackage_publish'), async ({ agent_name, ...body }) => {
-    const { client } = pickAgent(registry, agent_name);
-    // Straight through: the quality gate, the content hash and the address all live on the node, and
-    // a refusal comes back with the row and the column rather than a verdict.
-    const resp = await client.post('/v1/datapackages', body as Record<string, unknown>);
-    return flagged(jsonContent(resp.data ?? resp), resp);
-  });
-
-  mcp.tool('aimeat_datapackage_export', descriptionFor('aimeat_datapackage_export'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_datapackage_export') }, annotationsFor('aimeat_datapackage_export'), async ({ agent_name, ref, resource, format, limit, offset, select }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const m = /^pkg:([^/@]+)\/([^@]+)(?:@(sha256:[a-f0-9]{64}))?$/.exec(ref);
-    if (!m) return flagged(jsonContent({ error: 'ref must look like "pkg:owner/name" or "pkg:owner/name@sha256:..."' }), { ok: false });
-    const [, owner, name, version] = m;
-    const base = `/v1/datapackages/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
-    const qs: string[] = [];
-    if (version) qs.push(`version=${encodeURIComponent(version)}`);
-    // 'url' is the default because handing over the permanent address costs one small response,
-    // while pulling the table through the model context is slow, billed and usually unnecessary.
-    if ((format ?? 'url') === 'url') {
-      const resp = await client.get(base + (qs.length ? `?${qs.join('&')}` : ''));
-      return flagged(jsonContent(resp.data ?? resp), resp);
-    }
-    if (limit !== undefined) qs.push(`limit=${encodeURIComponent(limit)}`);
-    if (offset !== undefined) qs.push(`offset=${encodeURIComponent(offset)}`);
-    if (select?.length) qs.push(`select=${encodeURIComponent(select.join(','))}`);
-    const resp = await client.get(`${base}/rows/${encodeURIComponent(resource)}${qs.length ? `?${qs.join('&')}` : ''}`);
-    return flagged(jsonContent(resp.data ?? resp), resp);
-  });
-
-  // ── Admin ───────────────────────────────────────────────────────────
-  // Admin endpoints require operator role -- the agent_name parameter routes
-  // through that agent's token but the SERVER still rejects unless the agent
-  // has operator scope. Documented here so the param isn't misread as
-  // "operator masquerade".
-
-  mcp.tool('aimeat_admin_agents', descriptionFor('aimeat_admin_agents'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_agents') }, annotationsFor('aimeat_admin_agents'), async ({ agent_name, limit }) => {
-    const { client } = pickAgent(registry, agent_name);
-    const resp = await client.get('/v1/admin/agents');
-    // REST returns all agents; apply the limit client-side to match the server MCP tool.
-    const data = (resp.data ?? resp) as { agents?: unknown[] };
-    if (limit !== undefined && Array.isArray(data.agents)) {
-      data.agents = data.agents.slice(0, limit);
-    }
-    return payloadResult(data, resp);
-  });
-
-  // ── BR-04: SSO administration + manual account lifecycle (operator's agent) ──
-  const asText = (resp: ApiResponse) => envelopeResult(resp);
-
-  mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_admin_statistics') }, annotationsFor('aimeat_admin_statistics'), async ({ agent_name, from, to }) => {
-    const { client } = pickAgent(registry, agent_name);
-    // Both or neither: the route reads them as a pair, and one alone would silently return the
-    // node's whole life wearing a period's label.
-    const qs = from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : '';
-    return asText(await client.get(`/v1/stats${qs}`));
-  });
-
 }
