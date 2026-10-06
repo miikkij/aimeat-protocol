@@ -134,5 +134,27 @@ await test('6. Invariant: a second account cannot claim the SAME verified email'
     assert(owner === target, `email still resolves to original ${target}, got ${owner}`);
 });
 
+await test('7. Another person cannot make an account here through somebody else\'s organism, and a key never makes an address resolve', async () => {
+    // A code key is how an account comes to hold an address without its owner typing it, so who may
+    // mint one decides who can bind an address to an account (secaudit 2026-10 follow-up, A1).
+    const stranger = await setupOwner('str');
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(inviter.token), body: JSON.stringify({ name: 'Connect Org 2', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+    assert(org.status === 201, `org ${org.status}`);
+    const victim = `victim-${Date.now()}@example.com`;
+    const refused = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+        method: 'POST', headers: auth(stranger.token),
+        body: JSON.stringify({ email: victim, username: `cxvic${Date.now()}`, code: 'SuperSecret99' }),
+    });
+    assert(refused.status === 403, `a stranger minted a key in another person's organism: ${refused.status}`);
+    // The owner's own key makes the account, and the address it names still resolves to nobody.
+    const mint = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+        method: 'POST', headers: auth(inviter.token),
+        body: JSON.stringify({ email: victim, username: `cxvio${Date.now()}`, code: 'SuperSecret99' }),
+    });
+    assert(mint.status === 201, `owner mint ${mint.status}`);
+    const r = await deviceAuthorize(victim);
+    assert(r.status === 404 && r.body.error?.code === 'NO_ACCOUNT', `an unverified key address resolved: ${r.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

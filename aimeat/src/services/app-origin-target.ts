@@ -41,7 +41,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { resolvePublishedPortfolio } from '../routes/portfolio.js';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel } from '../routes/subdomains.js';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from '../routes/subdomains.js';
 
 /**
  * A grant target for a portfolio origin reads `portfolio:<username>`. An app target reads
@@ -79,7 +79,7 @@ export function appOriginHostFamily(
   return null;
 }
 
-export { draftBaseLabel };
+export { draftBaseLabel, DRAFT_LABEL_SUFFIX };
 
 /** The app's own origin for its draft origin: the same scheme and port, the app's label. */
 function appOriginOfDraft(draftOrigin: string, appLabel: string): string {
