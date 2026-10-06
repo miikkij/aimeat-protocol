@@ -11,6 +11,7 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.8.0 — 2026-10-06 — The heartbeat ping names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.6.0 — 2026-10-05 — peerCarriesAgents: agent resolution asks, and names a GAII to, only peers
  *     with routing or messaging on, never a packages-only peer (secaudit 2026-10, PKG-8).
@@ -35,6 +36,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { sign } from '../auth/keypair.js';
+import { audienceProof } from './signed-node-request.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { recordHeartbeatOutcome } from './federation-availability.js';
 import { getSoftwareVersion } from '../utils/version.js';
@@ -312,11 +314,13 @@ export function startHeartbeatJob(
                 const signature = nodeKey
                     ? await sign(nodeKey.privateKey, payloadJson)
                     : undefined;
+                // The node it is for, with a second signature a peer on an older version ignores (A7).
+                const audience = nodeKey ? await audienceProof(nodeKey.privateKey, payloadJson, peer.nodeId) : {};
 
                 const resp = await peerFetch(`${peer.url}/v1/federation/ping`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...payload, signature }),
+                    body: JSON.stringify({ ...payload, signature, ...audience }),
                 }, { timeoutMs: TIMEOUT_MS });
                 // Unreachable, a redirect, a timeout or an answer over the ceiling: counted as a failed heartbeat below.
                 if (!resp.ok) throw new Error(resp.message);

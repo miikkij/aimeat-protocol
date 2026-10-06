@@ -444,6 +444,12 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   federationOpenJoin: boolean;
   /** List this node (operators + resources) in the federation book. Default on; off = privacy opt-out. */
   federationBookListed: boolean;
+  /** Refuse a federation message in the older format (a message, broadcast, storage grant, ping,
+   *  heartbeat, presence, introduction, sign-in verification or memory list) that does not name this
+   *  node as its audience (services/signed-node-request.ts audienceRefusal). Default off while peers
+   *  on an older version send none; a message that names an audience is checked either way. Planned
+   *  to default on in 3.27.0 (secaudit 2026-10 follow-up, A7). */
+  federationAudienceRequired: boolean;
   /** Peer availability window (days) over which heartbeat uptime % is computed. */
   federationAvailabilityWindowDays: number;
   /** Uptime % at/above which a peer is labelled 'permanent' (else 'temporary'). */

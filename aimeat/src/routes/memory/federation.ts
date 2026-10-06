@@ -8,6 +8,7 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.9.0 — 2026-10-06 — A memory-list request names the node it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.7.0 — 2026-09-29 — TARGET-082 review: push-home answers 403 CLASSIFIED with the label and why
  *     when the visitor's record may not leave, instead of NOT_FOUND for a record that is here.
@@ -41,6 +42,7 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { sign } from '../../auth/keypair.js';
+import { audienceProof } from '../../services/signed-node-request.js';
 import type { MemoryRouteCtx } from './shared.js';
 import { systemReader } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
@@ -98,11 +100,16 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
    * key a person owns, and the `requesting_node` field alone never proved anything, because the
    * federation directory publishes every node id. Returns the body to POST, signature included.
    */
-  async function signedListBody(gaii: string): Promise<Record<string, unknown>> {
+  async function signedListBody(gaii: string, audienceNode: string): Promise<Record<string, unknown>> {
     const timestamp = new Date().toISOString();
     const body: Record<string, unknown> = { requesting_node: config.nodeId, gaii, timestamp };
     const nodeKey = await storage.getNodeKey();
-    if (nodeKey) body.signature = await sign(nodeKey.privateKey, JSON.stringify({ requesting_node: config.nodeId, gaii, timestamp }));
+    if (nodeKey) {
+      const signed = JSON.stringify({ requesting_node: config.nodeId, gaii, timestamp });
+      body.signature = await sign(nodeKey.privateKey, signed);
+      // The node it is for, with a second signature a peer on an older version ignores (A7).
+      Object.assign(body, await audienceProof(nodeKey.privateKey, signed, audienceNode));
+    }
     return body;
   }
 
@@ -365,7 +372,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
           'Content-Type': 'application/json',
           'X-Source-Node': config.nodeId,
         },
-        body: JSON.stringify(await signedListBody(ownerGhii)),
+        body: JSON.stringify(await signedListBody(ownerGhii, homeNode)),
       }, { timeoutMs: config.federationTimeoutMs }));
 
       if (response.status < 200 || response.status >= 300) {
@@ -428,7 +435,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
           'Content-Type': 'application/json',
           'X-Source-Node': config.nodeId,
         },
-        body: JSON.stringify(await signedListBody(gaii)),
+        body: JSON.stringify(await signedListBody(gaii, peer_node_id)),
       }, { timeoutMs: config.federationTimeoutMs }));
 
       if (response.status < 200 || response.status >= 300) {
