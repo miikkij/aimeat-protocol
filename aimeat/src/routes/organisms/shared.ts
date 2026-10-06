@@ -8,6 +8,12 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.13.0 — 2026-10-06 — publishDraftsBatch takes `opts`: `createOnly` refuses an id that already has
+ *     a `.latest` (code EXISTS), `dryRun` decides every record and writes nothing. An expected version
+ *     the caller names is held in every space, not only in a requires_expected_version space (code
+ *     VERSION_CONFLICT). An id given twice is refused the second time (DUPLICATE_ID). The draft's
+ *     provenance record travels to `.version.N` and `.latest`, as publishDraft carries it, and a direct
+ *     value may name one (`aiProvenanceId`). Wish bulk-records-for-ai, 2026-10-06.
  *   v1.12.0 — 2026-09-29 — publishDraft and publishDraftsBatch schedule write-time classification of
  *     each published `.latest` (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.11.0 — 2026-09-29 — The share and member-record collectors moved to shared-public.ts
@@ -85,6 +91,15 @@ export type { ShareAccess, ShareMeta, ResolvedShare, PublicDoc, PublicRecord } f
 import type { ShareAccess, ShareMeta, ResolvedShare } from './share-types.js';
 
 export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
+
+/** What publishDraftsBatch decided for one id. `code` says why a record failed: NO_DRAFT (nothing to
+ *  publish), INVALID (the locked schema or the space's write guard), EXISTS (createOnly), VERSION_CONFLICT
+ *  (the expected version the caller named), DUPLICATE_ID (the id came twice in one batch). */
+export interface BatchPublishItemResult {
+  instance: string; ok: boolean; version?: number; skipped?: boolean;
+  code?: 'NO_DRAFT' | 'INVALID' | 'EXISTS' | 'VERSION_CONFLICT' | 'DUPLICATE_ID';
+  violations?: unknown;
+}
 
 /** The closure-bound helpers shared by every organism route group. Created once per router. */
 export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
@@ -278,15 +293,19 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   // read for the whole batch) and the writes/deletes are committed together (ONE bulkSetMemory + ONE
   // bulkDeleteMemory), instead of the per-record scan + individual setMemory/deleteMemory pipeline that a
   // 520-record CADENCE import ran as ~11k separate operations. Auth (membership, meta.* role, archive,
-  // publish gate) stays in the route; this is the data operation.
+  // publish gate) is publishRecordsBatchOp's (services/workspace-batch-ops.ts), which the batch route
+  // and ctx.workspace.publishRecords both call; this is the data operation.
   const publishDraftsBatch = async (
     organismId: string, ws: string | undefined, namespace: string, instances: string[], publisher: string,
     expectedVersions?: Record<string, number | null>,
     // DRAFT-LESS import: when a value is supplied per instance, publish it DIRECTLY (no draft to read or
     // consume). An import has the final values, so this collapses N draft-writes + N publishes into ONE
     // request. Interactive edits still use the draft flow (no directValues).
-    directValues?: Record<string, { value: unknown; visibility?: MemoryRecord['visibility'] }>,
-  ): Promise<{ results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }>; refusal?: UndeclaredSpaceRefusal }> => {
+    directValues?: Record<string, { value: unknown; visibility?: MemoryRecord['visibility']; aiProvenanceId?: string }>,
+    // createOnly: refuse an id that already has a .latest (an import that must not overwrite).
+    // dryRun: decide every record exactly as a real run would, then write nothing and emit nothing.
+    opts?: { createOnly?: boolean; dryRun?: boolean },
+  ): Promise<{ results: BatchPublishItemResult[]; refusal?: UndeclaredSpaceRefusal }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const ownerGhii = ownerGhiiOf(publisher);
     const nsPrefix = `${wsRoot}.${namespace}.`;
@@ -325,17 +344,34 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // The values of the records that passed every refusal, whose embedded files are opened to the
     // workspace's members once the batch has written (see the loop).
     const toScope: unknown[] = [];
-    const results: Array<{ instance: string; ok: boolean; version?: number; skipped?: boolean; code?: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> = [];
+    const results: BatchPublishItemResult[] = [];
+    // An id given twice in one batch would write the same version key twice in one bulk write; the
+    // first occurrence is decided, every later one is refused.
+    const seen = new Set<string>();
 
     for (const instance of instances) {
+      if (seen.has(instance)) {
+        results.push({ instance, ok: false, code: 'DUPLICATE_ID', violations: [{ message: `id "${instance}" appears more than once in this batch; only its first occurrence was decided`, path: '/' }] });
+        continue;
+      }
+      seen.add(instance);
       const base = `${nsPrefix}${instance}`;
       const items = allRows.filter(r => r.key === base || r.key.startsWith(`${base}.`));
       // Draft-less import: use the supplied value as the source; else read the record's .draft.
       const direct = directValues ? directValues[instance] : undefined;
       const draft = direct
-        ? { value: direct.value, ownerGaii: publisher, visibility: (direct.visibility ?? 'owner') as MemoryRecord['visibility'], tags: [] as string[] }
+        ? { value: direct.value, ownerGaii: publisher, visibility: (direct.visibility ?? 'owner') as MemoryRecord['visibility'], tags: [] as string[], aiProvenanceId: direct.aiProvenanceId }
         : items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
       if (!draft) { results.push({ instance, ok: false, code: 'NO_DRAFT' }); continue; }
+      // The statement about how the content was made travels with it, as publishDraft carries it.
+      const provenanceId = draft.aiProvenanceId ?? undefined;
+      const existingLatestEarly = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+      // createOnly is the CALLER's demand for this batch, so it is decided before the change-guard: an
+      // identical record that already exists is still a record that exists.
+      if (opts?.createOnly && existingLatestEarly) {
+        results.push({ instance, ok: false, code: 'EXISTS', violations: [{ schema_rule: 'create_only', message: `record "${instance}" already exists (version ${existingLatestEarly.version}); create-only refused it, nothing was written`, path: '/' }] });
+        continue;
+      }
       // The URLs are rewritten with NO workspaceRef, so nothing is opened yet: passing it makes every
       // embedded file readable by the workspace's members as a side effect, and this record's own
       // refusals below (append-only, expected version, schema) can still refuse it. Opened after the
@@ -344,7 +380,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       const expectedVersion = expectedVersions?.[instance] ?? null;
 
       const maxN = maxVersionOf(versionsByBase.get(base) ?? []);
-      const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+      const existingLatest = existingLatestEarly;
       const vis = draft.visibility;
       const tags = draft.tags ?? [];
 
@@ -373,6 +409,16 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
           }
         }
       }
+      // An expected version the caller NAMED is a compare-and-swap in every space, not only in a
+      // requires_expected_version one: 0 means "must not exist yet", N means "must be at version N".
+      // null, or no entry, names no expectation.
+      if (typeof expectedVersion === 'number' && !policy?.requiresExpectedVersion) {
+        const current = existingLatest?.version ?? 0;
+        if (current !== expectedVersion) {
+          results.push({ instance, ok: false, code: 'VERSION_CONFLICT', violations: [{ schema_rule: 'expected_version', message: `expected version ${expectedVersion} for "${instance}", current is ${current}; nothing was written, read it again and retry`, path: '/' }] });
+          continue;
+        }
+      }
       // Schema (in-memory, from the ONCE-compiled schema) — no per-record findApplicableSchema round-trip.
       if (schemaToValidate) {
         const sv = validateValueAgainstSchema(draftValue, schemaToValidate);
@@ -380,7 +426,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       }
       const n = maxN + 1;
       if (versioned) {
-        toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+        toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, ...(provenanceId ? { aiProvenanceId: provenanceId } : {}), visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
         // Retention: history rows beyond the window ride the batch's ONE bulk delete.
         for (const r of versionRefsToPrune(versionsByBase.get(base) ?? [], n, pruneWindow)) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
       }
@@ -389,7 +435,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       // explicit version is what setMemory INSERTs; on an in-place UPDATE setMemory recomputes it — same
       // as publishDraft, since bulkSetMemory reuses setMemory verbatim.
       const latestOwner = existingLatest ? ownerGhiiOf(existingLatest.ownerGaii) : ownerGhii;
-      toUpsert.push({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, visibility: vis, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+      toUpsert.push({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, ...(provenanceId ? { aiProvenanceId: provenanceId } : {}), visibility: vis, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
       // Collapse: any pre-existing .latest copy under a DIFFERENT owner is removed (single-owner key).
       for (const r of items) if (r.key === `${base}.latest` && r.ownerGaii !== latestOwner) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
       // Consume the draft (none for a direct import) — EVERY copy of it, see draftCopies.
@@ -398,6 +444,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       toScope.push(draftValue);
       results.push({ instance, ok: true, version: n });
     }
+    // A dry run has decided every record; it stops before the first write.
+    if (opts?.dryRun) return { results };
 
     // ONE bulk upsert (every version + latest), then ONE bulk delete (consumed drafts + collapsed
     // copies) — both inside ONE transaction. Publishing a record writes its new version, moves

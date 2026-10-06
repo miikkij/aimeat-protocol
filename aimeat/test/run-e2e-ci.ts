@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.78.0 -- 2026-10-06 -- e2e-extension-workspace-batch.ts joins the list (ctx.workspace.publishRecords
+ *            and deleteRecords: 500 records in one action under the default limits).
  *   v1.77.0 -- 2026-10-03 -- e2e-theme-fonts.ts joins the list (the font manager).
  *   v1.76.0 -- 2026-10-02 -- e2e-app-design-spec.ts joins the list.
  *   v1.75.0 -- 2026-10-02 -- e2e-task-start.ts joins the list.
@@ -377,6 +379,8 @@ const ALL_SUITES = [
     // ctx.workspace: an extension acting on its CALLER's organism workspace, as the caller, through
     // the same functions the MCP tools run. One happy path and seven refusals, each a door.
     'test/e2e-extension-workspace.ts',
+    // Its batch: 500 records published in one action and removed in one, under the default limits.
+    'test/e2e-extension-workspace-batch.ts',
     // The same capability on the road that did not have it: an extension on a clock, writing bytes
     // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
     'test/e2e-scheduled-ext-files.ts',

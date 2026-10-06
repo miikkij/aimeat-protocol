@@ -44,15 +44,21 @@ ctx.workspace.{index,get,write,writeDoc,publish}
                                   operations aimeat_workspace_read/_write/_publish run; present only
                                   when the manifest declares `workspace: { read, write }` and a real
                                   caller invoked the action (never on a scheduled run)
+ctx.workspace.{publishRecords,deleteRecords}
+                                → a BATCH (up to 1000 / 2000 records) in one host call, through the
+                                  operations the batch publish and delete routes run
 ```
 
 `ctx.workspace` is the one road from the sandbox into a namespace that is not `ext:`, and it is not a
 hole in the fence above: nothing is read or written under the extension's own authority. The caller's
 membership, the creator's contributor grant, the caller's scopes (`memory:write` to write or publish,
-`organism:read` to read; an owner session needs neither), the space's locked schema and the publish
-gate all apply exactly as they do on the MCP tools, and every refusal reaches the script as a thrown
-`CODE: message`. The service is `src/services/workspace-tool-ops.ts`; the sandbox binding is
-`src/services/extension-workspace.ts`.
+`memory:purge` to remove records with `deleteRecords`, `organism:read` to read; an owner session
+needs none of them), the space's locked schema and the publish gate all apply exactly as they do on
+the MCP tools and the REST routes, and every refusal reaches the script as a thrown `CODE: message`.
+The services are `src/services/workspace-tool-ops.ts` and `src/services/workspace-batch-ops.ts`; the
+sandbox binding is `src/services/extension-workspace.ts`. A batch of records goes through
+`publishRecords` in one call: 500 records as `write` + `publish` would be 1000 calls, past the
+default ceiling of 500.
 
 ### Anything you COUNT needs `ifVersion`
 

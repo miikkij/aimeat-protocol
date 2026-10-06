@@ -13,6 +13,8 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.5.0 — 2026-10-06 — `ctx.workspace.publishRecords` and `deleteRecords`: a batch of records in
+ *     one host call (services/workspace-batch-ops.ts).
  *   v1.4.0 — 2026-09-28 — `ctx.ai.start` takes `role`, the AI role the job's call runs as.
  *   v1.3.0 — 2026-09-28 — System 2 plan, V5: `ctx.ai.start` takes `op` (text, image, transcribe),
  *     `provider`, `audio_key`, `language` and `size`, the fields POST /v1/ai/jobs takes.
@@ -199,6 +201,16 @@ export interface ExtensionCtx {
         writeDoc(organismId: string, ws: string, space: string, doc: { title: string; markdown: string }, opts?: { id?: string; section?: string }): Promise<unknown>;
         /** Publish the draft at namespace/id: `.version.N` under the caller, `.latest` under the member. */
         publish(organismId: string, ws: string, namespace: string, id: string, opts?: { expectedVersion?: number }): Promise<unknown>;
+        /**
+         * Publish up to 1000 records `[{ id, value, visibility? }]` in ONE call (one API call, one bulk
+         * write). Each record is decided alone: `{ published, skipped, failed, results: [{ instance, ok,
+         * version?, skipped?, code?, violations? }] }`. `dryRun` decides and writes nothing; `createOnly`
+         * refuses an id that exists (code EXISTS); `expectedVersions[id]` is a compare-and-swap (0 = must
+         * not exist yet).
+         */
+        publishRecords(organismId: string, ws: string, namespace: string, records: Array<{ id: string; value: unknown; visibility?: string }>, opts?: { expectedVersions?: Record<string, number | null>; createOnly?: boolean; dryRun?: boolean }): Promise<unknown>;
+        /** Remove up to 2000 records the caller owns in ONE call: `{ deleted: [{ id, keys }], failed: [{ id, reason }], rows_removed }`. */
+        deleteRecords(organismId: string, ws: string, namespace: string, ids: string[]): Promise<unknown>;
     };
     /**
      * Who invoked this action. `member` is their standing in the app this extension gates, resolved

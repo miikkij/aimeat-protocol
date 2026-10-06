@@ -215,7 +215,7 @@ export default async function(ctx, input) {
   // ctx.config   -- extension-level config values
   // ctx.instance -- { id, config } -- which instance (if multi-instance)
   // ctx.memory   -- { get, set, search, delete, getPublic }
-  // ctx.workspace -- { index, get, write, writeDoc, publish } -- the CALLER's organism workspace; only when the manifest declares `workspace:`
+  // ctx.workspace -- { index, get, write, writeDoc, publish, publishRecords, deleteRecords } -- the CALLER's organism workspace; only when the manifest declares `workspace:`
   // ctx.wallet   -- { consume, getBalance }
   // ctx.consent  -- { check, require }
   // ctx.trust    -- { getScore }
@@ -270,6 +270,17 @@ The caller's organism workspace, acted on as the caller. It exists only when the
 | `write` | `write(organismId, ws, space, id, value, { ifVersion? }): Promise<object>` | A DRAFT record in a records space, schema-validated. `ifVersion: 0` means "only if there is no draft yet"; a mismatch throws `VERSION_CONFLICT` and writes nothing |
 | `writeDoc` | `writeDoc(organismId, ws, space, { title, markdown }, { id?, section? }): Promise<object>` | A DRAFT document in a document space; the id is generated unless given |
 | `publish` | `publish(organismId, ws, namespace, id, { expectedVersion? }): Promise<object>` | Publish the draft: `.version.N` under the caller, `.latest` under the member |
+| `publishRecords` | `publishRecords(organismId, ws, namespace, [{ id, value, visibility? }], { expectedVersions?, createOnly?, dryRun? }): Promise<object>` | Publish up to 1000 records in ONE call. Answers `{ published, skipped, failed, results: [{ instance, ok, version?, skipped?, code?, violations? }] }`. Each record is decided alone |
+| `deleteRecords` | `deleteRecords(organismId, ws, namespace, ids): Promise<object>` | Remove up to 2000 of the caller's own records in ONE call. Answers `{ deleted: [{ id, keys }], failed: [{ id, reason }], rows_removed }` |
+
+**A batch goes in one call, never one record per call.** A run has at most 500 API calls and 5 seconds by default, and `write` + `publish` cost two calls per record, so 500 records that way cannot finish. `publishRecords` is one call and one write whatever the count; measured at 500 records, the whole action took 160 ms on SQLite and 514 ms on Postgres. It runs the same operation as `POST /v1/organisms/{id}/workspace/records/publish`, and `deleteRecords` the same as `.../workspace/records/delete`.
+
+- **Each record is decided alone.** A record the locked schema rejects fails with code `INVALID` and its `violations`; the others are published. `createOnly: true` refuses an id that already has a published version (code `EXISTS`). `expectedVersions: { id: n }` is a compare-and-swap: `0` means the record must not exist yet, `n` means it must be at version `n` (code `VERSION_CONFLICT`). An id given twice is refused the second time (`DUPLICATE_ID`).
+- **`dryRun: true` decides every record and writes nothing**, with the same answer and `dry_run: true`. Run it first so the person sees "480 new, 15 already there, 5 invalid" before anything is written, then run again without it.
+- **Undo.** Keep the ids of what you published under a batch id in your `ext:` memory; an undo is one `deleteRecords` call with them.
+- **Permissions.** An agent or app token needs `memory:write` for `publishRecords` and `memory:purge` for `deleteRecords`, which removes the records for good. An agent of a member who did not create the workspace also needs the creator's contributor grant, as for a draft write. An owner session needs none of the words.
+- **The publish gate.** When the organism reviews every publish, `publishRecords` is refused with `GATE_ENABLED`: write drafts for a reviewer, or ask an organism admin to turn the gate off for the import.
+- Every record carries the node's provenance stamp naming `ext.<name>.<action>`, as a `write` does.
 
 **Example — hold a shared claim, refusing a second claimant:**
 ```javascript

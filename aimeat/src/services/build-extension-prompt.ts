@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.6 — 2026-10-06 — ADDITIVE: ctx.workspace.publishRecords and deleteRecords in the ctx table,
+ *     and the rule that a batch goes in one call, never one record per call.
  *   v1.5.5 — 2026-10-05 — ADDITIVE: the manifest's `capabilities:` and what the sandbox does without
  *     them (secaudit 2026-10, PKG-3).
  *   v1.5.4 — 2026-09-28 — ADDITIVE: an extension as an AI provider, provides.ai_provider and the ai.<op> shapes (V6).
@@ -118,6 +120,8 @@ function sandboxSection(): string {
     '| `ctx.workspace.write(orgId, ws, space, id, value, {ifVersion})` | A schema-validated DRAFT record, as the caller. `ifVersion: 0` = only if no draft yet |',
     '| `ctx.workspace.writeDoc(orgId, ws, space, {title, markdown}, {id, section})` | A DRAFT document in a document space |',
     '| `ctx.workspace.publish(orgId, ws, namespace, id, {expectedVersion})` | Publish the draft; `.latest` lands under the member |',
+    '| `ctx.workspace.publishRecords(orgId, ws, namespace, [{id, value, visibility}], {expectedVersions, createOnly, dryRun})` | Publish up to 1000 records in ONE call. Answers `{published, skipped, failed, results: [{instance, ok, code, violations}]}`, one result per record. `dryRun` writes nothing; `createOnly` refuses an existing id (code `EXISTS`) |',
+    '| `ctx.workspace.deleteRecords(orgId, ws, namespace, ids)` | Remove up to 2000 of the caller\'s own records in ONE call. Answers `{deleted: [{id, keys}], failed: [{id, reason}], rows_removed}` |',
     '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
     '| `ctx.buy(appRef, tool, input)` | Buy one call of another owner\'s app tool, billed to this extension\'s owner. Needs a contract they already hold, else `{ok: false, code: \'NO_CONTRACT\'}` |',
     '| `ctx.wallet.consume(amount, reason)` | Spend the CALLER\'s morsels; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
@@ -205,6 +209,17 @@ function sandboxSection(): string {
     'thrown `CODE: message`. Let it propagate and the caller gets the service\'s status and code; catch',
     'it and answer in your own words. A scheduled run never has it. Every call costs one API call. A',
     'record written this way carries provenance naming your extension, because a script produced it.',
+    '',
+    '**A batch goes in one call, never one record per call.** A run has at most 500 API calls and 5',
+    'seconds, and `write` + `publish` cost two calls per record, so 500 records that way cannot finish.',
+    '`publishRecords` publishes up to 1000 records in one call and one write, and `deleteRecords`',
+    'removes up to 2000 in one call. Each record is decided alone: one that breaks the locked schema',
+    'fails with its `violations` and the others are published. Call it with `dryRun: true` first to',
+    'show the person what would happen (new, already there, invalid) before anything is written, then',
+    'again without it. Keep the ids of what you published (under a batch id in your `ext:` memory) and',
+    'an undo is one `deleteRecords` call. `deleteRecords` removes for good: an agent or app token needs',
+    '`memory:purge` for it, `memory:write` for the rest. When the organism reviews every publish (its',
+    'publish gate is on), `publishRecords` is refused with `GATE_ENABLED`: write drafts for a reviewer.',
     '',
     '**An extension as an AI provider.** Declare `provides: { ai_provider: { ops: [text, embed], models:',
     '[{ id, name, price? }], data_statement, hosts: [api.example.com], auth_header? } }` and one action',

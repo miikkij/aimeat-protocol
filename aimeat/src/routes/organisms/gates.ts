@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-06 — The batch publish route runs publishRecordsBatchOp
+ *     (services/workspace-batch-ops.ts), the function ctx.workspace.publishRecords runs, and takes
+ *     `dry_run` and `create_only`. Its GATE_ENABLED refusal says what to do instead.
  *   v1.4.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.4.0 — 2026-10-02 — POST /approvals decides with the workspace's own policy when the action names
@@ -42,6 +45,9 @@ import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/wo
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
 import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace-suggestions.js';
 import { logger } from '../../utils/logger.js';
+import { callerOf } from '../../middleware/caller.js';
+import { workspaceCallerOf } from '../../services/workspace-tool-ops.js';
+import { publishRecordsBatchOp } from '../../services/workspace-batch-ops.js';
 
 /**
  * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
@@ -59,7 +65,7 @@ function mergeWorkspaceGatePolicy(org: GatePolicy, ws: GatePolicy): GatePolicy {
 }
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft } = H;
+  const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, revertToDraft } = H;
   /** The session as the suggestion service takes it: its full identity, owner and roles. */
   const suggestionCaller = (req: Request) => ({
     principal: resolveIdentity(req.auth!, config.nodeId), owner: (req.auth!.owner as string) ?? '', roles: req.auth!.roles ?? [],
@@ -277,7 +283,9 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // commits every version+latest in one bulk write. Same authorization as the single publish — active
   // member, meta.* needs admin/creator, archived is read-only. The publish REVIEW gate is per-decision,
   // so when it's enabled this batch path is refused (use POST /v1/organisms/:id/publish one at a time).
-  // Body: { ws?, namespace, instances: [], expected_versions?: { <instance>: <version> } }.
+  // Body: { ws?, namespace, instances: [] | records: [], expected_versions?: { <instance>: <version> },
+  // create_only?, dry_run? }. The body of the operation is publishRecordsBatchOp
+  // (services/workspace-batch-ops.ts), which ctx.workspace.publishRecords runs too.
   // A17 (E2E test-quality audit). `requireAuth()` alone here meant the batch door asked less than the
   // single-record door it amortises, and less than the memory door the records land in — so an app
   // grant carrying any one scope could publish a workspace's records in bulk. organism:write is the
@@ -286,72 +294,26 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // Owner sessions are unaffected — requireScope waves them through — so the SPA and CADENCE's own
   // owner-session imports do not change.
   router.post('/v1/organisms/:id/workspace/records/publish', requireAuth(), requireScope('organism:write'), async (req, res) => {
-    const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const role = await memberRole(req, organism, id);
-    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
-
-    const { namespace, instances, records, ws, expected_versions: expectedVersions } = req.body ?? {};
-    const wsId = typeof ws === 'string' ? ws : undefined;
-    // Two shapes: `instances` (draft ids — publish each record's existing draft) OR `records`
-    // ([{id, value, visibility?}] — DRAFT-LESS import: publish the supplied values directly, no draft
+    const who = callerOf(req, config.nodeId, storage);
+    if (who.visitor) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node is not a member of this organism.')); return; }
+    const caller = workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles] }, config);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    // Two shapes: `instances` (draft ids, publish each record's existing draft) OR `records`
+    // ([{id, value, visibility?}], DRAFT-LESS import: publish the supplied values directly, no draft
     // round-trip). records is the fast import path (one request for a whole CSV migration).
-    const hasRecords = Array.isArray(records) && records.length > 0;
-    const list: unknown[] = hasRecords ? records : (Array.isArray(instances) ? instances : []);
-    if (typeof namespace !== 'string' || !namespace || list.length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace (string) and instances[] or records[] (non-empty) are required'));
-      return;
-    }
-    if (list.length > 1000) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'At most 1000 records per request')); return; }
-    if (!canWriteNamespace(role, namespace)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can publish here. Ask one of them, or publish somewhere you own.'));
-      return;
-    }
-    const pubGuard = await isKeyArchived(storage, wsId ? `organism.${id}.w.${wsId}.` : `organism.${id}.`);
-    if (pubGuard.archived) {
-      res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${pubGuard.level} is archived (read-only). Unarchive it before publishing.`));
-      return;
-    }
-    // The publish review gate is a per-decision workflow — a batch publish would bypass it, so refuse.
-    const cfg = await readConfig(id);
-    const pg = (cfg?.gates as Record<string, { enabled?: boolean }> | undefined)?.publish;
-    if (pg?.enabled === true) {
-      res.status(409).json(error(config.nodeId, 'GATE_ENABLED', 'The publish review gate is enabled — publish records one at a time via POST /v1/organisms/:id/publish'));
-      return;
-    }
-
-    const publisher = resolveIdentity(req.auth!, config.nodeId);
-    const expMap = (expectedVersions && typeof expectedVersions === 'object') ? expectedVersions as Record<string, number | null> : undefined;
-    let ids: string[];
-    let directValues: Record<string, { value: unknown; visibility?: 'private' | 'owner' | 'group' | 'members' | 'public' | 'workspace' }> | undefined;
-    if (hasRecords) {
-      directValues = {};
-      ids = [];
-      for (const r of records as Array<{ id?: unknown; value?: unknown; visibility?: unknown }>) {
-        if (!r || typeof r.id !== 'string' || !r.id) continue;
-        ids.push(r.id);
-        directValues[r.id] = { value: r.value, visibility: typeof r.visibility === 'string' ? r.visibility as 'private' : undefined };
-      }
-    } else {
-      ids = (instances as unknown[]).filter((x): x is string => typeof x === 'string' && !!x);
-    }
-    const { results, refusal } = await publishDraftsBatch(id, wsId, namespace, ids, publisher, expMap, directValues);
-    // The whole batch is one namespace, so a space the manifest does not declare refuses all of it.
-    if (refusal) { sendRefusal(res, refusal); return; }
-
-    const published = results.filter(r => r.ok && !r.skipped);
-    if (published.length > 0) {
-      await writeDecision(id, publisher, `published ${published.length} record(s) in ${namespace}`, published.map(r => `${namespace}.${r.instance}`));
-      emitChange('organisms');
-      void updateOrganismStructure(storage, config, id, { event: 'content published (batch)', actor: publisher }).catch(err => { logger.warn('expMap: best-effort', { error: String(err) }); });
-    }
-    res.json(success(config.nodeId, {
-      published: published.length,
-      skipped: results.filter(r => r.ok && r.skipped).length,
-      failed: results.filter(r => !r.ok).length,
-      results,
-    }));
+    // `dry_run` decides every record and writes nothing; `create_only` refuses an id that exists.
+    const r = await publishRecordsBatchOp({ storage, config }, caller, {
+      organismId: req.params.id as string,
+      ws: typeof body.ws === 'string' && body.ws ? body.ws : undefined,
+      namespace: body.namespace as string,
+      records: Array.isArray(body.records) ? body.records : undefined,
+      instances: Array.isArray(body.instances) ? body.instances : undefined,
+      expectedVersions: body.expected_versions && typeof body.expected_versions === 'object' ? body.expected_versions as Record<string, number | null> : undefined,
+      createOnly: body.create_only === true,
+      dryRun: body.dry_run === true,
+    });
+    if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details)); return; }
+    res.json(success(config.nodeId, r.data));
   });
 
   // POST /v1/organisms/:id/revert — reopen a published record for editing (copy .latest → .draft).
