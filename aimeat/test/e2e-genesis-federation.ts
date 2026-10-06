@@ -31,6 +31,8 @@
  *   the 404s and the denials
  * @usage cd aimeat && node --import tsx test/e2e-genesis-federation.ts
  * @version-history
+ *   v1.2.0 — 2026-10-06 — The subscribed push is verified as the replicate receiver verifies it, with
+ *     its delivery proof, and a refused push is not counted (wish-genesis-subscribed-memory-sync-never-lands).
  *   v1.1.0 — 2026-09-08 — The prune, the cross-catalogue id and stop() tests assert the fixes made
  *     the same day instead of pinning the defects.
  *   v1.0.0 — 2026-09-08 — Initial.
@@ -82,6 +84,8 @@ const { createServer: createNode } = await import('../src/server.js');
 const { loadConfig } = await import('../src/config.js');
 const { createGenesisSyncService } = await import('../src/services/genesis-sync.js');
 const { startFakeGenesisPeer } = await import('./helpers/fake-genesis-peer.js');
+const { verify } = await import('../src/auth/keypair.js');
+const { deliveryRefusal } = await import('../src/services/signed-node-request.js');
 type GenesisSyncService = import('../src/services/genesis-sync.js').GenesisSyncService;
 type FakeGenesisPeer = import('./helpers/fake-genesis-peer.js').FakeGenesisPeer;
 
@@ -767,10 +771,36 @@ async function run(): Promise<void> {
         assert(sent.length === before + 1, `one replicate call: ${sent.length} vs ${before}`);
         const body = sent[sent.length - 1].body as any;
         assert(body.gaii === agentGaii && body.key === AGENT_KEY, `the pushed record: ${JSON.stringify(body)}`);
-        assert(body.source_node === NODE_ID && body.source_genesis === NODE_ID, `provenance: ${JSON.stringify(body)}`);
-        assert(typeof body.signature === 'string' && body.signature.length > 0,
-            `the push must be signed with this node's key, got ${JSON.stringify(body.signature)}`);
+        assert(body.source_node === NODE_ID, `provenance: ${JSON.stringify(body)}`);
         assert(body.value.kelp === 'notes', `value: ${JSON.stringify(body.value)}`);
+        // The signature is checked the way /v1/federation/replicate checks it (federation-sync/
+        // messaging.ts): over these seven fields in this order. A string being present proved nothing:
+        // the push signed an eighth field, source_genesis, so every real receiver answered 401
+        // (wish-genesis-subscribed-memory-sync-never-lands). This assertion failed on that code.
+        const nodeKey = await storage.getNodeKey();
+        const signed = JSON.stringify({
+            source_node: body.source_node, gaii: body.gaii, key: body.key, value: body.value,
+            visibility: body.visibility, version: body.version, timestamp: body.timestamp,
+        });
+        assert(await verify(nodeKey!.publicKey, signed, String(body.signature)),
+            'the signature verifies over the seven fields the replicate receiver reads');
+        const delivery = await deliveryRefusal({
+            sourceNode: NODE_ID, signed, body, publicKey: nodeKey!.publicKey, thisNodeId: REMOTE_NODE, required: true,
+        });
+        assert(delivery === null, `the push carries a delivery proof for the peer: ${JSON.stringify(delivery)}`);
+    });
+
+    await test('a push the peer refuses is not counted as sent', async () => {
+        // The sender counted every answer as a push, a 401 included, so the result said one record
+        // was sent while the peer kept nothing.
+        peer!.replicateStatus = 401;
+        try {
+            const result = await syncService!.syncNow();
+            assert(result.memorySubscriptionsSent === 0,
+                `a refused replicate is not a sent one, got ${result.memorySubscriptionsSent}`);
+        } finally {
+            peer!.replicateStatus = 200;
+        }
     });
 
     await test('a peer that answers 404 on ingest is a graceful degradation, not a failure', async () => {

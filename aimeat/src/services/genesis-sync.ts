@@ -13,6 +13,9 @@
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
  *
  * @version-history
+ *   v1.4.1 — 2026-10-06 — syncSubscribedMemory signs the seven fields /v1/federation/replicate verifies
+ *     (it signed source_genesis too, so every push got 401), sends the delivery proof, and counts only a
+ *     push the peer accepted (wish-genesis-subscribed-memory-sync-never-lands).
  *   v1.4.0 — 2026-10-06 — The catalogue push carries a delivery proof: the genesis peer it is for and
  *     the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -326,9 +329,11 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
               const urlCheck = await validateOutboundUrl(peer.genesisUrl);
               if (!urlCheck.valid) continue;
 
+              // The seven fields /v1/federation/replicate verifies, in its order, and nothing else:
+              // this payload also signed `source_genesis`, which the receiver does not read, so
+              // every push was refused with 401 (wish-genesis-subscribed-memory-sync-never-lands).
               const payload = {
                 source_node: config.nodeId,
-                source_genesis: config.nodeId,
                 gaii: agent.gaii,
                 key: memory.key,
                 value: memory.value,
@@ -339,16 +344,25 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
 
               const nodeKey = await storage.getNodeKey();
               let memSig: string | undefined;
+              let delivery: Record<string, string> = {};
               if (nodeKey?.privateKey) {
                 memSig = await sign(nodeKey.privateKey, JSON.stringify(payload));
+                // The timestamp is the record's update time, so the send time and the peer go in
+                // the delivery proof, as memory-replication.ts sends it (secaudit 2026-10, D3).
+                delivery = await deliveryProof(nodeKey.privateKey, JSON.stringify(payload), peer.genesisNodeId);
               }
 
               const sent = await peerFetch(`${peer.genesisUrl}/v1/federation/replicate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...payload, signature: memSig }),
+                body: JSON.stringify({ ...payload, signature: memSig, ...delivery }),
               }, { timeoutMs: config.federationTimeoutMs });
               if (!sent.ok) throw new Error(sent.message);
+              // peerFetch is ok for any answer; a refusal is not a push, and it is counted as one
+              // no more.
+              if (sent.status < 200 || sent.status >= 300) {
+                throw new Error(`the peer refused the replicate (HTTP ${sent.status}): ${sent.text.slice(0, 200)}`);
+              }
 
               totalSent++;
             } catch (err) {
