@@ -14,6 +14,8 @@
  *   explained on first use.
  * @usage routed at /v1/business by spa.html
  * @version-history
+ *   2026-10-06 - "See hosting packages" and "See pricing" are StoreDoors: "Opens soon" while the store
+ *     does not take orders (site.store_status "soon").
  *   2026-09-17 - TARGET-078: distinguish the MIT software from customer applications.
  *   2026-09-13 -- Compose the shared aside role and its documented cuts.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
@@ -40,14 +42,15 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { ContactCard } from '/components/ContactCard.js';
 import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
-import { siteLink, hasSite, contactHref, storeHref } from '/js/site.js';
+import { siteLink, hasSite, contactHref } from '/js/site.js';
+import { StoreDoor } from '/components/StoreDoor.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 /* One outcome, told in the first person, with a way to check it and a way to start.
    `proofHref` empty → the case still renders, just without the proof link. */
-function Case({ id, title, text, quote, quoteBy, proofHref, proofLabel, proofNote, ctaLabel, ctaHref }) {
+function Case({ id, title, text, quote, quoteBy, proofHref, proofLabel, proofNote, ctaLabel, ctaHref, ctaStore = false }) {
   return html`
     <div class="ld-case" id=${id}>
       <h3 class="ld-case-title">${title}</h3>
@@ -60,7 +63,9 @@ function Case({ id, title, text, quote, quoteBy, proofHref, proofLabel, proofNot
           ? html`<a class="ld-case-proof" href="#" role="button" onClick=${(e) => { e.preventDefault(); openAppSandboxed(proofHref, proofLabel); }}>${proofLabel}</a>`
           : html`<a class="ld-case-proof" href=${proofHref} target="_blank" rel="noopener">${proofLabel}</a>`)
         : proofNote && html`<div class="ld-case-proofnote poster-aside">${proofNote}</div>`}
-      ${ctaHref ? html`<a class="ld-path-cta" href=${ctaHref}>${ctaLabel}</a>` : ''}
+      ${ctaStore
+        ? html`<${StoreDoor} class="ld-path-cta" label=${ctaLabel} newTab=${false} />`
+        : ctaHref ? html`<a class="ld-path-cta" href=${ctaHref}>${ctaLabel}</a>` : ''}
     </div>
   `;
 }
@@ -190,7 +195,7 @@ export default function Business({ navigate }) {
             quoteBy=${'Kalle Määttä, founder, The Original Miskate Oy'}
             proofHref=${siteLink('showcase')}
             proofLabel=${tr('biz.c6Proof', 'Open a living node →')}
-            ctaLabel=${tr('biz.c6Cta', 'See hosting packages →')} ctaHref=${storeHref()} />` : ''}
+            ctaLabel=${tr('biz.c6Cta', 'See hosting packages →')} ctaStore=${true} />` : ''}
       <//>
 
       <!-- The reason a regulated buyer signs. Often decisive before any of the cases above. -->
@@ -240,7 +245,7 @@ export default function Business({ navigate }) {
           ${hasSite('assessment') ? html`
             <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href=${siteLink('assessment')} target="_blank" rel="noopener">${tr('biz.ctaAssessment', 'Free: where is your AI right now? →')}</a>` : ''}
           ${CONTACT ? html`<a class=${hasSite('assessment') ? 'ld-sh-door showroom-door' : 'ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot'} href=${CONTACT}>${tr('biz.ctaDemo', 'Book a demo →')}</a>` : ''}
-          ${storeHref() ? html`<a class="ld-sh-door showroom-door" href=${storeHref()} target="_blank" rel="noopener">${tr('biz.ctaPricing', 'See pricing →')}</a>` : ''}
+          <${StoreDoor} class="ld-sh-door showroom-door" label=${tr('biz.ctaPricing', 'See pricing →')} />
         </div>
       </div>
 

@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.37.0 -- 2026-10-06 -- .store-soon (components/StoreDoor.js): a control into a store that does not take orders yet keeps its shape, does not answer the pointer, and a door loses its link underline; .store-soon-note, the line that says so. Additive: nothing carries the class while site.store_status is "open".
  *   v1.36.0 -- 2026-09-27 -- .poster-aside--chapter (Note aside `chapter`): the old catalogue's detail aside (.mk-aside), for appcat parity (sections-c); additive, outside the app-catalog ranges.
  *   v1.36.0 -- 2026-09-27 -- .poster-chip--need (Mark tone 'need') and .poster-chips--spread (Marks `spread`): the old catalogue's Needs chips, for appcat parity (sections-a); additive, outside the app-catalog ranges.
  *   v1.35.0 -- 2026-09-27 -- .poster-aside--disclosure (Note aside tone 'disclosure'): the old catalogue's AI notice (.dtl-ai-notice), for appcat parity; additive, outside the app-catalog ranges.
@@ -458,4 +459,9 @@
 .showroom-slab--hot { background: var(--accent); color: #fff; }
 .showroom-slab--sun { background: var(--sun); color: var(--on-sun); }
 .showroom-slab--ink { background: var(--text); color: var(--bg); box-shadow: 6px 6px 0 var(--accent); }
+/* A control into a store that is not open yet (components/StoreDoor.js): the same shape, words that
+   say "Opens soon", and nothing to press. A door drops the underline that marks it as a link. */
+.store-soon { cursor: default; pointer-events: none; }
+.showroom-door.store-soon { border-bottom-color: transparent; }
+.store-soon-note { font-weight: var(--weight-heavy); }
 .showroom-slab--ink:hover { box-shadow: 3px 3px 0 var(--accent); }

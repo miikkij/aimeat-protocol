@@ -17,6 +17,8 @@
  *     so a node that is not aimeat.io never advertises aimeat.io's apps or contact details.
  *   v1.1.0 — 2026-07-28 — Contacts become a list with roles (a company has more than one
  *     person), replacing the single contactName/Email/Phone trio.
+ *   v1.3.0 — 2026-10-06 — storeOpensSoon() and storeSoonNote(): a store that shows its prices and does
+ *     not take orders yet (site.store_status "soon").
  *   v1.2.0 — 2026-08-28 — storeHref(): the one price door. The pricing page is gone; every
  *     "get your own" control goes to the store when the node has one and hides when it does not.
  */
@@ -57,6 +59,27 @@ export function hasSite(key) {
  */
 export function storeHref() {
   return siteLink('store');
+}
+
+/**
+ * Whether the store is shown but does not take orders yet (site.store_status "soon"). Then the store
+ * section keeps its prices, and every control that would lead into the store says "Opens soon"
+ * instead. Never true on a node without a store.
+ * @returns {boolean}
+ */
+export function storeOpensSoon() {
+  return storeHref() !== '' && site().storeStatus === 'soon';
+}
+
+/**
+ * The operator's own "opens soon" sentence for this language (site.store_note_en / _fi / _es), or ''
+ * when they wrote none and the default text applies.
+ * @param {string} locale 'en', 'fi' or 'es'
+ * @returns {string}
+ */
+export function storeSoonNote(locale) {
+  const key = { en: 'storeNoteEn', fi: 'storeNoteFi', es: 'storeNoteEs' }[String(locale || '').slice(0, 2)];
+  return key ? siteLink(key) : '';
 }
 
 /**

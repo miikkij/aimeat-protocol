@@ -9,6 +9,8 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.6.0 — 2026-10-06 — StoreDoor (components/StoreDoor.js) and OwnAimeat's soonLabel: a store that
+ *     shows its prices and does not take orders yet (site.store_status "soon").
  *   v1.5.2 — 2026-09-27 — OwnAimeat names its module (components/OwnAimeat.js) and the words it takes
  *     (the catalogue pass, operator family).
  *   v1.5.1 — 2026-09-27 — InstructionBlock draws its own names from instruction-block.css (formerly
@@ -164,18 +166,38 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         summary: 'A demo site\'s one prompt to buy: a record-face card with its small row label, the headline, one paragraph, and the loud slab to the store, which opens in a new tab. With no store address it draws nothing.',
         module: '/components/OwnAimeat.js', sheet: '/css/components/own-aimeat.css',
         data: {
-            shape: 'OwnAimeat({ label, title, text, cta, href })',
+            shape: 'OwnAimeat({ label, title, text, cta, href, soonLabel? })',
             fields: {
                 label: 'the small row label at the top ("Demo")',
                 title: 'the headline',
                 text: 'the one paragraph under it',
                 cta: 'the slab\'s words',
                 href: 'the store\'s address; without it the card is not drawn (a stored layout can outlive its store)',
+                soonLabel: 'set while the store does not take orders (site.store_status "soon"): the slab carries these words and leads nowhere',
             },
         },
         useFor: ['The home of a demo node, as a layout block the operator adds; no built-in home has it.'],
         variants: [],
         example: { label: 'Demo', title: 'This is a demo. Get your own AIMEAT.', text: 'Many people share this site to try things out.', cta: 'Go to the store →', href: 'https://store.example.com' },
         note: 'The markup OwnAimeatBlock (views/surface/blocks-home.js) wrote, moved unchanged into components/OwnAimeat.js on 2026-09-27, so the block passes the words and the store\'s address. Its look is own-aimeat.css with the record and slab shapes of poster.css.',
+    },
+    {
+        id: 'store-door', name: 'StoreDoor', kind: 'component', status: 'active',
+        summary: 'Every control that leads into the store, and the sentence that says the store is not open yet. While the store takes orders it is the link it always was, opening the store in a new tab; while site.store_status is "soon" the same place carries "Opens soon" in the same shape with no link. Without a store address both draw nothing.',
+        module: '/components/StoreDoor.js', sheet: '/css/poster.css', classes: ['store-soon', 'store-soon-note'],
+        data: {
+            shape: 'StoreDoor({ class, label, newTab?, href?, soon? }) · StoreSoonNote({ class, soon? })',
+            fields: {
+                class: 'the page\'s own classes for the control (a door, a slab), kept on the "Opens soon" label',
+                label: 'the link\'s words while the store is open',
+                newTab: 'false keeps a link that always opened in the same tab doing so',
+                href: 'the store\'s address; defaults to this node\'s store link',
+                soon: 'true while the store does not take orders; defaults to this node\'s store status',
+            },
+        },
+        useFor: ['Any "get your own", pricing or store link on a public page.', 'The store section\'s "opens soon" sentence (StoreSoonNote): the operator\'s note for the page\'s language, or the default.'],
+        variants: [],
+        example: { class: 'ld-sh-door showroom-door', label: 'Get your own →' },
+        note: 'Added 2026-10-06 for aimeat.io, whose store showed its prices while its payments ran in test mode. .store-soon takes the pointer away and drops a door\'s link underline; nothing carries it while the store is open.',
     },
 ];

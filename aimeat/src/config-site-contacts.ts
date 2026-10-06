@@ -8,6 +8,8 @@
  * @structure parseSiteContacts() · siteLinksFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.2.0 — 2026-10-06 — AIMEAT_SITE_STORE_STATUS ('open' unless it says 'soon') and
+ *     AIMEAT_SITE_STORE_NOTE_EN / _FI / _ES.
  *   v1.1.0 — 2026-09-29 — siteLinksFromEnv(): config.ts's siteLinks object, moved here unchanged
  *     when config.ts reached 800 lines, plus the signage screen and its admin panel
  *     (AIMEAT_SITE_SIGNAGE_URL, AIMEAT_SITE_SIGNAGE_ADMIN_URL): the front page showed aimeat.io's own
@@ -75,6 +77,11 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     playbooks: process.env.AIMEAT_SITE_PLAYBOOKS_URL ?? '',
     showcase: process.env.AIMEAT_SITE_SHOWCASE_URL ?? '',
     store: (process.env.AIMEAT_SITE_STORE_URL ?? '').trim(),
+    // Anything but 'soon' is 'open', so a typo keeps today's behaviour rather than closing the store.
+    storeStatus: (process.env.AIMEAT_SITE_STORE_STATUS ?? '').trim().toLowerCase() === 'soon' ? 'soon' : 'open',
+    storeNoteEn: (process.env.AIMEAT_SITE_STORE_NOTE_EN ?? '').trim(),
+    storeNoteFi: (process.env.AIMEAT_SITE_STORE_NOTE_FI ?? '').trim(),
+    storeNoteEs: (process.env.AIMEAT_SITE_STORE_NOTE_ES ?? '').trim(),
     incubator: (process.env.AIMEAT_SITE_INCUBATOR_URL ?? '').trim(),
     signage: (process.env.AIMEAT_SITE_SIGNAGE_URL ?? '').trim(),
     signageAdmin: (process.env.AIMEAT_SITE_SIGNAGE_ADMIN_URL ?? '').trim(),

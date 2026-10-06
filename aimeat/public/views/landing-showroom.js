@@ -22,6 +22,8 @@
  * @structure ShowroomHero · WallIntro · ShowroomClose · AgentDoor (private)
  * @usage import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
  * @version-history
+ *   2026-10-06 -- "Get your own" and "Into the store" are StoreDoors: "Opens soon" while the store
+ *     does not take orders (site.store_status "soon").
  *   2026-09-13 -- V2ag: compose the agent registration prompt aside from poster.css.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.1 — 2026-08-29 — The connect door leads to the connect story (/v1/connect-your-ai): a signed-out
@@ -35,7 +37,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
-import { siteLink, hasSite, storeHref } from '/js/site.js';
+import { siteLink, hasSite } from '/js/site.js';
+import { StoreDoor } from '/components/StoreDoor.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { WishBox } from '/views/landing-doors.js';
@@ -96,7 +99,6 @@ export function ShowroomHero({ navigate, picture = true }) {
       navigate('/v1/portal');
     }
   };
-  const store = storeHref();
 
   return html`
     <section class="ld-sh-hero">
@@ -116,7 +118,7 @@ export function ShowroomHero({ navigate, picture = true }) {
             ${tr('landing.wishLead', 'Say what you need and press GO. You land in a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.')}
           </p>
           <div class="ld-sh-doors">
-            ${store ? html`<a class="ld-sh-door showroom-door" href=${store} target="_blank" rel="noopener">${tr('landing.showGetOwn', 'Get your own →')}</a>` : ''}
+            <${StoreDoor} class="ld-sh-door showroom-door" label=${tr('landing.showGetOwn', 'Get your own →')} />
             <a class="ld-sh-door showroom-door" href="/v1/connect-your-ai" onClick=${go('/v1/connect-your-ai')}>${tr('landing.showConnect', 'Connect the AI you already use →')}</a>
             ${session ? '' : html`
               <a class="ld-sh-door showroom-door" href="#agent-door" aria-expanded=${agentOpen}
@@ -176,7 +178,6 @@ export function WallIntro({ money = true }) {
  * the wish box; "Into the store" exists only when the node has one.
  */
 export function ShowroomClose() {
-  const store = storeHref();
   const backToTop = (e) => {
     e.preventDefault();
     try {
@@ -192,7 +193,7 @@ export function ShowroomClose() {
       </p>
       <div class="ld-sh-close-actions">
         <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="#top" onClick=${backToTop}>${tr('landing.closeDemo', 'Into the demo')}</a>
-        ${store ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--sun showroom-slab--sun" href=${store} target="_blank" rel="noopener">${tr('landing.closeStore', 'Into the store')}</a>` : ''}
+        <${StoreDoor} class="ld-sh-btn showroom-slab ld-sh-btn--sun showroom-slab--sun" label=${tr('landing.closeStore', 'Into the store')} />
       </div>
     </section>`;
 }

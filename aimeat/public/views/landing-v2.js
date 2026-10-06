@@ -21,6 +21,8 @@
  * @structure Hero2 · Steps2 · WishBox2 · TenSeconds · LinuxLine · Close2
  * @usage import { Hero2, TenSeconds, LinuxLine, Close2 } from '/views/landing-v2.js';
  * @version-history
+ *   v1.4.0 - 2026-10-06 - "Get your own AIMEAT" and "Into the store" are StoreDoors: "Opens soon"
+ *     while the store does not take orders (site.store_status "soon").
  *   v1.3.0 - 2026-09-19 - TARGET-080: three steps and what opens after them stand between the
  *     headline and the wish box, because an empty box asked a visitor for an idea before the page
  *     had said what is possible. The long paragraph left the hero; the steps say the same.
@@ -37,7 +39,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { storeHref } from '/js/site.js';
+import { StoreDoor } from '/components/StoreDoor.js';
 import { showLoginModal } from '/js/services/auth.js';
 import { storeWish } from './landing-doors.js';
 import { swallowed } from '/js/swallowed.js';
@@ -135,7 +137,6 @@ function Steps2() {
  * showroom's; `picture` is the block's one setting.
  */
 export function Hero2({ navigate, picture = true }) {
-  const store = storeHref();
   const go = (path) => (e) => { e.preventDefault(); navigate(path); };
   // The whole feature list's row count, from the file the build writes next to the list itself;
   // until it arrives, or if it never does, the link says the same thing without a number.
@@ -170,7 +171,7 @@ export function Hero2({ navigate, picture = true }) {
           <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="/v1/connect-your-ai" onClick=${go('/v1/connect-your-ai')}>
             ${tr('landing2.plugIn', 'Plug in the AI you already use →')}
           </a>
-          ${store ? html`<a class="ld-sh-door showroom-door" href=${store} target="_blank" rel="noopener">${tr('landing2.getOwn', 'Get your own AIMEAT →')}</a>` : ''}
+          <${StoreDoor} class="ld-sh-door showroom-door" label=${tr('landing2.getOwn', 'Get your own AIMEAT →')} />
         </div>
       </div>
       ${picture ? html`
@@ -315,7 +316,6 @@ export function LinuxLine() {
  * store once the two pages are joined.
  */
 export function Close2() {
-  const store = storeHref();
   const backToTop = (e) => {
     e.preventDefault();
     try {
@@ -334,7 +334,7 @@ export function Close2() {
       </p>
       <div class="ld-sh-close-actions">
         <a class="ld-sh-btn showroom-slab ld-sh-btn--hot showroom-slab--hot" href="#top" onClick=${backToTop}>${tr('landing.closeDemo', 'Into the demo')}</a>
-        ${store ? html`<a class="ld-sh-btn showroom-slab ld-sh-btn--sun showroom-slab--sun" href=${store} target="_blank" rel="noopener">${tr('landing.closeStore', 'Into the store')}</a>` : ''}
+        <${StoreDoor} class="ld-sh-btn showroom-slab ld-sh-btn--sun showroom-slab--sun" label=${tr('landing.closeStore', 'Into the store')} />
       </div>
     </section>`;
 }

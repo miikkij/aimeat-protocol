@@ -9,6 +9,8 @@
  * @structure OPERATOR_DEMOS — { [id]: { variants: [{ name, render() }] } } · admin(title, part) · menu(active)
  * @usage import { OPERATOR_DEMOS } from './demos-operator.js';
  * @version-history
+ *   v1.2.0 — 2026-10-06 — store-door (open, opens soon, a door opening soon) and own-aimeat's "store
+ *     opens soon" variant.
  *   v1.1.0 — 2026-09-27 — The demos of the operator family: readings, operator-menu, operator-frame,
  *     ask-page, solo-window, quick-find, pick-field, status-page-preview, search-preview, save-bar,
  *     move-buttons, day-chart, trend-line, count-bars, print-page, settings-index and shots; own-aimeat
@@ -24,6 +26,7 @@ import { AskPage } from '/components/AskPage.js';
 import { SoloWindow } from '/components/SoloWindow.js';
 import { QuickFind } from '/components/QuickFind.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
+import { StoreDoor, StoreSoonNote } from '/components/StoreDoor.js';
 import { PickField } from '/components/PickField.js';
 import { StatusPagePreview } from '/components/StatusPagePreview.js';
 import { SearchResult, ShareCard, SearchCard } from '/components/SearchPreview.js';
@@ -185,6 +188,22 @@ export const OPERATOR_DEMOS = {
       title="This is a demo. Get your own AIMEAT."
       text="Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you."
       cta="Go to the store →" />` },
+    { name: 'store opens soon', render: () => html`<${OwnAimeat} href="https://store.example.com" label="Demo"
+      title="This is a demo. Get your own AIMEAT."
+      text="Many people share this site to try things out."
+      cta="Go to the store →" soonLabel="Opens soon" />` },
+  ] },
+
+  'store-door': { variants: [
+    { name: 'store open', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${false}
+      class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Step into the store →" />` },
+    { name: 'opens soon', render: () => html`<div>
+      <${StoreSoonNote} soon=${true} />
+      <${StoreDoor} href="https://store.example.com" soon=${true}
+        class="ld-sh-btn showroom-slab ld-sh-btn--ink showroom-slab--ink" label="Step into the store →" />
+    </div>` },
+    { name: 'a door, opens soon', render: () => html`<${StoreDoor} href="https://store.example.com" soon=${true}
+      class="ld-sh-door showroom-door" label="Get your own →" />` },
   ] },
 
   'pick-field': { variants: [

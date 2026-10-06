@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.22.0 — 2026-10-06 — The site-link rows moved to config-schema-site-links.ts unchanged (max-file-lines),
+ *     where site.store_status and the store notes joined them.
  *   v1.21.0 — 2026-10-02 — federation.package_peer_cap (AIMEAT_PACKAGE_PEER_CAP): the most packages-only
  *     peers a repository registers (package sale design, finding F).
  *   v1.20.0 — 2026-10-01 — apps.audit_keep_default (AIMEAT_APP_AUDIT_KEEP): the node's default limit
@@ -84,7 +86,8 @@ import type { AimeatConfig } from '../config.js';
 import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { OperatorConfig } from '../config-types.js';
 import type { ConfigFieldShape } from './config-field-def.js';
-import { isEmptyOrHttpUrl, isContactList, oneOf } from './config-schema-validators.js';
+import { oneOf } from './config-schema-validators.js';
+import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
@@ -696,28 +699,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'gooseProviderApiKey', dotPath: 'ai.chat_agent_key', envVar: 'AIMEAT_GOOSE_PROVIDER_API_KEY', type: 'string', validate: () => true, immutable: false, description: "For a special case only. When set, EVERY chat turn is spent from this key and BYPASSES METERING: no allowance, daily budget or model policy applies to the chat. Empty (the default): each person's chat calls this node's /v1/llm, and the use is metered to that person", adminDisplay: 'configured' },
   { key: 'chatMaxLiveThreads', dotPath: 'ai.chat_max_live_threads', envVar: 'AIMEAT_CHAT_MAX_LIVE_THREADS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How many conversations stay open before the oldest rolls into a per-month archive record', range: '1-1000' },
 
-  // ── Site links (mutable) ──
-  // The apps, the store and the people this node's public pages point at. Every one is empty on a
-  // fresh clone and every page renders without it (the link, the nav item or the whole section is
-  // dropped), so none of these may ever be required. Mutable: a store opens, an app moves, and the
-  // front page should follow without a restart. These are the one nested group in this file; the
-  // key addresses config.siteLinks.<name> through readConfigField / writeConfigField.
-  { key: 'siteLinks.learn', dotPath: 'site.learn_url', envVar: 'AIMEAT_SITE_LEARN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Hands-on academy / showroom app. Renders the "Learn" nav item when set; empty hides it' },
-  { key: 'siteLinks.exchange', dotPath: 'site.exchange_url', envVar: 'AIMEAT_SITE_EXCHANGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Capability marketplace app. Renders the "EXCHANGE" nav item and the front page\'s live-proof link when set' },
-  { key: 'siteLinks.assessment', dotPath: 'site.assessment_url', envVar: 'AIMEAT_SITE_ASSESSMENT_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Free AI current-state assessment, the business page\'s entry point' },
-  { key: 'siteLinks.roadmap', dotPath: 'site.roadmap_url', envVar: 'AIMEAT_SITE_ROADMAP_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Public roadmap and portfolio surface' },
-  { key: 'siteLinks.paper', dotPath: 'site.paper_url', envVar: 'AIMEAT_SITE_PAPER_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Agent-written publication, the "work happens without you" proof on the business page' },
-  { key: 'siteLinks.crm', dotPath: 'site.crm_url', envVar: 'AIMEAT_SITE_CRM_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'CRM app shown as a business case' },
-  { key: 'siteLinks.radar', dotPath: 'site.radar_url', envVar: 'AIMEAT_SITE_RADAR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Company-intelligence / mention radar app shown as a business case' },
-  { key: 'siteLinks.briefing', dotPath: 'site.briefing_url', envVar: 'AIMEAT_SITE_BRIEFING_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Morning briefing board app shown as a business case' },
-  { key: 'siteLinks.apiAccelerator', dotPath: 'site.api_accelerator_url', envVar: 'AIMEAT_SITE_API_ACCELERATOR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Make-an-existing-API-agent-native app shown as a business case' },
-  { key: 'siteLinks.playbooks', dotPath: 'site.playbooks_url', envVar: 'AIMEAT_SITE_PLAYBOOKS_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Playbook app (the repeatable change package) shown as a business case' },
-  { key: 'siteLinks.showcase', dotPath: 'site.showcase_url', envVar: 'AIMEAT_SITE_SHOWCASE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'An external site running on AIMEAT, shown as third-party proof' },
-  { key: 'siteLinks.store', dotPath: 'site.store_url', envVar: 'AIMEAT_SITE_STORE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The store where a visitor buys their own AIMEAT: the ONE price door. Empty hides the front page\'s store section, every "get your own" control and every price; set, the section renders, the ladder is read from the store\'s public ext:shop/tiers record, and /v1/pricing redirects there' },
-  { key: 'siteLinks.signage', dotPath: 'site.signage_url', envVar: 'AIMEAT_SITE_SIGNAGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The signage screen the front page frames as its "built by asking" example. Empty hides the example; aimeat.io sets its own screen here' },
-  { key: 'siteLinks.signageAdmin', dotPath: 'site.signage_admin_url', envVar: 'AIMEAT_SITE_SIGNAGE_ADMIN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The admin panel the front page\'s signage example was made in (its second door)' },
-  { key: 'siteLinks.incubator', dotPath: 'site.incubator_url', envVar: 'AIMEAT_SITE_INCUBATOR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The agent incubator (adopt a ready-made helper): the "start here" door on the front page\'s incubator card' },
-  { key: 'siteLinks.contacts', dotPath: 'site.contacts', envVar: 'AIMEAT_SITE_CONTACTS', type: 'object', validate: isContactList, immutable: false, description: 'People printed on the public pages, in the order they should be approached: a JSON list of {name, role, email, phone, linkedin}. The first entry with an email fields every "talk to us" control; empty prints no contact card at all' },
+  // The site links (the apps, the store and the people the public pages point at) are in
+  // config-schema-site-links.ts, spread here in the place they always stood.
+  ...SITE_LINK_CONFIG_FIELDS,
 ];
 
 // isJsonObject, isEmptyOrHttpUrl and isContactList live in config-schema-validators.ts (a pure move).
