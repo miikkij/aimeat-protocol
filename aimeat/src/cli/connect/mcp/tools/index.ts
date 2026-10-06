@@ -8,6 +8,8 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   2026-10-06 — themes.ts is gone: the theme tools run their dispatch definition (secaudit 2026-10
+ *     follow-up, Part B).
  *   2026-10-05 — Every connector tool without a handler of its own runs its CLI dispatch definition
  *     (dispatch-tools.ts); registerAllTools records the names the modules register (secaudit 2026-10, M3).
  *   v2.6.0 -- 2026-09-29 -- Register aimeat_classification (TARGET-082 V5).
@@ -59,7 +61,6 @@ import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppManageTool } from './app-manage.js';
 import { registerDesignbookTools } from './designbook.js';
-import { registerThemeTools } from './themes.js';
 import { registerOperatorTools } from './operator.js';
 import { registerComplianceTools } from './compliance.js';
 import { registerInstallSetTools } from './install-sets.js';
@@ -109,7 +110,6 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
   registerSurfaceLayoutTools(mcp, registry);
   registerAppManageTool(mcp, registry);
   registerDesignbookTools(mcp, registry);
-  registerThemeTools(mcp, registry);
   registerOperatorTools(mcp, registry);
   registerComplianceTools(mcp, registry);
   registerInstallSetTools(mcp, registry);
