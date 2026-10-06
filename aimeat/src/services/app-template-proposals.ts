@@ -17,11 +17,14 @@
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
  *   v1.0.1 — 2026-09-26 — The caller's account comes from localAccountOf, so a visitor from another
  *     node has none here and never reaches the local namesake's proposals (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-10-06 — proposeTemplate answers to the memory ceilings (memory-ceilings.ts) before it
+ *     writes, and a refusal carries its status and code (secaudit 2026-10 last items, F3).
  */
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
+import { memoryCeilings } from './memory-ceilings.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 
 const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -83,7 +86,7 @@ function ownerGhiiOf(callerGaii: string, config: AimeatConfig): { owner: string;
 /** Upsert a proposal (same id replaces — proposals are meant to improve over time). */
 export async function proposeTemplate(
     storage: Storage, config: AimeatConfig, callerGaii: string, input: ProposeTemplateInput,
-): Promise<{ manifest: TemplateProposalManifest; updated: boolean } | { error: string }> {
+): Promise<{ manifest: TemplateProposalManifest; updated: boolean } | { error: string; status?: number; code?: string }> {
     const who = ownerGhiiOf(callerGaii, config);
     if (!who) return { error: 'Could not resolve the caller to an owner' };
     if (!ID_RE.test(input.id) || input.id.length > 64) {
@@ -129,6 +132,12 @@ export async function proposeTemplate(
         createdAt: existingValue?.createdAt ?? now,
         updatedAt: now,
     };
+
+    // A proposal is a memory record of the owner's, so it answers to the value size, the key count
+    // and the byte budget every memory write answers to, and is refused before it is written
+    // (secaudit 2026-10 last items, F3).
+    const ceilings = await memoryCeilings({ storage, config }, who.ownerGhii, [{ key, value: manifest }]);
+    if (!ceilings.ok) return { error: ceilings.refusal.message, status: ceilings.refusal.status, code: ceilings.refusal.code };
 
     await storage.setMemory({
         key,
