@@ -5,6 +5,7 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   2026-10-06 — aimeat_workspace_rows_delete runs its dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-09-30 -- aimeat_workspace_comment_delete (DELETE /v1/organisms/:id/comments/:commentId);
  *     aimeat_organism_invite_email takes `locale`, the email's language.
@@ -111,24 +112,6 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
 
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
-
-  // ── Workspace ROW spaces ──────────────────────────────────────────────────────────────────────
-  // The connector half of the four row tools. Each is a thin call to the same REST route the node
-  // MCP reaches through the service, so the manifest gate, the access rule and the quotas are the
-  // node's answer on this door too.
-  const rowsPath = (organism_id: string, space: string, ws: string, extra: Record<string, string> = {}) =>
-    `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/rows/${encodeURIComponent(space)}`
-    + `?${new URLSearchParams({ ws, ...extra }).toString()}`;
-
-  mcp.tool('aimeat_workspace_rows_delete', descriptionFor('aimeat_workspace_rows_delete'), zodShapeFor('aimeat_workspace_rows_delete'), annotationsFor('aimeat_workspace_rows_delete'), async ({ organism_id, ws, space, row_id, before }) => {
-    if (!!row_id === !!before) {
-      return { content: [{ type: 'text' as const, text: 'Pass exactly one of `row_id` (remove that row) or `before` (remove everything created before that ISO timestamp).' }], isError: true };
-    }
-    const path = row_id
-      ? `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/rows/${encodeURIComponent(space)}/${encodeURIComponent(row_id)}?${new URLSearchParams({ ws }).toString()}`
-      : rowsPath(organism_id, space, ws, { before: before! });
-    return out(await client.delete(path));
-  });
 
   // ── In-place DOCUMENT edits ───────────────────────────────────────────────────────────────────
   // The connector half of the two document tools. Thin calls to the same routes the node MCP
