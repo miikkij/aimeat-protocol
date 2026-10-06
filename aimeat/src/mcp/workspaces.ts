@@ -22,6 +22,9 @@
  *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The row, document and member-change tools receive it too.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
+ *   v1.27.1 -- 2026-10-06 -- The workspace operations' caller carries the session's scopes, so
+ *     aimeat_workspace_write asks provenance:write of the session too; its scope refusal reads
+ *     `SCOPE_DENIED: ...` (secaudit 2026-10 last items, F2).
  *   v1.27.0 -- 2026-10-02 -- Takes the session's scopes and hands them to the row tools.
  *   v1.26.0 -- 2026-09-29 -- aimeat_workspace_read and the two overviews pass the agent's classification
  *     reader (TARGET-082).
@@ -213,9 +216,11 @@ export function registerWorkspaceTools(
     // The session caller, in the shape services/workspace-tool-ops.ts takes: the read, the draft
     // write and the publish run there, so the extension sandbox can run them as its caller too.
     // Its roles are the agent role alone: an MCP session is always an agent record (mcp/index.ts).
-    // Built once, at registration, as before: it carries no scopes.
+    // Built once, at registration, as before. It carries the session's scopes, because a provenance
+    // declaration asks provenance:write of them as well as of the grant (secaudit 2026-10 last
+    // items, F2).
     const session = caller();
-    const opsCaller = workspaceCallerOf({ principal: session.principal, ownerName: session.owner, roles: [...session.roles] }, config);
+    const opsCaller = workspaceCallerOf({ principal: session.principal, ownerName: session.owner, roles: [...session.roles], scopes: session.scopes }, config);
     const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
@@ -226,7 +231,9 @@ export function registerWorkspaceTools(
     const failRefusal = (r: { code: string; message: string; details?: Record<string, unknown> }): TextResult =>
         r.code === 'UNDECLARED_SPACE'
             ? fail(JSON.stringify({ error: r.code, message: r.message, ...(r.details ?? {}) }, null, 2))
-            : fail(r.message);
+            // A scope refusal is new on these tools (F2), so it takes the toolError shape the REST
+            // door's code reads in: `SCOPE_DENIED: what happened`.
+            : r.code === 'SCOPE_DENIED' ? fail(`${r.code}: ${r.message}`) : fail(r.message);
 
     /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
     const parseObj = (v: unknown): unknown => {

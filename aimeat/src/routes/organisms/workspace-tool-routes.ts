@@ -16,6 +16,9 @@
  * @structure registerOrganismWorkspaceToolRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceToolRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.0.2 — 2026-10-06 — The caller carries the session's scopes; a provenance declaration the
+ *     session may not make answers 403 SCOPE_DENIED, where it answered 500 (secaudit 2026-10 last
+ *     items, F2).
  *   v1.0.1 — 2026-10-06 — POST /workspace/drafts asks memory:write, as aimeat_workspace_write does on
  *     the node's MCP; it asked organism:write, so an agent wrote drafts on one surface and was refused
  *     on the other (secaudit 2026-10 follow-up audit, finding 2).
@@ -44,7 +47,9 @@ export function registerOrganismWorkspaceToolRoutes(
     const opsCallerOf = (req: Request): WorkspaceOpsCaller | null => {
         const who = callerOf(req, config.nodeId, storage);
         if (who.visitor) return null;
-        return workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles] }, config);
+        // The session's scopes travel with it: a provenance declaration asks provenance:write of
+        // them as well as of the grant (secaudit 2026-10 last items, F2).
+        return workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles], scopes: who.scopes }, config);
     };
 
     const refuse = (res: Response, r: WorkspaceOpRefusal): void => {

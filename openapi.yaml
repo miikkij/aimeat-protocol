@@ -36736,7 +36736,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Not a member who may write this workspace, a session from another node, or no memory:write.
+          description: Not a member who may write this workspace, a session from another node, or no memory:write. SCOPE_DENIED when ai_provenance is declared and the grant or the session lacks provenance:write; nothing is written.
         '409':
           description: ARCHIVED, or VERSION_CONFLICT.
         '422':
