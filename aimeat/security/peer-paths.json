@@ -56,8 +56,8 @@
       "why": "Peer app search for an operator: active peers only, url checked with validateOutboundUrl first; reads public app listings and sends nothing private."
     },
     "src/routes/federation-genesis.ts": {
-      "count": 2,
-      "why": "Verifies a genesis node's signed message against the key pinned for the genesis peer, refusing when there is no key or no signature."
+      "count": 3,
+      "why": "Verifies a genesis node's signed message against the key pinned for the genesis peer, refusing when there is no key or no signature. The catalogue ingest reads the same pinned key again, after the message's own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-peer/introduce.ts": {
       "count": 4,
@@ -80,12 +80,12 @@
       "why": "Inbound settlements and relay hops verified with the pinned key after gatePeer('allowSettlement'); the outbound settle is operator-only, to an active peer, with validateOutboundUrl first."
     },
     "src/routes/federation-sync/catalogue-trust.ts": {
-      "count": 1,
-      "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue')."
+      "count": 2,
+      "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue'). The catalogue sync reads the same pinned key again, after its own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-sync/messaging.ts": {
-      "count": 8,
-      "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's sender must be on the signing node (2026-10-01). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
+      "count": 10,
+      "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's sender must be on the signing node (2026-10-01). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). Replicate and the receipt read it once more for the delivery proof, which names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-sync/routing.ts": {
       "count": 7,
