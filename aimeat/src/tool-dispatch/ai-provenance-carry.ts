@@ -56,6 +56,9 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.4 — 2026-10-06 — `readsId` on the four not-carried tools whose route reads ai_provenance_id
+ *     (design book propose and adopt, app draft publish, surface layout set): an id given alone is
+ *     reported attached again; v1.3.3 told them it went nowhere (audit of the last items, finding 4).
  *   v1.3.3 — 2026-10-06 — An ai_provenance_id given alone on a tool whose route reads no provenance
  *     answers recorded:false with the reason; it answered recorded:true (secaudit 2026-10 last items, F4).
  *   v1.3.2 — 2026-10-06 — aimeat_workspace_write: recorded-by-route, POST /v1/organisms/:id/workspace/drafts
@@ -100,9 +103,9 @@ export { memoryContentBytes };
  * than left implicit so that `check:ai-disclosure` can count them and so that nobody has to read
  * fourteen handlers to find out which of them actually work.
  *
- * ONE OF THEM IS NOW HALF-OPEN: `publish-draft` accepts a declaration (the app publish doors were
- * fixed after this list was written), so `aimeat_app_draft_publish` is no longer blocked by the node
- * — only by this side not sending the body. See its entry.
+ * FOUR OF THEM ARE HALF-OPEN (`readsId`): their route reads the declaration and the id, and the
+ * dispatch definition sends both; what is not proved yet is the declaration's `recorded: true` echo.
+ * See their entries.
  */
 export type ProvenanceCarrier =
   | {
@@ -110,7 +113,9 @@ export type ProvenanceCarrier =
     /** Where the record binds, derived from the tool's own input. Both surfaces call this. */
     attachFrom: (input: Record<string, unknown>) => { memoryKey: string; content: string } | undefined;
   }
-  | { kind: 'not-carried'; route: string }
+  /** `readsId`: the dispatch definition forwards `ai_provenance_id` and the route reads it from the
+   *  body, so an id given alone IS attached, though the declaration's echo is not proved yet. */
+  | { kind: 'not-carried'; route: string; readsId?: true }
   /** The node route records the declaration from the request body and names the record in its own
    *  answer, so the connector sends the block with the write and adds no echo of its own. */
   | { kind: 'recorded-by-route'; route: string };
@@ -123,12 +128,11 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
       : undefined),
   },
 
-  // READY TO MOVE, and the only entry on this list that is. The route now ACCEPTS a declaration
-  // (routes/apps/drafts.ts) — what is still missing is on this side: the connector's proxy posts an
-  // empty body, so the block never leaves the client. Left `not-carried` because that is what the
-  // caller is honestly told today; promoting it means sending the body AND being able to prove the
-  // echo's `recorded: true`, which is its own slice rather than a line change here.
-  aimeat_app_draft_publish: { kind: 'not-carried', route: 'POST /v1/apps/:owner/:filename/publish-draft' },
+  // READY TO MOVE. The route ACCEPTS a declaration and an id (routes/apps/drafts.ts), and since the
+  // connector runs the dispatch definition (secaudit 2026-10 follow-up, Part B) the body carries both.
+  // Left `not-carried` for the declaration because promoting it means proving the echo's
+  // `recorded: true`; an id alone is attached, and the echo says so (`readsId`).
+  aimeat_app_draft_publish: { kind: 'not-carried', route: 'POST /v1/apps/:owner/:filename/publish-draft', readsId: true },
   // POST /v1/apps records the declaration and attaches an id from the body, in both modes; the entry
   // named the package route these tools used before 2026-08-16 (secaudit 2026-10 follow-up, Part B).
   aimeat_app_publish: { kind: 'recorded-by-route', route: 'POST /v1/apps' },
@@ -146,8 +150,9 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // the connector sends the block with the description. Decided 2026-10-05 by the developer.
   aimeat_company_create: { kind: 'recorded-by-route', route: 'POST /v1/companies' },
   aimeat_company_update: { kind: 'recorded-by-route', route: 'PUT /v1/companies/:id' },
-  aimeat_designbook_propose: { kind: 'not-carried', route: 'POST /v1/designbook' },
-  aimeat_designbook_adopt: { kind: 'not-carried', route: 'POST /v1/designbook/:id/adopt' },
+  // routes/designbook.ts provenanceOf() reads ai_provenance_id from the body of both.
+  aimeat_designbook_propose: { kind: 'not-carried', route: 'POST /v1/designbook', readsId: true },
+  aimeat_designbook_adopt: { kind: 'not-carried', route: 'POST /v1/designbook/:id/adopt', readsId: true },
   aimeat_board_post: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts' },
   aimeat_board_reply: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts/:postId/replies' },
   aimeat_dm_ask: { kind: 'not-carried', route: 'POST /v1/messages' },
@@ -163,7 +168,7 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // bytes), and this side does send the block. What is not proved yet is the echo — telling the
   // caller `recorded: true` with the record's id — and promoting an entry means proving that, not
   // asserting it. Only a free-form passage carries prose at all; the rest of a layout is block names.
-  aimeat_surface_layout_set: { kind: 'not-carried', route: 'PUT /v1/site/layout/:surface' },
+  aimeat_surface_layout_set: { kind: 'not-carried', route: 'PUT /v1/site/layout/:surface', readsId: true },
   aimeat_workspace_comment: { kind: 'not-carried', route: 'POST /v1/organisms/:id/comments' },
   // POST /v1/organisms/:id/workspace/drafts runs writeWorkspaceDraftsOp, the node MCP tool's own
   // function, which records the declaration once per item and names the records in its answer. The
@@ -308,7 +313,7 @@ export async function carryDeclaration(
   // whose route reads no provenance the id went nowhere, and the answer says that instead
   // (secaudit 2026-10 last items, F4).
   if (declaredId && !declared) {
-    if (!carrier || carrier.kind === 'not-carried') {
+    if (!carrier || (carrier.kind === 'not-carried' && !carrier.readsId)) {
       const route = carrier?.route ?? 'this tool\'s node route';
       return {
         recorded: false,
