@@ -25,6 +25,8 @@
  *   const who = await checkNodeRequest(req.headers, { thisNodeId, fields, keyOf: (node) => ... });
  *   const refusal = signedMessageRefusal(source_node, timestamp, signature);   // an older format, after verify
  * @version-history
+ *   v1.1.1 — 2026-10-06 — signedMessageRefusal keys single use on the decoded signature bytes and
+ *     remembers it until the message's own window closes (secaudit 2026-10 follow-up audit, finding 3).
  *   v1.1.0 — 2026-10-06 — signedMessageRefusal: the five-minute window and single use for the older
  *     federation messages that carry no nonce (secaudit 2026-10 follow-up, A7).
  *   v1.0.0 — 2026-10-05 — Initial: the shared steps of package-node-auth.ts and package-sale-auth.ts
@@ -128,8 +130,12 @@ export function signedMessageRefusal(sourceNode: string, timestamp: unknown, sig
   if (!Number.isFinite(ts) || Math.abs(now - ts) > NONCE_WINDOW_MS) {
     return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
   }
-  const once = createHash('sha256').update(signature).digest('hex').slice(0, 32);
-  if (!nonceAccepted(`signed:${sourceNode}`, once, now)) {
+  // Keyed on the signature BYTES, the way verify() reads them: one signature has several base64
+  // spellings (padding, the URL alphabet, spare bits, whitespace), and a key on the text let the
+  // same message through once per spelling. Remembered until the message's own window closes, so one
+  // signed ahead of this node's clock cannot come back after five minutes from its arrival.
+  const once = createHash('sha256').update(Buffer.from(signature, 'base64')).digest('hex').slice(0, 32);
+  if (!nonceAccepted(`signed:${sourceNode}`, once, now, Math.max(now, ts) + NONCE_WINDOW_MS)) {
     return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed message was already received. A node signs every message anew.' };
   }
   return null;
