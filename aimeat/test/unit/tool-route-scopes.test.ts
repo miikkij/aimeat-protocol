@@ -16,6 +16,9 @@
  *   entry that no longer differs.
  * @usage pnpm test -- tool-route-scopes
  * @version-history
+ *   v1.1.2 — 2026-10-06 — aimeat_workspace_write leaves KNOWN: since Part B its first dispatch call is
+ *     the drafts route itself, so the LOOKUP reason was false and hid a pair that differed
+ *     (secaudit 2026-10 follow-up audit, finding 2).
  *   v1.1.1 — 2026-10-06 — aimeat_skill_list leaves KNOWN: its first dispatch call no longer reaches a
  *     route that asks a word (secaudit 2026-10 follow-up, Part B).
  *   v1.1.0 — 2026-10-06 — The UNREVIEWED pairs are triaged: each tool asks its route's words, and
@@ -128,7 +131,6 @@ function pairs(): { tool: string; route: string; tool_words: string[]; route_wor
  * nobody has made yet. Triage replaces UNREVIEWED with the answer, or fixes the entry and deletes it.
  */
 const KNOWN: Record<string, string> = {
-  aimeat_workspace_write: 'LOOKUP: reads the workspace to find the section before it writes.',
   aimeat_workspace_object_delete: 'LOOKUP: lists the memory keys of the object before it deletes them.',
   aimeat_offer_price_set: 'LOOKUP: reads the agent\'s offers before it sets the price.',
   // The 30 UNREVIEWED pairs were triaged on 2026-10-06 (secaudit 2026-10 follow-up, A4): the tools

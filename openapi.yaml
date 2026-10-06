@@ -36732,7 +36732,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: Not a member who may write this workspace, a session from another node, or no organism:write.
+          description: Not a member who may write this workspace, a session from another node, or no memory:write.
         '409':
           description: ARCHIVED, or VERSION_CONFLICT.
         '422':
