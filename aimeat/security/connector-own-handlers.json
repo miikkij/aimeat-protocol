@@ -50,7 +50,6 @@
     "aimeat_organism_overview",
     "aimeat_organism_search",
     "aimeat_package_claim",
-    "aimeat_package_install_requests",
     "aimeat_package_sale",
     "aimeat_schedule_report_internal",
     "aimeat_skill_get",

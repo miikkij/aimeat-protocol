@@ -8,8 +8,8 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
- *   2026-10-06 — themes.ts is gone: the theme tools run their dispatch definition (secaudit 2026-10
- *     follow-up, Part B).
+ *   2026-10-06 — themes.ts and apps.ts are gone: the theme, app and package install request tools run
+ *     their dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — Every connector tool without a handler of its own runs its CLI dispatch definition
  *     (dispatch-tools.ts); registerAllTools records the names the modules register (secaudit 2026-10, M3).
  *   v2.6.0 -- 2026-09-29 -- Register aimeat_classification (TARGET-082 V5).
@@ -40,7 +40,6 @@ import { registerAgentManagementTools } from './agent-management.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerBoardsTools } from './boards.js';
 import { registerCapabilitiesTools } from './capabilities.js';
-import { registerAppsTools } from './apps.js';
 import { registerKnowledgeTools } from './knowledge.js';
 import { registerSkillsTools } from './skills.js';
 import { registerOrganismsTools } from './organisms.js';
@@ -89,7 +88,6 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
   registerAgentTelemetryTools(mcp, registry);
   registerBoardsTools(mcp, registry);
   registerCapabilitiesTools(mcp, registry);
-  registerAppsTools(mcp, registry);
   registerKnowledgeTools(mcp, registry);
   registerSkillsTools(mcp, registry);
   registerOrganismsTools(mcp, registry);
