@@ -82,7 +82,7 @@ export function registerOrganismWorkspaceToolRoutes(
             if (!caller) { visitorRefusal(res); return; }
             const body = (req.body ?? {}) as Record<string, unknown>;
             const ws = typeof body.ws === 'string' ? body.ws.trim() : '';
-            if (!ws) { res.status(400).json(error(config.nodeId, 'WS_REQUIRED', 'Name the workspace with `ws`.')); return; }
+            if (!ws) { res.status(400).json(error(config.nodeId, 'WS_REQUIRED', 'Say which workspace to write into.', 400, { field: 'ws' })); return; }
             const declared = parseDeclaredProvenanceInput(body.ai_provenance);
             if (!declared.ok) {
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invalid ai_provenance declaration.', 400, { violations: declared.violations }));

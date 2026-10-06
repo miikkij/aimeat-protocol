@@ -44,6 +44,7 @@ import { allSubscriptions, catalogueEntry, putSubscription, type Subscription } 
 import { readOfferAsSeller, carryOutSale } from './package-sale-checkout.js';
 import { notify } from '../../notify.js';
 import { reserveAgentPurchase, releaseAgentPurchase } from '../../../commerce/agent-purchase-limit.js';
+import { agentSessionCaller } from '../../caller-context.js';
 import { CommerceError } from '../../../commerce/errors.js';
 import { emitChange } from '../../event-bus.js';
 import { logger } from '../../../utils/logger.js';
@@ -93,7 +94,9 @@ async function renewOne(deps: Deps, sub: Subscription, reference: string): Promi
     // limit its owner set, checked and counted in one step right before the charge, as a checkout
     // does (commerce/agent-purchase-limit.ts; secaudit 2026-10 follow-up, A6).
     const spend = { buyerGhii, currency, total: amount };
-    const agent = sub.auto_renew_by ? { sub: sub.auto_renew_by, roles: ['agent'] } : null;
+    // The agent as a caller (services/caller-context.ts): no session is open, so it holds no scopes,
+    // and the limit asks only who it is.
+    const agent = sub.auto_renew_by ? agentSessionCaller(sub.auto_renew_by, '', [], config.nodeId, storage).auth : null;
 
     let trackingCode: string;
     try {
