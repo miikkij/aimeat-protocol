@@ -27,7 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateDraftToken } from './draft-token.js';
 import { appOriginUrl } from '../routes/apps/helpers.js';
-import { DRAFT_LABEL_SUFFIX } from '../routes/subdomains.js';
+import { DRAFT_LABEL_SUFFIX } from './app-origin-target.js';
 
 /** How long a preview token stays valid, in seconds. */
 const PREVIEW_TTL_SECONDS = 600;

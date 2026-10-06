@@ -48,8 +48,8 @@
   },
   "readers": {
     "src/routes/federation-auth.ts": {
-      "count": 1,
-      "why": "POST /v1/federation/auth/verify, the home node's answer to a federated sign-in: gatePeer admits only an active peer with a key, the tier ceiling must allow sign-ins, and the request's signature is verified against that peer's pinned key before any account is read. The key is read, never the url (secaudit 2026-10, D1)."
+      "count": 2,
+      "why": "POST /v1/federation/auth/verify, the home node's answer to a federated sign-in: gatePeer admits only an active peer with a key, the tier ceiling must allow sign-ins, and the request's signature is verified against that peer's pinned key before any account is read. The key is read, never the url (secaudit 2026-10, D1). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/apps/catalogue-admin.ts": {
       "count": 3,
@@ -64,12 +64,12 @@
       "why": "Compares the key an introduction presents with the key of the peer already holding that node id, to refuse or to record a held id. No outbound use."
     },
     "src/routes/federation-peer/lifecycle.ts": {
-      "count": 11,
-      "why": "Key exchange: compares the presented key with the pinned one (rotation needs a signature by it), proves an unpinned key against the card at the operator-approved address, and verifies a ping's signature with the pinned key."
+      "count": 12,
+      "why": "Key exchange: compares the presented key with the pinned one (rotation needs a signature by it), proves an unpinned key against the card at the operator-approved address, and verifies a ping's signature with the pinned key. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/federation-peer/peers.ts": {
-      "count": 13,
-      "why": "Operator listing and editing of peers, the activate key exchange (bound to the peer's id), and inbound heartbeat and presence verified with the pinned key after gatePeer."
+      "count": 16,
+      "why": "Operator listing and editing of peers, the activate key exchange (bound to the peer's id), and inbound heartbeat and presence verified with the pinned key after gatePeer. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/federation-peer/promotion.ts": {
       "count": 2,
@@ -84,16 +84,16 @@
       "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue')."
     },
     "src/routes/federation-sync/messaging.ts": {
-      "count": 5,
-      "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's sender must be on the signing node (2026-10-01)."
+      "count": 8,
+      "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's sender must be on the signing node (2026-10-01). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/federation-sync/routing.ts": {
       "count": 7,
       "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off."
     },
     "src/routes/federation-sync/templates.ts": {
-      "count": 4,
-      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); outbound only to active peers sharing the catalogue."
+      "count": 5,
+      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); outbound only to active peers sharing the catalogue. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/ghii/register-login.ts": {
       "count": 8,
