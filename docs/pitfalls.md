@@ -152,6 +152,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 119 | After a deploy, agents no longer see tools they used yesterday; every test is green | 2 |
 | 120 | A replay window on a signed message refuses every record older than five minutes | · |
 | 121 | An E2E suite's server dies at start with a ReferenceError from a file you are editing | 5 |
+| 122 | An origin fix is green, and the same code still runs on that origin by another path | 1 |
 
 ---
 
@@ -1340,3 +1341,11 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** 2026-10-06, session cc-jouni-secaudit-last: a run of targeted suites went on in the background while the next change was written in the same worktree. The runner starts a fresh server for each suite from `src/` through tsx, so a suite that started between two edits (the route line written, its import not yet) loaded half a change. The failure belonged to neither change.
 - **The rule.** While suites run in a worktree, edit only files no server loads (tests not in the run, notes, the scratchpad), or run the suites from a second worktree at the commit under test. A red suite whose error names a line you were editing at that moment is run again before anything else is concluded (§18).
 - **The tell.** A startup failure in a file with an uncommitted change, from a run that began before the change was finished.
+
+## 122. An origin fix is green, and the same code still runs on that origin by another path
+
+*Symptoms: a fix moves app code off an origin (a draft off the app's own address, an app off the main domain) and its tests pass; the code still runs on the old origin when the URL is written another way.*
+
+- **The case.** D2 of the secaudit 2026-10 last items moved a draft's `/?preview=` from the app's own origin to `<sub>--draft.<appHost>`. `GET /v1/apps/:owner/:filename` answers on every host, and it still served the draft by its preview token on the app's own origin, and any other published app inline, so code that was not the origin's app reached that app's silent sign-in. Both were confirmed on aimeat.io. The tests covered only `/?preview=`. Fixed with `appOfRequestOrigin` (services/app-origin-target.ts): on a per-app origin that route runs only the origin's own app.
+- **The rule.** For an origin rule, list every route that returns runnable HTML (`grep` for the content types and `mode=inline`), not only the one the fix was written for, and test the refusal on the origin itself with a real Host (`helpers/host-request.ts`).
+- **The tell.** A route under `/v1/` that serves HTML and is not mounted per host.
