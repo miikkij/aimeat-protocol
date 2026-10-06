@@ -14,6 +14,7 @@
  *   to attachProofOverHttp() in tool-call-defs-apps.ts, which the shell path calls as well.
  * @usage registerAppdevTools(mcp, registry);
  * @version-history
+ *   2026-10-06 — aimeat_iam_define runs its dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 -- 2026-10-01 -- aimeat_iam_define takes default_role, version, author and ext_name, as the
  *     node MCP tool and the CLI dispatch do (audit 2026-10-01, defect B).
@@ -30,9 +31,6 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { defineAppIam } from '../../../../services/iam/define-app-iam.js';
-import type { LevelDef } from '../../../../services/iam/model.js';
-import type { CommandDef } from '../../../../services/iam/app-commands.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -75,15 +73,5 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
       updatedAt: new Date().toISOString(),
     };
     return out(await client.post('/v1/memory', { key: `template.catalog.${id}.manifest`, value, visibility: 'owner', tags: ['app-template'] }));
-  });
-
-  // iam_define is pure-local: validate + design an app IAM level/command schema (no node round-trip).
-  mcp.tool('aimeat_iam_define', descriptionFor('aimeat_iam_define'), zodShapeFor('aimeat_iam_define'), annotationsFor('aimeat_iam_define'), async ({ app_id, levels, commands, default_role, version, author, ext_name }) => {
-    const result = defineAppIam({
-      appId: app_id, levels: levels as unknown as LevelDef[], commands: commands as unknown as CommandDef[],
-      defaultRole: default_role, version, author, extName: ext_name,
-    });
-    const isError = (result as { ok?: boolean }).ok === false;
-    return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }], ...(isError ? { isError: true } : {}) };
   });
 }
