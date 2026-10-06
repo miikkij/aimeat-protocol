@@ -15,6 +15,8 @@
  *     mint, emailed code = its password; per-inviter quota; app-origin callable via organism:invite scope)
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
+ *   2026-10-06 -- GET /:id/workspace/index and POST /:id/workspace/drafts (organisms/workspace-tool-routes.ts):
+ *     the workspace read and draft write the node's MCP tools run, for the connector and the shell.
  *   v1.x -- 2026-07-11 -- Referential-integrity scan: GET /:id/workspace/dangling-refs flags reference
  *     fields (must_read/refs/born_from.docs/parent_id/target_id/card_id/release_id) + document prose
  *     mentions that point to a missing or archived id in the SAME workspace — read-only, never blocks a
@@ -118,6 +120,7 @@ import { registerOrganismWorkspaceTransferRoutes } from './organisms/workspace-t
 import { registerOrganismWorkspaceRowRoutes } from './organisms/workspace-rows.js';
 import { registerOrganismWorkspaceDocumentRoutes } from './organisms/workspace-documents.js';
 import { registerOrganismWorkspaceMemberChangeRoutes } from './organisms/workspace-member-changes.js';
+import { registerOrganismWorkspaceToolRoutes } from './organisms/workspace-tool-routes.js';
 import { registerOrganismGateRoutes } from './organisms/gates.js';
 import { registerOrganismIntakeRoutes } from './organisms/intake.js';
 import { error } from '../middleware/envelope.js';
@@ -160,6 +163,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   registerOrganismWorkspaceDocumentRoutes(router, config, storage);
   // A member's change to a workspace (a space, the sections) and the decision on a member's suggestion.
   registerOrganismWorkspaceMemberChangeRoutes(router, config, storage);
+  // The workspace index read and the draft write, as the node's MCP tools run them (workspace-tool-ops).
+  registerOrganismWorkspaceToolRoutes(router, config, storage);
   registerOrganismGateRoutes(router, config, storage, H);
   registerOrganismIntakeRoutes(router, config, storage, H);
 

@@ -9,7 +9,7 @@
  *   optional and defaults to the only loaded agent).
  * @version-history
  *   2026-10-06 — themes.ts, apps.ts, agent-management.ts, data-map.ts, designbook.ts, app-manage.ts,
- *     boards.ts, decide.ts, mcp-proxy.ts, ai-voice.ts, surface-layout.ts, compliance.ts, install-sets.ts, core.ts, agent-tasks.ts, schedules.ts, workflows.ts, agent-caps.ts, handbook.ts, agent-messages.ts, appdev.ts, capabilities.ts, flags.ts, operator.ts and skills.ts are gone: their
+ *     boards.ts, decide.ts, mcp-proxy.ts, ai-voice.ts, surface-layout.ts, compliance.ts, install-sets.ts, core.ts, agent-tasks.ts, schedules.ts, workflows.ts, agent-caps.ts, handbook.ts, agent-messages.ts, appdev.ts, capabilities.ts, flags.ts, operator.ts, skills.ts and workspaces.ts are gone, and organisms.ts keeps the tools that have no dispatch definition: their
  *     tools run their dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — Every connector tool without a handler of its own runs its CLI dispatch definition
  *     (dispatch-tools.ts); registerAllTools records the names the modules register (secaudit 2026-10, M3).
@@ -36,7 +36,6 @@ import { registerDmMessagesTools } from './dm-messages.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerKnowledgeTools } from './knowledge.js';
 import { registerOrganismsTools } from './organisms.js';
-import { registerWorkspaceTools } from './workspaces.js';
 import { registerCommerceTools } from './commerce.js';
 import { registerExchangeTools } from './exchange.js';
 import { registerContactTools } from './contacts.js';
@@ -61,7 +60,6 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
   registerAgentTelemetryTools(mcp, registry);
   registerKnowledgeTools(mcp, registry);
   registerOrganismsTools(mcp, registry);
-  registerWorkspaceTools(mcp, registry);
   registerCommerceTools(mcp, registry);
   registerExchangeTools(mcp, registry);
   registerContactTools(mcp, registry);

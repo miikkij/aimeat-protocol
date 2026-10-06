@@ -5,6 +5,8 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   2026-10-06 — aimeat_organism_list, _overview, _search and aimeat_workspace_comment run their dispatch
+ *     definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-06 — aimeat_workspace_rows_delete runs its dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-09-30 -- aimeat_workspace_comment_delete (DELETE /v1/organisms/:id/comments/:commentId);
@@ -33,48 +35,13 @@
  *     invitation_cancel tools (name-invite parity with the server MCP).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { provenanceEchoedResult } from '../../../../tool-dispatch/ai-provenance-carry.js';
-import { envelopeResult, payloadResult } from './_registry.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry): void {
-  const { client, owner } = registry.resolve();
-
-  mcp.tool('aimeat_organism_list', descriptionFor('aimeat_organism_list'), zodShapeFor('aimeat_organism_list'), annotationsFor('aimeat_organism_list'), async () => {
-    // Public discovery PLUS the agent's own organisms (?member={owner} — owner-keyed memberships,
-    // including private ones). A bare GET /v1/organisms is public-only, so an agent could not find
-    // its own home: join answered ALREADY_MEMBER while this list omitted the organism. Mirrors the
-    // server-MCP tool; is_member tells the agent which organisms it belongs to.
-    const [pub, mine] = await Promise.all([
-      client.get('/v1/organisms'),
-      client.get(`/v1/organisms?member=${encodeURIComponent(owner)}`),
-    ]);
-    if (pub.ok === false && mine.ok === false) return { content: [{ type: 'text' as const, text: JSON.stringify(pub.error ?? pub, null, 2) }], isError: true };
-    const mineList = ((mine.data as { organisms?: { id: string }[] } | undefined)?.organisms) ?? [];
-    const pubList = ((pub.data as { organisms?: { id: string }[] } | undefined)?.organisms) ?? [];
-    const memberIds = new Set(mineList.map(o => o.id));
-    const seen = new Set<string>();
-    const organisms = [...mineList, ...pubList]
-      .filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; })
-      .map(o => ({ ...o, is_member: memberIds.has(o.id) }));
-    // Two reads merged into one list, so the flag asks whether ANY of it could be read. A single
-    // refusal leaves a SHORTER list rather than no list -- the caller sees public organisms and not
-    // its own, or the other way round -- and calling that an error would be as wrong as calling it
-    // a success. What must not happen is both reads being refused and the answer coming back as an
-    // empty list that reads like "you belong to nothing".
-    return payloadResult({ organisms, total: organisms.length }, { ok: mine.ok !== false || pub.ok !== false });
-  });
-
-  mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'), {
-    organism_id: z.string().describe('Organism identifier.'),
-  }, annotationsFor('aimeat_organism_overview'), async ({ organism_id }) => {
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/overview`);
-    return envelopeResult(resp);
-  });
+  const { client } = registry.resolve();
 
   // Ownership is plural: adding is additive, and the LAST owner cannot be removed. Both mirror the
   // REST routes, which call services/organism-ownership.ts — the connector adds no rules of its own.
@@ -88,36 +55,8 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
-  mcp.tool('aimeat_organism_search', descriptionFor('aimeat_organism_search'), zodShapeFor('aimeat_organism_search'), annotationsFor('aimeat_organism_search'), async ({ organism_id, q, ws, archived }) => {
-    const params = new URLSearchParams({ q });
-    if (ws) params.set('ws', ws);
-    // The REST route reads archive scope from two flags: ?archived=only (archive
-    // search) and ?includeArchived=true (both). Map the enum to those; 'exclude'
-    // (the default) sends neither.
-    if (archived === 'only') params.set('archived', 'only');
-    else if (archived === 'include') params.set('includeArchived', 'true');
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/search?${params.toString()}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
-  });
-
-  mcp.tool('aimeat_workspace_comment', descriptionFor('aimeat_workspace_comment'), zodShapeFor('aimeat_workspace_comment'), annotationsFor('aimeat_workspace_comment'), async ({ organism_id, ws, space, instance_id, body, anchor, parent_id, ai_provenance, ai_provenance_id }) => {
-    const payload: Record<string, unknown> = { ws, space, instance_id, body };
-    if (anchor != null) payload.anchor = anchor;
-    if (parent_id != null) payload.parent_id = parent_id;
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/comments`, payload);
-    if (resp.ok === false) return { content: [{ type: 'text' as const, text: JSON.stringify(resp.error ?? resp, null, 2) }], isError: true };
-    return provenanceEchoedResult(client,
-      { tool: 'aimeat_workspace_comment', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
-  });
-
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
-
-  // ── In-place DOCUMENT edits ───────────────────────────────────────────────────────────────────
-  // The connector half of the two document tools. Thin calls to the same routes the node MCP
-  // reaches through services/workspace-doc-edit.ts, so the section lookup, the byte-identical
-  // splice and the compare-and-swap retry are the node's answer on this door too — which matters
-  // here more than anywhere, because a retry loop implemented twice is a retry loop that differs.
 
   // → POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin).
   mcp.tool('aimeat_organism_invite_email', descriptionFor('aimeat_organism_invite_email'), zodShapeFor('aimeat_organism_invite_email'), annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {

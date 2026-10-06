@@ -18,7 +18,7 @@
  *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
  *   v1.4.1 -- 2026-10-06 -- agent_name is compared on a tool whose catalog entry declares it, and
- *     thirteen entries leave KNOWN_INPUT_DRIFT (secaudit 2026-10 follow-up, Part B).
+ *     sixteen entries leave KNOWN_INPUT_DRIFT (secaudit 2026-10 follow-up, Part B).
  *   v1.4.0 -- 2026-10-05 -- The whole-schema comparison with the catalog (inventory/mcp-single-source.ts,
  *     secaudit 2026-10, M3). aimeat_checkout_list leaves KNOWN_INPUT_DRIFT: both surfaces register the
  *     catalog's schema, response_format included.
@@ -122,9 +122,8 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // forwards to, and that is a decision per tool, not a sweep.
     //
     // Same debt register, same rule: each line names what a connector caller cannot reach.
-    'aimeat_workspace_publish',        // expected_version — the optimistic lock, so a connector publish cannot refuse to overwrite an edit made in between
-    'aimeat_workspace_update',         // apps
-    'aimeat_organism_overview',        // include_archived
+    // aimeat_workspace_publish (expected_version), aimeat_workspace_update (apps) and
+    // aimeat_organism_overview (include_archived) RESOLVED 2026-10-06: one schema on both surfaces.
     // aimeat_skill_list, _link and _unlink RESOLVED 2026-10-06: one schema, and agent_name names the target agent on every surface.
     // RESOLVED 2026-09-06: not a naming difference, a broken door. The connector sent
     // { answer: {...} } at a route reading { picks, other } against the question pinned at ask time,

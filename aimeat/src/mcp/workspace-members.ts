@@ -11,6 +11,8 @@
  *   Access and grant live together because they are the two halves of ONE membership decision —
  *   someone asks, someone decides — and both were already reaching for the same role helpers.
  * @version-history
+ *   2026-10-06 — member_grant and member_revoke answer as a refusal when every workspace refused, as
+ *     the connector's tools did (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-25 — aimeat_workspace_access decide runs the REST decision route's own function
  *     (services/workspace-access-decision.ts): it writes the decision on the request record and tells
@@ -112,6 +114,9 @@ export function registerWorkspaceMemberTools(
             return fail("action must be 'request', 'list' or 'decide'.");
         });
 
+    /** The same result, marked as a refusal when nothing it was asked to do happened. */
+    const refusedOr = (r: TextResult, refused: boolean): TextResult => (refused ? { ...r, isError: true } : r);
+
     /** Normalize a single `ws` and/or a `workspaces` array into a de-duplicated list (order preserved). */
     const wsList = (ws?: string, workspaces?: string[]): string[] => {
         const out: string[] = [];
@@ -141,7 +146,10 @@ export function registerWorkspaceMemberTools(
             }
             emitChange('organisms');
             const granted = results.filter(r => r.status === 'granted').length;
-            return ok({ grantee: owner, role, granted, total: targets.length, results });
+            // Refused on every workspace is a refusal, not a grant of nothing: answered as ok it reads as
+            // "there was nothing to do". The connector has said so since TARGET-028; this tool had not.
+            const refusedEverywhere = results.every(r => r.status === 'forbidden_or_not_found');
+            return refusedOr(ok({ grantee: owner, role, granted, total: targets.length, results }), refusedEverywhere);
         });
 
     // ── aimeat_workspace_member_revoke ── (remove a member's role on one or many workspaces)
@@ -162,7 +170,9 @@ export function registerWorkspaceMemberTools(
             }
             emitChange('organisms');
             const revoked = results.filter(r => r.status === 'revoked').length;
-            return ok({ grantee: owner, revoked, total: targets.length, results });
+            // `not_a_member` is an answer, not a refusal; refused on every workspace is a refusal.
+            const refusedEverywhere = results.every(r => r.status === 'forbidden_or_not_found');
+            return refusedOr(ok({ grantee: owner, revoked, total: targets.length, results }), refusedEverywhere);
         });
 
     // ── aimeat_workspace_members ── (list a workspace's members with roles + grant provenance)

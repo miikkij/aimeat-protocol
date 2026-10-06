@@ -1,25 +1,7 @@
 {
   "description": "Connector MCP tools that have a CLI dispatch definition (src/tool-dispatch/) and still register a handler of their own in src/cli/connect/mcp/tools/. Every other connector tool runs its dispatch definition (dispatch-tools.ts). Seeded 2026-10-05 (secaudit 2026-10, M3): each one listed here was measured to differ from its dispatch definition in the HTTP request it sends or the result it answers, against a node that answers and one that refuses, or it is one of the tools whose connector takes other parameters than the node (security/mcp-schema-single-source.json). Not yet reviewed: which side is right is decided per tool by reading its route. Settling one means making the two the same and deleting the handler. scripts/audit-mcp-schemas.ts (pnpm check:mcp-schemas) refuses a new handler and a listed one that is gone. The list only shrinks.",
   "tools": [
-    "aimeat_knowledge_contribute",
-    "aimeat_organism_list",
-    "aimeat_organism_overview",
-    "aimeat_organism_search",
-    "aimeat_workspace_access",
-    "aimeat_workspace_comment",
-    "aimeat_workspace_create",
-    "aimeat_workspace_list",
-    "aimeat_workspace_member_grant",
-    "aimeat_workspace_member_revoke",
-    "aimeat_workspace_members",
-    "aimeat_workspace_object_delete",
-    "aimeat_workspace_overview",
-    "aimeat_workspace_publish",
-    "aimeat_workspace_read",
-    "aimeat_workspace_revert_to_draft",
-    "aimeat_workspace_transfer",
-    "aimeat_workspace_update",
-    "aimeat_workspace_write"
+    "aimeat_knowledge_contribute"
   ],
   "reasons": {
     "aimeat_knowledge_contribute": "Adding an entry to a knowledge package has no HTTP route (services/knowledge-package-entry.ts is reached only through the node MCP), so the connector and the shell refuse it. The connector keeps its own registration for one thing the dispatch path cannot give: a description that says the call refuses before an agent spends one (KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE). Whether to add the route is the developer's call (secaudit 2026-10 follow-up, Part B)."

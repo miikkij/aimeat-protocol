@@ -36640,6 +36640,104 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/organisms/{id}/workspace/index:
+    get:
+      operationId: readWorkspaceIndex
+      summary: A workspace's index (titles, no bodies), or the full values of named records
+      description: >-
+        The same answer as the aimeat_workspace_read MCP tool (services/workspace-tool-ops.ts
+        readWorkspaceOp). Without `ids`, every space's entries with id, title, updated, version and
+        size, plus the manifest, the pinned apps, the locked schemas, the member change rule and the
+        section indexes. With `ids`, the full value of only those records (an id, or a record's full
+        memory key inside this workspace). Version history is never returned. A session from another
+        node is refused.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: ws
+          in: query
+          required: true
+          schema: { type: string }
+        - name: ids
+          in: query
+          description: Comma-separated record ids or keys to open.
+          schema: { type: string }
+        - name: space
+          in: query
+          description: With ids, restrict the lookup to this space (name or namespace).
+          schema: { type: string }
+        - name: include_archived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: data is the index (mode index) or the opened records (mode content, with missing ids listed).
+        '400':
+          description: WS_REQUIRED — no ws.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not a member who may read this workspace, a session from another node, or no organism:read.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/workspace/drafts:
+    post:
+      operationId: writeWorkspaceDrafts
+      summary: Write one draft, or a batch of drafts, into a workspace
+      description: >-
+        The same write as the aimeat_workspace_write MCP tool (services/workspace-tool-ops.ts
+        writeWorkspaceDraftsOp). Every item is resolved against the manifest and schema-validated
+        before any is written, so a batch lands whole or not at all. A document filed under a
+        section is filed by the workspace's rule for members' changes, and each item says how its
+        filing ended. One ai_provenance declaration is recorded per item. A session from another node
+        is refused.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws]
+              properties:
+                ws: { type: string }
+                space: { type: string, description: The space name or namespace from the manifest. }
+                value: { type: object, description: The content of a single write. }
+                id: { type: string, description: The instance id; a document without one gets a generated id. }
+                section: { type: string, description: Document spaces only, the section to file it under. }
+                items:
+                  type: array
+                  description: A batch of { space?, value, id?, section? }; all or nothing.
+                  items: { type: object }
+                ai_provenance: { type: object, description: How the content was made (aimeat.provenance declaration). }
+                ai_provenance_id: { type: string, description: Attach an existing provenance record instead. }
+      responses:
+        '200':
+          description: data names the written key, id, space, mode, section and version (or count and items for a batch), and the provenance echo.
+        '400':
+          description: INVALID_INPUT or WS_REQUIRED.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not a member who may write this workspace, a session from another node, or no organism:write.
+        '409':
+          description: ARCHIVED, or VERSION_CONFLICT.
+        '422':
+          description: UNDECLARED_SPACE or a schema violation.
+
   /v1/organisms/{id}/workspace/overview:
     get:
       operationId: getWorkspaceOverview
