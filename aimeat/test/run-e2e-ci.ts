@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-06 -- e2e-app-tool-free-mcp.ts joins the list: unpriced calls agree with REST while
+ *     private manifests, scoped actions and paid capabilities remain protected.
  *   v1.78.0 -- 2026-10-06 -- e2e-extension-workspace-batch.ts joins the list (ctx.workspace.publishRecords
  *            and deleteRecords: 500 records in one action under the default limits).
  *   v1.77.0 -- 2026-10-03 -- e2e-theme-fonts.ts joins the list (the font manager).
@@ -837,6 +839,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-packages-tools.ts',
     // A tool published over MCP lands under the app filename, so both catalogues show it.
     'test/e2e-app-tools-key.ts',
+    'test/e2e-app-tool-free-mcp.ts',
     // One tool for an app's settings and reads, each action on its own permission word.
     'test/e2e-app-manage.ts',
     // The same sweep, three files further: the core doors nobody had called (the work lifecycle,

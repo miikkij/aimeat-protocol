@@ -13,6 +13,7 @@
  *   Morsels are plain integers; money is 6-decimal micro-units. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-10-06 — App-tool invocation documents unpriced access and the remaining paid-action checks.
  *   2026-10-06 — aimeat_exchange_accept takes offering_id (ext and action become the other way in), and
  *     aimeat_exchange_need_post takes usage_intent and requires app_id, as their routes do; both carry
  *     the bounds the node's MCP wrote by hand (secaudit 2026-10 follow-up, Part B).
@@ -212,10 +213,10 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_app_tool_invoke',
-        description: 'CALL an app\'s offered tool (a method like getCompanyBrief) through YOUR metered contract — the generic "one app/agent calls another app\'s function" channel. You must already hold a contract for this app-tool (accept its offering with aimeat_exchange_accept). The call is metered + charged to your budget at the provider price (+ platform rake), routed to the pinned interface version\'s backing capability; the provider\'s own upstream API keys stay server-side (you never see or need them). Returns the tool\'s result. If the invocation throws you are refunded. Read the tool\'s input fields first with aimeat_app_tools_get (its inputSchema): an input that does not match is refused before anything is charged, and the refusal names every missing field at once.',
+        description: 'CALL a published app tool (a method like getCompanyBrief). Unpriced tools need no contract; priced tools require your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Read inputSchema with aimeat_app_tools_get first: invalid input is refused before charging, with every missing field named.',
         caller: 'agent',
         visibility: agentMcp,
-        annotations: { title: 'Invoke App Tool (metered, via contract)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        annotations: { title: 'Invoke App Tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         scope: 'exchange:write',
         // On `service`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
         // On `agent`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
