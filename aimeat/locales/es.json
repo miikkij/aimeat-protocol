@@ -3316,6 +3316,7 @@
     "preset": {
       "readonly": "Puede ver: {areas}. No puede cambiar nada.",
       "standard": "Puede leer y escribir: {areas}. Tu saldo, tus mensajes y los ajustes de tu cuenta quedan fuera de su alcance.",
+      "organismWrite": "También puede crear organismos y eliminar los que son tuyos. Además, puede cambiar quién los ve y quién puede unirse a ellos.",
       "full": "Puede hacer casi todo lo que tú puedes hacer aquí. Tu inicio de sesión y la seguridad de la cuenta, los ajustes de pago de tu dinero, compartir tus datos con personas nuevas y cambiar los permisos de tus otros agentes requieren cada uno su propia marca separada.",
       "keep": "Deja los permisos exactamente como están.",
       "asked": "Exactamente lo que pidió: {areas}. Nada más.",

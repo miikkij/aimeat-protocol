@@ -25,6 +25,10 @@
  *   v1.1.0 — 2026-08-29 — requestedSummary(): the sentence for what an agent ASKED FOR in its
  *     device-authorize call. Both consent doors now offer that as a choice, so the two describe
  *     the request with one sentence rather than each inventing a phrasing.
+ *   v1.2.0 — 2026-10-06 — A preset or a request holding organism:write adds a sentence: the agent can
+ *     also create organisms, delete the owner's own and change who sees and joins them. The standard
+ *     preset carries the word since D4 and the summary said only "read and write" (audit of the
+ *     secaudit last items, finding 5).
  */
 import { SCOPE_TEMPLATES, NOT_IN_WILDCARD } from '/views/profile/agents/scope-model.js';
 
@@ -79,7 +83,16 @@ export function presetSummary(preset, t) {
   if (preset === 'full') return t('consent.preset.full');
   const tpl = SCOPE_TEMPLATES[preset];
   if (!tpl) return '';
-  return t(`consent.preset.${preset}`, { areas: areaLine(tpl, t) });
+  return withOrganismWrite(t(`consent.preset.${preset}`, { areas: areaLine(tpl, t) }), tpl, t);
+}
+
+/**
+ * "Read and write your organisms" undersells organism:write: the word also creates organisms, deletes
+ * the owner's own and changes who can see and join them (routes/organisms/crud.ts). A set holding it
+ * says so in a sentence of its own.
+ */
+function withOrganismWrite(summary, scopes, t) {
+  return scopes.includes('organism:write') ? `${summary} ${t('consent.preset.organismWrite')}` : summary;
 }
 
 /**
@@ -90,7 +103,7 @@ export function presetSummary(preset, t) {
 export function requestedSummary(scopes, t) {
   const list = Array.isArray(scopes) ? scopes.filter((s) => typeof s === 'string') : [];
   if (list.length === 0) return '';
-  return t('consent.preset.asked', { areas: areaLine(list, t) });
+  return withOrganismWrite(t('consent.preset.asked', { areas: areaLine(list, t) }), list, t);
 }
 
 /**

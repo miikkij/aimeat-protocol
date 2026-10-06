@@ -4374,6 +4374,7 @@
     "preset": {
       "readonly": "Can look at {areas}. It cannot change anything.",
       "standard": "Can read and write {areas}. Your balance, your messages and your account settings stay out of its reach.",
+      "organismWrite": "It can also create organisms and delete the ones you own. It can also change who can see them and who can join them.",
       "full": "Can do almost everything you can do here. Your sign-in and account security, your money's payout settings, sharing your data with new people, and rewriting your other agents' permissions each need their own separate tick.",
       "keep": "Leaves its permissions exactly as they are now.",
       "asked": "Exactly what it asked for: {areas}. Nothing beyond that.",

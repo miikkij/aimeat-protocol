@@ -4373,6 +4373,7 @@
     "preset": {
       "readonly": "Voi katsella: {areas}. Se ei voi muuttaa mitään.",
       "standard": "Voi lukea ja kirjoittaa: {areas}. Saldosi, viestisi ja tilisi asetukset pysyvät sen ulottumattomissa.",
+      "organismWrite": "Se voi myös luoda organismeja ja poistaa omistamiasi organismeja. Lisäksi se voi muuttaa, kuka niitä näkee ja kuka niihin voi liittyä.",
       "full": "Voi tehdä lähes kaiken minkä sinäkin täällä. Kirjautumisesi ja tilisi turva-asetukset, rahojesi maksatusasetukset, tietojesi jakaminen uusille ihmisille ja muiden agenttiesi oikeuksien muuttaminen vaativat kukin oman erillisen rastinsa.",
       "keep": "Jättää oikeudet täsmälleen ennalleen.",
       "asked": "Juuri se mitä se pyysi: {areas}. Ei mitään sen yli.",
