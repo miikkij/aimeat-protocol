@@ -13,6 +13,8 @@
  *   reason EMAIL_DISABLED. That answer is what "every policy gate passed" looks like: a refusal from
  *   a gate is 400, 403, 404, 422 or 429 and never reaches the transport.
  * @version-history
+ *   v1.5.1 — 2026-10-06 — The recipient's code-key address is marked verified with
+ *     helpers/verified-email.ts: a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.5.0 — 2026-09-25 — Test 18: an app holding outbound:send saves an address that has an account
  *     here and is not told so, on the save, the list, the send or the log; the owner in person still
  *     sees the link on the list, the log and the address book.
@@ -39,6 +41,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { markEmailVerified } from './helpers/verified-email.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -165,6 +168,8 @@ let recipientToken = '';
     body: JSON.stringify({ email: recipientEmail, username: recipientUsername, code: RECIPIENT_CODE, display_name: 'Vastaanottaja' }),
   });
   assert(mint.status === 201, `code-invite mint failed: ${mint.status} ${JSON.stringify(mint.body)}`);
+  // A key's address starts unverified since 2026-10-06 (secaudit 2026-10 follow-up, A1).
+  await markEmailVerified(recipientUsername, recipientEmail);
   const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recipientUsername, password: RECIPIENT_CODE }) });
   assert(login.status === 200, `recipient login failed: ${login.status} ${JSON.stringify(login.body)}`);
   recipientToken = login.body.data.token as string;

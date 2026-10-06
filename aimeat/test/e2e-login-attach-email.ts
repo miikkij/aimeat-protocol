@@ -12,6 +12,8 @@
  *   delivered over SMTP (absent here), so it is covered by the unchanged verify-email path + the wrong-code
  *   assertion below.
  * @version-history
+ *   v1.1.1 — 2026-10-06 — The code key's address is marked verified with helpers/verified-email.ts:
+ *     a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.1.0 — 2026-07-19 — The "email already owned" 409 now requires a VERIFIED owner: emailHash is a
  *     verified-email binding (an unverified register-web email no longer reserves the address), so the
  *     taken-email account is provisioned with a verified email via the code-invite flow.
@@ -23,6 +25,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as ed from '@noble/ed25519';
+import { markEmailVerified } from './helpers/verified-email.js';
 import { createHash } from 'node:crypto';
 import { waitForServer } from './helpers/wait-for-server.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -103,7 +106,7 @@ async function main() {
         });
         await test('provision an account with a VERIFIED email (code-invite)', async () => {
             // emailHash is a verified-email binding, so the "email taken" case below needs a VERIFIED
-            // owner. The code-invite flow is the only e2e-safe way to attach a verified email (no SMTP).
+            // owner: a code key makes the account and helpers/verified-email.ts verifies its address (no SMTP).
             const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `inviter${Date.now() % 1000000}`, display_name: 'Inviter', password: 'InviteP123' }) });
             assert(reg.status === 201, `inviter reg ${reg.status}`);
             const inv = reg.body.data.owner.name as string;
@@ -117,6 +120,8 @@ async function main() {
                 body: JSON.stringify({ email: takenEmail, username: emailOwner, code: 'SuperSecret99', display_name: 'Has Mail' }),
             });
             assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+            // A key's address starts unverified since 2026-10-06 (secaudit 2026-10 follow-up, A1).
+            await markEmailVerified(emailOwner, takenEmail, { sqlitePath: DB_PATH, nodeId: NODE_ID });
         });
     } finally {
         await stopServer(server);

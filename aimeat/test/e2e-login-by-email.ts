@@ -14,10 +14,13 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-login-by-email
  * @version-history
+ *   v1.0.1 — 2026-10-06 — The code key's address is marked verified with helpers/verified-email.ts:
+ *     a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { markEmailVerified } from './helpers/verified-email.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -80,6 +83,8 @@ await test('Provision the account through an organism code-invite', async () => 
         body: JSON.stringify({ email: inviteeEmail, username: invitee, code: INVITE_CODE, display_name: 'Has Mail' }),
     });
     assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+    // A key's address starts unverified since 2026-10-06 (secaudit 2026-10 follow-up, A1).
+    await markEmailVerified(invitee, inviteeEmail);
 });
 
 await test('The handle + its code signs in, and hands back the durable password', async () => {

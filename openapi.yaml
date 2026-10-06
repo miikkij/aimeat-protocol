@@ -44645,13 +44645,14 @@ paths:
       operationId: mintOrganismCodeInvitation
       summary: Mint a provisioned-code invitation ("key") to an organism
       description: >-
-        Any active member mints an access key: the server provisions a guest account (email verified)
-        whose password IS the supplied code, joins it to the organism (+ optional workspaces), and
-        emails the code + landing link. The recipient logs in with the code on the client — there is no
-        magic-link accept step. A per-inviter quota applies (org creator/admin unlimited); each
-        un-cancelled key counts. Authorized by organism membership + the organism:invite scope, so it
-        works from an H-2 app-origin session (role app). Membership opens the door but does not decide
-        what comes through it: org_role admin needs the organism's creator/admin, and each workspace
+        An owner of the organism mints an access key: the server provisions a guest account whose
+        password IS the supplied code, joins it to the organism (+ optional workspaces), and emails the
+        code + landing link. The recipient logs in with the code on the client; there is no magic-link
+        accept step. The account keeps the address as its notification email, UNVERIFIED: the person
+        verifies it from their own account (POST /v1/ghii/email/verify), and until then the address
+        does not sign in, resolve to the account, or take invitations sent to it. A member who is not
+        an owner, an org admin included, is refused (403) and nothing is provisioned. Requires the
+        organism:invite scope, so it works from an H-2 app-origin session (role app). Each workspace
         grant needs the workspace's creator or an org creator/admin (403 otherwise). Rate-limited.
       tags: [Organisms]
       security:
@@ -44666,14 +44667,14 @@ paths:
               type: object
               required: [email, username, code]
               properties:
-                email: { type: string, format: email, description: Recipient email — the code + explanation are sent here, and stored (verified) on the account }
+                email: { type: string, format: email, description: Recipient email — the code + explanation are sent here, and kept on the account unverified }
                 username: { type: string, description: Desired account username (must be free); the client owns the naming scheme }
                 code: { type: string, minLength: 8, description: The access code — also the account password (delivered once by email; never stored in plaintext) }
                 display_name: { type: string, description: Optional display name for the provisioned account }
                 locale: { type: string, enum: [en, fi], description: Language of the invitation email }
                 message: { type: string, description: Caller-composed, already-localized explanation shown in the email }
                 landing_url: { type: string, description: Where the recipient enters the code (defaults to the node base URL) }
-                org_role: { type: string, enum: [member, admin], description: 'Organism role granted (default: member). admin requires the caller to be the organism creator or an admin' }
+                org_role: { type: string, enum: [member, admin], description: 'Organism role granted (default: member).' }
                 workspaces:
                   type: array
                   description: Optional per-workspace grants. Each one requires the caller to be that workspace's creator or an org creator/admin.
