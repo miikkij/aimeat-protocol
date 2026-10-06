@@ -23,6 +23,10 @@
  *     holding the scope passes. Fails against the pre-fix requireRoleOrScope source.
  *   v1.5.0 — 2026-10-02 — C5c: the email-invitation cancel and edit answer 404 for a key, which
  *     stays pending; the cancel had marked it cancelled and left the provisioned account a member.
+ *   v1.6.0 — 2026-10-06 — Only an owner of the organism mints a key, and a key's account starts with its
+ *     address unverified (secaudit 2026-10 follow-up, A1): C4 is a plain member's refused mint that
+ *     makes no account, C4d the unverified address, C5 to C5c run on the owner's keys, and
+ *     registerVerified marks the address verified with helpers/verified-email.ts.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -45,6 +49,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { markEmailVerified } from './helpers/verified-email.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -165,7 +170,7 @@ await test('9. Cancel invalidates an invite before use', async () => {
 
 /** A separate organism for the code keys, so the organism under test holds no invitation for the address. */
 let verOrgId = '';
-/** A fresh account whose email is verified (an organism code key), signed in: name, token, email. */
+/** A fresh account whose email is verified (an organism code key, then helpers/verified-email.ts), signed in. */
 async function registerVerified(email: string): Promise<{ name: string; token: string; email: string }> {
     if (!verOrgId) {
         const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token),
@@ -177,6 +182,8 @@ async function registerVerified(email: string): Promise<{ name: string; token: s
     const code = 'VerCode12345';
     const mint = await json(`/v1/organisms/${verOrgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email, username: name, code }) });
     assert(mint.status === 201, `registerVerified code key ${mint.status}: ${JSON.stringify(mint.body?.error)}`);
+    // A key's address starts unverified since 2026-10-06 (A1); this helper's accounts need it verified.
+    await markEmailVerified(name, email);
     const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: name, password: code }) });
     assert(login.status === 200 && typeof login.body.data.token === 'string', `registerVerified login ${login.status}: ${JSON.stringify(login.body?.error)}`);
     return { name, token: login.body.data.token, email };
@@ -341,7 +348,7 @@ const codeUser1 = `e2ekey1${Date.now()}`;
 const codeCode1 = 'EXC91-ABCD-EFGH-JKLM';
 let codeInvId1 = '';
 
-await test('C1. A (creator) mints a code key → provisions a verified, joined account (unlimited)', async () => {
+await test('C1. A (creator) mints a code key → provisions a joined account (unlimited)', async () => {
     const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: `key1.${Date.now()}@example.com`, username: codeUser1, code: codeCode1, display_name: 'EXC_VIP_91', locale: 'en', message: 'welcome', landing_url: 'https://m-room.apps.aimeat.io/', workspaces: [{ ws: WS, role: 'viewer' }] }) });
     assert(r.status === 201, `mint ${r.status}: ${JSON.stringify(r.body.error)}`);
     assert(r.body.data.invitation.type === 'code', 'invitation type is code');
@@ -354,7 +361,7 @@ await test('C1. A (creator) mints a code key → provisions a verified, joined a
 let codeCred1: { username: string; password: string; email_sent: boolean } | null = null;
 await test('C2. The code IS the password: the provisioned account logs in and reads the room', async () => {
     const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: codeUser1, password: codeCode1 }) });
-    assert(lg.status === 200, `login ${lg.status}: ${JSON.stringify(lg.body.error)}`); // email gate lifted at mint
+    assert(lg.status === 200, `login ${lg.status}: ${JSON.stringify(lg.body.error)}`); // the suite's node runs without the email gate
     const tok = lg.body.data.token as string;
     assert(typeof tok === 'string' && tok.length > 0, 'login returns a session token');
     const read = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(tok) });
@@ -428,42 +435,60 @@ await test('C4c. A plain member cannot grant a workspace they do not manage', as
     assert(r.status === 403, `a plain member granted a workspace they do not manage: ${r.status} ${JSON.stringify(r.body?.data?.invitation ?? r.body?.error)}`);
 });
 
-await test('C4. Per-inviter quota: a plain member mints 3, the 4th is 429', async () => {
-    for (let i = 0; i < 3; i++) {
-        const u = `e2eq${i}${Date.now()}`;
-        const c = `EXC8${i}-ABCD-EFGH-JKLM`;
-        const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `q${i}.${Date.now()}@example.com`, username: u, code: c }) });
-        assert(r.status === 201, `member mint ${i} ${r.status}: ${JSON.stringify(r.body.error)}`);
-        bMints.push({ u, c, id: r.body.data.invitation.id }); provisioned.push({ u, c });
+await test('C4. A plain member cannot mint a key at all (403), and the refusal made no account', async () => {
+    // Only an owner of the organism mints since 2026-10-06 (secaudit 2026-10 follow-up, A1): a key
+    // makes an ACCOUNT on the node. Any member used to mint three, under a per-member quota.
+    const u = `e2eqm${Date.now()}`;
+    const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `qm.${Date.now()}@example.com`, username: u, code: 'EXC80-ABCD-EFGH-JKLM' }) });
+    assert(r.status === 403 && r.body.error?.code === 'ACCESS_DENIED', `a plain member minted a key: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: u, password: 'EXC80-ABCD-EFGH-JKLM' }) });
+    assert(lg.status !== 200, `the refused key made an account anyway: ${lg.status}`);
+    // The owner mints with no quota.
+    for (let i = 0; i < 4; i++) {
+        const ou = `e2eq${i}${Date.now()}`;
+        const oc = `EXC8${i}-ABCD-EFGH-JKLM`;
+        const m = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: `q${i}.${Date.now()}@example.com`, username: ou, code: oc }) });
+        assert(m.status === 201, `owner mint ${i} ${m.status}: ${JSON.stringify(m.body.error)}`);
+        bMints.push({ u: ou, c: oc, id: m.body.data.invitation.id }); provisioned.push({ u: ou, c: oc });
     }
-    const over = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `q4.${Date.now()}@example.com`, username: `e2eq4${Date.now()}`, code: 'EXC84-ABCD-EFGH-JKLM' }) });
-    assert(over.status === 429, `4th mint expected 429, got ${over.status}`);
-    const list = await json(`/v1/organisms/${orgId}/invitations/code`, { headers: auth(B.token) });
-    assert(list.body.data.quota.used === 3 && list.body.data.quota.limit === 3, `quota reports 3/3 (got ${JSON.stringify(list.body.data.quota)})`);
 });
 
-await test('C5. Cancelling an un-activated key deletes the account and frees a slot', async () => {
+await test('C4d. A key\'s account starts with its address unverified', async () => {
+    // A key's address was marked verified at mint, so the minter could make an account that owned
+    // somebody else's address (secaudit 2026-10 follow-up, A1; as APP-2 decided for the link).
+    const email = `unver.${Date.now()}@example.com`;
+    const u = `e2eunv${Date.now()}`, c = 'EXC86-ABCD-EFGH-JKLM';
+    const m = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email, username: u, code: c }) });
+    assert(m.status === 201, `mint ${m.status}: ${JSON.stringify(m.body.error)}`);
+    provisioned.push({ u, c });
+    const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: u, password: c }) });
+    assert(lg.status === 200, `key login ${lg.status}: ${JSON.stringify(lg.body?.error)}`);
+    provisioned[provisioned.length - 1].c = lg.body.data.key_credentials?.password ?? c;
+    const me = await json('/v1/ghii/me', { headers: auth(lg.body.data.token) });
+    assert(me.status === 200, `me ${me.status}`);
+    const meText = JSON.stringify(me.body.data);
+    assert(meText.includes('"email_verified_at":null'), `the key's address came out verified: ${meText.slice(0, 300)}`);
+    // And the address finds no account until it is verified.
+    const found = await json('/v1/contacts/resolve', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email }) });
+    assert(found.body.data?.found !== true, `an unverified key address resolves to the account: ${JSON.stringify(found.body.data)}`);
+});
+
+await test('C5. Cancelling an un-activated key deletes the account', async () => {
     const target = bMints[0];
-    const cancel = await json(`/v1/organisms/${orgId}/invitations/code/${target.id}/cancel`, { method: 'POST', headers: auth(B.token), body: '{}' });
+    const cancel = await json(`/v1/organisms/${orgId}/invitations/code/${target.id}/cancel`, { method: 'POST', headers: auth(A.token), body: '{}' });
     assert(cancel.status === 200 && cancel.body.data.status === 'cancelled', `cancel ${cancel.status}: ${JSON.stringify(cancel.body.error)}`);
     // The provisioned account is gone (login now fails).
     const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: target.u, password: target.c }) });
     assert(lg.status !== 200, `deleted account should not log in, got ${lg.status}`);
-    // Slot freed → B can mint again.
-    const u = `e2eq5${Date.now()}`, c = 'EXC85-ABCD-EFGH-JKLM';
-    const again = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `q5.${Date.now()}@example.com`, username: u, code: c }) });
-    assert(again.status === 201, `mint after cancel expected 201, got ${again.status}`);
-    provisioned.push({ u, c });
 });
 
-await test('C5b. A member cannot cancel ANOTHER member\'s un-activated key', async () => {
-    // C5 has B cancel B's OWN key. Delete the `inv.invitedBy !== inviter && !gate.unlimited` refusal
-    // and any active member cancels another member's key — which on this path runs
-    // storage.deleteOwner(inv.provisionedOwner): it deletes a real account, revokes its workspace
-    // grants and drops its membership.
+await test('C5b. A member cannot cancel a key somebody else minted', async () => {
+    // C5 has the owner cancel the owner's OWN key. Delete the `inv.invitedBy !== inviter &&
+    // !gate.unlimited` refusal and any active member cancels another person's key — which on this
+    // path erases the account it made, revokes its workspace grants and drops its membership.
     // NOT bMints[0]: C5 cancels that one, which deletes the account behind it.
     const target = bMints[1];
-    assert(!!target, 'B has an un-cancelled key to protect');
+    assert(!!target, 'the owner has an un-cancelled key to protect');
 
     // A THIRD member who is neither the inviter nor the creator: the account A's own key provisioned
     // in C1, which is already joined. It logs in with the credential C2 rotated it to.
@@ -487,14 +512,14 @@ await test('C5c. The email-invitation cancel and edit do not reach a key', async
     // was marked cancelled and the account stayed a member of the organism; the edit door rewrote
     // the grants the key cancel later revokes.
     const target = bMints[2];
-    assert(!!target, 'B has a third, un-activated key');
+    assert(!!target, 'the owner has a third, un-activated key');
     const edit = await json(`/v1/organisms/${orgId}/invitations/email/${target!.id}`, {
         method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ orgRole: 'admin' }),
     });
     assert(edit.status === 404, `the email edit reached a key: ${edit.status} ${JSON.stringify(edit.body?.error)}`);
     const cancel = await json(`/v1/organisms/${orgId}/invitations/email/${target!.id}/cancel`, { method: 'POST', headers: auth(A.token), body: '{}' });
     assert(cancel.status === 404, `the email cancel reached a key: ${cancel.status} ${JSON.stringify(cancel.body?.error)}`);
-    const list = await json(`/v1/organisms/${orgId}/invitations/code`, { headers: auth(B.token) });
+    const list = await json(`/v1/organisms/${orgId}/invitations/code`, { headers: auth(A.token) });
     const still = (list.body.data.items || []).find((x: any) => x.id === target!.id);
     assert(still && still.status === 'pending', `the key is still pending: ${JSON.stringify(still)}`);
 });

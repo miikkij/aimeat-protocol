@@ -6,6 +6,8 @@
  *   email-per-account-per-node invariant that the resolver relies on (a duplicate verified email is
  *   refused, so an email can never map to two accounts).
  * @version-history
+ *   v1.0.1 — 2026-10-06 — A code key's account starts unverified (secaudit 2026-10 follow-up, A1), so
+ *     the fixture marks the address verified with helpers/verified-email.ts.
  *   v1.0.0 — 2026-07-19 — Initial: email→handle resolution (found/handle/unknown/malformed) + uniqueness.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-connect-email
@@ -29,6 +31,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { markEmailVerified } from './helpers/verified-email.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -50,16 +53,19 @@ async function setupOwner(label: string) {
 }
 
 /**
- * Provision an account WITH a verified email via the code-invite flow — the only e2e-safe way to attach
- * a verified email (interactive verification needs real mail delivery). Returns the new account handle.
+ * Provision an account WITH a verified email: a code key makes the account (its address unverified
+ * since 2026-10-06), and helpers/verified-email.ts marks the address verified, because interactive
+ * verification needs real mail delivery. Returns the mint's answer.
  */
 async function provisionVerifiedEmailAccount(inviterToken: string, email: string, username: string): Promise<{ status: number; body: any }> {
     const org = await json('/v1/organisms', { method: 'POST', headers: auth(inviterToken), body: JSON.stringify({ name: 'Connect Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
     assert(org.status === 201, `org ${org.status}`);
-    return json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+    const mint = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
         method: 'POST', headers: auth(inviterToken),
         body: JSON.stringify({ email, username, code: 'SuperSecret99', display_name: 'Connect Target' }),
     });
+    if (mint.status === 201) await markEmailVerified(username, email);
+    return mint;
 }
 
 const deviceAuthorize = (owner: string) => json('/v1/agents/device-authorize', {

@@ -7,6 +7,8 @@
  *   behind. A 200 proved none of them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-members
  * @version-history
+ *   v1.2.1 — 2026-10-06 — provisionWithEmail marks the code key's address verified with
+ *     helpers/verified-email.ts: a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.2.0 — 2026-10-01 — IAM round 2: display names on every row and on /me, approve by email
  *     (found, invited, cancelled, and an invited address that gets a verified account), a role change
  *     told to the member in their own language, paging and search, managers and what they may not
@@ -16,6 +18,8 @@
  *     for somebody else's app.
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 2).
  */
+import { markEmailVerified } from './helpers/verified-email.js';
+
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 
@@ -1614,13 +1618,15 @@ let r2asker: Awaited<ReturnType<typeof setupOwner>>;
 let r2org = '';
 const R2_CODE = 'SuperSecret99';
 
-/** An account whose email is VERIFIED, made the one e2e-safe way there is: an organism code key. */
+/** An account whose email is VERIFIED: an organism code key makes it, and since a key's address
+ *  starts unverified (secaudit 2026-10 follow-up, A1) helpers/verified-email.ts verifies it. */
 async function provisionWithEmail(email: string, label: string): Promise<{ name: string; code: string }> {
     assert(!!r2org, 'the round 2 setup made the organism the code keys are minted in');
     const name = `amr2${label}${Date.now().toString(36)}`;
     const mint = await json(`/v1/organisms/${r2org}/invitations/code`, { method: 'POST', headers: auth(owner.token),
         body: JSON.stringify({ email, username: name, code: R2_CODE, display_name: `R2 ${label}` }) });
     assert(mint.status === 201, `code key ${mint.status}: ${JSON.stringify(mint.body?.error)}`);
+    await markEmailVerified(name, email);
     return { name, code: R2_CODE };
 }
 

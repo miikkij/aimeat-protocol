@@ -5,6 +5,8 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   v1.8.1 — 2026-10-06 — The code-key accounts get their address verified by helpers/verified-email.ts:
+ *     a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.8.0 — 2026-10-01 — Tests 34–40: contacts:read (the developer's ruling of 2026-10-01). An app of
  *     the owner's own and an agent holding the word read the owner's book on GET /v1/contacts, the
  *     agent over aimeat_contact_list too, with the conversation columns empty unless the caller may
@@ -54,6 +56,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { markEmailVerified } from './helpers/verified-email.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -191,8 +194,9 @@ await test('9. Resolve: unknown email → found:false; invalid → 400; unauthen
 });
 
 await test('10. Resolve finds an owner with a verified email (code-invite provisioned)', async () => {
-    // Provision an account WITH a verified email via the code-invite flow (the only e2e-safe way
-    // to attach an email — the interactive verification flows need real mail delivery).
+    // Provision an account with the code-invite flow, then mark its address verified
+    // (helpers/verified-email.ts): a key's address starts unverified since 2026-10-06, and the
+    // interactive verification flows need real mail delivery.
     const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Resolve Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
     assert(org.status === 201, `org ${org.status}`);
     const email = `resolveme-${Date.now()}@example.com`;
@@ -202,6 +206,7 @@ await test('10. Resolve finds an owner with a verified email (code-invite provis
         body: JSON.stringify({ email, username: uname, code: 'SuperSecret99', display_name: 'Resolve Target' }),
     });
     assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+    await markEmailVerified(uname, email);
     const hit = await json('/v1/contacts/resolve', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: email.toUpperCase() }) });
     assert(hit.status === 200 && hit.body.data.found === true, `hit ${hit.status}: ${JSON.stringify(hit.body.data)}`);
     assert(hit.body.data.owner === uname, `resolved owner ${hit.body.data.owner} !== ${uname}`);
@@ -349,6 +354,7 @@ await test('19. A saved person who later verifies that address becomes ONE row, 
         body: JSON.stringify({ email, username: uname, code: 'SuperSecret99', display_name: 'Fiona Real' }),
     });
     assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+    await markEmailVerified(uname, email);
 
     const list = await contactsOf(A.token);
     const ghii = `${uname}@${NODE_ID}`;
@@ -373,6 +379,7 @@ await test('20. Saving a person whose address belongs to a BLOCKED identity is r
         body: JSON.stringify({ email, username: uname, code: 'SuperSecret99', display_name: 'Blocked Bob' }),
     });
     assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+    await markEmailVerified(uname, email);
     const ghii = `${uname}@${NODE_ID}`;
     const block = await json(`/v1/messages/contacts/${encodeURIComponent(ghii)}/block`, { method: 'POST', headers: auth(A.token), body: '{}' });
     assert(block.status === 200, `block ${block.status}: ${JSON.stringify(block.body.error)}`);
@@ -401,6 +408,7 @@ await test('21. A person blocked AFTER being saved stays hidden (the card cannot
         body: JSON.stringify({ email, username: uname, code: 'SuperSecret99', display_name: 'Lars Real' }),
     });
     assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+    await markEmailVerified(uname, email);
     const ghii = `${uname}@${NODE_ID}`;
     assert((await contactsOf(A.token)).some(c => c.contact_id === ghii), 'promoted before the block');
 
@@ -486,10 +494,12 @@ await test('25. POST /invite: a bad address 400; a person gets a link (no organi
     // An address that already has a verified account here is added, not invited.
     const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Here Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
     const here = `already-${Date.now()}@example.com`;
+    const hereName = `contxh${Date.now()}`;
     const mint = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
-        method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: here, username: `contxh${Date.now()}`, code: 'SuperSecret99', display_name: 'Already Here' }),
+        method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: here, username: hereName, code: 'SuperSecret99', display_name: 'Already Here' }),
     });
     assert(mint.status === 201, `code mint ${mint.status}`);
+    await markEmailVerified(hereName, here);
     const taken = await json('/v1/contacts/invite', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: here }) });
     assert(taken.status === 409 && taken.body.error.code === 'ALREADY_HERE', `has an account → 409 ALREADY_HERE, got ${taken.status} ${taken.body.error?.code}`);
 });

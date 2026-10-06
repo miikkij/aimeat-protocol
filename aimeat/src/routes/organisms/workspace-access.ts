@@ -6,6 +6,10 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-10-06 — SECURITY: only an owner of the organism mints a code key, and the account a
+ *     key makes starts with its address unverified, for the person to verify from their account. Any member
+ *     could mint one, and the address was marked verified, so a member could make an account that
+ *     owned somebody else's address (secaudit 2026-10 follow-up, A1; Jouni 2026-10-06).
  *   v1.15.1 — 2026-10-05 — The code key's address is checked with isValidEmail (secaudit 2026-10, M2).
  *   v1.15.0 — 2026-10-05 — Cancelling a provisioned-code key erases the account it made with
  *     eraseOwner, the one account deletion (secaudit 2026-10, C7).
@@ -77,8 +81,9 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { hashPassword } from '../../services/password.js';
-import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError } from '../../services/owner-provisioning.js';
+import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner-provisioning.js';
 import { getActiveEmailService } from '../../services/email.js';
+import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { workspaceMetaReader } from '../../services/workspace-meta.js';
@@ -514,12 +519,12 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
   /* ══ Provisioned-code invitations ("keys") — a second invitation TYPE whose account is created at
    * MINT time and whose emailed code IS the account password. The recipient logs in with the code on
-   * the client (no magic-link accept step). A per-inviter quota (INVITE_CODE_QUOTA_PER_MEMBER) makes
-   * exclusivity spread virally; the org creator/admin is unlimited. Cancellable while un-activated →
-   * deletes the account + frees the slot. Authorized by ORG MEMBERSHIP + the organism:invite scope
-   * (not role) via requireExternalPrincipal, so it works from an H-2 app origin (role 'app') for the
-   * operator AND for keyholders. Membership opens the door; it does not decide what comes through it —
-   * the admin role and each workspace grant are authorized separately (see the mint handler).
+   * the client (no magic-link accept step). Since 2026-10-06 only an OWNER of the organism mints one
+   * (secaudit 2026-10 follow-up, A1): a key makes an account on the node, and the per-member quota
+   * that let keyholders pass keys on is no longer reached by the mint. Cancellable while un-activated →
+   * deletes the account + frees the slot. The routes take the organism:invite scope via
+   * requireExternalPrincipal, so they work from an H-2 app origin (role 'app'); listing and cancelling
+   * stay open to the member who minted a key. Each workspace grant is authorized against the minter.
    * Service-specific naming/format/email copy stays in the CLIENT: the caller supplies username +
    * code (its password) + a localized message + landing_url. */
 
@@ -529,21 +534,22 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const inviter = req.auth!.owner as string;
     const gate = await requireOrgMember(req, res, id);
     if (!gate) return;
-    const { organism, unlimited } = gate;
+    const { organism } = gate;
+    // Only an owner of the organism mints a key: a key makes an ACCOUNT on this node, not only a
+    // membership, and a member could make accounts in the node's name for anybody (Jouni, 2026-10-06;
+    // secaudit 2026-10 follow-up, A1). An owner mints without the per-inviter quota.
+    if (!isOrganismOwner(organism, inviter)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner of this organism can make a key, because a key makes a new account.'));
+      return;
+    }
 
     const { email, username, code, display_name, locale, message, landing_url, workspaces, org_role, expires_in_days } = req.body ?? {};
 
-    // A key may not hand out more than the person minting it holds. Both of these used to be applied
-    // unchecked on plain membership: any active member could mint a key that joined its recipient as an
-    // ORG ADMIN, or that granted a workspace the minter had no say over — and because the grant is
-    // written on the workspace creator's behalf, it looked legitimate afterwards. The email twin above
-    // has always required creator/admin and re-authorized every workspace; the two doors now decide the
-    // same way, with the code door still open to a plain member for the ordinary member-level key.
-    // Both checks run BEFORE the account is provisioned, so a refused key leaves no orphan owner behind.
+    // A key may not hand out more than the person minting it holds: every workspace it grants is
+    // authorized against the minter, because the grant is written on the workspace creator's behalf
+    // and looks legitimate afterwards. The check runs BEFORE the account is provisioned, so a refused
+    // key leaves no orphan owner behind. An owner may grant the admin role.
     const orgRole = normalizeOrgRole(org_role);
-    if (orgRole === 'admin' && !unlimited) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the organism creator or an admin can mint a key that grants the admin role')); return;
-    }
     const wsGrants = await authorizeWorkspaceGrants(req, res, id, workspaces);
     if (!wsGrants) return;
 
@@ -555,28 +561,28 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const nameErr = validateOwnerName(uname);
     if (nameErr) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameErr)); return; }
 
-    // Per-inviter quota (creator/admin exempt): every non-cancelled code key this inviter minted counts
-    // (activation does not change the count — only cancelling an un-activated key frees a slot).
-    if (!unlimited) {
-      const used = await storage.countInvitationsByInviter(inviter, { type: 'code', statuses: ['pending'] });
-      if (used >= INVITE_CODE_QUOTA_PER_MEMBER) { res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Key quota reached (${INVITE_CODE_QUOTA_PER_MEMBER}). Cancel an un-activated key to free a slot.`)); return; }
-    }
     if (await storage.getOwner(uname)) { res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${uname}" is already registered`)); return; }
+    // One account per address: an address another account has verified stays that account's.
+    if (await storage.getGHIIByEmailHash(emailHashOf(cleanEmail))) {
+      res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email already belongs to an account on this node.'));
+      return;
+    }
 
     // Provision the guest account: the code IS the password (hashed → a minted high-entropy credential,
-    // so the strength validator is intentionally skipped). verifiedEmail lifts the confirmation gate in
-    // one step (level 1); provisionOwner throws ProvisionEmailTakenError if it's already taken → 409.
+    // so the strength validator is intentionally skipped). The address is NOT verified by the key: the
+    // minter chose it and is handed nothing that proves the recipient reads it, so a key could claim
+    // somebody else's address (secaudit 2026-10 follow-up, A1, as APP-2 decided for the invitation
+    // link). It is the account's notification address and gets the usual verification code below.
     const passwordHash = await hashPassword(code);
     try {
       await provisionOwner(storage, config, {
-        // A member-minted code key is the 'invitation' road: open in 'invite' mode, refused only
+        // An owner-minted code key is the 'invitation' road: open in 'invite' mode, refused only
         // when the node is fully closed (the backstop below turns that into a clean 403).
         via: 'invitation',
         username: uname,
         displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : uname,
         passwordHash,
         locale: typeof locale === 'string' ? locale : undefined,
-        verifiedEmail: cleanEmail,
         enableMagicLink: false,
       });
     } catch (e) {
@@ -589,6 +595,10 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       return;
     }
     emitChange('ghii');
+    // The address, kept unverified as the account's notification address. No verification code goes
+    // out now: a code lives fifteen minutes and the recipient signs in with the key whenever they
+    // read the mail, so the person verifies it from their own account (POST /v1/ghii/email/verify).
+    await storage.updateGHII(`${uname}@${config.nodeId}`, { notificationEmail: cleanEmail });
 
     // Join the organism (mirrors the accept handler: membership row + roster arrays in sync).
     const nowIso = new Date().toISOString();

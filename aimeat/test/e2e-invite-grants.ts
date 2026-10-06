@@ -10,6 +10,8 @@
  *   v1.1.0 — 2026-08-11 — Tests 15-21 (H-28): a provisioned-code key hands out only what the person
  *     minting it holds. Plain membership opens that door and used to decide nothing else, so a member
  *     could mint a key granting the ADMIN role or a workspace they had no say over.
+ *   v1.2.0 — 2026-10-06 — Only an owner mints a key (secaudit 2026-10 follow-up, A1): 19 and 20 assert
+ *     that a plain member and an admin who is not an owner are refused, and the owner mints instead.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invite-grants
 
@@ -241,11 +243,10 @@ await test('14. ?all=1 stays scoped to owned workspaces for a plain member', asy
 });
 
 // ── H-28: a provisioned-code key hands out only what the person minting it holds ──
-// Plain membership opens this door on purpose: a keyholder invites a friend, bounded by a quota. What
-// the key may GRANT is a separate question, and it used to go unasked — any active member could mint
-// one that joined its recipient as an ORG ADMIN, or that granted a workspace they had nothing to do
-// with, because the grant is written on the workspace CREATOR's behalf and looks legitimate after the
-// fact. B is a plain member here; C is an org admin; A created WS1 and WS2.
+// Since 2026-10-06 only an owner of the organism mints a key (secaudit 2026-10 follow-up, A1): a key
+// makes an account on the node. What the key may GRANT is still asked separately, because the grant is
+// written on the workspace CREATOR's behalf and looks legitimate after the fact. B is a plain member
+// here; C is an org admin; A created the organism, WS1 and WS2.
 
 const KEY_STEM = `keyuser${Date.now()}`;
 /** Each key provisions a real account, so every mint that can succeed gets its own name + address. */
@@ -271,7 +272,8 @@ await test('16. A plain member cannot mint a key granting a workspace they do no
 });
 
 await test('17. A key naming a workspace that does not exist is refused (404)', async () => {
-    const r = await mintKey(B.token, orgId, 'a', { workspaces: [{ ws: 'no-such-ws', role: 'viewer' }] });
+    // The owner asks, so the refusal is about the workspace, not about who may mint.
+    const r = await mintKey(A.token, orgId, 'a', { workspaces: [{ ws: 'no-such-ws', role: 'viewer' }] });
     assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body.error)}`);
 });
 
@@ -282,24 +284,31 @@ await test('18. A non-member cannot mint a key at all (403, cross-owner)', async
     assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error)}`);
 });
 
-await test('19. The plain member still mints an ordinary key, and the refusals provisioned nothing', async () => {
-    // Same username the four refused attempts used: a 201 here proves none of them created an account
+await test('19. A plain member cannot mint even an ordinary key (403), and the refusals provisioned nothing', async () => {
+    // Only an owner of the organism mints since 2026-10-06 (secaudit 2026-10 follow-up, A1).
+    const refused = await mintKey(B.token, orgId, 'a');
+    assert(refused.status === 403, `a plain member minted a key: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+    // Same username the refused attempts used: the owner's 201 proves none of them created an account
     // on the way to being refused (a taken name answers 409 NAME_TAKEN).
-    const r = await mintKey(B.token, orgId, 'a');
+    const r = await mintKey(A.token, orgId, 'a');
     assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body.error)}`);
     assert(r.body.data.invitation.org_role === 'member', `key grants member, got ${r.body.data.invitation.org_role}`);
-    await cancelKey(B.token, orgId, r.body.data.invitation.id);
+    await cancelKey(A.token, orgId, r.body.data.invitation.id);
 });
 
-await test('20. A plain member CAN grant a workspace they created themselves', async () => {
+await test('20. An admin who is not an owner cannot mint; the owner grants a workspace a member created', async () => {
     const manifest = { objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
     const mk = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'B Own WS', manifest }) });
     assert(mk.status === 201, `B creates a workspace ${mk.status}: ${JSON.stringify(mk.body.error)}`);
     const bWs = mk.body.data.ws as string;
-    const r = await mintKey(B.token, orgId, 'b', { workspaces: [{ ws: bWs, role: 'contributor' }] });
+    const byMember = await mintKey(B.token, orgId, 'b', { workspaces: [{ ws: bWs, role: 'contributor' }] });
+    assert(byMember.status === 403, `the workspace's creator, a plain member, minted a key: ${byMember.status}`);
+    const byAdmin = await mintKey(C.token, orgId, 'b');
+    assert(byAdmin.status === 403, `an org admin who is not an owner minted a key: ${byAdmin.status}`);
+    const r = await mintKey(A.token, orgId, 'b', { workspaces: [{ ws: bWs, role: 'contributor' }] });
     assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body.error)}`);
     assert((r.body.data.workspaces || []).includes(bWs), `the grant was applied: ${JSON.stringify(r.body.data.workspaces)}`);
-    await cancelKey(B.token, orgId, r.body.data.invitation.id);
+    await cancelKey(A.token, orgId, r.body.data.invitation.id);
 });
 
 await test('21. The creator still mints an admin key with a workspace grant (regression)', async () => {
