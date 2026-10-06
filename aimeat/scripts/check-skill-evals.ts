@@ -29,6 +29,9 @@
  *   pnpm check:skill-evals --record aimeat-writing --ran "opus, 3 runs: +0.08 +0.08 +0.33"
  *   pnpm check:skill-evals --record aimeat-writing --skip "wording only; Jouni 2026-09-28"
  * @version-history
+ *   v1.0.1 — 2026-10-06 — The digest skips a suite's gitignored `results/` folder. A checkout that had
+ *     run the eval digested its own results, so a decision recorded there read as a change everywhere
+ *     else, and the other way round.
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { createHash } from 'node:crypto';
@@ -55,6 +58,8 @@ interface Entry {
 interface Ledger { about: string; skills: Record<string, Entry> }
 
 const fold = (s: string): string => s.replace(/\r\n/g, '\n');
+/** The eval runner's output folder inside a suite (gitignored as .claude/evals/*\/results/). */
+const RESULTS_DIR = /^[\\/]results[\\/]/;
 const sha = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
 
 function filesUnder(full: string): string[] {
@@ -83,7 +88,9 @@ function skillSource(skill: string): { kind: 'project' | 'node'; texts: Array<[s
 function digestOf(skill: string): { digest: string; kind: 'project' | 'node' } | null {
     const src = skillSource(skill);
     if (!src) return null;
-    const suite = filesUnder(join(EVALS, skill)).map(f => [f.slice(REPO.length + 1).replace(/\\/g, '/'), fold(readFileSync(f, 'utf8'))] as [string, string]);
+    // The suite is what git tracks: `results/` is where `pnpm eval:skill` writes its runs, and it is
+    // gitignored, so a checkout that ran the eval read a different digest from one that did not.
+    const suite = filesUnder(join(EVALS, skill)).filter(f => !RESULTS_DIR.test(f.slice(join(EVALS, skill).length))).map(f => [f.slice(REPO.length + 1).replace(/\\/g, '/'), fold(readFileSync(f, 'utf8'))] as [string, string]);
     const lines = [...src.texts, ...suite].sort(([a], [b]) => a.localeCompare(b)).map(([name, text]) => `${name} ${sha(text).slice(0, 16)}`).join('\n');
     return { digest: 'sha256:' + sha(lines).slice(0, 24), kind: src.kind };
 }
