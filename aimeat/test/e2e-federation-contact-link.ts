@@ -17,6 +17,9 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   v1.3.0 — 2026-10-06 — P5–P8: a message names the node it is for (secaudit 2026-10 follow-up, A7):
+ *     delivered when it names this node, refused when it names another or its audience is not signed,
+ *     and an older node's message is refused only while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on.
  *   v1.1.0 — 2026-09-17 — I9: an unsigned key exchange re-admits a purged peer at its approved address only.
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier.
  */
@@ -28,6 +31,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -42,7 +46,7 @@ async function test(name: string, fn: () => Promise<void>) {
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
 type Json = (p: string, o?: RequestInit) => Promise<{ status: number; body: any }>;
-interface NodeState { server: Server; baseUrl: string; nodeId: string; adminPw: string; ownerName: string; ownerGhii: string; ownerToken: string; json: Json }
+interface NodeState { server: Server; baseUrl: string; nodeId: string; adminPw: string; ownerName: string; ownerGhii: string; ownerToken: string; json: Json; config: { federationAudienceRequired: boolean } }
 
 function makeJson(baseUrl: string): Json {
     return async (path, opts: RequestInit = {}) => {
@@ -75,7 +79,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
 
     const { app } = await createServer(config);
     const server = await new Promise<Server>(resolve => { const s = app.listen(port, '127.0.0.1', () => resolve(s)); });
-    return { server, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, ownerName: '', ownerGhii: '', ownerToken: '', json: makeJson(`http://127.0.0.1:${port}`) };
+    return { server, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, ownerName: '', ownerGhii: '', ownerToken: '', json: makeJson(`http://127.0.0.1:${port}`), config };
 }
 
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
@@ -202,6 +206,42 @@ await test('P4. The same signed message sent twice is refused the second time', 
     assert(first.status === 200, `first: ${first.status} ${JSON.stringify(first.body)}`);
     const again = await asPeer('/v1/federation/message', payload);
     assert(again.status === 401 && again.body.error?.code === 'REPLAYED', `expected 401 REPLAYED, got ${again.status}: ${JSON.stringify(again.body)}`);
+});
+
+// A message names the node it is for, with a second signature, so one node cannot pass on what it
+// received to a third (secaudit 2026-10 follow-up, A7). The peer here signs as a node of this version.
+const withAudience = async (payload: Record<string, unknown>, audience: string, signOver?: string) => {
+    const signed = JSON.stringify(payload);
+    const proof = await audienceProof(cKeys.privateKey, signOver ?? signed, audience);
+    const signature = await sign(cKeys.privateKey, signed);
+    return V.json('/v1/federation/message', {
+        method: 'POST', headers: { 'x-source-node': C_NODE },
+        body: JSON.stringify({ ...payload, signature, ...proof }),
+    });
+};
+await test('P5. A message that names this node as its audience is delivered', async () => {
+    const r = await withAudience({ source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() }, V.nodeId);
+    assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+await test('P6. A message signed for another node is refused here (401 WRONG_AUDIENCE)', async () => {
+    const r = await withAudience({ source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() }, 'aimeat-test-001-elsewhere');
+    assert(r.status === 401 && r.body.error?.code === 'WRONG_AUDIENCE', `expected 401 WRONG_AUDIENCE, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+await test('P7. An audience the sending node did not sign is refused (401)', async () => {
+    const r = await withAudience({ source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() }, V.nodeId, 'something else');
+    assert(r.status === 401 && r.body.error?.code === 'UNAUTHORIZED', `expected 401 UNAUTHORIZED, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+await test('P8. With the audience required, a message from an older node that names none is refused; off, it is heard', async () => {
+    const legacy = { source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() };
+    V.config.federationAudienceRequired = true;
+    try {
+        const r = await asPeer('/v1/federation/message', legacy);
+        assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
+    } finally {
+        V.config.federationAudienceRequired = false;
+    }
+    const heard = await asPeer('/v1/federation/message', { ...legacy, timestamp: new Date(Date.now() + 1).toISOString() });
+    assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
 });
 
 // ── The promise. Each one signed correctly, each one read back. ──

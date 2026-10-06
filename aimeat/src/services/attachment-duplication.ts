@@ -12,6 +12,7 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-06 -- The storage grant request names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.4.1 -- 2026-10-05 -- The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.4.0 -- 2026-10-01 -- No storage-grant request to a peer whose messaging is off, or that is not
  *     active or degraded (peerTakesMessages in message-delivery.ts; the peer-registration incident,
@@ -43,6 +44,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord, DirectMessageAttachment } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign } from '../auth/keypair.js';
+import { audienceProof } from './signed-node-request.js';
 import { checkStorageQuota } from './quota.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
@@ -166,14 +168,17 @@ export async function requestStorageGrant(ctx: AttachmentCtx, message: DirectMes
     timestamp: new Date().toISOString(),
   };
   try {
-    const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
+    const signed = JSON.stringify(payload);
+    const signature = await sign(nodeKey.privateKey, signed);
+    // The node it is for, with a second signature a peer on an older version ignores (A7).
+    const audience = await audienceProof(nodeKey.privateKey, signed, peer.nodeId);
     // safeFetch validates + re-validates every redirect hop. The grant POST targets the peer-registry
     // URL; the download targets a URL the PEER returns in its JSON response (fully peer-controlled) —
     // safeFetch stops a malicious/compromised peer from pointing it at an internal/metadata address.
     const resp = await safeFetch(`${peer.url}/v1/federation/storage/grant`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-source-node': ctx.config.nodeId },
-      body: JSON.stringify({ ...payload, signature }),
+      body: JSON.stringify({ ...payload, signature, ...audience }),
       signal: AbortSignal.timeout(ctx.config.federationTimeoutMs),
     });
     if (!resp.ok) return null;

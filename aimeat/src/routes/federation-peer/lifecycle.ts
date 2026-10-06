@@ -5,6 +5,8 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-06 — The ping names this node as its audience (audienceRefusal; secaudit 2026-10
+ *     follow-up, A7).
  *   v1.6.0 — 2026-10-06 — The ping passes only inside the five-minute window and once
  *     (signedMessageRefusal; secaudit 2026-10 follow-up, A7). It checked no time.
  *   v1.5.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
@@ -34,7 +36,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { LIVENESS_RECOVERABLE, OPERATOR_PARKED, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal } from '../../services/signed-node-request.js';
+import { signedMessageRefusal, audienceRefusal } from '../../services/signed-node-request.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
@@ -97,7 +99,11 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             }
             // A captured ping kept a peer that had gone down `active` for ever, and could set its
             // version back: it passes inside the five-minute window and once (secaudit 2026-10 follow-up, A7).
-            const stale = signedMessageRefusal(fromId, timestamp, signature as string);
+            // And it names this node as its audience, so a ping meant for another node does not pass here (A7).
+            const stale = await audienceRefusal({
+                signed: pingPayload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
+                publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
+            }) ?? signedMessageRefusal(fromId, timestamp, signature as string);
             if (stale) { res.status(stale.status).json(error(config.nodeId, stale.code, stale.message)); return; }
             peer.lastSeen = new Date().toISOString();
             // A liveness signal proves the peer is up. It does not undo a decision about whether we

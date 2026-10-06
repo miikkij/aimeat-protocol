@@ -5,6 +5,8 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-06 — The heartbeat and the presence push name this node as their audience
+ *     (audienceRefusal; secaudit 2026-10 follow-up, A7).
  *   v1.8.0 — 2026-10-06 — The heartbeat and the presence push pass only inside the five-minute window
  *     and once (signedMessageRefusal; secaudit 2026-10 follow-up, A7). The heartbeat checked no time.
  *   v1.7.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
@@ -44,7 +46,7 @@ import { logger } from '../../utils/logger.js';
 import { PeeringDecisionSchema, validateBody } from '../../models/schemas.js';
 import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal } from '../../services/signed-node-request.js';
+import { signedMessageRefusal, audienceRefusal } from '../../services/signed-node-request.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../../services/presence.js';
@@ -251,8 +253,11 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                     'Heartbeat signature verification failed'));
                 return;
             }
-            // Inside the five-minute window and once, as the ping (secaudit 2026-10 follow-up, A7).
-            const stale = signedMessageRefusal(from_node_id, timestamp, signature);
+            // For this node, inside the five-minute window and once, as the ping (secaudit 2026-10 follow-up, A7).
+            const stale = await audienceRefusal({
+                signed: messageToVerify, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
+                publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
+            }) ?? signedMessageRefusal(from_node_id, timestamp, signature);
             if (stale) { res.status(stale.status).json(error(config.nodeId, stale.code, stale.message)); return; }
 
             peer.lastSeen = new Date().toISOString();
@@ -313,8 +318,12 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
         }
-        // Once inside the window checked above (secaudit 2026-10 follow-up, A7).
-        const replayed = signedMessageRefusal(from_node_id, timestamp, String(signature));
+        // For this node, and once inside the window checked above (secaudit 2026-10 follow-up, A7).
+        const replayed = (peer.publicKey ? await audienceRefusal({
+            signed: presenceSignString(from_node_id, timestamp, updates as PresenceUpdate[]),
+            audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
+            publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
+        }) : null) ?? signedMessageRefusal(from_node_id, timestamp, String(signature));
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         presence.applyRemoteUpdates(from_node_id, updates as PresenceUpdate[]);

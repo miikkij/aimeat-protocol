@@ -388,6 +388,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     federationDefaultScopes: (process.env.AIMEAT_FEDERATION_DEFAULT_SCOPES ?? 'memory:read,catalogue:read').split(',').filter(Boolean),
     federationOpenJoin: process.env.AIMEAT_FEDERATION_OPEN_JOIN === 'true',
     federationBookListed: process.env.AIMEAT_FEDERATION_BOOK_LISTED !== 'false',
+    federationAudienceRequired: process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED === 'true',
     federationAvailabilityWindowDays: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_WINDOW_DAYS ?? '30', 10),
     federationAvailabilityPermanentThreshold: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_PERMANENT_THRESHOLD ?? '90', 10),
     federationAvailabilityMinSamples: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_MIN_SAMPLES ?? '288', 10),

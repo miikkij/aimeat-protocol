@@ -12,6 +12,7 @@
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
  * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
  * @version-history
+ *   v1.4.0 -- 2026-10-06 -- A message names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.3.0 -- 2026-10-05 -- Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.2.0 -- 2026-10-01 -- Messages and read receipts go only to a peer that is active or degraded
  *     (peerTakesMessages); a pending, approved, leaving or parked peer waits in the queue (incident
@@ -32,6 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord, MessageDeliveryLog } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign } from '../auth/keypair.js';
+import { audienceProof } from './signed-node-request.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor } from '../utils/messaging.js';
 import { logger } from '../utils/logger.js';
@@ -111,13 +113,16 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
   if (!nodeKey) { await log('queued', { errorMessage: 'no_node_key' }); return 'queued'; }
 
   const payload = buildMessagePayload(config, record, deliveryGhii);
-  const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
+  const signed = JSON.stringify(payload);
+  const signature = await sign(nodeKey.privateKey, signed);
+  // The node it is for, with a second signature a peer on an older version ignores (A7).
+  const audience = await audienceProof(nodeKey.privateKey, signed, peer.nodeId);
 
   try {
     const resp = await peerFetch(`${peer.url}/v1/federation/message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-source-node': config.nodeId },
-      body: JSON.stringify({ ...payload, signature }),
+      body: JSON.stringify({ ...payload, signature, ...audience }),
     }, { timeoutMs: config.federationTimeoutMs });
     // Unreachable, a redirect, a timeout or an answer over the ceiling: kept queued, as a failed fetch was.
     if (!resp.ok) throw new Error(resp.message);

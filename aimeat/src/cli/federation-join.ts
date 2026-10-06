@@ -14,6 +14,7 @@
  *   - load/save/clearPendingJoin: resumable pending-request state on disk
  *
  * @version-history
+ *   v1.2.0 — 2026-10-06 — The introduction names the node it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.1.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -24,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
 import { createT, type Locale, type TFunction } from '../i18n.js';
 import { generateKeyPair, sign } from '../auth/keypair.js';
+import { audienceProof } from '../services/signed-node-request.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { peerFetch } from '../utils/peer-fetch.js';
@@ -281,6 +283,8 @@ export async function runFederationJoin(
     const timestamp = new Date().toISOString();
     const messageToSign = `${config.nodeId}${config.baseUrl}${timestamp}`;
     const signature = await sign(keys.privateKey, messageToSign);
+    // The node it is for, with a second signature a node on an older version ignores (A7).
+    const audience = await audienceProof(keys.privateKey, messageToSign, targetInfo.node_id);
 
     const introResp = await peerFetch(`${targetUrl}/v1/federation/peer/introduce`, {
       method: 'POST',
@@ -294,6 +298,7 @@ export async function runFederationJoin(
         message: '',
         signature,
         timestamp,
+        ...audience,
       }),
     }, { timeoutMs: 15_000 });
     if (!introResp.ok) throw new Error(introResp.message);

@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-06 — The federated sign-in verification names the home node it is for
+ *     (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.13.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.12.1 — 2026-10-05 — Test mode's re-registration wipes the old account with eraseOwner, the one
  *     account deletion (secaudit 2026-10, C7).
@@ -63,6 +65,7 @@ import type { EmailService } from '../../services/email.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { coerceTier, tierCeiling } from '../../services/federation-tiers.js';
 import { generateKeyPair, sign } from '../../auth/keypair.js';
+import { audienceProof } from '../../services/signed-node-request.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { validateOwnerName, FEDERATED_ROLE, homeIdentityOf } from '../../utils/gaii.js';
@@ -403,8 +406,10 @@ export function registerRegisterLoginRoutes(
                     return;
                 }
                 const timestamp = new Date().toISOString();
-                const signature = await sign(nodeKey.privateKey,
-                    federationAuthPayload({ username: loginName, requesting_node: config.nodeId, timestamp }));
+                const signedAuth = federationAuthPayload({ username: loginName, requesting_node: config.nodeId, timestamp });
+                const signature = await sign(nodeKey.privateKey, signedAuth);
+                // The node it is for, with a second signature a node on an older version ignores (A7).
+                const audience = await audienceProof(nodeKey.privateKey, signedAuth, homePeer.nodeId);
                 const verifyResp = await peerFetch(`${homePeer.url}/v1/federation/auth/verify`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -414,6 +419,7 @@ export function registerRegisterLoginRoutes(
                         requesting_node: config.nodeId,
                         timestamp,
                         signature,
+                        ...audience,
                         // The person's second factor, typed here, checked at home.
                         ...(typeof totp_code === 'string' && totp_code ? { totp_code } : {}),
                         ...(typeof backup_code === 'string' && backup_code ? { backup_code } : {}),

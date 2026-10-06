@@ -26304,6 +26304,8 @@ paths:
                 signature:
                   type: string
                   description: "The requesting node's Ed25519 signature over JSON.stringify({ purpose: 'federation-auth-verify', username, requesting_node, timestamp })"
+                audience: { type: string, description: 'The node this message is for (secaudit 2026-10 follow-up, A7). A message naming another node is refused (401 WRONG_AUDIENCE); one naming none is refused (401 AUDIENCE_REQUIRED) only when AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on.' }
+                audience_signature: { type: string, description: 'The sending node''s Ed25519 signature over "aimeat-audience:" + audience + a newline + the string the signature field covers. A node on an older version sends neither field.' }
                 totp_code:
                   type: string
                   description: The person's TOTP code, for an account with two-step sign-in
@@ -38336,6 +38338,8 @@ paths:
                 from_node_id: { type: string }
                 timestamp: { type: string, format: date-time }
                 signature: { type: string, description: Base64 Ed25519 signature }
+                audience: { type: string, description: 'The node this message is for (secaudit 2026-10 follow-up, A7). A message naming another node is refused (401 WRONG_AUDIENCE); one naming none is refused (401 AUDIENCE_REQUIRED) only when AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on.' }
+                audience_signature: { type: string, description: 'The sending node''s Ed25519 signature over "aimeat-audience:" + audience + a newline + the string the signature field covers. A node on an older version sends neither field.' }
                 updates:
                   type: array
                   items:
@@ -53543,6 +53547,8 @@ paths:
                 source_node: { type: string }
                 timestamp: { type: string, format: date-time }
                 signature: { type: string }
+                audience: { type: string, description: 'The node this message is for (secaudit 2026-10 follow-up, A7). A message naming another node is refused (401 WRONG_AUDIENCE); one naming none is refused (401 AUDIENCE_REQUIRED) only when AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on.' }
+                audience_signature: { type: string, description: 'The sending node''s Ed25519 signature over "aimeat-audience:" + audience + a newline + the string the signature field covers. A node on an older version sends neither field.' }
                 message:
                   $ref: '#/components/schemas/DirectMessageWire'
       responses:
@@ -53611,6 +53617,8 @@ paths:
                 recipient_ghii: { type: string }
                 timestamp: { type: string, format: date-time }
                 signature: { type: string }
+                audience: { type: string, description: 'The node this message is for (secaudit 2026-10 follow-up, A7). A message naming another node is refused (401 WRONG_AUDIENCE); one naming none is refused (401 AUDIENCE_REQUIRED) only when AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on.' }
+                audience_signature: { type: string, description: 'The sending node''s Ed25519 signature over "aimeat-audience:" + audience + a newline + the string the signature field covers. A node on an older version sends neither field.' }
       responses:
         '200':
           description: Download grant
@@ -64510,6 +64518,8 @@ paths:
                     createdAt: { type: string }
                 timestamp: { type: string }
                 signature: { type: string }
+                audience: { type: string, description: 'The node this message is for (secaudit 2026-10 follow-up, A7). A message naming another node is refused (401 WRONG_AUDIENCE); one naming none is refused (401 AUDIENCE_REQUIRED) only when AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on.' }
+                audience_signature: { type: string, description: 'The sending node''s Ed25519 signature over "aimeat-audience:" + audience + a newline + the string the signature field covers. A node on an older version sends neither field.' }
       responses:
         '200':
           description: Delivery count

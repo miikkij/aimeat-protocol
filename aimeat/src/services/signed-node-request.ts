@@ -19,12 +19,17 @@
  *   WHY ONE MODULE. The three verifiers wrote these steps out three times (secaudit 2026-10, C6). A
  *   step added to one, as the audience and nonce were on 2026-10-05 (PKG-10), had to be added to each.
  * @structure NodeRequestCheck · signNodeRequest(storage, config, audience, fields) ·
- *   checkNodeRequest(headers, opts) · signedMessageRefusal(sourceNode, timestamp, signature)
+ *   checkNodeRequest(headers, opts) · audienceProof(privateKey, signed, audience) ·
+ *   audienceRefusal(opts) · signedMessageRefusal(sourceNode, timestamp, signature)
  * @usage
  *   const headers = await signNodeRequest(storage, config, peerId, { purpose: 'package', group_id });
  *   const who = await checkNodeRequest(req.headers, { thisNodeId, fields, keyOf: (node) => ... });
  *   const refusal = signedMessageRefusal(source_node, timestamp, signature);   // an older format, after verify
  * @version-history
+ *   v1.2.0 — 2026-10-06 — audienceProof and audienceRefusal: a message in the older format names the
+ *     node it is for with a second signature beside its own, which a peer on an older version ignores;
+ *     AIMEAT_FEDERATION_AUDIENCE_REQUIRED refuses a message that names none (secaudit 2026-10
+ *     follow-up, A7; Jouni 2026-10-06).
  *   v1.1.1 — 2026-10-06 — signedMessageRefusal keys single use on the decoded signature bytes and
  *     remembers it until the message's own window closes (secaudit 2026-10 follow-up audit, finding 3).
  *   v1.1.0 — 2026-10-06 — signedMessageRefusal: the five-minute window and single use for the older
@@ -112,6 +117,47 @@ export async function checkNodeRequest(
     return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed request was already received. A node signs every request anew.' };
   }
   return { ok: true, nodeId: sourceNode };
+}
+
+/**
+ * The audience of a message in the older format: the node it is for, bound to the message by a second
+ * signature, so a message one node received cannot be passed on to another (secaudit 2026-10
+ * follow-up, A7). The message's own signature stays as it was, because a peer on an older version
+ * verifies that one and ignores the two added fields; a peer on this version verifies both.
+ */
+function audienceMessage(signed: string, audience: string): string {
+  return `aimeat-audience:${audience}\n${signed}`;
+}
+
+/** The two fields a sender adds to a message in the older format: the node it is for, and the proof. */
+export async function audienceProof(privateKey: string, signed: string, audience: string): Promise<{ audience: string; audience_signature: string }> {
+  return { audience, audience_signature: await sign(privateKey, audienceMessage(signed, audience)) };
+}
+
+/**
+ * The receiving side: a message that names an audience must name this node and prove it with the
+ * second signature. A message that names none comes from a peer on an older version: it passes while
+ * the node does not require an audience (AIMEAT_FEDERATION_AUDIENCE_REQUIRED, off by default until
+ * every peer runs this version), and is refused once it does. Call it after the message's own
+ * signature verified. Null when the message may pass.
+ */
+export async function audienceRefusal(opts: {
+  signed: string; audience: unknown; audienceSignature: unknown; publicKey: string; thisNodeId: string; required: boolean;
+}): Promise<Refusal | null> {
+  const audience = typeof opts.audience === 'string' ? opts.audience : '';
+  const proof = typeof opts.audienceSignature === 'string' ? opts.audienceSignature : '';
+  if (!audience && !proof) {
+    return opts.required
+      ? { ok: false, status: 401, code: 'AUDIENCE_REQUIRED', message: `This node takes a signed message only when it names the node it is for (audience: ${opts.thisNodeId}). The sending node runs an older version.` }
+      : null;
+  }
+  if (audience !== opts.thisNodeId) {
+    return { ok: false, status: 401, code: 'WRONG_AUDIENCE', message: `This message was signed for ${audience || 'another node'}, not for ${opts.thisNodeId}.` };
+  }
+  if (!proof || !await verify(opts.publicKey, audienceMessage(opts.signed, audience), proof)) {
+    return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The audience of this message is not signed by the sending node.' };
+  }
+  return null;
 }
 
 /**
