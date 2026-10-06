@@ -13,6 +13,9 @@
  *   Morsels are plain integers; money is 6-decimal micro-units. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-10-06 — aimeat_exchange_accept takes offering_id (ext and action become the other way in), and
+ *     aimeat_exchange_need_post takes usage_intent and requires app_id, as their routes do; both carry
+ *     the bounds the node's MCP wrote by hand (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -92,12 +95,16 @@ export const exchangeTools = [
         scope: 'exchange:write',
         surfaces: ['agent', 'service'],
         input: {
-            ext: { type: 'string', required: true, description: 'The provider extension name.' },
-            action: { type: 'string', required: true, description: 'The action id on that extension (must be priced).' },
-            contract_ref: { type: 'string', required: false, description: 'Your reference for this contract. Omit to auto-generate one (mcp:<uuid>).' },
-            cap_units: { type: 'number', required: false, description: 'Budget ceiling in the action\'s unit (morsels or money micro-units). Must cover one charge. Omit = uncapped.' },
-            plan_id: { type: 'string', required: false, description: 'A provider-declared plan id (bundle/subscription). Omit = per_call.' },
-            app_id: { type: 'string', required: false, description: 'The consuming app id ("owner/filename") when this contract powers an app — shown on the per-app cost view.' },
+            // POST /v1/exchange/entitlements and the node's MCP take an offering by id, the way that also
+            // reaches an app tool; the catalog named only ext + action, so the connector could not
+            // (secaudit 2026-10 follow-up, Part B). One of the two ways is needed.
+            offering_id: { type: 'string', required: false, description: 'The offering to accept (aimeat_exchange_offerings lists them). Preferred: it reaches an extension action and an app tool alike. Give this, or ext and action.', zod: z.string().min(1).max(120) },
+            ext: { type: 'string', required: false, description: 'The provider extension name, with action, when you accept a raw extension action instead of an offering.', zod: z.string().min(1).max(120) },
+            action: { type: 'string', required: false, description: 'The action id on that extension (must be priced). Pair with ext.', zod: z.string().min(1).max(120) },
+            contract_ref: { type: 'string', required: false, description: 'Your reference for this contract. Omit to auto-generate one.', zod: z.string().min(1).max(200) },
+            cap_units: { type: 'number', required: false, description: 'Budget ceiling in the action\'s unit (morsels or money micro-units). Must cover one charge. Omit = uncapped.', zod: z.number().int().nonnegative() },
+            plan_id: { type: 'string', required: false, description: 'A provider-declared plan id (bundle/subscription). Omit = per_call.', zod: z.string().min(1).max(120) },
+            app_id: { type: 'string', required: false, description: 'The consuming app id ("owner/filename") when this contract powers an app — shown on the per-app cost view.', zod: z.string().min(1).max(300) },
         },
     },
     {
@@ -147,13 +154,16 @@ export const exchangeTools = [
         scope: 'exchange:write',
         surfaces: ['agent', 'service'],
         input: {
-            description: { type: 'string', required: true, description: 'What you need, in plain language.' },
-            ext: { type: 'string', required: false, description: 'A desired extension name (when you know the exact capability).' },
-            action: { type: 'string', required: false, description: 'A desired action id (pair with `ext`).' },
+            description: { type: 'string', required: true, description: 'What you need, in plain language.', zod: z.string().min(1).max(4000) },
+            ext: { type: 'string', required: false, description: 'A desired extension name (when you know the exact capability).', zod: z.string().max(120) },
+            action: { type: 'string', required: false, description: 'A desired action id (pair with `ext`).', zod: z.string().max(120) },
             spec: { type: 'object', required: false, description: 'Minimum output shape: { requiredFields: string[], format?, sample?, notes? }.' },
+            // POST /v1/exchange/needs and the node's MCP read it; the catalog left it out (secaudit 2026-10 follow-up, Part B).
+            usage_intent: { type: 'string', required: false, description: 'What you will do with the data, so a provider can judge whether its terms allow it.', zod: z.string().max(2000) },
             budget_unit: { type: 'string', required: false, description: 'Budget unit for `budget_cap`.', enum: ['morsels', 'money'] },
-            budget_cap: { type: 'number', required: false, description: 'Budget ceiling (integer; morsels or money micro-units).' },
-            app_id: { type: 'string', required: false, description: 'The app this need belongs to ("owner/filename").' },
+            budget_cap: { type: 'number', required: false, description: 'Budget ceiling (integer; morsels or money micro-units).', zod: z.number().int().nonnegative() },
+            // The node's MCP has always required it, and the need is filed under it.
+            app_id: { type: 'string', required: true, description: 'The app this need belongs to ("owner/filename").', zod: z.string().min(1).max(300) },
             autonomy: { type: 'string', required: false, description: 'supervised (default) or auto.', enum: ['supervised', 'auto'] },
         },
     },

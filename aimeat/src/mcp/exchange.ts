@@ -18,6 +18,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-06 — aimeat_exchange_accept and aimeat_exchange_need_post register the catalog's schema
+ *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -35,7 +37,6 @@
  */
 import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -189,15 +190,8 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_accept',
         descriptionFor('aimeat_exchange_accept'),
-        {
-            offering_id: z.string().min(1).max(120).optional(),
-            ext: z.string().min(1).max(120).optional(),
-            action: z.string().min(1).max(120).optional(),
-            contract_ref: z.string().min(1).max(200).optional(),
-            cap_units: z.number().int().nonnegative().optional(),
-            plan_id: z.string().min(1).max(120).optional(),
-            app_id: z.string().min(1).max(300).optional(),
-        },
+        // The catalog's schema, which now carries offering_id and these bounds (secaudit 2026-10 follow-up, Part B).
+        zodShapeFor('aimeat_exchange_accept'),
         annotationsFor('aimeat_exchange_accept'),
         async ({ offering_id, ext, action, contract_ref, cap_units, plan_id, app_id }) => {
             const capUnits = cap_units !== undefined ? Math.floor(cap_units) : null;
@@ -298,17 +292,8 @@ export function registerExchangeTools(
     mcp.tool(
         'aimeat_exchange_need_post',
         descriptionFor('aimeat_exchange_need_post'),
-        {
-            description: z.string().min(1).max(4000),
-            app_id: z.string().min(1).max(300),
-            ext: z.string().max(120).optional(),
-            action: z.string().max(120).optional(),
-            spec: z.record(z.string(), z.unknown()).optional(),
-            usage_intent: z.string().max(2000).optional(),
-            budget_unit: z.enum(['morsels', 'money']).optional(),
-            budget_cap: z.number().int().nonnegative().optional(),
-            autonomy: z.enum(['supervised', 'auto']).optional(),
-        },
+        // The catalog's schema, which now carries usage_intent and these bounds (secaudit 2026-10 follow-up, Part B).
+        zodShapeFor('aimeat_exchange_need_post'),
         annotationsFor('aimeat_exchange_need_post'),
         async ({ description, app_id, ext, action, spec, usage_intent, budget_unit, budget_cap, autonomy }) => {
             const now = new Date().toISOString();

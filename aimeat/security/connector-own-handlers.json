@@ -13,8 +13,6 @@
     "aimeat_dm_broadcast",
     "aimeat_dm_send",
     "aimeat_dm_send_as_owner",
-    "aimeat_exchange_accept",
-    "aimeat_exchange_need_post",
     "aimeat_flag_report",
     "aimeat_handbook_get",
     "aimeat_knowledge_contribute",
