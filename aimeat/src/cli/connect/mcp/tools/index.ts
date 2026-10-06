@@ -9,7 +9,7 @@
  *   optional and defaults to the only loaded agent).
  * @version-history
  *   2026-10-06 — themes.ts, apps.ts, agent-management.ts, data-map.ts, designbook.ts, app-manage.ts,
- *     boards.ts, decide.ts, mcp-proxy.ts, ai-voice.ts, surface-layout.ts and compliance.ts are gone: their
+ *     boards.ts, decide.ts, mcp-proxy.ts, ai-voice.ts, surface-layout.ts, compliance.ts and install-sets.ts are gone: their
  *     tools run their dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — Every connector tool without a handler of its own runs its CLI dispatch definition
  *     (dispatch-tools.ts); registerAllTools records the names the modules register (secaudit 2026-10, M3).
@@ -54,7 +54,6 @@ import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerOperatorTools } from './operator.js';
-import { registerInstallSetTools } from './install-sets.js';
 import { registerDispatchTools } from './dispatch-tools.js';
 
 export function registerAllTools(server: McpServer, registry: AgentRegistry): void {
@@ -92,6 +91,5 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
   registerCompanyTools(mcp, registry);
   registerPortfolioTools(mcp, registry);
   registerOperatorTools(mcp, registry);
-  registerInstallSetTools(mcp, registry);
   registerDispatchTools(server, registry, registered);
 }

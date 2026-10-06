@@ -1,7 +1,6 @@
 {
   "description": "Connector MCP tools that have a CLI dispatch definition (src/tool-dispatch/) and still register a handler of their own in src/cli/connect/mcp/tools/. Every other connector tool runs its dispatch definition (dispatch-tools.ts). Seeded 2026-10-05 (secaudit 2026-10, M3): each one listed here was measured to differ from its dispatch definition in the HTTP request it sends or the result it answers, against a node that answers and one that refuses, or it is one of the tools whose connector takes other parameters than the node (security/mcp-schema-single-source.json). Not yet reviewed: which side is right is decided per tool by reading its route. Settling one means making the two the same and deleting the handler. scripts/audit-mcp-schemas.ts (pnpm check:mcp-schemas) refuses a new handler and a listed one that is gone. The list only shrinks.",
   "tools": [
-    "aimeat_admin_install_set",
     "aimeat_agent_capabilities_report",
     "aimeat_agent_telemetry_report",
     "aimeat_app_template_propose",
@@ -33,8 +32,6 @@
     "aimeat_organism_list",
     "aimeat_organism_overview",
     "aimeat_organism_search",
-    "aimeat_package_claim",
-    "aimeat_package_sale",
     "aimeat_schedule_report_internal",
     "aimeat_skill_get",
     "aimeat_skill_link",
