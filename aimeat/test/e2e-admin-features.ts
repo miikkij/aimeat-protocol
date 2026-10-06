@@ -4,6 +4,8 @@
  *   sending, the directory and matching runs, push templates, CSM and MSM, genesis peers, and the
  *   node config doors mounted alongside them.
  * @version-history
+ *   v1.6.0 — 2026-10-06 — site.store_soon_code reaches the page's site links with "soon" and leaves with
+ *     the restore; a code with a space, over 40 characters or with markup is refused.
  *   v1.5.0 — 2026-10-06 — The store status: site.store_status=soon and a store note reach the page's
  *     site links while the store address and /v1/pricing stay; open restores; a value outside
  *     open|soon and a note over 300 characters are refused.
@@ -627,21 +629,23 @@ await test('site.store_status: soon and a Finnish note reach the page, open rest
     const before = await site();
     assert(typeof before.store === 'string' && before.store !== '', 'the test env names a store');
     assert(before.storeStatus === 'open', `the default is open, got ${JSON.stringify(before.storeStatus)}`);
-    const on = await put([{ path: 'site.store_status', value: 'soon' }, { path: 'site.store_note_fi', value: 'Avaamme kaupan pian.' }]);
+    const on = await put([{ path: 'site.store_status', value: 'soon' }, { path: 'site.store_note_fi', value: 'Avaamme kaupan pian.' }, { path: 'site.store_soon_code', value: 'EARLY-20' }]);
     assert(on.status === 200, `flip to soon: ${on.status} ${JSON.stringify(on.body)}`);
     try {
         const soon = await site();
         assert(soon.storeStatus === 'soon', `storeStatus ${JSON.stringify(soon.storeStatus)}`);
         assert(soon.storeNoteFi === 'Avaamme kaupan pian.', `storeNoteFi ${JSON.stringify(soon.storeNoteFi)}`);
+        assert(soon.storeSoonCode === 'EARLY-20', `storeSoonCode ${JSON.stringify(soon.storeSoonCode)}`);
         assert(soon.store === before.store, 'the store address stays, so the section keeps its prices');
         // /v1/pricing still leads to the store while it opens soon.
         const pricing = await fetch(`${BASE}/v1/pricing`, { redirect: 'manual' });
         assert(pricing.status === 301, `pricing ${pricing.status}`);
     } finally {
-        await put([{ path: 'site.store_status', value: 'open' }, { path: 'site.store_note_fi', value: '' }]);
+        await put([{ path: 'site.store_status', value: 'open' }, { path: 'site.store_note_fi', value: '' }, { path: 'site.store_soon_code', value: '' }]);
     }
     const after = await site();
-    assert(after.storeStatus === 'open' && !('storeNoteFi' in after), `restored: ${JSON.stringify({ s: after.storeStatus, n: after.storeNoteFi })}`);
+    assert(after.storeStatus === 'open' && !('storeNoteFi' in after) && !('storeSoonCode' in after),
+        `restored: ${JSON.stringify({ s: after.storeStatus, n: after.storeNoteFi, c: after.storeSoonCode })}`);
 });
 
 await test('site.store_status: a value outside open|soon and an over-long note are refused', async () => {
@@ -655,6 +659,13 @@ await test('site.store_status: a value outside open|soon and an over-long note a
         body: JSON.stringify({ changes: [{ path: 'site.store_note_en', value: 'x'.repeat(301) }] }),
     }));
     assert(long.status === 400, `long note: expected 400, got ${long.status}: ${JSON.stringify(long.body)}`);
+    for (const value of ['EARLY 20', 'X'.repeat(41), '<b>20</b>']) {
+        const code = await json('/v1/admin/config', authed({
+            method: 'PUT',
+            body: JSON.stringify({ changes: [{ path: 'site.store_soon_code', value }] }),
+        }));
+        assert(code.status === 400, `code ${JSON.stringify(value)}: expected 400, got ${code.status}: ${JSON.stringify(code.body)}`);
+    }
 });
 
 // ─── Translations ───

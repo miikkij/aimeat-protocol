@@ -8944,6 +8944,7 @@
     "cfg_site_store_note_en": "Aviso de la tienda en inglés",
     "cfg_site_store_note_fi": "Aviso de la tienda en finés",
     "cfg_site_store_note_es": "Aviso de la tienda en español",
+    "cfg_site_store_soon_code": "Código de descuento de apertura",
     "cfg_site_incubator_url": "Enlace de la incubadora",
     "cfg_site_contacts": "Contactos públicos",
     "cfgDesc_node_id": "Identificador único de esta instancia.",
@@ -9262,6 +9263,7 @@
     "cfgDesc_site_store_note_en": "La frase que muestra la sección de tienda en la página en inglés mientras el estado de la tienda es \"Abre pronto\". Vacío muestra la frase por defecto: \"The marketplace opens soon.\"",
     "cfgDesc_site_store_note_fi": "La frase que muestra la sección de tienda en la página en finés mientras el estado de la tienda es \"Abre pronto\". Vacío muestra la frase por defecto: \"Kauppapaikka aukeaa pian.\"",
     "cfgDesc_site_store_note_es": "La frase que muestra la sección de tienda en la página en español mientras el estado de la tienda es \"Abre pronto\". Vacío muestra la frase por defecto: \"El mercado abre pronto.\"",
+    "cfgDesc_site_store_soon_code": "El código de descuento que recibe un visitante al pulsar \"Abre pronto\" mientras el estado de la tienda es \"Abre pronto\". Un solo código para todos. Lo creas tú en el proveedor de pagos de la tienda (Stripe); este sitio solo lo muestra. Letras, dígitos, - y _, como máximo 40. Vacío: \"Abre pronto\" es un texto que no se puede pulsar.",
     "cfgDesc_site_incubator_url": "La incubadora de agentes (adopta un ayudante listo): la puerta \"empieza aquí\" de la portada.",
     "cfgDesc_site_contacts": "Personas impresas en las páginas públicas, en orden de contacto: lista JSON de {name, role, email, phone, linkedin}. La primera con correo recibe cada control de \"habla con nosotros\"; vacío no imprime tarjeta.",
     "cfgShowChanges": "¿Qué cambia?",
@@ -12136,6 +12138,9 @@
     "storeLi2": "Tus datos y las aplicaciones que creas siguen siendo tuyos. Tú decides a quién dar acceso.",
     "storeOpensSoon": "Abre pronto",
     "storeSoonNote": "El mercado abre pronto.",
+    "storeSoonCodeCta": "Abre pronto: consigue tu código de descuento",
+    "storeSoonCodeText": "Tu código de descuento:",
+    "storeSoonCodeHint": "Úsalo al pagar cuando abra la tienda.",
     "trust4Text": "Tu cuenta incluye funciones para exportar y eliminar datos. El lugar donde se guardan y donde la IA los procesa depende del alojamiento y del modelo que elijas."
   },
   "everything": {

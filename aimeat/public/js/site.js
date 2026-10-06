@@ -17,6 +17,7 @@
  *     so a node that is not aimeat.io never advertises aimeat.io's apps or contact details.
  *   v1.1.0 — 2026-07-28 — Contacts become a list with roles (a company has more than one
  *     person), replacing the single contactName/Email/Phone trio.
+ *   v1.4.0 — 2026-10-06 — storeSoonCode(): the shared discount code "Opens soon" shows when pressed.
  *   v1.3.0 — 2026-10-06 — storeOpensSoon() and storeSoonNote(): a store that shows its prices and does
  *     not take orders yet (site.store_status "soon").
  *   v1.2.0 — 2026-08-28 — storeHref(): the one price door. The pricing page is gone; every
@@ -69,6 +70,15 @@ export function storeHref() {
  */
 export function storeOpensSoon() {
   return storeHref() !== '' && site().storeStatus === 'soon';
+}
+
+/**
+ * The discount code "Opens soon" gives when pressed (site.store_soon_code), or '' when the store is
+ * open or the operator set none. One code for everybody; the store's payment provider checks it.
+ * @returns {string}
+ */
+export function storeSoonCode() {
+  return storeOpensSoon() ? siteLink('storeSoonCode') : '';
 }
 
 /**

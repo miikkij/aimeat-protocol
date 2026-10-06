@@ -8,6 +8,7 @@
  * @structure parseSiteContacts() · siteLinksFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.3.0 — 2026-10-06 — AIMEAT_SITE_STORE_SOON_CODE.
  *   v1.2.0 — 2026-10-06 — AIMEAT_SITE_STORE_STATUS ('open' unless it says 'soon') and
  *     AIMEAT_SITE_STORE_NOTE_EN / _FI / _ES.
  *   v1.1.0 — 2026-09-29 — siteLinksFromEnv(): config.ts's siteLinks object, moved here unchanged
@@ -82,6 +83,7 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     storeNoteEn: (process.env.AIMEAT_SITE_STORE_NOTE_EN ?? '').trim(),
     storeNoteFi: (process.env.AIMEAT_SITE_STORE_NOTE_FI ?? '').trim(),
     storeNoteEs: (process.env.AIMEAT_SITE_STORE_NOTE_ES ?? '').trim(),
+    storeSoonCode: (process.env.AIMEAT_SITE_STORE_SOON_CODE ?? '').trim(),
     incubator: (process.env.AIMEAT_SITE_INCUBATOR_URL ?? '').trim(),
     signage: (process.env.AIMEAT_SITE_SIGNAGE_URL ?? '').trim(),
     signageAdmin: (process.env.AIMEAT_SITE_SIGNAGE_ADMIN_URL ?? '').trim(),
