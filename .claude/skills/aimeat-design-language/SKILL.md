@@ -272,7 +272,7 @@ dimensions. It does not re-declare the shape's font, rule, fill, padding or shad
 | Showroom section and coral shadow | `.showroom-section`, `.showroom-section--coral` |
 | Showroom underlined door | `.showroom-door` |
 | Showroom slab and its named colours | `.showroom-slab`, `--hot`, `--sun`, `--ink` modifiers |
-| A way into a store that does not take orders yet | `.store-soon` on the door or slab (components/StoreDoor.js): the same shape, "Opens soon" for words, no pointer, and a door without its underline; `.store-soon-note`, the sentence that says so. Only while site.store_status is "soon" |
+| A way into a store that does not take orders yet | `.store-soon` on the door or slab (components/StoreDoor.js): the same shape, "Opens soon" for words, no pointer, and a door without its underline; `.store-soon-note`, the sentence that says so. With a discount code set (site.store_soon_code) the control is `.store-soon-ask`, pressable in its own shape, and the press shows `.store-soon-code`: the code in an ink frame with a copy button. Only while site.store_status is "soon" |
 
 Only page and section headline sizes take per-view properties: `--poster-page-size` and
 `--poster-section-size`, set on the view root. A deviating cut becomes a shared modifier only

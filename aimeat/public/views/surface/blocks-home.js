@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-06: OwnAimeatBlock passes `soon` and the discount code, so its slab gives the code when
+ *     pressed (site.store_soon_code).
  *   2026-10-06: OwnAimeatBlock's slab says "Opens soon" and leads nowhere while the store does not
  *     take orders (site.store_status "soon").
  *   2026-09-27: OwnAimeatBlock draws components/OwnAimeat.js, which carries the markup it wrote,
@@ -54,7 +56,7 @@ import { InstallCta } from '/components/InstallCta.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
-import { storeHref, storeOpensSoon } from '/js/site.js';
+import { storeHref, storeOpensSoon, storeSoonCode } from '/js/site.js';
 import { LinkLine } from '/components/LinkLine.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
 
@@ -297,7 +299,7 @@ export function OwnAimeatBlock() {
       title=${tr('home.ownAimeat.title', 'This is a demo. Get your own AIMEAT.')}
       text=${tr('home.ownAimeat.text', 'Many people share this site to try things out. Your own AIMEAT is the same whole system, at an address with your name on it. We keep it running and up to date for a monthly fee, and everything in it belongs to you.')}
       cta=${tr('home.ownAimeat.cta', 'Go to the store →')}
-      soonLabel=${storeOpensSoon() ? tr('landing.storeOpensSoon', 'Opens soon') : ''} />`;
+      soon=${storeOpensSoon()} code=${storeSoonCode()} />`;
 }
 
 export function TrustBlock() {

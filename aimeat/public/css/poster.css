@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.38.0 -- 2026-10-06 -- .store-soon-ask ("Opens soon" pressed for the discount code, in the control's own shape) and .store-soon-code (the code in an ink frame with its copy button and when to use it). Additive: nothing carries them unless site.store_soon_code is set.
  *   v1.37.0 -- 2026-10-06 -- .store-soon (components/StoreDoor.js): a control into a store that does not take orders yet keeps its shape, does not answer the pointer, and a door loses its link underline; .store-soon-note, the line that says so. Additive: nothing carries the class while site.store_status is "open".
  *   v1.36.0 -- 2026-09-27 -- .poster-aside--chapter (Note aside `chapter`): the old catalogue's detail aside (.mk-aside), for appcat parity (sections-c); additive, outside the app-catalog ranges.
  *   v1.36.0 -- 2026-09-27 -- .poster-chip--need (Mark tone 'need') and .poster-chips--spread (Marks `spread`): the old catalogue's Needs chips, for appcat parity (sections-a); additive, outside the app-catalog ranges.
@@ -464,4 +465,13 @@
 .store-soon { cursor: default; pointer-events: none; }
 .showroom-door.store-soon { border-bottom-color: transparent; }
 .store-soon-note { font-weight: var(--weight-heavy); }
+/* With a discount code set, "Opens soon" is pressed for the code (.store-soon-ask keeps the control's
+   own shape), and the code then stands in its place in an ink frame, ready to copy. */
+.store-soon-ask { cursor: pointer; }
+.store-soon-code {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; max-width: 100%;
+  padding: 0.75rem 1rem; border: var(--shape-frame-heavy) solid var(--text); background: var(--card-bg); color: var(--text);
+}
+.store-soon-code-value { font-family: var(--font-mono); font-size: var(--text-md); letter-spacing: 0.05em; }
+.store-soon-code-hint { flex-basis: 100%; color: var(--text-muted); }
 .showroom-slab--ink:hover { box-shadow: 3px 3px 0 var(--accent); }

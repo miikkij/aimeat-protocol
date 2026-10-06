@@ -9,6 +9,7 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.3.0 — 2026-10-06 — storeSoonCode: the shared discount code "Opens soon" shows when pressed.
  *   v1.2.0 — 2026-10-06 — storeStatus ('open' | 'soon') and the per-language storeNote*: the front
  *     page can show the store and its prices while the store does not take orders yet.
  *   v1.1.0 — 2026-09-29 — signage and signageAdmin: the front page's signage example.
@@ -85,6 +86,12 @@ export interface SiteLinksConfig {
   storeNoteEn: string;
   storeNoteFi: string;
   storeNoteEs: string;
+  /**
+   * The discount code a visitor gets by pressing "Opens soon" while storeStatus is 'soon'. One code for
+   * everybody, created in the store's payment provider by the operator; this node only shows it.
+   * Empty keeps "Opens soon" a label with nothing to press.
+   */
+  storeSoonCode: string;
   /** The agent incubator: where a visitor adopts a ready-made helper. Empty hides its card's door. */
   incubator: string;
   /**

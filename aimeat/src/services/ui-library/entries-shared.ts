@@ -9,6 +9,8 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.7.0 — 2026-10-06 — StoreDoor's discount code (code, StoreSoonCode, .store-soon-ask, .store-soon-code);
+ *     OwnAimeat's soonLabel becomes `soon` and `code`.
  *   v1.6.0 — 2026-10-06 — StoreDoor (components/StoreDoor.js) and OwnAimeat's soonLabel: a store that
  *     shows its prices and does not take orders yet (site.store_status "soon").
  *   v1.5.2 — 2026-09-27 — OwnAimeat names its module (components/OwnAimeat.js) and the words it takes
@@ -166,14 +168,15 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         summary: 'A demo site\'s one prompt to buy: a record-face card with its small row label, the headline, one paragraph, and the loud slab to the store, which opens in a new tab. With no store address it draws nothing.',
         module: '/components/OwnAimeat.js', sheet: '/css/components/own-aimeat.css',
         data: {
-            shape: 'OwnAimeat({ label, title, text, cta, href, soonLabel? })',
+            shape: 'OwnAimeat({ label, title, text, cta, href, soon?, code? })',
             fields: {
                 label: 'the small row label at the top ("Demo")',
                 title: 'the headline',
                 text: 'the one paragraph under it',
                 cta: 'the slab\'s words',
                 href: 'the store\'s address; without it the card is not drawn (a stored layout can outlive its store)',
-                soonLabel: 'set while the store does not take orders (site.store_status "soon"): the slab carries these words and leads nowhere',
+                soon: 'true while the store does not take orders (site.store_status "soon"): the slab is a StoreDoor, "Opens soon" with no link',
+                code: 'the shared discount code (site.store_soon_code); with it the "Opens soon" slab can be pressed and shows the code',
             },
         },
         useFor: ['The home of a demo node, as a layout block the operator adds; no built-in home has it.'],
@@ -183,16 +186,17 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'store-door', name: 'StoreDoor', kind: 'component', status: 'active',
-        summary: 'Every control that leads into the store, and the sentence that says the store is not open yet. While the store takes orders it is the link it always was, opening the store in a new tab; while site.store_status is "soon" the same place carries "Opens soon" in the same shape with no link. Without a store address both draw nothing.',
-        module: '/components/StoreDoor.js', sheet: '/css/poster.css', classes: ['store-soon', 'store-soon-note'],
+        summary: 'Every control that leads into the store, and the sentence that says the store is not open yet. While the store takes orders it is the link it always was, opening the store in a new tab; while site.store_status is "soon" the same place carries "Opens soon" in the same shape with no link. With a discount code set (site.store_soon_code) "Opens soon" can be pressed, and the press puts the code in its place with a copy button (StoreSoonCode). Without a store address everything draws nothing.',
+        module: '/components/StoreDoor.js', sheet: '/css/poster.css', classes: ['store-soon', 'store-soon-ask', 'store-soon-code', 'store-soon-note'],
         data: {
-            shape: 'StoreDoor({ class, label, newTab?, href?, soon? }) · StoreSoonNote({ class, soon? })',
+            shape: 'StoreDoor({ class, label, newTab?, href?, soon?, code? }) · StoreSoonCode({ code }) · StoreSoonNote({ class, soon? })',
             fields: {
                 class: 'the page\'s own classes for the control (a door, a slab), kept on the "Opens soon" label',
                 label: 'the link\'s words while the store is open',
                 newTab: 'false keeps a link that always opened in the same tab doing so',
                 href: 'the store\'s address; defaults to this node\'s store link',
                 soon: 'true while the store does not take orders; defaults to this node\'s store status',
+                code: 'the shared discount code; defaults to this node\'s site.store_soon_code while the store opens soon',
             },
         },
         useFor: ['Any "get your own", pricing or store link on a public page.', 'The store section\'s "opens soon" sentence (StoreSoonNote): the operator\'s note for the page\'s language, or the default.'],

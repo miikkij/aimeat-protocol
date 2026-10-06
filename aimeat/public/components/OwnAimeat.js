@@ -7,9 +7,11 @@
  *   it to a demo site's home; no built-in home has it. A page passes the words and the store's
  *   address; it never writes a class. Its look is css/components/own-aimeat.css and the record and
  *   slab shapes of css/poster.css.
- * @structure OwnAimeat({ label, title, text, cta, href, soonLabel? })
+ * @structure OwnAimeat({ label, title, text, cta, href, soon?, code? })
  * @usage html`<${OwnAimeat} href=${store} label=${…} title=${…} text=${…} cta=${…} />`
  * @version-history
+ *   v1.2.0 — 2026-10-06 — `soon` and `code` replace soonLabel: the slab is a StoreDoor, so the demo
+ *     block gives the discount code like every other "Opens soon" (site.store_soon_code).
  *   v1.1.0 — 2026-10-06 — soonLabel: a store that does not take orders yet gets those words on the
  *     slab and no link (site.store_status "soon").
  *   v1.0.0 — 2026-09-27 — The markup views/surface/blocks-home.js OwnAimeatBlock wrote, moved here
@@ -17,14 +19,16 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
+import { StoreDoor } from '/components/StoreDoor.js';
 
 const html = htm.bind(h);
 
 /**
- * Nothing without an address: a stored layout can outlive the store it was made under. `soonLabel`
- * set means the store does not take orders yet: the slab carries those words and leads nowhere.
+ * Nothing without an address: a stored layout can outlive the store it was made under. `soon` means
+ * the store does not take orders yet: the slab is a StoreDoor, "Opens soon" with no link, or the
+ * discount code when `code` is set.
  */
-export function OwnAimeat({ label, title, text, cta, href, soonLabel = '' }) {
+export function OwnAimeat({ label, title, text, cta, href, soon = false, code = '' }) {
   if (!href) return null;
   return html`
     <section class="poster-own-aimeat poster-record">
@@ -35,8 +39,8 @@ export function OwnAimeat({ label, title, text, cta, href, soonLabel = '' }) {
       <p class="poster-own-aimeat-text">
         ${text}
       </p>
-      ${soonLabel
-        ? html`<span class="poster-own-aimeat-cta poster-slab store-soon">${soonLabel}</span>`
+      ${soon
+        ? html`<${StoreDoor} class="poster-own-aimeat-cta poster-slab" href=${href} soon=${true} code=${code} label=${cta} />`
         : html`<a class="poster-own-aimeat-cta poster-slab" href=${href} target="_blank" rel="noopener">
         ${cta}
       </a>`}
