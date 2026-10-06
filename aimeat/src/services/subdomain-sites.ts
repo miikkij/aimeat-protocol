@@ -22,13 +22,15 @@
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.1.0 — 2026-10-06 — A name ending in `--draft` is refused: it is the address of an app's draft
+ *     (secaudit 2026-10 follow-up, A2).
  *   v1.0.0 — 2026-09-27 — Extracted from routes/subdomain-admin.ts v1.0.0, same validation, codes,
  *     messages and writes, when an agent holding operator:admin was allowed to manage the list.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
 import {
-  RESERVED_SUBDOMAINS, SUBDOMAIN_RE, resolveAppTarget, appIsRestricted,
+  RESERVED_SUBDOMAINS, SUBDOMAIN_RE, resolveAppTarget, appIsRestricted, draftBaseLabel, DRAFT_LABEL_SUFFIX,
 } from '../routes/subdomains.js';
 
 /** A refusal, in the shape each door renders as its own error envelope. */
@@ -98,6 +100,10 @@ export async function createSubdomainSite(
   }
   if (RESERVED_SUBDOMAINS.has(subdomain)) {
     return refuse(400, 'RESERVED_SUBDOMAIN', `The name "${subdomain}" is kept for the node itself. Choose a different one.`);
+  }
+  // `<sub>--draft` is the address of an app's draft (routes/subdomains.ts DRAFT_LABEL_SUFFIX).
+  if (draftBaseLabel(subdomain) !== null) {
+    return refuse(400, 'RESERVED_SUBDOMAIN', `A name ending in "${DRAFT_LABEL_SUFFIX}" is kept for an app's draft. Choose a different one.`);
   }
   if (kind !== 'app' && kind !== 'redirect') {
     return refuse(400, 'INVALID_KIND', 'kind must be "app" or "redirect"');

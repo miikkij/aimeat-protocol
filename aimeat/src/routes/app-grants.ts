@@ -20,6 +20,10 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.25.0 — 2026-10-06 — SECURITY: code at an app's draft origin (`<sub>--draft.<appHost>`) is
+ *     unpublished on the silent bridge whatever its page sends, so it keeps the grant the owner holds
+ *     and asks for anything wider; its authorize request is not origin-bound, so the consent screen
+ *     shows even to the owner (secaudit 2026-10 follow-up, A2).
  *   v1.24.1 — 2026-10-05 — The grant redirect check asks appOriginHostFamily (services/app-origin-target.ts)
  *     for the host families, as resolveAppOriginTarget does; a subdomain two labels deep under the app
  *     host is no longer an app address (secaudit 2026-10, C8).
@@ -135,7 +139,7 @@ import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
-import { PORTFOLIO_TARGET_PREFIX, appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget } from '../services/app-origin-target.js';
+import { PORTFOLIO_TARGET_PREFIX, appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel } from '../services/app-origin-target.js';
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
@@ -422,12 +426,16 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const coHostL = (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase();
     const rdHost = new URL(redirectUri).hostname.toLowerCase();
     if (appHostL && rdHost !== appHostL && rdHost.endsWith('.' + appHostL)) {
-      const sub = rdHost.slice(0, -(appHostL.length + 1));
+      const label = rdHost.slice(0, -(appHostL.length + 1));
+      // The app's draft origin belongs to the app, but its code is unpublished: the consent screen is
+      // shown even to the app's owner, because the request is not bound (secaudit 2026-10 follow-up, A2).
+      const draftOf = draftBaseLabel(label);
+      const sub = draftOf ?? label;
       const site = sub && !sub.includes('.') ? await storage.getSubdomainSite(sub) : null;
       if (!site || !site.enabled || site.kind !== 'app' || site.target !== app) {
         return res.status(400).json(error(config.nodeId, 'INVALID_REDIRECT_URI', 'redirect_uri subdomain is not bound to this app'));
       }
-      originBound = true;
+      originBound = draftOf === null;
     } else if (coHostL && rdHost !== coHostL && rdHost.endsWith('.' + coHostL)) {
       // A company address binds the same way, and it has to: without this an app could name a
       // company's origin as its redirect and harvest a code there in that company's name. The
@@ -590,9 +598,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const grantOwner = resolvedOrigin.owner;     // bare owner whose own visit auto-approves
     // The origin as the resolver accepted it, for the grant row's display/redirect field. An app in the
     // isolated frame runs at the node's own address, so that is what its row shows.
+    // A draft origin's grant is the app's grant, so the row keeps naming the app's own origin.
     const grantOrigin = frameApp
       ? apexOrigin(config)
-      : `https://${new URL(String(req.query.origin ?? '')).hostname.toLowerCase()}`;
+      : resolvedOrigin.appOrigin ?? `https://${new URL(String(req.query.origin ?? '')).hostname.toLowerCase()}`;
 
     // A word outside the vocabulary refuses the whole list, whoever is signed in, so it is answered
     // before the session is read. The answer names the app and the words: it used to be a bare
@@ -647,7 +656,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // has not published it. It keeps the grant the owner holds and asks for consent beyond it
     // (secaudit 2026-10, WEB-2). Only a page of the node's own origin reaches this line (the caller
     // check above), and the frame's code cannot remove the flag the page adds.
-    const unpublishedBytes = req.query.bytes === 'unpublished';
+    // The app's draft origin is unpublished code too, decided by the address it runs at rather than
+    // by a flag its page adds (secaudit 2026-10 follow-up, A2).
+    const unpublishedBytes = req.query.bytes === 'unpublished' || resolvedOrigin.unpublished === true;
     const isOwnApp = owner === grantOwner && !unpublishedBytes && !(await isPackageApp(storage, owner, grantTarget));
     const existing = await storage.getAppGrantByOwnerAndApp(owner, grantTarget);
     const fallback = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];

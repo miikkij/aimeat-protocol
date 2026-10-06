@@ -31401,11 +31401,13 @@ paths:
       summary: Mint a preview URL for the app's draft
       description: |
         Returns a short-lived (≈10 min), owner-only preview URL for the current draft. On a node with
-        the app origin enabled the URL points at the isolated app origin (a real, session-less origin
-        where `getUserMedia` — mic/camera — works); otherwise at the apex inline URL. Open it TOP-LEVEL
-        in a new tab to test the next version exactly as it will run once published, while the live app
-        stays live. Requires a saved draft (`404` otherwise). The token is single-app and reusable
-        within its TTL.
+        the app origin enabled the URL points at the app's DRAFT origin, `<sub>--draft.<appHost>` (a
+        real, session-less origin where `getUserMedia` — mic/camera — works); otherwise at the apex
+        inline URL. The draft origin is not the app's own: the draft's code gets no silent sign-in
+        beyond the grant the viewer already holds, and anything wider shows the consent screen, even
+        to the app's owner. A `?preview=` link on the app's own origin redirects there. Open it
+        TOP-LEVEL in a new tab to test the next version while the live app stays live. Requires a
+        saved draft (`404` otherwise). The token is single-app and reusable within its TTL.
       tags: [Apps]
       security:
         - BearerAuth: []

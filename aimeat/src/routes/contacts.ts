@@ -15,6 +15,8 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   v1.7.2 — 2026-10-06 — POST /v1/contacts/handles refuses an app's draft origin (secaudit 2026-10
+ *     follow-up, A2).
  *   v1.7.1 — 2026-10-05 — GET /v1/contacts answers listContactsFor (services/contacts.ts), which the MCP
  *     tool calls too, in place of reaching this route over loopback (secaudit 2026-10, M6).
  *   v1.7.0 — 2026-10-01 — GET /v1/contacts admits an app grant, an agent or an ecosystem app holding
@@ -260,6 +262,11 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
     const target = await resolveAppOriginTarget(config, storage, appOrigin);
     if (!target.ok) {
       res.status(400).json(error(config.nodeId, 'INVALID_ORIGIN', `That origin does not serve an app on this node (${target.error})`));
+      return;
+    }
+    // An app's draft origin runs code the owner has not published: it gets no handle to a contact.
+    if (target.unpublished) {
+      res.status(400).json(error(config.nodeId, 'INVALID_ORIGIN', 'That origin serves an unpublished draft, which does not get contacts.'));
       return;
     }
     // The contact has to be one this owner actually has. Reading it back from the projection is

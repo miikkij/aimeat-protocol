@@ -28,6 +28,10 @@
  *   v1.6.0 — 2026-10-02 — Phase 6: an app a package installed for the owner asks for consent instead of
  *     approving itself (package sale design, T2).
  *   v1.7.0 — 2026-10-04 — Phase 6: the grant made by name carries the app's own name, not its file name.
+ *   v1.8.0 — 2026-10-06 — Phase 8: an app's draft runs at `<sub>--draft.<appHost>`. The preview link
+ *     names it, the app's own origin redirects a preview there, the owner's silent sign-in there asks
+ *     for anything wider than the grant, its authorize request is not bound, and a `--draft` subdomain
+ *     cannot be registered (secaudit 2026-10 follow-up, A2).
  *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
  *     (helpers/host-request.ts). `x-app-origin` on its own stopped being an app origin when
  *     subdomain.ts v1.5.0 began requiring the Host to belong to the family it claims.
@@ -623,6 +627,60 @@ async function main() {
             assert(det.body.data.origin_bound === true, `bound, got ${det.body.data.origin_bound}`);
             const other = await authorize(`${bn}/app-b.html`, 'memory:read', `${BASE}/v1/apps/${a}/app-a.html`);
             assert(other.status === 400 && other.body?.error?.code === 'INVALID_REDIRECT_URI', `another app's path: ${other.status}`);
+        });
+
+        // A draft's code may be somebody else's and the owner has not published it. On the app's own
+        // origin it reached the silent sign-in the published app gets, with no page between (secaudit
+        // 2026-10 follow-up, A2). It runs at `<sub>--draft.<appHost>` now, and its sign-in asks.
+        console.log('\nPhase 8: An app\'s draft runs at a draft origin of its own, and its sign-in asks');
+        const ORIGIN_A_DRAFT = `https://aaa--draft.${APP_HOST}`;
+        let previewUrl = '';
+        await test('the preview link names the draft origin', async () => {
+            const html = '<!doctype html><title>draft</title><p>DRAFT-MARKER';
+            const save = await json(`/v1/apps/${a}/app-a.html/draft`, {
+                method: 'PUT', headers: { Authorization: `Bearer ${A.token}` },
+                body: JSON.stringify({ content: Buffer.from(html, 'utf8').toString('base64') }),
+            });
+            assert(save.status === 200 || save.status === 201, `draft save: ${save.status} ${JSON.stringify(save.body?.error)}`);
+            const tok = await json(`/v1/apps/${a}/app-a.html/draft/preview-token`, { method: 'POST', headers: { Authorization: `Bearer ${A.token}` }, body: '{}' });
+            assert(tok.status === 200, `preview token: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+            previewUrl = tok.body.data.preview_url as string;
+            assert(new URL(previewUrl).hostname === `aaa--draft.${APP_HOST}`, `the preview link is not on the draft origin: ${previewUrl}`);
+        });
+        await test('a preview on the app\'s own origin moves to the draft origin; the draft origin serves only the draft', async () => {
+            const q = new URL(previewUrl).search;
+            const onApp = await hostRequest(BASE, `/${q}`, `aaa.${APP_HOST}:${PORT}`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'aaa' } });
+            assert(onApp.status === 302, `the app's own origin served the draft: ${onApp.status}`);
+            assert(String(onApp.header('location')).includes(`//aaa--draft.${APP_HOST}`), `redirected elsewhere: ${onApp.header('location')}`);
+            const draft = await hostRequest(BASE, `/${q}`, `aaa--draft.${APP_HOST}:${PORT}`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'aaa--draft' } });
+            assert(draft.status === 200 && draft.body.includes('DRAFT-MARKER'), `the draft origin did not serve the draft: ${draft.status}`);
+            const live = await hostRequest(BASE, '/', `aaa--draft.${APP_HOST}:${PORT}`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'aaa--draft' } });
+            assert(live.status === 404, `the draft origin served something without a preview token: ${live.status}`);
+        });
+        await test('the owner\'s silent sign-in at the draft origin keeps what the grant holds and asks for more', async () => {
+            // On the app's own origin the owner gets any scope silently (Phase 1). At the draft origin
+            // the code is unpublished: the grant the owner holds stays, anything wider asks.
+            const held = await silent(ORIGIN_A, 'memory:read', A.rt);
+            assert(held.ok === true, `own-app grant: ${JSON.stringify(held)}`);
+            const wider = await silent(ORIGIN_A_DRAFT, 'memory:read memory:delete', A.rt);
+            assert(wider.ok === false && wider.error === 'consent_required' && !wider.access_token, `the draft got a wider grant silently: ${JSON.stringify({ ...wider, access_token: !!wider.access_token })}`);
+            assert(wider.app === `${a}/app-a.html`, `the draft is named as its app: ${wider.app}`);
+        });
+        await test('another owner at the draft origin gets nothing beyond their grant, and the authorize request is not bound', async () => {
+            // B approved app-a for memory:read in Phase 4: that grant holds, a wider one asks.
+            const r = await silent(ORIGIN_A_DRAFT, 'memory:read memory:delete', B.rt);
+            assert(r.ok === false && r.error === 'consent_required', `expected consent_required, got ${JSON.stringify({ ...r, access_token: !!r.access_token })}`);
+            const auth = await authorize(`${a}/app-a.html`, 'memory:read', `${ORIGIN_A_DRAFT}/callback`);
+            assert(auth.status === 302 && !!auth.requestId, `authorize from the draft origin: ${auth.status} ${JSON.stringify(auth.body)}`);
+            const det = await json(`/v1/app-grants/request/${auth.requestId}`);
+            assert(det.body.data.origin_bound === false, `a draft's request is bound, so the owner's consent screen is skipped: ${det.body.data.origin_bound}`);
+            const otherApp = await authorize(`${bn}/app-b.html`, 'memory:read', `${ORIGIN_A_DRAFT}/callback`);
+            assert(otherApp.status === 400, `another app's flow accepted a draft origin it does not own: ${otherApp.status}`);
+        });
+        await test('a subdomain ending in --draft cannot be registered', async () => {
+            const r = await json('/v1/admin/subdomains', { method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
+                body: JSON.stringify({ subdomain: 'bbb--draft', kind: 'app', target: `${a}/app-a.html` }) });
+            assert(r.status === 400 && r.body?.error?.code === 'RESERVED_SUBDOMAIN', `registered a draft label: ${r.status} ${JSON.stringify(r.body?.error)}`);
         });
 
         console.log('\n─────────────────────────────────────');
