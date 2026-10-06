@@ -8,6 +8,10 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   v1.1.0 — 2026-10-06 — aimeat_app_publish and aimeat_app_draft_save are the one schema all three
+ *     surfaces register: publish types its tags and crew-defs, and the draft takes content or
+ *     content_base64 (both base64) and the category, tags and icon the surfaces already took
+ *     (secaudit 2026-10 follow-up, Part B).
  *   v1.0.0 — 2026-10-05 — Extracted from organisms-workspaces-apps.ts (pure extraction; no behavior change).
  */
 import { z } from 'zod';
@@ -15,6 +19,26 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { AI_ROLE_PARAM } from './ai-models.js';
+
+/**
+ * The build-spec pair, declared once for both publish tools. The node's MCP wrote these two out by
+ * hand with the fuller descriptions below, and the catalog's one-line ones were what the other two
+ * surfaces showed (secaudit 2026-10 follow-up, Part B).
+ */
+const SPEC_GATE_INPUT = {
+    spec_token: {
+        type: 'string',
+        description: 'The `spec_token` from GET /v1/prompts/build-app — the digest of the build spec you built against. '
+            + 'It changes when the spec changes. Omitting it publishes anyway and returns spec_check.status "missing"; '
+            + 'an out-of-date one returns "stale". Fetch the spec and pass the token rather than guessing a value: '
+            + 'the point is that you read what it currently says.',
+    },
+    spec_ack: {
+        type: 'string',
+        description: 'Send "skipped-by-owner" when the owner explicitly told you to publish without reading the build spec. '
+            + 'The publish is recorded as skipped on the node\'s change log instead of passing silently.',
+    },
+} as const;
 
 export const appPublishTools = [
     {
@@ -28,19 +52,18 @@ export const appPublishTools = [
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer.' },
-            spec_token: { type: 'string', description: 'Current app build spec digest.' },
-            spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
+            ...SPEC_GATE_INPUT,
             ...aiProvenanceCatalogInput,
             filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
             name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
-            content: { type: 'string', description: 'The app HTML as plain text. Omit for upload mode. Use @file:path with the CLI fallback.' },
-            content_base64: { type: 'string', description: 'Already-encoded HTML, if you did the encoding yourself.' },
+            content: { type: 'string', description: 'The app HTML as plain text; the tool encodes it. Omit both content fields for upload mode. Use @file:path with the CLI fallback.' },
+            content_base64: { type: 'string', description: 'Already base64-encoded HTML, if you did the encoding yourself. Give this or content, not both.' },
             description: { type: 'string', description: 'Short description.' },
             category: { type: 'string', description: 'Category (default "tool").' },
-            tags: { type: 'array', description: 'Tags for search and filtering.' },
+            tags: { type: 'array', description: 'Tags for search and filtering.', zod: z.array(z.string()) },
             icon: { type: 'string', description: 'Emoji icon.' },
             version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
-            cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish in both modes. Omit on update to carry them forward; [] clears.' },
+            cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish in both modes. Omit on update to carry them forward; [] clears.', zod: z.array(z.record(z.string(), z.unknown())) },
         },
     },
     {
@@ -114,9 +137,15 @@ export const appPublishTools = [
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             filename: { type: 'string', required: true, description: 'App filename this draft stages (e.g. "drumpad.html").' },
-            content: { type: 'string', required: true, description: 'The draft HTML (the next version to test). Use @file:path with the CLI fallback.' },
+            // Base64 under both names: the connector and the shell have read `content` as base64 since
+            // the tool was written, and the node's MCP named it content_base64. One of the two is needed.
+            content: { type: 'string', description: 'Base64-encoded HTML of the draft (the next version to test). Give this or content_base64. Use @file:path with the CLI fallback.' },
+            content_base64: { type: 'string', description: 'The same base64-encoded HTML, under the name the node\'s MCP used. Give this or content.' },
             name: { type: 'string', description: 'Display name (defaults to the live app\'s).' },
             description: { type: 'string', description: 'Description (defaults to the live app\'s).' },
+            category: { type: 'string', description: 'Category (defaults to the live app\'s).' },
+            tags: { type: 'array', description: 'Tags (default: the live app\'s).', zod: z.array(z.string()) },
+            icon: { type: 'string', description: 'Emoji icon (defaults to the live app\'s).' },
         },
     },
     {
@@ -130,8 +159,7 @@ export const appPublishTools = [
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer.' },
-            spec_token: { type: 'string', description: 'Current app build spec digest.' },
-            spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
+            ...SPEC_GATE_INPUT,
             ...aiProvenanceCatalogInput,
             filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' },
         },

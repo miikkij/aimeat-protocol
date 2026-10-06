@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-06 — aimeat_app_publish and aimeat_app_draft_save register the catalog's schema: publish
+ *     takes plain `content` too, the draft takes `content` as well as content_base64 (secaudit 2026-10
+ *     follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.19.0 — 2026-10-02 — design_spec_hint in the publish and draft-publish answers (services/app-design-spec.ts).
  *   v1.18.0 — 2026-09-27 — aimeat_app_versions moved into aimeat_app_manage (action "versions"), which
@@ -96,7 +99,6 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -118,7 +120,7 @@ import { roadmapGate } from '../services/app-roadmap.js';
 import { publicAppManifest } from '../services/app-public-manifest.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
 import { registerAppForkTool } from './apps-fork.js';
@@ -146,46 +148,17 @@ export function registerAppsTools(
         return `${refusal.message}\n\n${JSON.stringify(refusal.details, null, 2)}`;
     }
 
-    /**
-     * The build-spec parameters, declared once and spread into both publish tools. Two tools
-     * spelling the same pair by hand is how `ai_provenance` came to be accepted on one door and
-     * dropped on another.
-     */
-    const specGateInputs = {
-        spec_token: z.string().optional().describe(
-            'The `spec_token` from GET /v1/prompts/build-app — the digest of the build spec you built against. '
-            + 'It changes when the spec changes. Omitting it publishes anyway and returns spec_check.status "missing"; '
-            + 'an out-of-date one returns "stale". Fetch the spec and pass the token rather than guessing a value: '
-            + 'the point is that you read what it currently says.'),
-        spec_ack: z.string().optional().describe(
-            'Send "skipped-by-owner" when the owner explicitly told you to publish without reading the build spec. '
-            + 'The publish is recorded as skipped on the node\'s change log instead of passing silently.'),
-    };
-
     // ── Tool 1: aimeat_app_publish ──
     mcp.tool(
         'aimeat_app_publish',
         descriptionFor('aimeat_app_publish'),
-        {
-            filename: z.string().describe('App filename (e.g. "starwars.html"). Alphanumeric, dots, hyphens, underscores. Max 100 chars.'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-            content_base64: z.string().optional().describe('Base64-encoded HTML content. Omit to get an upload URL instead (recommended for files > 1KB).'),
-            name: z.string().describe('Display name of the app'),
-            description: z.string().optional().describe('Short description of the app'),
-            category: z.string().optional().describe('App category (default: "tool")'),
-            tags: z.array(z.string()).optional().describe('Array of tags for search/filtering'),
-            icon: z.string().optional().describe('Emoji icon for the app'),
-            version: z.string().optional().describe('Semver display version (e.g. "1.0.0"). Auto-generated if omitted.'),
-            cortex_agents: z.array(z.record(z.string(), z.unknown())).optional().describe(
-                'Declarative crew-defs this app ships (Agent-Bundled Apps). Each entry is a crewaimeat crew_def JSON document (agent_name, agents[], tasks[], ...) validated at publish — DATA the owner\'s own fleet interprets, never code. Stored as manifest.cortex.agents. Omit on update to carry the existing list forward; send [] to clear.'),
-            ...aiProvenanceInputs,
-            ...specGateInputs,
-            roadmap: z.string().optional()
-                .describe('One sentence saying what this version changes, in your own words. It goes on the app\'s roadmap. REQUIRED when somebody else helps build this app: it is the only way they learn what happened.'),
-        },
+        // The catalog's schema, the one the connector and the shell take too (secaudit 2026-10
+        // follow-up, Part B): `content` is plain HTML this tool encodes, `content_base64` the same
+        // already encoded, as on the other two surfaces.
+        zodShapeFor('aimeat_app_publish'),
         annotationsFor('aimeat_app_publish'),
-        async ({ filename, owner, roadmap, content_base64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+        async ({ filename, owner, roadmap, content, content_base64: givenBase64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+            const content_base64 = givenBase64 ?? (content !== undefined ? Buffer.from(content, 'utf-8').toString('base64') : undefined);
             const agentGaii = getAgentGaii();
             // The same target the HTTP door resolves, through the same function: whose catalogue this
             // lands in, and whether a rung carries publishing into it. Composing `owner@nodeId` here
@@ -347,19 +320,13 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_draft_save',
         descriptionFor('aimeat_app_draft_save'),
-        {
-            filename: z.string().describe('App filename (e.g. "starwars.html"). The draft is the staging copy of THIS app.'),
-            owner: z.string().optional()
-                .describe('Whose catalogue this app is in. Omit for your own. Naming somebody else works only when they granted you a development right on it.'),
-            content_base64: z.string().describe('Base64-encoded HTML of the draft (the next version to test).'),
-            name: z.string().optional().describe('Display name (defaults to the live app\'s name when omitted).'),
-            description: z.string().optional().describe('Description (defaults to the live app\'s when omitted).'),
-            category: z.string().optional().describe('Category (defaults to the live app\'s).'),
-            tags: z.array(z.string()).optional().describe('Tags (default: the live app\'s).'),
-            icon: z.string().optional().describe('Emoji icon (defaults to the live app\'s).'),
-        },
+        // The catalog's schema (secaudit 2026-10 follow-up, Part B): the draft's base64 HTML as
+        // content_base64, the name this tool used, or as content, the name the other surfaces use.
+        zodShapeFor('aimeat_app_draft_save'),
         annotationsFor('aimeat_app_draft_save'),
-        async ({ filename, owner, content_base64, name, description, category, tags, icon }) => {
+        async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon }) => {
+            const content_base64 = givenBase64 ?? content;
+            if (!content_base64) return { content: [{ type: 'text' as const, text: 'INVALID_INPUT: give the draft\'s base64-encoded HTML as content_base64 (or content).' }], isError: true };
             const agentGaii = getAgentGaii();
             const scope = await resolveAppTargetScope(storage, config,
                 { principal: agentGaii, owner, filename, act: 'draft' });

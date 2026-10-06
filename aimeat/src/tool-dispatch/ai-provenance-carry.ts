@@ -56,6 +56,8 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.1 — 2026-10-06 — aimeat_app_publish: recorded-by-route, POST /v1/apps (secaudit 2026-10
+ *     follow-up, Part B).
  *   v1.3.0 — 2026-10-05 — aimeat_datapackage_publish, aimeat_company_create and aimeat_company_update:
  *     recorded-by-route (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-08-02 — Carry `provider` (who SERVED the model). It was added to the node's own MCP
@@ -123,7 +125,9 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // caller is honestly told today; promoting it means sending the body AND being able to prove the
   // echo's `recorded: true`, which is its own slice rather than a line change here.
   aimeat_app_draft_publish: { kind: 'not-carried', route: 'POST /v1/apps/:owner/:filename/publish-draft' },
-  aimeat_app_publish: { kind: 'not-carried', route: 'POST /v1/packages' },
+  // POST /v1/apps records the declaration and attaches an id from the body, in both modes; the entry
+  // named the package route these tools used before 2026-08-16 (secaudit 2026-10 follow-up, Part B).
+  aimeat_app_publish: { kind: 'recorded-by-route', route: 'POST /v1/apps' },
   // Same shape as aimeat_surface_layout_set below: the node route ACCEPTS the declaration (the
   // app-ui service mints it against the layout's own bytes) and this side does send the block; what
   // is not proved yet is the `recorded: true` echo, and promoting means proving that.

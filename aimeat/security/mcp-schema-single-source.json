@@ -1,8 +1,6 @@
 {
   "description": "Tools whose MCP input schema, on the node or the connector, is still written by hand instead of built from the catalog by zodShapeFor (src/tool-catalog/zod-shape.ts). scripts/audit-mcp-schemas.ts (pnpm check:mcp-schemas) refuses a new one and a listed one that matches. Secaudit 2026-10, M3: the list only shrinks, one catalog group per commit.",
   "tools": [
-    "aimeat_app_draft_save",
-    "aimeat_app_publish",
     "aimeat_app_template_propose",
     "aimeat_app_tools_publish",
     "aimeat_appdev_pitfall_list",

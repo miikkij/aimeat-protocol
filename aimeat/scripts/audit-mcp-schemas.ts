@@ -73,10 +73,8 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // app. The packages moved to aimeat_package_*, the app tools point at apps on every door, and
     // app_delete / app_get / app_list / app_versions are off this list.
     //
-    // aimeat_app_publish stays, for a different and smaller reason: it takes `content_base64` plus
-    // the spec-token pair on the node and plain `content` on the connector. Same backend now, same
-    // meaning, different upload vocabulary.
-    'aimeat_app_publish',
+    // aimeat_app_publish RESOLVED 2026-10-06 (secaudit 2026-10 follow-up, Part B): every surface
+    // registers the catalog's schema, with `content` (plain) and `content_base64` both.
     // intentional: server MCP handbook_get returns managed system prompts by `tier` (/v1/prompts/:tier),
     // connector handbook_get returns the agent operating handbook by `module` (/v1/agents/me/handbook/:module).
     // Two different resources sharing the tool name; unifying them is a semantic decision for consolidation.
@@ -112,7 +110,7 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     'aimeat_knowledge_contribute', // model
     'aimeat_capabilities_create',  // status
     'aimeat_capabilities_update',  // status
-    'aimeat_app_draft_save',     // content_base64 vs content — same app_* debt
+    // aimeat_app_draft_save RESOLVED 2026-10-06: `content` and `content_base64` on every surface.
 
     // ── Seventeen the audit could not see until 2026-09-03. ──
     //

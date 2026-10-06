@@ -5,6 +5,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   2026-10-06 — aimeat_app_publish, aimeat_app_list, aimeat_app_get and aimeat_app_draft_save run their
+ *     dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-02 — aimeat_package_withdraw (POST /v1/packages/:groupId/versions/:version/withdraw).
  *   2026-10-02 — aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
@@ -49,55 +51,15 @@
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
-import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { provenanceEchoedResult, readPayloadWithProvenance } from '../../../../tool-dispatch/ai-provenance-carry.js';
-import { envelopeResult, payloadResult } from './_registry.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void {
-  const { client, owner } = registry.resolve();
+  const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
-
-  mcp.tool('aimeat_app_publish', descriptionFor('aimeat_app_publish'), {
-    filename: z.string().describe('App filename, e.g. "starwars.html"'),
-    roadmap: z.string().optional().describe('One sentence saying what this version changes, in your own words. It goes on the app roadmap, and it is REQUIRED when somebody else helps build this app.'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    content: z.string().optional().describe('The app HTML as plain text — this tool base64-encodes it for you'),
-    content_base64: z.string().optional().describe('Already-encoded HTML, if you did the encoding yourself'),
-    name: z.string().describe('Display name shown in the catalogue'),
-    description: z.string().optional().describe('Short description'),
-    category: z.string().optional().describe('Category (default "tool")'),
-    tags: z.array(z.string()).optional().describe('Tags for search and filtering'),
-    icon: z.string().optional().describe('Emoji icon'),
-    version: z.string().optional().describe('Semver display version. Generated if omitted.'),
-    cortex_agents: z.array(z.record(z.string(), z.unknown())).optional().describe('Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish. Omit on update to carry them forward; [] clears.'),
-    ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_app_publish'), async (a) => {
-    const targetOwner = a.owner;
-    // POST /v1/apps takes `content` base64-encoded and 400s on plain text; encode here so the
-    // caller does not have to know the rule.
-    const encoded = a.content_base64 ?? (a.content !== undefined ? Buffer.from(a.content, 'utf-8').toString('base64') : undefined);
-    const body: Record<string, unknown> = {
-      filename: a.filename, name: a.name,
-      // No path to carry it on this door, so the target owner travels in the body, which is what
-      // POST /v1/apps reads.
-      ...(targetOwner ? { owner: targetOwner } : {}),
-      ...(a.roadmap ? { roadmap: a.roadmap } : {}),
-      ...(encoded !== undefined ? { content: encoded } : {}),
-    };
-    for (const f of ['description', 'category', 'icon', 'version'] as const) if (a[f]) body[f] = a[f];
-    if (a.tags) body.tags = a.tags;
-    if (a.cortex_agents) body.cortex = { agents: a.cortex_agents };
-    if (a.ai_provenance_id) body.ai_provenance_id = a.ai_provenance_id;
-    const resp = await client.post('/v1/apps', body);
-    return provenanceEchoedResult(client,
-      { tool: 'aimeat_app_publish', declared: a.ai_provenance, declaredId: a.ai_provenance_id }, resp);
-  });
 
   // An install that needed words this agent lacked came back as a request (202, awaiting_owner).
   // This lists the owner's requests and lets an agent of theirs answer one, on the node's own rule.
@@ -111,66 +73,4 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     if (request_id) return out(await client.get(`/v1/package-install-requests/${encodeURIComponent(request_id)}`));
     return out(await client.get('/v1/package-install-requests'));
   });
-
-  // ───────────────────────────────────────────────────────────────────────────────────────────────
-  // THE APP TOOLS TALK ABOUT APPS. Until 2026-08-16 the four below pointed at /v1/packages, a
-  // separate component-package system, while the same names on the node's MCP meant the single-file
-  // web apps at /v1/apps. Measured on production the day it was found: 50 apps, 4 packages, three of
-  // the four being ::system examples. The split ran through this very file — aimeat_app_get read a
-  // package while aimeat_app_draft_write, twenty lines down, wrote an app — so an agent that listed,
-  // chose and edited crossed between two systems with nothing saying so.
-  // Packages keep the capability under aimeat_package_* below.
-  // ───────────────────────────────────────────────────────────────────────────────────────────────
-  mcp.tool('aimeat_app_list', descriptionFor('aimeat_app_list'), zodShapeFor('aimeat_app_list'), annotationsFor('aimeat_app_list'), async ({ search, category, tag, own, building, limit, offset }) => {
-    const params = new URLSearchParams();
-    // GET /v1/apps reads `q`, not `search`. Sent under the wrong name the filter was dropped and the
-    // whole catalogue came back as though it had been searched.
-    if (search) params.set('q', search);
-    if (category) params.set('category', category);
-    if (tag) params.set('tag', tag);
-    if (own) params.set('own', 'true');
-    if (building) params.set('building', 'true');
-    if (limit !== undefined) params.set('limit', String(limit));
-    if (offset !== undefined) params.set('offset', String(offset));
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const resp = await client.get(`/v1/apps${qs}`);
-    return envelopeResult(resp);
-  });
-
-  mcp.tool('aimeat_app_get', descriptionFor('aimeat_app_get'), zodShapeFor('aimeat_app_get'), annotationsFor('aimeat_app_get'), async ({ owner, filename }) => {
-    // No REST route returns one app's DETAIL — GET /v1/apps/:owner/:filename serves the app's own
-    // bytes — so it comes from the catalogue listing, which already carries manifest, version, size,
-    // download count and public url per entry.
-    const resp = await client.get(`/v1/apps?search=${encodeURIComponent(filename)}`);
-    if (resp.ok === false) return out(resp);
-    const apps = ((resp.data ?? {}) as { apps?: Array<Record<string, unknown>> }).apps ?? [];
-    const app = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
-    if (!app) {
-      return out({ ok: false, data: { error: { code: 'NOT_FOUND', message: `No app "${filename}" published by "${owner}".` } } });
-    }
-    return payloadResult(readPayloadWithProvenance({ ...resp, data: { app } }), resp);
-  });
-
-  // ── Component packages: the capability the app_* tools above used to be ──
-
-  // → PUT /v1/apps/:owner/:filename/draft — stage the next version (owner resolved server-side).
-  mcp.tool('aimeat_app_draft_save', descriptionFor('aimeat_app_draft_save'), {
-    filename: z.string().describe('App filename, e.g. "shop.html".'),
-    owner: z.string().optional().describe('Whose catalogue this app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.'),
-    content: z.string().describe('Base64-encoded HTML of the draft.'),
-    name: z.string().optional().describe('Display name (defaults to the live app\'s).'),
-    description: z.string().optional().describe('Description (defaults to the live app\'s).'),
-    category: z.string().optional().describe('Category (defaults to the live app\'s).'),
-    tags: z.array(z.string()).optional().describe('Tags (default: the live app\'s).'),
-    icon: z.string().optional().describe('Emoji icon (defaults to the live app\'s).'),
-  }, annotationsFor('aimeat_app_draft_save'), async ({ owner: targetOwner, filename, content, name, description, category, tags, icon }) => {
-    const body: Record<string, unknown> = { content };
-    if (name) body.name = name;
-    if (description !== undefined) body.description = description;
-    if (category) body.category = category;
-    if (tags) body.tags = tags;
-    if (icon) body.icon = icon;
-    return out(await client.put(`/v1/apps/${encodeURIComponent(targetOwner ?? owner)}/${encodeURIComponent(filename)}/draft`, body));
-  });
-
 }
