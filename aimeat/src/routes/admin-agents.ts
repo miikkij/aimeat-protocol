@@ -11,6 +11,8 @@
  *   - PUT /v1/admin/agents/:gaii/cors: refuse a missing agent, then services/cors-overview.ts setCorsList
  *
  * @version-history
+ *   v1.4.0 — 2026-10-06 — GET /v1/admin/agents reads `limit`, as aimeat_admin_agents does on the
+ *     node's MCP (secaudit 2026-10 follow-up, Part B).
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.1 — 2026-09-26 — The app owner behind a grant comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
@@ -67,11 +69,15 @@ export function adminAgentsRouter(
     const router = Router();
 
     // GET /v1/admin/agents — list all agents with full details (operator only)
-    router.get('/v1/admin/agents', requireAuth(), requireOperator(storage), async (_req, res) => {
+    router.get('/v1/admin/agents', requireAuth(), requireOperator(storage), async (req, res) => {
         const agents = await storage.listAgents();
+        // `limit` is what aimeat_admin_agents publishes and the node's MCP applies; the route ignored
+        // it, so the connector, which calls this route, could not (secaudit 2026-10 follow-up, Part B).
+        const limit = Number.parseInt(String(req.query.limit ?? ''), 10);
+        const shown = Number.isFinite(limit) && limit > 0 ? agents.slice(0, limit) : agents;
 
         res.json(success(config.nodeId, {
-            agents: agents.map(a => ({
+            agents: shown.map(a => ({
                 gaii: a.gaii,
                 owner: a.owner,
                 display_name: a.displayName,

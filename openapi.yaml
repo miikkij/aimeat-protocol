@@ -26933,10 +26933,17 @@ paths:
       description: |
         Returns all agents on the node. Response includes `allowed_origins` for CORS override
         visibility and `default_scopes` — the scopes their owner approved, which is what decides
-        whether a new scope gate would refuse an existing agent.
+        whether a new scope gate would refuse an existing agent. `total` counts every agent; `limit`
+        caps the list.
       tags: [Admin]
       security:
         - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+          description: The most agents to list.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

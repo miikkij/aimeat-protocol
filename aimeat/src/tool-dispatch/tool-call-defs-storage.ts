@@ -6,12 +6,16 @@
  *   aimeat_storage_download and aimeat_storage_delete, thin proxies over /v1/storage and /v1/pub.
  *   Moved from tool-call-defs-core.ts, which had reached the 800-line limit.
  * @version-history
+ *   v1.2.0 — 2026-10-06 — aimeat_storage_upload without data_base64 asks for a presigned upload_url;
+ *     aimeat_storage_download always names `mode` (handle or inline), the query GET /v1/storage/:key
+ *     reads, and reads a reference as a handle. The connector MCP runs these now (secaudit 2026-10
+ *     follow-up, Part B).
  *   v1.1.0 — 2026-09-29 — aimeat_storage_upload forwards workspace_refs, so a 'workspace' file names
  *     its workspaces here as on the other two surfaces.
  *   v1.0.0 — 2026-09-29 — Moved from tool-call-defs-core.ts, unchanged.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalBoolean, optionalArray } from './tool-call-helpers.js';
+import { requiredString, optionalString, optionalBoolean, optionalArray } from './tool-call-helpers.js';
 
 export const storageCliTools: ConnectCliToolDefinition[] = [
     {
@@ -19,8 +23,12 @@ export const storageCliTools: ConnectCliToolDefinition[] = [
         // The catalog and the connector-MCP door both publish `data_base64`; POST /v1/storage reads
         // it as `data`. This door read `content`, which nothing declares and nothing sends, so the
         // whole tool was unreachable — and `visibility`/`group_id` were dropped besides.
+        // Without data_base64 it asks for a presigned upload_url (mode 'presigned'), the mode the
+        // catalog describes and the node's MCP runs. Neither connector door reached it: one required
+        // the payload and the other posted `{ key }` alone, which POST /v1/storage answers 400.
         handler: ({ client }, input) => {
-            const body: JsonObject = { key: requiredString(input, 'key'), data: requiredString(input, 'data_base64') };
+            const data = optionalString(input, 'data_base64');
+            const body: JsonObject = { key: requiredString(input, 'key'), ...(data ? { data } : { mode: 'presigned' }) };
             const mimeType = optionalString(input, 'mime_type'); if (mimeType) body.mime_type = mimeType;
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
             const groupId = optionalString(input, 'group_id'); if (groupId) body.group_id = groupId;
@@ -40,10 +48,13 @@ export const storageCliTools: ConnectCliToolDefinition[] = [
             const owner = optionalString(input, 'owner') ?? (head.includes('@') || head.startsWith('ext:') ? head : '');
             // `inline` asks for the BYTES in the response rather than a handle to fetch. It is the
             // difference between an agent reading a file and an agent being told where one is.
+            // GET /v1/storage/:key reads `mode` (handle or inline) and answers raw bytes without it, so
+            // the request always names one. GET /v1/pub has a handle mode only; its other answer is
+            // the bytes, so a reference is always read as a handle.
             const inline = optionalBoolean(input, 'inline') === true;
-            if (!owner) return client.get(`/v1/storage/${encodeURIComponent(key)}${query({ inline: inline ? 'true' : undefined })}`);
+            if (!owner) return client.get(`/v1/storage/${encodeURIComponent(key)}?mode=${inline ? 'inline' : 'handle'}`);
             const refKey = optionalString(input, 'owner') ? key : key.slice(slash + 1);
-            return client.get(`/v1/pub/${encodeURIComponent(owner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=${inline ? 'inline' : 'handle'}`);
+            return client.get(`/v1/pub/${encodeURIComponent(owner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`);
         },
     },
     {
