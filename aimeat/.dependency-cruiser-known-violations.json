@@ -1,20 +1,6 @@
 [
   {
     "type": "dependency",
-    "from": "src/mcp/agent-management.ts",
-    "to": "src/routes/agents/constants.ts",
-    "unresolvedTo": "../routes/agents/constants.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/mcp/apps.ts",
     "to": "src/routes/apps/helpers.ts",
     "unresolvedTo": "../routes/apps/helpers.js",
@@ -9214,15 +9200,6 @@
   },
   {
     "type": "module",
-    "from": "src/generated/api-types.ts",
-    "to": "src/generated/api-types.ts",
-    "rule": {
-      "severity": "warn",
-      "name": "no-orphans"
-    }
-  },
-  {
-    "type": "module",
     "from": "src/static/app-frame-shim.js",
     "to": "src/static/app-frame-shim.js",
     "rule": {
@@ -9660,15 +9637,6 @@
     "rule": {
       "severity": "warn",
       "name": "no-orphans"
-    }
-  },
-  {
-    "type": "module",
-    "from": "src/storage/repositories/index.ts",
-    "to": "src/storage/repositories/index.ts",
-    "rule": {
-      "severity": "warn",
-      "name": "reachable-from-the-node"
     }
   }
 ]
