@@ -22,8 +22,9 @@
  * @version-history
  *   v1.1.0 — 2026-10-06 — `response_format` is taken as the view only on a tool whose catalog entry
  *     supports one; on any other it is the tool's own input and reaches its handler. aimeat_voice_speak
- *     names its audio format so, and would have lost an mp3 request when it moved here (secaudit
- *     2026-10 follow-up, Part B).
+ *     names its audio format so, and would have lost an mp3 request when it moved here. The same for
+ *     `agent_name`: on a tool that declares one (aimeat_offer_price_set) it is the tool's input, not
+ *     the routing choice (secaudit 2026-10 follow-up, Part B).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M3).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -42,15 +43,21 @@ export function registerDispatchTools(mcp: McpServer, registry: AgentRegistry, r
         if (registered.has(tool.name)) continue;
         // Every shell-callable tool is on the connector MCP too (audit-mcp-tools, cliFallbackWithoutConnectorMcp).
         if (!getAimeatToolDefinition(tool.name)) continue;
-        const shape = { agent_name: agentNameSchema, ...zodShapeFor(tool.name) };
+        const def = getAimeatToolDefinition(tool.name)!;
+        // `agent_name` picks the registered agent that makes the call, unless the tool declares an
+        // agent_name of its own (aimeat_offer_price_set: whose offer). Then the field is the tool's,
+        // and the call is made by the default agent, as the handlers these tools had did.
+        const ownsAgentName = 'agent_name' in def.input;
+        const shape = ownsAgentName ? zodShapeFor(tool.name) : { agent_name: agentNameSchema, ...zodShapeFor(tool.name) };
         // `response_format` is the concise/detailed view only on a tool that supports one; on any other
         // it is the tool's own input (aimeat_voice_speak's audio format) and goes to the handler.
-        const viewParam = getAimeatToolDefinition(tool.name)?.supportsResponseFormat === true;
+        const viewParam = def.supportsResponseFormat === true;
         mcp.tool(tool.name, descriptionFor(tool.name), shape, annotationsFor(tool.name), async (args: Record<string, unknown>) => {
-            const { agent_name, ...rest } = args;
+            const { agent_name, ...routed } = args;
+            const rest = ownsAgentName ? args : routed;
             const { response_format, ...viewless } = rest;
             const input = viewParam ? viewless : rest;
-            const picked = pickAgent(registry, agent_name as string | undefined);
+            const picked = pickAgent(registry, ownsAgentName ? undefined : agent_name as string | undefined);
             const resp = await tool.handler({
                 client: picked.client,
                 config: { node_url: picked.config.node_url, agent: picked.agent, owner: picked.owner },

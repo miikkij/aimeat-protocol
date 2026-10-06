@@ -9,6 +9,8 @@
  *   /v1/agents/:name/offers for offer pricing; and the generic /v1/memory routes (memory:write authz
  *   unchanged) for the commerce.psp / apps.{id}.tools records the server MCP writes directly.
  * @version-history
+ *   2026-10-06 — aimeat_app_tools_publish, aimeat_app_tools_get, aimeat_offer_price_set and aimeat_checkout_list
+ *     run their dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 -- 2026-09-16 -- psp_set, psp_status and psp_delete go through /v1/commerce/payout. Through
  *     the generic memory routes psp_set stored the Stripe key in plain text and psp_status returned it.
@@ -19,7 +21,6 @@
  *     checkout open/complete/list — connector-surface coverage.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
@@ -29,69 +30,6 @@ export function registerCommerceTools(mcp: McpServer, registry: AgentRegistry): 
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
-
-  // Publish the sellable tool manifest — server MCP validates + writes apps.{id}.tools; the connector
-  // writes that public owner record via POST /v1/memory.
-  mcp.tool('aimeat_app_tools_publish', descriptionFor('aimeat_app_tools_publish'), {
-    app_id: z.string().describe('The app\'s published filename (manifest key is apps.{app_id}.tools).'),
-    tools: z.array(z.record(z.string(), z.unknown())).describe('Full tool list: [{ name, description?, inputSchema?, action_id?, agent?, price?, priceMoney? }].'),
-  }, annotationsFor('aimeat_app_tools_publish'), async ({ app_id, tools }) => {
-    // `owner_scope: true` — AN APP TOOL BELONGS TO THE OWNER, WHICHEVER PRINCIPAL PUBLISHED IT.
-    // Without it an AGENT's write lands in the agent's own namespace
-    // (`concierge#bob@node`), while every reader looks the manifest up under the OWNER
-    // (`getMemory(`${ownerName}@${nodeId}`, appToolsKey(app))` in mcp/exchange-run.ts and
-    // commerce/sellable-resolvers.ts). Publish answered 200 and the tool was invisible to
-    // everyone, the publishing agent included. The node's own MCP already passed the equivalent
-    // (`ownerScoped: true` through writeMemoryRecord); this surface did not, which is how the two
-    // disagreed. Measured 2026-09-02 against a live node.
-    return out(await client.post('/v1/memory', {
-      key: `apps.${app_id}.tools`,
-      value: { version: 1, updatedAt: new Date().toISOString(), tools },
-      visibility: 'public',
-      tags: ['commerce', 'app-tools'],
-      owner_scope: true,
-    }));
-  });
-
-  mcp.tool('aimeat_app_tools_get', descriptionFor('aimeat_app_tools_get'), zodShapeFor('aimeat_app_tools_get'), annotationsFor('aimeat_app_tools_get'), async ({ app_id, owner: ownerArg }) => {
-    const key = `apps.${app_id}.tools`;
-    // Own manifest: GET /v1/memory/:key. Cross-owner needs a full GHII (owner@node) — GET
-    // /v1/memory/:gaii/:key (public only); a bare owner falls back to own (the connector has no nodeId).
-    const resp = ownerArg && ownerArg.includes('@')
-      ? await client.get(`/v1/memory/${encodeURIComponent(ownerArg)}/${encodeURIComponent(key)}`)
-      : await client.get(`/v1/memory/${encodeURIComponent(key)}`);
-    return out(resp);
-  });
-
-  // Set/clear one offer's price — no single-field route; read the whole offers doc, patch the one offer,
-  // and PUT it back (the same whole-doc contract the server MCP uses; agent-role authz unchanged).
-  mcp.tool('aimeat_offer_price_set', descriptionFor('aimeat_offer_price_set'), {
-    agent_name: z.string().describe('Bare name of your agent that publishes the offer.'),
-    offer_id: z.string().describe('The offer id inside agents.{agent_name}.offers.'),
-    price_morsels: z.number().int().positive().optional().describe('Morsel price per call.'),
-    money_amount_micros: z.number().int().positive().optional().describe('Money price in integer 6-decimal micro-units.'),
-    money_currency: z.enum(['EUR', 'USD']).optional().describe('Currency for money_amount_micros.'),
-    clear_morsels: z.boolean().optional().describe('Remove the morsel price.'),
-    clear_money: z.boolean().optional().describe('Remove the money price.'),
-    visibility: z.enum(['private', 'unlisted', 'public']).optional().describe('Offer visibility.'),
-  }, annotationsFor('aimeat_offer_price_set'), async ({ agent_name, offer_id, price_morsels, money_amount_micros, money_currency, clear_morsels, clear_money, visibility }) => {
-    const current = await client.get(`/v1/agents/${encodeURIComponent(agent_name)}/offers`);
-    if (current.ok === false) return out(current);
-    const data = current.data as { offers?: Array<Record<string, unknown>> } | undefined;
-    const offers = Array.isArray(data?.offers) ? data!.offers : [];
-    const offer = offers.find(o => o.id === offer_id);
-    if (!offer) return { content: [{ type: 'text' as const, text: `OFFER_NOT_FOUND: ${offer_id} on agent ${agent_name}` }], isError: true };
-    if (price_morsels !== undefined) offer.price = { morsels: price_morsels, unit: (offer.price as { unit?: string } | undefined)?.unit ?? 'per-call' };
-    if (clear_morsels) offer.price = null;
-    if (money_amount_micros !== undefined) offer.priceMoney = { amount: money_amount_micros, currency: money_currency ?? 'EUR' };
-    if (clear_money) offer.priceMoney = null;
-    if (visibility) offer.visibility = visibility;
-    return out(await client.put(`/v1/agents/${encodeURIComponent(agent_name)}/offers`, { offers }));
-  });
-
-  mcp.tool('aimeat_checkout_list', descriptionFor('aimeat_checkout_list'), zodShapeFor('aimeat_checkout_list'), annotationsFor('aimeat_checkout_list'), async ({ limit }) => {
-    return out(await client.get(`/v1/commerce/checkout-sessions${limit ? `?limit=${limit}` : ''}`));
-  });
 
   // Beneficiary splits — a seller declares who else earns from a sale, releases what accrued and pays
   // it out; a beneficiary reads its own earnings. The connector proxies /v1/commerce/beneficiary*;

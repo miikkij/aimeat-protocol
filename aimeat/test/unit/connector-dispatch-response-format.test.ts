@@ -35,4 +35,13 @@ describe('the connector dispatch path and response_format', () => {
         await connector(sent).get('aimeat_voice_speak')!({ input: 'hello', response_format: 'mp3' });
         expect((sent[0]?.body as { response_format?: string } | undefined)?.response_format).toBe('mp3');
     });
+
+    // The same collision on `agent_name`, which the connector uses to pick its registered agent:
+    // aimeat_offer_price_set declares its own (whose offer). Taken as the routing choice, the
+    // handler never saw it and refused every call.
+    it('aimeat_offer_price_set reads the offers of the agent it names', async () => {
+        const sent: Sent[] = [];
+        await connector(sent).get('aimeat_offer_price_set')!({ agent_name: 'seller', offer_id: 'o1', price_morsels: 3 });
+        expect(sent[0]).toEqual({ method: 'GET', path: '/v1/agents/seller/offers' });
+    });
 });
