@@ -27,6 +27,7 @@
  *   ... drive the node ...
  *   await peer.close();
  * @version-history
+ *   v1.1.0 — 2026-10-06 — replicateStatus: the replicate door can refuse, as a real receiver does.
  *   v1.0.0 — 2026-09-08 — Written for test/e2e-genesis-federation.ts.
  */
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -62,6 +63,8 @@ export interface FakeGenesisPeer {
     memoryResults: Array<Record<string, unknown>>;
     /** The status POST /v1/federation/genesis-catalogue-ingest answers with. 404 is the graceful case. */
     ingestStatus: number;
+    /** The status POST /v1/federation/replicate answers with. 401 is what a real receiver says to a bad signature. */
+    replicateStatus: number;
 
     /** How many requests of this method reached this exact path. */
     count(method: string, path: string): number;
@@ -99,6 +102,7 @@ export async function startFakeGenesisPeer(nodeId: string): Promise<FakeGenesisP
         catalogueHash: 'remote-catalogue-hash-0',
         memoryResults: [] as Array<Record<string, unknown>>,
         ingestStatus: 200,
+        replicateStatus: 200,
     };
 
     const server: Server = createServer((req, res) => {
@@ -145,6 +149,10 @@ export async function startFakeGenesisPeer(nodeId: string): Promise<FakeGenesisP
             }
 
             if (req.method === 'POST' && parsed.pathname === '/v1/federation/replicate') {
+                if (state.replicateStatus !== 200) {
+                    send(res, state.replicateStatus, { ok: false, error: { code: 'UNAUTHORIZED', message: 'Invalid signature on replication request' } });
+                    return;
+                }
                 send(res, 200, { ok: true, node_id: state.nodeId, data: { replicated: true } });
                 return;
             }
@@ -172,6 +180,8 @@ export async function startFakeGenesisPeer(nodeId: string): Promise<FakeGenesisP
         set memoryResults(v) { state.memoryResults = v; },
         get ingestStatus() { return state.ingestStatus; },
         set ingestStatus(v) { state.ingestStatus = v; },
+        get replicateStatus() { return state.replicateStatus; },
+        set replicateStatus(v) { state.replicateStatus = v; },
         count(method, path) {
             return state.requests.filter(r => r.method === method && r.path === path).length;
         },
