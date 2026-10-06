@@ -8,6 +8,9 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.10.0 -- 2026-10-06 -- aimeat_app_list sends its search as `q`, the name GET /v1/apps reads;
+ *     aimeat_app_publish forwards ai_provenance and ai_provenance_id, which POST /v1/apps records;
+ *     aimeat_app_draft_save takes content or content_base64 (secaudit 2026-10 follow-up, Part B).
  *   v1.9.0 -- 2026-10-05 -- aimeat_cortex_install without a manifest answers the upload offer for a ZIP,
  *     through POST /v1/cortex mode presigned, as the node MCP does (secaudit 2026-10, M3).
  *   v1.11.0 -- 2026-10-01 -- aimeat_iam_define forwards default_role, version, author and ext_name to
@@ -262,6 +265,11 @@ export const appTools: ConnectCliToolDefinition[] = [
             // `cortex.agents` and validates them there.
             const crew = optionalArray(input, 'cortex_agents');
             if (crew) body.cortex = { agents: crew };
+            // POST /v1/apps records a declaration and attaches an existing record from the body, in
+            // both modes; this door left both out, so a publish over the shell or the connector
+            // carried no provenance (secaudit 2026-10 follow-up, Part B).
+            if (input.ai_provenance && typeof input.ai_provenance === 'object') body.ai_provenance = input.ai_provenance;
+            const provenanceId = optionalString(input, 'ai_provenance_id'); if (provenanceId) body.ai_provenance_id = provenanceId;
             return client.post('/v1/apps', body);
         },
     },
@@ -295,7 +303,9 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/apps${query({
             // `query` used to be read as an alias for `search`; nothing declares it, so
             // withDeclaredInputOnly refuses it before the handler runs and the alias was dead.
-            search: optionalString(input, 'search'),
+            // GET /v1/apps reads the search as `q`; sent as `search` it was ignored and the whole
+            // catalogue came back (secaudit 2026-10 follow-up, Part B).
+            q: optionalString(input, 'search'),
             category: optionalString(input, 'category'),
             tag: optionalString(input, 'tag'),
             own: optionalBoolean(input, 'own') ? 'true' : undefined,
@@ -316,7 +326,9 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: async ({ client }, input) => {
             const owner = requiredString(input, 'owner');
             const filename = requiredString(input, 'filename');
-            const resp = await client.get(`/v1/apps${query({ search: filename })}`);
+            // `q` is the search GET /v1/apps reads. Sent as `search` it was ignored, the listing was
+            // the newest 50 apps, and an older app answered NOT_FOUND (secaudit 2026-10 follow-up, Part B).
+            const resp = await client.get(`/v1/apps${query({ q: filename, limit: '200' })}`);
             if (resp.ok === false) return resp;
             const apps = ((resp.data ?? {}) as { apps?: Array<Record<string, unknown>> }).apps ?? [];
             const app = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
@@ -524,7 +536,8 @@ export const appTools: ConnectCliToolDefinition[] = [
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps.' },
             filename: { type: 'string', required: true, description: 'App filename, e.g. "shop.html".' },
-            content: { type: 'string', required: true, description: 'Base64-encoded HTML of the draft.' },
+            content: { type: 'string', description: 'Base64-encoded HTML of the draft. Give this or content_base64.' },
+            content_base64: { type: 'string', description: 'The same base64-encoded HTML, under the name the node\'s MCP used.' },
             name: { type: 'string', description: 'Display name (defaults to the live app\'s).' },
             description: { type: 'string', description: 'Description (defaults to the live app\'s).' },
             category: { type: 'string', description: 'Category (defaults to the live app\'s).' },
@@ -533,7 +546,9 @@ export const appTools: ConnectCliToolDefinition[] = [
         },
         handler: ({ client, config }, input) => {
             const filename = requiredString(input, 'filename');
-            const body: JsonObject = { content: requiredString(input, 'content') };
+            const content = optionalString(input, 'content') ?? optionalString(input, 'content_base64');
+            if (!content) return Promise.resolve({ ok: false, error: { code: 'INVALID_INPUT', message: 'Give the draft\'s base64-encoded HTML as content (or content_base64).' } });
+            const body: JsonObject = { content };
             const name = optionalString(input, 'name'); if (name) body.name = name;
             const description = optionalString(input, 'description'); if (description !== undefined) body.description = description;
             const category = optionalString(input, 'category'); if (category) body.category = category;
