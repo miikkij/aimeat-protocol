@@ -8,7 +8,7 @@
  *   satisfy max-file-lines.
  * @version-history
  *   v1.13.0 -- 2026-10-06 -- POST .../workspace/records/delete runs deleteRecordsBatchOp
- *     (services/workspace-batch-ops.ts), the function ctx.workspace.deleteRecords runs. An id given
+ *     (services/workspace-tool-ops.ts), the function ctx.workspace.deleteRecords runs. An id given
  *     twice is decided once.
  *   v1.12.0 -- 2026-10-02 -- DELETE /v1/organisms/:id/workspace asks memory:purge beside organism:write:
  *     it removes every record and its history for good (Jouni, 2026-10-02).
@@ -58,8 +58,7 @@ import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
 import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../../services/workspace-engagements.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { callerOf } from '../../middleware/caller.js';
-import { workspaceCallerOf } from '../../services/workspace-tool-ops.js';
-import { deleteRecordsBatchOp } from '../../services/workspace-batch-ops.js';
+import { workspaceCallerOf, deleteRecordsBatchOp } from '../../services/workspace-tool-ops.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -648,7 +647,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * DELETE /v1/memory/:key. App grants that held memory:delete were given the word once
    * (services/task-start-migrations.ts). ── */
   router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:purge'), async (req, res) => {
-    // The body is deleteRecordsBatchOp (services/workspace-batch-ops.ts), which
+    // The body is deleteRecordsBatchOp (services/workspace-tool-ops.ts), which
     // ctx.workspace.deleteRecords runs too: membership, the append-only guard, the caller-owned family.
     const who = callerOf(req, config.nodeId, storage);
     if (who.visitor) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node is not a member of this organism.')); return; }

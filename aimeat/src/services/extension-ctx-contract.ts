@@ -14,7 +14,7 @@
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
  *   v1.5.0 — 2026-10-06 — `ctx.workspace.publishRecords` and `deleteRecords`: a batch of records in
- *     one host call (services/workspace-batch-ops.ts).
+ *     one host call (services/workspace-tool-ops.ts).
  *   v1.4.0 — 2026-09-28 — `ctx.ai.start` takes `role`, the AI role the job's call runs as.
  *   v1.3.0 — 2026-09-28 — System 2 plan, V5: `ctx.ai.start` takes `op` (text, image, transcribe),
  *     `provider`, `audio_key`, `language` and `size`, the fields POST /v1/ai/jobs takes.

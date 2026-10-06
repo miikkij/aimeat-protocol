@@ -293,7 +293,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   // read for the whole batch) and the writes/deletes are committed together (ONE bulkSetMemory + ONE
   // bulkDeleteMemory), instead of the per-record scan + individual setMemory/deleteMemory pipeline that a
   // 520-record CADENCE import ran as ~11k separate operations. Auth (membership, meta.* role, archive,
-  // publish gate) is publishRecordsBatchOp's (services/workspace-batch-ops.ts), which the batch route
+  // publish gate) is publishRecordsBatchOp's (services/workspace-tool-ops.ts), which the batch route
   // and ctx.workspace.publishRecords both call; this is the data operation.
   const publishDraftsBatch = async (
     organismId: string, ws: string | undefined, namespace: string, instances: string[], publisher: string,

@@ -2,7 +2,7 @@
  * @file workspace-batch-ops.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description publishRecordsBatchOp and deleteRecordsBatchOp (services/workspace-batch-ops.ts), the
+ * @description publishRecordsBatchOp and deleteRecordsBatchOp (services/workspace-tool-ops.ts), the
  *   two functions the batch routes and ctx.workspace.publishRecords / deleteRecords run, on a real
  *   SQLite store: a workspace alice created, with a records space under a locked schema and an
  *   append-only space, bob a plain member and bob's agent with no contributor grant.
@@ -21,8 +21,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { workspaceCallerOf } from '../../src/services/workspace-tool-ops.js';
-import { publishRecordsBatchOp, deleteRecordsBatchOp } from '../../src/services/workspace-batch-ops.js';
+import { workspaceCallerOf, publishRecordsBatchOp, deleteRecordsBatchOp } from '../../src/services/workspace-tool-ops.js';
 import type { OrganismRecord, OrganismMembershipRecord, GHIIRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 
