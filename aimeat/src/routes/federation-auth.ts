@@ -14,6 +14,9 @@
  *   through services/password-check.ts, with the same per-account lock as the sign-in route, and an
  *   account with two-step sign-in needs its code here too.
  * @version-history
+ *   v1.2.1 -- 2026-10-06 -- A signed verify request passes once (signedMessageRefusal): the password is
+ *     not signed, so a captured signature carried other passwords for five minutes (secaudit 2026-10
+ *     follow-up, A7).
  *   v1.2.0 -- 2026-10-05 -- Hardened (secaudit 2026-10, D1; Jouni: "harden it"). Before, any caller
  *     could name any requesting_node in the body and test passwords with only a per-IP limit: no
  *     account lock, no second factor, no peer signature, and 401 for a wrong password against 403 for
@@ -35,6 +38,7 @@ import { gatePeer } from '../services/federation-peer-gate.js';
 import { federationAuthPayload } from '../services/federation-auth-payload.js';
 import { checkPassword, checkSecondFactor } from '../services/password-check.js';
 import { sign, verify } from '../auth/keypair.js';
+import { signedMessageRefusal } from '../services/signed-node-request.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 
@@ -98,6 +102,11 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
                 res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The request is not signed by the requesting node'));
                 return;
             }
+            // The password is not part of what is signed, so one captured signature could carry other
+            // passwords for this person for five minutes: a signature carries one try (secaudit 2026-10
+            // follow-up, A7). The window is checked again here, after the signature.
+            const replayed = signedMessageRefusal(requesting_node, timestamp, signature);
+            if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
             // One answer for a missing consent, a missing account and a wrong password: the caller
             // learns whether the password is right only together with a consent that lets it ask.

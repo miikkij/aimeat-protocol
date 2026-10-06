@@ -5,6 +5,8 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.1 — 2026-10-06 — A signed memory-list request passes once (signedMessageRefusal; secaudit
+ *     2026-10 follow-up, A7). The template listing is a read of the shared catalogue and keeps its window only.
  *   v1.2.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-08-10 — Security audit H-15 (the July F2): POST /v1/federation/memory/list requires an
  *     Ed25519 peer signature and a fresh timestamp. Its only gate was a node id, which the public
@@ -23,6 +25,7 @@ import type { PeerInfo } from '../../services/federation.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { sign, verify } from '../../auth/keypair.js';
+import { signedMessageRefusal } from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
@@ -241,6 +244,9 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on memory-list request'));
             return;
         }
+        // A person's key inventory: one listing per signed request (secaudit 2026-10 follow-up, A7).
+        const replayed = signedMessageRefusal(String(requesting_node), timestamp, String(signature));
+        if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         try {
             const memories = await storage.listMemory(gaii as string, {});

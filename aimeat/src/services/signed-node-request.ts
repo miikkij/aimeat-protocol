@@ -19,17 +19,21 @@
  *   WHY ONE MODULE. The three verifiers wrote these steps out three times (secaudit 2026-10, C6). A
  *   step added to one, as the audience and nonce were on 2026-10-05 (PKG-10), had to be added to each.
  * @structure NodeRequestCheck · signNodeRequest(storage, config, audience, fields) ·
- *   checkNodeRequest(headers, opts)
+ *   checkNodeRequest(headers, opts) · signedMessageRefusal(sourceNode, timestamp, signature)
  * @usage
  *   const headers = await signNodeRequest(storage, config, peerId, { purpose: 'package', group_id });
  *   const who = await checkNodeRequest(req.headers, { thisNodeId, fields, keyOf: (node) => ... });
+ *   const refusal = signedMessageRefusal(source_node, timestamp, signature);   // an older format, after verify
  * @version-history
+ *   v1.1.0 — 2026-10-06 — signedMessageRefusal: the five-minute window and single use for the older
+ *     federation messages that carry no nonce (secaudit 2026-10 follow-up, A7).
  *   v1.0.0 — 2026-10-05 — Initial: the shared steps of package-node-auth.ts and package-sale-auth.ts
  *     (secaudit 2026-10, C6).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { sign, verify } from '../auth/keypair.js';
+import { createHash } from 'node:crypto';
 import { newNonce, nonceAccepted, NONCE_WINDOW_MS } from './request-nonce.js';
 
 export type NodeRequestCheck =
@@ -106,4 +110,27 @@ export async function checkNodeRequest(
     return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed request was already received. A node signs every request anew.' };
   }
   return { ok: true, nodeId: sourceNode };
+}
+
+/**
+ * The window and the single use for a signed message in an older wire format, which signs its own
+ * fields with a timestamp but names no audience and carries no nonce: the federation message,
+ * broadcast, storage grant, ping, heartbeat, presence, memory list, template list, introduction and
+ * federated sign-in verification (secaudit 2026-10 follow-up, A7). Moving those onto the headers
+ * above changes what a peer sends, so it waits for a version every peer runs.
+ *
+ * The signature is the one-time value. Ed25519 signs the same bytes the same way, so a message sent
+ * again carries the same signature, while a node sending anew signs a new moment. Call this after the
+ * signature verified, so a forged message cannot use up a real one. Null when the message may pass.
+ */
+export function signedMessageRefusal(sourceNode: string, timestamp: unknown, signature: string, now = Date.now()): Refusal | null {
+  const ts = Date.parse(String(timestamp ?? ''));
+  if (!Number.isFinite(ts) || Math.abs(now - ts) > NONCE_WINDOW_MS) {
+    return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
+  }
+  const once = createHash('sha256').update(signature).digest('hex').slice(0, 32);
+  if (!nonceAccepted(`signed:${sourceNode}`, once, now)) {
+    return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed message was already received. A node signs every message anew.' };
+  }
+  return null;
 }

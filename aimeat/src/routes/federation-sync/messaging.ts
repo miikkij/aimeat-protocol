@@ -5,6 +5,12 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-06 — The message, the broadcast and the storage grant pass only inside the
+ *     five-minute window of their signed time and only once (signedMessageRefusal; secaudit 2026-10
+ *     follow-up, A7). None checked the time: a captured broadcast reached every person on the node
+ *     again each time it was sent, and a captured grant returned a fresh download link each time.
+ *     Replication keeps no window, because its timestamp is the record's own time; the read
+ *     receipt sets a flag that is already set.
  *   v1.5.1 — 2026-10-05 — An attachment's workspace binding goes to fileTarget, so a workspace file
  *     leaves by federation under its organism's classification (secaudit 2026-10, DATA-4).
  *   v1.5.0 — 2026-10-01 — POST /v1/federation/message refuses a sender who is not on the signing node
@@ -34,7 +40,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from federation-sync.ts (max-file-lines)
  */
 
-import type { Router } from 'express';
+import type { Router, Response } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, DirectMessageAttachment } from '../../storage/interface.js';
@@ -43,6 +49,7 @@ import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { verify } from '../../auth/keypair.js';
+import { signedMessageRefusal } from '../../services/signed-node-request.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
@@ -75,6 +82,13 @@ function normalizeInboundAttachments(
 }
 
 export function registerMessagingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
+    /** After the signature: a message passes inside the five-minute window and once (signed-node-request.ts). True when refused. */
+    const refuseOldOrReplayed = (res: Response, sourceNode: string, timestamp: unknown, signature: string): boolean => {
+        const refusal = signedMessageRefusal(sourceNode, timestamp, signature);
+        if (refusal) res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
+        return !!refusal;
+    };
+
     // POST /v1/federation/replicate — Receive replicated memory from a peer node
     router.post('/v1/federation/replicate', async (req, res) => {
         const { source_node, gaii, key, value, visibility, version, timestamp, signature } = req.body ?? {};
@@ -200,6 +214,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on message'));
             return;
         }
+        if (refuseOldOrReplayed(res, source_node, timestamp, signature)) return;
         // The signature proves which node sent this, not who wrote it: `senderGhii` is the sending
         // node's word. A node speaks for its own people only, so a sender on another node is refused.
         // Until 2026-10-01 a peer could deliver a message that read as from bob@<any node>, and the
@@ -427,6 +442,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on broadcast'));
             return;
         }
+        if (refuseOldOrReplayed(res, source_node, timestamp, signature)) return;
 
         const senderGhii: string = broadcast.senderGhii;
         // The title a peer sent, bounded here rather than trusted. Everything else on this frame is
@@ -534,6 +550,8 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on storage grant'));
             return;
         }
+        // Each grant hands out a fresh download link, so a grant passes once, inside the window.
+        if (refuseOldOrReplayed(res, source_node, timestamp, signature)) return;
 
         // Authority check: this node must hold the sender's copy of that message, addressed to the
         // requesting recipient, and it must actually reference this storage key.
