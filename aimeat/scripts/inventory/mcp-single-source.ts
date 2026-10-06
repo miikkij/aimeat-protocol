@@ -14,6 +14,8 @@
  * @structure singleSourceReport(server, connector) · BASELINE_PATH
  * @usage const r = singleSourceReport(captureServer(), captureConnector()); r.unlisted, r.stale
  * @version-history
+ *   v1.2.0 — 2026-10-06 — A tool whose catalog entry declares its own agent_name keeps it in the
+ *     connector's schema; only the routing agent_name is left out (secaudit 2026-10 follow-up, Part B).
  *   v1.1.0 — 2026-10-05 — ownHandlerReport(): the connector tools that keep a handler of their own beside
  *     their CLI dispatch definition, against security/connector-own-handlers.json (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M3).
@@ -22,7 +24,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../../src/tool-catalog/definitions.js';
+import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition } from '../../src/tool-catalog/definitions.js';
 import { zodShapeFor } from '../../src/tool-catalog/zod-shape.js';
 import type { CapturedTool } from './mcp-capture.js';
 
@@ -100,7 +102,10 @@ export function singleSourceReport(server: Map<string, CapturedTool>, connector:
         const sv = server.get(name);
         if (sv && schemaText(sv.shape) !== want) why.push('node');
         const cn = connector.get(name);
-        if (cn && schemaText(cn.shape, ['agent_name']) !== want) why.push('connector');
+        // The connector adds `agent_name` to pick its registered agent, except on a tool whose catalog
+        // entry declares an agent_name of its own: there the field is the tool's (dispatch-tools.ts).
+        const routing = 'agent_name' in (getAimeatToolDefinition(name)?.input ?? {}) ? [] : ['agent_name'];
+        if (cn && schemaText(cn.shape, routing) !== want) why.push('connector');
         if (why.length) differing.set(name, why);
     }
     return {

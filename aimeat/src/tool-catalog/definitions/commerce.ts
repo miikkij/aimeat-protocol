@@ -10,6 +10,9 @@
  *   6-decimal MICRO-UNITS (1 EUR = 1_000_000), morsels are plain integers; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-06 — aimeat_app_tools_publish and aimeat_offer_price_set carry the bounds the node's MCP wrote
+ *     by hand (app id pattern, at most 200 tools, positive integer prices), so all surfaces take one
+ *     schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-10-01 — aimeat_commerce_psp_set is screen-only: it refuses and returns the Wallet page link (decision D5).
@@ -227,8 +230,8 @@ export const commerceTools = [
         scope: ['commerce:sell', 'memory:write'],
         surfaces: ['service', 'commerce'],
         input: {
-            app_id: { type: 'string', required: true, description: 'The app\'s published filename (e.g. "shop.html") — the manifest key is apps.{app_id}.tools. A name without the extension ("shop") is stored under your app "shop.html" when you have one, and the answer names the filename.' },
-            tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, outputSchema?, action_id?, agent?, exchange?, price?: {morsels, unit?}, priceMoney?: {amount /* micro-units */, currency}, usageTerms?, provenance?, odps? }]' },
+            app_id: { type: 'string', required: true, description: 'The app\'s published filename (e.g. "shop.html") — the manifest key is apps.{app_id}.tools. A name without the extension ("shop") is stored under your app "shop.html" when you have one, and the answer names the filename.', zod: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/) },
+            tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, outputSchema?, action_id?, agent?, exchange?, price?: {morsels, unit?}, priceMoney?: {amount /* micro-units */, currency}, usageTerms?, provenance?, odps? }]', zod: z.array(z.record(z.string(), z.unknown())).max(200) },
             odps: { type: 'object', required: false, description: 'APP-LEVEL ODPS defaults inherited by every tool: { language, dataHolder: {legalName, businessID, email, URL, addressCountry}, logoURL, brandSlogan, governanceProfile, portfolioPriority, license: {geographicalArea, applicableLaws} }. A tool\'s own `odps` overrides these field by field.' },
             provenance: { type: 'object', required: false, description: 'APP-LEVEL provenance defaults inherited by every tool: { source, legalBasis, consentStatus, retention, transformations, snapshotHash (SHA-256 hex), lineage: [{source, transform, at}] }. State only what you know.' },
         },
@@ -255,10 +258,10 @@ export const commerceTools = [
         scope: 'commerce:sell',
         surfaces: ['service', 'commerce'],
         input: {
-            agent_name: { type: 'string', required: true, description: 'Bare name of your owner\'s agent that publishes the offer' },
-            offer_id: { type: 'string', required: true, description: 'The offer id inside agents.{agent_name}.offers' },
-            price_morsels: { type: 'number', required: false, description: 'Morsel price per call (integer, >0). Omit to leave unchanged' },
-            money_amount_micros: { type: 'number', required: false, description: 'Money price in integer 6-decimal MICRO-UNITS (never cents/floats). Omit to leave unchanged' },
+            agent_name: { type: 'string', required: true, description: 'Bare name of your owner\'s agent that publishes the offer', zod: z.string().min(1).max(100) },
+            offer_id: { type: 'string', required: true, description: 'The offer id inside agents.{agent_name}.offers', zod: z.string().min(1).max(100) },
+            price_morsels: { type: 'number', required: false, description: 'Morsel price per call (integer, >0). Omit to leave unchanged', zod: z.number().int().positive() },
+            money_amount_micros: { type: 'number', required: false, description: 'Money price in integer 6-decimal MICRO-UNITS (never cents/floats). Omit to leave unchanged', zod: z.number().int().positive() },
             money_currency: { type: 'string', required: false, description: 'ISO code for money_amount_micros: EUR or USD', enum: ['EUR', 'USD'] },
             clear_morsels: { type: 'boolean', required: false, description: 'Remove the morsel price' },
             clear_money: { type: 'boolean', required: false, description: 'Remove the money price' },

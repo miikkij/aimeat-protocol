@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-06 — aimeat_app_tools_publish and aimeat_offer_price_set register the catalog's schema, which
+ *     now carries their bounds (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 — 2026-10-01 — aimeat_commerce_psp_set refuses and gives the Wallet page link: the payment
@@ -60,7 +62,6 @@
  *   v1.0.0 — 2026-07-14 — Initial commerce MCP surface (PSP, app-tools, offer pricing, checkout)
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
@@ -256,12 +257,8 @@ export function registerCommerceTools(
     mcp.tool(
         'aimeat_app_tools_publish',
         descriptionFor('aimeat_app_tools_publish'),
-        {
-            app_id: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
-            tools: z.array(z.record(z.string(), z.unknown())).max(200),
-            odps: z.record(z.string(), z.unknown()).optional(),
-            provenance: z.record(z.string(), z.unknown()).optional(),
-        },
+        // The catalog's schema, which carries the bounds this tool wrote by hand (secaudit 2026-10 follow-up, Part B).
+        zodShapeFor('aimeat_app_tools_publish'),
         annotationsFor('aimeat_app_tools_publish'),
         async ({ app_id: named, tools, odps, provenance }) => {
             const parsed = AppToolsDocSchema.safeParse({ tools, ...(odps ? { odps } : {}), ...(provenance ? { provenance } : {}) });
@@ -330,16 +327,8 @@ export function registerCommerceTools(
     mcp.tool(
         'aimeat_offer_price_set',
         descriptionFor('aimeat_offer_price_set'),
-        {
-            agent_name: z.string().min(1).max(100),
-            offer_id: z.string().min(1).max(100),
-            price_morsels: z.number().int().positive().optional(),
-            money_amount_micros: z.number().int().positive().optional(),
-            money_currency: z.enum(['EUR', 'USD']).optional(),
-            clear_morsels: z.boolean().optional(),
-            clear_money: z.boolean().optional(),
-            visibility: z.enum(['private', 'unlisted', 'public']).optional(),
-        },
+        // The catalog's schema, which carries the bounds this tool wrote by hand (secaudit 2026-10 follow-up, Part B).
+        zodShapeFor('aimeat_offer_price_set'),
         annotationsFor('aimeat_offer_price_set'),
         async ({ agent_name, offer_id, price_morsels, money_amount_micros, money_currency, clear_morsels, clear_money, visibility }) => {
             // Ownership: only the caller's OWN owner's agents. The target is resolved from the
