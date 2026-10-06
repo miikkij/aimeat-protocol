@@ -8,8 +8,8 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
- *   2026-10-06 — themes.ts and apps.ts are gone: the theme, app and package install request tools run
- *     their dispatch definition (secaudit 2026-10 follow-up, Part B).
+ *   2026-10-06 — themes.ts, apps.ts, agent-management.ts, data-map.ts and designbook.ts are gone: their
+ *     tools run their dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — Every connector tool without a handler of its own runs its CLI dispatch definition
  *     (dispatch-tools.ts); registerAllTools records the names the modules register (secaudit 2026-10, M3).
  *   v2.6.0 -- 2026-09-29 -- Register aimeat_classification (TARGET-082 V5).
@@ -36,7 +36,6 @@ import { registerAgentTasksTools } from './agent-tasks.js';
 import { registerAgentMessagesTools } from './agent-messages.js';
 import { registerDmMessagesTools } from './dm-messages.js';
 import { registerAgentCapsTools } from './agent-caps.js';
-import { registerAgentManagementTools } from './agent-management.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerBoardsTools } from './boards.js';
 import { registerCapabilitiesTools } from './capabilities.js';
@@ -59,11 +58,9 @@ import { registerCompanyTools } from './companies.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerSurfaceLayoutTools } from './surface-layout.js';
 import { registerAppManageTool } from './app-manage.js';
-import { registerDesignbookTools } from './designbook.js';
 import { registerOperatorTools } from './operator.js';
 import { registerComplianceTools } from './compliance.js';
 import { registerInstallSetTools } from './install-sets.js';
-import { registerDataMapTools } from './data-map.js';
 import { registerDispatchTools } from './dispatch-tools.js';
 
 export function registerAllTools(server: McpServer, registry: AgentRegistry): void {
@@ -84,7 +81,6 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
   registerAgentMessagesTools(mcp, registry);
   registerDmMessagesTools(mcp, registry);
   registerAgentCapsTools(mcp, registry);
-  registerAgentManagementTools(mcp, registry);
   registerAgentTelemetryTools(mcp, registry);
   registerBoardsTools(mcp, registry);
   registerCapabilitiesTools(mcp, registry);
@@ -107,10 +103,8 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
   registerPortfolioTools(mcp, registry);
   registerSurfaceLayoutTools(mcp, registry);
   registerAppManageTool(mcp, registry);
-  registerDesignbookTools(mcp, registry);
   registerOperatorTools(mcp, registry);
   registerComplianceTools(mcp, registry);
   registerInstallSetTools(mcp, registry);
-  registerDataMapTools(mcp, registry);
   registerDispatchTools(server, registry, registered);
 }
