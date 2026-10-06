@@ -8,6 +8,8 @@
  *   provider lineage locally. Thin REST proxies over the /v1/exchange/* routes (src/routes/exchange.ts +
  *   exchange-market.ts) — server-side authz + authoritative pricing unchanged.
  * @version-history
+ *   2026-10-06 — aimeat_exchange_accept and aimeat_exchange_need_post run their dispatch definition (secaudit
+ *     2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 11: aimeat_exchange_work_deliver carries
  *     `ai_provenance` / `ai_provenance_id` and echoes what was recorded.
@@ -18,7 +20,6 @@
  *     need_post, bid, bid_accept, consumers — connector-surface coverage.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
@@ -29,43 +30,6 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
   const { client } = registry.resolve();
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
-
-  mcp.tool('aimeat_exchange_accept', descriptionFor('aimeat_exchange_accept'), {
-    ext: z.string().describe('The provider extension name.'),
-    action: z.string().describe('The action id (must be priced).'),
-    contract_ref: z.string().optional().describe('Your contract reference. Omit to auto-generate (mcp:<uuid>).'),
-    cap_units: z.number().int().nonnegative().optional().describe('Budget ceiling in the action\'s unit. Omit = uncapped.'),
-    plan_id: z.string().optional().describe('A provider-declared plan id (bundle/subscription).'),
-    app_id: z.string().optional().describe('The consuming app id ("owner/filename").'),
-  }, annotationsFor('aimeat_exchange_accept'), async ({ ext, action, contract_ref, cap_units, plan_id, app_id }) => {
-    const body: Record<string, unknown> = { ext, action };
-    body.contract_ref = contract_ref || `mcp:${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`;
-    if (cap_units !== undefined) body.cap_units = cap_units;
-    if (plan_id) body.plan_id = plan_id;
-    if (app_id) body.app_id = app_id;
-    return out(await client.post('/v1/exchange/entitlements', body));
-  });
-
-  mcp.tool('aimeat_exchange_need_post', descriptionFor('aimeat_exchange_need_post'), {
-    description: z.string().describe('What you need, in plain language.'),
-    ext: z.string().optional().describe('A desired extension name.'),
-    action: z.string().optional().describe('A desired action id (pair with ext).'),
-    spec: z.record(z.string(), z.unknown()).optional().describe('Minimum output shape: { requiredFields[], format?, sample?, notes? }.'),
-    budget_unit: z.enum(['morsels', 'money']).optional().describe('Budget unit for budget_cap.'),
-    budget_cap: z.number().int().nonnegative().optional().describe('Budget ceiling (integer).'),
-    app_id: z.string().optional().describe('The app this need belongs to ("owner/filename").'),
-    autonomy: z.enum(['supervised', 'auto']).optional().describe('supervised (default) or auto.'),
-  }, annotationsFor('aimeat_exchange_need_post'), async ({ description, ext, action, spec, budget_unit, budget_cap, app_id, autonomy }) => {
-    const body: Record<string, unknown> = { description };
-    if (ext) body.ext = ext;
-    if (action) body.action = action;
-    if (spec) body.spec = spec;
-    if (budget_unit) body.budget_unit = budget_unit;
-    if (budget_cap !== undefined) body.budget_cap = budget_cap;
-    if (app_id) body.app_id = app_id;
-    if (autonomy) body.autonomy = autonomy;
-    return out(await client.post('/v1/exchange/needs', body));
-  });
 
   // ── Act-on-exchange (generic, tunnelled fleet parity with the server MCP) ──────────────────────────
   mcp.tool('aimeat_app_tool_invoke', descriptionFor('aimeat_app_tool_invoke'), zodShapeFor('aimeat_app_tool_invoke'), annotationsFor('aimeat_app_tool_invoke'), async ({ owner, app, tool, input }) => {

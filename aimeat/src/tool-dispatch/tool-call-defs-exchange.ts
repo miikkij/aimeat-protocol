@@ -8,6 +8,8 @@
  *   pause/revoke the caller's own contracts, post + browse needs, bid, accept a bid, and provider
  *   lineage. Server-side authz + authoritative pricing unchanged.
  * @version-history
+ *   v1.1.0 — 2026-10-06 — aimeat_exchange_accept takes offering_id, aimeat_exchange_need_post sends
+ *     usage_intent: both fields their routes read (secaudit 2026-10 follow-up, Part B).
  *   v1.0.0 — 2026-07-20 — Initial EXCHANGE CLI fallback handlers (10 tools).
  */
 import { randomUUID } from 'node:crypto';
@@ -37,11 +39,17 @@ export const exchangeTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_exchange_accept',
         description: 'Accept a contract on an offering → mint a metered entitlement for you. Price is authoritative from the provider action; you set only the budget cap + contract ref.',
         handler: ({ client }, input) => {
-            const body: JsonObject = {
-                ext: requiredString(input, 'ext'),
-                action: requiredString(input, 'action'),
-                contract_ref: optionalString(input, 'contract_ref') ?? `mcp:${randomUUID()}`,
-            };
+            // An offering by id (the route names the contract `offering:<id>` unless one is given),
+            // or a raw extension action, as POST /v1/exchange/entitlements takes either.
+            const offeringId = optionalString(input, 'offering_id');
+            const contractRef = optionalString(input, 'contract_ref');
+            const body: JsonObject = offeringId
+                ? { offering_id: offeringId, ...(contractRef ? { contract_ref: contractRef } : {}) }
+                : {
+                    ext: requiredString(input, 'ext'),
+                    action: requiredString(input, 'action'),
+                    contract_ref: contractRef ?? `mcp:${randomUUID()}`,
+                };
             const capUnits = optionalNumber(input, 'cap_units'); if (capUnits !== undefined) body.cap_units = capUnits;
             const planId = optionalString(input, 'plan_id'); if (planId) body.plan_id = planId;
             const appId = optionalString(input, 'app_id'); if (appId) body.app_id = appId;
@@ -83,6 +91,7 @@ export const exchangeTools: ConnectCliToolDefinition[] = [
             const ext = optionalString(input, 'ext'); if (ext) body.ext = ext;
             const action = optionalString(input, 'action'); if (action) body.action = action;
             const spec = optionalRecord(input, 'spec'); if (spec) body.spec = spec;
+            const usageIntent = optionalString(input, 'usage_intent'); if (usageIntent) body.usage_intent = usageIntent;
             const budgetUnit = optionalString(input, 'budget_unit'); if (budgetUnit) body.budget_unit = budgetUnit;
             const budgetCap = optionalNumber(input, 'budget_cap'); if (budgetCap !== undefined) body.budget_cap = budgetCap;
             const appId = optionalString(input, 'app_id'); if (appId) body.app_id = appId;
