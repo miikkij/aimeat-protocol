@@ -17,6 +17,9 @@
  *   const out = await mintDraftPreview(storage, config, { owner, ownerGhii, filename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.1.0 — 2026-10-06 — On a per-app origin the link names the app's draft origin,
+ *     `<sub>--draft.<appHost>`, where the draft's code gets no silent sign-in (secaudit 2026-10
+ *     follow-up, A2). A path-form address is unchanged: it is bound to no app.
  *   v1.0.0 — 2026-09-27 — Extracted from routes/apps/drafts.ts (POST .../draft/preview-token) so
  *     aimeat_app_draft_save returns the same URL as the REST endpoint.
  */
@@ -24,9 +27,21 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateDraftToken } from './draft-token.js';
 import { appOriginUrl } from '../routes/apps/helpers.js';
+import { DRAFT_LABEL_SUFFIX } from '../routes/subdomains.js';
 
 /** How long a preview token stays valid, in seconds. */
 const PREVIEW_TTL_SECONDS = 600;
+
+/** The app's draft origin for its per-app address; any other address unchanged. */
+function draftOriginUrl(appUrl: string, appHost: string | undefined): string {
+    const host = (appHost || '').toLowerCase();
+    if (!host || !URL.canParse(appUrl)) return appUrl;
+    const u = new URL(appUrl);
+    const label = u.hostname.endsWith(`.${host}`) ? u.hostname.slice(0, -(host.length + 1)) : '';
+    if (!label || label.includes('.')) return appUrl;
+    u.hostname = `${label}${DRAFT_LABEL_SUFFIX}.${host}`;
+    return u.toString();
+}
 
 /** The preview answer, in the field names the REST endpoint returns. */
 export interface DraftPreview {
@@ -68,7 +83,7 @@ export async function mintDraftPreview(
     const token = await generateDraftToken({ sub: ownerGhii, filename }, PREVIEW_TTL_SECONDS);
     let previewUrl: string;
     if (config.appOriginEnabled && config.appHost) {
-        const originBase = await appOriginUrl(config, storage, owner, filename);
+        const originBase = draftOriginUrl(await appOriginUrl(config, storage, owner, filename), config.appHost);
         const sep = originBase.includes('?') ? '&' : '?';
         previewUrl = `${originBase}${sep}preview=${encodeURIComponent(token)}`;
     } else {

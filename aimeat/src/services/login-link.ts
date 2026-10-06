@@ -32,6 +32,7 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.3.1 — 2026-10-06 — A link never lands on an app's draft origin (secaudit 2026-10 follow-up, A2).
  *   v1.3.0 — 2026-10-05 — redeemLoginLink() also refuses a link whose account turned the link off or
  *     changed the address it was mailed to (the seven-day welcome link included), and spends it with
  *     one conditional update; loginReturnTarget() takes the account on open, and an app address must
@@ -89,7 +90,8 @@ export async function loginReturnTarget(storage: Storage, config: AimeatConfig, 
     const rest = `${url.pathname}${url.search}${url.hash}`;
     if (url.origin === base.origin) return isSameOriginPath(rest) ? `${config.baseUrl}${rest}` : null;
     const app = await resolveAppOriginTarget(config, storage, url.origin);
-    if (!app.ok) return null;
+    // A draft origin runs unpublished code: a sign-in link never lands there (secaudit 2026-10 follow-up, A2).
+    if (!app.ok || app.unpublished) return null;
     // On open, the account is known: it lands on an app of its own, or one it already holds a live
     // grant for. Anyone may ask for a link to somebody's address naming any app on this node, so
     // without this a link the victim did not ask for landed them, signed in, on a page the asker

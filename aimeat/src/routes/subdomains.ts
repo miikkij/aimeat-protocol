@@ -14,6 +14,10 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.23.0 — 2026-10-06 — SECURITY: an app's draft has its own origin, `<sub>--draft.<appHost>`
+ *     (DRAFT_LABEL_SUFFIX). A `?preview=` on the app's origin redirects there, and the draft origin
+ *     serves only the draft. On the app's own origin the draft's code reached the silent sign-in
+ *     the published app gets (secaudit 2026-10 follow-up, A2; Jouni 2026-10-06).
  *   v1.22.0 — 2026-09-29 — The badge reads the node's AIMEAT_APP_BADGE switch too (servedBadgeOn), on
  *     the app, the draft preview and the portfolio.
  *   v1.21.2 — 2026-09-26 — Every owner name here (the app target, the draft token, the frame grant,
@@ -152,6 +156,22 @@ export const RESERVED_SUBDOMAINS = new Set([
 export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
 
 /**
+ * An app's UNPUBLISHED draft has an origin of its own, `<sub>--draft.<appHost>`, next to the app's
+ * `<sub>.<appHost>`. The draft's code may be somebody else's (a builder, a fork's author, an AI) and
+ * the owner has not published it, so it must not run where the published app's sign-in answers
+ * silently: on the app's own origin it reached the silent grant with no page between (secaudit
+ * 2026-10 follow-up, A2). A label with this suffix is never an app's own address.
+ */
+export const DRAFT_LABEL_SUFFIX = '--draft';
+
+/** The app label a draft label belongs to, or null when the label is not a draft's. */
+export function draftBaseLabel(label: string): string | null {
+  if (!label.endsWith(DRAFT_LABEL_SUFFIX)) return null;
+  const base = label.slice(0, -DRAFT_LABEL_SUFFIX.length);
+  return SUBDOMAIN_RE.test(base) ? base : null;
+}
+
+/**
  * Ensure an app has a per-app subdomain (creating one if needed) and return its label. This makes
  * the per-app origin — and therefore seamless SSO — work WITHOUT the operator assigning subdomains
  * by hand: the first time an app is opened it auto-gets a `<sub>.apps.<domain>` from its filename
@@ -173,7 +193,7 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
   if (forTarget.length > 0) return null;
 
   const taken = new Set(sites.map(s => s.subdomain));
-  const free = (n: string) => SUBDOMAIN_RE.test(n) && !RESERVED_SUBDOMAINS.has(n) && !taken.has(n);
+  const free = (n: string) => SUBDOMAIN_RE.test(n) && !RESERVED_SUBDOMAINS.has(n) && !taken.has(n) && draftBaseLabel(n) === null;
   let base = filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
   if (base.length < 2) base = `app-${base}`.replace(/-+$/g, '').slice(0, 50);
   const candidates = [base, `${ownerBare}-${base}`.replace(/^-+|-+$/g, '').slice(0, 63), ...Array.from({ length: 50 }, (_, i) => `${base}-${i + 2}`)];
@@ -631,6 +651,18 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
     if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return notFound();
 
+    // An app's draft origin (DRAFT_LABEL_SUFFIX): the app's unpublished draft, against a draft-preview
+    // token and nothing else. The published app is never served here, no frame grant widens the
+    // policy, and the silent sign-in treats code from here as unpublished (services/app-origin-target.ts).
+    const draftOf = draftBaseLabel(sub);
+    if (draftOf !== null) {
+      const draftSite = await storage.getSubdomainSite(draftOf);
+      const draftToken = req.query.preview as string | undefined;
+      if (!draftSite || !draftSite.enabled || draftSite.kind !== 'app' || !draftToken) return notFound();
+      await serveDraftPreview(res, storage, config, draftSite.target, draftToken, appCsp(apexOrigin), apexOrigin);
+      return;
+    }
+
     const site = await storage.getSubdomainSite(sub);
     if (!site || !site.enabled) return notFound();
 
@@ -664,9 +696,13 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // would veto it in browsers that honour it, so it goes — but only when a grant applies.
     if (grantedOrigin) res.removeHeader('X-Frame-Options');
 
+    // A draft is not served on the app's own origin: there its code reached the silent sign-in the
+    // published app gets. The preview link moves to the draft's origin, whose sign-in asks.
     const previewToken = req.query.preview as string | undefined;
     if (previewToken) {
-      await serveDraftPreview(res, storage, config, site.target, previewToken, appCspForRequest, apexOrigin);
+      const draftOrigin = appOriginFor(req, config).replace(`//${sub}.`, `//${sub}${DRAFT_LABEL_SUFFIX}.`);
+      res.setHeader('Cache-Control', 'no-store');
+      res.redirect(302, `${draftOrigin}${req.originalUrl}`);
       return;
     }
 

@@ -17,6 +17,9 @@
  *   resolveFrameAppTarget
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   v1.6.0 — 2026-10-06 — An app's draft origin (`<sub>--draft.<appHost>`) resolves to its app with
+ *     `unpublished: true` and the app's own origin, so a caller grants the draft's code nothing
+ *     silently (secaudit 2026-10 follow-up, A2).
  *   v1.5.0 — 2026-10-05 — appOriginHostFamily: the one test of which address family a host belongs
  *     to, used here and by the grant redirect check in routes/app-grants.ts (secaudit 2026-10, C8).
  *   v1.4.0 — 2026-10-04 — The isolated frame's answer names the app by its own name, which the record
@@ -38,7 +41,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { resolvePublishedPortfolio } from '../routes/portfolio.js';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../routes/subdomains.js';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel } from '../routes/subdomains.js';
 
 /**
  * A grant target for a portfolio origin reads `portfolio:<username>`. An app target reads
@@ -76,8 +79,24 @@ export function appOriginHostFamily(
   return null;
 }
 
+export { draftBaseLabel };
+
+/** The app's own origin for its draft origin: the same scheme and port, the app's label. */
+function appOriginOfDraft(draftOrigin: string, appLabel: string): string {
+  const u = new URL(draftOrigin);
+  u.hostname = `${appLabel}${u.hostname.slice(u.hostname.indexOf('.'))}`;
+  return u.origin;
+}
+
 export type AppOriginTarget =
-  | { ok: true; family: 'app' | 'portfolio'; target: string; name: string; owner: string }
+  | {
+    ok: true; family: 'app' | 'portfolio'; target: string; name: string; owner: string;
+    /** The origin is the app's DRAFT origin (`<sub>--draft.<appHost>`): code the owner has not
+     *  published, which may be somebody else's. A caller grants it nothing silently. */
+    unpublished?: true;
+    /** For a draft origin, the app's own origin, which a grant row names. */
+    appOrigin?: string;
+  }
   | { ok: false; error: 'app_origin_disabled' | 'bad_origin' | 'unknown_app' };
 
 /**
@@ -102,7 +121,9 @@ export async function resolveAppOriginTarget(
   const family = appOriginHostFamily(config, host);
 
   if (family?.family === 'app') {
-    const sub = family.label; // single-label per-app subdomain only (appOriginHostFamily)
+    // A draft origin names the app it belongs to; the code running there is unpublished.
+    const draftOf = draftBaseLabel(family.label);
+    const sub = draftOf ?? family.label; // single-label per-app subdomain only (appOriginHostFamily)
 
     // Subdomain → the app it serves. This binding is what ties a token to one app's origin.
     const site = await storage.getSubdomainSite(sub);
@@ -114,6 +135,7 @@ export async function resolveAppOriginTarget(
       target: site.target,
       name: site.target.slice(slash + 1),
       owner: site.target.slice(0, slash),
+      ...(draftOf !== null ? { unpublished: true as const, appOrigin: appOriginOfDraft(String(origin), sub) } : {}),
     };
   }
 
