@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-06 — aimeat_memory_write registers the catalog's schema, which now carries its bounds
+ *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.33.0 — 2026-10-02 — aimeat_agents_list carries task_start, task_start_effective and
@@ -129,7 +131,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerMemoryBinTools } from './core-memory-bin.js';
 import { registerCoreBoardTools } from './core-boards.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
@@ -143,7 +144,7 @@ import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
-import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
 import { registerCoreAdminTools } from './core-admin.js';
 import { registerAdminSsoTools } from './admin-sso.js';
@@ -157,7 +158,6 @@ import { registerAdminNodeUpdateTools } from './admin-node-update.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
-import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
@@ -453,19 +453,14 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_memory_write',
         descriptionFor('aimeat_memory_write'),
-        {
-            key: z.string().describe('Memory key (hierarchical, slash-separated)'),
-            value: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]).describe('The value to store — any JSON type'),
-            visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).default('private').describe('private = only you, owner = all your agents, group = sharing group members, members = any logged-in user of this node, public = anyone'),
-            group_id: z.string().optional().describe('ID of sharing group for group visibility'),
-            tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
-            ttl_hours: z.number().optional().describe('Time-to-live in hours (entry expires after this; omit for no expiry)'),
-            owner_scope: flexibleBoolean.optional().describe("Write this under the OWNER instead of yourself, so the owner's own tools read it as theirs. Requires the memory:write-as-owner scope, which your owner grants per agent. Without this flag every write lands in your own namespace exactly as before. Does not change `visibility` — where a record lives and who may read it are separate."),
-            expected_version: z.number().int().nonnegative().optional().describe("Optimistic lock: the `version` you read from this record. The write is refused with VERSION_CONFLICT if the record has changed since, so you never silently overwrite an edit someone else made in between. Pass 0 to assert the key does not exist yet. Omit it and the write proceeds as before (last write wins) — supply it whenever a human or another agent can be editing the same record."),
-            ...aiProvenanceInputs,
-        },
+        // The catalog's schema, the one the connector and the shell take too (secaudit 2026-10
+        // follow-up, Part B). Its visibility and tags have no default there, so they are given here,
+        // the same two POST /v1/memory gives.
+        zodShapeFor('aimeat_memory_write'),
         annotationsFor('aimeat_memory_write'),
-        async ({ key, value, visibility, group_id, tags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
+        async ({ key, value, visibility: givenVisibility, group_id, tags: givenTags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
+            const visibility = givenVisibility ?? 'private';
+            const tags = givenTags ?? [];
             // ONE implementation, and it is not this one. services/memory-write.ts owns the scope
             // gate, the schema lock, the version check, the shadowing warning, the provenance stamp,
             // the record shape and the change event — because every one of those had to be fixed

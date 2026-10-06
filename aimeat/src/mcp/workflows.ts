@@ -12,6 +12,7 @@
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
+ *   2026-10-06 — aimeat_workflow_save registers the catalog's schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.3 — 2026-09-26 — aimeat_workflow_save's definition says an ai step's call holds its share of
  *     maxCostUsd until it answers, the share is one attempt, and a step expected to cost more than the
@@ -41,7 +42,6 @@
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { pendingHumanInputs } from '../services/workflow/lifecycle.js';
-import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -86,12 +86,8 @@ export function registerWorkflowTools(
   mcp.tool(
     'aimeat_workflow_save',
     descriptionFor('aimeat_workflow_save'),
-    {
-      id: z.string().describe('Workflow id (lowercase slug). Creating with an existing id updates it.'),
-      definition: z.record(z.string(), z.unknown()).describe('The workflow descriptor: { title, description (both localized string | {locale:text}), trigger {kind:"schedule"|"manual"|"event", cron?, timezone?, on?, match?}, vars[], steps[{id, agent, offer, after?, description, required_to_function?, success_signal?, retry?, timeout_min}], on_step_fail:"inspect", llm?{approved}, maxCostUsd? }. Signals/deliverable.location are inherited from each step\'s offer; a step using an `llm` signal leaf requires llm.approved=true. maxCostUsd (US dollars, per run) caps what a run spends on AI, its ai steps and the judging of its llm signals together: an ai step\'s model call starts only when what one attempt is expected to cost fits in what is left, and holds that share until the call answers, also after a timeout or a retry; otherwise the step waits for the open calls or stops the run. A step expected to cost more than the whole cap starts alone while the run has spent less. Rejected if the graph is not a DAG or an offer is not workflow-compatible.'),
-      propose: z.boolean().optional().describe('Operator flow: return a diff vs the current definition + a single-use confirm_token WITHOUT saving. Default false (direct save, unchanged behavior).'),
-      confirm_token: z.string().optional().describe('Token from the propose step — applies exactly the proposed definition.'),
-    },
+    // The catalog's schema, which carries the definition text this tool wrote (secaudit 2026-10 follow-up, Part B).
+    zodShapeFor('aimeat_workflow_save'),
     annotationsFor('aimeat_workflow_save'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');

@@ -7,14 +7,12 @@
     "aimeat_capabilities_update",
     "aimeat_handbook_get",
     "aimeat_knowledge_contribute",
-    "aimeat_memory_write",
     "aimeat_operator_agent_configure",
     "aimeat_operator_ai_config",
     "aimeat_organism_overview",
     "aimeat_skill_link",
     "aimeat_skill_list",
     "aimeat_skill_unlink",
-    "aimeat_workflow_save",
     "aimeat_workspace_publish",
     "aimeat_workspace_update"
   ]

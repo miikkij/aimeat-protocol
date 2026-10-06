@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   POST /v1/memory lock — 2026-10-06 — MemoryWriteSchema takes expected_version (secaudit 2026-10
+ *     follow-up, Part B).
  *   Chunked upload binding — 2026-09-29 — ChunkedUploadInitSchema takes 'workspace' visibility and
  *     group_id / workspace_ref / workspace_refs, the binding POST /v1/storage already took.
  *   Semantic prefixes — 2026-09-08 — SemanticAnnotationSchema refuses a prefix no @context defines.
@@ -120,6 +122,9 @@ export const MemoryWriteSchema = z.object({
     group_id: z.string().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).optional(), // max 1 year
+    // Optimistic lock: the version the caller read; a write over a changed record is refused with
+    // VERSION_CONFLICT. aimeat_memory_write publishes it on every surface (secaudit 2026-10 follow-up, Part B).
+    expected_version: z.number().int().nonnegative().optional(),
     // Owner-session only: target GAII to store this entry under one of the
     // owner's own agents (instead of the owner's GHII). Ignored for agents.
     agent: z.string().optional(),

@@ -7,6 +7,8 @@
  * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { workflowTools } from './tool-call-defs-workflows.js';
  * @version-history
+ *   2026-10-06 -- aimeat_workflow_save refuses propose and confirm_token by name instead of saving
+ *     directly without them (secaudit 2026-10 follow-up, Part B).
  *   2026-09-27 -- Agent-facing texts use industry terms: door and surface became tool and interface (docs/coding-guidelines/shell-and-git.md).
  *   v1.3.3 -- 2026-09-26 -- aimeat_workflow_save's description says an ai step's call holds its share
  *     of maxCostUsd until it answers, the share is one attempt, and a step expected to cost more than
@@ -40,7 +42,13 @@ export const workflowTools: ConnectCliToolDefinition[] = [
             id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
             definition: { type: 'object', required: true, description: 'The workflow descriptor.' },
         },
-        handler: ({ client }, input) => client.put(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}`, requiredRecord(input, 'definition')),
+        // Propose-then-confirm is the node MCP's operator flow, and PUT /v1/workflows/:id takes the
+        // definition as its whole body with no field for either. Refused by name rather than dropped,
+        // so a caller asking for a proposal is never told a direct save happened (secaudit 2026-10
+        // follow-up, Part B).
+        handler: ({ client }, input) => input.propose !== undefined || input.confirm_token !== undefined
+            ? Promise.resolve({ ok: false as const, error: { code: 'NOT_ON_THIS_SURFACE', message: 'propose and confirm_token run on the node\'s own MCP (the operator\'s propose-then-confirm flow). Here a workflow is saved directly: call again with id and definition only.' } })
+            : client.put(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}`, requiredRecord(input, 'definition')),
     },
     {
         name: 'aimeat_workflow_get',

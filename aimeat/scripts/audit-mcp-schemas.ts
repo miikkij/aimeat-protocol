@@ -104,7 +104,7 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // the tool — so the same tool name had meant two different searches, one returning windows and
     // one returning whole records (review item 6.4). One left, and it needs the same kind of REST
     // change before its connector line is worth writing:
-    'aimeat_memory_write',       // expected_version — POST /v1/memory has no optimistic lock at all; the server MCP calls the write service directly and the PUT route spells it `version`
+    // aimeat_memory_write RESOLVED 2026-10-06: POST /v1/memory takes expected_version.
     // aimeat_extension_install RESOLVED 2026-09-13: the connector declares update and activate and
     // sends them to the doors that read them (PUT /v1/extensions/:name, then the activate route).
     'aimeat_knowledge_contribute', // model
@@ -132,7 +132,7 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // { answer: {...} } at a route reading { picks, other } against the question pinned at ask time,
     // so WorkflowHumanAnswerSchema saw an empty body and every answer given there left the run
     // parked. Both doors take picks/other now; `answer` is deleted, not aliased.
-    'aimeat_workflow_save',            // confirm_token, propose — the propose-then-confirm handshake is unreachable from the connector
+    // aimeat_workflow_save RESOLVED 2026-10-06: one schema; the shell and the connector refuse propose and confirm_token by name.
     'aimeat_operator_agent_configure', // confirm_token, and agent_name vs target_agent_name
     'aimeat_operator_ai_config',       // confirm_token
     'aimeat_app_template_propose',     // composes, derived_from, model_notes, packs, start_mode_rationale
