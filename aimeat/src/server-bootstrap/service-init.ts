@@ -24,6 +24,9 @@
  *     it — which for a living document's hooks means the feature did not exist on a fresh node.
  *   v1.4.0 — 2026-09-16 — sealStoredPspRecords(): encrypts the Stripe secrets of seller records
  *     written before they were stored sealed (commerce/psp-secrets.ts).
+ *   v1.15.0 — 2026-10-06 — migrateToolScopeWordsOnce(): once per node, agents approved before the
+ *     2026-10-06 MCP tool scope words keep their workspace read and send-as-owner tools
+ *     (services/tool-scope-words-migration.ts).
  *   v1.14.0 — 2026-09-30 — migrateScopeVocabulary gets the node id: its agent half runs once per node
  *     and widens only agents approved before the words had names.
  *   v1.7.0 — 2026-09-25 — migrateOperatorAdminOnce(), chained after the scope vocabulary: once per
@@ -90,6 +93,7 @@ import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.j
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
+import { migrateToolScopeWordsOnce } from '../services/tool-scope-words-migration.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -306,6 +310,10 @@ export async function initializeServices(
   // router a key-only save wrote as the owner's model is cleared, so the node's default applies.
   migrateImplicitFreeModelOnce(storage, config.nodeId)
     .catch(err => logger.error('Failed to clear the implicit free model from AI settings; the next boot tries again', { error: String(err) }));
+  // The MCP tool scope words of 2026-10-06 (services/tool-scope-words-migration.ts), once per node:
+  // an agent approved before them keeps its workspace read tools and its send-as-owner tool.
+  migrateToolScopeWordsOnce(storage, config.nodeId)
+    .catch(err => logger.error('Failed to carry existing agents onto the 2026-10-06 tool scope words; the next boot tries again', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.
   // Until this runs, a plain Stripe key is readable through the generic memory doors

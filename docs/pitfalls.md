@@ -149,6 +149,7 @@ and its shape. Symptom first in the section too, then cause, then the rule.
 | 116 | An agent keeps a scope or the operator pass after it was taken away | 3 |
 | 117 | A tool's own `agent_name` or `response_format` vanishes on the connector | 1 |
 | 118 | A tool call answers ok, and the route never saw one of its parameters | 1 |
+| 119 | After a deploy, agents no longer see tools they used yesterday; every test is green | 2 |
 
 ---
 
@@ -1313,3 +1314,11 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 - **The case.** Part B of the secaudit 2026-10 follow-up read each connector tool against its route and found the same defect eleven times on the dispatch path the connector now runs: the tool sent `target_type` where `POST /v1/flags` reads `targetType`; `include_archived` where the overview and search routes read `includeArchived`; `archived=include` where the search route reads only `archived=only`; the capability's arguments as the whole body where the route reads `body.input`; a `sections` list where the route reads one comma-separated string; and it did not send `status`, `apps` or `expected_version` at all. `withDeclaredInputOnly` refuses a parameter the tool does not declare, and `cli-tool-param-forwarding.test.ts` checks that every declared parameter leaves the process; neither can see that the route reads another spelling. A related case is the result of a loop: `aimeat_workspace_member_grant` refused on every workspace answered ok with `granted: 0` on the node's MCP.
 - **The rule.** Read the route's handler for each field the tool sends, not the catalog description. Where the work for a tool exists only in an MCP handler, give it a route that runs the same service function rather than composing it from generic routes in the client (`POST /v1/appdev/templates`, `GET /v1/appdev/pitfalls/index`, `GET /v1/organisms/:id/workspace/index`, `POST /v1/organisms/:id/workspace/drafts`). An answer that did none of the work asked is a refusal, even when each step had its own reason.
 - **The tell.** A dispatch definition that builds memory records itself, or a query parameter in snake_case beside a route that reads `req.query.someName`.
+
+## 119. After a deploy, agents no longer see tools they used yesterday; every test is green
+
+*Symptoms: an agent connected over the node's MCP says a tool does not exist (`aimeat_workspace_read`, `aimeat_workspace_publish`); a test agent with `*` sees it; the suites that broke were fixed by giving their test agents a new scope word.*
+
+- **The case.** The secaudit 2026-10 follow-up (A4, `65d3c5b36`) made each MCP tool ask the scope words its REST route asks. The node MCP registers a tool only when the session holds every word on it (`scopeAllowsTool`), so a new word does not refuse a call, it REMOVES the tool. `organism:read` went onto the workspace read tools, and neither `config.defaultAgentScopes` nor the "standard" consent preset carries it: on aimeat.io every agent approved with them lost workspace read, overview, organism search and export at the deploy. Four E2E suites failed and were fixed by adding the word to their test agents, which is the one fix a real agent never gets. The same shape broke production in changelog 1.33.1. Fixed by `services/tool-scope-words-migration.ts`.
+- **The rule.** A word added to a tool's `scope` ships in the same commit as a once-per-node migration that hands the word to the agents approved before it, on positive evidence only (the word they already held that reached the tool), and never a word that opens more than the reach they had (`services/scope-vocabulary-migration.ts` and `tool-scope-words-migration.ts` say which words never go in). Check the default scopes and the consent presets as well: an agent approved tomorrow gets the same lists.
+- **The tell.** A test fixed by giving its agent a new scope word. Ask what happens to the agents in production that hold yesterday's words.
