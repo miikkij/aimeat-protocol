@@ -18,6 +18,8 @@
  *   - Phase 3: the other doors and the refusals (REST, an id that names no app, another owner)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tools-key
  * @version-history
+ *   v1.0.1 — 2026-10-06 — The seller's agent holds memory:write, which aimeat_app_tools_publish asks
+ *     since the secaudit 2026-10 follow-up (A4).
  *   v1.0.0 — 2026-09-27 — Initial (wish-tools-for-sale-published-over-mcp-do-not-show-in-the-app-cat).
  */
 
@@ -172,7 +174,9 @@ const SCRIPTS = { echo: 'export default async function(ctx, input){ return { ech
 // The first owner on the runner's emptied database is the operator, who may run the aggregate.
 const seller = await makeOwner('tksell');
 const other = await makeOwner('tkother');
-const sellerAgent = await makeAgent(seller, ['commerce:sell', 'exchange:read', 'exchange:write', 'memory:read']);
+// memory:write: aimeat_app_tools_publish asks it beside commerce:sell since the secaudit 2026-10
+// follow-up (A4), the word the route it runs on asks.
+const sellerAgent = await makeAgent(seller, ['commerce:sell', 'exchange:read', 'exchange:write', 'memory:read', 'memory:write']);
 const session = await openSession(sellerAgent);
 
 console.log('\nPhase 1 — fixtures');
