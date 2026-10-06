@@ -13,6 +13,8 @@
  *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
  *
  * @version-history
+ *   v1.4.0 — 2026-10-06 — A replicate carries a delivery proof: the peer it is for and the send time,
+ *     since its signed timestamp is the record's (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.2.0 — 2026-09-29 — TARGET-082 review: what the classification keeps on this node is counted
  *     (`classified_withheld` per peer) and logged by key; a single replication says CLASSIFIED.
@@ -28,6 +30,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sign } from '../auth/keypair.js';
+import { deliveryProof } from './signed-node-request.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { logger } from '../utils/logger.js';
@@ -158,6 +161,7 @@ export async function replicateMemoryToPeer(
     // Sign the payload
     const nodeKey = await storage.getNodeKey();
     let replicateSignature: string | undefined;
+    let delivery: Record<string, string> = {};
     if (nodeKey?.privateKey) {
       const signPayload = JSON.stringify({
         source_node: payload.source_node,
@@ -169,12 +173,15 @@ export async function replicateMemoryToPeer(
         timestamp: payload.timestamp,
       });
       replicateSignature = await sign(nodeKey.privateKey, signPayload);
+      // The timestamp is the record's update time, so the send time and the peer go in the
+      // delivery proof (secaudit 2026-10 last items, D3).
+      delivery = await deliveryProof(nodeKey.privateKey, signPayload, peer.nodeId);
     }
 
     const resp = await peerFetch(`${peer.url}/v1/federation/replicate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, signature: replicateSignature }),
+      body: JSON.stringify({ ...payload, signature: replicateSignature, ...delivery }),
     }, { timeoutMs: config.federationTimeoutMs });
     if (!resp.ok) return { success: false, error: resp.message };
 

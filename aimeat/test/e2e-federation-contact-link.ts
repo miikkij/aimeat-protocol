@@ -17,6 +17,8 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   v1.4.0 — 2026-10-06 — P9–P12: a read receipt names the node it is for and its send time, and is
+ *     heard once inside five minutes (secaudit 2026-10 last items, D3).
  *   v1.3.0 — 2026-10-06 — P5–P8: a message names the node it is for (secaudit 2026-10 follow-up, A7):
  *     delivered when it names this node, refused when it names another or its audience is not signed,
  *     and an older node's message is refused only while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on.
@@ -31,7 +33,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
-import { audienceProof } from '../src/services/signed-node-request.js';
+import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -241,6 +243,50 @@ await test('P8. With the audience required, a message from an older node that na
         V.config.federationAudienceRequired = false;
     }
     const heard = await asPeer('/v1/federation/message', { ...legacy, timestamp: new Date(Date.now() + 1).toISOString() });
+    assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
+});
+
+// The read receipt is one of the four messages that sign no send time of their own (with memory
+// replicate, catalogue sync and the genesis catalogue ingest): its timestamp is when the message was
+// READ, so a captured receipt passed for ever. A sender of this version adds the audience and the send
+// time under a second signature (deliveryProof), and the receiver holds that to the five-minute window
+// and to one use (secaudit 2026-10 last items, D3; Jouni 2026-10-06). P9 to P12 failed on the old code
+// (200 each time: the proof was ignored).
+const receipt = () => ({ source_node: C_NODE, message_id: deliveredMessageId, kind: 'read', timestamp: new Date(Date.now() - 3 * 86_400_000).toISOString() });
+const withDelivery = async (payload: Record<string, unknown>, audience: string, sentAt?: string) => {
+    const signed = JSON.stringify(payload);
+    const proof = await deliveryProof(cKeys.privateKey, signed, audience, sentAt);
+    return V.json('/v1/federation/message/receipt', {
+        method: 'POST', headers: { 'x-source-node': C_NODE },
+        body: JSON.stringify({ ...payload, signature: await sign(cKeys.privateKey, signed), ...proof }),
+    });
+};
+await test('P9. A read receipt that names this node and its send time is heard once, and refused the second time', async () => {
+    // Read three days ago and sent now: the read time is not the send time, and only the send time is held to the window.
+    const sentAt = new Date().toISOString();
+    const once = receipt();
+    const first = await withDelivery(once, V.nodeId, sentAt);
+    assert(first.status === 200, `first: ${first.status} ${JSON.stringify(first.body)}`);
+    const again = await withDelivery(once, V.nodeId, sentAt);
+    assert(again.status === 401 && again.body.error?.code === 'REPLAYED', `expected 401 REPLAYED, got ${again.status}: ${JSON.stringify(again.body)}`);
+});
+await test('P10. A read receipt sent more than five minutes ago is refused', async () => {
+    const r = await withDelivery(receipt(), V.nodeId, new Date(Date.now() - 10 * 60_000).toISOString());
+    assert(r.status === 400 && r.body.error?.code === 'STALE_TIMESTAMP', `expected 400 STALE_TIMESTAMP, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+await test('P11. A read receipt signed for another node is refused here (401 WRONG_AUDIENCE)', async () => {
+    const r = await withDelivery(receipt(), 'aimeat-test-001-elsewhere');
+    assert(r.status === 401 && r.body.error?.code === 'WRONG_AUDIENCE', `expected 401 WRONG_AUDIENCE, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+await test('P12. With the audience required, a read receipt from an older node is refused; off, it is heard', async () => {
+    V.config.federationAudienceRequired = true;
+    try {
+        const r = await asPeer('/v1/federation/message/receipt', receipt());
+        assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
+    } finally {
+        V.config.federationAudienceRequired = false;
+    }
+    const heard = await asPeer('/v1/federation/message/receipt', receipt());
     assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
 });
 

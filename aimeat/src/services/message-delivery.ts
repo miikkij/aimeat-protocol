@@ -12,6 +12,7 @@
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
  * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-06 -- A read receipt carries a delivery proof: the peer and the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.4.0 -- 2026-10-06 -- A message names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.3.0 -- 2026-10-05 -- Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.2.0 -- 2026-10-01 -- Messages and read receipts go only to a peer that is active or degraded
@@ -33,7 +34,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord, MessageDeliveryLog } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { sign } from '../auth/keypair.js';
-import { audienceProof } from './signed-node-request.js';
+import { audienceProof, deliveryProof } from './signed-node-request.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor } from '../utils/messaging.js';
 import { logger } from '../utils/logger.js';
@@ -175,10 +176,12 @@ export async function propagateReadReceipt(ctx: DeliveryCtx, message: DirectMess
   const payload = { source_node: config.nodeId, message_id: message.id, kind: 'read' as const, timestamp: readAt };
   try {
     const signature = await sign(nodeKey.privateKey, JSON.stringify(payload));
+    // The read time is not the send time: the delivery proof names the peer and the moment this goes out (D3).
+    const proof = await deliveryProof(nodeKey.privateKey, JSON.stringify(payload), peer.nodeId);
     const sent = await peerFetch(`${peer.url}/v1/federation/message/receipt`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-source-node': config.nodeId },
-      body: JSON.stringify({ ...payload, signature }),
+      body: JSON.stringify({ ...payload, signature, ...proof }),
     }, { timeoutMs: config.federationTimeoutMs });
     if (!sent.ok) throw new Error(sent.message);
   } catch (err) {

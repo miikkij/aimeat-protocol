@@ -13,6 +13,8 @@
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
  *
  * @version-history
+ *   v1.4.0 — 2026-10-06 — The catalogue push carries a delivery proof: the genesis peer it is for and
+ *     the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.2.0 — 2026-09-29 — syncSubscribedMemory sends only what leaveToPeer lets leave (TARGET-082
  *     V4) and logs the keys that stayed behind, with the reason.
@@ -27,6 +29,7 @@ import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { sign } from '../auth/keypair.js';
+import { deliveryProof } from './signed-node-request.js';
 import { logger } from '../utils/logger.js';
 import { leaveToPeer } from './classification/egress.js';
 
@@ -153,14 +156,18 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
       // Sign the push payload
       const nodeKey = await storage.getNodeKey();
       let pushSignature: string | undefined;
+      let delivery: Record<string, string> = {};
       if (nodeKey?.privateKey) {
         pushSignature = await sign(nodeKey.privateKey, JSON.stringify(payload));
+        // Nothing signed says when this was sent: the delivery proof does, and names the peer
+        // (secaudit 2026-10 last items, D3).
+        delivery = await deliveryProof(nodeKey.privateKey, JSON.stringify(payload), peer.genesisNodeId);
       }
 
       const resp = await peerFetch(`${peer.genesisUrl}/v1/federation/genesis-catalogue-ingest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, signature: pushSignature }),
+        body: JSON.stringify({ ...payload, signature: pushSignature, ...delivery }),
       }, { timeoutMs: config.federationTimeoutMs });
       if (!resp.ok) return { success: false, error: resp.message };
 

@@ -5,6 +5,7 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-10-06 — catalogue-sync checks a delivery proof: this node named, sent inside five minutes, heard once (deliveryRefusal; secaudit 2026-10 last items, D3).
  *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from federation-sync.ts (max-file-lines)
  */
@@ -18,6 +19,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
+import { deliveryRefusal } from '../../services/signed-node-request.js';
 import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation-tiers.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -51,6 +53,16 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
         const catalogueSyncValid = await verify(peer.publicKey, catalogueSyncPayload, signature);
         if (!catalogueSyncValid) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on catalogue-sync request'));
+            return;
+        }
+        // No send time is signed above (since_timestamp is the previous sync), so the delivery proof
+        // carries it: this node named, inside five minutes, once (secaudit 2026-10 last items, D3).
+        const undelivered = await deliveryRefusal({
+            sourceNode: source_node, signed: catalogueSyncPayload, body: req.body, publicKey: peer.publicKey,
+            thisNodeId: config.nodeId, required: config.federationAudienceRequired,
+        });
+        if (undelivered) {
+            res.status(undelivered.status).json(error(config.nodeId, undelivered.code, undelivered.message));
             return;
         }
 

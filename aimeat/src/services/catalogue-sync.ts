@@ -13,6 +13,8 @@
  *   - syncCatalogueToPeer(peer, config, storage): diff, hash, sign, and push to one peer
  *
  * @version-history
+ *   v1.2.0 — 2026-10-06 — The sync carries a delivery proof: the peer it is for and the send time
+ *     (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.1.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -21,6 +23,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sign } from '../auth/keypair.js';
+import { deliveryProof } from './signed-node-request.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
@@ -141,6 +144,7 @@ export async function syncCatalogueToPeer(
     // 5. Sign the payload
     const nodeKey = await storage.getNodeKey();
     let payloadSignature: string | undefined;
+    let delivery: Record<string, string> = {};
     if (nodeKey?.privateKey) {
       const signPayload = JSON.stringify({
         source_node: payload.source_node,
@@ -149,6 +153,8 @@ export async function syncCatalogueToPeer(
         catalogue_hash: payload.catalogue_hash,
       });
       payloadSignature = await sign(nodeKey.privateKey, signPayload);
+      // Nothing signed says when this was sent: the delivery proof does, and names the peer (D3).
+      delivery = await deliveryProof(nodeKey.privateKey, signPayload, peer.nodeId);
     }
 
     // 6. SSRF validation
@@ -161,7 +167,7 @@ export async function syncCatalogueToPeer(
     const resp = await peerFetch(`${peer.url}/v1/federation/catalogue-sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...payload, signature: payloadSignature }),
+      body: JSON.stringify({ ...payload, signature: payloadSignature, ...delivery }),
     }, { timeoutMs: config.federationTimeoutMs });
     if (!resp.ok) throw new Error(resp.message);
 
