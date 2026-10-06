@@ -20,12 +20,16 @@
  *   step added to one, as the audience and nonce were on 2026-10-05 (PKG-10), had to be added to each.
  * @structure NodeRequestCheck · signNodeRequest(storage, config, audience, fields) ·
  *   checkNodeRequest(headers, opts) · audienceProof(privateKey, signed, audience) ·
- *   audienceRefusal(opts) · signedMessageRefusal(sourceNode, timestamp, signature)
+ *   audienceRefusal(opts) · signedMessageRefusal(sourceNode, timestamp, signature) ·
+ *   deliveryProof(privateKey, signed, audience, sentAt?) · deliveryRefusal(opts)
  * @usage
  *   const headers = await signNodeRequest(storage, config, peerId, { purpose: 'package', group_id });
  *   const who = await checkNodeRequest(req.headers, { thisNodeId, fields, keyOf: (node) => ... });
  *   const refusal = signedMessageRefusal(source_node, timestamp, signature);   // an older format, after verify
  * @version-history
+ *   v1.3.0 — 2026-10-06 — deliveryProof and deliveryRefusal: replicate, catalogue sync, genesis
+ *     catalogue ingest and the read receipt name their node and send time under a second signature,
+ *     and pass inside five minutes and once (secaudit 2026-10 last items, D3; Jouni 2026-10-06).
  *   v1.2.0 — 2026-10-06 — audienceProof and audienceRefusal: a message in the older format names the
  *     node it is for with a second signature beside its own, which a peer on an older version ignores;
  *     AIMEAT_FEDERATION_AUDIENCE_REQUIRED refuses a message that names none (secaudit 2026-10
@@ -185,4 +189,50 @@ export function signedMessageRefusal(sourceNode: string, timestamp: unknown, sig
     return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed message was already received. A node signs every message anew.' };
   }
   return null;
+}
+
+/**
+ * The four federation messages that sign no send time of their own: memory replicate (its timestamp is
+ * the RECORD's update time, which may be months old), catalogue sync, genesis catalogue ingest and the
+ * read receipt. A captured one could be sent again for ever, and a replicate sent again brought back a
+ * record its owner had deleted. The proof names the node the message is for and the moment it was
+ * sent, under a second signature with its own prefix, so an audience proof cannot stand in for it
+ * (secaudit 2026-10 last items, D3; Jouni 2026-10-06). The message's own signature stays as it was,
+ * so a peer on an older version verifies that one and ignores the three added fields.
+ */
+function deliveryMessage(signed: string, audience: string, sentAt: string): string {
+  return `aimeat-delivery:${audience}\n${sentAt}\n${signed}`;
+}
+
+/** The three fields a sender adds to one of the four messages: the node it is for, the send time, and the proof. */
+export async function deliveryProof(
+  privateKey: string, signed: string, audience: string, sentAt = new Date().toISOString(),
+): Promise<{ audience: string; sent_at: string; audience_signature: string }> {
+  return { audience, sent_at: sentAt, audience_signature: await sign(privateKey, deliveryMessage(signed, audience, sentAt)) };
+}
+
+/**
+ * The receiving side, after the message's own signature verified: a delivery names this node, its
+ * proof is the sending node's, and it passes inside five minutes of its send time and once
+ * (signedMessageRefusal, keyed on the proof). A delivery that carries none of the three fields comes
+ * from a peer on an older version and passes while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off, as an
+ * older message without an audience does. Null when the message may pass.
+ */
+export async function deliveryRefusal(opts: {
+  sourceNode: string; signed: string; body: Record<string, unknown>; publicKey: string; thisNodeId: string; required: boolean; now?: number;
+}): Promise<Refusal | null> {
+  const field = (name: string): string => (typeof opts.body[name] === 'string' ? opts.body[name] as string : '');
+  const audience = field('audience'), proof = field('audience_signature'), sentAt = field('sent_at');
+  if (!audience && !proof && !sentAt) {
+    return opts.required
+      ? { ok: false, status: 401, code: 'AUDIENCE_REQUIRED', message: `This node takes a signed message only when it names the node it is for (audience: ${opts.thisNodeId}) and when it was sent (sent_at). The sending node runs an older version.` }
+      : null;
+  }
+  if (audience !== opts.thisNodeId) {
+    return { ok: false, status: 401, code: 'WRONG_AUDIENCE', message: `This message was signed for ${audience || 'another node'}, not for ${opts.thisNodeId}.` };
+  }
+  if (!proof || !sentAt || !await verify(opts.publicKey, deliveryMessage(opts.signed, audience, sentAt), proof)) {
+    return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The audience and send time of this message are not signed by the sending node.' };
+  }
+  return signedMessageRefusal(opts.sourceNode, sentAt, proof, opts.now);
 }

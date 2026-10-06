@@ -14,6 +14,7 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.9.0 — 2026-10-06 — genesis-catalogue-ingest checks a delivery proof: this node named, sent inside five minutes, heard once (deliveryRefusal; secaudit 2026-10 last items, D3).
  *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.7.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-09-29 — TARGET-082 review: what leave() keeps from a peer's memory read is counted
@@ -46,6 +47,7 @@ import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { verify } from '../auth/keypair.js';
+import { deliveryRefusal } from '../services/signed-node-request.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from '../services/event-bus.js';
@@ -339,6 +341,15 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
             const isValid = await verify(genesisPeer.publicKey, payload, signature);
             if (!isValid) {
                 res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on genesis catalogue ingest'));
+                return;
+            }
+            // Nothing above says when it was sent, so the delivery proof does (secaudit 2026-10 last items, D3).
+            const undelivered = await deliveryRefusal({
+                sourceNode: source_node, signed: payload, body: req.body, publicKey: genesisPeer.publicKey,
+                thisNodeId: config.nodeId, required: config.federationAudienceRequired,
+            });
+            if (undelivered) {
+                res.status(undelivered.status).json(error(config.nodeId, undelivered.code, undelivered.message));
                 return;
             }
 

@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-06 — Replicate and the receipt check a delivery proof: the node they are for and
+ *     a send time, heard once inside five minutes (deliveryRefusal; secaudit 2026-10 last items, D3).
  *   v1.7.0 — 2026-10-06 — The message, the broadcast and the storage grant name this node as their
  *     audience with a second signature (audienceRefusal); one that names another node is refused, and
  *     one that names none is refused when AIMEAT_FEDERATION_AUDIENCE_REQUIRED is on (secaudit 2026-10
@@ -53,7 +55,7 @@ import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal } from '../../services/signed-node-request.js';
+import { signedMessageRefusal, audienceRefusal, deliveryRefusal } from '../../services/signed-node-request.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
@@ -103,6 +105,21 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         return !!refusal;
     };
 
+    /**
+     * After the signature, for the two messages here that sign no send time of their own (replicate,
+     * receipt): the delivery proof names this node and a send time inside five minutes, once
+     * (deliveryRefusal, signed-node-request.ts; secaudit 2026-10 last items, D3). True when refused.
+     */
+    const refuseUndelivered = async (
+        res: Response, sourceNode: string, signed: string, body: Record<string, unknown>, publicKey: string,
+    ): Promise<boolean> => {
+        const refusal = await deliveryRefusal({
+            sourceNode, signed, body, publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
+        });
+        if (refusal) res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
+        return !!refusal;
+    };
+
     // POST /v1/federation/replicate — Receive replicated memory from a peer node
     router.post('/v1/federation/replicate', async (req, res) => {
         const { source_node, gaii, key, value, visibility, version, timestamp, signature } = req.body ?? {};
@@ -131,6 +148,8 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on replication request'));
             return;
         }
+        // The signed timestamp is the record's own update time, so the send time comes in the proof.
+        if (await refuseUndelivered(res, source_node, replicatePayload, req.body, peer.publicKey)) return;
 
         // Store replicated memory with cross-node prefix
         const replicaKey = `replica:${source_node}:${key}`;
@@ -529,6 +548,8 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on receipt'));
             return;
         }
+        // The signed timestamp is when the message was read, so the send time comes in the proof.
+        if (await refuseUndelivered(res, source_node, receiptPayload, req.body, peer.publicKey)) return;
 
         if (kind === 'read') {
             await storage.setMessageReadReceipt(message_id, timestamp ?? new Date().toISOString());

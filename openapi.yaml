@@ -26438,6 +26438,16 @@ paths:
                 signature:
                   type: string
                   description: Ed25519 signature of the payload
+                audience:
+                  type: string
+                  description: The node this replicate is for. With sent_at and audience_signature it makes the delivery proof; a replicate without the three passes only while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off.
+                sent_at:
+                  type: string
+                  format: date-time
+                  description: When the sending node sent it (timestamp is the record's update time). Refused outside five minutes (400 STALE_TIMESTAMP) and the second time (401 REPLAYED).
+                audience_signature:
+                  type: string
+                  description: Ed25519 signature of "aimeat-delivery:{audience}\n{sent_at}\n{the signed payload}" by the sending node.
       responses:
         '200':
           description: Replica accepted
@@ -26522,6 +26532,16 @@ paths:
                 catalogue_hash:
                   type: string
                   description: Hash of the sender's full catalogue for consistency checks
+                audience:
+                  type: string
+                  description: The node this sync is for. With sent_at and audience_signature it makes the delivery proof; a sync without the three passes only while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off.
+                sent_at:
+                  type: string
+                  format: date-time
+                  description: When the sending node sent it. Refused outside five minutes (400 STALE_TIMESTAMP) and the second time (401 REPLAYED).
+                audience_signature:
+                  type: string
+                  description: Ed25519 signature of "aimeat-delivery:{audience}\n{sent_at}\n{the signed payload}" by the sending node.
       responses:
         '200':
           description: Sync result
@@ -45500,7 +45520,7 @@ paths:
     post:
       operationId: ingestGenesisCatalogue
       summary: Ingest genesis catalogue data
-      description: Receive catalogue data from a genesis peer.
+      description: Receive catalogue data from a genesis peer, signed by it. A push of this version also carries a delivery proof (audience, sent_at, audience_signature) and is heard once inside five minutes; one without it passes only while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off.
       tags: [Federation]
       requestBody:
         required: true
@@ -45508,6 +45528,15 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                source_node: { type: string }
+                entries: { type: array, items: { type: object } }
+                csms: { type: array, items: { type: object } }
+                catalogue_hash: { type: string }
+                signature: { type: string }
+                audience: { type: string, description: The node this push is for. }
+                sent_at: { type: string, format: date-time, description: When the genesis peer sent it. }
+                audience_signature: { type: string, description: 'Ed25519 signature of "aimeat-delivery:{audience}\n{sent_at}\n{the signed payload}".' }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -53583,15 +53612,18 @@ paths:
                 source_node: { type: string }
                 message_id: { type: string, format: uuid }
                 kind: { type: string, enum: [read, accepted, blocked] }
-                timestamp: { type: string, format: date-time }
+                timestamp: { type: string, format: date-time, description: When the message was read. }
                 signature: { type: string }
+                audience: { type: string, description: 'The node this receipt is for. With sent_at and audience_signature it makes the delivery proof; a receipt without the three passes only while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off.' }
+                sent_at: { type: string, format: date-time, description: When the sending node sent it. Refused outside five minutes and the second time. }
+                audience_signature: { type: string, description: 'Ed25519 signature of "aimeat-delivery:{audience}\n{sent_at}\n{the signed payload}" by the sending node.' }
       responses:
         '200':
           description: Receipt applied
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: INVALID_INPUT, or STALE_TIMESTAMP when sent_at is outside five minutes.
         '401':
-          description: Missing or invalid signature
+          description: Missing or invalid signature; WRONG_AUDIENCE, AUDIENCE_REQUIRED or REPLAYED for the delivery proof.
         '403':
           description: Source not an active peer
 

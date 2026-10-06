@@ -8,6 +8,7 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.10.0 — 2026-10-06 — A push-home replicate carries a delivery proof: the home node and the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.9.0 — 2026-10-06 — A memory-list request names the node it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.7.0 — 2026-09-29 — TARGET-082 review: push-home answers 403 CLASSIFIED with the label and why
@@ -42,7 +43,7 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { sign } from '../../auth/keypair.js';
-import { audienceProof } from '../../services/signed-node-request.js';
+import { audienceProof, deliveryProof } from '../../services/signed-node-request.js';
 import type { MemoryRouteCtx } from './shared.js';
 import { systemReader } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
@@ -301,10 +302,14 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       // answer is 401 "Missing signature on replication request". Found by e2e-federated-session.
       const nodeKey = await storage.getNodeKey();
       if (nodeKey) {
-        payload.signature = await sign(nodeKey.privateKey, JSON.stringify({
+        const signed = JSON.stringify({
           source_node: payload.source_node, gaii: payload.gaii, key, value: record.value,
           visibility: record.visibility, version: record.version, timestamp: record.updatedAt,
-        }));
+        });
+        payload.signature = await sign(nodeKey.privateKey, signed);
+        // The timestamp is the record's update time, so the send time and the home node go in the
+        // delivery proof (secaudit 2026-10 last items, D3).
+        Object.assign(payload, await deliveryProof(nodeKey.privateKey, signed, homeNode));
       }
 
       const response = arrived(await peerFetch(replicateUrl, {
