@@ -10,6 +10,7 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-06 — A memory ceiling refusal reads `QUOTA_EXCEEDED: ...` (secaudit 2026-10 last items, F3).
  *   2026-10-06 — aimeat_app_template_propose takes the catalog's schema, which now carries the bounds
  *     this file held; POST /v1/appdev/templates validates with the same one (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -53,7 +54,8 @@ export function registerAppTemplateProposalTools(
         annotationsFor('aimeat_app_template_propose'),
         async (input) => {
             const result = await proposeTemplate(storage, config, agentGaii, input);
-            if ('error' in result) return errText(result.error);
+            // A memory ceiling refusal carries its code (F3): `QUOTA_EXCEEDED: ...`, as REST answers.
+            if ('error' in result) return errText(result.code ? `${result.code}: ${result.error}` : result.error);
             return text({ id: result.manifest.id, updated: result.updated, key: `template.catalog.${result.manifest.id}.manifest` });
         },
     );

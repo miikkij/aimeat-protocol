@@ -15046,6 +15046,10 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: The caller lacks memory:write.
+        '413':
+          description: QUOTA_EXCEEDED — the proposal would pass the owner's memory key ceiling, the value size or the byte budget; nothing is written.
+        '429':
+          description: More than 30 proposals in a minute.
 
   /v1/appdev/templates/{id}:
     get:

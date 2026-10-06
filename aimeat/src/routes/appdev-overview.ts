@@ -9,6 +9,8 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.4.1 — 2026-10-06 — POST /v1/appdev/templates is rate-limited (30 a minute) and answers a memory
+ *     ceiling with 413 QUOTA_EXCEEDED (secaudit 2026-10 last items, F3).
  *   v1.4.0 — 2026-10-06 — POST /v1/appdev/templates proposes (upserts) a template through
  *     proposeTemplate(), the node MCP tool's own function, with the catalog's schema. The connector's
  *     aimeat_app_template_propose wrote a memory record itself, under tags the list does not read,
@@ -28,6 +30,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { buildAppdevOverview } from '../services/appdev-overview.js';
 import { readerFor } from '../services/classification/reader.js';
@@ -72,7 +75,8 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
   });
 
   // POST /v1/appdev/templates — propose or update one template (same id replaces).
-  router.post('/v1/appdev/templates', requireAuth(), requireScope('memory:write'), async (req, res) => {
+  // A memory write, so rate-limited as POST /v1/organisms/:id/workspace/drafts is (F3).
+  router.post('/v1/appdev/templates', requireAuth(), requireScope('memory:write'), rateLimit({ windowMs: 60_000, max: 30 }), async (req, res) => {
     const parsed = ProposeTemplateBody.safeParse(req.body ?? {});
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues.map(i => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ')));
@@ -80,7 +84,8 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     }
     const result = await proposeTemplate(storage, config, resolveIdentity(req.auth!, config.nodeId), parsed.data as ProposeTemplateInput);
     if ('error' in result) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', result.error));
+      // A memory ceiling answers 413 QUOTA_EXCEEDED, as POST /v1/memory does; the rest are 400.
+      res.status(result.status ?? 400).json(error(config.nodeId, result.code ?? 'INVALID_INPUT', result.error));
       return;
     }
     res.json(success(config.nodeId, { id: result.manifest.id, updated: result.updated, key: `template.catalog.${result.manifest.id}.manifest` }));
