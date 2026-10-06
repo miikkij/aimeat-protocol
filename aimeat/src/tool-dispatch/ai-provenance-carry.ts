@@ -56,6 +56,8 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.3 — 2026-10-06 — An ai_provenance_id given alone on a tool whose route reads no provenance
+ *     answers recorded:false with the reason; it answered recorded:true (secaudit 2026-10 last items, F4).
  *   v1.3.2 — 2026-10-06 — aimeat_workspace_write: recorded-by-route, POST /v1/organisms/:id/workspace/drafts
  *     (secaudit 2026-10 follow-up, Part B).
  *   v1.3.1 — 2026-10-06 — aimeat_app_publish: recorded-by-route, POST /v1/apps (secaudit 2026-10
@@ -299,14 +301,28 @@ export async function carryDeclaration(
 ): Promise<ProvenanceEcho | undefined> {
   const { tool, declared, declaredId, attach } = opts;
 
+  const carrier = CONNECTOR_PROVENANCE_CARRIERS[tool];
+
   // An id the write body already carried. Nothing more to do — but say so, because "I attached
-  // record X" and "I silently ignored your id" look identical from the outside otherwise.
+  // record X" and "I silently ignored your id" look identical from the outside otherwise. On a tool
+  // whose route reads no provenance the id went nowhere, and the answer says that instead
+  // (secaudit 2026-10 last items, F4).
   if (declaredId && !declared) {
+    if (!carrier || carrier.kind === 'not-carried') {
+      const route = carrier?.route ?? 'this tool\'s node route';
+      return {
+        recorded: false,
+        declared: { ai_provenance_id: declaredId },
+        reason:
+          `${route} reads no ai_provenance_id, so record ${declaredId} was NOT attached to this write. `
+          + 'The node stamped the write from your principal instead. To attach a record, write through '
+          + 'aimeat_memory_write, which carries ai_provenance_id.',
+      };
+    }
     return { recorded: true, id: declaredId, via: 'attached' };
   }
   if (!declared) return undefined;
 
-  const carrier = CONNECTOR_PROVENANCE_CARRIERS[tool];
   // The route recorded it and says so in its own answer; a second echo here could only disagree.
   if (carrier?.kind === 'recorded-by-route') return undefined;
   if (!carrier || carrier.kind === 'not-carried') {
