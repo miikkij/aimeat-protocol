@@ -12,6 +12,10 @@
  *   delivered over SMTP (absent here), so it is covered by the unchanged verify-email path + the wrong-code
  *   assertion below.
  * @version-history
+ *   v1.2.0 — 2026-10-06 — A code key's holder under the gate: signing in with the key answers
+ *     EMAIL_NOT_VERIFIED with has_email true, and attach-email takes the key as the password and sends a
+ *     code to the key's own address, so the holder can sign in on a node that requires a confirmed
+ *     address (audit of the secaudit last items, finding 3).
  *   v1.1.1 — 2026-10-06 — The code key's address is marked verified with helpers/verified-email.ts:
  *     a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.1.0 — 2026-07-19 — The "email already owned" 409 now requires a VERIFIED owner: emailHash is a
@@ -89,6 +93,9 @@ async function main() {
     const password = 'LegacyPass123';
     const emailOwner = `hasmail${Date.now() % 1000000}`;  // holds a taken (verified) email
     const takenEmail = `taken-${Date.now()}@example.com`;
+    const keyOwner = `keyholder${Date.now() % 1000000}`;   // made by a code key, address unverified
+    const keyEmail = `key-${Date.now()}@example.com`;
+    const keyCode = 'KeyCode12345';
     let verificationId = '';
 
     console.log('\n=== Login → attach-email recovery E2E ===\n');
@@ -122,6 +129,12 @@ async function main() {
             assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
             // A key's address starts unverified since 2026-10-06 (secaudit 2026-10 follow-up, A1).
             await markEmailVerified(emailOwner, takenEmail, { sqlitePath: DB_PATH, nodeId: NODE_ID });
+            // A second key, left as the recipient gets it: its address unverified.
+            const second = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ email: keyEmail, username: keyOwner, code: keyCode, display_name: 'Key Holder' }),
+            });
+            assert(second.status === 201, `second code mint ${second.status}: ${JSON.stringify(second.body.error)}`);
         });
     } finally {
         await stopServer(server);
@@ -170,6 +183,16 @@ async function main() {
             assert(body.error?.code === 'EMAIL_NOT_VERIFIED', `code ${body.error?.code}`);
             assert(body.error?.details?.email_required === true, 'details.email_required should be true');
             assert(body.error?.details?.has_email === false, 'details.has_email should be false for a legacy account');
+        });
+        await test('a code key\'s holder signs in with the code → 403 EMAIL_NOT_VERIFIED that says the address exists', async () => {
+            // The sign-in window (sdk-libs/auth/modal.js) opens the email completion on this answer and
+            // prefills the address, so the key holder confirms it with a code sent at that moment.
+            const { status, body } = await json('/v1/ghii/login', {
+                method: 'POST', body: JSON.stringify({ username: keyOwner, password: keyCode }),
+            });
+            assert(status === 403, `expected 403, got ${status}`);
+            assert(body.error?.code === 'EMAIL_NOT_VERIFIED', `code ${body.error?.code}`);
+            assert(body.error?.details?.has_email === true, 'details.has_email should be true for a key account');
         });
         await test('login with WRONG password → generic 401 (no email hint leaked)', async () => {
             const { status, body } = await json('/v1/ghii/login', {
@@ -252,6 +275,13 @@ async function main() {
             verificationId = body.data.verification_id;
             // email_sent reflects whether SMTP is configured — boolean either way (true when the env has SMTP).
             assert(typeof body.data.email_sent === 'boolean', 'email_sent is a boolean');
+        });
+        await test('the key holder asks for a code to the key\'s own address with the key → 200 + verification_id', async () => {
+            const { status, body } = await json('/v1/ghii/login/attach-email', {
+                method: 'POST', body: JSON.stringify({ username: keyOwner, password: keyCode, email: keyEmail }),
+            });
+            assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
+            assert(typeof body.data.verification_id === 'string' && body.data.verification_id.length > 0, 'verification_id present');
         });
         await test('login still gated until the code is confirmed → 403', async () => {
             const { status } = await json('/v1/ghii/login', {

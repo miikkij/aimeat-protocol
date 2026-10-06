@@ -6,6 +6,9 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.1 — 2026-10-06 — The comments say how a key holder confirms the address on a node that
+ *     requires one: at first sign-in, through the sign-in window's email completion. They said a
+ *     verification code went out at mint, which it does not (audit of the secaudit last items).
  *   v1.16.0 — 2026-10-06 — SECURITY: only an owner of the organism mints a code key, and the account a
  *     key makes starts with its address unverified, for the person to verify from their account. Any member
  *     could mint one, and the address was marked verified, so a member could make an account that
@@ -572,7 +575,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     // so the strength validator is intentionally skipped). The address is NOT verified by the key: the
     // minter chose it and is handed nothing that proves the recipient reads it, so a key could claim
     // somebody else's address (secaudit 2026-10 follow-up, A1, as APP-2 decided for the invitation
-    // link). It is the account's notification address and gets the usual verification code below.
+    // link). It is the account's notification address, and the recipient confirms it at first sign-in.
     const passwordHash = await hashPassword(code);
     try {
       await provisionOwner(storage, config, {
@@ -597,7 +600,11 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     emitChange('ghii');
     // The address, kept unverified as the account's notification address. No verification code goes
     // out now: a code lives fifteen minutes and the recipient signs in with the key whenever they
-    // read the mail, so the person verifies it from their own account (POST /v1/ghii/email/verify).
+    // read the mail. On a node that requires a confirmed address, that sign-in answers
+    // EMAIL_NOT_VERIFIED with has_email, the sign-in window (sdk-libs/auth/modal.js) opens the email
+    // completion with the address filled in, and POST /v1/ghii/login/attach-email sends the code then,
+    // taking the key as the password (e2e-login-attach-email). Elsewhere the person verifies it from
+    // their own account (POST /v1/ghii/email/verify).
     await storage.updateGHII(`${uname}@${config.nodeId}`, { notificationEmail: cleanEmail });
 
     // Join the organism (mirrors the accept handler: membership row + roster arrays in sync).
