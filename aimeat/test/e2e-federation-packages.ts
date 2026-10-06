@@ -12,6 +12,8 @@
  *     shareCatalogue off, a stranger node, a changed key, federation off
  *   - Phase 5: scope and identity refusals
  * @version-history
+ *   v1.0.1 — 2026-10-06 — The two nodes listen on ports the operating system hands out, so the suite
+ *     runs beside others (secaudit 2026-10 follow-up, Part C).
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 
@@ -23,6 +25,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
 import type { Server } from 'node:http';
+import { freePort } from './helpers/free-port.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -122,12 +125,12 @@ let firstPublishedAt = '';
 console.log('Setup');
 
 await test('Boot A (publisher) and B (puller) with an owner each', async () => {
-    // 40701/40702, not the 4025x-4029x band: thirty-odd suites hardcode ports in there, and a
-    // collision does not fail loudly — the health check accepts whatever already answers, and every
-    // assertion then runs against somebody else's node. That is incident
-    // 2026-09-05-port-40262-app-origin, and this is the range it named as clear.
-    A = await bootNode(40701, `aimeat-test-001-fedpka${ts}`, true);
-    B = await bootNode(40702, `aimeat-test-001-fedpkb${ts}`, true);
+    // Ports the operating system hands out (helpers/free-port.ts), so this suite runs beside any
+    // other. It held 40701/40702, which kept two sessions from running it at once, and a collision
+    // does not fail loudly: every assertion then runs against somebody else's node (incident
+    // 2026-09-05-port-40262-app-origin).
+    A = await bootNode(await freePort(), `aimeat-test-001-fedpka${ts}`, true);
+    B = await bootNode(await freePort(), `aimeat-test-001-fedpkb${ts}`, true);
     await setupOwner(A, `fpa${ts}`);
     await setupOwner(B, `fpb${ts}`);
 });

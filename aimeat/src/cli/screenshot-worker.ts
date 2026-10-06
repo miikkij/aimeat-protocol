@@ -18,11 +18,18 @@
  *   One-shot by default; --watch N loops every N seconds (a self-contained daemon). For unattended
  *   runs use a long-lived operator PAT (POST /v1/access/tokens, grant_operator) — not a login JWT.
  * @version-history
+ *   v1.1.0 — 2026-10-06 — The browser gets the node's network rule (services/headless-network.ts,
+ *     7d3642551): a dead proxy, service workers blocked, and every request answered by
+ *     headlessRequestHandlerFor, so an app it renders cannot reach the operator's private network or
+ *     a metadata address. AIMEAT_SCREENSHOT_EGRESS lists private origins a page may reach, as on the
+ *     node (secaudit 2026-10 follow-up, Part C).
  *   v1.0.0 — 2026-06-20 — extracted from scripts/screenshot-worker.ts into a CLI subcommand;
  *     playwright-core + system-browser (Edge/Chrome) channel fallback so npm installs work without a
  *     300 MB browser download; keeps --watch daemon, anonymous render, operator-PAT auth.
  */
 import { chromium, type Browser } from 'playwright-core';
+import { HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, headlessRequestHandlerFor } from '../services/headless-network.js';
+import { egressOriginsOf } from '../services/ai-provider-common.js';
 
 function arg(name: string, def?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -51,7 +58,8 @@ async function launchBrowser(): Promise<Browser> {
   let lastErr: unknown;
   for (const a of attempts) {
     try {
-      const browser = await chromium.launch({ headless: true, channel: a.channel });
+      // A proxy that leads nowhere: a request the route handler below does not answer fails.
+      const browser = await chromium.launch({ headless: true, channel: a.channel, args: HEADLESS_NO_NETWORK_ARGS });
       console.log(`Browser: ${a.label}.`);
       return browser;
     } catch (e) { lastErr = e; }
@@ -79,7 +87,16 @@ async function runOnce(base: string, token: string, opts: {
   const browser = await launchBrowser();
   let ok = 0; let fail = 0;
   try {
-    const ctx = await browser.newContext({ viewport: { width: opts.width, height: opts.height }, deviceScaleFactor: 1 });
+    const ctx = await browser.newContext({ viewport: { width: opts.width, height: opts.height }, deviceScaleFactor: 1, ...HEADLESS_CONTEXT_OPTIONS });
+    // The node's network rule (services/headless-network.ts): an app is code somebody else wrote,
+    // and this browser runs on the operator's machine, inside the operator's network. The node is
+    // fetched at its own address with no credential; any other address goes through safeFetch, which
+    // refuses private, loopback, link-local and metadata ranges; only GET and HEAD leave.
+    await ctx.route('**/*', headlessRequestHandlerFor({
+      own: [new URL(base).origin],
+      ownFetchBase: new URL(base).origin,
+      egress: egressOriginsOf(process.env.AIMEAT_SCREENSHOT_EGRESS, 'screenshot-worker', 'AIMEAT_SCREENSHOT_EGRESS'),
+    }));
     for (const a of targets) {
       const label = `${a.owner}/${a.filename}`;
       const path = `/v1/apps/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.filename)}`;

@@ -7,13 +7,15 @@
  *   one for a private service. Before 2026-10-05 every sub-request went to the browser's own network
  *   (secaudit 2026-10, SSRF-1).
  * @version-history
+ *   v1.1.0 — 2026-10-06 — headlessRequestHandlerFor, the rule aimeat screenshot-worker installs
+ *     (secaudit 2026-10 follow-up, Part C).
  *   v1.0.0 — 2026-10-05 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { createServer, type Server, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { AimeatConfig } from '../../src/config.js';
-import { headlessRequestHandler, serveDocumentOnce, type HeadlessRoute } from '../../src/services/headless-network.js';
+import { headlessRequestHandler, headlessRequestHandlerFor, serveDocumentOnce, type HeadlessRoute } from '../../src/services/headless-network.js';
 
 interface Recorded { kind: 'fulfill' | 'abort' | 'fallback'; status?: number; body?: string; headers?: Record<string, string> }
 
@@ -108,6 +110,29 @@ describe('headlessRequestHandler', () => {
       expect(out, `${method} ${url}`).toEqual([{ kind: 'abort' }]);
     }
     expect(node.seen.length).toBe(before);
+  });
+});
+
+describe('headlessRequestHandlerFor (aimeat screenshot-worker, a browser outside the node)', () => {
+  // The worker names the node by its own address; here that address is a loopback server, which a
+  // public profile refuses to every fetch, so reaching it proves the node's origin is the one allowed.
+  const workerRule = () => ({ own: [`http://127.0.0.1:${node.port}`], ownFetchBase: `http://127.0.0.1:${node.port}`, egress: [] });
+
+  it('fetches the node at its own address with no credential, and nothing private beside it', async () => {
+    const nodeBefore = node.seen.length;
+    const own = route(`http://127.0.0.1:${node.port}/v1/apps/a/x.html?mode=inline`, 'GET', { authorization: 'Bearer abc' }, 'document');
+    await headlessRequestHandlerFor(workerRule())(own.r);
+    expect(own.out).toEqual([{ kind: 'fulfill', status: 200, body: 'own', headers: { 'content-type': 'text/plain' } }]);
+    expect(node.seen.length).toBe(nodeBefore + 1);
+    expect(node.seen[node.seen.length - 1]!.authorization).toBeUndefined();
+
+    const privateBefore = privateService.seen.length;
+    for (const url of [`http://127.0.0.1:${privateService.port}/admin`, 'http://169.254.169.254/latest/meta-data/', 'http://192.168.1.1/']) {
+      const { r, out } = route(url, 'GET', {}, 'document');
+      await headlessRequestHandlerFor(workerRule())(r);
+      expect(out, url).toEqual([{ kind: 'abort' }]);
+    }
+    expect(privateService.seen.length).toBe(privateBefore);
   });
 });
 
