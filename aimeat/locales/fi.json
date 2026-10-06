@@ -10628,7 +10628,7 @@
     "cfgDesc_metrics_access": "Mittaripäätteen näkyvyys: public, authenticated tai operator.",
     "cfgDesc_mcp_session_idle_minutes": "Sulje MCP-sessio, kun pyyntöjä ei ole tullut näin moneen minuuttiin (murto-osat sallittu; suljettu asiakas alustaa itsensä uudelleen).",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
-    "cfgDesc_scopes_default_agent_scopes": "Agentin oletusoikeudet pilkuin eroteltuina.",
+    "cfgDesc_scopes_default_agent_scopes": "Oikeudet, jotka agentti saa, kun kukaan ei valitse niitä. Erota pilkulla. Valmiiksi agentti saa lukea ja kirjoittaa omistajansa muistia, lukea katalogia ja lukea omistajansa organismien työtiloja.",
     "cfgDesc_scopes_max_agent_scopes": "Tarjolla olevat agenttioikeudet pilkuin eroteltuina (* = kaikki).",
     "cfgDesc_sso_enabled": "Organisaatiokirjautumisen (SAML) ja provisioinnin (SCIM) ovet käytössä.",
     "cfgDesc_sso_connections_locked": "Jäädytä SSO-yhteyksien hallinta (jokainen hallintakirjoitus vastaa 403).",

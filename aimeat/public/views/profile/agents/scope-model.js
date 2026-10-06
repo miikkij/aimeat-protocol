@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.16.1 — 2026-10-06 — The standard preset carries organism:read and organism:write, the words the
+ *     workspace tools ask (secaudit 2026-10 last items, D4).
  *   v1.16.0 — 2026-10-02 — memory:purge, inside the wildcard: deleting shared workspace records for good.
  *   v1.15.0 — 2026-10-01 — contacts:read, inside the wildcard: listing the owner's address book. It
  *     rode messages:read on the node's MCP tool while the REST endpoint refused every agent.
@@ -340,7 +342,9 @@ export const SCOPE_DOMAINS = [
 
 export const SCOPE_TEMPLATES = {
   readonly:  ['memory:read', 'storage:read', 'catalogue:read', 'social:read'],
-  standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'work:request', 'work:read'],
+  // organism:read and organism:write: the workspace tools ask them since 2026-10-06, so an agent
+  // approved with this preset reads and publishes in its owner's workspaces (Jouni 2026-10-06, D4).
+  standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'work:request', 'work:read', 'organism:read', 'organism:write'],
   full:      ['*'],
 };
 
