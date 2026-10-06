@@ -5,6 +5,8 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-06 — The heartbeat and the presence push pass only inside the five-minute window
+ *     and once (signedMessageRefusal; secaudit 2026-10 follow-up, A7). The heartbeat checked no time.
  *   v1.7.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-10-01 — GET /peers says how each peer arrived (`origin`, services/peer-origin-view.ts)
  *     and lists the package registrations still waiting for their node (`pending_registrations`), so
@@ -42,6 +44,7 @@ import { logger } from '../../utils/logger.js';
 import { PeeringDecisionSchema, validateBody } from '../../models/schemas.js';
 import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
+import { signedMessageRefusal } from '../../services/signed-node-request.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../../services/presence.js';
@@ -248,6 +251,9 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                     'Heartbeat signature verification failed'));
                 return;
             }
+            // Inside the five-minute window and once, as the ping (secaudit 2026-10 follow-up, A7).
+            const stale = signedMessageRefusal(from_node_id, timestamp, signature);
+            if (stale) { res.status(stale.status).json(error(config.nodeId, stale.code, stale.message)); return; }
 
             peer.lastSeen = new Date().toISOString();
             // Liveness recovers a peer from a liveness state, never from an operator decision
@@ -307,6 +313,9 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
         }
+        // Once inside the window checked above (secaudit 2026-10 follow-up, A7).
+        const replayed = signedMessageRefusal(from_node_id, timestamp, String(signature));
+        if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         presence.applyRemoteUpdates(from_node_id, updates as PresenceUpdate[]);
         res.json(success(config.nodeId, { accepted: true, count: updates.length }));

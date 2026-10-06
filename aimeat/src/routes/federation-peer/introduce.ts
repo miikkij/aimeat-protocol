@@ -5,6 +5,8 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.1 — 2026-10-06 — A signed introduction passes once (signedMessageRefusal; secaudit 2026-10
+ *     follow-up, A7).
  *   v1.4.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.0 — 2026-10-01 — An introduction that only becomes a pending request no longer deletes the
  *     offline or de-peering peer of that node id; only an admission (an invite or an open join)
@@ -31,6 +33,7 @@ import { executeHooks } from '../../services/hooks.js';
 import { PeeringRequestSchema, validateBody } from '../../models/schemas.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
+import { signedMessageRefusal } from '../../services/signed-node-request.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
@@ -163,6 +166,9 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
                 'Signature verification failed'));
             return;
         }
+        // Once inside the window checked above (secaudit 2026-10 follow-up, A7).
+        const replayed = signedMessageRefusal(node_id, timestamp, signature);
+        if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         // Check if already a peer (allow re-introduction if depeering/offline). This is a pure
         // refusal — it deletes nothing, so it stays early. The DELETE of a re-introducible

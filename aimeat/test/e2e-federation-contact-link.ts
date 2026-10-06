@@ -184,6 +184,26 @@ await test('P2. A contact peer CAN send a read receipt', async () => {
     assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
+// Secaudit 2026-10 follow-up, A7. The node-to-node messages that predate signed-node-request.ts carry
+// no nonce, and several receivers did not check the signed time at all: a captured broadcast, message,
+// ping or storage grant could be sent again for ever. Each now passes only inside the five-minute
+// window and only once. Both tests below failed on the old code (200, delivered).
+const freshMessage = () => ({
+    id: randomUUID(), conversationId: randomUUID(), senderGhii: `someone@${C_NODE}`,
+    recipientGhii: V.ownerGhii, deliveryGhii: V.ownerGhii, body: 'replay probe', createdAt: new Date().toISOString(),
+});
+await test('P3. A message signed more than five minutes ago is refused', async () => {
+    const r = await asPeer('/v1/federation/message', { source_node: C_NODE, message: freshMessage(), timestamp: new Date(Date.now() - 10 * 60_000).toISOString() });
+    assert(r.status === 400 && r.body.error?.code === 'STALE_TIMESTAMP', `expected 400 STALE_TIMESTAMP, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+await test('P4. The same signed message sent twice is refused the second time', async () => {
+    const payload = { source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() };
+    const first = await asPeer('/v1/federation/message', payload);
+    assert(first.status === 200, `first: ${first.status} ${JSON.stringify(first.body)}`);
+    const again = await asPeer('/v1/federation/message', payload);
+    assert(again.status === 401 && again.body.error?.code === 'REPLAYED', `expected 401 REPLAYED, got ${again.status}: ${JSON.stringify(again.body)}`);
+});
+
 // ── The promise. Each one signed correctly, each one read back. ──
 console.log('\nPhase 2 — and nothing else crosses');
 
