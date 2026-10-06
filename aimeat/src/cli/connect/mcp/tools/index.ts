@@ -9,7 +9,7 @@
  *   optional and defaults to the only loaded agent).
  * @version-history
  *   2026-10-06 — themes.ts, apps.ts, agent-management.ts, data-map.ts, designbook.ts, app-manage.ts,
- *     boards.ts, decide.ts, mcp-proxy.ts, ai-voice.ts, surface-layout.ts, compliance.ts, install-sets.ts, core.ts, agent-tasks.ts, schedules.ts and workflows.ts are gone: their
+ *     boards.ts, decide.ts, mcp-proxy.ts, ai-voice.ts, surface-layout.ts, compliance.ts, install-sets.ts, core.ts, agent-tasks.ts, schedules.ts, workflows.ts, agent-caps.ts, handbook.ts and agent-messages.ts are gone: their
  *     tools run their dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — Every connector tool without a handler of its own runs its CLI dispatch definition
  *     (dispatch-tools.ts); registerAllTools records the names the modules register (secaudit 2026-10, M3).
@@ -32,9 +32,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
 
-import { registerAgentMessagesTools } from './agent-messages.js';
 import { registerDmMessagesTools } from './dm-messages.js';
-import { registerAgentCapsTools } from './agent-caps.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerKnowledgeTools } from './knowledge.js';
@@ -42,7 +40,6 @@ import { registerSkillsTools } from './skills.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
 import { registerFlagsTools } from './flags.js';
-import { registerHandbookTools } from './handbook.js';
 import { registerAppdevTools } from './appdev.js';
 import { registerCommerceTools } from './commerce.js';
 import { registerExchangeTools } from './exchange.js';
@@ -65,9 +62,7 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
       return typeof value === 'function' ? value.bind(target) : value;
     },
   });
-  registerAgentMessagesTools(mcp, registry);
   registerDmMessagesTools(mcp, registry);
-  registerAgentCapsTools(mcp, registry);
   registerAgentTelemetryTools(mcp, registry);
   registerCapabilitiesTools(mcp, registry);
   registerKnowledgeTools(mcp, registry);
@@ -75,7 +70,6 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
   registerOrganismsTools(mcp, registry);
   registerWorkspaceTools(mcp, registry);
   registerFlagsTools(mcp, registry);
-  registerHandbookTools(mcp, registry);
   registerAppdevTools(mcp, registry);
   registerCommerceTools(mcp, registry);
   registerExchangeTools(mcp, registry);

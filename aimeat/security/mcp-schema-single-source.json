@@ -15,5 +15,8 @@
     "aimeat_skill_unlink",
     "aimeat_workspace_publish",
     "aimeat_workspace_update"
-  ]
+  ],
+  "reasons": {
+    "aimeat_handbook_get": "The node's MCP answers with the handbook of the interface the agent is connected to (surface, tier); it has no `module`. A module is one of the REST tier-1 feature handbooks, written for an agent that works over HTTP, which is what the connector and the shell reach. The connector registers the catalog's schema; the node's stays its own (secaudit 2026-10 follow-up, Part B)."
+  }
 }

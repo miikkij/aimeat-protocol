@@ -8,6 +8,7 @@
  *   MCP surface does.
  * @usage Called by `aimeat connect serve` via the MCP tool registry.
  * @version-history
+ *   2026-10-06 — aimeat_agent_telemetry_report runs its dispatch definition (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-05-28 -- Initial connector MCP telemetry tool
  *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
@@ -27,20 +28,6 @@ import { descriptionFor } from '../../../../tool-catalog/shape.js';
 import { zodShapeFor } from '../../../../tool-catalog/zod-shape.js';
 
 export function registerAgentTelemetryTools(mcp: McpServer, registry: AgentRegistry): void {
-
-    mcp.tool('aimeat_agent_telemetry_report', descriptionFor('aimeat_agent_telemetry_report'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_agent_telemetry_report') }, annotationsFor('aimeat_agent_telemetry_report'), async ({ agent_name, type, data, session_id, task_id }) => {
-        const { client, agent } = pickAgent(registry, agent_name);
-        const enc = encodeURIComponent(agent);
-        const body: Record<string, unknown> = {
-            type,
-            data: data ?? {},
-        };
-        if (session_id) body.session_id = session_id;
-        if (task_id) body.task_id = task_id;
-
-        const resp = await client.post(`/v1/agents/${enc}/telemetry`, body);
-        return envelopeResult(resp);
-    });
 
     mcp.tool('aimeat_usage_report', descriptionFor('aimeat_usage_report'), { agent_name: agentNameSchema, ...zodShapeFor('aimeat_usage_report') }, annotationsFor('aimeat_usage_report'), async ({ agent_name, report, from, to, grain, limit }) => {
         const { client } = pickAgent(registry, agent_name);

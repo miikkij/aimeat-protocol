@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-06 -- aimeat_handbook_get reads an interface's handbook from its own route; aimeat_message_send
+ *     forwards thread_id, which the send service reads (secaudit 2026-10 follow-up, Part B).
  *   2026-10-04 -- aimeat_task_decline → POST …/decline, `reason` required.
  *   2026-10-03 -- `tier`: "settings" also holds the system's words in plain language ("settings/concept.<id>").
  *   2026-10-02 -- `tier` names "settings" and "settings/<term>", the setting explanations in parts.
@@ -63,8 +65,11 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const tier = optionalString(input, 'tier');
             if (tier) return client.get(handbookTierPath(tier));
             const module = optionalString(input, 'module');
-            const q = query({ surface: optionalString(input, 'surface') });
-            return client.get(module ? `/v1/agents/me/handbook/${encodeURIComponent(module)}${q}` : `/v1/agents/me/handbook${q}`);
+            if (module) return client.get(`/v1/agents/me/handbook/${encodeURIComponent(module)}`);
+            // One interface's handbook is its own route; the root reads no `surface` query, so sent
+            // that way it answered the general handbook (secaudit 2026-10 follow-up, Part B).
+            const surface = optionalString(input, 'surface');
+            return client.get(surface ? `/v1/agents/me/handbook/surface/${encodeURIComponent(surface)}` : '/v1/agents/me/handbook');
         },
     },
     {
@@ -318,6 +323,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         input: {
             content: { type: 'string', description: 'Message content.' },
             body: { type: 'string', description: 'Message content alias for older callers.' },
+            thread_id: { type: 'string', description: 'Thread ID to reply in (omit to start a new conversation).' },
             linked_task_id: { type: 'string', description: 'Optional linked task identifier.' },
             metadata: { type: 'object', description: 'Optional metadata object.' },
         },
@@ -327,6 +333,9 @@ export const agentTools: ConnectCliToolDefinition[] = [
             return client.post(`/v1/agents/${agentPath}/messages`, {
                 content,
                 direction: 'outbound',
+                // The send service replies in this thread; dropped here, every reply opened a new
+                // conversation (secaudit 2026-10 follow-up, Part B).
+                ...(optionalString(input, 'thread_id') ? { thread_id: optionalString(input, 'thread_id') } : {}),
                 ...(optionalString(input, 'linked_task_id') ? { linked_task_id: optionalString(input, 'linked_task_id') } : {}),
                 ...(optionalRecord(input, 'metadata') ? { metadata: optionalRecord(input, 'metadata') } : {}),
             });
