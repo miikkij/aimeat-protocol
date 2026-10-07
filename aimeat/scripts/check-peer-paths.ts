@@ -8,7 +8,7 @@
  *   WHY. On 2026-09-28 three package routes were given a way to write a peer, and nobody reading them
  *   asked what else trusts a peer: direct messages went to its url and federated sign-in verified its
  *   key, so any owner could register a node id that was not theirs and sign in as its users (the
- *   peer-registration incident, 2026-10-01; docs/pitfalls.md §103). A sweep that day found five more
+ *   peer-registration incident, 2026-10-01). A sweep that day found five more
  *   defects of the same kind in the federation routes. The knowledge to see it was in the code; what
  *   was missing was a place that asks, for each new writer and each new reader, on what proof.
  *
@@ -118,7 +118,7 @@ function main(): void {
     console.log('');
     if (fresh.length) {
         console.log('  A peer is written, or its url or key trusted, in a place nobody has answered for. Say on');
-        console.log('  what proof in security/peer-paths.json (docs/pitfalls.md §103): a writer names who may call');
+        console.log('  what proof in security/peer-paths.json: a writer names who may call');
         console.log('  it and what binds the node id to the key; a reader names the status, flag or tier it checks.');
         console.log('');
         for (const f of fresh) console.log(`    ${f}`);

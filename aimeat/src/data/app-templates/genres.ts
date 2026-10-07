@@ -116,14 +116,14 @@
  *   v1.3.0 — 2026-09-02 — nighttrain: the scroll STORY genre (wish-atelier-motion-round-three),
  *     the first register on the kit's director: a journey told chapter by chapter, one chapter
  *     sideways, the aurora as parallax, the route drawn on, the distance as a ring. Authored as
- *     a probe page (fiction, per pitfalls §34) and JSON-escaped by script, as the others.
+ *     a probe page (fiction, per the demo trap in build-atelier-prompt.ts) and JSON-escaped by script, as the others.
  *   v1.2.0 — 2026-08-30 — mtv: the Music Television world, distilled from the shipped
  *     ai-music-charts.html v17 (canvas "Music Television") into a fictional local station's
  *     countdown page. The moving app parts (spectrum bars, party lights, marquee crawl) are
  *     translated to the register's physics: the broadcast comes ON AIR once and then holds.
  *     Authored as a probe page and JSON-escaped by script, same discipline as the generator.
  *   v1.1.0 — 2026-08-29 — The machine-room wave, done as fiction after the demo-trap lesson
- *     (docs/pitfalls.md §34): nightwatch (a power station's phosphor wall), crossing (a ferry
+ *     (build-atelier-prompt.ts, the genre section): nightwatch (a power station's phosphor wall), crossing (a ferry
  *     line's night board on the real map) and orchard (a season printed as a keepsake) — the
  *     new components mounted where they serve the page, never stacked.
  *   v1.0.0 — 2026-08-29 — Initial: the thirteen approved genres ("jokainen noista oli ihania").

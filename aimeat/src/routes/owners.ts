@@ -211,7 +211,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
 
     // A session from another node carries the LOCAL PART of somebody else's account as `owner`, so
     // the name alone made a visitor the local namesake here and showed them its roles and agent
-    // roster (docs/pitfalls.md §83, security-development-dna invariant 11c). A federated session is
+    // roster (security-development-dna invariant 11c). A federated session is
     // never this account and never this node's operator.
     const local = !!req.auth && !req.auth.anonymous && !isForeignPrincipal(req.auth);
     const isSelf = local && req.auth!.owner === owner.name;

@@ -453,8 +453,8 @@ const publish = (token: string, body: Record<string, unknown>) =>
 
     // ── The register: an Atelier app names the look it committed to ──────────────────────────
     // Every Atelier app built from the bare shell came out as stacked sections in the default
-    // look, and the Design Book's genres exist so a page starts from a committed register
-    // (docs/pitfalls.md §34). Nothing enforced that. Now the shell carries a placeholder the
+    // look, and the Design Book's genres exist so a page starts from a committed register.
+    // Nothing enforced that. Now the shell carries a placeholder the
     // builder has to replace, and the publish refuses the placeholder and the absence alike.
 
     /** An Atelier app in miniature: track declared, kit loaded, and the register line if given. */
@@ -559,7 +559,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(!(r.body.data.app_hints ?? []).some((h: any) => h.pitfall === 'atelier-register'),
             `no register finding on a Classic app: ${JSON.stringify(r.body.data.app_hints)}`);
         // And it is told nothing about genres: the acceptance question belongs to the track that
-        // forks one (docs/pitfalls.md §34).
+        // forks one.
         assert(!r.body.data.next_steps?.acceptance,
             `a Classic app must not be sent to a genre: ${JSON.stringify(r.body.data.next_steps?.acceptance)}`);
     });

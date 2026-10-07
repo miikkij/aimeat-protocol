@@ -6,7 +6,7 @@
  *
  *   AIMEAT.organism.createWorkspace filled `{ type: 'object', additionalProperties: true }` for a
  *   records space without a schema, and a workspace locks every schema strict, which closes such an
- *   object to every property (docs/pitfalls.md §102). Production held 8 such locks on 2026-10-01.
+ *   object to every property. Production held 8 such locks on 2026-10-01.
  *   A lock exactly equal to that object is positive evidence and is re-locked open; a lock that says
  *   open and admits nothing in another shape stays as it is and is reported once on the Security
  *   page. Real in-memory SQLite, and the write validator every surface uses.

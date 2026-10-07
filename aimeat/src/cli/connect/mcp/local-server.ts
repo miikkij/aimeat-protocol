@@ -241,7 +241,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     // the shared path returns before reaching, so the binding sat in its temporal dead zone for the
     // daemon's life and every invoke threw `Cannot access 'tunnel' before initialization`. Enrolment
     // is an invoke, so the migration button failed for every agent on a shared socket — all of them,
-    // since one-socket-per-node. → pitfalls §40
+    // since one-socket-per-node.
     //
     // It moved onto the channel because the REST proxy and the subscribe route, which are handlers
     // registered far below this function and could not see the `let` at all, each reached for
