@@ -15,6 +15,10 @@
  *   const all = await listPublicAppTools(storage, config, { pricedOnly: false });
  *   const mine = await listOwnCallableAppTools(storage, config, req.auth.owner, 500);
  * @version-history
+ *   v1.3.0 — 2026-10-07 — A tool counts as priced by isToolPriced, the invoke route's own test, and
+ *     an entry carries every money price (`pricesMoney`, with `priceMoney` its first). A tool sold
+ *     only in `pricesMoney` was missing from the feed, this catalog and the MCP card while its
+ *     invoke answered 402.
  *   v1.2.0 — 2026-10-07 — listOwnCallableAppTools(): one owner's UNPRICED callable tools, for
  *     GET /v1/commerce/tools?include=own, so an agent reads its own owner's free tools in the same
  *     call as the priced catalog instead of one listing per app. publicManifestTools() is the one
@@ -32,7 +36,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { AppToolsDocSchema, appIdFromToolsKey, isToolPriced, type AppTool } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appIdFromToolsKey, isToolPriced, toolMoneyPrices, type AppTool } from '../models/app-tool-schemas.js';
 import { localAccountName } from '../utils/gaii.js';
 
 /** One sellable app-tool as every discovery surface sees it. */
@@ -53,8 +57,10 @@ export interface PricedAppTool {
   /** 'call' = synchronous capability invoke on completion; 'task' = agent TASK for the seller. */
   fulfillment: 'call' | 'task';
   price?: { morsels: number; unit: string };
-  /** Money price in 6-decimal micro-units. */
+  /** Money price in 6-decimal micro-units: the first of `pricesMoney`. */
   priceMoney?: { amount: number; currency: string; scale: 6 };
+  /** Every money price, one per currency, `priceMoney` first. Buy in another one with the session `currency`. */
+  pricesMoney?: Array<{ amount: number; currency: string; scale: 6 }>;
   /** The WebMCP bridge surfaces for this tool (listing + HTTP invoke; unpaid priced invoke → 402). */
   webmcp: { listing: string; invoke: string };
   /** Ready-made checkout line item — add your `input`, open + complete a session with it. */
@@ -127,8 +133,12 @@ export async function listPublicAppTools(
     const appRef = `${ownerName}/${appId}`;
     for (const tool of tools) {
       if (out.length >= cap) break;
+      // isToolPriced is the invoke route's own test, so a tool that route answers 402 for is listed
+      // here. The scan used to look at `price` and `priceMoney` only, which left out a tool sold in
+      // `pricesMoney` alone while the invoke route asked for payment.
+      if (pricedOnly && !isToolPriced(tool)) continue;
       const morsels = tool.price?.morsels ?? 0;
-      if (pricedOnly && morsels <= 0 && !tool.priceMoney) continue;
+      const money = toolMoneyPrices(tool).map((m) => ({ amount: m.amount, currency: m.currency, scale: 6 as const }));
       out.push({
         sku: `app-tool:${appRef}:${tool.name}`,
         app: appRef,
@@ -140,7 +150,7 @@ export async function listPublicAppTools(
         inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
         fulfillment: tool.action_id ? 'call' : 'task',
         ...(morsels > 0 ? { price: { morsels, unit: tool.price?.unit ?? 'per-call' } } : {}),
-        ...(tool.priceMoney ? { priceMoney: { amount: tool.priceMoney.amount, currency: tool.priceMoney.currency, scale: 6 as const } } : {}),
+        ...(money.length ? { priceMoney: money[0], pricesMoney: money } : {}),
         webmcp: webmcpUrls(config, ownerName, appId, tool.name),
         checkout_item: { kind: 'app-tool', app: appRef, tool: tool.name },
       });

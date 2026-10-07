@@ -25393,6 +25393,9 @@ paths:
         morsel/micro-unit money price, the WebMCP listing/invoke URLs, and a ready-made
         checkout_item. The MCP Server Card's commerce_tools block embeds (inline mode, default)
         or links (pointer mode) this catalog (TARGET-034 phase D).
+        A tool sold in money carries every money price it declares in pricesMoney (one per
+        currency), with priceMoney its first; the checkout sells it in any of them through the
+        session currency.
         With include=own and a token, the answer also carries the caller's OWN owner's unpriced
         callable tools (a PUBLIC manifest, an action_id, no price in any field), after the priced
         entries: the same fields with price null, no checkout_item, and own true. The caller's

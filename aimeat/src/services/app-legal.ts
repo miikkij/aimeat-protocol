@@ -37,6 +37,8 @@
  * @usage
  *   const out = await applyOwnerLegalUpdate(storage, { ownerGaii, filename }, { legal: body.legal, actor });
  * @version-history
+ *   v1.2.2 — 2026-10-07 — appSellsForMoney reads a tool's money prices with toolMoneyPrices, the
+ *     function the checkout and the catalog use, instead of its own copy of the two-field test.
  *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.2.0 — 2026-09-24 — legalUpdateRefusal(): what applyOwnerLegalUpdate() would refuse, the
  *     provenance scope included, asked without writing (508c32904067). PATCH /v1/apps/:filename
@@ -56,7 +58,7 @@ import { emitChange } from './event-bus.js';
 import { recordAppAudit } from './app-audit.js';
 import { renderMarkdownLite } from '../utils/markdown-lite.js';
 import { appDisplayName } from './app-agent-surfaces.js';
-import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, toolMoneyPrices } from '../models/app-tool-schemas.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, ProvenanceScopeError, type DeclaredProvenance } from './ai-provenance.js';
 import { logger } from '../utils/logger.js';
 import { escapeHtml as esc } from '../utils/html-escape.js';
@@ -212,9 +214,7 @@ export async function appSellsForMoney(storage: Storage, app: Pick<AppRecord, 'o
     if (!rec) return false;
     const parsed = AppToolsDocSchema.safeParse(rec.value);
     if (!parsed.success) return false;
-    return parsed.data.tools.some((t) => (t.priceMoney?.amount ?? 0) > 0
-      || (Array.isArray((t as { pricesMoney?: Array<{ amount: number }> }).pricesMoney)
-        && (t as { pricesMoney?: Array<{ amount: number }> }).pricesMoney!.some((p) => p.amount > 0)));
+    return parsed.data.tools.some((t) => toolMoneyPrices(t).length > 0);
   } catch (err) {
     // A failed read answers "not a shop" and says so in the log: the readiness this feeds is a
     // recommendation, and refusing the whole details view over it would hide more than it protects.

@@ -16,6 +16,8 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.5.1 — 2026-10-07 — An app tool is bought in money at any price it declares (toolMoneyPrices),
+ *     so a tool sold only in `pricesMoney`, or in a second currency there, can be bought.
  *   v1.5.0 — 2026-10-01 — The app-tool and ext-call resolvers refuse a buyer the app's members-only
  *     stance refuses (MEMBERS_ONLY, 403) before a session opens, so nothing is collected from them.
  *   v1.4.1 — 2026-09-24 — The scope travels as the capability service's authority object; a checkout
@@ -35,7 +37,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
-import { AppToolsDocSchema, appToolsKey, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey, applyLockedInput, toolMoneyPrices, type AppTool } from '../models/app-tool-schemas.js';
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
 import { listPaymentHandlers } from './payment-handlers.js';
@@ -209,7 +211,11 @@ export function appToolSellableResolver(): SellableResolver {
           unitPrice = Number(tool.price.morsels);
         }
       } else if (!carriedByProvider) {
-        if (!tool.priceMoney || tool.priceMoney.currency !== currency) {
+        // Every money price the tool declares, from `priceMoney` and `pricesMoney` both. Reading
+        // `priceMoney` alone refused a tool sold only in `pricesMoney`, and the second currency of a
+        // tool sold in two, while the catalog and the 402 named those prices.
+        const moneyPrice = toolMoneyPrices(tool).find((m) => m.currency === currency);
+        if (!moneyPrice) {
           throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This tool has no ${currency} price`);
         }
         if (!listPaymentHandlers().some((h) => h.currencies.includes(currency))) {
@@ -217,7 +223,7 @@ export function appToolSellableResolver(): SellableResolver {
         }
         const pspRec = await storage.getMemory(sellerGhii, 'commerce.psp');
         psp = pspRec?.value ?? undefined;
-        unitPrice = integerMicros(tool.priceMoney.amount);
+        unitPrice = integerMicros(moneyPrice.amount);
       }
 
       const actionId = tool.action_id;

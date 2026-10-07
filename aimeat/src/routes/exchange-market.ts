@@ -13,6 +13,8 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.5.1 — 2026-10-07 — Offering an app tool reads its money price with toolMoneyPrices, so a tool
+ *     sold only in `pricesMoney` lists at that price instead of being refused as unpriced.
  *   v1.5.0 — 2026-07-25 — ODPS v4.1 (TARGET-045 §4): GET /v1/exchange/offerings/{id}/odps(.yaml) projects the
  *     listing as an Open Data Product Specification document; `provenance` is now VALIDATED (400
  *     INVALID_PROVENANCE) instead of cast, and a new `odps` authoring block carries the standard fields the
@@ -45,7 +47,7 @@ import {
 } from '../services/exchange-market.js';
 import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
 import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-odps.js';
-import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey, toolMoneyPrices } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled, migrateLegacyOfferings } from '../services/exchange-projection.js';
 import { logger } from '../utils/logger.js';
@@ -176,7 +178,9 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       // Authoritative pricing from the tool's own price/plans.
       const commercial: ActionCommercial = {
         payMorsels: tool.price && tool.price.morsels > 0 ? tool.price.morsels : undefined,
-        payMoney: tool.priceMoney ?? undefined,
+        // The first money price from `priceMoney` or `pricesMoney`: a tool sold only in `pricesMoney`
+        // has a price, and reading `priceMoney` alone refused it as unpriced.
+        payMoney: toolMoneyPrices(tool)[0],
         plans: tool.plans as OfferingPlan[] | undefined,
       };
       const priced = resolveActionPricing(commercial, null);
