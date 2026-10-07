@@ -16,6 +16,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.7.1 — 2026-10-07 — loadPublicManifest reads through publicManifestTools
+ *     (commerce/app-tool-catalog.ts), the gate GET /v1/commerce/tools?include=own lists through.
  *   v1.7.0 — 2026-10-01 — A tool whose backing extension serves members only refuses a non-member
  *     (MEMBERS_ONLY, 403) before the metered call is settled.
  *   v1.6.2 — 2026-09-26 — The app owner in the listing and the invoke comes from localAccountName
@@ -49,8 +51,9 @@ import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
-import { AppToolsDocSchema, appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
+import { appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
+import { publicManifestTools } from '../commerce/app-tool-catalog.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
@@ -82,11 +85,9 @@ async function loadPublicManifest(
   ownerName: string,
   filename: string,
 ): Promise<AppTool[] | null> {
-  const rec = await storage.getMemory(`${ownerName}@${config.nodeId}`, appToolsKey(filename));
-  if (!rec || rec.visibility !== 'public') return null;
-  const parsed = AppToolsDocSchema.safeParse(rec.value);
-  if (!parsed.success) return null;
-  return parsed.data.tools;
+  // The same gate the commerce catalog lists through (commerce/app-tool-catalog.ts), so a tool
+  // GET /v1/commerce/tools?include=own lists is one this route serves.
+  return publicManifestTools(await storage.getMemory(`${ownerName}@${config.nodeId}`, appToolsKey(filename)));
 }
 
 /** One tool in the served listing: the WebMCP descriptor fields + the AIMEAT payment contract. */

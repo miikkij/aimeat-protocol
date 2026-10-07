@@ -1874,10 +1874,10 @@
      "slug": "g-10-app-tools",
      "cells": [
       "<strong>App tools</strong>",
-      "Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent.",
-      "<code>aimeat_app_tools_publish</code>, <code>aimeat_app_tools_get</code>, <code>aimeat_app_tool_invoke</code>, <code>/v1/apps/:owner/:filename/webmcp</code>"
+      "Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent. An agent lists its own owner's free callable tools beside the priced catalog in one read.",
+      "<code>aimeat_app_tools_publish</code>, <code>aimeat_app_tools_get</code>, <code>aimeat_app_tool_invoke</code>, <code>/v1/apps/:owner/:filename/webmcp</code>, <code>/v1/commerce/tools?include=own</code>"
      ],
-     "plain": "App tools Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent. aimeat_app_tools_publish, aimeat_app_tools_get, aimeat_app_tool_invoke, /v1/apps/:owner/:filename/webmcp"
+     "plain": "App tools Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent. An agent lists its own owner's free callable tools beside the priced catalog in one read. aimeat_app_tools_publish, aimeat_app_tools_get, aimeat_app_tool_invoke, /v1/apps/:owner/:filename/webmcp, /v1/commerce/tools?include=own"
     },
     {
      "slug": "g-10-selling-app-tools",

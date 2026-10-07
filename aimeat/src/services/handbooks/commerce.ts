@@ -7,6 +7,7 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   v2.3.0 — 2026-10-07 — GET /v1/commerce/tools?include=own lists the agent's own owner's free callable app tools.
  *   v2.2.0 — 2026-10-02 — An agent buys in money only within its daily purchase limit, and reads it from two records.
  *   v2.1.0 — 2026-10-01 — The payment-provider secret is entered by the owner on the Wallet page; aimeat_commerce_psp_set refuses (decision D5).
  *   v2.0.0 — 2026-07-28 — Renamed from the `enterprise` surface handbook when the edition seam was
@@ -35,7 +36,9 @@ price an offer on one of the owner's agents (morsels and/or priceMoney micro-uni
 ({kind:"app-tool", app:"owner/appId", tool, input}). The OWNER's balance pays. A callable
 app-tool returns its result on session.fulfillment.results; task fulfillments land as the
 seller's agent task. Discover sellables with \`aimeat_discover\` or GET /v1/commerce/feed +
-/v1/commerce/tools.
+/v1/commerce/tools. GET /v1/commerce/tools?include=own with your token also lists your own
+owner's FREE callable app tools (own: true, price null): no checkout, POST the input to the
+entry's webmcp.invoke.
 
 **Your daily purchase limit.** You pay in money only within the limit your owner set on your card,
 per currency; with no limit you do not spend money, and a checkout in money answers
