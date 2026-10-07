@@ -543,6 +543,18 @@ const QUESTIONS = {
     assert(d.status === 200 && d.body.data.has_own_key === false, 'the key is forgotten');
   });
 
+  // The node's own key falls under the same ruling: "the AI routes answer a provider's key refusal with
+  // 424 Failed Dependency, keeping the code INVALID_API_KEY and the message" (Jouni, 2026-10-07). It was
+  // 502 PROVIDER_ERROR until then, which a client that retries 5xx sends three times.
+  await test('4e3. a refusal of the NODE\'s key is 424 INVALID_API_KEY too, and the key is not shown', async () => {
+    stubStatus = 401;
+    const r = await json('/v1/ai/decide', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ state: 'Node key refused.', questions: { q: QUESTIONS.urgent }, cache: false }) });
+    stubStatus = 200;
+    assert(r.status === 424 && r.body.error?.code === 'INVALID_API_KEY', `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(seen[seen.length - 1].auth === `Bearer ${NODE_KEY}`, 'the node key was the one refused');
+    assert(!JSON.stringify(r.body).includes(NODE_KEY), 'the node key is not in the error');
+  });
+
   // secaudit 2026-09, N3: the node reads a provider's answer up to 4 MB, the same way on every road.
   await test('4e2. an answer past 4 MB is PROVIDER_ERROR on REST and on MCP with one sentence naming the limit, and nothing is recorded or metered', async () => {
     const calls = async () => (await json('/v1/ai/usage', { headers: auth(A.token) })).body.data?.total_calls ?? 0;
