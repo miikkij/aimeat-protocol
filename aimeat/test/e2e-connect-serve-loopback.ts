@@ -1211,6 +1211,42 @@ await test('The REST proxy forwards each identity as ITSELF, not as whoever open
   assert(seen[0] !== seen[1], `two identities got the same answer (${seen[0]}) — the stamp is missing`);
 });
 
+// ─── A 401 about something else is not the agent's credential dying ───
+//
+// aimeat-commercial, 2026-10-07: a crm agent's first model call met the AI provider refusing the
+// NODE's key, the node answered 401 INVALID_API_KEY, and the connector read it as crm's own
+// credential dying. It detached crm from the shared socket, every later call for it waited out the
+// request timeout, and /local/status reported auth_failed, so the next spawn exited at once. The
+// same 401 for the socket's opener stopped the whole client. A real route that answers 401 with a
+// code that is not about the bearer: the v2 token route, refusing an assertion for an agent that
+// holds no key (both agents here are v1). Asked by BOTH identities, so the opener and the attached
+// one are each covered.
+await test('A 401 that is not about the bearer leaves both identities on the socket and their calls answered', async () => {
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  for (const acc of [acc3a!, acc3b!]) {
+    const gaii = `concierge#${acc.ownerName}@${NODE_ID}`;
+    const assertion = `${b64({ alg: 'EdDSA', typ: 'JWT' })}.${b64({ sub: gaii, aud: NODE_ID, jti: `e2e-${stamp}-${acc.ownerName}`, exp: Math.floor(Date.now() / 1000) + 60 })}.AAAA`;
+    const r = await json(lb3, '/v1/agents/v2/token', {
+      method: 'POST', headers: { 'X-Aimeat-Agent': gaii },
+      body: JSON.stringify({ grant_type: 'urn:aimeat:params:oauth:grant-type:agent-key', assertion }),
+    });
+    assert(r.status === 401 && r.body?.error?.code === 'INVALID_ASSERTION', `${gaii}: expected 401 INVALID_ASSERTION, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+  }
+  await sleep(300);
+  const st = await json(lb3, '/local/status');
+  const rows = ((st.body.data?.principals ?? []) as any[]);
+  for (const row of rows) {
+    assert(row.tunnel_status === 'online' && row.transport === 'tunnel', `${row.id} must still ride the tunnel, got ${row.transport}/${row.tunnel_status}`);
+  }
+  for (const acc of [acc3a!, acc3b!]) {
+    const gaii = `concierge#${acc.ownerName}@${NODE_ID}`;
+    const started = Date.now();
+    const me = await json(lb3, '/v1/agents/me', { headers: { 'X-Aimeat-Agent': gaii } });
+    assert(me.status === 200 && me.body?.data?.gaii === gaii, `${gaii}: /v1/agents/me after the 401 gave ${me.status} ${JSON.stringify(me.body?.error)}`);
+    assert(Date.now() - started < 5_000, `${gaii}: /v1/agents/me took ${Date.now() - started} ms, the call waited on a refusal`);
+  }
+});
+
 // NOT COVERED HERE, and saying so rather than shipping a green test that proves nothing:
 // `/local/subscribe` had the identical missing stamp and is fixed in the same commit, but the only
 // way to observe it is to write a record into a subscribed space and see which identity the node

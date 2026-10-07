@@ -661,3 +661,143 @@ describe('scopes_changed is not auth_revoked', () => {
     expect(client.isOnline()).toBe(true);   // the socket the opener rides is untouched
   });
 });
+
+/**
+ * A 401 IS A VERDICT ON THE CALLER'S CREDENTIAL ONLY WHEN IT SAYS SO.
+ *
+ * aimeat-commercial, 2026-10-07, place stripetestiydqzuo: the crm agent's first model call went to
+ * the node's LLM route, the provider refused the NODE's key ("User not found"), and the node answered
+ * 401 INVALID_API_KEY. The client read any forwarded 401 as the agent's own credential dying,
+ * detached crm, and every later call for it waited out the 30 s request timeout on an UNKNOWN_IDENTITY
+ * error frame nobody answered. The serve daemon then reported crm auth_failed, so the next spawn
+ * exited at once. The agent's credential was fine the whole time.
+ */
+describe('a 401 that is not about the caller\'s credential', () => {
+  const OPENER = 'concierge#alice@node';
+  const CRM = 'crm#alice@node';
+  const providerRefusal = { ok: false, error: { code: 'INVALID_API_KEY', message: 'The provider rejected the key.' } };
+
+  it('leaves an attached identity on the socket and its later calls answered', async () => {
+    let refuse = true;
+    const server = await startServer({
+      welcome: { multiplex: true },
+      onRequest: (frame, ws) => {
+        const body = refuse && frame.agent === CRM ? providerRefusal : { ok: true };
+        ws.send(JSON.stringify({ type: 'response', id: frame.id, agent: frame.agent, status: body === providerRefusal ? 401 : 200, body }));
+      },
+    });
+    const { client } = makeClient(server, { gaii: OPENER });
+    await client.start();
+    const failures: string[] = [];
+    await client.attachIdentity({ gaii: CRM, getToken: async () => 'crm-tok', onAuthFailure: (m) => failures.push(m) });
+
+    const r = await client.forward('POST', '/v1/llm/chat/completions', { body: {} }, CRM);
+    expect(r.status).toBe(401);   // the caller still sees the node's answer
+    await new Promise(res => setTimeout(res, 150));
+    expect(server.framesOfType('detach').length).toBe(0);
+    expect(failures).toEqual([]);
+
+    refuse = false;
+    const next = await client.forward('GET', '/v1/memory', {}, CRM);
+    expect(next.status).toBe(200);
+  });
+
+  it('does not stop the client when the socket\'s own identity meets it', async () => {
+    const server = await startServer({
+      onRequest: (frame, ws) => ws.send(JSON.stringify({ type: 'response', id: frame.id, status: 401, body: providerRefusal })),
+    });
+    let authFailed = false;
+    const { client } = makeClient(server, { onAuthFailure: () => { authFailed = true; } });
+    await client.start();
+    const r = await client.forward('POST', '/v1/llm/chat/completions', { body: {} });
+    expect(r.status).toBe(401);
+    await new Promise(res => setTimeout(res, 150));
+    expect(authFailed).toBe(false);
+    expect(client.isOnline()).toBe(true);
+  });
+});
+
+describe('an error frame that answers a forward', () => {
+  it('resolves that forward at once instead of waiting out the request timeout', async () => {
+    // The node answers a request for an identity the socket does not carry with an `error` frame
+    // carrying the request's id (services/connect-tunnel.ts). The client logged it and let the
+    // forward sit for 35 s, every call, for the life of the run.
+    const server = await startServer({
+      welcome: { multiplex: true, request_timeout_ms: 5_000 },
+      onRequest: (frame, ws) => ws.send(JSON.stringify({ type: 'error', id: frame.id, agent: frame.agent, code: 'UNKNOWN_IDENTITY', message: 'This connection does not carry that identity. Attach it first.' })),
+    });
+    const { client } = makeClient(server, { gaii: 'concierge#alice@node' });
+    await client.start();
+    const started = Date.now();
+    const r = await client.forward('GET', '/v1/memory', {}, 'crm#alice@node');
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(r.status).toBe(503);
+    expect((r.body as { error: { code: string } }).error.code).toBe('UNKNOWN_IDENTITY');
+  });
+});
+
+/**
+ * A CREDENTIAL THAT CAN BE REPLACED IS REPLACED BEFORE THE IDENTITY IS GIVEN UP.
+ *
+ * A key-holding (v2) agent's credential is minted, and the node authorizes a forwarded call against
+ * the token pinned when the identity attached. When that pin is refused, a fresh mint and one attach
+ * put the identity back, and the call that met the refusal is sent once more. An identity that can
+ * produce no different credential is given up exactly as before.
+ */
+describe('a credential verdict on an identity that can mint again', () => {
+  const OPENER = 'concierge#alice@node';
+  const CRM = 'crm#alice@node';
+
+  async function pinnedFixture() {
+    // The node authorizes a forward against the token the LAST attach pinned (handleAttach ->
+    // conn.rawToken), so the mock answers from the last attach frame it received for CRM.
+    const pinOf = (): unknown => [...server.framesOfType('attach')].reverse().find(f => f.agent === CRM)?.token;
+    const server: MockTunnelServer = await startServer({
+      welcome: { multiplex: true },
+      onRequest: (frame, ws) => {
+        const live = frame.agent !== CRM || pinOf() === 'fresh';
+        ws.send(JSON.stringify({ type: 'response', id: frame.id, agent: frame.agent, status: live ? 200 : 401,
+          body: live ? { ok: true } : { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Invalid or expired token' } } }));
+      },
+    });
+    const { client } = makeClient(server, { gaii: OPENER });
+    await client.start();
+    return { server, client };
+  }
+
+  it('re-attaches with a fresh credential and answers the call that met the refusal', async () => {
+    const { server, client } = await pinnedFixture();
+    let current = 'stale';
+    let forgotten = 0;
+    const failures: string[] = [];
+    await client.attachIdentity({
+      gaii: CRM,
+      getToken: async () => current,
+      forgetToken: () => { forgotten++; current = 'fresh'; },
+      onAuthFailure: (m) => failures.push(m),
+    });
+
+    const r = await client.forward('GET', '/v1/memory', {}, CRM);
+    expect(r.status).toBe(200);
+    expect(forgotten).toBe(1);
+    expect(server.framesOfType('detach').length).toBe(0);
+    expect(failures).toEqual([]);
+  });
+
+  it('gives the identity up when the fresh credential is the same one', async () => {
+    const { server, client } = await pinnedFixture();
+    const failures: string[] = [];
+    await client.attachIdentity({
+      gaii: CRM,
+      getToken: async () => 'stale',
+      forgetToken: () => { /* a stored bearer: forgetting changes nothing */ },
+      onAuthFailure: (m) => failures.push(m),
+    });
+
+    const r = await client.forward('GET', '/v1/memory', {}, CRM);
+    expect(r.status).toBe(401);
+    await waitFor(() => failures.length === 1 && server.framesOfType('detach').length === 1);
+    expect(server.framesOfType('detach').map(f => f.agent)).toEqual([CRM]);
+    expect(client.isOnline()).toBe(true);
+  });
+});

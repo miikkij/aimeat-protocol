@@ -34,6 +34,9 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-10-07 -- Each identity hands the tunnel `forgetToken`, so a refused pinned credential is
+ *     re-minted and re-attached before the agent is reported auth_failed; the REST proxy forwards
+ *     over the tunnel only while the identity itself is on it.
  *   2026-09-27 -- The /local/call route moved to ./local-call.ts (pure extraction, the file passed 800 lines),
  *     where a tool that moved into aimeat_app_manage answers 410 TOOL_MOVED with the replacing call.
  *   2026-09-24 — The degraded proxy holds back a credential the node refused (../refused-credentials.ts).
@@ -137,7 +140,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
 import { TunnelHub, statusOfIdentity, principalRow } from './tunnel-hub.js';
-import { resolveToken } from '../agent-key.js';
+import { resolveToken, forgetCachedToken } from '../agent-key.js';
 import { refusedCredential, noteCredentialAnswer } from '../refused-credentials.js';
 import { type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
@@ -256,6 +259,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       // Not getToken(): a v2 agent has no stored bearer, it has a key and mints a credential per
       // use. resolveToken answers for both kinds, so this line does not have to know which it is.
       getToken: () => resolveToken(entry.agent, entry.owner, entry.config.node_url),
+      // When the node refuses the pinned credential, the tunnel drops this cache, mints once more and
+      // re-attaches before it gives the identity up. For a stored bearer the next read is the same
+      // string, and the tunnel gives up at once as before.
+      forgetToken: () => forgetCachedToken(entry.agent, entry.owner),
       onInvoke: (frame) => {
         // The one capability the DAEMON answers itself rather than offering to a crew runtime:
         // taking on new agents. A crew cannot do it — it has no access to the keychain and no way
@@ -703,7 +710,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       // `activity-reporter`, and was then served `activity-reporter`'s list when it asked for that
       // one. Reads misattributed, writes misattributed AND landed under the wrong agent — this
       // path carries `DELETE /v1/memory/…`. Found by crewaimeat-dev. → pitfalls §43
-      if (ch.tunnel?.isOnline() && ch.forward) {
+      // Over the tunnel only while THIS identity is on it. The socket stays online for the others
+      // after one identity's credential is refused, and a call stamped with the refused identity is
+      // then answered UNKNOWN_IDENTITY; the direct path below gives the node's own answer instead.
+      if (ch.transportMode === 'tunnel' && ch.tunnel?.isOnline() && ch.forward) {
         const r = await ch.forward(req.method, req.path, { query, body });
         res.status(r.status).json(r.body);
         return;
