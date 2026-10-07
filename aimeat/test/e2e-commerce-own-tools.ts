@@ -181,6 +181,11 @@ await test('SECURITY: A\'s agent never sees B\'s unpriced tool, and B sees B\'s 
     assert(JSON.stringify(bOwn.map(t => t.name)) === JSON.stringify(['b_free_call']), `B's own entries: ${JSON.stringify(bOwn.map(t => t.sku))}`);
 });
 
+await test('the listed invoke URL refuses a caller with no token', async () => {
+    const r = await json(ownEntry.webmcp.invoke, { method: 'POST', body: JSON.stringify({ input: { q: 'x' } }) });
+    assert(r.status === 401, `an anonymous invoke ran: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+});
+
 await test('the listed invoke URL runs A\'s free tool for A\'s agent, unmetered', async () => {
     const r = await json(ownEntry.webmcp.invoke, { method: 'POST', headers: auth(aAgent), body: JSON.stringify({ input: { q: 'x' } }) });
     assert(r.status === 200, `invoke ${r.status}: ${JSON.stringify(r.body?.error)}`);
