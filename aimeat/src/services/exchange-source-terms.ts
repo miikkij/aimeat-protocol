@@ -13,6 +13,7 @@
  *   const terms = usageTermsOf(tool.usageTerms);
  *   for (const p of prices(morsels, moneyPricesOf(tool.priceMoney, tool.pricesMoney))) { ... }
  * @version-history
+ *   v1.0.1 — 2026-10-07 — moneyPricesOf moved unchanged to commerce/money.ts and re-exported here.
  *   v1.0.0 — 2026-09-13 — Extracted verbatim from services/exchange-projection.ts (pure move).
  */
 import { createHash } from 'node:crypto';
@@ -39,20 +40,9 @@ export function provenanceOf(src: Provenance | undefined): Provenance | null {
   return { ...src, odpsVersion: src.odpsVersion ?? ODPS_VERSION };
 }
 
-/** Every money price a source declares, `priceMoney` first, de-duplicated by currency. */
-export function moneyPricesOf(
-  primary: { amount: number; currency: string } | null | undefined,
-  extra: Array<{ amount: number; currency: string }> | undefined,
-): Array<{ amount: number; currency: string }> {
-  const out: Array<{ amount: number; currency: string }> = [];
-  const seen = new Set<string>();
-  for (const p of [primary, ...(extra ?? [])]) {
-    if (!p || typeof p.amount !== 'number' || !Number.isInteger(p.amount) || p.amount <= 0 || !p.currency) continue;
-    if (seen.has(p.currency)) continue;
-    seen.add(p.currency); out.push({ amount: p.amount, currency: p.currency });
-  }
-  return out;
-}
+/** Every money price a source declares, `priceMoney` first. Lives in commerce/money.ts, so the
+ *  checkout and the tool catalog read money prices with the same function this listing does. */
+export { moneyPricesOf } from '../commerce/money.js';
 
 export function contentHash(parts: unknown): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 24);

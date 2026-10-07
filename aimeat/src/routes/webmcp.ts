@@ -16,6 +16,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.7.2 — 2026-10-07 — A priced tool's payment block carries every money price (`pricesMoney`,
+ *     `priceMoney` its first). A tool sold only in `pricesMoney` answered 402 naming no price.
  *   v1.7.1 — 2026-10-07 — loadPublicManifest reads through publicManifestTools
  *     (commerce/app-tool-catalog.ts), the gate GET /v1/commerce/tools?include=own lists through.
  *   v1.7.0 — 2026-10-01 — A tool whose backing extension serves members only refuses a non-member
@@ -51,7 +53,7 @@ import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
-import { appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
+import { appToolsKey, isToolPriced, toolMoneyPrices, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { publicManifestTools } from '../commerce/app-tool-catalog.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
@@ -95,6 +97,7 @@ function toolEntry(config: AimeatConfig, ownerName: string, filename: string, to
   const b = config.baseUrl;
   const appRef = `${ownerName}/${filename}`;
   const priced = isToolPriced(tool);
+  const money = toolMoneyPrices(tool).map((m) => ({ amount: m.amount, currency: m.currency, scale: 6 }));
   return {
     // WebMCP descriptor fields (document.modelContext.registerTool) — execute lives in the page.
     name: tool.name,
@@ -106,7 +109,8 @@ function toolEntry(config: AimeatConfig, ownerName: string, filename: string, to
       ? {
           required: true,
           ...(tool.price && tool.price.morsels > 0 ? { price: { morsels: tool.price.morsels, unit: tool.price.unit ?? 'per-call' } } : {}),
-          ...(tool.priceMoney ? { priceMoney: { amount: tool.priceMoney.amount, currency: tool.priceMoney.currency, scale: 6 } } : {}),
+          // Every money price, so a tool sold only in `pricesMoney` does not answer 402 with no price.
+          ...(money.length ? { priceMoney: money[0], pricesMoney: money } : {}),
           note: 'Payment IS the invocation: open + complete a checkout session with the item below. A callable tool returns its result on session.fulfillment.results; a task tool queues the order for the seller. Self-purchase by the app owner is free.',
           checkout: {
             create: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions` },

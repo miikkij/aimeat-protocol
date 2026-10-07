@@ -13,6 +13,8 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.6.0 — 2026-10-07 — `toolMoneyPrices`: every money price a tool is sold at, read from both
+ *     `priceMoney` and `pricesMoney`, for the catalog, the WebMCP payment block and the checkout.
  *   Comment only — 2026-09-13 — `exchange` states the developer's two decisions: a tool and the flagged
  *     extension action it calls list once, and changed text past an ODPS cap is refused at the write.
  *   v1.8.0 — 2026-08-01 — TARGET-058 Phase 5: optional `aiProvenance` on a tool and on the manifest
@@ -41,7 +43,7 @@
  *   v1.0.0 — 2026-07-14 — Initial app-tool manifest schema (TARGET-034 phase A)
  */
 import { z } from 'zod';
-import { MONEY_CURRENCIES } from '../commerce/money.js';
+import { MONEY_CURRENCIES, moneyPricesOf } from '../commerce/money.js';
 import { ProvenanceSchema, OdpsExtrasSchema } from './odps-schemas.js';
 
 /** A provider pricing plan on a sellable tool — mirrors exchange-market OfferingPlan so a tool can carry
@@ -211,4 +213,13 @@ export function isToolPriced(t: {
   if (t.price && typeof t.price.morsels === 'number' && t.price.morsels > 0) return true;
   if (t.priceMoney && typeof t.priceMoney.amount === 'number' && t.priceMoney.amount > 0) return true;
   return (t.pricesMoney ?? []).some(m => typeof m?.amount === 'number' && m.amount > 0);
+}
+
+/**
+ * Every money price a tool is sold at, `priceMoney` first, one per currency. A tool may state its
+ * money price in `priceMoney`, in `pricesMoney`, or in both, so a reader that looks at `priceMoney`
+ * alone misses a tool sold only in `pricesMoney` and every currency after the first.
+ */
+export function toolMoneyPrices(t: Pick<AppTool, 'priceMoney' | 'pricesMoney'>): Array<{ amount: number; currency: string }> {
+  return moneyPricesOf(t.priceMoney, t.pricesMoney);
 }

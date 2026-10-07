@@ -335,6 +335,7 @@ const ALL_SUITES = [
     'test/e2e-app-members.ts',
     'test/e2e-members-only-payments.ts',
     'test/e2e-commerce-own-tools.ts',
+    'test/e2e-app-tool-money-prices.ts',
     'test/e2e-app-dev-grant.ts',
     'test/e2e-app-roadmap.ts',
     'test/e2e-app-design-spec.ts',

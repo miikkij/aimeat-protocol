@@ -16,12 +16,16 @@
  * @structure MONEY_SCALE · MONEY_UNIT · MONEY_CURRENCIES · isMoneyCurrency ·
  *   isSupportedMoneyCurrency · microsToStripeMinor · stripeMinorToMicros · microsToTokenRaw ·
  *   microsToUsdcRaw · usdcRawToMicros · integerMicros · percentFee · percentCut ·
- *   roundToMoneyScale · formatMoneyMajor
+ *   roundToMoneyScale · formatMoneyMajor · moneyPricesOf
  * @usage
  *   import { isMoneyCurrency, microsToStripeMinor, percentFee } from './money.js';
  *   if (isMoneyCurrency(session.currency)) stripeAmount = microsToStripeMinor(micros); // → cents
  *   const fee = percentFee(gross, commerceFeePercent(config));
  * @version-history
+ *   v1.3.0 — 2026-10-07 — moneyPricesOf moved here unchanged from services/exchange-source-terms.ts,
+ *     so the checkout, the tool catalog and the WebMCP route read a tool's money prices with the
+ *     function the EXCHANGE listing reads them with. They read `priceMoney` only, and a tool priced
+ *     in `pricesMoney` alone was missing from the catalog and could not be bought.
  *   v1.2.0 — 2026-07-25 — microsToTokenRaw: decimals-aware micros → token atomic units, so a second
  *     settlement asset (EURC) crosses the chokepoint on its own precision (TARGET-042)
  *   v1.1.0 — 2026-07-14 — Chokepoint completion: currency allowlist, Stripe-minor + USDC-raw
@@ -143,4 +147,19 @@ export function formatMoneyMajor(micros: number): string {
   const s = (micros / MONEY_UNIT).toFixed(MONEY_SCALE);
   // Trim trailing zeros but keep at least two decimals.
   return s.replace(/(\.\d{2}\d*?)0+$/, '$1');
+}
+
+/** Every money price a source declares, `priceMoney` first, de-duplicated by currency. */
+export function moneyPricesOf(
+  primary: { amount: number; currency: string } | null | undefined,
+  extra: Array<{ amount: number; currency: string }> | undefined,
+): Array<{ amount: number; currency: string }> {
+  const out: Array<{ amount: number; currency: string }> = [];
+  const seen = new Set<string>();
+  for (const p of [primary, ...(extra ?? [])]) {
+    if (!p || typeof p.amount !== 'number' || !Number.isInteger(p.amount) || p.amount <= 0 || !p.currency) continue;
+    if (seen.has(p.currency)) continue;
+    seen.add(p.currency); out.push({ amount: p.amount, currency: p.currency });
+  }
+  return out;
 }
