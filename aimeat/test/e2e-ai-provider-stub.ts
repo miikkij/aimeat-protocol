@@ -394,6 +394,29 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(r.body.error?.code === 'RATE_LIMITED', `code ${r.body.error?.code}`);
     });
 
+    // A provider's key refusal is 424 with the code INVALID_API_KEY. Not 401, which says the CALLER'S
+    // credential failed: on 2026-10-07 the connector detached a healthy crm agent on it, and the
+    // browser SDK refreshes the session and repeats the call. Not 502, which the OpenAI client and
+    // crewaimeat retry, so a refused key would be sent three times (Jouni, 2026-10-07).
+    await test('2c2. A key the provider rejects is 424 INVALID_API_KEY on the proxy, complete and image, sent once', async () => {
+        const refusal = '{"error":{"message":"User not found.","code":401}}';
+        provider.queue('chat', providerStatus(401, refusal), carries('MARK-PROXY-401'));
+        const proxy = await json('/v1/llm/chat/completions', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'MARK-PROXY-401' }] }),
+        });
+        assert(proxy.status === 424 && proxy.body.error?.code === 'INVALID_API_KEY', `/v1/llm/chat/completions: ${proxy.status} ${JSON.stringify(proxy.body?.error)}`);
+        assert(provider.requestsFor('chat').filter(carries('MARK-PROXY-401')).length === 1, 'the refused key was sent once');
+
+        provider.queue('chat', providerStatus(401, refusal), carries('MARK-COMPLETE-401'));
+        const done = await json('/v1/ai/complete', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ prompt: 'MARK-COMPLETE-401', app_id: 'e2e-ai-stub' }) });
+        assert(done.status === 424 && done.body.error?.code === 'INVALID_API_KEY', `/v1/ai/complete: ${done.status} ${JSON.stringify(done.body?.error)}`);
+
+        provider.queue('images', providerStatus(401, refusal));
+        const img = await json('/v1/ai/image', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ prompt: 'a red bicycle', model: MODEL }) });
+        assert(img.status === 424 && img.body.error?.code === 'INVALID_API_KEY', `/v1/ai/image: ${img.status} ${JSON.stringify(img.body?.error)}`);
+    });
+
     await test('2d. parallel_tool_calls reaches the provider beside tools, is left out without them, and must be a boolean', async () => {
         // crewfive's wish, 2026-10-03: the proxy dropped the field, so a crew on the node route could
         // not stop a model from batching tool calls it should make one at a time.
@@ -477,14 +500,14 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(seen.length === 1, `the provider was asked for image models exactly once, got ${seen.length}`);
     });
 
-    await test('3c. A catalogue that answers badly is a named 502, and a rejected key is a 401', async () => {
+    await test('3c. A catalogue that answers badly is a named 502, and a rejected key is a 424', async () => {
         provider.queue('models', providerStatus(503, 'upstream down'), r => r.query.get('output_modalities') === 'speech');
         const bad = await json('/v1/openrouter/models?modality=speech', { headers: auth(a.token) });
         assert(bad.status === 502, `expected 502, got ${bad.status}: ${JSON.stringify(bad.body?.error)}`);
         assert(bad.body.error?.code === 'OPENROUTER_ERROR', `code ${bad.body.error?.code}`);
         provider.queue('models', providerStatus(401, 'bad key'), r => r.query.get('output_modalities') === 'speech');
         const rejected = await json('/v1/openrouter/models?modality=speech', { headers: auth(a.token) });
-        assert(rejected.status === 401, `a rejected key is 401, got ${rejected.status}`);
+        assert(rejected.status === 424, `a rejected key is 424, got ${rejected.status}`);
         assert(rejected.body.error?.code === 'INVALID_API_KEY', `code ${rejected.body.error?.code}`);
     });
 
@@ -543,7 +566,7 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(/500/.test(nonOk.body.error?.message ?? ''), `the status is named: ${nonOk.body.error?.message}`);
         provider.queue('transcriptions', providerStatus(401, 'nope'));
         const rejected = await transcribe({});
-        assert(rejected.status === 401, `a rejected key is 401, got ${rejected.status}`);
+        assert(rejected.status === 424, `a rejected key is 424, got ${rejected.status}`);
         assert(rejected.body.error?.code === 'INVALID_API_KEY', `code ${rejected.body.error?.code}`);
     });
 

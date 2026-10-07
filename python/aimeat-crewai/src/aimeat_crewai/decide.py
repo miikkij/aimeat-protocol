@@ -159,7 +159,8 @@ class DecideRefused(DecideError):
       ``DECIDE_DISABLED``        the operator turned the decision model off on this node (503).
       ``NO_API_KEY``             no TypeSafe key is set anywhere (400). The message says what to set
                                  and where -- pass it on to the owner as it is.
-      ``INVALID_API_KEY``        TypeSafe refused the key that paid (401).
+      ``INVALID_API_KEY``        TypeSafe refused the key that paid (424; it was 401 until 2026-10-07,
+                                 which said the caller's own credential failed). Direct mode too.
       ``QUOTA_EXHAUSTED``        the owner's allowance on the node's key is used up (402).
       ``APP_QUOTA_EXHAUSTED``    the calling app's own daily cap is used up (402).
       ``AGENT_QUOTA_EXHAUSTED``  this agent's own daily cap is used up (402).
@@ -1223,8 +1224,10 @@ def _decide_direct(
             retry_after=_retry_after_of(resp, None),
         )
     if status in (401, 403):
+        # 424, the status the node answers for the same refusal, so a caller reads one status
+        # whichever mode it ran in. Not 401: that says the caller's own credential failed.
         raise DecideRefused(
-            "INVALID_API_KEY", f"TypeSafe did not accept the key in ${key_env}.", status=status
+            "INVALID_API_KEY", f"TypeSafe did not accept the key in ${key_env}.", status=424
         )
     if status >= 400:
         raise DecideUnreachable(f"TypeSafe answered HTTP {status} in direct mode.")

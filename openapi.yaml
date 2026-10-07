@@ -6332,6 +6332,26 @@ components:
                       code:
                         example: VALIDATION_FAILED
 
+    ProviderKeyRefused:
+      description: |
+        INVALID_API_KEY - the AI provider refused the key that pays for this call (the owner's, the
+        agent's or the node's). The caller's own credential is fine, so this is not a 401: a client
+        must not refresh its session or drop its connection on it. It is not a 5xx either, so a client
+        that retries server errors does not send the refused key again. The owner (or the operator, for
+        the node's key) fixes the key; repeating the call changes nothing until then.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code:
+                        example: INVALID_API_KEY
+
     RateLimited:
       description: Too many requests
       headers:
@@ -11591,6 +11611,8 @@ paths:
           description: The allowance is spent and this node has no free-model fallback configured
         '403':
           description: Not an owner session and no ai:use scope
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '429':
           description: The model is rate limited. Free models reach this first.
         '502':
@@ -16549,6 +16571,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
 
   /v1/ai/policy:
     get:
@@ -16827,6 +16851,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '403':
           $ref: '#/components/responses/AimeatError'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '429':
           $ref: '#/components/responses/RateLimited'
         '502':
@@ -17644,6 +17670,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '429':
           description: '`RATE_LIMITED` — this node''s minute window for the key is full, or TypeSafe limited it. Carries `Retry-After`.'
           headers:
@@ -18545,9 +18573,11 @@ paths:
         '409':
           description: AI_ROLE_NOT_BOUND - the app's role runs only once the owner binds it (PUT /v1/ai/roles)
         '401':
-          description: Unauthorized, or INVALID_API_KEY when the provider rejected the key
+          description: Unauthorized
         '402':
           description: QUOTA_EXHAUSTED - the daily budget is spent; nothing was generated
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '429':
           description: RATE_LIMITED by the provider
         '502':
@@ -18629,6 +18659,7 @@ paths:
         '402': { description: AI budget exhausted }
         '403': { description: Missing ai:use or conflicting application identity }
         '409': { description: 'AI_ROLE_NOT_BOUND: the app''s role runs only once the owner binds it (PUT /v1/ai/roles)' }
+        '424': { $ref: '#/components/responses/ProviderKeyRefused' }
         '429': { description: Rate limited }
         '502': { description: Provider failure before streaming started }
   /v1/ai/speak:
@@ -18692,6 +18723,7 @@ paths:
         '402': { description: AI budget exhausted }
         '403': { description: Missing ai:use or conflicting application identity }
         '409': { description: 'AI_ROLE_NOT_BOUND: the app''s role runs only once the owner binds it (PUT /v1/ai/roles)' }
+        '424': { $ref: '#/components/responses/ProviderKeyRefused' }
         '429': { description: Rate limited }
         '502': { description: Provider failure before streaming started }
   /v1/ai/transcribe:
@@ -18811,6 +18843,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '403':
           description: Missing ai:use scope, app not allowlisted, or provider host not allowlisted
           content:
@@ -49011,12 +49045,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
-        '401':
-          description: Invalid API key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '503':
           description: Encryption not configured
           content:
@@ -49060,12 +49090,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
-        '401':
-          description: Invalid API key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
         '402':
           description: The owner's daily AI budget is spent
           content:
@@ -49078,6 +49102,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '503':
           description: Encryption not configured
           content:
@@ -49177,11 +49203,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '401':
-          description: Invalid API key
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
+          $ref: '#/components/responses/Unauthorized'
         '402':
           description: The owner's daily AI budget (or this app's quota) is spent
           content:
@@ -49200,6 +49222,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '429':
           description: Rate limited by OpenRouter
           content:

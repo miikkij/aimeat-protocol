@@ -56,6 +56,7 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.6 -- 2026-10-07 -- A provider's refusal of the owner's or the agent's key is 424 INVALID_API_KEY, not 401.
  *   v1.4.5 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     DecideCaller.limit 'exempt' is passed by a run's items, the classifier and the refinery.
  *   v1.4.4 — 2026-10-05 — The node's key asks nodeKeyStanding (ai-allowance.ts), the one answer every
@@ -88,7 +89,7 @@ import type {
   Storage, AiDecisionRow, AiDecisionAnswer, AiDecisionQuestion, AiDecisionReview,
   AiDecisionKeyScope, AiDecisionOutcome, AiDecisionStatsGroup, AiDecisionStatsGroupBy,
 } from '../../storage/interface.js';
-import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError } from '../ai/completion.js';
+import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError, PROVIDER_KEY_REFUSED_STATUS } from '../ai/completion.js';
 import { nodeKeyStanding, debitAllowance } from '../ai-allowance.js';
 import { readProgramMap } from '../data-map/data-map-access.js';
 import { logger } from '../../utils/logger.js';
@@ -355,9 +356,9 @@ function mapProviderError(e: SystemOneError, scope: AiDecisionKeyScope, provider
   switch (e.code) {
     case 'JEV_UNAUTHORIZED':
     case 'JEV_FORBIDDEN':
-      if (scope === 'agent') return new DecideError('INVALID_API_KEY', 401, `${name} refused this agent's key. The owner checks it on the agent's page.`, details);
+      if (scope === 'agent') return new DecideError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, `${name} refused this agent's key. The owner checks it on the agent's page.`, details);
       return scope === 'own'
-        ? new DecideError('INVALID_API_KEY', 401, `${name} refused your key. Check it in AI settings.`, details)
+        ? new DecideError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, `${name} refused your key. Check it in AI settings.`, details)
         : new DecideError('PROVIDER_ERROR', 502, `${name} refused this node's key. The operator has been told in the log.`, details);
     case 'JEV_RATE_LIMITED':
       return new DecideError('RATE_LIMITED', 429, `${name} is limiting requests right now. Try again shortly.`, details);

@@ -27,6 +27,7 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.10.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v1.9.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     POST /v1/llm/chat/completions counts the account on the route (aiCallLimit), not per principal.
  *   v1.8.0 — 2026-10-04 — A call to OpenRouter asks for its own cost (usage.include), and a catalogue
@@ -67,7 +68,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOf } from './ai-policy.js';
 import {
-    prepareAiCall, settleAiCall, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
+    prepareAiCall, settleAiCall, AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, planFor, recordFailedAttempts, type AiCallPlan,
 } from '../services/ai/completion.js';
 import { readCallRole } from '../services/ai/call-guards.js';
 import { chatCompletionRaw, listModels } from '../services/openrouter.js';
@@ -333,7 +334,9 @@ function proxyRole(req: Request): string | undefined {
 function providerFailure(status: number, detail: string): AiCompletionError {
     const short = detail.slice(0, 300);
     if (status === 401 || status === 403) {
-        return new AiCompletionError('INVALID_API_KEY', 401, `The provider rejected the key. ${short}`);
+        // 424, not 401: the caller's own credential was fine. The connector detached a healthy agent
+        // on the 401 (2026-10-07). See PROVIDER_KEY_REFUSED_STATUS.
+        return new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, `The provider rejected the key. ${short}`);
     }
     if (status === 429) {
         // The one a free model hits first: the free tier's request ceiling depends on what the

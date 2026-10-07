@@ -178,6 +178,16 @@ async function mcpCall(token: string, name: string, args: Record<string, unknown
       await routing(a, { defaults: { embed: ['e-openai'] } });
     });
 
+    // A provider's key refusal is 424 with the code INVALID_API_KEY: not 401, which says the caller's
+    // own credential failed, and not 502, which clients retry (Jouni, 2026-10-07).
+    await test('4b. a key the provider rejects is 424 INVALID_API_KEY, not 401', async () => {
+      // Both providers serve the same model after test 4, so the call falls back once; both refuse.
+      stub.queue('embeddings', providerStatus(401, '{"error":{"message":"User not found."}}'), at('openai'));
+      stub.queue('embeddings', providerStatus(401, '{"error":{"message":"User not found."}}'), at('or'));
+      const r = await embed(a.token, { input: ['x'] });
+      assert(r.status === 424 && r.body.error?.code === 'INVALID_API_KEY', `a rejected key: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    });
+
     await test('5. the limits of one call, and an empty input, are refused before anything is sent', async () => {
       const before = stub.requestsFor('embeddings').length;
       const many = await embed(a.token, { input: Array.from({ length: 257 }, (_, i) => `t${i}`) });

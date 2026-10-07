@@ -6,6 +6,7 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.9.0 - 2026-10-07 - A speech provider's key refusal is 424 INVALID_API_KEY, not PROVIDER_ERROR at 401.
  *   v1.8.0 - 2026-10-05 - The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.7.0 - 2026-10-05 - `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.6.0 - 2026-09-28 - The reply and the speech take `role`, the AI role the call runs as (services/ai/roles.ts).
@@ -31,7 +32,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
-  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
+  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai/completion.js';
 import { chatCompletionRaw, speechRaw, generationCost, listModels } from './openrouter.js';
 import { openAiChat, speaksOpenAiChat } from './ai/gateway.js';
@@ -80,12 +81,22 @@ export interface SpeakOptions extends VoicePolicyCaller {
   limit?: AiCallLimitMark;
 }
 
+/**
+ * A speech provider's non-OK status as the node's refusal. A key refusal is INVALID_API_KEY at 424, as
+ * on every other AI route (PROVIDER_KEY_REFUSED_STATUS); it was PROVIDER_ERROR at 401, which told the
+ * caller its own credential had failed. The message stays generic: provider responses can echo
+ * credentials or request content.
+ */
+function speechProviderError(status: number): AiCompletionError {
+  const message = `Speech provider returned HTTP ${status}.`;
+  if (status === 401) return new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, message);
+  return new AiCompletionError('PROVIDER_ERROR', status === 429 ? 429 : 502, message);
+}
+
 async function checkResponse(response: Response): Promise<void> {
   if (response.ok && response.body) return;
-  const status = response.status === 401 ? 401 : response.status === 429 ? 429 : 502;
-  // Provider responses can echo credentials or request content. Keep the external error bounded and generic.
   await response.body?.cancel();
-  throw new AiCompletionError('PROVIDER_ERROR', status, `Speech provider returned HTTP ${response.status}.`);
+  throw speechProviderError(response.status);
 }
 
 /** The provider uses SSE; emit only text and terminal metadata, never hidden reasoning. */
@@ -152,7 +163,7 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
   } catch (e) {
     const status = (e as { status?: number }).status;
     if (typeof status !== 'number') throw e;
-    throw new AiCompletionError('PROVIDER_ERROR', status === 401 ? 401 : status === 429 ? 429 : 502, `Speech provider returned HTTP ${status}.`);
+    throw speechProviderError(status);
   }
   await checkResponse(response);
   let content = '', prompt = 0, completion = 0, cost: number | undefined, finish: string | null = null;
