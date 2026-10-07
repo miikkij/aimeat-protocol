@@ -15,6 +15,8 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.8.1 — 2026-10-07 — The Server Card's commerce_tools note names /v1/commerce/tools?include=own,
+ *     which adds the authenticated caller's own owner's unpriced callable tools.
  *   v1.8.0 — 2026-09-18 — GET /.well-known/ai-plugin.json is removed. ChatGPT stopped reading the
  *     plugin format on 2024-04-09; what ChatGPT connects through today is MCP, which the Server
  *     Card here already describes. The manifest had also rotted: it told an agent to authenticate
@@ -126,13 +128,13 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
     if (config.commerceEnabled) {
       const url = `${config.baseUrl}/v1/commerce/tools`;
       if (config.mcpCardCommerceTools === 'pointer') {
-        commerceTools = { mode: 'pointer', url, note: 'Priced app-tools sellable through the commerce checkout — fetch the catalog from `url`.' };
+        commerceTools = { mode: 'pointer', url, note: 'Priced app-tools sellable through the commerce checkout — fetch the catalog from `url`. Authenticated, `url?include=own` adds your own owner\'s unpriced callable tools (price null, own: true).' };
       } else {
         const { listPricedAppTools } = await import('../commerce/app-tool-catalog.js');
         const tools = await listPricedAppTools(storage, config, 100);
         commerceTools = {
           mode: 'inline', url, tools, total: tools.length,
-          note: 'Priced app-tools sellable through the commerce checkout. Payment IS the invocation: open + complete a checkout session with checkout_item (+ your input); unpaid HTTP invokes answer 402 with x402 accepts. Capped at 100 entries — `url` serves the full catalog.',
+          note: 'Priced app-tools sellable through the commerce checkout. Payment IS the invocation: open + complete a checkout session with checkout_item (+ your input); unpaid HTTP invokes answer 402 with x402 accepts. Capped at 100 entries — `url` serves the full catalog. Authenticated, `url?include=own` adds your own owner\'s unpriced callable tools (price null, own: true), invoked directly on webmcp.invoke.',
         };
       }
     }

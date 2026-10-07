@@ -25386,23 +25386,40 @@ paths:
   /v1/commerce/tools:
     get:
       operationId: commerceToolsCatalog
-      summary: Priced app-tool catalog (public)
+      summary: Priced app-tool catalog (public), plus the caller's own free tools on request
       description: >-
         Every priced app-tool from every PUBLIC apps.{appId}.tools manifest, as normalized
         entries — sku "app-tool:<owner>/<appId>:<tool>", inputSchema, fulfillment 'call'|'task',
         morsel/micro-unit money price, the WebMCP listing/invoke URLs, and a ready-made
         checkout_item. The MCP Server Card's commerce_tools block embeds (inline mode, default)
         or links (pointer mode) this catalog (TARGET-034 phase D).
+        With include=own and a token, the answer also carries the caller's OWN owner's unpriced
+        callable tools (a PUBLIC manifest, an action_id, no price in any field), after the priced
+        entries: the same fields with price null, no checkout_item, and own true. The caller's
+        owner comes from the token (an agent or app token resolves to its owner). They are invoked
+        directly with the same token on webmcp.invoke. Another owner's unpriced tools are never
+        listed. An anonymous caller or a visitor from another node gets the priced catalog
+        unchanged. The own entries are served even when commerce is disabled, with no priced half.
       tags: [Commerce]
+      parameters:
+        - name: include
+          in: query
+          required: false
+          description: >-
+            Comma-separated extras. `own` adds the authenticated caller's own owner's unpriced
+            callable app tools (own true, price null). Ignored for an anonymous caller.
+          schema:
+            type: string
+            example: own
       responses:
         '200':
-          description: Priced app-tool catalog
+          description: Priced app-tool catalog, and with include=own the caller's own free tools
           content:
             application/json:
               schema:
                 type: object
         '503':
-          description: Commerce disabled on this node
+          description: Commerce disabled on this node (and no own tools were asked for by an authenticated caller)
 
   /v1/apps/{owner}/{filename}/webmcp:
     get:

@@ -12,12 +12,17 @@
  *   ready, discoverable at /.well-known/acp.json.
  * @structure
  *   - GET  /v1/commerce/feed                      public product feed (ACP-shaped entries)
- *   - GET  /v1/commerce/tools                     priced app-tool catalog (MCP card pointer target)
+ *   - GET  /v1/commerce/tools                     priced app-tool catalog (MCP card pointer target);
+ *                                                 ?include=own adds the caller's own free tools
  *   - GET  /.well-known/acp.json                  discovery document
  *   - POST /acp/v1/checkout_sessions              create ({ items: [{ id, quantity }] })
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.5.0 — 2026-10-07 — GET /v1/commerce/tools?include=own: an authenticated caller also gets its
+ *     own owner's unpriced callable app tools (price null, own: true), so an agent sees its owner's
+ *     free tools in the same read as the priced ones (wish-commerce-tool-catalog-includes-the-caller-
+ *     s-own-unpriced-cal). Never another owner's: only the caller's own owner's records are read.
  *   v1.4.0 — 2026-08-10 — Security audit H-3: pass the completing principal to completeSession.
  *   v1.3.0 — 2026-07-14 — Feed app-tool scan extracted to the shared app-tool-catalog enumerator +
  *     dedicated GET /v1/commerce/tools catalog endpoint (TARGET-034 phase D)
@@ -37,8 +42,9 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
-import { listPricedAppTools } from '../commerce/app-tool-catalog.js';
+import { listPricedAppTools, listOwnCallableAppTools } from '../commerce/app-tool-catalog.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { callerOf } from '../middleware/caller.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
@@ -226,15 +232,28 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
   // The dedicated priced-app-tool catalog (TARGET-034 phase D): the MCP Server Card's
   // commerce_tools target — full normalized entries (sku, schema, price, WebMCP invoke,
   // ready-made checkout item) from the same shared scanner the feed uses. Public.
-  router.get('/v1/commerce/tools', async (_req, res) => {
-    if (!config.commerceEnabled) {
+  //
+  // ?include=own adds the AUTHENTICATED caller's own owner's unpriced callable tools after the priced
+  // entries, each with `price: null` and `own: true`, so an agent reads what it can buy and what its
+  // owner gives it for free in one call. Opt-in, so a client that reads the catalog as "things for
+  // sale" sees the same list it always did. An anonymous caller or a visitor from another node has no
+  // owner here and gets the priced catalog unchanged. The own entries are not sold, so they are
+  // served even when commerce is off; the priced half is then empty.
+  router.get('/v1/commerce/tools', async (req, res) => {
+    const include = typeof req.query.include === 'string' ? req.query.include.split(',') : [];
+    const caller = include.includes('own') && req.auth ? callerOf(req, config.nodeId, storage) : null;
+    const ownerGhii = caller && caller.kind !== 'anonymous' && !caller.visitor ? caller.ownerGhii : null;
+    if (!config.commerceEnabled && !ownerGhii) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Commerce is disabled on this node')); return;
     }
-    const tools = await listPricedAppTools(storage, config, FEED_CAP);
+    const priced = config.commerceEnabled ? await listPricedAppTools(storage, config, FEED_CAP) : [];
+    const own = ownerGhii ? await listOwnCallableAppTools(storage, config, ownerGhii, FEED_CAP) : [];
+    const tools = [...priced, ...own];
     res.json({
       version: 'draft',
       updated_at: new Date().toISOString(),
-      note: 'Priced app-tools sellable through the commerce checkout. Payment IS the invocation: open + complete a checkout session with checkout_item (+ your input); a callable tool returns its result on session.fulfillment.results, a task tool queues the order. Unpaid HTTP invokes answer 402 with x402 accepts.',
+      note: 'Priced app-tools sellable through the commerce checkout. Payment IS the invocation: open + complete a checkout session with checkout_item (+ your input); a callable tool returns its result on session.fulfillment.results, a task tool queues the order. Unpaid HTTP invokes answer 402 with x402 accepts.'
+        + (ownerGhii ? ' Entries with own: true are your own owner\'s unpriced tools: no checkout, POST your input to webmcp.invoke with your token.' : ''),
       checkout: { create: { method: 'POST', url: `${config.baseUrl}/v1/commerce/checkout-sessions` } },
       tools,
       total: tools.length,

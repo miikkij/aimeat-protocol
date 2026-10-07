@@ -8,11 +8,18 @@
  *   endpoint, and the MCP Server Card's commerce_tools block (inline mode). One scanner means the
  *   surfaces can never drift on gates (public record, priced tool, dotted appIds) or on the sku
  *   grammar "app-tool:<owner>/<appId>:<tool>".
- * @structure PricedAppTool · listPublicAppTools · listPricedAppTools
+ * @structure PricedAppTool · OwnAppTool · publicManifestTools · listPublicAppTools ·
+ *   listPricedAppTools · listOwnCallableAppTools
  * @usage
  *   const tools = await listPricedAppTools(storage, config, 100);
  *   const all = await listPublicAppTools(storage, config, { pricedOnly: false });
+ *   const mine = await listOwnCallableAppTools(storage, config, req.auth.owner, 500);
  * @version-history
+ *   v1.2.0 — 2026-10-07 — listOwnCallableAppTools(): one owner's UNPRICED callable tools, for
+ *     GET /v1/commerce/tools?include=own, so an agent reads its own owner's free tools in the same
+ *     call as the priced catalog instead of one listing per app. publicManifestTools() is the one
+ *     "is this manifest public and well-formed" gate, shared with the WebMCP invoke route, so a
+ *     tool this file lists is a tool that route will run.
  *   v1.1.1 — 2026-09-26 — The owner name comes from localAccountName (utils/gaii.ts), which keeps an
  *     identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-31 — listPublicAppTools(): the same scan with the price gate made optional, so
@@ -24,8 +31,8 @@
  *     (TARGET-034 phase D)
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { AppToolsDocSchema, appIdFromToolsKey } from '../models/app-tool-schemas.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
+import { AppToolsDocSchema, appIdFromToolsKey, isToolPriced, type AppTool } from '../models/app-tool-schemas.js';
 import { localAccountName } from '../utils/gaii.js';
 
 /** One sellable app-tool as every discovery surface sees it. */
@@ -66,6 +73,37 @@ export interface AppToolScanOptions {
 }
 
 /**
+ * One of the caller's own owner's UNPRICED callable tools. Same fields as a priced entry, with
+ * `price: null` and no checkout item (there is nothing to buy: the owner's own principals invoke
+ * it directly on `webmcp.invoke`), and `own: true` to say so.
+ */
+export type OwnAppTool = Omit<PricedAppTool, 'price' | 'priceMoney' | 'checkout_item'> & {
+  price: null;
+  own: true;
+};
+
+/**
+ * The tools of a stored apps.{appId}.tools record when it is PUBLIC and well-formed, else null.
+ * The one gate for "may this manifest be served": the WebMCP listing and invoke route read through
+ * it as well as this catalog, so a tool listed here is a tool that route will run, and a private
+ * manifest reads exactly like an absent one everywhere.
+ */
+export function publicManifestTools(rec: MemoryRecord | null | undefined): AppTool[] | null {
+  if (!rec || rec.visibility !== 'public') return null;
+  const parsed = AppToolsDocSchema.safeParse(rec.value);
+  return parsed.success ? parsed.data.tools : null;
+}
+
+/** The WebMCP listing and invoke URLs of one tool. */
+function webmcpUrls(config: AimeatConfig, ownerName: string, appId: string, tool: string) {
+  const appPath = `${encodeURIComponent(ownerName)}/${encodeURIComponent(appId)}`;
+  return {
+    listing: `${config.baseUrl}/v1/apps/${appPath}/webmcp`,
+    invoke: `${config.baseUrl}/v1/apps/${appPath}/webmcp/tools/${encodeURIComponent(tool)}`,
+  };
+}
+
+/**
  * Every tool from every PUBLIC apps.{appId}.tools manifest, capped at `cap` entries.
  * appIds are published filenames and nearly always carry dots ("aimeat-pages.html") — the key is
  * matched greedily between the fixed "apps." prefix and ".tools" suffix.
@@ -77,19 +115,17 @@ export async function listPublicAppTools(
 ): Promise<PricedAppTool[]> {
   const cap = opts.cap ?? 500;
   const pricedOnly = opts.pricedOnly ?? true;
-  const b = config.baseUrl;
   const out: PricedAppTool[] = [];
   const { items } = await storage.listAllMemory({ prefix: 'apps.', limit: 2000 });
   for (const rec of items) {
     if (out.length >= cap) break;
     const appId = appIdFromToolsKey(rec.key);
-    if (!appId || rec.visibility !== 'public') continue;
-    const parsed = AppToolsDocSchema.safeParse(rec.value);
-    if (!parsed.success) continue;
+    if (!appId) continue;
+    const tools = publicManifestTools(rec);
+    if (!tools) continue;
     const ownerName = localAccountName(rec.ownerGaii);
     const appRef = `${ownerName}/${appId}`;
-    const appPath = `${encodeURIComponent(ownerName)}/${encodeURIComponent(appId)}`;
-    for (const tool of parsed.data.tools) {
+    for (const tool of tools) {
       if (out.length >= cap) break;
       const morsels = tool.price?.morsels ?? 0;
       if (pricedOnly && morsels <= 0 && !tool.priceMoney) continue;
@@ -105,11 +141,55 @@ export async function listPublicAppTools(
         fulfillment: tool.action_id ? 'call' : 'task',
         ...(morsels > 0 ? { price: { morsels, unit: tool.price?.unit ?? 'per-call' } } : {}),
         ...(tool.priceMoney ? { priceMoney: { amount: tool.priceMoney.amount, currency: tool.priceMoney.currency, scale: 6 as const } } : {}),
-        webmcp: {
-          listing: `${b}/v1/apps/${appPath}/webmcp`,
-          invoke: `${b}/v1/apps/${appPath}/webmcp/tools/${encodeURIComponent(tool.name)}`,
-        },
+        webmcp: webmcpUrls(config, ownerName, appId, tool.name),
         checkout_item: { kind: 'app-tool', app: appRef, tool: tool.name },
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * The UNPRICED callable tools of one owner's PUBLIC manifests: what that owner's own principals
+ * (the owner, their agents, their apps) can run directly on the WebMCP invoke route.
+ *
+ * Reads only the records stored under `ownerGhii`, the identity the invoke route reads the manifest
+ * from, so another owner's free tools cannot enter this list whatever their manifests say. A tool
+ * with a price in any of its three fields (isToolPriced) is left out: it is in the priced catalog
+ * already, and the invoke route would answer 402. A tool with no action_id is left out too: an
+ * unpriced task tool has nothing to run, and the invoke route answers 422 for it.
+ */
+export async function listOwnCallableAppTools(
+  storage: Storage,
+  config: AimeatConfig,
+  ownerGhii: string,
+  cap = 500,
+): Promise<OwnAppTool[]> {
+  const out: OwnAppTool[] = [];
+  const records = await storage.listMemory(ownerGhii, { prefix: 'apps.', visibility: 'public' });
+  for (const rec of records) {
+    if (out.length >= cap) break;
+    const appId = appIdFromToolsKey(rec.key);
+    if (!appId) continue;
+    const tools = publicManifestTools(rec);
+    if (!tools) continue;
+    const ownerName = localAccountName(rec.ownerGaii);
+    for (const tool of tools) {
+      if (out.length >= cap) break;
+      if (isToolPriced(tool) || !tool.action_id) continue;
+      out.push({
+        sku: `app-tool:${ownerName}/${appId}:${tool.name}`,
+        app: `${ownerName}/${appId}`,
+        ownerName,
+        appId,
+        updatedAt: rec.updatedAt,
+        name: tool.name,
+        description: tool.description ?? '',
+        inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
+        fulfillment: 'call',
+        price: null,
+        webmcp: webmcpUrls(config, ownerName, appId, tool.name),
+        own: true,
       });
     }
   }
