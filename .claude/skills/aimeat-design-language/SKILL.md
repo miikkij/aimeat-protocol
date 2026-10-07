@@ -331,7 +331,7 @@ a migration; `--record` requires an explicit decision to forgive debt. A green g
 new copies, not that the remaining baseline is zero. Verify migrations at all three viewports
 in both themes against the original page, side by side on the same data: a migration passes only
 with no visible difference, and any difference goes on a list for Jouni's approval before it stays
-(rolled back 2026-09-23 when "unification" was allowed to excuse differences; `docs/pitfalls.md` §94).
+(rolled back 2026-09-23 when "unification" was allowed to excuse differences).
 
 ### The kit an app is built from has its own contract
 

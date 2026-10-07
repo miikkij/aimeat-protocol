@@ -90,7 +90,7 @@
  *     bubble, tooltips, donut delta) and scene3d kind "model" (a .glb by URL as a product shot).
  *   v1.15.0 — 2026-08-29 — THE DEMO TRAP named in the genre section: a block stack wearing a
  *     look is never a statement — subject first, genre fork, components serving the page
- *     (docs/pitfalls.md §34, learned the hard way twice in one day).
+ *     (learned the hard way twice in one day).
  *   v1.14.0 — 2026-08-29 — The machine room taught: the ops family (health / queue / gauge /
  *     console), the chart family (kind + area + trend sparklines), the offline atlas, and
  *     LIVE BY DECLARATION (the mosaic's `live` map over aimeat-live).

@@ -63,7 +63,7 @@
  *            that needs words it lacks becomes a request the owner answers. Not in the guard tier.
  *   v1.54.1 -- 2026-09-25 -- The port STOP message no longer says nothing is written down above
  *            40650 (suites name 40665, 40672, 40701, 40702 and 40961); it names the grep that
- *            answers the question and the cross-session trap (docs/pitfalls.md §96).
+ *            answers the question and the cross-session trap.
  *   v1.54.0 -- 2026-09-24 -- Add e2e-themes.ts to ALL_SUITES: Themes & Styles (a theme, a style,
  *            component CSS, warnings, the operator-only writes). Not in the guard tier.
  *   v1.53.1 -- 2026-09-13 -- Add e2e-memory-discover.ts to ALL_SUITES: the cross-user public read a
@@ -162,7 +162,7 @@
  *            eleven of its seventeen assertions are a refusal, and the capability it proves did not
  *            exist before (a receiving node could not refuse a relay). It spawns its own node on
  *            40293 with its own sqlite file, so it neither needs nor disturbs the shared server
- *            (40291 is e2e-sealed-config's; see docs/pitfalls.md §38b).
+ *            (40291 is e2e-sealed-config's).
  *   v1.27.0 -- 2026-09-02 -- Add e2e-workspace-doc-edit.ts: in-place document edits, the byte-identity
  *            of everything they do not touch, and two concurrent appends both surviving.
  *   v1.26.0 -- 2026-09-02 -- Add e2e-app-playtest.ts: the game playtest bench through the audit door.
@@ -1694,7 +1694,7 @@ async function main() {
   Give the runner a port no suite writes down:  AIMEAT_PORT=<port> pnpm ...
   40500-40599 is this runner's own lanes and 40600-40649 is pnpm sandbox. Any other port is
   clear only when no test file names it: grep -lE "\\b<port>\\b" test/*.ts finds nothing.
-  A suite in ANOTHER session's run cannot see your port either (docs/pitfalls.md §96).
+  A suite in ANOTHER session's run cannot see your port either.
 `);
             process.exit(1);
         }

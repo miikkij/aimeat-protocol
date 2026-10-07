@@ -208,8 +208,8 @@ describe('describe() answers for the two new types', () => {
     expect(describeType()).toContain('trigger');
   });
 
-  // A FIELD THE RUNTIME SENDS AND NO VOCABULARY DECLARES CANNOT BE WRITTEN BY AN AI (pitfalls §48
-  // read from the other end). Both roads out now carry headers, and both say so where an agent
+  // A FIELD THE RUNTIME SENDS AND NO VOCABULARY DECLARES CANNOT BE WRITTEN BY AN AI (a route field
+  // no tool surface declares, read from the other end). Both roads out now carry headers, and both say so where an agent
   // asks — including that a key is NAMED rather than typed into a document anyone may copy.
   it('the source says a url read may carry headers, and that a secret is named rather than typed', () => {
     const d = describeType('source') as { options: string[] };

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The start step that re-opens workspace spaces the strict lock had closed to every
- *   property (docs/pitfalls.md §102).
+ *   property.
  *
  *   AIMEAT.organism.createWorkspace filled `{ type: 'object', additionalProperties: true }` for a
  *   records space the caller gave no schema, meaning "any field". A workspace locks every schema

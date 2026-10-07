@@ -340,7 +340,7 @@ const REGISTER_PLACEHOLDER = /^REPLACE-ME\b/i;
  *
  * THE DECISION BEHIND THIS BLOCK. Every Atelier app an agent built from the bare shell came out as
  * stacked sections in the default look, and the owner ruled it must never happen again. The Design
- * Book's genres exist so a page starts from a committed register (docs/pitfalls.md §34); this is
+ * Book's genres exist so a page starts from a committed register; this is
  * the gate that makes starting there the only road. It is the one blocking finding that is a
  * decision rather than a proof about the bytes — see the file header.
  *

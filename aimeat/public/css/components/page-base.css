@@ -10,7 +10,7 @@
  *   header's version history (".notif-reply*" then "/") closed the comment early, and the rest of the
  *   header became part of the reset's selector, which the browser dropped. The site has always been
  *   drawn without it. Moving it here would switch it on and change every page, so it is deleted:
- *   Jouni ruled on 2026-09-24 to keep it off. docs/pitfalls.md §95.
+ *   Jouni ruled on 2026-09-24 to keep it off.
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history

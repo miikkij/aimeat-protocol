@@ -198,7 +198,7 @@ async function run() {
     await test('GET /v1/owners/:name gives the visitor the namesake\'s public card, never its roles or agent roster', async () => {
         // "Is this you" was answered by comparing the session's owner NAME with the account, so a
         // visitor from another node was the local namesake at this door and saw who the operators are
-        // and every agent GAII the account holds. Found 2026-09-13 reading the §83 shape door by door.
+        // and every agent GAII the account holds. Found 2026-09-13 reading the namesake shape (security-development-dna invariant 11c) door by door.
         const self = await json(`/v1/owners/${namesake}`, as(alice.token));
         assert(self.status === 200 && Array.isArray(self.body.data.roles) && Array.isArray(self.body.data.agents),
             `positive control: the local account sees its own roles and roster: ${JSON.stringify(self.body.data)}`);

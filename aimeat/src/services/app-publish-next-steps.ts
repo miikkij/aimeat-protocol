@@ -79,7 +79,7 @@ export async function buildPublishNextSteps(
 
     // An Atelier app is judged on a picture, not on a count. The genre it forked is the thing it
     // has to stand next to, and this is the one surface the publisher is guaranteed to read
-    // (docs/pitfalls.md §34: element counts, overflow zero and a green matrix all passed on the
+    // (element counts, overflow zero and a green matrix all passed on the
     // pages the owner then rejected).
     const genreAddress = register && /^genre-[a-z0-9-]+$/i.test(register)
       ? `/v1/app-templates/${register}`

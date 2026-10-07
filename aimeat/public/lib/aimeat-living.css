@@ -19,7 +19,7 @@
  *   bottom. It is finite by construction, and the still block below carries every selector the
  *   scripts honour — the media query, the kit's own Less-motion switch and the per-surface
  *   opt-out — because a switch that reaches the scripts and not the stylesheet is a switch that
- *   does nothing (docs/pitfalls.md §47).
+ *   does nothing.
  * @structure tokens · control row · formula · sentence · machine state · chain · gear · stale ·
  *   trigger · dialogs · refusals · still
  * @version-history
@@ -624,7 +624,7 @@
   margin: 0 0 0.4em;
 }
 
-/* ── Still. Whatever the scripts honour, this honours too (docs/pitfalls.md §47). ──────── */
+/* ── Still. Whatever the scripts honour, this honours too. ──────── */
 
 @media (prefers-reduced-motion: reduce) {
   .ak-living__chain .ak-graph__node[data-living-flash='yes'] .ak-graph__pill,

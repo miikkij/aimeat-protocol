@@ -1406,7 +1406,7 @@ await test('GET /lib/aimeat-living.css — every value comes off the kit\'s own 
     // Its own tokens exist and each falls back to the kit token it descends from.
     assert(/--ak-living-gap:\s*var\(--ak-gap/.test(css), 'each --ak-living-* token must fall back to the kit\'s');
     assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css), 'must not use rgba(255,255,255,…)');
-    // The switch reaches the stylesheet as well as the scripts (docs/pitfalls.md §47).
+    // The switch reaches the stylesheet as well as the scripts.
     assert(css.includes('prefers-reduced-motion'), 'must carry the reduced-motion block');
     assert(css.includes("html[data-ak-motion='less']"), 'the kit\'s own Less-motion switch must reach it too');
     assert(css.includes("[data-ak-motion-defaults='off']"), 'the per-surface opt-out must reach it too');

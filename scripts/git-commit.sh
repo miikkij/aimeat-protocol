@@ -38,7 +38,7 @@ fi
 shift
 
 # `--only -- <paths>` is how a session commits its own files while another session's staged work
-# stays in the index (docs/pitfalls.md §32). Git's --only takes TRACKED paths: a new file named
+# stays in the index (docs/pitfalls.md §20). Git's --only takes TRACKED paths: a new file named
 # after `--` fails with "pathspec did not match any file(s) known to git" and nothing is committed
 # (2026-08-29, five new files). So a path the caller named that git does not know yet is staged
 # here first, by name — exactly the paths listed, never `-A` — and each one is announced.

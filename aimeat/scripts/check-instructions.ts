@@ -47,8 +47,8 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * Raised to 39,000 on 2026-09-14, at Jouni's request, for the two reply-language rules (STE100 and
  * selkeä kieli), which hold in every session.
  * Raised to 39,500 on 2026-09-23, at Jouni's request, for the rule under "Accepting a result" that a
- * look-keeping change passes only with no visible difference and his words are never paraphrased
- * (docs/pitfalls.md §94), which holds in every session.
+ * look-keeping change passes only with no visible difference and his words are never paraphrased,
+ * which holds in every session.
  * Raised to 40,500 on 2026-09-27, at Jouni's request, for the rule that plans live in the main
  * checkout's docs/internal/ and never in a worktree's, which holds in every session.
  * Raised to 40,800 on 2026-10-04, at Jouni's request, for the rule that every place a reply mentions

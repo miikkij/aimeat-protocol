@@ -145,7 +145,7 @@ value back. What the app owes the person is the NAME and where it goes: their Ac
 wildcard scope carries; `aimeat_secret_list` shows names and which extensions used them). A living
 document names a key the same way in a trigger's or a source's `headers`, and its gear dialogs pick
 from the stored names. Show a missing key by its name in the UI; never draw a text field for the key.
-→ `docs/coding-guidelines/extension-memory-architecture.md` (Secrets: the fourth namespace). `docs/pitfalls.md` §52 is a different trap that the `{{secret:NAME}}` placeholder exposed: a capability with a shared builder and a VM bridge was implemented twice, and one copy was dead.
+→ `docs/coding-guidelines/extension-memory-architecture.md` (Secrets: the fourth namespace). A different trap is the one that the `{{secret:NAME}}` placeholder exposed: a capability with a shared builder and a VM bridge was implemented twice, and one copy was dead.
 
 ## Removed, do not revive
 

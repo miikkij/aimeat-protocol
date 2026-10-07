@@ -736,7 +736,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const applied: JsonObject = {};
             const unsupported: string[] = [];
             // A refused write is reported as the node's refusal and makes the whole answer a refusal:
-            // it read 'ok' whatever the route answered (secaudit 2026-10 follow-up, Part B; pitfalls §115).
+            // it read 'ok' whatever the route answered (secaudit 2026-10 follow-up, Part B; pitfalls §17).
             let refused = false;
             const step = async (field: string, call: Promise<ApiResponse>) => {
                 const resp = await call;
@@ -763,7 +763,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const applied: JsonObject = {};
             const unsupported: string[] = [];
             const budget = optionalNumber(input, 'daily_budget_usd');
-            // A refused budget write is the node's refusal, not 'ok' (secaudit 2026-10 follow-up, Part B; pitfalls §115).
+            // A refused budget write is the node's refusal, not 'ok' (secaudit 2026-10 follow-up, Part B; pitfalls §17).
             let refused = false;
             if (budget !== undefined) {
                 const resp = await client.post('/v1/ai/settings', { daily_budget_usd: budget });

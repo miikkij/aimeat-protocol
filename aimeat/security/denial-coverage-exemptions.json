@@ -6,7 +6,7 @@
       "sha": "b777eca41dd1362b"
     },
     "test/e2e-boot-port-in-use.ts": {
-      "reason": "REVIEWED 2026-09-17 — the suite has no principal at all. It starts a node on a port another listener already holds and asserts the process exits with the port and the cause named, instead of printing its start banner over the failed listen (docs/pitfalls.md §93). No request ever reaches the node, so there is no door to refuse anyone at.",
+      "reason": "REVIEWED 2026-09-17 — the suite has no principal at all. It starts a node on a port another listener already holds and asserts the process exits with the port and the cause named, instead of printing its start banner over the failed listen (docs/pitfalls.md §105). No request ever reaches the node, so there is no door to refuse anyone at.",
       "sha": "fa3fd32da42b4f14"
     },
     "test/e2e-oauth-login.ts": {

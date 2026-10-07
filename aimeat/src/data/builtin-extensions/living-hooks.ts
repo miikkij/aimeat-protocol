@@ -33,7 +33,7 @@
  *   v1.1.1 — 2026-09-14 — livingHost ends the authority at a backslash, so the allowlist judges the
  *     host the fetch will actually use. WITHOUT THIS BUMP the fix reaches no node that already has
  *     the extension: the seeder only replaces an installed copy when the shipped version is newer,
- *     which is pitfalls §82 in its other clothes.
+ *     which is pitfalls §88 in its other clothes.
  *   v1.1.0 — 2026-09-06 — The secret is the PLATFORM's now. This extension resolved
  *     {{secret:NAME}} inside its own sandbox until today, which meant the credential was handed to
  *     the guest; ctx.fetch does it instead, after the script has let go of the request. Two things

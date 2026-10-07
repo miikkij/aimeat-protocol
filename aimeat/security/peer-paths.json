@@ -1,5 +1,5 @@
 {
-  "about": "Every file under src/ that writes a federation peer (saveFederationPeer) or trusts a peer url or key (<name with peer>.url / .publicKey), how many times, and on what proof. pnpm check:peer-paths fails on a new file and on a count that grew. UNREVIEWED marks an entry nobody has answered yet. Written 2026-10-01 after the peer-registration incident; docs/pitfalls.md section 103.",
+  "about": "Every file under src/ that writes a federation peer (saveFederationPeer) or trusts a peer url or key (<name with peer>.url / .publicKey), how many times, and on what proof. pnpm check:peer-paths fails on a new file and on a count that grew. UNREVIEWED marks an entry nobody has answered yet. Written 2026-10-01 after the peer-registration incident.",
   "writers": {
     "src/routes/admin-monitoring.ts": {
       "count": 1,
@@ -39,7 +39,7 @@
     },
     "src/services/packages/peer/package-peer-register.ts": {
       "count": 1,
-      "why": "registerPackagePeer, from linkPackagePeer and adoptPendingPeer only: a package author, an operator or a seller node of the author asked, and the node's own card answered with the same id and key. Written packages-only (contact tier, messaging off). The card does not prove the id is the asker's (docs/pitfalls.md section 103); the readers below keep such a peer to packages."
+      "why": "registerPackagePeer, from linkPackagePeer and adoptPendingPeer only: a package author, an operator or a seller node of the author asked, and the node's own card answered with the same id and key. Written packages-only (contact tier, messaging off). The card does not prove the id is the asker's; the readers below keep such a peer to packages."
     },
     "src/services/relay-claim-policy.ts": {
       "count": 2,

@@ -54,7 +54,7 @@ How both are proven:
 Ask before the first line of work when his words, or two rules, read two ways or leave no room for
 the goal. The first attempt (rolled back in `cee2cbaf5`) changed the look without his decision; the
 second kept every pixel and unified nothing, because its plan forbade unifying. Zero overflow, zero
-console errors, a green gate and green CI are floors, not the verdict. → `docs/pitfalls.md` §94
+console errors, a green gate and green CI are floors, not the verdict.
 
 ## Measure, don't glance
 
@@ -70,7 +70,7 @@ Run all three and report the numbers.
          out.push((el.id ? '#' + el.id : '') + '.' + String(el.className).slice(0, 36) + ' r=' + Math.round(r.right)); });
      return out.slice(0, 12); }
    ```
-   The outermost entry is the one to fix (`min-width: 0` on the item, `align-items: stretch` on a column container); the rest are its children. → `docs/pitfalls.md` §30
+   The outermost entry is the one to fix (`min-width: 0` on the item, `align-items: stretch` on a column container); the rest are its children.
 2. **Live channel connected, dialog open, count repaints:** `MutationObserver` on the open panel's content node, 20 seconds while other activity happens on the account. Expected zero. Above zero means a live event is repainting what the user is reading.
 3. **Network log after 60 idle seconds:** a repeating full listing is a bug even when nothing visibly breaks. It is an unintended poll.
 
@@ -82,7 +82,7 @@ The same gate is served to app builders in `src/services/build-app-prompt.ts` un
 
 For an app on the Atelier track the numbers above are the floor, not the verdict. Screenshot it at **390 and 1440, in both themes**, open the genre it names in `<meta name="aimeat-register">` (`/v1/app-templates/genre-<id>`, or the shelf at `/v1/designbook?kind=genre`), and place the two pictures **side by side**. Then ask, while looking: **would this pass beside the genre?**
 
-That question is the acceptance criterion, and it exists because the metrics answered yes on pages the developer then rejected: three Design Book showcase pages passed element counts, overflow zero and a green contrast matrix while reading as "the same dashboard in new paint" (`docs/pitfalls.md` §34). A screenshot beside the genre is what catches a costume.
+That question is the acceptance criterion, and it exists because the metrics answered yes on pages the developer then rejected: three Design Book showcase pages passed element counts, overflow zero and a green contrast matrix while reading as "the same dashboard in new paint". A screenshot beside the genre is what catches a costume.
 
 Under the picture, eight measured checks, all reported as numbers:
 
@@ -93,11 +93,11 @@ Under the picture, eight measured checks, all reported as numbers:
 | Text size | no visible text under 11 px |
 | Tap targets | at 390, no control under 40 px in either dimension |
 | Contrast | 4.5 for body text, 3.0 for ≥24 px or ≥19 px bold |
-| Reduced motion | zero animations whose computed duration is over 1 ms (`docs/pitfalls.md` §47) |
+| Reduced motion | zero animations whose computed duration is over 1 ms |
 | Console | zero JavaScript errors |
 | The pill's switches | pressed, not looked at: the language switch moves `<html lang>` **and** every text the page itself renders, English to Finnish and back, in the middle of using the app, and what the person was doing survives it. **Fewer than two languages in `<meta name="aimeat-locales">` is a FINDING, not a reason to skip**: `en fi` is the default here, and one language passes only when Jouni asked for one in so many words. The language of the conversation is not the app's language list. On 2026-09-19 a build declared `content="fi"` on its own, this line let the check be skipped for it, and a page with a Finnish bar over English content was called done; the mode buttons take `data-theme` away from its current value and back, unless the page declares `<meta name="aimeat-light" content="fixed">`, where both are `disabled` and say why |
 
-And one measurement only phone width reveals: a kit component that declares `container-type` cannot restyle itself from its own container query, so a fold can succeed and leave the detail pane at 40 % of its panel with no error and a correct page width. When the change touches `listDetail` or another container-query component, measure the panel's width against its container's at 390 (`docs/pitfalls.md` §46).
+And one measurement only phone width reveals: a kit component that declares `container-type` cannot restyle itself from its own container query, so a fold can succeed and leave the detail pane at 40 % of its panel with no error and a correct page width. When the change touches `listDetail` or another container-query component, measure the panel's width against its container's at 390.
 
 ## Four things a metric will never tell you
 
@@ -108,7 +108,7 @@ Automated checks prove overflow, contrast and element counts. They say nothing a
 3. **An empty state reads as broken**, not as "nothing has happened yet". Prefer a cumulative counter that is always populated ("this node has X apps, Y organisms, Z agents") over an event feed that can be empty.
 4. **The primary action belongs on the landing surface.** If an app's main use is "copy a prompt for your agent", the button that opens it goes in the hero or toolbar, with the requirements written out in plain language and the prompt visible. A prompt reachable only through a help page makes the whole product look broken while the mechanics work.
 
-**"Mobile-optimised" means using the phone properly, not trimming chrome.** For a focused view (a chat thread, an editor, a wizard) go full screen: lift it out of the profile shell with `position:fixed; inset:0` and hide the shell chrome, handle the on-screen keyboard from the start (`interactive-widget=resizes-content`, a `visualViewport` fallback, `env(safe-area-inset-*)`), and replace a heavy desktop widget with a native-feeling control. Pattern: `docs/frontend-development-guide.md` under Mobile & Responsive UX; traps: `docs/pitfalls.md` §15.
+**"Mobile-optimised" means using the phone properly, not trimming chrome.** For a focused view (a chat thread, an editor, a wizard) go full screen: lift it out of the profile shell with `position:fixed; inset:0` and hide the shell chrome, handle the on-screen keyboard from the start (`interactive-widget=resizes-content`, a `visualViewport` fallback, `env(safe-area-inset-*)`), and replace a heavy desktop widget with a native-feeling control. Pattern and the portal's own traps: `docs/frontend-development-guide.md` under Mobile & Responsive UX; the general phone traps: `mobile-means-fullscreen` and `keyboard-viewport` in `aimeat/src/data/appdev-pitfalls.ts`.
 
 ## Styling rules that get caught here
 
