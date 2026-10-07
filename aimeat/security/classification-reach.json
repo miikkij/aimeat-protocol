@@ -9,9 +9,10 @@
     },
     "src/commerce/app-tool-catalog.ts": {
       "reads": {
-        "listAllMemory": 1
+        "listAllMemory": 1,
+        "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public app tool manifests (app configuration) for the commerce and directory catalogue, published by design."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public app tool manifests (app configuration) for the commerce and directory catalogue, published by design. The listMemory (2026-10-07, listOwnCallableAppTools) reads the caller's own owner's PUBLIC apps.*.tools manifests for GET /v1/commerce/tools?include=own: the same published records, in the caller's own namespace only."
     },
     "src/commerce/beneficiary-book.ts": {
       "reads": {
