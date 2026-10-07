@@ -13,6 +13,9 @@
  *   decide whether a failure is a verdict or a hiccup, and the one pure function. What does not:
  *   anything that reads `this`. That line is what keeps the split a move rather than a rewrite.
  * @version-history
+ *   v1.2.0 -- 2026-10-07 -- `forgetToken` on an identity: one that can mint is re-attached with a new
+ *     credential before a refusal gives it up. `handlersFor` moved here from tunnel-client.ts (that
+ *     file passed 800 lines); its client state became parameters.
  *   v1.1.0 — 2026-09-05 — `gaii` on the options: the socket's own identity, so a frame for a name
  *     the client does not hold can be told apart from a frame for itself and dropped rather than
  *     handed to the opener's handlers.
@@ -131,6 +134,13 @@ export interface TunnelIdentity {
   onBacklog?: (payload: { tasks: unknown[]; messages: unknown[] }) => void;
   onConnect?: (connectCount: number) => void;
   onAuthFailure?: (message: string) => void;
+  /**
+   * Drop the cached credential, so the next getToken() produces a new one. Given by an identity that
+   * mints its credential: when the node refuses the pinned one, the client mints and re-attaches once
+   * before giving the identity up (./tunnel-credential-verdict.ts). Absent means the credential
+   * cannot be renewed here, and a refusal gives the identity up at once.
+   */
+  forgetToken?: () => void;
 }
 
 export interface TunnelFrame {
@@ -185,4 +195,48 @@ export const MAX_TIMER_CHUNK_MS = 24 * 60 * 60 * 1000;
 
 export function wsUrl(nodeUrl: string): string {
   return nodeUrl.replace(/\/+$/, '').replace(/^http/, 'ws') + '/v1/connect/tunnel';
+}
+
+/**
+ * Whose handlers a frame belongs to.
+ *
+ * `agent` names the identity on a shared socket; absent — or naming the socket's own identity —
+ * means this client's own `opts`. A node older than 2026-09-03 stamps nothing, so every frame
+ * lands on `opts` and the multiplex path is simply never taken.
+ */
+/**
+ * Whose handlers a frame goes to, or NULL when it names an identity this socket no longer holds.
+ *
+ * IT USED TO FALL BACK TO THE OPENER. `(identities.get(gaii)) || this.opts` cannot tell "this
+ * frame names the socket's own identity" from "this frame names one I evicted": both miss the map
+ * and both landed on `this.opts`, the handlers of whoever opened the socket. The node stamps
+ * every outbound frame with the principal it is for and keeps pushing until told to detach, so
+ * after an attached agent's credential died, its next task arrived here stamped with its name,
+ * missed the map, and was filed on the OPENER's channel — queued for `/local/tasks/next` under
+ * the wrong agent, its runner launched, and the auto-ack telling the node the right agent had it.
+ * With two owners on one daemon that is a task crossing an ownership boundary. Found by an
+ * adversarial review on 2026-09-05, verified link by link.
+ *
+ * THE THREE CASES, in order. A frame with no `agent` is a legacy node's and is the socket's own.
+ * A frame naming my own gaii is mine. A frame naming an attached identity is that identity's.
+ * Anything else names an identity this socket does not hold, and the only correct thing to do
+ * with it is nothing: dropped, logged, never handed to somebody else's handlers.
+ *
+ * Moved here from tunnel-client.ts on 2026-10-07 (800-line limit); `this.opts`, `this.identities`
+ * and `this.label` became the three parameters, and nothing else changed.
+ */
+export function handlersFor(
+  frame: TunnelFrame, opts: ConnectTunnelClientOptions, identities: Map<string, TunnelIdentity>, label: string,
+): Pick<ConnectTunnelClientOptions, 'onDeliver' | 'onInvoke' | 'onBacklog' | 'onAuthFailure'> | null {
+  const gaii = typeof frame.agent === 'string' ? frame.agent : '';
+  if (!gaii) return opts;
+  if (opts.gaii && gaii === opts.gaii) return opts;
+  const attached = identities.get(gaii);
+  if (attached) return attached;
+  // A client built without its own gaii cannot distinguish the second case from the fourth, so it
+  // keeps the old behaviour for the socket's own frames — which is every frame from a node that
+  // never learnt to stamp. The hub and the private socket both set it, so this is the legacy path.
+  if (!opts.gaii) return opts;
+  console.error(`[${label}] frame for ${gaii}, which this socket does not hold — dropped, not delivered to somebody else`);
+  return null;
 }

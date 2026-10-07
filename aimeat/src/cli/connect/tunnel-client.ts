@@ -30,6 +30,13 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.12.0 -- 2026-10-07 -- A forwarded 401 detaches an identity only when its code says the CALLER'S
+ *     credential was refused (./tunnel-credential-verdict.ts): the node's AI routes answer 401
+ *     INVALID_API_KEY when the provider refuses the node's key, and that detached a healthy crm agent
+ *     on a fresh place, or stopped the whole client when the socket's own identity met it. An identity
+ *     that can mint gets one fresh credential and re-attach before it is given up, and the refused
+ *     call is sent again. An `error` frame answering a forward resolves it now instead of after the
+ *     request timeout. handlersFor moved to ./tunnel-client-types.ts (800-line limit).
  *   v1.11.0 -- 2026-10-02 -- The upgrade carries X-AIMEAT-Run-Modes (./run-modes.ts): how this
  *     connector runs agents, so the node corrects a proposal nobody here could run.
  *   v1.10.0 -- 2026-09-24 -- Counts what the socket carries (./tunnel-traffic.ts), for `aimeat connect tui`.
@@ -97,8 +104,9 @@ import type {
   TunnelFrame, TunnelIdentity, TunnelStartOutcome, TunnelStatus,
 } from './tunnel-client-types.js';
 import {
-  ATTACH_REFUSAL_CODES, MAX_TIMER_CHUNK_MS, RE_AUTH_GUIDANCE, TOKEN_DEAD_CODES, wsUrl,
+  ATTACH_REFUSAL_CODES, MAX_TIMER_CHUNK_MS, RE_AUTH_GUIDANCE, handlersFor, wsUrl,
 } from './tunnel-client-types.js';
+import { CredentialRecovery, errorCodeOf, errorFrameAnswer, isCredentialVerdict } from './tunnel-credential-verdict.js';
 
 // Re-exported, not relocated. Every one of these was imported FROM this file before the split, so
 // carrying the names here is what makes the extraction a move rather than a change to N callers.
@@ -130,6 +138,13 @@ export class ConnectTunnelClient {
   private identities = new Map<string, TunnelIdentity>();
   /** In-flight `attach` frames, correlated by id like everything else on this wire. */
   private pendingAttach = new Map<string, { resolve: (ok: boolean) => void; timer: ReturnType<typeof setTimeout> }>();
+  /** The credential each attached identity's accepted attach pinned on the node. */
+  private pins = new Map<string, string>();
+  /** One re-mint and re-attach before a refused identity is given up. ./tunnel-credential-verdict.ts */
+  private readonly recovery = new CredentialRecovery({
+    reattach: (identity, token) => this.sendAttach(identity, token),
+    pinned: (gaii) => this.pins.get(gaii),
+  });
   /** Does this node speak `attach`? Read from the `welcome` frame; false means one socket per agent,
    *  as before, and the hub falls back to that without anyone asking. */
   private multiplex = false;
@@ -207,7 +222,7 @@ export class ConnectTunnelClient {
     return ok;
   }
 
-  private async sendAttach(identity: TunnelIdentity): Promise<boolean> {
+  private async sendAttach(identity: TunnelIdentity, given?: string): Promise<boolean> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.multiplex) return false;
     // THIS IS WHERE THE BUDGET ACTUALLY RUNS OUT. Sixty-two identities joining one socket is
     // sixty-two mints inside a few seconds, so the node's per-minute limit is reached here before
@@ -215,14 +230,16 @@ export class ConnectTunnelClient {
     // the caller opens it a private one, which retries with backoff instead of stopping.
     let token: string | null;
     try {
-      token = await identity.getToken();
+      token = given ?? await identity.getToken();
     } catch (err) {
       console.error(`[${this.label}] ${identity.gaii}: no credential right now (${String(err)}) — not joining the shared socket yet`);
       return false;
     }
     if (!token) return false;
+    const pin = token;
     const id = randomUUID();
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean>((answer) => {
+      const resolve = (ok: boolean) => { if (ok) this.pins.set(identity.gaii, pin); answer(ok); };
       const timer = setTimeout(() => { this.pendingAttach.delete(id); resolve(false); }, this.opts.requestTimeoutMs);
       this.pendingAttach.set(id, { resolve, timer });
       try { this.ws!.send(JSON.stringify({ type: 'attach', id, agent: identity.gaii, token })); }
@@ -239,6 +256,7 @@ export class ConnectTunnelClient {
    */
   detachIdentity(gaii: string): void {
     this.identities.delete(gaii);
+    this.pins.delete(gaii);
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     try { this.ws.send(JSON.stringify({ type: 'detach', agent: gaii })); }
     catch (err) { console.error(`[${this.label}] detach send failed: ${(err as Error).message}`); }
@@ -271,7 +289,17 @@ export class ConnectTunnelClient {
    * (welcome-advertised) request timeout. Rejects only when the tunnel is not
    * connected at call time.
    */
-  forward(method: string, path: string, opts: ForwardOptions = {}, agent?: string): Promise<ForwardResult> {
+  async forward(method: string, path: string, opts: ForwardOptions = {}, agent?: string): Promise<ForwardResult> {
+    const first = await this.forwardOnce(method, path, opts, agent);
+    // A refused pin that the recovery replaced (handleFrame started it on this very answer): the same
+    // call once more, on the new credential. The refusal came from requireAuth before any handler
+    // ran, so sending it again does nothing twice.
+    const recovering = agent && isCredentialVerdict(first.status, errorCodeOf(first.body)) ? this.recovery.pending(agent) : undefined;
+    if (recovering && await recovering) return this.forwardOnce(method, path, opts, agent);
+    return first;
+  }
+
+  private forwardOnce(method: string, path: string, opts: ForwardOptions, agent?: string): Promise<ForwardResult> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'online') {
       return Promise.reject(new Error('Tunnel not connected'));
     }
@@ -532,47 +560,9 @@ export class ConnectTunnelClient {
     }
   }
 
-  /**
-   * Whose handlers a frame belongs to.
-   *
-   * `agent` names the identity on a shared socket; absent — or naming the socket's own identity —
-   * means this client's own `opts`. A node older than 2026-09-03 stamps nothing, so every frame
-   * lands on `opts` and the multiplex path is simply never taken.
-   */
-  /**
-   * Whose handlers a frame goes to, or NULL when it names an identity this socket no longer holds.
-   *
-   * IT USED TO FALL BACK TO THE OPENER. `(identities.get(gaii)) || this.opts` cannot tell "this
-   * frame names the socket's own identity" from "this frame names one I evicted": both miss the map
-   * and both landed on `this.opts`, the handlers of whoever opened the socket. The node stamps
-   * every outbound frame with the principal it is for and keeps pushing until told to detach, so
-   * after an attached agent's credential died, its next task arrived here stamped with its name,
-   * missed the map, and was filed on the OPENER's channel — queued for `/local/tasks/next` under
-   * the wrong agent, its runner launched, and the auto-ack telling the node the right agent had it.
-   * With two owners on one daemon that is a task crossing an ownership boundary. Found by an
-   * adversarial review on 2026-09-05, verified link by link.
-   *
-   * THE THREE CASES, in order. A frame with no `agent` is a legacy node's and is the socket's own.
-   * A frame naming my own gaii is mine. A frame naming an attached identity is that identity's.
-   * Anything else names an identity this socket does not hold, and the only correct thing to do
-   * with it is nothing: dropped, logged, never handed to somebody else's handlers.
-   */
-  private handlersFor(frame: TunnelFrame): Pick<ConnectTunnelClientOptions, 'onDeliver' | 'onInvoke' | 'onBacklog' | 'onAuthFailure'> | null {
-    const gaii = typeof frame.agent === 'string' ? frame.agent : '';
-    if (!gaii) return this.opts;
-    if (this.opts.gaii && gaii === this.opts.gaii) return this.opts;
-    const attached = this.identities.get(gaii);
-    if (attached) return attached;
-    // A client built without its own gaii cannot distinguish the second case from the fourth, so it
-    // keeps the old behaviour for the socket's own frames — which is every frame from a node that
-    // never learnt to stamp. The hub and the private socket both set it, so this is the legacy path.
-    if (!this.opts.gaii) return this.opts;
-    console.error(`[${this.label}] frame for ${gaii}, which this socket does not hold — dropped, not delivered to somebody else`);
-    return null;
-  }
-
   private handleFrame(frame: TunnelFrame): void {
-    const h = this.handlersFor(frame);
+    // Whose handlers, or null for an identity this socket no longer holds (./tunnel-client-types.ts).
+    const h = handlersFor(frame, this.opts, this.identities, this.label);
     switch (frame.type) {
       case 'attached': {
         const p = frame.id ? this.pendingAttach.get(frame.id) : undefined;
@@ -584,28 +574,38 @@ export class ConnectTunnelClient {
         break;
       }
       case 'response': {
+        // A refused pinned bearer means every later call would be refused too while the socket sits
+        // open (silent breakage). ONLY the node's credential codes say that: a 401 INVALID_API_KEY
+        // is the AI provider refusing the node's key, and reading it as this agent's death detached
+        // a healthy crm agent on a fresh place (2026-10-07). ./tunnel-credential-verdict.ts
+        const errCode = errorCodeOf(frame.body);
+        const verdict = isCredentialVerdict(frame.status, errCode);
+        const who = typeof frame.agent === 'string' ? frame.agent : '';
+        const att = verdict && who ? this.identities.get(who) : undefined;
+        // Started BEFORE the forward is answered, so forward() finds it and sends the call again.
+        const recovering = att ? this.recovery.begin(att) : null;
         const p = frame.id ? this.pending.get(frame.id) : undefined;
         if (p && frame.id) {
           clearTimeout(p.timer);
           this.pending.delete(frame.id);
           p.resolve({ status: frame.status ?? 0, body: frame.body });
         }
-        // A forwarded 401 means the pinned bearer is dead — every subsequent
-        // call would 401 too while the socket sits open (silent breakage).
-        const errCode = ((frame.body as { error?: { code?: string } } | null)?.error?.code) ?? '';
-        if (frame.status === 401 || TOKEN_DEAD_CODES.has(errCode)) {
-          // Same fence as auth_revoked: a 401 is a verdict on ONE identity's credential, so on a
+        if (verdict) {
+          // Same fence as auth_revoked: a refusal is a verdict on ONE identity's credential, so on a
           // shared socket it stops that identity rather than the connection eleven others use.
-          const who = typeof frame.agent === 'string' ? frame.agent : '';
-          const att = who ? this.identities.get(who) : undefined;
           const msg = `Forwarded request returned ${frame.status} ${errCode || 'UNAUTHORIZED'}`;
           if (att) {
             // detachIdentity, NOT identities.delete. Deleting only here left the NODE holding the
             // principal on this socket and pushing its deliveries down it, stamped with a name
             // this client no longer knew — and those frames fell back onto the opener's handlers.
-            // A detach frame tells the node to stop, which is the half that was missing.
-            this.detachIdentity(who);
-            try { att.onAuthFailure?.(msg); } catch (err) { console.error(`[${this.label}] onAuthFailure handler error: ${(err as Error).message}`); }
+            // A detach frame tells the node to stop, which is the half that was missing. An identity
+            // that can mint gets one new credential first, and is given up only if that is refused.
+            const giveUp = () => {
+              this.detachIdentity(who);
+              try { att.onAuthFailure?.(msg); } catch (err) { console.error(`[${this.label}] onAuthFailure handler error: ${(err as Error).message}`); }
+            };
+            if (!recovering) giveUp();
+            else void recovering.then(ok => { if (!ok && this.identities.get(who) === att) giveUp(); });
           } else if (who && this.opts.gaii && who !== this.opts.gaii) {
             // A 401 for an identity this socket does not hold — a straggler for one already
             // evicted, racing the detach. Before this it took the branch below and STOPPED THE
@@ -699,6 +699,10 @@ export class ConnectTunnelClient {
         // them at a time (2026-09-03).
         const pa = frame.id ? this.pendingAttach.get(frame.id) : undefined;
         if (pa && frame.id) { clearTimeout(pa.timer); this.pendingAttach.delete(frame.id); pa.resolve(false); }
+        // The same holds for a forward: a request the node refused (UNKNOWN_IDENTITY, a bad frame) is
+        // answered now. It used to wait out the request timeout, 35 s per call (2026-10-07).
+        const pf = frame.id ? this.pending.get(frame.id) : undefined;
+        if (pf && frame.id) { clearTimeout(pf.timer); this.pending.delete(frame.id); pf.resolve(errorFrameAnswer(frame)); }
         // The node judging a credential is the same verdict a forwarded 401 carries, so it takes
         // the same fence: it stops THAT identity and tells its owner, and the connection the other
         // forty-eight are riding does not notice.
