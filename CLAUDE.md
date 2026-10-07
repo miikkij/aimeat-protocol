@@ -223,7 +223,7 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 
 ## Where things are
 
-`docs/pitfalls.md` is the catalogue of traps we have actually hit, organised by kind of problem. Read it when something breaks in a way that feels like it should work, and add an entry when a bug turns out to be a repeatable trap.
+`docs/pitfalls.md` is the catalogue of traps we have actually hit, organised by kind of problem. Read it when something breaks in a way that feels like it should work. **Add nothing by default**: only a trap that can recur and no gate or comment can prevent; the file's header has the rule.
 
 | Guide | Purpose |
 |-------|---------|

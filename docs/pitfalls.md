@@ -10,10 +10,20 @@ knowledge base (`aimeat_appdev_pitfall_list`). The app-builder bullets that used
 called done, read the diff once against the five shapes: they are what most of this file turned out
 to be about.
 
+**Whether to add to it.** The default is no. A new section needs all three: the trap can bite again
+in code or a practice that still exists; no gate, test, lint rule or comment at the spot can prevent
+it (if one can, write that instead); and the section names the files it is about. A one-time
+incident, a finished migration or a fix already explained in its own code goes to the Platform
+Development Notes document of that work. Ruled by Jouni on 2026-10-07.
+
 **How to add to it.** A new section goes at the END, numbered after the highest number on
 `origin/main` (two sessions numbered the same section in one hour, which is why 38b, 77b and 78b
 exist). In the same commit, add its row to the index: what the reader SEES, in under fifteen words,
 and its shape. Symptom first in the section too, then cause, then the rule.
+
+**When a section goes.** Delete it when the code it names is gone, or when a gate or test now
+enforces it, and remove its index row and its number from the shape lists in the same commit. A
+number is never reused.
 
 > Related: `CLAUDE.md` (mandatory rules + architecture), `docs/known_gaps.md` (deferred gaps, developer-approved only), `docs/coding-guidelines/` (the full guides). The gatekeeper agent reads a diff against the five shapes (`.claude/agents/gatekeeper.md`).
 
