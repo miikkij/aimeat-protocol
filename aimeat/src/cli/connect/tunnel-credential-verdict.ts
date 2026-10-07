@@ -5,8 +5,10 @@
  * @description When a forwarded answer is a verdict on the CALLER'S credential, and what the tunnel
  *   client does about one before it gives an identity up.
  *
- *   A 401 IS NOT ALWAYS ABOUT THE CALLER. The node's AI routes answer 401 INVALID_API_KEY when the
- *   provider refuses the key the NODE (or the owner) holds, and the agent's own credential is fine.
+ *   A 401 IS NOT ALWAYS ABOUT THE CALLER. Until 2026-10-07 the node's AI routes answered 401
+ *   INVALID_API_KEY when the provider refused the key the NODE (or the owner) holds, and the agent's
+ *   own credential was fine. They answer 424 now (services/ai/errors.ts PROVIDER_KEY_REFUSED_STATUS),
+ *   but a connector also talks to nodes older than that, and other routes answer their own 401s.
  *   Until 2026-10-07 the client read every forwarded 401 as its credential dying: on a fresh place
  *   (aimeat-commercial, stripetestiydqzuo) the crm agent's first model call met a provider refusal,
  *   the client detached crm, every later call for it waited out the request timeout on an

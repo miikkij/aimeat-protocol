@@ -585,7 +585,7 @@ Throws on failure with `err.code` set. Codes:
 | `AI_MODEL_POLICY_EMPTY` | 403. The owner's policy and the app's `models=` have no model in common. |
 | `AI_PROVIDER_NOT_CONFIGURED` | The model named in the call belongs to a provider type the owner has not set up. |
 | `NO_API_KEY` | The provider that would answer has no key. |
-| `INVALID_API_KEY` | Provider rejected the key (key revoked or expired). |
+| `INVALID_API_KEY` | 424. Provider rejected the key (key revoked or expired). Not a 401: the app's own sign-in is fine, so do not refresh the session or repeat the call. |
 | `QUOTA_EXHAUSTED` | Daily owner budget hit. |
 | `APP_QUOTA_EXHAUSTED` | Per-app daily quota hit. |
 | `APP_NOT_ALLOWED` | Owner has an allowlist and your `app_id` isn't on it. |

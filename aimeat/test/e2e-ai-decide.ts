@@ -526,11 +526,14 @@ const QUESTIONS = {
     assert(seen[seen.length - 1].auth === `Bearer ${NODE_KEY}`, 'the operator test used the node key');
   });
 
-  await test('4e. a key the provider refuses is the owner\'s to fix: 401 INVALID_API_KEY', async () => {
+  // 424, not 401: a 401 says the CALLER'S credential failed, so a connector detached a healthy agent
+  // on it and the browser SDK refreshed the session and repeated the call. Not 502 either: clients
+  // retry 5xx, so a refused key would be sent three times (Jouni, 2026-10-07).
+  await test('4e. a key the provider refuses is the owner\'s to fix: 424 INVALID_API_KEY', async () => {
     stubStatus = 401;
     const r = await json('/v1/ai/decide', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ state: 'Refused.', questions: { q: QUESTIONS.urgent }, cache: false }) });
     stubStatus = 200;
-    assert(r.status === 401 && r.body.error?.code === 'INVALID_API_KEY', `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(r.status === 424 && r.body.error?.code === 'INVALID_API_KEY', `got ${r.status} ${JSON.stringify(r.body.error)}`);
     assert(!JSON.stringify(r.body).includes(OWN_KEY), 'the key is not in the error');
     stubStatus = 401;
     const t = await json('/v1/ai/decide/settings/test', { method: 'POST', headers: auth(A.token), body: '{}' });

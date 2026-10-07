@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.6.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v2.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v2.3.0 — 2026-10-02 — Takes `lang`, so a refusal's sentence is in the person's language.
@@ -48,7 +49,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import {
-  AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
+  AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai/completion.js';
 import { image as gatewayImage } from './ai/gateway.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
@@ -193,7 +194,7 @@ export async function generateForOwner(
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
     if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-image' });
     const status = (e as { status?: number }).status;
-    if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
+    if (status === 401) throw new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, 'API key was rejected by the provider.');
     if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
     throw new AiCompletionError('PROVIDER_ERROR', 502, (e as Error).message);
   }

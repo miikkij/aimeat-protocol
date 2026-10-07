@@ -14,6 +14,7 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.18.0 -- 2026-10-07 -- The model list answers a provider's key refusal with 424 INVALID_API_KEY, not 401.
  *   v1.17.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     POST /v1/openrouter/complete counts the account on the route (aiCallLimit), not per principal.
  *   v1.16.0 — 2026-10-02 — A new settings record names no model, so the node's default model applies
@@ -94,7 +95,7 @@ import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
-import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai/completion.js';
+import { completeForOwner, AiCompletionError, assertProviderAllowed, PROVIDER_KEY_REFUSED_STATUS } from '../services/ai/completion.js';
 import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
 import { holdsImplicitFreeModel } from '../services/ai-model-defaults.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
@@ -479,7 +480,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       } catch (e) {
         const status = (e as { status?: number }).status;
         if (status === 401) {
-          return res.status(401).json(error(config.nodeId, 'INVALID_API_KEY', 'API key was rejected.'));
+          return res.status(PROVIDER_KEY_REFUSED_STATUS).json(error(config.nodeId, 'INVALID_API_KEY', 'API key was rejected.'));
         }
         return res.status(502).json(error(config.nodeId, 'OPENROUTER_ERROR', (e as Error).message));
       }

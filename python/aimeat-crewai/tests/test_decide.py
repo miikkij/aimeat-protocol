@@ -23,6 +23,7 @@ Four things are worth testing here and each one earned its place:
 """
 from __future__ import annotations
 
+import importlib
 import json
 from typing import Any
 
@@ -118,9 +119,10 @@ def _node_kwargs(session: _StubSession) -> dict[str, Any]:
 def _no_direct_mode(monkeypatch):
     """Node mode is the default in every test that does not ask for direct mode."""
     monkeypatch.delenv(DIRECT_ENV, raising=False)
-    import aimeat_crewai.decide as mod
-
-    mod._direct_warned = False
+    # The MODULE, by import_module: `import aimeat_crewai.decide as mod` binds the `decide` FUNCTION the
+    # package exports under the same name, so the reset used to land on the function and the warn-once
+    # flag never reset between tests.
+    importlib.import_module("aimeat_crewai.decide")._direct_warned = False
 
 
 # ── the three question builders ───────────────────────────────────────────────────────────────
@@ -383,7 +385,7 @@ def test_optional_fields_are_only_sent_when_given() -> None:
     [
         ("DECIDE_DISABLED", 503),
         ("NO_API_KEY", 400),
-        ("INVALID_API_KEY", 401),
+        ("INVALID_API_KEY", 424),
         ("QUOTA_EXHAUSTED", 402),
         ("APP_QUOTA_EXHAUSTED", 402),
         ("AGENT_QUOTA_EXHAUSTED", 402),
@@ -676,9 +678,7 @@ def _direct(monkeypatch, tmp_path):
     monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
     monkeypatch.setenv(DIRECT_KEY_ENV_VAR, "TEST_TYPESAFE_KEY")
     monkeypatch.setenv("TEST_TYPESAFE_KEY", "sk-test")
-    import aimeat_crewai.decide as mod
-
-    mod._direct_warned = False
+    importlib.import_module("aimeat_crewai.decide")._direct_warned = False   # the module; see _no_direct_mode
     return tmp_path
 
 
@@ -690,6 +690,19 @@ def _typesafe_ok(answers: dict[str, Any]) -> _Resp:
         "usage": {"input_tokens": 120, "output_tokens": 0},
         "request_id": "req-1",
     })
+
+
+def test_direct_mode_reports_a_refused_key_with_the_status_the_node_uses(_direct, monkeypatch) -> None:
+    # The node answers a provider's key refusal 424 INVALID_API_KEY (Jouni, 2026-10-07): not 401,
+    # which says the caller's own credential failed. Direct mode reports the same, so a caller reads
+    # one status whichever mode it ran in.
+    for refused in (401, 403):
+        monkeypatch.setattr("requests.post", lambda url, refused=refused, **kw: _Resp(refused, {"error": "User not found."}))
+        with pytest.raises(DecideRefused) as caught:
+            decide({"subject": "s"}, questions={"safe": yes_no("safe")})
+        assert caught.value.code == "INVALID_API_KEY"
+        assert caught.value.status == 424
+        assert caught.value.retryable is False
 
 
 def test_direct_mode_is_off_unless_it_is_switched_on(monkeypatch) -> None:

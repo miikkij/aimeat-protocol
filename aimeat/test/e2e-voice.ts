@@ -67,6 +67,7 @@ const peer = createServer(async (req, res) => {
   } else if (req.url === '/audio/speech') {
     const input = JSON.parse(Buffer.concat(chunks).toString());
     if (input.voice === 'error') { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"bad voice"}'); return; }
+    if (input.voice === 'refused-key') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"User not found."}}'); return; }
     res.writeHead(200, { 'Content-Type': 'audio/pcm' }); res.write(Buffer.alloc(2400));
     await new Promise(r => setTimeout(r, 20)); res.end(Buffer.alloc(2400));
   } else if (req.url === '/audio/transcriptions') {
@@ -143,6 +144,10 @@ try {
   });
   await test('Provider failures and incomplete streams never become successful turns', async () => {
     const bad = await call('/v1/ai/speak', { ...speech, voice: 'error' }, alice.token); assert(bad.status === 502, bad.text);
+    // A provider's key refusal is 424 INVALID_API_KEY on every AI route, this one too: a 401 says the
+    // caller's own credential failed, and the SDK's voice adapter refreshes the session on one (Jouni, 2026-10-07).
+    const refused = await call('/v1/ai/speak', { ...speech, voice: 'refused-key' }, alice.token);
+    assert(refused.status === 424 && refused.text.includes('INVALID_API_KEY'), refused.text);
     const cut = await call('/v1/ai/stream', { ...request, messages: [{ role: 'user', content: 'fail' }] }, alice.token);
     assert(cut.text.includes('"type":"error"') && !cut.text.includes('"type":"done"'), cut.text);
   });

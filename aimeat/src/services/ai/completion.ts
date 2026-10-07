@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.11.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (./errors.ts
+ *     PROVIDER_KEY_REFUSED_STATUS, re-exported here).
  *   v3.10.0 — 2026-10-05 — prepareAiCall takes `estimate`, and a text call passes its prompt's size and
  *     its maxTokens, so the price ceiling per call measures this call (secaudit 2026-10, AI-4).
  *   v3.9.1 — 2026-10-05 — The planner's node-key answer is nodeKeyStanding (ai-allowance.ts), with the
@@ -144,7 +146,7 @@ import { text as gatewayText, type TextFile } from './gateway.js';
 import type { AiCapability, AiOp, CostSource } from './types.js';
 import { loadPolicyDecision, freeModelAllowed } from './policy-gate.js';
 import type { CallerClass } from './policy.js';
-import { AiCompletionError } from './errors.js';
+import { AiCompletionError, PROVIDER_KEY_REFUSED_STATUS } from './errors.js';
 import { providersForOwner } from './provider-store.js';
 import { readRouting, rulesFor } from './routing.js';
 import { readRoles, rolesWithLegacy, resolveRole, noteRoleUsed, noteRoleRequest, bindingKey, type ResolvedRole } from './roles.js';
@@ -169,8 +171,9 @@ export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY
 export { estimateCostUsd, assertProviderAllowed, assertAppAllowed, decryptOwnerKey, assertWithinBudget };
 
 // The typed error lives in services/ai/errors.ts (a leaf the policy code can throw too) and is
-// re-exported here, so every existing importer keeps its path.
-export { AiCompletionError };
+// re-exported here, so every existing importer keeps its path. So is the status a provider's key
+// refusal answers with, which every AI path throws.
+export { AiCompletionError, PROVIDER_KEY_REFUSED_STATUS };
 
 export interface CompleteForOwnerOptions {
   prompt: string;
@@ -716,7 +719,7 @@ export async function completeForOwner(
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
     if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
     const status = (e as { status?: number }).status;
-    if (status === 401) throw new AiCompletionError('INVALID_API_KEY', 401, 'API key was rejected by the provider.');
+    if (status === 401) throw new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, 'API key was rejected by the provider.');
     if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
     // The provider answered, every attempt, with nothing. Its own name so a caller can tell "the
     // model said nothing" from "the provider was down" and act on the finish_reason in the message.
