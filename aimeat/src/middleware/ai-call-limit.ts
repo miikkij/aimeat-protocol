@@ -14,6 +14,7 @@
  * @structure aiCallLimit(config)
  * @usage router.post('/v1/ai/complete', requireAuth(), aiCallLimit(config), handler)
  * @version-history
+ *   v1.0.1 — 2026-10-07 — A request without real authentication gets 401 instead of passing uncounted (code scanning alert 1700).
  *   v1.0.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -21,10 +22,16 @@ import type { AimeatConfig } from '../config.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { takeAiCall } from '../services/account-limits.js';
 import { error } from './envelope.js';
+import { deny401 } from '../auth/deny.js';
 
 export function aiCallLimit(config: AimeatConfig) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth) return next();
+    // Every mount sits after requireAuth(), which refuses both cases. A mount without it refuses here
+    // rather than letting the call through uncounted.
+    if (!req.auth || req.auth.anonymous) {
+      deny401(req, res, 'Authentication required');
+      return;
+    }
     const turn = takeAiCall(config, resolveIdentity(req.auth, config.nodeId));
     if (turn.ok) return next();
     res.setHeader('Retry-After', String(turn.retryAfterSec));

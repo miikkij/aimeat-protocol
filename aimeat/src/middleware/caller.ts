@@ -8,6 +8,7 @@
  * @structure callerOf(req, nodeId, storage)
  * @usage const caller = callerOf(req, config.nodeId, storage); if (!caller.has('company:write')) …
  * @version-history
+ *   v1.0.1 — 2026-10-07 — The anonymous identity optionalAuth injects counts as no auth (code scanning alert 1701).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C9).
  */
 import type { Request } from 'express';
@@ -20,7 +21,7 @@ const built = new WeakMap<Request, CallerContext>();
 export function callerOf(req: Request, nodeId: string, storage: Storage): CallerContext {
     let caller = built.get(req);
     if (!caller) {
-        if (!req.auth) throw new Error('callerOf: the request carries no auth; mount requireAuth() before it.');
+        if (!req.auth || req.auth.anonymous) throw new Error('callerOf: the request carries no real auth; mount requireAuth() before it.');
         caller = callerFromAuth(req.auth, nodeId, storage);
         built.set(req, caller);
     }

@@ -28,6 +28,8 @@
  *   app-frame-core.js, shared with the App Catalog's preview.
  * @usage Served at /app-frame.js as a module; referenced by app-frame.html.
  * @version-history
+ *   v1.3.1 — 2026-10-07 — The storage area is picked by a constant, not by the message's value (code
+ *     scanning alert 1699). The areas were null-prototype objects already, so nothing changes in use.
  *   v1.3.0 — 2026-10-05 — Secaudit 2026-10, WEB-1 and WEB-2. A message counts only with the frame's
  *     secret; the storage is no longer written back into the frame's name after each change (a foreign
  *     page in the frame read the app's storage, the SDK's access token in it, from window.name); a
@@ -163,7 +165,8 @@ import { silentGrant, consentWindow, frameSecret, bootName as nameFor, fromFrame
   window.addEventListener('pagehide', function () { if (flushTimer) { clearTimeout(flushTimer); flush(); } });
 
   function onStore(d) {
-    var area = d.area === 'ls' || d.area === 'ss' ? d.area : null;
+    // The constant, never the message's own value, indexes `areas`.
+    var area = d.area === 'ls' ? 'ls' : d.area === 'ss' ? 'ss' : null;
     if (!area) return;
     var map = areas[area];
     if (d.action === 'clear') {

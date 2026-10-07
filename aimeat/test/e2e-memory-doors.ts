@@ -711,6 +711,24 @@ await test('a deleted key appears in the bin with the day it stops being restora
   assert(restored.status === 200, `the bin's promise is keepable: restore ${restored.status}`);
 });
 
+// A repeated query parameter arrives as an array. The route cast it to a string and handed it to the
+// identity tests in the service (code scanning alerts 1704-1707); it now counts as no override.
+await test('DELETE with ?owner= given twice is no override: the operator\'s own key goes, the other owner\'s stays', async () => {
+  const key = `memdoors.twoowners${Date.now()}`;
+  for (const auth of [ownerAuth(), strangerAuth()]) {
+    const w = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key, value: { n: 1 }, visibility: 'private' }) });
+    assert(w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+  }
+  const q = `owner=${encodeURIComponent(strangerGhii)}&owner=${encodeURIComponent(ownerGhii)}`;
+  const d = await json(`/v1/memory/${encodeURIComponent(key)}?${q}`, { method: 'DELETE', headers: ownerAuth() });
+  assert(d.status === 200, `expected 200, got ${d.status}: ${JSON.stringify(d.body?.error)}`);
+  const own = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: ownerAuth() });
+  assert(own.status === 404, `the operator's own key is gone: ${own.status}`);
+  const theirs = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: strangerAuth() });
+  assert(theirs.status === 200, `the other owner's key stays: ${theirs.status}`);
+  await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: strangerAuth() });
+});
+
 await test('the bin route is not reached by a caller with no token (401)', async () => {
   // It is registered BEFORE /v1/memory/:key on purpose; a 404 saying "Memory key not found:
   // deleted" would mean the literal path had been swallowed as a key.

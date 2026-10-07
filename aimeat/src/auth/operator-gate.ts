@@ -8,6 +8,7 @@
  * @structure requireOperatorPrincipal(storage, scope) · requireOperator(storage)
  * @usage const operator = [requireAuth(), requireOperator(storage)]; then spread `...operator` into a route.
  * @version-history
+ *   v1.0.1 — 2026-10-07 — requireOperatorPrincipal refuses the anonymous identity with 401 (code scanning alert 1702).
  *   v1.0.0 — 2026-10-05 — Moved from auth/middleware.ts (max-file-lines), with requireOperator added
  *     the same day (secaudit 2026-10, C2).
  */
@@ -50,7 +51,7 @@ import { askOperator } from '../services/operator-principal.js';
  */
 export function requireOperatorPrincipal(storage: Storage, scope: string = OPERATOR_ORGANISM_REPAIR_SCOPE) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth) {
+    if (!req.auth || req.auth.anonymous) {
       deny401(req, res, 'Authentication required');
       return;
     }
