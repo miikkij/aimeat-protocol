@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-07 — aimeat_app_tools_publish answers `priced` with isToolPriced, so a tool sold only in
+ *     `pricesMoney` is reported as priced.
  *   2026-10-06 — aimeat_app_tools_publish and aimeat_offer_price_set register the catalog's schema, which
  *     now carries their bounds (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -70,7 +72,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { canonicalAppToolsId } from '../services/app-tools-key.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
-import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey, isToolPriced } from '../models/app-tool-schemas.js';
 import { loadAgentOffers, publishAgentOffers } from '../services/agent-offers-write.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
@@ -288,7 +290,7 @@ export function registerCommerceTools(
                     sku: `app-tool:${owner}/${app_id}:${t.name}`,
                     name: t.name,
                     fulfillment: t.action_id ? 'call' : 'task',
-                    priced: !!((t.price && t.price.morsels > 0) || t.priceMoney),
+                    priced: isToolPriced(t),
                 })),
                 exchange: exchangeOutcome(written.exchange,
                     `POST /v1/exchange/reconcile with {"dry_run": true, "app_id": "${app_id}"}`),
