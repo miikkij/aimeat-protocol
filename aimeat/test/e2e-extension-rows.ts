@@ -332,17 +332,19 @@ await test('Workflow: a missing input_from key arrives as null, and the act step
 
 await test('Workflow: input_from is a read, so an agent with workflow:write and no memory:read is refused the save', async () => {
     const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: `exrwf${STAMP % 100000}`, owner: A.name }) });
-    await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['workflow:write', 'workflow:read'], owner_token: A.token }) });
+    await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['workflow:write', 'workflow:read', 'ext:invoke'], owner_token: A.token }) });
     const tok = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
     assert(typeof tok.body?.token === 'string', `agent token ${tok.status}`);
     const def = {
         title: { en_US: 'Read by input_from' }, description: { en_US: 'authority' },
         trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
         steps: [{ id: 'act', description: { en_US: 'Act' }, required_to_function: 'none',
-            action: { kind: 'extension', extension: EXT, action: 'propose', input: {}, input_from: { secret: 'some.private.key' } } }],
+            action: { kind: 'extension', extension: EXT, action: 'propose', input: {}, input_from: { secret: 'some.private.key' }, result_to_key: `exr.${STAMP}.auth` } }],
     };
     const put = await json(`/v1/workflows/exr-wf-auth-${STAMP}`, { method: 'PUT', headers: auth(tok.body.token), body: JSON.stringify(def) });
-    // HOLE: 200 before step-authority counted input_from as a read.
+    // GUARD, not hole: a valid extension step already needs result_to_key or a signal, and both are
+    // reads, so memory:read was asked before input_from existed. step-authority.ts counts input_from
+    // as a read too, so the rule holds if that validation ever loosens.
     assert(put.status === 403, `expected 403, got ${put.status}: ${JSON.stringify(put.body?.error)}`);
     assert(/memory:read/.test(JSON.stringify(put.body)), `names the permission: ${JSON.stringify(put.body?.error)}`);
 });
