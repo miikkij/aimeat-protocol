@@ -19,6 +19,9 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   v1.8.0 — 2026-10-08 — A call answered 404 for its session (a restarted server) drops the pooled
+ *     client and is made once more on a new session, as the MCP transport asks of a client. It was
+ *     answered 502 and the server parked, so an agent's first call after any upstream restart failed.
  *   v1.7.0 — 2026-09-26 — A tool list refused as too large drops the list stored before, so no door
  *     answers from an older copy of it; MAX_TOOL_LIST_BYTES is 2 MB, since this node's own list
  *     measured 436,530 bytes; a list cut at the read ceiling (transport.ts MCP_RESPONSE_MAX_BYTES) is
@@ -343,6 +346,14 @@ async function refuseToolList(
   return { ok: false, code: 'TOOL_LIST_TOO_LARGE', message };
 }
 
+/**
+ * The far side answered 404 to a request that carried a session id: it no longer holds that session
+ * (a restart, or the session expired). The SDK carries the HTTP status in `.code`, as it does for 401.
+ */
+function isSessionGone(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === 404;
+}
+
 /** The guarded fetch's ceiling was hit (transport.ts, utils/read-capped.ts), not the network. */
 function isResponseTooLarge(err: unknown): boolean {
   return err instanceof ResponseTooLargeError || (err as { code?: unknown } | null)?.code === 'RESPONSE_TOO_LARGE';
@@ -490,10 +501,21 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
   }
 
   try {
-    const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity, config);
-    const result = await client.callTool({ name: tool, arguments: effectiveArgs }, undefined, {
-      timeout: CALL_TIMEOUT_MS,
-    });
+    const callOnce = async () => {
+      const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity, config);
+      return client.callTool({ name: tool, arguments: effectiveArgs }, undefined, { timeout: CALL_TIMEOUT_MS });
+    };
+    let result: Awaited<ReturnType<typeof callOnce>>;
+    try {
+      result = await callOnce();
+    } catch (err) {
+      // 404 on a session is the far side saying it no longer knows it: a restarted server. The MCP
+      // transport says the client then starts a new session, so the pooled client goes and the call
+      // is made once more on a fresh one. Anything else, or a second failure, is described below.
+      if (!isSessionGone(err)) throw err;
+      await mcpClientPool.invalidate(server.id);
+      result = await callOnce();
+    }
     await storage.touchMcpServerOk(server.id);
 
     // isError true is the TOOL saying no, which is a successful proxy of an unsuccessful call. The

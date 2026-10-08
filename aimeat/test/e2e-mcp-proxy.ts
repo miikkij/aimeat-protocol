@@ -31,6 +31,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.11.0 — 2026-10-08 — The upstream answers 404 to an unknown session, as the MCP transport
+ *     says, and a call after it drops every session (a restart) still answers 200 on a new session.
  *   v1.10.0 — 2026-10-08 — Phase 4c: a read_only grant admits `echo` (the server marks it
  *     readOnlyHint) and refuses `refuses` (no mark) although `tools` is '*' (aimeat-soc).
  *   v1.9.0 — 2026-09-24 — An app grant of the server's owner, holding no mcp:use, is refused on the
@@ -256,6 +258,13 @@ async function mcpTool(
 const upstreamTransports = new Map<string, StreamableHTTPServerTransport>();
 const upstream = http.createServer(async (req, res) => {
   const sid = req.headers['mcp-session-id'] as string | undefined;
+  // An unknown session is 404, as the MCP transport specification says: the answer a restarted
+  // server gives, and the one phase 4d restarts the server to see.
+  if (sid && !upstreamTransports.has(sid)) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end('{"jsonrpc":"2.0","error":{"code":-32001,"message":"Session not found"},"id":null}');
+    return;
+  }
   let transport = sid ? upstreamTransports.get(sid) : undefined;
   if (!transport) {
     // A fresh McpServer per transport: one server instance binds to one transport.
@@ -816,6 +825,21 @@ await test('read_only set through the node MCP tool aimeat_mcp_grant_set holds t
     method: 'POST', headers: agentAuth(), body: JSON.stringify({ tool: 'refuses' }),
   });
   assert(refused.status === 403 && /read-only/i.test(JSON.stringify(refused.body)), `expected the read-only refusal, got ${refused.status}: ${JSON.stringify(refused.body)}`);
+});
+
+await test('after the far side restarts, the next call starts a new session instead of failing', async () => {
+  const before = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: ownerAuth(), body: JSON.stringify({ tool: 'echo', arguments: { text: 'before restart' } }),
+  });
+  assert(before.status === 200, `warm call: ${before.status}`);
+  // A restart, as the far side sees it: every session it held is gone.
+  upstreamTransports.clear();
+  const after = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: ownerAuth(), body: JSON.stringify({ tool: 'echo', arguments: { text: 'after restart' } }),
+  });
+  // HOLE: 502 before 2026-10-08; the node sent the old session, got 404 and parked the server.
+  assert(after.status === 200, `expected 200 on a new session, got ${after.status}: ${JSON.stringify(after.body)}`);
+  assert(JSON.stringify(after.body).includes('echo:after restart'), `answer: ${JSON.stringify(after.body?.data?.content)}`);
 });
 
 await test('removing the read-only narrowing opens the other tool again', async () => {
