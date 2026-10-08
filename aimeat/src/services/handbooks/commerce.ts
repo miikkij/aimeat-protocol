@@ -7,6 +7,7 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   v2.4.0 — 2026-10-08 — aimeat_visibility_report and aimeat_visibility_settings_set: where the buyers come from.
  *   v2.3.0 — 2026-10-07 — GET /v1/commerce/tools?include=own lists the agent's own owner's free callable app tools.
  *   v2.2.0 — 2026-10-02 — An agent buys in money only within its daily purchase limit, and reads it from two records.
  *   v2.1.0 — 2026-10-01 — The payment-provider secret is entered by the owner on the Wallet page; aimeat_commerce_psp_set refuses (decision D5).
@@ -46,6 +47,13 @@ PURCHASE_LIMIT_NOT_SET. Read it before you buy: \`aimeat_memory_read { key: "com
 owner_scope: true }\` (per agent GAII and currency, in 6-decimal micro-units) and today's spending
 under \`commerce.agent-spend\`. Only the owner changes it, signed in, on the Agents page; give them
 that link. Morsel prices are not limited.
+
+**Where the buyers come from (scope signals:read).** \`aimeat_visibility_report\` — people by
+channel (an AI answer, search, social, another site, direct), which AIs fetched which pages, who read
+the place's llms.txt, AGENTS.md, MCP card and UCP profile, and completed purchases by the channel
+they came from (a person on a page, or an agent at a checkout). Read it when the owner asks why sales
+moved. It cannot show what a person asked the AI; say so. \`aimeat_visibility_settings_set\` switches
+the counting off or on (scope signals:write); ask the owner first.
 
 **Working state.** \`aimeat_memory_*\` for notes and state · \`aimeat_storage_upload\`/\`_download\`
 · \`aimeat_wallet_balance\`/\`_transactions\` · \`aimeat_handbook_get\`.

@@ -132,6 +132,21 @@
   var { authFetch: authFetch2 } = makeSession("aimeat-commerce.js");
   var NODE_URL2 = APEX_URL;
   var MONEY_UNIT = 1e6;
+  function pageAttribution() {
+    try {
+      const nav = (
+        /** @type {Navigator & { globalPrivacyControl?: boolean }} */
+        navigator
+      );
+      if (nav.globalPrivacyControl === true || nav.doNotTrack === "1") return null;
+      const referrer = document.referrer || null;
+      const utm = new URLSearchParams(location.search).get("utm_source");
+      if (!referrer && !utm) return null;
+      return { referrer: referrer ? referrer.slice(0, 2048) : null, utm_source: utm ? utm.slice(0, 100) : null };
+    } catch {
+      return null;
+    }
+  }
   function commerceError(res, fallback) {
     const e = (
       /** @type {Error & { code?: string, paymentRequired?: boolean, accepts?: unknown, x402Version?: unknown }} */
@@ -242,6 +257,8 @@
       );
       if (opts && opts.note) body.note = opts.note;
       if (opts && opts.currency) body.currency = opts.currency;
+      const attribution = pageAttribution();
+      if (attribution) body.attribution = attribution;
       const res = await authFetch2("/v1/commerce/checkout-sessions", {
         method: "POST",
         body: JSON.stringify(body)

@@ -27,6 +27,9 @@
  * @structure SignalError · createStream/listStreams/getStream/deleteStream · recordHit · readReport
  * @usage await recordHit(storage, { ownerGhii, streamId, event: 'open', userAgent });
  * @version-history
+ *   v1.1.1 — 2026-10-08 — withKeyLock is exported: the AI visibility counter
+ *     (services/visibility/visibility-counter.ts) merges into its month record through the same
+ *     per-key queue.
  *   v1.1.0 — 2026-09-18 — A stream may keep WHERE a person came from, at the precision its owner
  *     set (`geo`). The place arrives as plain fields the route read from the reverse proxy's
  *     headers; this file still never sees an address. People only: an AI fetcher's place is a data
@@ -277,7 +280,7 @@ const CAS_ATTEMPTS = 25;
  */
 const keyLocks = new Map<string, Promise<unknown>>();
 
-async function withKeyLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+export async function withKeyLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const previous = keyLocks.get(key) ?? Promise.resolve();
   // `.then(fn, fn)` rather than `.then(fn)`: a failed predecessor must not cancel the whole line.
   const run = previous.then(fn, fn);

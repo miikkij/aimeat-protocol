@@ -15,6 +15,8 @@
  *   - PATCH /ucp/v1/checkout-sessions/:id        update line_items OR { cancel: true }
  *   - POST  /ucp/v1/checkout-sessions/:id/complete  ({ payment: { handler?, instrument? } })
  * @version-history
+ *   v1.2.0 — 2026-10-08 — A checkout opened here is attributed to the platform named in UCP-Agent, or
+ *     the User-Agent (services/visibility/attribution.ts), for the seller's AI visibility report.
  *   v1.1.0 — 2026-08-10 — Security audit H-3: pass the completing principal to completeSession.
  *   v1.1.0 — 2026-07-14 — app-tool item ids ("app-tool:<owner>/<appId>:<tool>") + inline ref form
  *     + caller JWT threaded into completeSession (TARGET-034 phase A)
@@ -37,6 +39,7 @@ import type { CheckoutSessionRecord } from '../commerce/types.js';
 import type { SellableRef } from '../commerce/sellable-resolvers.js';
 import { PaymentError, listPaymentHandlers } from '../commerce/payment-handlers.js';
 import { paymentChallenge } from '../commerce/x402.js';
+import { agentAttribution } from '../services/visibility/attribution.js';
 
 export const UCP_VERSION = '2026-04-08';
 const UCP_CAPABILITIES = [{ name: 'dev.ucp.shopping.checkout', version: '1' }];
@@ -195,6 +198,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
         items: toRefs(parsed.data.line_items),
         note: parsed.data.note,
         currency: parsed.data.currency,
+        attribution: agentAttribution({ ucpAgent: req.get('ucp-agent'), userAgent: req.get('user-agent') }),
       });
       res.status(201).json(ucpEnvelope(capabilities, { checkout_session: toUcpSession(session) }));
     } catch (err) { sendUcpError(res, config, err); }

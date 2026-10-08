@@ -16,6 +16,9 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.8.0 — 2026-10-08 — A checkout may carry `attribution` (the page's Referer and utm_source); the
+ *     session keeps the channel it names, never the values. An agent's checkout is attributed to the
+ *     agent (services/visibility/attribution.ts).
  *   v1.7.1 — 2026-09-26 — A hold's seller comes from localAccountName (utils/gaii.ts), which keeps an
  *     identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.7.0 — 2026-09-16 — The Stripe secrets are stored encrypted (commerce/psp-secrets.ts): every
@@ -42,6 +45,9 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, localAccountName } from '../utils/gaii.js';
+import { pageAttribution, agentAttribution } from '../services/visibility/attribution.js';
+import { visitSignals } from '../utils/visit-signals.js';
+import { callerOf } from '../middleware/caller.js';
 import { isEvmAddressShape, toChecksumAddress, checksumIsWrong, settlementAssetMatch, probeIsContract } from '../commerce/evm-address.js';
 import {
   createSession, getSession, updateSessionItems, cancelSession, completeSession, CommerceError,
@@ -74,6 +80,11 @@ const CreateSchema = z.object({
   items: ItemsSchema,
   note: z.string().max(2000).optional(),
   currency: z.string().min(3).max(10).optional(),
+  /** Where the page that opens the checkout was opened from. Read once into a channel, not kept. */
+  attribution: z.object({
+    referrer: z.string().max(2048).nullish(),
+    utm_source: z.string().max(100).nullish(),
+  }).strict().optional(),
 });
 
 const PatchSchema = z.object({
@@ -319,12 +330,18 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
+      const visit = visitSignals((n) => req.get(n), undefined, req.hostname, config.baseUrl);
+      const given = parsed.data.attribution;
+      const attribution = given
+        ? pageAttribution({ referrer: given.referrer, utmSource: given.utm_source, selfHosts: visit.selfHosts, optedOut: visit.optedOut })
+        : (callerOf(req, config.nodeId, storage).kind === 'agent' ? agentAttribution({ userAgent: visit.userAgent }) : undefined);
       const session = await createSession(storage, config, {
         buyerOwner: req.auth!.owner as string,
         buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
         items: parsed.data.items,
         note: parsed.data.note,
         currency: parsed.data.currency,
+        attribution,
       });
       res.status(201).json(success(config.nodeId, { session }, [
         { description: 'Complete checkout', method: 'POST', url: `/v1/commerce/checkout-sessions/${session.id}/complete` },

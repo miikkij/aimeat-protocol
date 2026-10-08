@@ -23,6 +23,8 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.3.0 — 2026-10-08 — llms.txt, AGENTS.md and the MCP server card count who fetched them for the
+ *     app's owner (services/visibility/, AI visibility layer A).
  *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.2.0 — 2026-09-24 — The origin sitemap lists the app and its legal pages only; the agent
  *     documents left it (Bing counted them as thin pages).
@@ -48,6 +50,9 @@ import { applyServeMarks } from '../services/app-serve-marks.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { appReviewedBy } from '../services/app-marks.js';
 import { escapeHtml } from '../utils/html-escape.js';
+import { countVisit } from '../services/visibility/visibility-counter.js';
+import { visitSignals } from '../utils/visit-signals.js';
+import type { VisibilityDoc } from '../models/visibility-schemas.js';
 
 export interface AppOriginDocDeps {
   resolveApp: (target: string) => Promise<AppRecord | null>;
@@ -85,6 +90,12 @@ export function registerAppOriginDocs(
     return app;
   }
 
+  /** Count a fetch of one of the app's discovery files for its owner (services/visibility/). */
+  const countDoc = (req: Request, app: AppRecord, doc: VisibilityDoc): void => countVisit(storage, config, {
+    ownerGaii: app.ownerGaii, target: `${app.filename}${req.path}`, doc,
+    ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl),
+  });
+
   // `llms.txt` on an APP origin is the app's own agent-facing document, not the node's.
   // The node-wide guide is 139 kB of app-BUILDING instructions in which the app's own name
   // appears zero times, and it was being served here: an agent that habitually tries
@@ -93,6 +104,7 @@ export function registerAppOriginDocs(
   router.get(['/llms.txt', '/llms-full.txt'], async (req: Request, res: Response, next) => {
     const app = await appForOrigin(req);
     if (!app) return next();
+    countDoc(req, app, req.path === '/llms-full.txt' ? 'llms-full.txt' : 'llms.txt');
     const face = await buildAppAgentFace(config, storage, app);
     const tools = await appToolNames(storage, app.ownerGaii, app.filename);
     // text/plain, not text/markdown: llmstxt.org names that content type, and this path was
@@ -183,6 +195,7 @@ export function registerAppOriginDocs(
     async (req: Request, res: Response, next) => {
     const app = await appForOrigin(req);
     if (!app) return next();
+    countDoc(req, app, 'mcp.json');
     const origin = appOriginFor(req, config);
     const tools = await appToolNames(storage, app.ownerGaii, app.filename);
     const name = app.manifest?.name ?? app.filename.replace(/\.[^.]+$/, '');
@@ -308,6 +321,7 @@ export function registerAppOriginDocs(
   router.get(['/AGENTS.md', '/agents.md'], async (req: Request, res: Response, next) => {
     const app = await appForOrigin(req);
     if (!app) return next();
+    countDoc(req, app, 'AGENTS.md');
     const face = await buildAppAgentFace(config, storage, app);
     const tools = await appToolNames(storage, app.ownerGaii, app.filename);
     sendMarkdown(res, appAgentsMd(config, app, appOriginFor(req, config), tools, face?.markdown));

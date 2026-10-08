@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.18.0 — 2026-10-08 — The app download counts the visit for AI visibility (services/visibility/).
  *   v1.17.0 — 2026-10-06 — SECURITY: on a per-app origin GET /v1/apps/:owner/:filename runs only that
  *     origin's own app. A draft preview through it is refused there (the draft origin serves it at
  *     `/`), and a runnable request for another app, or on a draft origin, is redirected to the app's
@@ -106,6 +107,8 @@ import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
 import { countPageView } from '../../services/signals/page-views.js';
 import { geoFromHeaders } from '../../utils/geo-headers.js';
+import { countVisit } from '../../services/visibility/visibility-counter.js';
+import { visitSignals } from '../../utils/visit-signals.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import {
@@ -717,6 +720,8 @@ export function registerReadRoutes(
             ownerGaii: app.ownerGaii, name: filename, userAgent: req.get('user-agent'),
             geo: geoFromHeaders(config.geoHeaders, (name) => req.get(name)),
         });
+        // Where the visitor came from, counted for every owner by default (services/visibility/).
+        countVisit(storage, config, { ownerGaii: app.ownerGaii, target: filename, ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
 
         res.send(body);
     });

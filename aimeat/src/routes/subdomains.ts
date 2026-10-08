@@ -14,6 +14,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.24.0 — 2026-10-08 — serveApp, the portfolio and the company page count the visit for AI
+ *     visibility (services/visibility/), on by default; the signal stream stays opt-in. The router
+ *     also runs countApexDocs, which counts the node's own discovery files and serves nothing.
  *   v1.23.0 — 2026-10-06 — SECURITY: an app's draft has its own origin, `<sub>--draft.<appHost>`
  *     (DRAFT_LABEL_SUFFIX). A `?preview=` on the app's origin redirects there, and the draft origin
  *     serves only the draft. On the app's own origin the draft's code reached the silent sign-in
@@ -131,6 +134,9 @@ import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { countPageView } from '../services/signals/page-views.js';
 import { geoFromHeaders } from '../utils/geo-headers.js';
 import type { SignalGeoInput } from '../models/signal-schemas.js';
+import { countVisit } from '../services/visibility/visibility-counter.js';
+import { visitSignals, type VisitSignals } from '../utils/visit-signals.js';
+import { countApexDocs } from './visibility.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
@@ -340,7 +346,7 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
                   // is no safe value to invent.
                   // `userAgent` is required although it may be undefined, so a new call site cannot
                   // forget it: a missing one would count every AI fetch as a person.
-                  protect: { config: AimeatConfig; viewer: string; anonymous: boolean; userAgent: string | undefined; geo: SignalGeoInput | null },
+                  protect: { config: AimeatConfig; viewer: string; anonymous: boolean; userAgent: string | undefined; geo: SignalGeoInput | null; visit: VisitSignals },
                   discover?: { baseUrl: string; toolNames: string[]; origin?: string },
                   prov?: ServedProvenance,
                   // TARGET-058: what the VISIBLE label needs. Separate from `protect` because this
@@ -363,6 +369,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
   // This origin is where people and AI fetchers actually land. No-op unless the owner opted this
   // page in by creating its stream. Never awaited.
   countPageView(storage, { ownerGaii: app.ownerGaii, name: app.filename, userAgent: protect.userAgent, geo: protect.geo });
+  // And where the visitor came from, counted for every owner by default (services/visibility/).
+  countVisit(storage, protect.config, { ownerGaii: app.ownerGaii, target: app.filename, ...protect.visit });
 
   // Search visibility, decided once (services/app-seo.ts) and used twice below: the header here,
   // and the head metadata inside the marks pass. The header is the half that stops a LISTING —
@@ -561,6 +569,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
   // eslint-disable-next-line aimeat/no-silent-catch -- no apex frame-ancestor
   try { apexOrigin = new URL(config.baseUrl).origin; } catch { /* no apex frame-ancestor */ }
   const csp = appCsp(apexOrigin);
+  router.use(countApexDocs(config, storage)); // the node's own llms.txt, AGENTS.md, MCP card, UCP profile
 
   router.get('/', async (req: Request, res: Response, next) => {
     const sub = req.subdomain;
@@ -587,6 +596,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (!portfolioSeoIndexable(resolved.portfolioConfig as PortfolioSeoConfig, config)) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
+      countVisit(storage, config, { ownerGaii: `${sub}@${config.nodeId}`, target: 'portfolio', ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
       servePortfolio(res, resolved.html, resolved.portfolioConfig, csp, config);
       return;
     }
@@ -619,6 +629,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         // the portfolio origin: same bridge, same CSP, same isolated session-less host.
         const html = await readCompanyPortfolioHtml(storage, company);
         if (!html) return companyNotFound();
+        countVisit(storage, config, { ownerGaii: company.ownerGhii, target: `company:${sub}`, ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
         servePortfolio(res, html, {}, csp, config);
         return;
       }
@@ -631,7 +642,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       // The front page is an app, so it is served through the app path unchanged: same CSP,
       // same serve-time marks, same download accounting.
       await serveApp(res, storage, companyApp, csp, apexOrigin,
-        { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)) },
+        { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) },
         { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, companyApp.ownerGaii, companyApp.filename) },
         await loadServedProvenance(storage, config, companyApp.aiProvenanceId),
         { config, locale: detectLocale(req.headers['accept-language']) });
@@ -730,7 +741,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       origin: appOriginFor(req, config),
     };
     await serveApp(res, storage, app, appCspForRequest, apexOrigin,
-      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)) }, discover,
+      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) }, discover,
       await loadServedProvenance(storage, config, app.aiProvenanceId),  // the SDK (aimeat-auth.js) does the silent SSO itself
       { config, locale: detectLocale(req.headers['accept-language']) });
   });
@@ -778,7 +789,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     }
     const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
     await serveApp(res, storage, app, csp, apexOrigin,
-      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)) }, discoverShared,
+      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) }, discoverShared,
       await loadServedProvenance(storage, config, app.aiProvenanceId), // no subdomain available → serve on the shared host (no SSO)
       { config, locale: detectLocale(req.headers['accept-language']) });
   });

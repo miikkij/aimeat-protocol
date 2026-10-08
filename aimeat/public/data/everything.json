@@ -1459,6 +1459,15 @@
       "<code>/v1/signals</code>"
      ],
      "plain": "Signals Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (AIMEAT_GEO_HEADERS, docs/visitor-geography.md); no address is stored, and AI fetchers are never placed. /v1/signals"
+    },
+    {
+     "slug": "g-8-how-people-and-ais-find-you",
+     "cells": [
+      "<strong>How people and AIs find you</strong>",
+      "See, for your whole place and with no setup, where the people who open your apps, portfolio and company page came from (an AI answer and which AI, search, social, another site, or direct), which AI fetched which page because a person asked it or to build its index, who read your llms.txt, AGENTS.md, MCP card and UCP profile, and which completed purchases came from which channel, including purchases an AI agent made at your checkout. Your own AI reads the same report and can answer &quot;why did sales drop&quot;. Counts only: no address, no cookie and no visitor id is kept, so it is on by default without a consent banner; a browser that sends Global Privacy Control or Do Not Track is counted in the total alone. You can switch it off for your place, and the operator for the node (<code>AIMEAT_AI_VISIBILITY</code>). Limits: the questions people asked the AI are not visible, only what the AI fetched; a purchase is placed in a channel only when the page that opened the checkout used the commerce library or an agent opened it; counts reach the report within ten seconds, and a node stopped without warning can lose the last ten seconds.",
+      "<code>GET /v1/visibility/report</code>, <code>/v1/visibility/settings</code>, <code>aimeat_visibility_report</code>, <code>aimeat_visibility_settings_set</code>"
+     ],
+     "plain": "How people and AIs find you See, for your whole place and with no setup, where the people who open your apps, portfolio and company page came from (an AI answer and which AI, search, social, another site, or direct), which AI fetched which page because a person asked it or to build its index, who read your llms.txt, AGENTS.md, MCP card and UCP profile, and which completed purchases came from which channel, including purchases an AI agent made at your checkout. Your own AI reads the same report and can answer \"why did sales drop\". Counts only: no address, no cookie and no visitor id is kept, so it is on by default without a consent banner; a browser that sends Global Privacy Control or Do Not Track is counted in the total alone. You can switch it off for your place, and the operator for the node (AIMEAT_AI_VISIBILITY). Limits: the questions people asked the AI are not visible, only what the AI fetched; a purchase is placed in a channel only when the page that opened the checkout used the commerce library or an agent opened it; counts reach the report within ten seconds, and a node stopped without warning can lose the last ten seconds. GET /v1/visibility/report, /v1/visibility/settings, aimeat_visibility_report, aimeat_visibility_settings_set"
     }
    ]
   },
@@ -3754,6 +3763,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 374
+  "rows": 375
  }
 }

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.6.0 -- 2026-10-08 -- visibilityCliTools: aimeat_visibility_report and aimeat_visibility_settings_set.
  *   v1.5.0 -- 2026-09-29 -- storageCliTools: the storage tools moved out of tool-call-defs-core.ts.
  *   v1.4.0 -- 2026-09-29 -- classificationCliTools: aimeat_classification (TARGET-082 V5).
  *   v1.3.0 -- 2026-09-29 -- refineryCliTools: aimeat_refinery_classes, _run and _status.
@@ -38,6 +39,7 @@ import { classificationCliTools } from './tool-call-defs-classification.js';
 import { mcpProxyCliTools } from './tool-call-defs-mcp-proxy.js';
 import { adminCliTools } from './tool-call-defs-admin.js';
 import { themeCliTools } from './tool-call-defs-themes.js';
+import { visibilityCliTools } from './tool-call-defs-visibility.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -72,6 +74,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...mcpProxyCliTools,
     ...adminCliTools,
     ...themeCliTools,
+    ...visibilityCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

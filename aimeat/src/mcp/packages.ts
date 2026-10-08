@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-08 — aimeat_package_buy attributes the session to the agent (AI visibility).
  *   2026-10-06 — aimeat_package_buy's auto_renew names the agent on the subscription, so each renewal is
  *     held to its daily purchase limit (secaudit 2026-10 follow-up, A6).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -89,6 +90,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { localAccountName } from '../utils/gaii.js';
+import { agentAttribution } from '../services/visibility/attribution.js';
 import { readOffer, setOffer, publicOffer } from '../services/packages/sale/package-offer.js';
 import { buyerOfferView } from '../services/packages/sale/package-sale-checkout.js';
 import { subscriptionsOf, readRequests, setAutoRenew } from '../services/packages/sale/package-sale-catalogue.js';
@@ -160,6 +162,7 @@ function registerPackageSaleTools(
         try {
             const session = await createSession(storage, config, {
                 buyerOwner: owner, buyerIdentity: getAgentGaii(), currency: buy.currency,
+                attribution: agentAttribution({}),
                 items: [{
                     kind: 'package', agent: repository, app: groupId,
                     offer_id: input.action === 'renew' ? `renew:${input.node_id ?? ''}` : 'buy',

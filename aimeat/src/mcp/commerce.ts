@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-08 — aimeat_checkout_open attributes the session to the agent, so the seller's AI
+ *     visibility report counts the purchase as an agent's (services/visibility/attribution.ts).
  *   2026-10-07 — aimeat_app_tools_publish answers `priced` with isToolPriced, so a tool sold only in
  *     `pricesMoney` is reported as priced.
  *   2026-10-06 — aimeat_app_tools_publish and aimeat_offer_price_set register the catalog's schema, which
@@ -88,6 +90,7 @@ import { exchangeOutcome, type ReconcileReport } from '../services/exchange-proj
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
 import { logger } from '../utils/logger.js';
+import { agentAttribution } from '../services/visibility/attribution.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
@@ -388,6 +391,7 @@ export function registerCommerceTools(
             try {
                 const session = await createSession(storage, config, {
                     buyerOwner: owner, buyerIdentity: agentGaii, items, note, currency,
+                    attribution: agentAttribution({}),
                 });
                 return ok({ session });
             } catch (err) { return commerceFail(err); }

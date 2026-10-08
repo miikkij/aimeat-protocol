@@ -12,6 +12,8 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   v1.3.0 — 2026-10-08 — CheckoutAttribution: the channel a checkout came from, carried on the
+ *     session so the completed purchase is counted under it (services/visibility/attribution.ts).
  *   v1.2.0 — 2026-10-02 — SavedPayment: collect may keep the payment method for later charges
  *     (`saveForLater`), and the optional chargeSaved charges it without the buyer; fulfilment sees
  *     what was saved (package sale design: automatic renewal).
@@ -120,6 +122,18 @@ export interface CheckoutReceipt {
  * SELLER owner's GHII (their orders-received list). All state transitions go through
  * session-service.ts — `open → completed | cancelled | expired`.
  */
+/**
+ * Where a checkout came from: a channel and an AI family from closed lists, never a URL. Set when
+ * the session opens and read when it completes, so a purchase is counted under its channel without
+ * a cookie. Absent when the buyer opted out (Sec-GPC, DNT) or the door gave nothing to go on.
+ */
+export interface CheckoutAttribution {
+  channel: 'ai' | 'search' | 'social' | 'referral' | 'direct' | 'internal';
+  family: string | null;
+  /** `page`: a person on a page. `agent`: an AI at a checkout endpoint. */
+  via: 'page' | 'agent';
+}
+
 export interface CheckoutSessionRecord {
   id: string;
   status: 'open' | 'completed' | 'cancelled' | 'expired';
@@ -139,6 +153,8 @@ export interface CheckoutSessionRecord {
   /** Fulfillment: agent tasks created on completion (offer-ask → TASK path) and/or inline
    *  results from custom fulfillments (app-tool capability invokes). */
   fulfillment?: { taskIds: string[]; results?: Array<{ sku: string; result: unknown }> };
+  /** Where the checkout came from (AI visibility). Absent on sessions opened before 2026-10-08. */
+  attribution?: CheckoutAttribution;
   createdAt: string;
   updatedAt: string;
   /** Open sessions expire lazily after this instant (checked on read + on complete). */
