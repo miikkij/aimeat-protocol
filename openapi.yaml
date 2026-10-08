@@ -62948,6 +62948,13 @@ paths:
                           avatar: { type: string }
                           has_html: { type: boolean }
                           portfolio_html: { type: string, nullable: true }
+                          ai_provenance:
+                            allOf:
+                              - $ref: '#/components/schemas/AiProvenanceItemBlock'
+                            description: >
+                              How the page was made, when it carries a record (an agent that published
+                              it without a declaration is stamped model-written). The portfolio and
+                              company origins serve the page with the same record's marks.
                           viewer_authenticated: { type: boolean }
                           viewer_is_owner: { type: boolean }
                           owner_gaiis: { type: array, items: { type: string } }

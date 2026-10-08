@@ -8,6 +8,9 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.11.0 — 2026-10-08 — writePortfolioHtml takes the writer and records the page's AI provenance
+ *     (an agent's page is stamped model-written, a person's is not); resolvePublishedPortfolio names
+ *     the record, and the portfolio origin serves its marks with the page.
  *   v1.10.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.10.0 — 2026-10-03 — `enable: true` on the JSON upload (and on the MCP tool) switches the page
  *     on unless the owner switched it off; the answer carries `served`. A card an AI published was
@@ -53,7 +56,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, GHIIRecord, AgentRecord } from '../storage/interface.js';
+import type { Storage, GHIIRecord, AgentRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -61,10 +64,15 @@ import { listPublishedMembers } from '../services/portfolio-members.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
 import { fileTarget } from '../services/classification/labels.js';
+import { provenanceForWrite, storeHeldProvenance } from '../services/ai-provenance.js';
+import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 /** Result of resolving a username to their published portfolio. */
 export type PortfolioResolution =
-  | { ok: true; html: string | null; ghii: GHIIRecord; agents: AgentRecord[]; portfolioConfig: Record<string, unknown> }
+  | { ok: true; html: string | null; ghii: GHIIRecord; agents: AgentRecord[]; portfolioConfig: Record<string, unknown>;
+      /** The page's AI-provenance record, when it has one: the serve path sends its marks. */
+      aiProvenanceId?: string }
   | { ok: false; reason: 'user_not_found' | 'not_enabled' };
 
 /** Where this owner's portfolio file and config live. */
@@ -92,12 +100,25 @@ export const PORTFOLIO_CONFIG_KEY = 'portfolio.config';
  * to be resolved in three, and a fourth surface would have made a fourth.
  *
  * Returns the target identity, because every caller reports it back one way or another.
+ *
+ * `writer` is who wrote the page, for its AI-provenance record (B10): an agent that writes a page
+ * and says nothing about it is stamped model-written (Mint-3), a person writing in person is not.
+ * The page is public, so the record resolves for every visitor, and the portfolio origin serves its
+ * marks with the page.
  */
 export async function writePortfolioHtml(
   storage: Storage,
   target: string,
   data: Buffer,
+  writer?: { config: AimeatConfig; principal: string; pipeline: string },
 ): Promise<string> {
+  const held: AiProvenanceRecordRow[] = [];
+  const aiProvenanceId = writer ? await provenanceForWrite(storage, {
+    principal: writer.principal, content: data, pipeline: writer.pipeline,
+    surface: { visibility: 'public', humanAudience: true },
+    labelPolicy: writer.config.aiLabelPublic, nodeId: writer.config.nodeId, baseUrl: writer.config.baseUrl,
+    enabled: writer.config.aiProvenance, held,
+  }) : undefined;
   await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
   await storage.createStorageFile({
     key: PORTFOLIO_HTML_KEY,
@@ -107,7 +128,9 @@ export async function writePortfolioHtml(
     size: data.length,
     data,
     createdAt: new Date().toISOString(),
+    ...(aiProvenanceId ? { aiProvenanceId } : {}),
   });
+  await storeHeldProvenance(storage, held);
   return target;
 }
 
@@ -197,11 +220,12 @@ export async function resolvePublishedPortfolio(
   if (!portfolioConfig) return { ok: false, reason: 'not_enabled' };
 
   let html: string | null = null;
+  let aiProvenanceId: string | undefined;
   for (const gaii of candidates) {
     const file = await storage.getStorageFile(gaii, PORTFOLIO_HTML_KEY);
-    if (file) { html = file.data.toString('utf-8'); break; }
+    if (file) { html = file.data.toString('utf-8'); aiProvenanceId = file.aiProvenanceId; break; }
   }
-  return { ok: true, html, ghii, agents, portfolioConfig };
+  return { ok: true, html, ghii, agents, portfolioConfig, ...(aiProvenanceId ? { aiProvenanceId } : {}) };
 }
 
 /** Valid DNS label for a portfolio subdomain (same shape as SUBDOMAIN_RE; kept local
@@ -467,7 +491,8 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    await writePortfolioHtml(storage, target, fileData);
+    await writePortfolioHtml(storage, target, fileData,
+      { config, principal: resolveIdentity(req.auth!, config.nodeId), pipeline: 'rest.portfolio.upload' });
     // The JSON body is the agent's road (the connector's aimeat_portfolio_publish). `enable: true`
     // switches the page on, as the node's MCP tool does; without it the file and the switch stay two
     // acts. A browser upload keeps the Portfolio tab's own switch.
@@ -510,6 +535,8 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       avatar: resolved.ghii.avatar,
       has_html: !!resolved.html,
       portfolio_html: resolved.html,
+      // How the page was made (`ai_provenance`), when it names a record, so a viewer can show the label.
+      ...provenanceItemBlock(await loadServedProvenance(storage, config, resolved.aiProvenanceId)),
       viewer_authenticated: isAuthenticated,
       viewer_is_owner: isOwner,
       // Identities whose memory records the viewer's fetch bridge may proxy on
