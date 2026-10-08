@@ -67189,6 +67189,15 @@ paths:
                     four is refused rather than coerced to the nearest one. Declaring a level and
                     then asking for the header to be left off is not possible — there is no
                     parameter for that.
+
+
+                    THE RECORD IS THE SENDER'S OWN. A `provenance_id` is attached, and named in
+                    `X-AI-Disclosure-Record`, only when the record belongs to the sender's account;
+                    another account's id is not attached. Every send is stamped by the node as well
+                    (an agent's message is recorded as model-written, a person's own is not), the
+                    record is stored only when the message goes out, and the answer names it as
+                    `ai_provenance_id`. The record is private: the recipient's follow of the header
+                    link answers 404 unless the sender publishes it.
                   oneOf:
                     - type: string
                       enum: [none, ai-assisted, ai-generated, autonomous]
