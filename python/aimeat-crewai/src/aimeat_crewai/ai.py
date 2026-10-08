@@ -116,8 +116,11 @@ class AiRefused(AiError):
 
     @property
     def retryable(self) -> bool:
-        """True only for a rate limit (429 ``RATE_LIMITED``). A missing scope or a bad token stays
-        the same on a retry."""
+        """True only for a rate limit (429 ``RATE_LIMITED``: the account's AI call limit, or since
+        node 2026-10-08 the provider's own, with its Retry-After). A missing scope or a bad token stays
+        the same on a retry, and so does a provider's refusal of the call as sent:
+        ``PROVIDER_REJECTED`` and ``CONTENT_REFUSED`` (422, ``details['provider_message']`` says why)
+        and ``PROVIDER_NO_CREDIT`` (402)."""
         return self.code == "RATE_LIMITED"
 
 

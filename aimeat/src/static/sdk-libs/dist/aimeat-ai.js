@@ -986,7 +986,7 @@
           pending = pending.slice(end + 1);
           if (!line.trim()) continue;
           const event = JSON.parse(line);
-          if (event.type === "error") throw aiError({ error: { code: event.code, message: event.message } }, "The AI stream failed");
+          if (event.type === "error") throw aiError({ error: { code: event.code, message: event.message, details: event.details } }, "The AI stream failed");
           if (event.type === "done") {
             done = true;
             if (event.budget) noteBudget(event.budget);
@@ -1072,17 +1072,22 @@
       const chunks = [];
       let bytes = 0;
       let done = null;
+      let audio = null;
       for await (const event of ndjson(response)) {
-        if (event.type === "audio" && typeof event.data === "string") {
+        if (event.type === "start") {
+          audio = event.audio || null;
+          if (opts.onStart) opts.onStart(event);
+        } else if (event.type === "audio" && typeof event.data === "string") {
           const chunk = Uint8Array.from(atob(event.data), (c) => c.charCodeAt(0));
           chunks.push(chunk);
           bytes += chunk.length;
           if (opts.onAudio) opts.onAudio(chunk);
         } else if (event.type === "done") done = event;
       }
-      const mime = SPEECH_MIME[format] || "application/octet-stream";
       const rest = withoutType(done);
-      return { ...rest, blob: new Blob(chunks, { type: mime }), mime_type: mime, format, bytes };
+      const said = (rest.audio || audio || {}).mime;
+      const mime = typeof said === "string" && said ? said : SPEECH_MIME[format] || "application/octet-stream";
+      return { ...rest, audio: rest.audio || audio, blob: new Blob(chunks, { type: mime }), mime_type: mime, format, bytes };
     });
   }
 

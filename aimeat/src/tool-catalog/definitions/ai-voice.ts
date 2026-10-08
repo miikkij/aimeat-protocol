@@ -2,6 +2,8 @@
  * @file ai-voice.ts
  * @description Shared voice tool metadata for node MCP, connector MCP and CLI.
  * @version-history
+ *   v1.2.0 - 2026-10-08 - aimeat_voice_speak says the `audio` block, INVALID_VOICE and PROVIDER_REJECTED
+ *     (aiprov plan, A1, A4, A6).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.1.0 - 2026-09-28 - Reply and speech take `role`, the AI role the call runs as, and declare
@@ -36,13 +38,13 @@ export const voiceTools = [
         annotations: { title: 'Generate Speech', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         scope: 'ai:use',
         surfaces: ['appdev', 'agent'],
-    description: 'Synthesize speech using the owner\'s configured provider and AI budget. Returns a PRIVATE storage_key, fetch_url, usage and provenance, never audio bytes in model context. Download using authenticated storage access; delete the file when no longer needed. Select a model and voice supported by the provider.',
+    description: 'Synthesize speech using the owner\'s configured provider and AI budget. Returns a PRIVATE storage_key, fetch_url, usage and provenance, never audio bytes in model context, and `audio` { mime, sample_rate, channels, sample_format }: pcm is raw samples with no header (24000 Hz mono s16le from OpenAI and OpenRouter; null when the provider does not say). Download using authenticated storage access; delete the file when no longer needed. Select a model and voice supported by the provider: a voice the catalogue says the model lacks is INVALID_VOICE with the valid ones, and a provider that refuses the request as sent is PROVIDER_REJECTED (the same call fails again; for mp3, ask for pcm).',
     input: {
       app_id: { type: 'string', required: true, description: 'App attribution for the owner\'s allowlist and daily quota.', zod: voiceSpeechSchema.shape.app_id },
       input: { type: 'string', required: true, description: 'Text to speak, 1-4000 characters.', zod: voiceSpeechSchema.shape.input },
       model: { type: 'string', description: 'Speech model id; the speech role gives one when it is left out.', zod: voiceSpeechSchema.shape.model },
       voice: { type: 'string', description: 'Provider voice id; the speech role gives one when it is left out.', zod: voiceSpeechSchema.shape.voice },
-      response_format: { type: 'string', enum: ['pcm', 'mp3'], description: 'Audio format, default pcm. PCM rate and channel count follow the provider.', zod: voiceSpeechSchema.shape.response_format },
+      response_format: { type: 'string', enum: ['pcm', 'mp3'], description: 'Audio format, default pcm. The result\'s `audio` says the PCM rate, channels and sample format. Not every model makes mp3.', zod: voiceSpeechSchema.shape.response_format },
       speed: { type: 'number', description: 'Speech speed, 0.25-4, default 1.', zod: voiceSpeechSchema.shape.speed },
       instructions: { type: 'string', description: 'Optional provider-specific speaking instructions, at most 2000 characters.', zod: voiceSpeechSchema.shape.instructions },
       provider: { type: 'string', description: 'One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.', zod: voiceSpeechSchema.shape.provider },
