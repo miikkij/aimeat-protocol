@@ -38,6 +38,10 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.5.0 — 2026-10-08 — completeTask() takes the session's scopes and answers a declaration the
+ *     caller may not make as a 403 result before the state move, so the REST route can carry
+ *     ai_provenance (aiprov D5). The public feed entry for a public deliverable no longer copies the
+ *     private completion message, which went out with no provenance and no label (D7).
  *   v1.4.0 — 2026-10-04 — declineTask(): a task the agent refused with its reason ends as 'declined',
  *     not 'failed' (hosted fleet report, 2026-10-03).
  *   v1.3.0 — 2026-08-24 — completeTask() refuses a plan-less Hello Integration test task. It used to
@@ -62,7 +66,7 @@ import { closeItemsForTask } from './open-items.js';
 import { reclaimTaskLiveTrace } from '../routes/agent-tasks/helpers.js';
 import { recordPublicActivity } from './public-activity.js';
 import { emitChange } from './event-bus.js';
-import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
 import { isOnboardingTestTask } from './onboarding-test-task.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
@@ -126,7 +130,11 @@ export async function afterTaskCompleted(
                 category: 'agents',
                 actor: task.agentGaii,
                 summary: `Agent ${task.agentGaii.split('#')[0]} completed "${task.title}"`,
-                detail: message,
+                // No completion message here. That text is the task's private event, usually written
+                // by a model, and the public feed copied it out with no provenance record and no
+                // label (aiprov D7). The feed entry links the public deliverable, which carries its
+                // own record, and public-activity.ts admits already-public fields only.
+                detail: '',
                 link: `/v1/memory/${encodeURIComponent(task.agentGaii)}/${encodeURIComponent(deliverableKey)}`,
             });
         })().catch(e => logger.error('public activity (task deliverable) failed', { taskId: id, error: String(e) }));
@@ -199,6 +207,8 @@ export interface CompleteTaskInput {
     declaredProvenanceId?: string;
     /** What the caller said about how the completion message was made. */
     declaredProvenance?: DeclaredProvenance;
+    /** The session's own scopes, when the caller has them: a declaration needs provenance:write there too. */
+    scopes?: readonly string[];
     /** Which road this came down, for the provenance record: 'mcp.task_complete' | 'rest.task_complete'. */
     pipeline: string;
 }
@@ -284,16 +294,22 @@ export async function completeTask(
     // label depend on which client wrote it, which is a split a reader can neither see nor account
     // for, and it is the same thing routes/boards.ts closed in TARGET-058 Phase 9.
     //
-    // The DECLARATION stays an MCP-only parameter, which is that same precedent: `ai_provenance` is
-    // scope-gated on `provenance:write`, and an agent that wants to state how content was made has a
-    // tool that takes it. What arrives from REST is the node's own observation and nothing else.
+    // The DECLARATION reaches this function from both doors since 2026-10-08 (aiprov D5): the REST
+    // route takes `ai_provenance` too, so a connector or fleet agent can say how its completion was
+    // made. It is scope-gated on `provenance:write` on both, asked here of the grant and the session.
     //
-    // MINTED BEFORE THE STATE MOVE. A declaration without the scope raises ProvenanceScopeError, and
-    // minting after the update would leave a task marked done with no 'completed' event and a refusal
-    // handed back to the agent. Nothing is lost the other way round: an unreferenced provenance row
-    // is inert.
+    // REFUSED BEFORE THE STATE MOVE, as a result rather than a throw, so the REST route answers 403
+    // and not 500, and the task stays where it was.
+    const provenanceRefused = await provenanceDeclarationRefusal(deps.storage, {
+        principal: actor, declaredId: input.declaredProvenanceId, declared: input.declaredProvenance,
+        enabled: deps.config.aiProvenance, scopes: input.scopes,
+    });
+    if (provenanceRefused) {
+        return { ok: false, status: 403, code: provenanceRefused.code, message: provenanceRefused.message };
+    }
     const aiProvenanceId = await provenanceForWrite(deps.storage, {
         principal: actor,
+        scopes: input.scopes,
         content: message,
         declaredId: input.declaredProvenanceId,
         declared: input.declaredProvenance,

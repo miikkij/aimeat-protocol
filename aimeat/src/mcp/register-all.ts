@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-08 — registerAgentMessageTools receives the session's scopes: declaring how a message was
+ *     made needs provenance:write there too (aiprov D5).
  *   2026-10-08 — registerVisibilityTools: aimeat_visibility_report and aimeat_visibility_settings_set.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The tool groups that built a caller of their own receive `caller` as their last argument; it is built per call, because the session's scopes are the current request's.
  *   v1.20.3 — 2026-10-05 — registerCompanyTools receives the session's scopes: declaring how a company
@@ -245,7 +247,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAiProviderTools(mcp, storage, config, agentGaii);
     registerAiCapabilityTools(mcp, storage, config, agentGaii);
     registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
-    registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerAgentMessageTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     // The v2 turn, beside the dashboard thread above it and the federated DM below. A session
     // here authenticates against an agent record, so the ops see the session caller with the agent role.
     registerAgentV2MessagingTools(mcp, storage, config, agentGaii, owner, caller);

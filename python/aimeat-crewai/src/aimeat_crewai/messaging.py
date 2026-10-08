@@ -22,6 +22,9 @@ uses). Mirrors the node contract in aimeat/src/models/message-schemas.ts (the no
 mismatch).
 
 Changelog:
+  unreleased -- 2026-10-08 -- ask() takes ai_provenance and ai_provenance_id and returns the
+    ai_provenance_id the node recorded. POST /v1/messages stripped both until node 3.25 (aiprov D5),
+    so a REST crew could not say how its question was made.
   0.29.0 -- 2026-09-24 -- ServeClient sends the serve daemon's secret on every request: the one
     serve_client() read with the port, or the one serve.json names for the port it is given. The
     daemon refuses a request without it since connector schema 3 (secaudit 2026-09, A9-1).
@@ -137,10 +140,18 @@ def ask(
     subject: str | None = None,
     conversation_id: str | None = None,
     submit_label: str | None = None,
+    ai_provenance: Mapping[str, Any] | None = None,
+    ai_provenance_id: str | None = None,
 ) -> dict[str, Any]:
     """Send a structured (interactive) question to `to` (owner@node, agent#owner@node, or eco:app#owner@node).
     `api` is any object with `.post(path, json=...)` (a ServeClient or the daemon's api). Returns
-    {"message_id", "conversation_id"}."""
+    {"message_id", "conversation_id", "ai_provenance_id"}.
+
+    `ai_provenance` says how the intro and the questions were made ({"level": "ai-generated",
+    "model": "<your model id>", ...}); the node records it on the message. Without it the node
+    records an agent's message as model-written with no human review. Declaring needs the
+    provenance:write scope: without it the node refuses the send (403 SCOPE_DENIED) and this raises.
+    `ai_provenance_id` attaches a record the node already minted for you instead."""
     if not questions:
         raise AimeatMessagingError("ask() needs at least one question")
     interactive: dict[str, Any] = {"role": "questions", "v": 1, "questions": list(questions)}
@@ -153,11 +164,17 @@ def ask(
         payload["subject"] = subject
     if conversation_id:
         payload["conversation_id"] = conversation_id
+    if ai_provenance:
+        payload["ai_provenance"] = dict(ai_provenance)
+    if ai_provenance_id:
+        payload["ai_provenance_id"] = ai_provenance_id
     resp = api.post("/v1/messages", json=payload)
     if getattr(resp, "status_code", 0) >= 300:
         raise AimeatMessagingError(f"dm ask failed: {getattr(resp, 'status_code', '?')} {_body_text(resp)}")
-    msg = (_json(resp).get("data") or {}).get("message") or {}
-    return {"message_id": msg.get("id"), "conversation_id": msg.get("conversationId")}
+    data = _json(resp).get("data") or {}
+    msg = data.get("message") or {}
+    return {"message_id": msg.get("id"), "conversation_id": msg.get("conversationId"),
+            "ai_provenance_id": data.get("ai_provenance_id")}
 
 
 def read_answers(api: Any, conversation_id: str, *, answers_for: str | None = None) -> dict[str, Any] | None:

@@ -13,6 +13,10 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.10.0 — 2026-10-08 — POST /v1/boards/:boardId/posts and the replies route take ai_provenance
+ *     and ai_provenance_id, as aimeat_board_post and aimeat_board_reply do, carry the session's
+ *     scopes, and name the record in the answer (aiprov D5). A declaration the caller may not make
+ *     is 403 SCOPE_DENIED, refused before a public board's price is charged.
  *   v1.9.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.2 — 2026-09-26 — The board's owner in the members door comes from localAccountName, so a board
@@ -90,10 +94,15 @@ import { resolveIdentity, isSameOwner, localAccountName, isOwnerInPerson } from 
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai-provenance-marks.js';
+import { toDeclaredProvenance } from '../mcp/ai-provenance-input.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
+  /** The record a post or reply carries, named in the answer: the writer's own, in full. */
+  const writtenProvenance = async (id: string | undefined) => (id
+    ? { ai_provenance_id: id, ...provenanceItemBlock(await loadServedProvenance(storage, config, id, { full: true })) }
+    : {});
 
   /** Notify board subscribers of a new post (fire-and-forget). */
 
@@ -327,13 +336,18 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // aimeat_board_post also calls. It used to be written out here, and the tool surface then had a
     // thinner copy of it: no board load at all, so no access check, no price and no hook. The event
     // and the subscriber notification were the last two pieces still living only on this door.
-    const { title, body, category, tags, ttl_hours } = req.body ?? {};
+    const { title, body, category, tags, ttl_hours, ai_provenance, ai_provenance_id } = req.body ?? {};
     const out = await createBoardPost({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      scopes: req.auth!.scopes ?? [],
     }, {
       boardId: req.params.boardId as string,
       title, body, category, tags, ttlHours: ttl_hours,
+      // How the post was made, as aimeat_board_post takes it (aiprov D5). The service refuses a
+      // declaration the caller may not make before it charges the board's price.
+      declaredProvenanceId: ai_provenance_id,
+      declaredProvenance: toDeclaredProvenance(ai_provenance),
       pipeline: 'rest.board_post',
     });
     if (!out.ok) {
@@ -348,6 +362,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       category: post.category,
       ttl_expires_at: post.ttlExpiresAt,
       created_at: post.createdAt,
+      ...(await writtenProvenance(post.aiProvenanceId)),
     }, [
       { description: 'View this post', method: 'GET', url: `/v1/boards/${post.boardId}/posts` },
     ]));
@@ -630,13 +645,17 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // services/board-post.ts — the same reply aimeat_board_reply makes. It carries the board's
     // ACCESS rule, which this handler did not apply to a reply: it checked only that the parent post
     // existed, so a reply could land on a board the replier may not post to.
+    const { body, ai_provenance, ai_provenance_id } = req.body ?? {};
     const out = await createBoardReply({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      scopes: req.auth!.scopes ?? [],
     }, {
       boardId: req.params.boardId as string,
       postId: req.params.postId as string,
-      body: (req.body ?? {}).body,
+      body,
+      declaredProvenanceId: ai_provenance_id,
+      declaredProvenance: toDeclaredProvenance(ai_provenance),
       pipeline: 'rest.board_reply',
     });
     if (!out.ok) {
@@ -649,6 +668,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       reply_to: reply.replyTo,
       body: reply.body,
       created_at: reply.createdAt,
+      ...(await writtenProvenance(reply.aiProvenanceId)),
     }));
   });
 

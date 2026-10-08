@@ -15,9 +15,11 @@
  *   Moved here unchanged from src/mcp/ai-provenance-input.ts on 2026-10-05 (secaudit 2026-10, M3): the
  *   catalog imports nothing above utils/ and models/, and the catalog is now where a field's exact
  *   schema lives.
- * @structure AiProvenanceBlockSchema
+ * @structure AiProvenanceBlockSchema · AiProvenanceBodyFields
  * @usage import { AiProvenanceBlockSchema } from '../ai-provenance-schema.js';
  * @version-history
+ *   v1.1.0 — 2026-10-08 — AiProvenanceBodyFields: ai_provenance and ai_provenance_id for a REST body
+ *     schema to spread (aiprov D5).
  *   v1.0.0 — 2026-10-05 — Moved from src/mcp/ai-provenance-input.ts v1.2.1 (secaudit 2026-10, M3).
  */
 import { z } from 'zod';
@@ -63,3 +65,14 @@ export const AiProvenanceBlockSchema = z.object({
     'Anything a reader would need to interpret the above. Never prompt text or anything private — '
     + 'the record is publishable alongside the content.'),
 });
+
+/**
+ * The two optional fields a REST write body spreads into its own zod object, so the routes that take
+ * a declaration (the DM send and broadcast, board post and reply, agent messages, task completion)
+ * validate it against the same block the MCP tools register. A zod object strips unknown keys, so a
+ * body schema without these fields dropped a declaration in silence.
+ */
+export const AiProvenanceBodyFields = {
+  ai_provenance: AiProvenanceBlockSchema.optional(),
+  ai_provenance_id: z.string().min(1).max(200).optional(),
+};

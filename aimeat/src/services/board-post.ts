@@ -33,6 +33,7 @@
  *   v1.3.0 — 2026-10-08 — createBoardPost asks provenanceDeclarationRefusal before it debits the
  *     public-board price: a declaration the session may not make cost the author the price of a post
  *     that was never written. The caller carries the session's scopes into both provenance calls.
+ *     createBoardReply answers the same refusal as a 403 result instead of throwing it.
  *   v1.2.0 — 2026-08-30 — The board's own rules (RFC §27) decide who posts, which categories a
  *     notice may carry, how long it lives by default and what it costs; updateBoardPost() takes a
  *     notice down as handled or moves its expiry.
@@ -335,6 +336,14 @@ export async function createBoardReply(
     const body = String(input.body ?? '');
     if (!body || body.length > BOARD_POST_LIMITS.bodyMax) {
         return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `body must be 1-${BOARD_POST_LIMITS.bodyMax} characters` };
+    }
+    // Answered as a refusal rather than thrown, so the REST route says 403 instead of 500.
+    const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+        principal: caller.gaii, declaredId: input.declaredProvenanceId, declared: input.declaredProvenance,
+        enabled: config.aiProvenance, scopes: caller.scopes,
+    });
+    if (provenanceRefused) {
+        return { ok: false, status: 403, code: provenanceRefused.code, message: provenanceRefused.message };
     }
 
     const aiProvenanceId = await provenanceForWrite(storage, {
