@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-08 — registerVisibilityTools: aimeat_visibility_report and aimeat_visibility_settings_set.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The tool groups that built a caller of their own receive `caller` as their last argument; it is built per call, because the session's scopes are the current request's.
  *   v1.20.3 — 2026-10-05 — registerCompanyTools receives the session's scopes: declaring how a company
  *     description was made needs provenance:write there too.
@@ -104,6 +105,7 @@ import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
 import { registerSeoTools } from './seo.js';
+import { registerVisibilityTools } from './visibility.js';
 import { registerAppManageTool } from './app-manage.js';
 import { registerAppsTools } from './apps.js';
 import { registerAppDraftEditTools } from './apps-draft-edit.js';
@@ -228,6 +230,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
+    registerVisibilityTools(mcp, storage, config, caller);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
     registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller);
     registerAiImageTool(mcp, storage, config, agentGaii);

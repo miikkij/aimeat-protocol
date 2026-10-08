@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.23.0 — 2026-10-08 — visibilityDefaults(): one switch per visibility layer (config-visibility.ts).
  *   v1.22.0 — 2026-10-06 — SHIPPED_DEFAULT_AGENT_SCOPES carries organism:read (secaudit 2026-10 last
  *     items, D4).
  *   v1.21.1 — 2026-10-06 — isPrivateHost moved to config-private-host.ts (max-file-lines), unchanged.
@@ -82,6 +83,7 @@ import { securityDoorDefaults } from './config-security.js';
 import { aiJobDefaults } from './config-ai-jobs.js';
 import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
+import { visibilityDefaults } from './config-visibility.js';
 import { dataAccessDefaults } from './config-data-access.js';
 import { updateCheckDefaults } from './config-update-check.js';
 import { themesDefaults } from './config-themes.js';
@@ -346,6 +348,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // AI jobs — a model call with a handle (config-ai-jobs.ts, a pure move under the 800-line ceiling).
     ...aiJobDefaults(),
     ...decideDefaults(),
+    ...visibilityDefaults(),
     ...themesDefaults(),
     maxActionsPerAgent: parseInt(process.env.AIMEAT_MAX_ACTIONS_PER_AGENT ?? '20', 10),
     minTrustForPaidActions: parseInt(process.env.AIMEAT_MIN_TRUST_PAID_ACTIONS ?? '10', 10),

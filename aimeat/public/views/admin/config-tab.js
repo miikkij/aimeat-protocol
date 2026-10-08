@@ -29,6 +29,7 @@
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.3.1 -- 2026-10-08 -- The `visibility` section (AI visibility switches) sits under integrations.
  *   v3.3.0 -- 2026-10-02 -- The question mark that explains a setting: a SettingLine gets `help` ('config.' + path) when the locale has explain.config.<path> (hasExplain), so far the fourteen config.* terms, ai.model_default_embed among them (components/HelpTip.js).
  *   v3.2.0 -- 2026-09-30 -- `?q=` in the address opens the page with that search, so a link names one
  *     setting (the header's new-version notice links to node.update_check).
@@ -106,7 +107,7 @@ const DOMAINS = [
   { id: 'node', groups: ['node', 'storage', 'database_url', 'sqlite_path', 'admin_password', 'setup', 'consul', 'stats', 'metrics'] },
   { id: 'limits', groups: ['quotas', 'rate_limits', 'extensions', 'realtime'] },
   { id: 'federation', groups: ['federation', 'sync', 'personal_nodes', 'genesis', 'tunnel', 'msm'] },
-  { id: 'integrations', groups: ['email', 'push', 'indexing', 'cors', 'site', 'portal', 'cookie_consent', 'connections'] },
+  { id: 'integrations', groups: ['email', 'push', 'indexing', 'cors', 'site', 'portal', 'cookie_consent', 'connections', 'visibility'] },
 ];
 
 /**

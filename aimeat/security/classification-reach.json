@@ -1944,6 +1944,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Signal stream config and monthly counters."
     },
+    "src/services/visibility/visibility-counter.ts": {
+      "reads": {
+        "getMemory": 3,
+        "listMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the owner's visibility switch and the month count records under the reserved signals.visibility. prefix, which only this counter writes. No content."
+    },
+    "src/services/visibility/visibility-report.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the owner's own month count records (signals.visibility.month.*), returned to the owner. Counts only, no content."
+    },
     "src/services/site-tags.ts": {
       "reads": {
         "getMemory": 2

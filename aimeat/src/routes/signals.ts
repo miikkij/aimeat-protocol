@@ -24,6 +24,7 @@
  * @structure PIXEL_SVG · signalsRouter (streams CRUD · report · public pixel · public hit)
  * @usage app.use(signalsRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.2.0 — 2026-10-08 — Mounts the AI visibility routes (routes/visibility.ts).
  *   v1.1.0 — 2026-09-18 — A stream takes `geo` (off, country, region, city), and both public doors
  *     hand the hit the place the proxy reported. The report takes a day window (`from_day`, `to_day`).
  *   v1.0.0 — 2026-08-24 — Initial: generic hit collection.
@@ -43,6 +44,7 @@ import {
 } from '../services/signals/signal-service.js';
 import { SIGNAL_CHANNELS, SIGNAL_EVENTS, SIGNAL_GEO_LEVELS } from '../models/signal-schemas.js';
 import { geoFromHeaders } from '../utils/geo-headers.js';
+import { visibilityRouter } from './visibility.js';
 
 /**
  * A 1x1 fully transparent SVG. SVG rather than a GIF because it is text, so it is readable in the
@@ -93,6 +95,9 @@ export function signalsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const owned = (req: { auth?: unknown }): string => resolveIdentity((req as { auth: Parameters<typeof resolveIdentity>[0] }).auth, config.nodeId);
   const ownerFromName = (name: string): string => `${name}@${config.nodeId}`;
+  // AI visibility, the counting every owner has by default, mounted here because it is the same
+  // family and the route loader is at its line ceiling.
+  router.use(visibilityRouter(config, storage));
 
   // ── Owner side: what is measured ────────────────────────────────────────────────────────────
 

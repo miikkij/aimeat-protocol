@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.15.0 — 2026-10-08 — VisibilityConfig mixed in (config-visibility.ts): one switch per
+ *     visibility layer.
  *   v1.14.0 — 2026-10-04 — The agent, MCP-session and ecosystem scope settings moved unchanged to
  *     config-types-agent-access.ts (AgentAccessConfig, mixed in) at the 800-line ceiling.
  *   v1.13.0 — 2026-10-01 — AppAuditConfig mixed in (config-app-audit.ts): the node's default limit
@@ -167,8 +169,9 @@ import type { ClassificationConfig } from './config-data-access.js';
 import type { UpdateCheckConfig } from './config-update-check.js';
 import type { AppAuditConfig } from './config-app-audit.js';
 import type { AgentAccessConfig } from './config-types-agent-access.js';
+import type { VisibilityConfig } from './config-visibility.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig {
   port: number;
   baseUrl: string;
   /**

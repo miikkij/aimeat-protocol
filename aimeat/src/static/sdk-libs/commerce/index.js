@@ -12,6 +12,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-commerce.js"></script>
  *   const s = await AIMEAT.commerce.buyOffer('vendor#alice@node', 'translate-doc');
  * @version-history
+ *   v1.2.0 — 2026-10-08 — openCheckout sends `attribution` (the page's referrer and utm_source)
+ *     unless the browser asks not to be followed, so the seller sees which channel a purchase came
+ *     from (AI visibility). The node keeps only the channel.
  *   v1.1.0 — 2026-09-13 — parseAmount(), the one amount parser, and microsFromInput built on it. The
  *     old one-liner replaced only the first comma, so '1,500.00' became 1.5 EUR; an ambiguous amount
  *     ('1,000') now returns null so the app asks again (appdev pitfall
@@ -28,6 +31,26 @@ const NODE_URL = APEX_URL;
 
 /** Micros per whole currency unit — money amounts are 6-decimal micro-units (matches USDC/x402). */
 const MONEY_UNIT = 1000000;
+
+/**
+ * Where this page was opened from, for the seller's AI visibility report: the Referer and
+ * `utm_source` of the page load. The node turns them into a channel (ai, search, social, ...) and
+ * keeps nothing else. Null when the browser asks not to be followed (Global Privacy Control or Do
+ * Not Track), and then the purchase counts under no channel.
+ */
+function pageAttribution() {
+  try {
+    const nav = /** @type {Navigator & { globalPrivacyControl?: boolean }} */ (navigator);
+    if (nav.globalPrivacyControl === true || nav.doNotTrack === '1') return null;
+    const referrer = document.referrer || null;
+    const utm = new URLSearchParams(location.search).get('utm_source');
+    if (!referrer && !utm) return null;
+    return { referrer: referrer ? referrer.slice(0, 2048) : null, utm_source: utm ? utm.slice(0, 100) : null };
+  } catch {
+    // A page without a DOM (a worker, a test harness) has nothing to attribute.
+    return null;
+  }
+}
 
 /** Build an Error from a failed envelope; 402 responses carry the x402-style accepts block. */
 function commerceError(res, fallback) {
@@ -143,6 +166,8 @@ const commerce = {
     const body = /** @type {Record<string, any>} */ ({ items: normalizeItems(items) });
     if (opts && opts.note) body.note = opts.note;
     if (opts && opts.currency) body.currency = opts.currency;
+    const attribution = pageAttribution();
+    if (attribution) body.attribution = attribution;
     const res = await authFetch('/v1/commerce/checkout-sessions', {
       method: 'POST', body: JSON.stringify(body),
     });

@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.23.0 — 2026-10-08 — The visibility rows (config-schema-visibility.ts), beside the visitor geography.
  *   v1.22.0 — 2026-10-06 — The site-link rows moved to config-schema-site-links.ts unchanged (max-file-lines),
  *     where site.store_status and the store notes joined them.
  *   v1.21.0 — 2026-10-02 — federation.package_peer_cap (AIMEAT_PACKAGE_PEER_CAP): the most packages-only
@@ -88,6 +89,7 @@ import type { OperatorConfig } from '../config-types.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
 import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
+import { VISIBILITY_CONFIG_FIELDS } from './config-schema-visibility.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
@@ -295,6 +297,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   //    from a browser. Turned on with no such proxy, the place headers would be the visitor's own.
   { key: 'geoHeaders', dotPath: 'geo.headers', envVar: 'AIMEAT_GEO_HEADERS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'The reverse proxy reports where each request came from (X-Geo-Country, -Region, -City, -Lat, -Lon), so an app owner can see visitors by place. Leave off unless the proxy sets and overwrites these headers: docs/visitor-geography.md. No address is stored either way' },
   { key: 'geoAttribution', dotPath: 'geo.attribution', envVar: 'AIMEAT_GEO_ATTRIBUTION', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false, description: 'The credit line your proxy\'s address database asks for (DB-IP Lite is CC BY 4.0), shown under the visitor map. Empty shows nothing' },
+  // ── Visibility and visitors ── one switch per layer (config-schema-visibility.ts).
+  ...VISIBILITY_CONFIG_FIELDS,
 
   // ── Marketplace (Phase 2.6, mutable) ──
   { key: 'marketplaceEnabled', dotPath: 'marketplace.enabled', envVar: 'AIMEAT_MARKETPLACE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Marketplace feature enabled' },

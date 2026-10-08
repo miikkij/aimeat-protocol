@@ -15,6 +15,8 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.9.0 — 2026-10-08 — A session carries its attribution (where the checkout came from), and a
+ *     completed one is counted for the seller under it (services/visibility/, AI visibility layer A).
  *   v2.8.0 — 2026-10-05 — An agent's amount is reserved against its daily limit in one compare-and-swap
  *     right before the collect, and released when the collect fails or the fulfilment is refunded
  *     (secaudit 2026-10, PKG-6).
@@ -50,7 +52,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext } from './types.js';
+import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, CheckoutAttribution } from './types.js';
 import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
@@ -66,6 +68,7 @@ import { takeDesignations } from './beneficiary-designation.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
+import { recordPurchase } from '../services/visibility/visibility-counter.js';
 
 export { CommerceError } from './errors.js';
 
@@ -142,6 +145,8 @@ export async function createSession(
     note?: string;
     /** 'morsel' (default) or a money code an EE handler + KYB-verified seller supports. */
     currency?: string;
+    /** Where the checkout came from (services/visibility/attribution.ts). */
+    attribution?: CheckoutAttribution;
   },
 ): Promise<CheckoutSessionRecord> {
   const currency = args.currency ?? 'morsel';
@@ -156,6 +161,7 @@ export async function createSession(
     sellerOwner, sellerGhii,
     items, currency, total,
     note: args.note,
+    ...(args.attribution ? { attribution: args.attribution } : {}),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + sessionTtlMs(config)).toISOString(),
@@ -574,6 +580,13 @@ export async function completeSession(
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);
   // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data).
   await putRecord(storage, session.sellerGhii, orderKey(session.id), completed);
+  // Counted for the seller under the channel it came from. Without an attribution (the buyer opted
+  // out, or the door gave nothing to go on) it counts as `none`: in the totals, under no channel.
+  recordPurchase(storage, config, {
+    sellerGhii: session.sellerGhii, channel: session.attribution?.channel ?? 'none',
+    family: session.attribution?.family ?? null, via: session.attribution?.via ?? 'page',
+    amount: session.total, currency: session.currency,
+  });
 
   // BOTH sides get a row. Money moved in two directions and each party experienced a different
   // event: one paid, one was paid. A single row on the buyer's feed would leave the seller — the

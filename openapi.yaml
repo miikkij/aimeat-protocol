@@ -25317,6 +25317,13 @@ paths:
                       quantity: { type: integer, minimum: 1, maximum: 1000, default: 1, description: app-tool items are limited to 1 }
                 note: { type: string, maxLength: 2000 }
                 currency: { type: string, description: "'morsel' (default) or a money code with a registered handler (amounts in 6-decimal micro-units)" }
+                attribution:
+                  type: object
+                  additionalProperties: false
+                  description: "Where the page that opens the checkout was opened from, sent by the browser SDK. The node turns it into a channel and an AI name for the seller's visibility report (GET /v1/visibility/report) and keeps neither value. Ignored when the request carries Sec-GPC: 1 or DNT: 1. An agent's checkout is attributed to the agent and needs no attribution."
+                  properties:
+                    referrer: { type: string, maxLength: 2048, nullable: true }
+                    utm_source: { type: string, maxLength: 100, nullable: true }
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -67323,6 +67330,53 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/visibility/report:
+    get:
+      operationId: readVisibilityReport
+      tags: [Signals]
+      summary: AI visibility report for the caller's place
+      description: 'How people and AIs find the caller''s place over a window of days: people by channel (ai, search, social, referral, direct, internal), people sent by each AI, assistant and crawler fetches by AI and by target (an app, the portfolio, a discovery file), fetches of llms.txt, AGENTS.md, the MCP server card and the UCP profile, and completed purchases by channel, AI and how they were made (page or agent), with one row per day. Counting is on by default and keeps no address, cookie, visitor id, Referer or query string. Requests with Sec-GPC: 1 or DNT: 1 count in `totals.requests` and `totals.opted_out` only. A `reading` block says what each number is worth and what the report cannot see. The MCP tool aimeat_visibility_report returns the same object. Requires scope signals:read.'
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 400, default: 30 }, description: 'The window in days, counted back from today. 0 is today only.' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/visibility/settings:
+    get:
+      operationId: readVisibilitySettings
+      tags: [Signals]
+      summary: Whether AI visibility counting is on for the caller's place
+      description: '`enabled` is the owner''s switch (absent means on); `node_enabled` is the operator''s (AIMEAT_AI_VISIBILITY). Requires scope signals:read.'
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: setVisibilitySettings
+      tags: [Signals]
+      summary: Switch AI visibility counting off or on
+      description: 'Off stops new counting and keeps what was counted. The MCP tool aimeat_visibility_settings_set does the same. Requires scope signals:write.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /v1/signals/{owner}/{streamId}/px.svg:
     get:

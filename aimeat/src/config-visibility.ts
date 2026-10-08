@@ -1,0 +1,32 @@
+/**
+ * @file src/config-visibility.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator's switches for visibility and visitors: one switch per layer, so that
+ *   which tier carries which layer can be decided later without touching the code that counts.
+ *
+ *   Its own file because config.ts is at the line ceiling, and these switches answer one question:
+ *   what this node may measure about the people and the AIs that reach the places it serves.
+ * @structure VisibilityConfig · visibilityDefaults()
+ * @usage
+ *   import { visibilityDefaults } from './config-visibility.js';
+ *   const config = { ...visibilityDefaults(), ... };
+ * @version-history
+ *   v1.0.0 — 2026-10-08 — Initial: aiVisibilityEnabled (layer A).
+ */
+
+/** Declared here, not picked from AimeatConfig, so this file imports nothing (config-decide.ts gives the reason). */
+export interface VisibilityConfig {
+  /**
+   * Layer A: count page loads by channel, AI fetches by family and target, discovery-file fetches and
+   * purchases by channel, for every owner on this node unless the owner switches it off. On by
+   * default: the record holds counts only (models/visibility-schemas.ts).
+   */
+  aiVisibilityEnabled: boolean;
+}
+
+export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): VisibilityConfig {
+  return {
+    aiVisibilityEnabled: env.AIMEAT_AI_VISIBILITY !== 'false',
+  };
+}

@@ -19,6 +19,8 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.6.0 — 2026-10-08 — A checkout opened here is attributed to the agent that opened it
+ *     (services/visibility/attribution.ts), so the seller's report counts it as an AI purchase.
  *   v1.5.1 — 2026-10-08 — GET /v1/commerce/tools?include=own treats the anonymous identity as no
  *     caller, so an anonymous request gets the priced catalog instead of 500.
  *   v1.5.0 — 2026-10-07 — GET /v1/commerce/tools?include=own: an authenticated caller also gets its
@@ -49,6 +51,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { callerOf } from '../middleware/caller.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { agentAttribution } from '../services/visibility/attribution.js';
 import {
   createSession, getSession, completeSession, CommerceError,
 } from '../commerce/session-service.js';
@@ -290,6 +293,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
         buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
         items: parsed.data.items.map((i) => ({ ...parseSku(i.id), quantity: i.quantity ?? 1 })),
         note: parsed.data.note,
+        attribution: agentAttribution({ userAgent: req.get('user-agent') }),
       });
       res.status(201).json(toAcpSession(session));
     } catch (err) { sendAcpError(res, config, err); }
