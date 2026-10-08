@@ -5,6 +5,7 @@
  * @description Commit accepted batch rows with their provenance; restores retain source attribution.
  * @structure writeMemoryBatch
  * @version-history
+ *   1.2.0 2026-10-08 A row's provenance record states its medium (text or data).
  *   1.1.0 2026-09-29 Rows that landed are scheduled for write-time classification
  *     (services/classify-on-write.ts, TARGET-082 V3).
  *   1.0.0 2026-09-27 Share the existing batch storage and provenance services.
@@ -14,6 +15,7 @@ import type { AimeatConfig } from '../config.js';
 import type { MemoryDbService, BulkWriteItem, BulkWriteOptions } from './db/memory-db-service.js';
 import { provenanceForWrite, storeHeldProvenance, contentHashOf } from './ai-provenance.js';
 import { memoryContentBytes } from '../utils/memory-content.js';
+import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 
@@ -61,6 +63,7 @@ export async function writeMemoryBatch(
         for (const record of records) {
           record.aiProvenanceId = await provenanceForWrite(provenanceStorage, {
             principal: caller.principal, content: memoryContentBytes(record.value),
+            mediaKind: mediaKindOfValue(record.value),
             pipeline: 'memory.bulk', surface: { visibility: record.visibility, humanAudience: true },
             labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl,
             enabled: config.aiProvenance, held,

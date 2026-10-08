@@ -489,6 +489,85 @@
       aiModified: "Content partially modified by AI",
       aiBasic: "AI was involved in making this content",
       unstated: "AI involvement unstated"
+    },
+    syntheticImageLong: "AI made or changed this image. It is not a photograph of real events.",
+    syntheticAudioLong: "AI made this audio. It is not a recording of a real person or event.",
+    syntheticVideoLong: "AI made or changed this video. It is not a recording of real events.",
+    generatedAppLong: "AI wrote this app. No person reviewed its code.",
+    generatedDataLong: "AI produced this data. No person reviewed it.",
+    generatedContentLong: "AI made this. No person reviewed it.",
+    transcriptLong: "AI turned speech into this text. No person checked it against the recording.",
+    reviewedMediaLong: "AI made this, and a person reviewed it.",
+    assistedMediaLong: "A person made this. AI changed part of it.",
+    originalMedia: "Made by a person",
+    originalMediaLong: "A person made this. No AI was involved.",
+    reviewedMade: "Made with AI, reviewed by {{name}}.",
+    reviewedMadeShort: "Made with AI, reviewed by a person.",
+    note: {
+      heading: "AI provenance",
+      reviewed: "human editorial review",
+      unreviewed: "no human editorial review",
+      record: "record",
+      model: "AI model"
+    },
+    page: {
+      title: "How this was made",
+      unstated: "This record does not state it.",
+      fields: "What the record says",
+      level: "How much a model made",
+      method: "Method",
+      human: "Human involvement",
+      medium: "What it is",
+      model: "Model",
+      provider: "Served by",
+      generatedAt: "Recorded",
+      pipeline: "Pipeline",
+      principal: "Recorded for",
+      stampedBy: "Stated by",
+      sources: "Sources",
+      hash: "Content fingerprint",
+      hashNote: "The record is bound to these exact bytes. Content that has changed since is not what this record describes.",
+      stampedNode: "this service, which did not see the content being made and inferred this",
+      stampedPrincipal: "the account that produced it, as its own statement",
+      wrongTitle: "Is this label wrong, or missing somewhere?",
+      wrongBody: "Anyone can report it. Quote the record id below.",
+      reportBtn: "How to report it",
+      howNode: "How this service marks AI content",
+      recordId: "Record id",
+      machine: "The same record as JSON",
+      noneOwed: "No visible label is owed for this content.",
+      gone: "No such record",
+      goneBody: "There is no provenance record at this address, or it is not public. If you arrived from a label, the content it described may have been unpublished.",
+      levels: {
+        original: "A person made it. No model was involved.",
+        assisted: "A person made it. A model changed part of it.",
+        synthesized: "A model combined sources into it.",
+        aiGenerated: "A model made it."
+      },
+      methods: {
+        human: "By a person",
+        rewritten: "Rewritten",
+        summarized: "Summarized",
+        translated: "Translated",
+        synthesized: "Combined from sources",
+        fullyGenerated: "Fully generated",
+        multiAgent: "Several AI agents together",
+        transcribed: "Transcribed from speech"
+      },
+      involvement: {
+        none: "Nobody reviewed the substance.",
+        lightReview: "Someone skimmed it.",
+        editorialControl: "A person reviewed the substance and answers for it.",
+        fullHuman: "A person wrote or rewrote it."
+      },
+      media: {
+        text: "Text",
+        image: "Image",
+        audio: "Audio",
+        video: "Video",
+        code: "App or code",
+        data: "Data"
+      }
     }
   };
 
@@ -519,6 +598,85 @@
       aiModified: "Sisältöä on osittain muokattu tekoälyllä",
       aiBasic: "Tekoäly on ollut mukana tämän sisällön tekemisessä",
       unstated: "Tekoälyn osuutta ei ole kerrottu"
+    },
+    syntheticImageLong: "Tekoäly on tehnyt tai muokannut tämän kuvan. Se ei ole valokuva todellisista tapahtumista.",
+    syntheticAudioLong: "Tekoäly on tehnyt tämän äänen. Se ei ole äänitys todellisesta ihmisestä tai tapahtumasta.",
+    syntheticVideoLong: "Tekoäly on tehnyt tai muokannut tämän videon. Sitä ei ole kuvattu todellisista tapahtumista.",
+    generatedAppLong: "Tekoäly on kirjoittanut tämän sovelluksen. Kukaan ei ole tarkistanut sen koodia.",
+    generatedDataLong: "Tekoäly on tuottanut tämän aineiston. Kukaan ei ole tarkistanut sitä.",
+    generatedContentLong: "Tekoäly on tehnyt tämän. Kukaan ei ole tarkistanut sitä.",
+    transcriptLong: "Tekoäly on muuttanut puheen tekstiksi. Kukaan ei ole verrannut tekstiä äänitykseen.",
+    reviewedMediaLong: "Tekoäly on tehnyt tämän, ja ihminen on tarkistanut sen.",
+    assistedMediaLong: "Tämän on tehnyt ihminen. Tekoäly on muokannut osaa siitä.",
+    originalMedia: "Ihmisen tekemä",
+    originalMediaLong: "Tämän on tehnyt ihminen. Tekoäly ei ole ollut mukana.",
+    reviewedMade: "Tehty tekoälyn avulla, tarkistanut {{name}}.",
+    reviewedMadeShort: "Tehty tekoälyn avulla, ihmisen tarkistama.",
+    note: {
+      heading: "Tekoälyn osuus",
+      reviewed: "ihminen on tarkistanut sisällön",
+      unreviewed: "ihminen ei ole tarkistanut sisältöä",
+      record: "tietue",
+      model: "tekoälymalli"
+    },
+    page: {
+      title: "Miten tämä on tehty",
+      unstated: "Tietue ei kerro sitä.",
+      fields: "Mitä tietue kertoo",
+      level: "Kuinka paljon malli teki",
+      method: "Menetelmä",
+      human: "Ihmisen osuus",
+      medium: "Mitä se on",
+      model: "Malli",
+      provider: "Tarjoaja",
+      generatedAt: "Kirjattu",
+      pipeline: "Tuotantoketju",
+      principal: "Kirjattu tilille",
+      stampedBy: "Kertonut",
+      sources: "Lähteet",
+      hash: "Sisällön sormenjälki",
+      hashNote: "Tietue on sidottu juuri näihin tavuihin. Jos sisältö on muuttunut sen jälkeen, tietue ei kuvaa sitä.",
+      stampedNode: "tämä palvelu, joka ei nähnyt tuottamista vaan päätteli sen",
+      stampedPrincipal: "sisällön tuottanut tili omana ilmoituksenaan",
+      wrongTitle: "Onko merkintä väärä tai puuttuuko se jostain?",
+      wrongBody: "Kuka tahansa voi ilmoittaa siitä. Mainitse alla oleva tietueen tunnus.",
+      reportBtn: "Miten ilmoitat",
+      howNode: "Miten tämä palvelu merkitsee tekoälyn tekemää sisältöä",
+      recordId: "Tietueen tunnus",
+      machine: "Sama tietue JSON-muodossa",
+      noneOwed: "Tähän sisältöön ei tarvita näkyvää tekoälymerkintää.",
+      gone: "Tietuetta ei ole",
+      goneBody: "Tässä osoitteessa ei ole alkuperätietuetta, tai se ei ole julkinen. Jos tulit merkinnästä, sen kuvaama sisältö on ehkä poistettu julkaisusta.",
+      levels: {
+        original: "Ihminen teki sen. Tekoäly ei ollut mukana.",
+        assisted: "Ihminen teki sen. Tekoäly muokkasi osaa siitä.",
+        synthesized: "Tekoäly kokosi sen lähteistä.",
+        aiGenerated: "Tekoäly teki sen."
+      },
+      methods: {
+        human: "Ihminen",
+        rewritten: "Kirjoitettu uudelleen",
+        summarized: "Tiivistetty",
+        translated: "Käännetty",
+        synthesized: "Koottu lähteistä",
+        fullyGenerated: "Kokonaan tekoälyn tuottama",
+        multiAgent: "Useampi tekoälyagentti yhdessä",
+        transcribed: "Muutettu puheesta tekstiksi"
+      },
+      involvement: {
+        none: "Kukaan ei tarkistanut sisältöä.",
+        lightReview: "Joku silmäili sen.",
+        editorialControl: "Ihminen tarkisti sisällön ja vastaa siitä.",
+        fullHuman: "Ihminen kirjoitti sen tai kirjoitti sen uudelleen."
+      },
+      media: {
+        text: "Teksti",
+        image: "Kuva",
+        audio: "Ääni",
+        video: "Video",
+        code: "Sovellus tai koodi",
+        data: "Aineisto"
+      }
     }
   };
 
@@ -549,6 +707,85 @@
       aiModified: "Contenido modificado en parte por IA",
       aiBasic: "Una IA intervino en la creación de este contenido",
       unstated: "Intervención de la IA sin declarar"
+    },
+    syntheticImageLong: "Esta imagen la creó o la modificó una IA. No es una fotografía de hechos reales.",
+    syntheticAudioLong: "Este audio lo creó una IA. No es la grabación de una persona real ni de un hecho real.",
+    syntheticVideoLong: "Este video lo creó o lo modificó una IA. No es la grabación de hechos reales.",
+    generatedAppLong: "Esta aplicación la escribió una IA. Ninguna persona revisó su código.",
+    generatedDataLong: "Estos datos los produjo una IA. Ninguna persona los revisó.",
+    generatedContentLong: "Esto lo hizo una IA. Ninguna persona lo revisó.",
+    transcriptLong: "Una IA transcribió este texto a partir del audio. Ninguna persona lo comparó con la grabación.",
+    reviewedMediaLong: "Esto lo hizo una IA y una persona lo revisó.",
+    assistedMediaLong: "Esto lo hizo una persona. Una IA modificó una parte.",
+    originalMedia: "Hecho por una persona",
+    originalMediaLong: "Esto lo hizo una persona. No intervino ninguna IA.",
+    reviewedMade: "Hecho con IA, revisado por {{name}}.",
+    reviewedMadeShort: "Hecho con IA, revisado por una persona.",
+    note: {
+      heading: "Intervención de la IA",
+      reviewed: "con revisión editorial humana",
+      unreviewed: "sin revisión editorial humana",
+      record: "registro",
+      model: "modelo de IA"
+    },
+    page: {
+      title: "Cómo se hizo esto",
+      unstated: "El registro no lo indica.",
+      fields: "Qué dice el registro",
+      level: "Cuánto hizo un modelo",
+      method: "Método",
+      human: "Intervención humana",
+      medium: "Qué es",
+      model: "Modelo",
+      provider: "Proveedor",
+      generatedAt: "Registrado",
+      pipeline: "Proceso",
+      principal: "Registrado para",
+      stampedBy: "Lo declara",
+      sources: "Fuentes",
+      hash: "Huella del contenido",
+      hashNote: "El registro está ligado a estos bytes exactos. Si el contenido cambió después, ya no es lo que describe este registro.",
+      stampedNode: "este servicio, que no presenció la generación y lo dedujo",
+      stampedPrincipal: "la cuenta que lo produjo, como declaración propia",
+      wrongTitle: "¿La etiqueta es incorrecta o falta en algún lugar?",
+      wrongBody: "Cualquiera puede reportarlo. Cita el identificador del registro que aparece abajo.",
+      reportBtn: "Cómo reportarlo",
+      howNode: "Cómo marca este servicio el contenido hecho con IA",
+      recordId: "Identificador del registro",
+      machine: "El mismo registro en JSON",
+      noneOwed: "Este contenido no necesita una etiqueta visible de IA.",
+      gone: "No existe ese registro",
+      goneBody: "En esta dirección no hay ningún registro de procedencia, o no es público. Si llegaste desde una etiqueta, es posible que el contenido que describía ya no esté publicado.",
+      levels: {
+        original: "Lo hizo una persona. No intervino ningún modelo.",
+        assisted: "Lo hizo una persona. Un modelo modificó una parte.",
+        synthesized: "Un modelo lo compuso a partir de fuentes.",
+        aiGenerated: "Lo hizo un modelo."
+      },
+      methods: {
+        human: "Una persona",
+        rewritten: "Reescrito",
+        summarized: "Resumido",
+        translated: "Traducido",
+        synthesized: "Compuesto a partir de fuentes",
+        fullyGenerated: "Generado por completo por IA",
+        multiAgent: "Varios agentes de IA juntos",
+        transcribed: "Transcrito del audio"
+      },
+      involvement: {
+        none: "Nadie revisó el contenido.",
+        lightReview: "Alguien le echó un vistazo.",
+        editorialControl: "Una persona revisó el contenido y responde por él.",
+        fullHuman: "Una persona lo escribió o lo reescribió."
+      },
+      media: {
+        text: "Texto",
+        image: "Imagen",
+        audio: "Audio",
+        video: "Video",
+        code: "Aplicación o código",
+        data: "Datos"
+      }
     }
   };
 

@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-08 — The app's provenance record states `mediaKind: code` and the app's MIME type.
  *   2026-10-02 — The design spec's stamp is copied onto the new manifest, and `designSpecHint` says
  *     when a shared app has no spec or this version moved past the one it was written against
  *     (services/app-design-spec.ts). A hint, never a refusal.
@@ -555,6 +556,9 @@ export async function publishApp(
   const aiProvenanceId = await provenanceForWrite(storage, {
     principal: callerGaii,
     content: data,
+    // An app is code: its label says "AI wrote this app", not "this text".
+    mediaKind: 'code',
+    mediaType: mimeType,
     declaredId: input.declaredProvenanceId,
     declared: input.declaredProvenance,
     pipeline: 'app.publish',

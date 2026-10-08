@@ -20,10 +20,13 @@
  *   does not follow a link to a hash, and the value of the mark is that a filter, an archive or a
  *   recipient's own tooling can see it.
  *
- *   THE NAME IS BORROWED, NOT INVENTED. The IETF's AI-Disclosure draft (draft-abaris-aicdh) defines
- *   the field and the vocabulary — none | ai-assisted | ai-generated | autonomous — for HTTP. It has
- *   no formal standing and it is not about mail, but borrowing a documented name and its four words
- *   beats coining a private fifth. The `X-` prefix is here because Microsoft Graph accepts a custom
+ *   THE NAME IS BORROWED, NOT INVENTED. The header NAME comes from the IETF's AI-Disclosure draft
+ *   (draft-abaris-aicdh), whose own `mode` vocabulary is none | ai-modified | ai-originated |
+ *   machine-generated (services/ai-provenance-adapters.ts toIetfHeader). The four VALUES used here —
+ *   none | ai-assisted | ai-generated | autonomous — are the W3C Community Group's `ai-disclosure`
+ *   vocabulary (the same adapter's toW3cHtml), which reads better to a person inspecting a header.
+ *   Neither has formal standing and neither is about mail, but borrowing documented words beats
+ *   coining private ones. The `X-` prefix is here because Microsoft Graph accepts a custom
  *   header only in that form, and one header that works on both providers beats two that each work
  *   on one.
  *
@@ -39,6 +42,8 @@
  * @structure AiDisclosureLevel · AiDisclosure · disclosureHeaders
  * @usage const headers = disclosureHeaders(input.aiDisclosure, config);
  * @version-history
+ *   v1.0.1 — 2026-10-08 — The header comment names the vocabularies right: the values are the W3C
+ *     list, the header name is the IETF draft's, whose own values differ.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';

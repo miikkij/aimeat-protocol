@@ -29,6 +29,9 @@
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.4.0 — 2026-10-08 — A facet carries the minted `reason` and the record's `mediaKind`, so the
+ *     report decides each label for the content as it is now; the list filter is
+ *     `unreviewedPublicOnly` (it no longer reads the stored `required`).
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. `board_posts` joins the list: a post on a public
  *     board is served unauthenticated, so leaving it out meant the one surface an anonymous visitor
  *     reads had a record that would not resolve for them. Agent messages got the same column in the
@@ -118,17 +121,23 @@ export interface AiProvenanceFacet {
   day: string;
   /** Is the content this record describes readable by an anonymous visitor right now? */
   publiclyLinked: boolean;
-  /** Does the record's pre-rendered `disclosure` block say a label was required? */
+  /** Does the record's pre-rendered `disclosure` block say a label was required AT MINT? */
   disclosureRequired: boolean;
+  /** The reason recorded at mint (`disclosure.reason`), or null. It carries the publisher's
+   *  declarations a serve-time decision reads back (services/ai-disclosure-served.ts). */
+  reason: string | null;
+  /** The record's `mediaKind`, or null for a record that does not state one. */
+  mediaKind: string | null;
   count: number;
 }
 
 export interface AiProvenanceListQuery extends AiProvenanceFacetQuery {
   /**
-   * Only records whose content is public, where nobody reviewed the substance, and whose disclosure
-   * block does not say a label was required — the sweep's population, and the case nobody thought of.
+   * Only records whose content is public and where nobody reviewed the substance: the population
+   * the sweep decides about. Whether each one owes a label is decided for its content as it is now
+   * (services/ai-transparency-report.ts), not read from the block stored at mint.
    */
-  unlabelledPublicOnly?: boolean;
+  unreviewedPublicOnly?: boolean;
   limit?: number;
   offset?: number;
 }

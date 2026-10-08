@@ -13,6 +13,7 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.8.0 -- 2026-10-08 -- The record states text with method `transcribed`, so its label says a model transcribed it.
  *   v2.7.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (services/ai/errors.ts):
  *     a permanent 4xx is 422 PROVIDER_REJECTED with the provider's reason (aiprov plan, A1). The
  *     result's `seconds` is null when the provider did not measure the audio, and a verbose call
@@ -206,6 +207,8 @@ export async function transcribeForOwner(
     // transcription is not a hole in the per-model report.
     model: result.model, promptTokens: 0, completionTokens: totalTok, totalTokens: totalTok,
     costUsd, content: result.text, appId: opts.appId, source: 'ai-transcribe',
+    // Text a model heard rather than wrote: its label says it was transcribed.
+    media: { mediaKind: 'text', mediaType: 'text/plain', method: 'transcribed' },
     units: { seconds }, costSource: price.costSource, priceRef: price.priceRef,
   });
   const updated = settled.usage;

@@ -27,7 +27,9 @@
  *     ALREADY authorized the content read
  *   - loadServedProvenanceMany(storage, config, ids, opts) — the same, batched, for a surface that
  *     reads a PAGE of items; one query rather than one per item
- *   - envelopeMeta(p)                — the `meta.provenance` value; the single envelope carrier
+ *   - servedProvenanceOf(config, row, opts) / servedDisclosure(record, surface, policy) — the
+ *     disclosure decided for the item as it is served, not trusted from mint
+ *   - envelopeMeta(p)               — the `meta.provenance` value; the single envelope carrier
  *   - provenanceItemBlock(p)         — the per-ITEM `ai_provenance` block, for a list of rows that
  *     each carry their own statement (REST DTOs and MCP tool results share it verbatim)
  *   - setProvenanceHeaders(res, p)   — `AI-Disclosure` + `Link: rel="ai-provenance"`
@@ -42,6 +44,13 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.9.0 — 2026-10-08 — The disclosure is decided when the record is SERVED, against the item's
+ *     visibility as served and the record's medium (servedDisclosure). The loaders take an optional
+ *     `surface`; without its visibility they ask the live visibility predicate, so an item made
+ *     public after mint (a visibility-only update, an access code removed) carries the label it now
+ *     owes. Minted words are kept while the decision is unchanged. The JSON-LD is typed by medium
+ *     and carries `encodingFormat`; its fallback model name and the markdown note come from
+ *     `aiLabel.note.*`. reviewedForLabel leaves synthetic media alone and reads the record's medium.
  *   v1.8.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.8.0 — 2026-09-29 — The visible label is the EU icon alone on every viewport (developer
  *     decision 2026-09-29), and its statement opens in a panel above the chip on hover, focus or a
@@ -81,10 +90,13 @@
 import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
-import type { AiProvenance } from '../models/ai-provenance-schemas.js';
+import { isSyntheticMedia, type AiProvenance, type AiDisclosureBlock } from '../models/ai-provenance-schemas.js';
 import { toIetfHeader, toW3cHtml, toIptc, toEuIcon } from './ai-provenance-adapters.js';
-import { projectForDetail, buildDisclosure } from './ai-provenance.js';
+import { projectForDetail, buildDisclosure, publiclyResolvable } from './ai-provenance.js';
 import type { SurfaceContext } from './ai-disclosure.js';
+import { servedContext, type ServedSurface } from './ai-disclosure-served.js';
+
+export type { ServedSurface };
 import { createT, type Locale } from '../i18n.js';
 import { escapeHtml } from '../utils/html-escape.js';
 
@@ -99,6 +111,16 @@ export interface ServedProvenance {
 }
 
 /**
+ * How a serving route asks for a record. `full` serves the whole record (the owner's own view);
+ * anything else is projected down to what AIMEAT_AI_PROVENANCE_DETAIL permits a public surface to
+ * show. `surface` is what the route knows about the item it serves; see servedDisclosure().
+ */
+export interface ServeOptions {
+  full?: boolean;
+  surface?: ServedSurface;
+}
+
+/**
  * Load the record attached to an item, for a route that has ALREADY decided the caller may read the
  * item itself.
  *
@@ -107,18 +129,22 @@ export interface ServedProvenance {
  * members-only workspace record is allowed to know how it was made. The strict derived-visibility
  * rule belongs to `/v1/provenance/:id`, where a bare id arrives with no content to justify it.
  *
- * `full` serves the whole record (the owner's own view); anything else is projected down to what
- * AIMEAT_AI_PROVENANCE_DETAIL permits a public surface to show.
+ * THE DISCLOSURE IS DECIDED HERE, NOT AT MINT. A route that does not say the item's visibility gets
+ * the live answer of the visibility predicate (publiclyResolvable): public while anything public
+ * points at the record. One query for the whole call, and a route that knows passes `surface`.
  */
 export async function loadServedProvenance(
   storage: Storage,
   config: AimeatConfig,
   provenanceId: string | null | undefined,
-  opts?: { full?: boolean },
+  opts?: ServeOptions,
 ): Promise<ServedProvenance | undefined> {
   if (!provenanceId) return undefined;
   const row = await storage.getAiProvenance(provenanceId);
-  return row ? servedProvenanceOf(config, row, opts) : undefined;
+  if (!row) return undefined;
+  const visibility = opts?.surface?.visibility
+    ?? ((await publiclyResolvable(storage, [row.id])).has(row.id) ? 'public' : 'private');
+  return servedProvenanceOf(config, row, { ...opts, surface: { ...opts?.surface, visibility } });
 }
 
 /**
@@ -136,26 +162,61 @@ export async function loadServedProvenanceMany(
   storage: Storage,
   config: AimeatConfig,
   provenanceIds: readonly (string | null | undefined)[],
-  opts?: { full?: boolean },
+  opts?: ServeOptions,
 ): Promise<Map<string, ServedProvenance>> {
   const ids = [...new Set(provenanceIds.filter((id): id is string => !!id))];
   const out = new Map<string, ServedProvenance>();
   if (ids.length === 0) return out;
-  for (const row of await storage.getAiProvenanceMany(ids)) {
-    out.set(row.id, servedProvenanceOf(config, row, opts));
+  const rows = await storage.getAiProvenanceMany(ids);
+  // One predicate query for the page when the route did not say the items' visibility.
+  const known = opts?.surface?.visibility;
+  const pub = known ? undefined : await publiclyResolvable(storage, rows.map((r) => r.id));
+  for (const row of rows) {
+    const visibility = known ?? (pub?.has(row.id) ? 'public' : 'private');
+    out.set(row.id, servedProvenanceOf(config, row, { ...opts, surface: { ...opts?.surface, visibility } }));
   }
   return out;
 }
 
-/** The same projection for a caller that already holds the row — the mint path, typically. */
+/**
+ * The same projection for a caller that already holds the row. With `surface.visibility` the
+ * disclosure is decided for that surface (servedDisclosure); without it the block is served as
+ * minted, which is right only for the mint path itself, where the record was decided a moment ago
+ * against the surface the caller passed to the mint.
+ */
 export function servedProvenanceOf(
-  config: AimeatConfig, row: AiProvenanceRecordRow, opts?: { full?: boolean },
+  config: AimeatConfig, row: AiProvenanceRecordRow, opts?: ServeOptions,
 ): ServedProvenance {
+  const visibility = opts?.surface?.visibility;
+  const decided = visibility
+    ? { ...row.record, disclosure: servedDisclosure(row.record, { ...opts!.surface, visibility }, config.aiLabelPublic) }
+    : row.record;
   return {
     id: row.id,
-    record: opts?.full ? row.record : projectForDetail(row.record, config.aiProvenanceDetail),
+    record: opts?.full ? decided : projectForDetail(decided, config.aiProvenanceDetail),
     recordUrl: recordUrlFor(config, row.id),
   };
+}
+
+/**
+ * THE serve-time decision: the disclosure a reader of this item is owed NOW, against the item's
+ * visibility as served and the record's medium.
+ *
+ * The block stored at mint is the record of what was decided then, against the surface the item
+ * had then. An item made public afterwards (a visibility-only update, an access code removed, a file
+ * shared) kept "no label owed" on every surface that trusted it. So every serving surface decides
+ * again. When the decision is the one the record was minted with, the minted words are kept, so a
+ * record keeps the words it was minted with until the decision itself changes.
+ */
+export function servedDisclosure(
+  record: AiProvenance, served: ServedSurface & { visibility: SurfaceContext['visibility'] },
+  policy: AimeatConfig['aiLabelPublic'],
+): AiDisclosureBlock {
+  const block = buildDisclosure(record, servedContext(record, served), policy);
+  const minted = record.disclosure;
+  if (minted && minted.required === block.required && minted.reason === block.reason
+    && (minted.strength ?? block.strength) === block.strength) return minted;
+  return block;
 }
 
 /** The canonical absolute URL of a record on this node. One spelling, so the planes agree. */
@@ -249,21 +310,28 @@ function escAscii(s: string): string {
   return esc(s).replace(/[^\x20-\x7E]/g, (c) => `&#${c.codePointAt(0)};`);
 }
 
+/** The schema.org type for a record's medium. `CreativeWork` when the record does not say. */
+const SCHEMA_TYPE_BY_MEDIUM: Record<string, string> = {
+  code: 'WebApplication', image: 'ImageObject', audio: 'AudioObject', video: 'VideoObject', data: 'Dataset',
+};
+
 /**
- * schema.org `CreativeWork`, the one structured vocabulary a general-purpose crawler already reads.
+ * schema.org, the one structured vocabulary a general-purpose crawler already reads, typed by the
+ * record's medium (a served app is a `WebApplication`, a picture an `ImageObject`).
  * `digitalSourceType` is the IPTC URI, from the adapter — the same value a C2PA manifest would
  * carry, so a reader that understands one understands both.
  */
-function jsonLd(p: ServedProvenance, reviewedBy?: string): string {
+function jsonLd(p: ServedProvenance, reviewedBy?: string, locale: Locale = 'en'): string {
   const doc: Record<string, unknown> = {
     '@context': 'https://schema.org',
-    '@type': 'CreativeWork',
+    '@type': SCHEMA_TYPE_BY_MEDIUM[p.record.mediaKind ?? ''] ?? 'CreativeWork',
     dateCreated: p.record.generatedAt,
+    ...(p.record.mediaType ? { encodingFormat: p.record.mediaType } : {}),
     // Not `author`: the model did not author anything in the legal sense, and saying so in a
     // vocabulary that feeds search results would be a claim about authorship we do not make.
     creator: {
       '@type': 'SoftwareApplication',
-      name: p.record.generator?.model ?? 'AI model',
+      name: p.record.generator?.model ?? createT(locale)('aiLabel.note.model'),
       applicationCategory: 'AI',
     },
     subjectOf: { '@type': 'CreativeWork', url: p.recordUrl },
@@ -322,8 +390,8 @@ export function markDocumentElement(text: string, value: string): string {
  * the whole footprint the marks cost — the strip apps keep clear via `--aimeat-chrome-bottom`
  * (utils/app-chrome-reserve.ts).
  *
- * Returns '' when no visible label is owed — which is disclosureFor()'s decision, pre-rendered into
- * the record at mint time. Nothing here re-decides it.
+ * Returns '' when no visible label is owed — which is disclosureFor()'s decision, made for this
+ * surface when the record was loaded (servedDisclosure). Nothing here re-decides it.
  */
 function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: Locale): string {
   if (!p.record.disclosure?.required) return '';
@@ -493,7 +561,7 @@ export function aiDisclosureParts(
   const block =
     (w3c ? `<meta name="ai-disclosure" content="${esc(w3c)}">` : '')
     + `<link rel="ai-provenance" href="${esc(p.recordUrl)}">`
-    + `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>${jsonLd(p, visible?.reviewedBy)}</script>`
+    + `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>${jsonLd(p, visible?.reviewedBy, visible?.locale)}</script>`
     + (visible ? visibleLabelMarkup(forLabel, visible.config, visible.locale) : '');
   return { block, w3c };
 }
@@ -521,10 +589,11 @@ function reviewedForLabel(
 ): ServedProvenance {
   const reason = p.record.disclosure?.reason;
   if (!p.record.disclosure?.required) return p;
-  if (reason === 'art50_1_interaction' || reason === 'art50_4_deepfake') return p;
+  // Synthetic media is labelled whatever the reason recorded (deep fake or precautionary).
+  if (reason === 'art50_1_interaction' || reason === 'art50_4_deepfake' || isSyntheticMedia(p.record.mediaKind)) return p;
   const ctx: SurfaceContext = {
     visibility: publiclyReadable ? 'public' : 'private',
-    humanAudience: true, editorialResponsibility: true, mediaKind: 'text',
+    humanAudience: true, editorialResponsibility: true,
   };
   const disclosure = buildDisclosure(p.record, ctx, config.aiLabelPublic, { reviewer });
   const humanInvolvement = p.record.humanInvolvement === 'full-human' ? 'full-human' : 'editorial-control';
@@ -560,13 +629,14 @@ export function provenanceFrontmatter(p: ServedProvenance | undefined): string[]
  * The words come from the record's own pre-rendered `disclosure.short`, so the markdown face and a
  * rendered label say the same thing in the same language.
  */
-export function provenanceMarkdownNote(p: ServedProvenance | undefined): string {
+export function provenanceMarkdownNote(p: ServedProvenance | undefined, locale: Locale = 'en'): string {
   if (!p) return '';
+  const t = createT(locale);
   const r = p.record;
-  const label = r.disclosure?.short?.en ?? r.level;
+  const label = r.disclosure?.short?.[locale] ?? r.disclosure?.short?.en ?? r.level;
   const model = r.generator?.model ? ` (${r.generator.model})` : '';
   const reviewed = r.humanInvolvement === 'editorial-control' || r.humanInvolvement === 'full-human'
-    ? 'human editorial review'
-    : 'no human editorial review';
-  return `> **AI provenance** — ${label}${model}, ${reviewed}, ${r.generatedAt} · record: ${p.recordUrl}`;
+    ? t('aiLabel.note.reviewed')
+    : t('aiLabel.note.unreviewed');
+  return `> **${t('aiLabel.note.heading')}** — ${label}${model}, ${reviewed}, ${r.generatedAt} · ${t('aiLabel.note.record')}: ${p.recordUrl}`;
 }

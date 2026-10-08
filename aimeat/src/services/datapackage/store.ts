@@ -28,6 +28,7 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   v1.0.3 -- 2026-10-08 -- The package's provenance record states `mediaKind: data`.
  *   v1.0.2 -- 2026-09-26 -- The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.1 -- 2026-09-05 -- Notifies MCP through mcp/resource-events.ts, the leaf, rather than
  *            mcp/index.ts, which assembles the registry that imports this store back (a cycle the
@@ -213,6 +214,7 @@ export async function publishPackage(
         declaredId: input.declaredProvenanceId,
         declared: input.declaredProvenance as DeclaredProvenance | undefined,
         pipeline: `datapackage.publish.${producedBy.kind}`,
+        mediaKind: 'data',
         // A published package is world-readable at a permanent address and is read by people as well
         // as programs, which is exactly the surface the disclosure rules are written for.
         surface: { visibility: 'public', humanAudience: true },
