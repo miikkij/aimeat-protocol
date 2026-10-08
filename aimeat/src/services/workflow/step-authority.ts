@@ -23,6 +23,8 @@
  *   const missing = missingStepScopes(def, caller, 'full');
  *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
  * @version-history
+ *   v1.4.0 — 2026-10-08 — An extension step with `input_from` reads owner records, so it costs
+ *     memory:read like an ai step's input_keys.
  *   v1.3.1 — 2026-10-05 — ownerInPerson asks isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 — 2026-09-25 — An agent step costs work:request, the word for giving an agent work, for a
  *     workflow saved under WORKFLOW_AUTHORITY_VERSION 2; a workflow keeps the rules it was saved
@@ -108,7 +110,8 @@ function readsOwnerRecords(step: Pick<WorkflowStep, 'action' | 'success_signal' 
     const a = step.action;
     if (!a || a.kind === 'agent') return true;
     if (a.kind === 'ai') return !!(a.prompt_key || a.input_keys?.length || a.result_to_key);
-    if (a.kind === 'extension') return !!a.result_to_key;
+    // input_from hands owner records to the extension, which is a read like an ai step's input_keys.
+    if (a.kind === 'extension') return !!a.result_to_key || Object.keys(a.input_from ?? {}).length > 0;
     if (a.kind === 'human-input') return !!a.answer_to_key;
     return a.kind === 'datapackage' || a.kind === 'export-out';
 }

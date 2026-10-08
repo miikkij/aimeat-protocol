@@ -2108,11 +2108,11 @@
     },
     "src/services/workflow/engine-steps.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 4,
         "listOwnerScopeMemory": 1,
         "getOwnerScopeMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Export-out and the data package step pass leave; the other reads are read-to-update and the fresh clear."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Export-out and the data package step pass leave; the other reads are read-to-update and the fresh clear. 2026-10-08: the extension step's input_from read passes the system reader's show() before the value enters the owner's own extension, and the saver needs memory:read for it (step-authority.ts)."
     },
     "src/services/workflow/engine.ts": {
       "reads": {

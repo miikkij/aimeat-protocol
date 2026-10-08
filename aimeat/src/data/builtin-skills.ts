@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.8 -- 2026-10-08 -- set-up-content-pipeline names an extension step's input_from (and the
+ *     memory:read it costs); diagnose-a-workflow reads an input field that arrived null.
  *   v1.23.7 -- 2026-10-08 -- add-a-crew-agent: an agent approved with no connector connected waits and
  *     gets its key when the connector next connects; Attach is for a connector that refused it.
  *   v1.23.6 -- 2026-10-05 -- diagnose-a-workflow: a run's ai steps ask the model as its aiCaller, so
@@ -518,6 +520,11 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   permission its steps need; if the owner later takes one away, the scheduled run is refused and
   the owner is asked, once. Chaining agents is giving them work, so a step that dispatches to an
   agent costs \`work:request\`: ask the owner for it before saving, or the save answers SCOPE_DENIED.
+- An extension step reads the run's vars, and nothing else, unless it names what it takes:
+  \`input_from: { proposal: "x.{ref}.proposal", decision: "x.{ref}.decision" }\` hands it an
+  earlier step's \`result_to_key\` or a person's \`answer_to_key\` as input fields. A key with no record
+  arrives as null, so the extension must throw on a field it cannot act without. Naming keys there is
+  a read of the owner's records, so the saver needs \`memory:read\`.
 `,
   },
   CONFIGURE_ROUTING_SKILL_ENTRY,
@@ -667,6 +674,11 @@ metadata:
    The run's ai steps ask the model as the run's \`aiCaller\`: the agent or app that started it, the
    saver for a trigger's run, or the owner for "Run as me". So the owner's model rules and daily cap
    for that agent or app apply, and they can refuse a step that the owner's own call would pass.
+8. **An extension step that got null for an input field:** its \`input_from\` named a key that held no
+   record when the step started. Usually the step that should write it is not in the step's \`after\`
+   list, wrote a different key, or ran in a sandbox run under the run's key prefix; a classification
+   label that keeps the record from the node's own work hides it too. Read the key with
+   \`aimeat_memory_read\` and compare it with the writing step's \`result_to_key\` or \`answer_to_key\`.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.

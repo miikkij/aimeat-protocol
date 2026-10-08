@@ -308,6 +308,45 @@ await test('Workflow: an extension step acts on an earlier result and a person\'
     await json(`/v1/workflows/${wf}`, { method: 'DELETE', headers: auth(A.token) });
 });
 
+await test('Workflow: a missing input_from key arrives as null, and the act step goes red instead of acting', async () => {
+    const wf = `exr-wf-miss-${STAMP}`;
+    const def = {
+        title: { en_US: 'Act without a decision' }, description: { en_US: 'input_from missing key' },
+        trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+        steps: [{ id: 'act', description: { en_US: 'Act' }, required_to_function: 'none',
+            action: { kind: 'extension', extension: EXT, action: 'act', input: { org: orgId, ws: WS, run: 'miss' },
+                      input_from: { proposal: `exr.${STAMP}.nothing.proposal`, decision: `exr.${STAMP}.nothing.decision` },
+                      result_to_key: `exr.${STAMP}.miss.acted` } }],
+    };
+    const put = await json(`/v1/workflows/${wf}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify(def) });
+    assert(put.status === 200 || put.status === 201, `save ${put.status}`);
+    const r = await json(`/v1/workflows/${wf}/run`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ mode: 'full' }) });
+    const runId = r.body.data.run?.runId ?? r.body.data.runId;
+    let run: any;
+    for (let i = 0; i < 40; i++) { run = await runOf(wf, runId); if (run && !['running', 'waiting-step'].includes(run.status)) break; await sleep(250); }
+    assert(run.steps.act.state !== 'green', `act must not green on null input, got ${run.steps.act.state}`);
+    const page = await rows();
+    assert(!(page.body.data.rows as Array<{ rowId: string }>).some(x => x.rowId === 'act-miss'), 'nothing was recorded');
+    await json(`/v1/workflows/${wf}`, { method: 'DELETE', headers: auth(A.token) });
+});
+
+await test('Workflow: input_from is a read, so an agent with workflow:write and no memory:read is refused the save', async () => {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: `exrwf${STAMP % 100000}`, owner: A.name }) });
+    await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['workflow:write', 'workflow:read'], owner_token: A.token }) });
+    const tok = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    assert(typeof tok.body?.token === 'string', `agent token ${tok.status}`);
+    const def = {
+        title: { en_US: 'Read by input_from' }, description: { en_US: 'authority' },
+        trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+        steps: [{ id: 'act', description: { en_US: 'Act' }, required_to_function: 'none',
+            action: { kind: 'extension', extension: EXT, action: 'propose', input: {}, input_from: { secret: 'some.private.key' } } }],
+    };
+    const put = await json(`/v1/workflows/exr-wf-auth-${STAMP}`, { method: 'PUT', headers: auth(tok.body.token), body: JSON.stringify(def) });
+    // HOLE: 200 before step-authority counted input_from as a read.
+    assert(put.status === 403, `expected 403, got ${put.status}: ${JSON.stringify(put.body?.error)}`);
+    assert(/memory:read/.test(JSON.stringify(put.body)), `names the permission: ${JSON.stringify(put.body?.error)}`);
+});
+
 // ─── Cleanup ───
 await test('Cleanup: schedule, extensions, rows', async () => {
     if (scheduleId) await json(`/v1/schedules/${scheduleId}`, { method: 'DELETE', headers: auth(A.token) });
