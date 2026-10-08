@@ -13,6 +13,8 @@
  *   reason EMAIL_DISABLED. That answer is what "every policy gate passed" looks like: a refusal from
  *   a gate is 400, 403, 404, 422 or 429 and never reaches the transport.
  * @version-history
+ *   v1.6.0 — 2026-10-08 — D9 (aiprov): another account's provenance_id is not attached to a send, the
+ *     sender's own is and is named in the answer, and an agent's send is stamped model-written.
  *   v1.5.1 — 2026-10-06 — The recipient's code-key address is marked verified with
  *     helpers/verified-email.ts: a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.5.0 — 2026-09-25 — Test 18: an app holding outbound:send saves an address that has an account
@@ -800,6 +802,52 @@ await test('18. an app that saves an address with an account here is not told so
   const ownLog = await json(`/v1/outbound/log?contact_id=${encodeURIComponent(contactId)}`, { headers: authed(C.token) });
   assert(ownLog.body.data.messages.length === 1 && ownLog.body.data.messages[0].channel === 'inbox',
     `the owner's log read: ${JSON.stringify(ownLog.body.data?.messages?.map((m: any) => m.channel))}`);
+});
+
+// ── aiprov D9: the record a sent message carries is the sender's own ──
+// The X-AI-Disclosure-Record header copied whatever provenance_id the caller named, unchecked, so a
+// message could point at another account's record; and the node stamped no message it sent. The
+// inbox channel needs no transport, so the answer and the delivered copy are what is read.
+await test('D9. a sent message carries only the sender\'s own record, and an agent\'s send is stamped', async () => {
+  const D = await makeOwner('obprov');
+  const contact = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(D.token), body: JSON.stringify({ name: 'Provenance Recipient', email: recipientEmail }),
+  });
+  assert(contact.status === 201 && !!contact.body.data.contact.ghii, `contact: ${contact.status} ${JSON.stringify(contact.body.data?.contact)}`);
+  const cid = contact.body.data.contact.id as string;
+  const mint = async (token: string, content: string) => {
+    const r = await json('/v1/provenance', { method: 'POST', headers: authed(token), body: JSON.stringify({ level: 'ai-generated', humanInvolvement: 'none', content }) });
+    assert(r.status === 201 || r.status === 200, `mint: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    return r.body.data.id as string;
+  };
+  const send = (token: string, subject: string, disclosure: unknown) => json('/v1/outbound/send', {
+    method: 'POST', headers: authed(token),
+    body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject, body: 'A model drafted this.', ai_disclosure: disclosure }),
+  });
+
+  // CROSS-OWNER: another account's record is not attached.
+  const foreign = await mint(B.token, 'somebody else\'s words');
+  const refused = await send(D.token, 'with a foreign record', { level: 'ai-generated', provenance_id: foreign });
+  assert(refused.status === 200 && refused.body.data.status === 'sent', `send: ${refused.status} ${JSON.stringify(refused.body.error)}`);
+  assert(refused.body.data.ai_provenance_id !== foreign, `another account's record was attached: ${refused.body.data.ai_provenance_id}`);
+
+  // The sender's own record is attached and named in the answer.
+  const own = await mint(D.token, 'my own words');
+  const attached = await send(D.token, 'with my own record', { level: 'ai-assisted', provenance_id: own });
+  assert(attached.status === 200 && attached.body.data.ai_provenance_id === own, `own record: ${JSON.stringify(attached.body.data ?? attached.body.error)}`);
+
+  // An agent sending in the owner's name is stamped model-written by the node.
+  const reg = await json('/v1/agents', { method: 'POST', headers: authed(D.token),
+    body: JSON.stringify({ name: `mailer${Date.now().toString(36).slice(-4)}`, owner: D.owner, scopes: ['outbound:send', 'outbound:read'] }) });
+  assert(reg.status === 201, `agent: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+  const gaii = reg.body.data.agent.gaii as string;
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }) });
+  const agentSend = await send(tok.body.data.token, 'from the agent', undefined);
+  assert(agentSend.status === 200 && typeof agentSend.body.data.ai_provenance_id === 'string', `agent send: ${JSON.stringify(agentSend.body.data ?? agentSend.body.error)}`);
+  const rec = await json(`/v1/provenance/${agentSend.body.data.ai_provenance_id}`, { headers: authed(D.token) });
+  assert(rec.status === 200 && rec.body.data.provenance?.level === 'ai-generated' && rec.body.data.provenance?.generator?.principal === gaii,
+    `the agent's message is recorded as model-written, by the agent: ${JSON.stringify(rec.body.data?.provenance ?? rec.body.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

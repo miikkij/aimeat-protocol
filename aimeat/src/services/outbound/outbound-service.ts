@@ -24,6 +24,9 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-10-08 — sendOutbound stamps the message with a provenance record (Mint-3 for an agent),
+ *     held until the send goes out, and attaches a caller-named record only when it is the sender's
+ *     own; the X-AI-Disclosure-Record header names that record and nothing else (aiprov D9).
  *   2026-10-05 — sendOutbound counts the account's send allowance itself (takeMailSend), so every
  *     surface shares one count per owner (secaudit 2026-10, C5).
  *   2026-09-28 — SendInput.principal: the company check knows which agent is sending.
@@ -80,7 +83,9 @@ import { localAccountName } from '../../utils/gaii.js';
 import { getStream } from '../signals/signal-service.js';
 import { renderCampaignEmail } from './campaign-email.js';
 import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
-import { disclosureHeaders, type AiDisclosure } from './ai-disclosure.js';
+import { disclosureHeaders, isDeclared, type AiDisclosure } from './ai-disclosure.js';
+import { provenanceForWrite, storeHeldProvenance } from '../ai-provenance.js';
+import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import { takeMailSend } from '../account-limits.js';
 
 /**
@@ -398,6 +403,8 @@ export interface SendResult {
   log: OutboundMessageRecord;
   channel: OutboundChannel;
   status: 'sent';
+  /** The provenance record the message carries, when the node holds one (aiprov D9). */
+  aiProvenanceId?: string;
 }
 
 function substitute(text: string, variables: Record<string, string>): string {
@@ -558,6 +565,31 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     throw new OutboundError('INVALID_MESSAGE', 400, 'subject and body are required (directly, via template_id, or implied by invoice_id)');
   }
 
+  // aiprov D9. The message is stamped like every other write: an agent that sends is recorded as
+  // model-written, a person sending in person is not stamped. A record id the caller names is
+  // attached only when it is the sender's own (resolveAttachableProvenanceId inside
+  // provenanceForWrite); it used to be copied into the header unchecked, so a caller could point a
+  // message at somebody else's record. Minted HELD and stored only when the send goes out, so a
+  // refused or failed send leaves no record. The hash covers the subject and the body as composed.
+  const heldProvenance: AiProvenanceRecordRow[] = [];
+  const aiProvenanceId = await provenanceForWrite(storage, {
+    principal: input.principal ?? ownerGhii,
+    content: `${subject}\n\n${body}`,
+    declaredId: input.aiDisclosure?.provenanceId,
+    pipeline: 'outbound.send',
+    surface: { visibility: 'private', humanAudience: true },
+    labelPolicy: config.aiLabelPublic,
+    nodeId: config.nodeId,
+    baseUrl: config.baseUrl,
+    enabled: config.aiProvenance,
+    held: heldProvenance,
+  });
+  // The header names a record only when it is the sender's own: the one attached, or the one minted
+  // above. A level stays the caller's to declare; nothing is added when the caller declared none.
+  const aiDisclosure: AiDisclosure | undefined = input.aiDisclosure && isDeclared(input.aiDisclosure)
+    ? { level: input.aiDisclosure.level, ...(aiProvenanceId ? { provenanceId: aiProvenanceId } : {}) }
+    : input.aiDisclosure;
+
   // Gate 5: channel selection — AIMEAT inbox first when the recipient has an identity here.
   let channel: OutboundChannel;
   let status: OutboundStatus;
@@ -587,6 +619,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       // POST /v1/outbound/send has its own per-sender limit (routes/outbound.ts), so this send is
       // counted there and not a second time against the account's message limit.
       sendLimit: 'exempt',
+      ...(aiProvenanceId ? { aiProvenanceId } : {}),
     });
     status = result.ok ? 'sent' : 'failed';
     if (!result.ok) error = result.code;
@@ -625,7 +658,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
         ...(trackingUrl ? { trackingUrl } : {}),
       });
       // One place, three paths. Empty when nothing was declared, and then nothing is added.
-      const extraHeaders = disclosureHeaders(input.aiDisclosure, config);
+      const extraHeaders = disclosureHeaders(aiDisclosure, config);
       // THE ORDER IS THE FEATURE. The caller's own mailbox first, then the company's server, then
       // the node's shared sender. A message a person sends is theirs, and it should look like it in
       // the recipient's inbox and in their own Sent folder; a company's server is the next best
@@ -662,6 +695,9 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     }
   }
 
+  // The record of what went out, stored only for a message that did.
+  if (status === 'sent') await storeHeldProvenance(storage, heldProvenance);
+
   // Invoice delivery state follows the actual outcome.
   if (invoiceId && status === 'sent') {
     await storage.setInvoiceStatus(invoiceId, (await storage.getInvoice(invoiceId))!.status, { deliveryStatus: 'delivered' });
@@ -681,7 +717,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // LOGGED AND ANNOUNCED FIRST, THEN REFUSED. The row and the change event are what an owner reads
   // when a send looks wrong, so a failure reaches both before it becomes an error for the caller.
   if (status !== 'sent') throw sendFailedError(log, noTransport);
-  return { log, channel, status };
+  return { log, channel, status, ...(aiProvenanceId ? { aiProvenanceId } : {}) };
 }
 
 /**

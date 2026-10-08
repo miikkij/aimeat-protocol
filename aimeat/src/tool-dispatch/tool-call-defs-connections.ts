@@ -10,6 +10,7 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
+ *   2026-10-08 — aimeat_mail_send sends ai_provenance_id inside ai_disclosure (aiprov D9).
  *   2026-10-05 — read() makes the call with the path written in it, so check:field-reach's CodeQL query
  *     sees the route; the connector MCP serves these tools through here now (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-28 — aimeat_mail_read forwards store, filename, mime_type and key: the attachment
@@ -155,7 +156,10 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             const conn = optionalString(input, 'connection_id'); if (conn) body.connection_id = conn;
             const alias = optionalString(input, 'from_alias'); if (alias) body.from_alias = alias;
             const replyTo = optionalString(input, 'reply_to'); if (replyTo) body.reply_to = replyTo;
-            const disc = optionalString(input, 'ai_disclosure'); if (disc) body.ai_disclosure = disc;
+            // The record id travels inside ai_disclosure, the shape POST /v1/outbound/send reads.
+            const disc = optionalString(input, 'ai_disclosure');
+            const provId = optionalString(input, 'ai_provenance_id');
+            if (disc) body.ai_disclosure = provId ? { level: disc, provenance_id: provId } : disc;
             const theme = optionalString(input, 'theme'); if (theme) body.theme = theme;
             return refuseUnsentSend(await client.post('/v1/outbound/send', body));
         },
