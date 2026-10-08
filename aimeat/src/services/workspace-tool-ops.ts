@@ -30,6 +30,11 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.9.0 — 2026-10-08 — publishRecordsBatchOp records provenance for every direct value through
+ *     services/workspace-direct-provenance.ts: a record's own declaration or id, else the default
+ *     stamp for the writer; only the sandbox was stamped (aiprov E3). A document's record describes its
+ *     markdown in the draft write as well (aiprov E13). instanceFromKey moved to
+ *     ./workspace-record-key.ts (max-file-lines) and is re-exported.
  *   v1.8.1 — 2026-10-06 — The caller carries the session's scopes; a declaration the session may not
  *     make is refused 403 SCOPE_DENIED before any write (secaudit 2026-10 last items, F2).
  *   v1.8.0 — 2026-10-06 — publishRecordsBatchOp and deleteRecordsBatchOp: the bodies of the batch
@@ -111,7 +116,9 @@ import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js'
 import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput, storeHeldProvenance, type DeclaredProvenance } from './ai-provenance.js';
 import type { AiProvenanceLevel, AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
-import { memoryContentBytes } from '../routes/memory/shared.js';
+import { memoryContentBytes, documentContentBytes } from '../utils/memory-content.js';
+import { directValueProvenance, type DeclarationParser } from './workspace-direct-provenance.js';
+import { instanceFromKey } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number };
@@ -216,24 +223,8 @@ export interface ReadWorkspaceArgs {
     reader: ContentReader;
 }
 
-/**
- * Read an instance out of a full memory key, when the key belongs to THIS workspace.
- *
- *   organism.<org>.w.<ws>.<namespace>.<instance>[.latest | .draft | .version.N]
- *
- * `root` is `organism.<org>.w.<ws>`, so a key from another organism or another workspace matches
- * no prefix and the answer is null: the caller then treats what was asked as a plain instance id,
- * finds nothing, and reports it missing under its own name. The longest matching namespace wins,
- * because one namespace may be the beginning of another (`shared.notes`, `shared.notes-old`).
- */
-export function instanceFromKey(root: string, namespaces: string[], asked: string): { namespace: string; instance: string } | null {
-    if (!asked.startsWith(`${root}.`)) return null;
-    const rest = asked.slice(root.length + 1);
-    const namespace = namespaces.filter(ns => rest.startsWith(`${ns}.`)).sort((a, b) => b.length - a.length)[0];
-    if (!namespace) return null;
-    const instance = rest.slice(namespace.length + 1).split('.')[0];
-    return instance ? { namespace, instance } : null;
-}
+// instanceFromKey moved to ./workspace-record-key.ts (max-file-lines), re-exported for its importers.
+export { instanceFromKey } from './workspace-record-key.js';
 
 /**
  * Two modes, one function. DEFAULT (no `ids`) → the INDEX: per space, every instance's id + title +
@@ -465,12 +456,12 @@ export async function writeWorkspaceDraftsOp(
         const held: AiProvenanceRecordRow[] = [];
         const provenanceId = args.nodeStamp
             ? await stampAutonomousOutput(storage, {
-                principal: caller.principal, content: memoryContentBytes(v),
+                principal: caller.principal, content: item.isDoc ? documentContentBytes(v) : memoryContentBytes(v),
                 level: args.nodeStamp.level, method: args.nodeStamp.method, pipeline: args.pipeline,
                 ...provenanceSurface, held,
             })
             : await provenanceForWrite(storage, {
-                principal: caller.principal, scopes: caller.scopes, content: memoryContentBytes(v),
+                principal: caller.principal, scopes: caller.scopes, content: item.isDoc ? documentContentBytes(v) : memoryContentBytes(v),
                 declaredId: args.aiProvenanceId, declared: args.aiProvenance, pipeline: args.pipeline,
                 ...provenanceSurface, held,
             });
@@ -587,6 +578,8 @@ export interface PublishRecordsBatchArgs {
      * extension sandbox). Absent on the REST route, which writes what the caller sent as before.
      */
     nodeStamp?: { pipeline: string; level?: AiProvenanceLevel; method?: AiProvenanceMethod };
+    /** The REST route's parser for a record's own `ai_provenance` (workspace-direct-provenance.ts). */
+    parseDeclaration?: DeclarationParser;
 }
 
 export interface PublishRecordsBatchData {
@@ -654,11 +647,12 @@ export async function publishRecordsBatchOp(
     let directValues: Record<string, { value: unknown; visibility?: MemoryRecord['visibility']; aiProvenanceId?: string }> | undefined;
     // Held per id: a record's provenance is stored only if that record is written.
     const heldById = new Map<string, AiProvenanceRecordRow[]>();
+    const provenance = directValueProvenance(deps, caller, args);
     if (useRecords) {
         directValues = {};
         ids = [];
         for (let i = 0; i < list.length; i++) {
-            const r = list[i] as { id?: unknown; value?: unknown; visibility?: unknown } | null;
+            const r = list[i] as { id?: unknown; value?: unknown; visibility?: unknown; ai_provenance?: unknown; ai_provenance_id?: unknown } | null;
             if (!r || typeof r.id !== 'string' || !r.id) {
                 early.push({ instance: `#${i}`, ok: false, code: 'INVALID', violations: [{ message: `records[${i}] has no id (a non-empty string)`, path: `/records/${i}/id` }] });
                 continue;
@@ -668,21 +662,19 @@ export async function publishRecordsBatchOp(
                 continue;
             }
             const visibility = r.visibility as MemoryRecord['visibility'] | undefined;
+            const own = provenance.declarationOf(r, i);
+            if (!own.ok) { early.push({ instance: r.id, ok: false, code: 'INVALID', violations: own.violations }); continue; }
             ids.push(r.id);
             // A later duplicate keeps the first value; publishDraftsBatch refuses the repeat.
             if (directValues[r.id]) continue;
-            let aiProvenanceId: string | undefined;
-            if (args.nodeStamp && !args.dryRun) {
-                const held: AiProvenanceRecordRow[] = [];
-                aiProvenanceId = await stampAutonomousOutput(storage, {
-                    principal: publisher, content: memoryContentBytes(r.value),
-                    level: args.nodeStamp.level, method: args.nodeStamp.method, pipeline: args.nodeStamp.pipeline,
-                    surface: { visibility: visibility ?? 'owner', humanAudience: true },
-                    labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl,
-                    enabled: config.aiProvenance, held,
-                });
-                heldById.set(r.id, held);
-            }
+            // The record each value carries (services/workspace-direct-provenance.ts): the sandbox's
+            // node stamp, or the caller's declaration, id or default stamp. Held, never stored here, so
+            // a dry run decides the refusal too and stores nothing.
+            const held: AiProvenanceRecordRow[] = [];
+            const stamped = await provenance.stamp(r.value, visibility, own.own, held);
+            if (!stamped.ok) return refuse(403, 'SCOPE_DENIED', stamped.message);
+            const aiProvenanceId = stamped.id;
+            heldById.set(r.id, held);
             directValues[r.id] = { value: r.value, visibility, ...(aiProvenanceId ? { aiProvenanceId } : {}) };
         }
     } else {

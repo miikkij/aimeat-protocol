@@ -7,6 +7,10 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 -- 2026-10-08 -- The share reads (public documents, document, records) and the member read
+ *     of records serve each item's `ai_provenance` block; the single public document also sends the
+ *     AI-Disclosure and Link headers (both formats) and `meta.provenance`. A shared page carried no
+ *     mark of how it was made (aiprov E1).
  *   v1.13.0 -- 2026-10-06 -- POST .../workspace/records/delete runs deleteRecordsBatchOp
  *     (services/workspace-tool-ops.ts), the function ctx.workspace.deleteRecords runs. An id given
  *     twice is decided once.
@@ -63,6 +67,8 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
+import { withItemProvenance } from './share-provenance.js';
+import { loadServedProvenance, setProvenanceHeaders, envelopeMeta } from '../../services/ai-provenance-marks.js';
 import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
@@ -412,7 +418,9 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       res.type('text/markdown; charset=utf-8').send(docsToMarkdown(entry?.name, docs));
       return;
     }
-    res.json(success(config.nodeId, { organism_id: id, ws, documents: docs }));
+    // Each document carries its own record, `ai_provenance` (aiprov E1): a page of documents is
+    // not one piece of content, so there is no page-level header.
+    res.json(success(config.nodeId, { organism_id: id, ws, documents: await withItemProvenance(storage, config, docs) }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/public/document?ws=&type=&id=&format= — NO AUTH. A single
@@ -431,11 +439,16 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const [doc] = await found.release(readerFor({ storage, config }, req.auth));
     if (!doc) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
+    // ONE document is one piece of content: its record rides the AI-Disclosure and Link headers in
+    // both formats, `meta.provenance` and the item's block in JSON (aiprov E1).
+    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId);
+    setProvenanceHeaders(res, prov);
     if (req.query.format === 'md') {
       res.type('text/markdown; charset=utf-8').send(`# ${doc.title}\n\n${doc.markdown.trim()}\n`);
       return;
     }
-    res.json(success(config.nodeId, { organism_id: id, ws, document: doc }));
+    const [served] = await withItemProvenance(storage, config, [doc]);
+    res.json(success(config.nodeId, { organism_id: id, ws, document: served }, undefined, envelopeMeta(prov)));
   });
 
   /* ── GET /v1/organisms/:id/workspace/public/records?ws=&space= — NO AUTH. The PUBLISHED (.latest)
@@ -458,7 +471,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const records = await found.release(readerFor({ storage, config }, req.auth));
     if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
-    res.json(success(config.nodeId, { organism_id: id, ws, records }));
+    res.json(success(config.nodeId, { organism_id: id, ws, records: await withItemProvenance(storage, config, records) }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/records?ws=&space= — AUTHENTICATED member read of a
@@ -479,7 +492,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     if (!(await canReadWs(id, ws, callerGaii))) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const records = await collectWsRecords(id, ws, readerFor({ storage, config }, req.auth), space ? { space } : undefined);
-    res.json(success(config.nodeId, { organism_id: id, ws, records }));
+    res.json(success(config.nodeId, { organism_id: id, ws, records: await withItemProvenance(storage, config, records) }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/share?ws= — the current share state (for the UI toggles).

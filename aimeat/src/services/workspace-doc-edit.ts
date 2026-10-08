@@ -34,6 +34,11 @@
  *   const res = await appendToDocument({ storage, config }, caller,
  *     { organismId, wsId, space: 'notes', id: 'doc-x', markdown: '## Found\n\n…' });
  * @version-history
+ *   v1.3.0 — 2026-10-08 — The edit's record comes from provenanceForDocEdit
+ *     (services/workspace-doc-provenance.ts): an edit that mixes a person's text with a model's is
+ *     `assisted`, derived from the previous record, where an agent's one-line append had labelled a
+ *     person's whole document ai-generated and a person's append had dropped an agent's stamp
+ *     (aiprov E11). The record describes the document's markdown (aiprov E13).
  *   v1.2.1 — 2026-09-26 — The edit's provenance record is stored only once its swap lands: built and
  *     held before the write, stored by writeWorkspaceRecord's onLanded (secaudit 2026-09, N2). It was
  *     stored on every attempt, so each attempt that lost the swap left a record about bytes never stored.
@@ -54,8 +59,9 @@ import { archivedRefusal } from './workspace-write-guards.js';
 import { memoryCeilings } from './memory-ceilings.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
-import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
-import { memoryContentBytes } from '../routes/memory/shared.js';
+import { storeHeldProvenance } from './ai-provenance.js';
+import { provenanceForDocEdit } from './workspace-doc-provenance.js';
+import { documentContentBytes } from '../utils/memory-content.js';
 import { emitChange } from './event-bus.js';
 import { insertAt, isHeadingLine, locateSection, replaceRange } from './workspace-doc-markdown.js';
 
@@ -299,16 +305,16 @@ async function editDocument(
         // HELD, NOT STORED, until the swap below lands (onLanded). The draft names the record's id
         // in the same swap, so the record is built and checked here; an attempt that loses the
         // swap drops it. The store is append-only, so one stored first could not be taken back.
+        //
+        // The record describes the WHOLE document, so an edit that mixes a person's text with a
+        // model's is `assisted`, derived from the record the document carried before
+        // (services/workspace-doc-provenance.ts), and it describes the markdown a reader is served.
         const held: AiProvenanceRecordRow[] = [];
-        const aiProvenanceId = await provenanceForWrite(storage, {
+        const aiProvenanceId = await provenanceForDocEdit(storage, config, {
             principal: caller.principal,
-            content: memoryContentBytes(next),
+            previousId: source.aiProvenanceId ?? null,
+            content: documentContentBytes(next),
             pipeline: target.pipeline,
-            surface: { visibility: 'private', humanAudience: true },
-            labelPolicy: config.aiLabelPublic,
-            nodeId: config.nodeId,
-            baseUrl: config.baseUrl,
-            enabled: config.aiProvenance,
             held,
         });
 

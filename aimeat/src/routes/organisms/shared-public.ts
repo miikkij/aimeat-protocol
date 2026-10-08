@@ -14,6 +14,8 @@
  *   // … the share gate …
  *   const docs = await found.release(readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.2.0 — 2026-10-08 — Every collected doc and record keeps its row's aiProvenanceId, which the
+ *     share routes serve as the item's `ai_provenance` block; it was dropped here (aiprov E1).
  *   v1.1.0 — 2026-09-29 — TARGET-082 review: the public collectors return a SharePending, whose
  *     `release(reader)` runs the classification reader only after the route's share gate, so a
  *     refused visitor writes no audit row. What leave() keeps back is logged by key.
@@ -99,6 +101,7 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
           type: name, id: docId,
           title: (v && typeof v.title === 'string') ? v.title : docId,
           markdown: (v && typeof v.markdown === 'string') ? v.markdown : '',
+          aiProvenanceId: r.aiProvenanceId ?? null,
         } });
       }
     }
@@ -129,7 +132,7 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
         const parts = r.key.slice(nsPrefix.length).split('.');
         const recId = parts[0];
         if (parts.slice(1).join('.') !== 'latest') continue;   // only published
-        out.push({ rec: r, out: { type: name, id: recId, value: r.value ?? null } });
+        out.push({ rec: r, out: { type: name, id: recId, value: r.value ?? null, aiProvenanceId: r.aiProvenanceId ?? null } });
       }
     }
     return out;

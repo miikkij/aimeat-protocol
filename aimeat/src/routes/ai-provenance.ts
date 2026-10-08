@@ -36,6 +36,10 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-10-08 — A record an open workspace share serves to anyone resolves anonymously on
+ *     GET /v1/provenance/:id and is found by GET /v1/provenance/by-hash
+ *     (routes/organisms/share-provenance.ts): the share serves a record whose stored visibility stays
+ *     private, so the SQL rule answered 404 for content anyone could read (aiprov E1).
  *   v1.3.0 — 2026-08-02 — GET /v1/provenance/:id is content-negotiated. A visible AI label's
  *     "how this was made" link lands here, so a PERSON arrives — and the route answered
  *     application/json to everyone, leaving the correction procedure it offers stranded in
@@ -62,7 +66,8 @@ import {
   AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AI_UPSTREAM_MARKS,
   AiProvenanceSourceSchema, CONTENT_HASH_PATTERN, aiProvenanceJsonSchema, AI_PROVENANCE_SCHEMA_PATH,
 } from '../models/ai-provenance-schemas.js';
-import { mintProvenance, projectForDetail, publiclyResolvable } from '../services/ai-provenance.js';
+import { mintProvenance, projectForDetail } from '../services/ai-provenance.js';
+import { publiclyResolvableWithShares, findShareOpenedProvenanceByHash } from './organisms/share-provenance.js';
 import { prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { provenancePage, provenanceNotFoundPage } from '../services/ai-provenance-page.js';
 import { detectLocale } from '../i18n.js';
@@ -183,7 +188,11 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     }
 
     const owner = callerOwner(req);
-    const rows = await storage.findAiProvenanceByHash(hash, owner ? { ownerGhii: owner } : undefined);
+    const found = await storage.findAiProvenanceByHash(hash, owner ? { ownerGhii: owner } : undefined);
+    // The records an open workspace share serves to anyone, which the SQL rule cannot see
+    // (routes/organisms/share-provenance.ts, aiprov E1). Up to the same page size, listed once.
+    const shared = await findShareOpenedProvenanceByHash(storage, config, hash, new Set(found.map(r => r.id)), 20 - found.length);
+    const rows = [...found, ...shared];
     res.json(success(config.nodeId, {
       content_hash: hash,
       // An empty list is a real, useful answer here: "this node has no statement about these bytes".
@@ -204,7 +213,8 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     // VISIBILITY FOLLOWS THE CONTENT. Not a flag on the record — a live question about whether
     // anything public points at it. Publishing the content makes this resolve; unpublishing takes
     // it straight back to the 404 below, with nothing to remember to do.
-    const isPublic = !!row && !isOwner && (await publiclyResolvable(storage, [row.id])).has(row.id);
+    // An open workspace share counts too: it serves the content to anyone (aiprov E1).
+    const isPublic = !!row && !isOwner && (await publiclyResolvableWithShares(storage, config, [row.id])).has(row.id);
 
     // A person may be reading this: the visible label's "details" link lands here. Negotiated the
     // same way /v1/ai-transparency does — only a client that ranks text/html ABOVE application/json
