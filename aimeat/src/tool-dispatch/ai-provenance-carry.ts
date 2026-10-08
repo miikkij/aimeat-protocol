@@ -56,6 +56,8 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.5 — 2026-10-08 — aimeat_exchange_work_deliver: recorded-by-route, POST
+ *     /v1/exchange/work/:id/deliver (aiprov D2).
  *   v1.3.4 — 2026-10-06 — `readsId` on the four not-carried tools whose route reads ai_provenance_id
  *     (design book propose and adopt, app draft publish, surface layout set): an id given alone is
  *     reported attached again; v1.3.3 told them it went nowhere (audit of the last items, finding 4).
@@ -159,7 +161,9 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   aimeat_dm_send: { kind: 'not-carried', route: 'POST /v1/messages' },
   aimeat_dm_broadcast: { kind: 'not-carried', route: 'POST /v1/messages/broadcast' },
   aimeat_dm_send_as_owner: { kind: 'not-carried', route: 'POST /v1/messages' },
-  aimeat_exchange_work_deliver: { kind: 'not-carried', route: 'POST /v1/exchange/work/:id/deliver' },
+  // The route records the declaration and attaches an id from the body, refuses a declaration the
+  // caller may not make before it settles, and embeds the record in the work it answers (aiprov D2).
+  aimeat_exchange_work_deliver: { kind: 'recorded-by-route', route: 'POST /v1/exchange/work/:id/deliver' },
   aimeat_knowledge_contribute: { kind: 'not-carried', route: 'POST /v1/knowledge/:id/contribute' },
   aimeat_message_send: { kind: 'not-carried', route: 'POST /v1/agents/:agent/messages' },
   aimeat_task_complete: { kind: 'not-carried', route: 'POST /v1/agents/:agent/tasks/:id/complete' },
