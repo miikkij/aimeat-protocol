@@ -9,8 +9,8 @@
  *   vertical variant renders on mobile. No protocol terms in body copy.
  * @usage routed at /v1/how-it-works by spa.html
  * @version-history
- *   2026-10-08 -- The paper link uses site.paper when the operator set it (the catalog lookup opened
- *     an old Sanomat copy on aimeat.io). "Shared place" in the diagram, as on the card. The assets
+ *   2026-10-08 -- The paper link uses site.paper when the operator set it, as the business page does;
+ *     the catalog lookup took whichever Sanomat app the list returned first. "Shared place" in the diagram, as on the card. The assets
  *     card no longer claims a machine the reader controls; the consent card loses a metaphor.
  *   2026-10-06 -- "See pricing" is a StoreDoor: "Opens soon" while the store does not take orders
  *     (site.store_status "soon").
