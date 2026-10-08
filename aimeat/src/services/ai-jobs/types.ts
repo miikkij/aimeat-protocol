@@ -13,6 +13,7 @@
  * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.7.0 — 2026-10-08 — AiJobRecord.error carries `status` and `details` (aiprov plan, A11).
  *   v1.6.1 — 2026-10-06 — StartAiJobContext.limit is 'exempt' only for a chain's continuation
  *     (secaudit 2026-10 follow-up, A5).
  *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -97,7 +98,8 @@ export interface AiJobRecord {
     finished_at?: string;
     cost_usd?: number;
     tokens?: number;
-    error?: { code: string; message: string };
+    /** `status` and `details` are what the REST call would have answered (since 2026-10-08). */
+    error?: { code: string; message: string; status?: number; details?: Record<string, unknown> };
     provenance_id?: string;
     /** The principal that asked for it. Audit, not authority — what a job may do is decided by
      *  `owner`, which is resolved server-side. */

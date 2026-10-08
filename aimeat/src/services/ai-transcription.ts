@@ -13,6 +13,10 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.7.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (services/ai/errors.ts):
+ *     a permanent 4xx is 422 PROVIDER_REJECTED with the provider's reason (aiprov plan, A1). The
+ *     result's `seconds` is null when the provider did not measure the audio, and a verbose call
+ *     returns the provider's timed `segments` (A13).
  *   v2.6.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v2.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
@@ -43,10 +47,11 @@ import type { Storage } from '../storage/interface.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import type { TranscriptionAudio } from './openrouter.js';
 import {
-  AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
+  AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai/completion.js';
 import { transcribeAudio } from './ai/gateway.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
+import { providerFailureOf } from './ai/errors.js';
 import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import { logger } from '../utils/logger.js';
@@ -93,8 +98,11 @@ export interface TranscribeForOwnerResult {
   text: string;
   model: string;
   language?: string;
-  /** Audio duration as the provider measured it; 0 when it did not report one. */
-  seconds: number;
+  /** Audio duration as the provider measured it; null when it did not report one (it was 0 until
+   *  2026-10-08, which read as an empty recording). The price uses 0 then. */
+  seconds: number | null;
+  /** Timed segments, when the call asked for verbose and the provider gave them. */
+  segments?: Array<{ start: number; end: number; text: string }>;
   usage: { totalTokens: number; costUsd: number; costExact: boolean };
   budget: { dailyBudgetUsd: number; spentTodayUsd: number; remainingUsd: number };
   /** The provenance record minted for this transcript (content hash = SHA-256 of the text). Absent
@@ -172,10 +180,8 @@ export async function transcribeForOwner(
   } catch (e) {
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
     if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-transcribe' });
-    const status = (e as { status?: number }).status;
-    if (status === 401) throw new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, 'API key was rejected by the provider.');
-    if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
-    throw new AiCompletionError('PROVIDER_ERROR', 502, (e as Error).message);
+    // The one status table every AI path uses (services/ai/errors.ts).
+    throw providerFailureOf(e);
   }
 
   const seconds = result.usage?.seconds ?? 0;
@@ -211,7 +217,8 @@ export async function transcribeForOwner(
     text: result.text,
     model: result.model,
     language: result.language,
-    seconds,
+    seconds: typeof result.usage?.seconds === 'number' ? result.usage.seconds : null,
+    ...(result.segments?.length ? { segments: result.segments } : {}),
     usage: { totalTokens: totalTok, costUsd, costExact },
     budget: {
       dailyBudgetUsd: dailyBudget,

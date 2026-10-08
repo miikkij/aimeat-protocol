@@ -45,6 +45,8 @@
  *     many slashes and another character (CodeQL js/polynomial-redos, alert 1673).
  *   v1.2.0 — 2026-09-28 — A text, vision or files capability carries `params`, the provider's default
  *     fine-tuning, which the call and the app's role override (AI roles).
+ *   v1.3.0 — 2026-10-08 — A speech capability may state the PCM its server sends (sampleRate,
+ *     channels, sampleFormat), which the speech answer's `audio` block reports (aiprov plan, A4).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -76,6 +78,14 @@ export interface ProviderCapabilityConfig {
   pool: boolean;
   /** Speech only: the voice. */
   voice?: string;
+  /**
+   * Speech only: the PCM the provider sends, for a local or OpenAI-compatible server whose answer
+   * does not say it. The speech answer's `audio` block reports them (services/ai-voice-audio.ts);
+   * OpenAI and OpenRouter need none (24000 Hz, mono, s16le).
+   */
+  sampleRate?: number;
+  channels?: number;
+  sampleFormat?: 's16le' | 's16be' | 'f32le';
   /** Transcription only: the language hint. */
   language?: string;
   /** OpenRouter's files capability only: who converts a PDF for a model that cannot read one. */
@@ -176,6 +186,25 @@ export const TYPE_CAPABILITIES: Readonly<Record<AiAdapterType, readonly AiCapabi
   extension: ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'],
 };
 
+/** A speech capability's PCM layout (sampleRate, channels, sampleFormat), each optional; what does not read is a problem. */
+function readSpeechPcm(v: Record<string, unknown>, c: AiCapability, entry: ProviderCapabilityConfig, problems: string[]): void {
+  const given = (k: string) => v[k] !== undefined && v[k] !== null && v[k] !== '';
+  if (!given('sampleRate') && !given('channels') && !given('sampleFormat')) return;
+  if (c !== 'speech') { problems.push(`capabilities.${c}: sampleRate, channels and sampleFormat are for speech only.`); return; }
+  const int = (k: 'sampleRate' | 'channels', min: number, max: number) => {
+    if (!given(k)) return;
+    const x = v[k];
+    if (typeof x !== 'number' || !Number.isInteger(x) || x < min || x > max) problems.push(`capabilities.speech.${k}: a whole number from ${min} to ${max}.`);
+    else entry[k] = x;
+  };
+  int('sampleRate', 8000, 192000);
+  int('channels', 1, 8);
+  if (given('sampleFormat')) {
+    if (v.sampleFormat === 's16le' || v.sampleFormat === 's16be' || v.sampleFormat === 'f32le') entry.sampleFormat = v.sampleFormat;
+    else problems.push('capabilities.speech.sampleFormat: s16le, s16be or f32le.');
+  }
+}
+
 /** An extension's name, as the extension manifest allows it (services/extension-manifest.ts). */
 const EXTENSION_NAME_RE = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 
@@ -272,6 +301,7 @@ function parseCapabilities(
     if (pool && !model) problems.push(`capabilities.${c}: the node picks this provider by capability alone only with a model to use; set model.`);
     const entry: ProviderCapabilityConfig = { enabled, pool, ...(model ? { model } : {}) };
     if (typeof v.voice === 'string' && c === 'speech' && v.voice.trim()) entry.voice = v.voice.trim().slice(0, 64);
+    readSpeechPcm(v, c, entry, problems);
     if (typeof v.language === 'string' && c === 'transcription' && /^[a-z]{2,3}$/.test(v.language)) entry.language = v.language;
     if (v.params !== undefined && v.params !== null) {
       if (!PARAM_CAPABILITIES.includes(c)) problems.push(`capabilities.${c}.params: only text, vision and files take fine-tuning.`);

@@ -20,6 +20,8 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.5.0 — 2026-10-08 — 17f: a job the provider refuses stores error.status and error.details
+ *     (aiprov plan, A11).
  *   v1.4.0 — 2026-09-28 — System 2 plan, V5, cases 17a-17e: an image job lands the record
  *     { storage_key, url, mime_type, model } and the picture is readable at the url; a transcribe job
  *     reads the audio from the caller's own storage and lands the transcript, or the JSON record with
@@ -49,7 +51,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
-import { startFakeAiProvider, imageJson, transcriptionJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
+import { startFakeAiProvider, imageJson, transcriptionJson, providerStatus, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -811,6 +813,16 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(unknown.status === 400 && unknown.body.error.code === 'INVALID_BODY', `unknown op: ${unknown.status} ${unknown.body?.error?.code}`);
         assert((await readMemory(c, 'aijob.v5.bad')).status === 404, 'no result was written');
         assert(fake.requestsFor('images').length === heardBefore, 'the provider heard nothing');
+    });
+
+    await test('17f. A11: a job the provider refuses keeps the refusal\'s status and details, so a reader can tell it repeats', async () => {
+        fake.queue('transcriptions', providerStatus(415, '{"error":{"message":"Unsupported audio format."}}'));
+        const r = await startJob(c, { op: 'transcribe', audio_key: AUDIO_KEY, result_key: 'aijob.v5.refused' });
+        assert(r.status === 202, `expected 202, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const end = await waitForState(c, r.body.data.job_id, ['done', 'failed']);
+        assert(end.state === 'failed' && end.error?.code === 'PROVIDER_REJECTED' && end.error?.status === 422, `error: ${JSON.stringify(end.error)}`);
+        assert(end.error.details?.provider_status === 415 && /Unsupported audio format/.test(end.error.details?.provider_message ?? ''),
+            `details: ${JSON.stringify(end.error.details)}`);
     });
 
     // ── cleanup ──

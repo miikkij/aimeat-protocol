@@ -29,6 +29,12 @@
  *   - openAiChat() / speaksOpenAiChat — an OpenAI chat answer from a provider that does not speak it
  *   - GatewayError — the error shape callers map to their own codes
  * @version-history
+ *   v1.3.0 — 2026-10-08 — A provider's error carries its reason by the one policy (./errors.ts
+ *     providerReasonFromText: the JSON message, redacted, at most 300 characters, where it carried 500
+ *     raw characters) and its Retry-After; a provider that cannot serve the operation is the node's
+ *     400 INVALID_PROVIDER, and a string model id the node's 500, never a provider status. A picture
+ *     carries its pixel size; a verbose transcription from a provider package its segments (aiprov
+ *     plan, A2, A8, A13).
  *   v1.2.0 — 2026-09-28 — Capabilities for apps and agents (System 2 plan, V5): embed(); files (a PDF
  *     among them) as file parts of a text call, and OpenRouter's file-parser plugin when the owner
  *     chose an engine for a model that does not read PDFs itself.
@@ -43,6 +49,7 @@ import type {
 } from '@ai-sdk/provider';
 import { logger } from '../../utils/logger.js';
 import type { AiTarget } from './types.js';
+import { AiCompletionError, providerReasonFromText, retryAfterHeader } from './errors.js';
 import { adapterFor, openAiChat as adapterOpenAiChat, speaksOpenAiChat } from './adapters/index.js';
 import { COMPATIBLE_OPTIONS_KEY } from './adapters/sdk.js';
 import type { AimeatImageMetadata } from './adapters/image.js';
@@ -51,6 +58,7 @@ import type { OpenAiChatBody } from './adapters/openai-chat.js';
 import type {
   CompletionReasoning, ImageGenerationResult, TranscriptionAudio, TranscriptionResult,
 } from '../openrouter.js';
+import { sniffImage } from '../openrouter.js';
 
 /** How long one attempt may take. The same ceiling the transport had. */
 const TIMEOUT_MS = 1_800_000;
@@ -60,9 +68,6 @@ const STT_TIMEOUT_MS = 120_000;
 export const DEFAULT_EMPTY_RETRIES = 2;
 /** The ceiling, the same one the owner's maxRetries setting has always had. */
 const MAX_EMPTY_RETRIES = 10;
-/** How much of a provider's error body is carried into a message. */
-const ERROR_BODY_CHARS = 500;
-
 /** A failed call, with the provider's HTTP status (502 when it gave none). */
 export interface GatewayError extends Error {
   status: number;
@@ -70,18 +75,35 @@ export interface GatewayError extends Error {
   empty?: true;
   finish_reason?: string;
   attempts?: number;
+  /** The provider's own reason, redacted and capped (./errors.ts providerReasonFromText). */
+  providerMessage?: string;
+  /** Seconds from the provider's Retry-After, on a 429. */
+  retryAfter?: number;
 }
 
 function gatewayError(status: number, message: string): GatewayError {
   return Object.assign(new Error(message), { status });
 }
 
-/** A provider-side failure as the error the callers already map: status plus a bounded message. */
-function providerError(e: unknown): GatewayError {
+/** A provider this node cannot use for the operation: the node's own refusal, never a provider status. */
+function cannotServe(message: string): AiCompletionError {
+  return new AiCompletionError('INVALID_PROVIDER', 400, message);
+}
+
+/**
+ * A provider-side failure as the error the callers map (./errors.ts providerFailureOf): the status,
+ * the provider's reason read by the one policy (redacted, at most 300 characters), and its Retry-After.
+ * A refusal the node already named (AiCompletionError) passes as it is.
+ */
+function providerError(e: unknown): GatewayError | AiCompletionError {
+  if (e instanceof AiCompletionError) return e;
   if (APICallError.isInstance(e)) {
     const status = e.statusCode ?? 502;
-    const body = typeof e.responseBody === 'string' && e.responseBody ? e.responseBody : e.message;
-    return gatewayError(status, `Provider ${status}: ${body.slice(0, ERROR_BODY_CHARS)}`);
+    const reason = providerReasonFromText(typeof e.responseBody === 'string' && e.responseBody ? e.responseBody : e.message);
+    const retryAfter = retryAfterHeader(e.responseHeaders);
+    return Object.assign(gatewayError(status, `Provider ${status}: ${reason}`), {
+      providerMessage: reason, ...(retryAfter !== undefined ? { retryAfter } : {}),
+    });
   }
   const status = (e as { status?: unknown }).status;
   const err = e instanceof Error ? e : new Error(String(e));
@@ -91,7 +113,7 @@ function providerError(e: unknown): GatewayError {
 /** Refuse a string model id at run time; see the file header for why. */
 function assertModelInstance<M extends LanguageModelV4 | ImageModelV4 | TranscriptionModelV4 | EmbeddingModelV4>(model: M | string): M {
   if (typeof model === 'string' || !model || typeof model !== 'object') {
-    throw gatewayError(500, 'A model id reached the AI SDK as a string. Build it through the adapter registry.');
+    throw new AiCompletionError('INTERNAL_ERROR', 500, 'A model id reached the AI SDK as a string. Build it through the adapter registry.');
   }
   return model;
 }
@@ -192,7 +214,7 @@ function reportedCost(providerMetadata: unknown, body: unknown): number | undefi
 
 export async function text(req: TextRequest): Promise<TextResult> {
   const adapter = adapterFor(req.target.type);
-  if (!adapter.language) throw gatewayError(400, `A ${req.target.type} provider does not produce text.`);
+  if (!adapter.language) throw cannotServe(`A ${req.target.type} provider does not produce text.`);
   const model = assertModelInstance(adapter.language(req.target, req.model));
   const content = userContent(req.prompt, req.images, req.files);
   const providerOptions = textProviderOptions(req);
@@ -269,7 +291,7 @@ export interface ImageRequest {
 
 export async function image(req: ImageRequest): Promise<ImageGenerationResult> {
   const adapter = adapterFor(req.target.type);
-  if (!adapter.image) throw gatewayError(400, `A ${req.target.type} provider does not make images.`);
+  if (!adapter.image) throw cannotServe(`A ${req.target.type} provider does not make images.`);
   const model = assertModelInstance(adapter.image(req.target, req.model));
   let r;
   try {
@@ -286,9 +308,13 @@ export async function image(req: ImageRequest): Promise<ImageGenerationResult> {
     throw providerError(e);
   }
   const meta = (r.providerMetadata?.aimeat?.images as unknown as AimeatImageMetadata[] | undefined)?.[0];
+  const data = Buffer.from(r.image.uint8Array);
+  // The pixel size from the file's header, whichever adapter made it (services/openrouter.ts sniffImage).
+  const sniffed = sniffImage(data);
   return {
-    data: Buffer.from(r.image.uint8Array),
-    mime: meta?.mime ?? r.image.mediaType,
+    data,
+    mime: meta?.mime ?? sniffed.mime ?? r.image.mediaType,
+    ...(sniffed.width && sniffed.height ? { width: sniffed.width, height: sniffed.height } : {}),
     model: meta?.model ?? req.model,
     costUsd: typeof meta?.costUsd === 'number' ? meta.costUsd : undefined,
   };
@@ -308,7 +334,7 @@ export interface TranscribeRequest {
 
 export async function transcribeAudio(req: TranscribeRequest): Promise<TranscriptionResult> {
   const adapter = adapterFor(req.target.type);
-  if (!adapter.transcription) throw gatewayError(400, `A ${req.target.type} provider does not transcribe.`);
+  if (!adapter.transcription) throw cannotServe(`A ${req.target.type} provider does not transcribe.`);
   const model = adapter.transcription(req.target, req.model);
   assertModelInstance(model);
   const options: AimeatTranscriptionOptions = {
@@ -346,9 +372,12 @@ export async function transcribeAudio(req: TranscribeRequest): Promise<Transcrip
     return last;
   }
   // A direct provider reports no charge for audio; the seconds are what the record keeps.
+  const segments = req.verbose && Array.isArray(r.segments)
+    ? r.segments.map(s => ({ start: s.startSecond, end: s.endSecond, text: s.text.trim() })) : [];
   return {
     text: r.text, model: r.responses[0]?.modelId ?? req.model,
     ...(r.language ? { language: r.language } : {}),
+    ...(segments.length ? { segments } : {}),
     ...(typeof r.durationInSeconds === 'number' ? { usage: { seconds: r.durationInSeconds } } : {}),
   };
 }
@@ -374,7 +403,7 @@ const EMBED_TIMEOUT_MS = 120_000;
 
 export async function embed(req: EmbedRequest): Promise<EmbedResult> {
   const adapter = adapterFor(req.target.type);
-  if (!adapter.embedding) throw gatewayError(400, `A ${req.target.type} provider does not make embeddings.`);
+  if (!adapter.embedding) throw cannotServe(`A ${req.target.type} provider does not make embeddings.`);
   const model = assertModelInstance(adapter.embedding(req.target, req.model));
   let r;
   try {

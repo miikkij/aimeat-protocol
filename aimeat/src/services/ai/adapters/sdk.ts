@@ -21,6 +21,9 @@
  *   - OPENROUTER_ATTRIBUTION — the two headers OpenRouter's own address receives
  *   - COMPATIBLE_OPTIONS_KEY — where extra body fields for an OpenAI-compatible provider are filed
  * @version-history
+ *   v1.3.0 — 2026-10-08 — A missing key (NO_API_KEY), an operation the type does not serve here
+ *     (INVALID_PROVIDER) and a misrouted extension (INTERNAL_ERROR) are the node's own refusals,
+ *     AiCompletionError, so no caller reads them as a provider's status (aiprov plan, A8).
  *   v1.2.0 — 2026-09-28 — embeddingModel() (System 2 plan, V5).
  *   v1.1.0 — 2026-09-28 — The direct providers (System 2 plan, V3): openai, anthropic, xai and mistral,
  *     each with an explicit key and address; a target's allowOrigins reaches aiFetch.
@@ -35,6 +38,7 @@ import { createMistral } from '@ai-sdk/mistral';
 import type { EmbeddingModelV4, ImageModelV4, LanguageModelV4, TranscriptionModelV4 } from '@ai-sdk/provider';
 import { FIXED_BASE_URLS, type AiTarget } from '../types.js';
 import { aiFetch } from '../fetch.js';
+import { AiCompletionError } from '../errors.js';
 
 /** The headers OpenRouter's dashboard uses to attribute traffic, as the node has always sent them. */
 const OPENROUTER_ATTRIBUTION = { 'HTTP-Referer': 'https://aimeat.io', 'X-Title': 'AIMEAT' };
@@ -54,7 +58,7 @@ function fetchOf(target: AiTarget): typeof fetch {
 
 /** A fixed type's call needs a key; without one its package would read the process environment. */
 function requireKey(target: AiTarget): string {
-  if (!target.key) throw Object.assign(new Error(`A ${target.type} call needs a key.`), { status: 400 });
+  if (!target.key) throw new AiCompletionError('NO_API_KEY', 400, `A ${target.type} call needs a key.`);
   return target.key;
 }
 
@@ -82,7 +86,7 @@ export function languageModel(target: AiTarget, modelId: string): LanguageModelV
       }).chatModel(modelId) as LanguageModelV4;
     case 'extension':
       // An extension has no package: adapters/extension.ts builds its model (adapterFor('extension')).
-      throw Object.assign(new Error('An extension provider has no AI SDK package; use adapters/extension.ts.'), { status: 500 });
+      throw new AiCompletionError('INTERNAL_ERROR', 500, 'An extension provider has no AI SDK package; use adapters/extension.ts.');
   }
 }
 
@@ -91,7 +95,7 @@ export function sdkImageModel(target: AiTarget, modelId: string): ImageModelV4 {
   const common = { apiKey: requireKey(target), baseURL: target.baseUrl, fetch: fetchOf(target) };
   if (target.type === 'openai') return createOpenAI(common).image(modelId);
   if (target.type === 'xai') return createXai(common).image(modelId);
-  throw Object.assign(new Error(`A ${target.type} provider does not make images here.`), { status: 400 });
+  throw new AiCompletionError('INVALID_PROVIDER', 400, `A ${target.type} provider does not make images here.`);
 }
 
 /** An embedding model for this target. Anthropic and xAI make none. */
@@ -112,7 +116,7 @@ export function embeddingModel(target: AiTarget, modelId: string): EmbeddingMode
         ...(target.key ? { apiKey: target.key } : {}),
       }).embeddingModel(modelId);
     default:
-      throw Object.assign(new Error(`A ${target.type} provider does not make embeddings.`), { status: 400 });
+      throw new AiCompletionError('INVALID_PROVIDER', 400, `A ${target.type} provider does not make embeddings.`);
   }
 }
 
@@ -122,5 +126,5 @@ export function sdkTranscriptionModel(target: AiTarget, modelId: string): Transc
   if (target.type === 'openai') return createOpenAI(common).transcription(modelId);
   if (target.type === 'mistral') return createMistral(common).transcription(modelId);
   if (target.type === 'xai') return createXai(common).transcription();
-  throw Object.assign(new Error(`A ${target.type} provider does not transcribe here.`), { status: 400 });
+  throw new AiCompletionError('INVALID_PROVIDER', 400, `A ${target.type} provider does not transcribe here.`);
 }

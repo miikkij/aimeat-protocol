@@ -21,6 +21,10 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-10-08 — /complete, /transcribe and /image answer a failure that is not a provider's as
+ *     500 INTERNAL_ERROR (nodeFailureOf), not 502 PROVIDER_ERROR; a provider's refusal keeps its own
+ *     status (422 PROVIDER_REJECTED, 429 with Retry-After). /image answers width and height,
+ *     /transcribe `segments` on a verbose call and `seconds` null when unmeasured (aiprov plan, A8, A13).
  *   v1.x — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.x — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.x — 2026-10-03 — GET /v1/ai/usage answers `per_agent`: each agent's spend today, split by app,
@@ -94,6 +98,7 @@ import {
   completeForOwner, prepareAiCall, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
   DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai/completion.js';
+import { nodeFailureOf } from '../services/ai/errors.js';
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
 import { getUsageHistory } from '../services/ai-usage-history.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
@@ -133,6 +138,13 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const setAiRetryAfter = (res: Response, e: unknown): void => {
     const s = retryAfterOf(e);
     if (s !== undefined) res.setHeader('Retry-After', String(s));
+  };
+  /** The answer for a failed AI call: the service's typed refusal as it is (a provider's status mapped
+   *  in services/ai/errors.ts), anything else the node's 500 (nodeFailureOf), never 502 for it. */
+  const sendAiFailure = (res: Response, e: unknown, where: string) => {
+    const f = nodeFailureOf(e, where);
+    setAiRetryAfter(res, f);
+    return res.status(f.status).json(error(config.nodeId, f.code, f.message, f.status, f.details));
   };
 
   const upsertMemory = (gaii: string, key: string, value: unknown, tags: string[]): Promise<void> =>
@@ -240,13 +252,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           ...warningsNote(reader),
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
-        if (e instanceof AiCompletionError) {
-          setAiRetryAfter(res, e);
-          return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
-        }
         // A file no model may read is refused before the call, and said as that, not as a provider fault.
         if (e instanceof ClassificationError) return res.status(e.status).json(error(config.nodeId, e.code, e.message));
-        return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+        return sendAiFailure(res, e, 'POST /v1/ai/complete');
       }
     });
 
@@ -336,6 +344,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           model: r.model,
           language: r.language ?? null,
           seconds: r.seconds,
+          ...(r.segments ? { segments: r.segments } : {}),
           route: r.route,
           usage: {
             total_tokens: r.usage.totalTokens,
@@ -351,11 +360,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           ...warningsNote(reader),
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
-        if (e instanceof AiCompletionError) {
-          setAiRetryAfter(res, e);
-          return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
-        }
-        return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+        return sendAiFailure(res, e, 'POST /v1/ai/transcribe');
       }
     });
 
@@ -406,6 +411,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           storage_key: r.storageKey,
           mime_type: r.mime,
           size: r.sizeBytes,
+          width: r.width,
+          height: r.height,
           model: r.model,
           visibility: r.visibility,
           ...(download ? { download_url: `${config.baseUrl}/v1/download/${download}`, download_expires_in_seconds: IMAGE_DOWNLOAD_TTL_SECONDS } : {}),
@@ -424,11 +431,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           { description: 'Download the image', method: 'GET', url: r.fetchUrl },
         ], envelopeMeta(prov)));
       } catch (e) {
-        if (e instanceof AiCompletionError) {
-          setAiRetryAfter(res, e);
-          return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
-        }
-        return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+        return sendAiFailure(res, e, 'POST /v1/ai/image');
       }
     });
 

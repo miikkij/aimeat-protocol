@@ -732,6 +732,20 @@ components:
 
 
     # === Core Envelope ===
+    SpeechAudio:
+      type: object
+      description: >-
+        What a speech answer's bytes are. `mime` is the provider's real content type. For pcm the
+        bytes are raw samples with no header, and the other three say their layout: OpenAI and
+        OpenRouter send 24000, 1, s16le; another provider says it in its content type or its provider
+        record, else null (never a guess). For mp3 the other three are null.
+      required: [mime, sample_rate, channels, sample_format]
+      properties:
+        mime: { type: string, example: audio/pcm }
+        sample_rate: { type: integer, nullable: true, example: 24000 }
+        channels: { type: integer, nullable: true, example: 1 }
+        sample_format: { type: string, nullable: true, enum: [s16le, s16be, f32le, null], example: s16le }
+
     AiCallRole:
       type: string
       minLength: 1
@@ -6352,6 +6366,58 @@ components:
                       code:
                         example: INVALID_API_KEY
 
+    ProviderRefused:
+      description: |
+        The AI provider answered and said no, and the same call gets the same answer, so a client must
+        not retry it as it is. `PROVIDER_REJECTED`: the provider refused the request as sent (HTTP 400,
+        404, 413, 415, 422 and the like: a model that does not make the asked format, a voice it does
+        not have, a parameter out of range); change the model, the format or the voice. A speech call in
+        mp3 carries `details.hint`, which says to ask for pcm. `CONTENT_REFUSED`: the provider's
+        moderation refused the content; the call does not move to another provider. Both carry
+        `error.details.provider_status` (the provider's HTTP status) and, when the provider gave one,
+        `error.details.provider_message` (its reason, at most 300 characters, credentials redacted).
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code: { type: string, enum: [PROVIDER_REJECTED, CONTENT_REFUSED] }
+                      details:
+                        type: object
+                        properties:
+                          provider_status: { type: integer, example: 400 }
+                          provider_message: { type: string, maxLength: 300 }
+                          hint: { type: string }
+
+    AiProviderLimited:
+      description: |
+        RATE_LIMITED - either the account's own AI call limit (details.retry_after_sec) or the AI
+        provider's rate limit (details.provider_status 429, details.retry_after_sec when the provider
+        sent a Retry-After). Retry-After carries the seconds when known; retry after it.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait, when the node or the provider said.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AimeatEnvelope'
+
+    AiProviderFailure:
+      description: |
+        PROVIDER_ERROR - the AI provider failed (HTTP 5xx, a timeout, no answer, an answer the node
+        cannot read). `details.provider_status` names its status when it gave one. Trying again later
+        may work. A failure of the node itself is 500 INTERNAL_ERROR, never this.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AimeatEnvelope'
+
     RateLimited:
       description: Too many requests
       headers:
@@ -11616,15 +11682,19 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '402':
-          description: The allowance is spent and this node has no free-model fallback configured
+          description: The allowance is spent and this node has no free-model fallback configured (QUOTA_EXHAUSTED), or the provider says the key that pays has no credit left (PROVIDER_NO_CREDIT)
         '403':
           description: Not an owner session and no ai:use scope
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
         '429':
-          description: The model is rate limited. Free models reach this first.
+          $ref: '#/components/responses/AiProviderLimited'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
         '502':
-          description: The model is overloaded, unavailable, or answered with an error
+          $ref: '#/components/responses/AiProviderFailure'
   /v1/llm/models:
     get:
       operationId: llmProxyListModels
@@ -16559,7 +16629,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '402':
-          $ref: '#/components/responses/AimeatError'
+          description: QUOTA_EXHAUSTED, APP_QUOTA_EXHAUSTED or AGENT_QUOTA_EXHAUSTED (a budget on this node), or PROVIDER_NO_CREDIT (the provider says the key that pays has no credit left).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '403':
           description: >
             Refused: the caller lacks `ai:use`, the app is not on the owner's allowlist, the model
@@ -16579,8 +16653,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
+        '429':
+          $ref: '#/components/responses/AiProviderLimited'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
+        '502':
+          description: PROVIDER_ERROR (the provider failed; see AiProviderFailure) or EMPTY_COMPLETION (every attempt answered with no content; the message names the finish_reason).
 
   /v1/ai/policy:
     get:
@@ -16859,12 +16941,16 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '403':
           $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/AiProviderLimited'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
         '502':
-          $ref: '#/components/responses/AimeatError'
+          $ref: '#/components/responses/AiProviderFailure'
 
   /v1/ai/catalog/meta:
     get:
@@ -16972,7 +17058,7 @@ paths:
                     type: { type: string, enum: [key, none] }
                 capabilities:
                   type: object
-                  description: '{ "<capability>": { enabled, model?, pool?, voice?, language?, parser? } }. Capabilities: text, vision, files, image, speech, transcription, embed.'
+                  description: '{ "<capability>": { enabled, model?, pool?, voice?, language?, parser?, sampleRate?, channels?, sampleFormat? } }. Capabilities: text, vision, files, image, speech, transcription, embed. speech only: sampleRate (8000-192000), channels (1-8) and sampleFormat (s16le, s16be, f32le) state the PCM a local or OpenAI-compatible server sends, which the speech answer''s `audio` block then reports; OpenAI and OpenRouter need none (24000 Hz, mono, s16le).'
                   additionalProperties: true
       responses:
         '200':
@@ -17513,7 +17599,10 @@ paths:
         from anything the caller sends; another owner's id is a 404 rather than a 403, because whose
         jobs exist is not a stranger's business. `classification_warnings` (ClassificationWarnings)
         names the warning-classified items the job gave its model: the prompt's records, and a
-        transcription's audio once it ran.
+        transcription's audio once it ran. A failed job's `error` is { code, message, status?,
+        details? }: the status and details a REST call would have answered (a provider's refusal is
+        PROVIDER_REJECTED, status 422, with details.provider_status and provider_message), so a reader
+        can tell a refusal that repeats from a failure worth trying again.
 
 
         Requires an owner session or a token carrying `ai:use`.
@@ -17673,7 +17762,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '422':
-          description: '`PROVIDER_REJECTED` — TypeSafe refused the request; `details.provider_detail` names the field.'
+          description: '`PROVIDER_REJECTED` — the decision provider refused the request (HTTP 400, or 404 for an address or model it does not know); `details.provider_detail` names the field when it said.'
           content:
             application/json:
               schema:
@@ -18560,8 +18649,10 @@ paths:
                         type: object
                         properties:
                           storage_key: { type: string }
-                          mime_type: { type: string }
+                          mime_type: { type: string, description: 'Sniffed from the bytes: image/png, image/jpeg, image/webp or image/gif.' }
                           size: { type: integer }
+                          width: { type: integer, nullable: true, description: 'Pixel width from the file''s header; null when it could not be read.' }
+                          height: { type: integer, nullable: true, description: 'Pixel height from the file''s header; null when it could not be read.' }
                           model: { type: string }
                           visibility: { type: string, enum: [public, private] }
                           url: { type: string }
@@ -18583,13 +18674,17 @@ paths:
         '401':
           description: Unauthorized
         '402':
-          description: QUOTA_EXHAUSTED - the daily budget is spent; nothing was generated
+          description: QUOTA_EXHAUSTED - the daily budget is spent, nothing was generated; or PROVIDER_NO_CREDIT - the provider says the key that pays has no credit left
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
         '429':
-          description: RATE_LIMITED by the provider
+          $ref: '#/components/responses/AiProviderLimited'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
         '502':
-          description: PROVIDER_ERROR - the provider failed; the message carries what it said
+          $ref: '#/components/responses/AiProviderFailure'
   /v1/ai/stream:
     post:
       operationId: aiStream
@@ -18597,10 +18692,15 @@ paths:
       description: >
         Requires ai:use (owners bypass scopes). Uses the caller's provider and shared AI budget.
         An app token's signed app identity supplies app_id; a conflicting value is refused with 403.
-        Returns newline-delimited JSON start, text and done frames. The done frame carries model,
-        finish_reason, truncated, usage, budget, cost_exact and provenance when available.
-        Failures after headers are error frames. Missing done is a failed stream. Disconnect cancels
-        generation and records available usage. Accepts text messages, not arbitrary tools or URLs.
+        Returns newline-delimited JSON start, text and done frames. The start frame carries model,
+        keySource (kept for older clients) and key_source (agent | own | node, which pocket pays). The
+        done frame carries model, finish_reason, truncated, usage, budget, cost_exact, key_source and
+        provenance when available. A failure after the first frame is an error frame
+        `{ "type": "error", "code", "message", "details"? }` with the same code and details the JSON
+        refusal would carry (a provider's 4xx is PROVIDER_REJECTED with details.provider_status and
+        provider_message). Missing done is a failed stream. Disconnect cancels generation and records
+        available usage. A spent own OpenRouter key is tried once on the free router when the call named
+        no model, as /v1/ai/complete does. Accepts text messages, not arbitrary tools or URLs.
         With json=1, returns a JSON envelope containing final text and done metadata for agent clients.
         Agent calls use the owner's AI key and budget, preserving the identity's home node.
       parameters:
@@ -18664,12 +18764,15 @@ paths:
                       data: { type: object, description: 'Final text, model, usage, budget and provenance.' }
         '400': { description: 'Invalid parameters, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)' }
         '401': { description: Authentication required }
-        '402': { description: AI budget exhausted }
+        '402': { description: 'AI budget exhausted (QUOTA_EXHAUSTED), or the provider says the key that pays has no credit left (PROVIDER_NO_CREDIT)' }
         '403': { description: Missing ai:use or conflicting application identity }
         '409': { description: 'AI_ROLE_NOT_BOUND: the app''s role runs only once the owner binds it (PUT /v1/ai/roles)' }
+        '413': { description: 'TOO_LARGE: the answer passed 200 000 characters (json=1; as an error frame when streaming)' }
+        '422': { $ref: '#/components/responses/ProviderRefused' }
         '424': { $ref: '#/components/responses/ProviderKeyRefused' }
-        '429': { description: Rate limited }
-        '502': { description: Provider failure before streaming started }
+        '429': { $ref: '#/components/responses/AiProviderLimited' }
+        '500': { description: 'INTERNAL_ERROR: the node failed while handling the call' }
+        '502': { $ref: '#/components/responses/AiProviderFailure' }
   /v1/ai/speak:
     post:
       operationId: aiSpeak
@@ -18677,15 +18780,28 @@ paths:
       description: >
         Requires ai:use. Uses the same daily and application AI budgets as completions.
         App identity is bound to the signed grant. Returns NDJSON start, audio (base64 bytes),
-        done or error frames. Done carries bytes, model, cost_usd, key_source, usage, budget, cost_exact,
-        cost_known, provenance and syntheticAudio. Speech moves to another provider only when the owner's
-        routing allows another voice (speechVoiceMayChange). PCM format is provider-specific signed PCM; configure
-        the browser's sample rate and channels to match. MP3 is available where the model supports it.
-        OpenRouter cost uses the generation endpoint, falling back to its per-character catalogue
-        estimate. Custom providers without pricing return cost_known false. Cancellation may be billed.
+        done or error frames. Start carries model, format, key_source, syntheticAudio and `audio`. Done
+        carries bytes, model, `audio`, cost_usd, key_source, usage, budget, cost_exact, cost_known,
+        provenance, syntheticAudio and route (who chose, who answered, every attempt). `audio` is
+        { mime, sample_rate, channels, sample_format }: the provider's real content type, and for pcm
+        the layout of the raw samples, which carry no header. OpenAI and OpenRouter send 24000 Hz, mono,
+        s16le (signed 16-bit little-endian); a local or OpenAI-compatible provider says it in its
+        content type (audio/L16; rate=..; channels=..) or in its provider record (capabilities.speech
+        sampleRate, channels, sampleFormat); otherwise the three are null, never a guess. For mp3 they
+        are null. The bytes are passed as the provider sent them. A failure after the first frame is an
+        error frame `{ "type": "error", "code", "message", "details"? }`. Speech moves to another
+        provider before the first byte only when the owner's routing allows another voice
+        (speechVoiceMayChange); failed attempts are recorded in usage. When the catalogue lists the
+        model's voices, a voice outside them is refused 400 INVALID_VOICE (details.voices) before the
+        provider is called. A provider that refuses the request (mp3 from a model that makes only pcm, an
+        unknown voice) is 422 PROVIDER_REJECTED with details.provider_status, provider_message and, for
+        mp3, a hint to ask for pcm: the same call fails again. OpenRouter cost uses the generation
+        endpoint, falling back to its per-character catalogue estimate. Custom providers without pricing
+        return cost_known false. Cancellation may be billed.
         With json=1, stores the completed audio privately in the calling principal's storage namespace
-        and returns storage_key, fetch_url, mime_type, size_bytes and done metadata in a JSON envelope.
-        The file persists until deleted; download requires storage:read and deletion storage:write.
+        and returns storage_key, fetch_url, mime_type (the provider's), size_bytes, audio and done
+        metadata in a JSON envelope. The file persists until deleted; download requires storage:read
+        and deletion storage:write.
       parameters:
         - in: query
           name: json
@@ -18725,15 +18841,23 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { type: object, description: 'Private storage_key, fetch_url, mime_type, size_bytes, usage, budget and provenance.' }
-        '400': { description: 'Invalid parameters, unknown speech model, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)' }
+                      data:
+                        type: object
+                        description: 'Private storage_key, fetch_url, mime_type, size_bytes, audio, usage, budget, route and provenance.'
+                        properties:
+                          audio:
+                            $ref: '#/components/schemas/SpeechAudio'
+        '400': { description: 'Invalid parameters, unknown speech model, INVALID_VOICE (details.voices lists the model''s voices), or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)' }
         '401': { description: Authentication required }
-        '402': { description: AI budget exhausted }
+        '402': { description: 'AI budget exhausted (QUOTA_EXHAUSTED), or the provider says the key that pays has no credit left (PROVIDER_NO_CREDIT)' }
         '403': { description: Missing ai:use or conflicting application identity }
         '409': { description: 'AI_ROLE_NOT_BOUND: the app''s role runs only once the owner binds it (PUT /v1/ai/roles)' }
+        '413': { description: 'TOO_LARGE: the speech passed 16 MB (json=1; as an error frame when streaming)' }
+        '422': { $ref: '#/components/responses/ProviderRefused' }
         '424': { $ref: '#/components/responses/ProviderKeyRefused' }
-        '429': { description: Rate limited }
-        '502': { description: Provider failure before streaming started }
+        '429': { $ref: '#/components/responses/AiProviderLimited' }
+        '500': { description: 'INTERNAL_ERROR: the node failed while handling the call' }
+        '502': { $ref: '#/components/responses/AiProviderFailure' }
   /v1/ai/transcribe:
     post:
       operationId: aiTranscribe
@@ -18821,7 +18945,17 @@ paths:
                             $ref: '#/components/schemas/ClassificationWarnings'
                           seconds:
                             type: number
-                            description: Audio duration as the provider measured it; 0 if unreported.
+                            nullable: true
+                            description: Audio duration as the provider measured it; null when the provider did not report one (0 until 2026-10-08).
+                          segments:
+                            type: array
+                            description: With verbose, the provider's timed segments, when it gave them; absent otherwise.
+                            items:
+                              type: object
+                              properties:
+                                start: { type: number, description: Seconds from the start. }
+                                end: { type: number }
+                                text: { type: string }
                           usage:
                             type: object
                             properties:
@@ -18846,11 +18980,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '402':
-          description: Daily AI budget or per-app quota exhausted
+          description: Daily AI budget or per-app quota exhausted, or the provider says the key that pays has no credit left (PROVIDER_NO_CREDIT)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
         '403':
@@ -18866,13 +19002,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/AiProviderLimited'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
         '502':
-          description: Provider error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AimeatEnvelope'
+          $ref: '#/components/responses/AiProviderFailure'
 
   /v1/ai/available:
     get:
@@ -49060,8 +49194,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
+        '502':
+          description: OPENROUTER_ERROR - the provider failed (HTTP 5xx or no answer); details.provider_status names its status.
         '503':
           description: Encryption not configured
           content:
@@ -49117,8 +49255,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the test.
         '503':
           description: Encryption not configured
           content:
@@ -49237,10 +49379,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
         '424':
           $ref: '#/components/responses/ProviderKeyRefused'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the call.
         '429':
-          description: Rate limited by OpenRouter
+          description: Rate limited by OpenRouter (RATE_LIMITED; Retry-After when the provider sent one)
           content:
             application/json:
               schema:
@@ -52716,14 +52862,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '422':
+          $ref: '#/components/responses/ProviderRefused'
+        '424':
+          $ref: '#/components/responses/ProviderKeyRefused'
         '429':
           description: >
             RATE_LIMITED — the account started as many AI calls this minute as it may (counted per
-            account, with POST /v1/ai/transcribe and aimeat_ai_transcribe).
+            account, with POST /v1/ai/transcribe and aimeat_ai_transcribe), or the provider limited the
+            call (details.provider_status 429). Retry-After carries the seconds when known.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '500':
+          description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
+        '502':
+          $ref: '#/components/responses/AiProviderFailure'
 
   /v1/messages/{id}:
     delete:
