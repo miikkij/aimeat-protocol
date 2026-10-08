@@ -55,6 +55,13 @@ they came from (a person on a page, or an agent at a checkout). Read it when the
 moved. It cannot show what a person asked the AI; say so. \`aimeat_visibility_settings_set\` switches
 the counting off or on (scope signals:write); ask the owner first.
 
+**Sell through AI shopping agents (scope signals:write).** \`aimeat_visibility_feed\` — the owner's
+USD-priced offers and app tools as a Microsoft Merchant Center feed (Copilot Checkout) and a Stripe
+agent-commerce catalog. Read it, switch it on, set the brand, the return policy label and a page per
+product, and push the catalog into the owner's own Stripe with \`stripe_sync: "send"\`. Read its
+\`todo\` lines to the owner: they connect their own Merchant Center account to the feed address. An
+agent order through Stripe arrives as an order with a fulfilment task.
+
 **Working state.** \`aimeat_memory_*\` for notes and state · \`aimeat_storage_upload\`/\`_download\`
 · \`aimeat_wallet_balance\`/\`_transactions\` · \`aimeat_handbook_get\`.
 

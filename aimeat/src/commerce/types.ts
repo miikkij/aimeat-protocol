@@ -12,6 +12,8 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   v1.4.0 — 2026-10-08 — CheckoutSessionRecord.guest: a buyer with no account (an AI shopping
+ *     platform), for agent orders from Stripe's Agentic Commerce Suite and UCP platform checkouts.
  *   v1.3.0 — 2026-10-08 — CheckoutAttribution: the channel a checkout came from, carried on the
  *     session so the completed purchase is counted under it (services/visibility/attribution.ts).
  *   v1.2.0 — 2026-10-02 — SavedPayment: collect may keep the payment method for later charges
@@ -155,6 +157,12 @@ export interface CheckoutSessionRecord {
   fulfillment?: { taskIds: string[]; results?: Array<{ sku: string; result: unknown }> };
   /** Where the checkout came from (AI visibility). Absent on sessions opened before 2026-10-08. */
   attribution?: CheckoutAttribution;
+  /**
+   * A buyer with no account here: an AI shopping platform buying for a person (layer E). Set on an
+   * order taken from Stripe's Agentic Commerce Suite (`stripe-acs`) or a UCP platform checkout
+   * (`ucp`); `buyerOwner` and `buyerGhii` are then empty, and the contact is the seller's to fulfil.
+   */
+  guest?: { source: 'stripe-acs' | 'ucp'; platform: string; email: string | null; name: string | null; eventId?: string; profileUrl?: string };
   createdAt: string;
   updatedAt: string;
   /** Open sessions expire lazily after this instant (checked on read + on complete). */

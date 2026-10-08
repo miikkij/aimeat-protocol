@@ -13,6 +13,7 @@
  * @structure visibilityRouter (GET /v1/visibility/report, GET|PUT /v1/visibility/settings) · countApexDocs
  * @usage app.use(visibilityRouter(config, storage)); router.use(countApexDocs(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-08 — Mounts the product feed routes (routes/visibility-feed.ts, layer E).
  *   v1.1.0 — 2026-10-08 — The settings take the owner's Clarity project id and GA4 measurement id
  *     (layer B), and answer in one view shared with the MCP tool.
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
@@ -31,6 +32,7 @@ import { countVisit, nodeCountsVisibility, resolvePlaceOwner } from '../services
 import { getVisibilitySettings, setVisibilitySettings, VisibilitySettingsError } from '../services/visibility/visibility-settings.js';
 import { visibilitySettingsView } from '../services/visibility/analytics-tags.js';
 import { readVisibilityReport } from '../services/visibility/visibility-report.js';
+import { visibilityFeedRouter } from './visibility-feed.js';
 
 /** Every field optional: only what is given changes. A null id removes it. */
 const SettingsSchema = z.object({
@@ -73,6 +75,8 @@ export function countApexDocs(config: AimeatConfig, storage: Storage): RequestHa
 
 export function visibilityRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  // The owner's product feeds (layer E), in their own file.
+  router.use(visibilityFeedRouter(config, storage));
 
   /** The account whose report this is. A visitor from another node has none here. */
   function ownerOf(req: Request, res: Response): string | null {

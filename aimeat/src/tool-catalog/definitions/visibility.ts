@@ -10,6 +10,7 @@
  * @structure visibilityTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.2.0 — 2026-10-08 — aimeat_visibility_feed: the product feeds for Copilot Checkout and Stripe (layer E).
  *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes clarity_project_id and ga4_measurement_id (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
@@ -41,6 +42,24 @@ export const visibilityTools = [
             enabled: { type: 'boolean', description: 'true counts, false stops counting.' },
             clarity_project_id: { type: 'string', description: 'The Microsoft Clarity project id (Clarity: Settings > Overview), 6 to 20 letters and digits. null removes it.', zod: z.string().max(40).nullable() },
             ga4_measurement_id: { type: 'string', description: 'The Google Analytics 4 measurement id of a web data stream, such as G-ABC123XYZ9. null removes it.', zod: z.string().max(40).nullable() },
+        },
+    },
+    {
+        name: 'aimeat_visibility_feed',
+        description: 'The person\'s product feeds for AI shopping agents (Microsoft Copilot Checkout and Stripe agent checkout). With no field it reads the feed: whether it is on, its two public addresses (a Merchant Center feed and a Stripe catalog), every product listed with its feed id, price and page, what was left out and why, the last push to Stripe, and a `todo` list of what the person still has to do. Only public offers and app tools with a USD price in whole cents are listed (Copilot Checkout is US and USD only); packages are not. `enabled`, `brand`, `return_policy_label`, `store_url` and `product_links` (sku to page address; null removes) change the feed; only the fields given change. `stripe_sync: "send"` pushes the catalog into the person\'s OWN Stripe with their selling key, and `"check"` reads that import\'s status again. The person connects their own Merchant Center account to the merchant_center address; say the todo lines to them.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        // Not idempotent: stripe_sync "send" starts a new import at Stripe each time. Open world: it talks to Stripe.
+        annotations: { title: 'Product Feeds for AI Shopping', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        scope: 'signals:write',
+        surfaces: ['appdev', 'commerce'],
+        input: {
+            enabled: { type: 'boolean', description: 'true publishes both feeds; false answers 404 at both addresses.' },
+            brand: { type: 'string', description: 'The brand and seller name shown with every product (70 characters). Defaults to the person\'s display name; null resets.', zod: z.string().max(70).nullable() },
+            return_policy_label: { type: 'string', description: 'The label of the return policy the person set in Merchant Center (Store settings > UCP settings), 50 characters. null removes it.', zod: z.string().max(50).nullable() },
+            store_url: { type: 'string', description: 'Where a product with no page of its own links: an https address. Defaults to the place\'s front page. null resets.', zod: z.string().max(2048).nullable() },
+            product_links: { type: 'object', description: 'A product page per sku (the `sku` of a listed product, as this tool reads it) to an https address. Merged; a null value removes that link.', zod: z.record(z.string().max(300), z.string().max(2048).nullable()) },
+            stripe_sync: { type: 'string', description: '"send" pushes the catalog into the person\'s own Stripe now; "check" reads the last import\'s status.', enum: ['send', 'check'], zod: z.enum(['send', 'check']) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];
