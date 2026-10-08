@@ -23,7 +23,7 @@
  * @usage const space = resolveRowSpace(manifest, 'mailmessage');
  * @version-history
  *   v1.2.0 — 2026-10-08 — `extensions`: the installed extensions the organism opened the space to,
- *     for an ingest that runs on a schedule (row-service.ts authorizeExtension).
+ *     as `installer/name`, for an ingest that runs on a schedule (row-service.ts authorizeExtension).
  *   v1.1.0 — 2026-08-29 — `apps`: the apps the organism opened the space to, normalised to
  *     lowercase owner/filename.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -58,8 +58,8 @@ export interface RowObjectType {
    */
   apps?: unknown;
   /**
-   * Extensions this space is open to, by installed name. An extension that runs on a schedule or a
-   * workflow step has nobody present, so it can never borrow a caller's membership: the ORGANISM
+   * Extensions this space is open to, as `installer/name`. An extension that runs on a schedule or
+   * a workflow step has nobody present, so it can never borrow a caller's membership: the ORGANISM
    * names the extension here, the extension's manifest declares `workspace.rows`, and its installer
    * must be an active member. Read the design in row-service.ts (authorizeExtension).
    */
@@ -76,7 +76,7 @@ export interface RowSpace {
   retention: { maxRows: number | null; maxDays: number | null };
   /** The apps the organism opened this space to (`owner/filename`, lowercase). Empty = none. */
   apps: string[];
-  /** The extensions the organism opened this space to (installed names, lowercase). Empty = none. */
+  /** The extensions the organism opened this space to (`installer/name`, lowercase). Empty = none. */
   extensions: string[];
 }
 
@@ -141,9 +141,11 @@ export function resolveRowSpace(
     apps: Array.isArray(ot.apps)
       ? ot.apps.filter((a): a is string => typeof a === 'string' && a.includes('/')).map((a) => a.trim().toLowerCase())
       : [],
-    // Installed extension names, lowercased; a name with a slash is an app, never an extension.
+    // `installer/name`, lowercased. The installer is part of the name on purpose: an extension name
+    // is free again once it is uninstalled, and a bare name would hand the space to whoever
+    // installs the next extension under it.
     extensions: Array.isArray(ot.extensions)
-      ? ot.extensions.filter((e): e is string => typeof e === 'string' && !!e.trim() && !e.includes('/')).map((e) => e.trim().toLowerCase())
+      ? ot.extensions.filter((e): e is string => typeof e === 'string' && /^[^/\s]+\/[^/\s]+$/.test(e.trim())).map((e) => e.trim().toLowerCase())
       : [],
   };
 }

@@ -974,9 +974,9 @@
      "cells": [
       "<strong>Rows from an extension on a schedule</strong>",
       "An extension can fill a shared row space with nobody present, for example a feed of security alerts fetched every five minutes. An admin of the organism names the extension in the space's definition, and the extension asks for row access in its manifest, which the person installing it sees. Each row records the extension as its writer, and a row sent again with the same id replaces the earlier one, so a repeated fetch does not duplicate. Limits: the extension reaches only the row spaces that name it, its installer must be a member, and on a schedule it can neither read nor write records or documents.",
-      "manifest <code>workspace: { rows: true }</code>, space <code>extensions: [name]</code>, <code>ctx.workspace.appendRows</code>, <code>ctx.workspace.readRows</code>"
+      "manifest <code>workspace: { rows: true }</code>, space <code>extensions: [installer/name]</code>, <code>ctx.workspace.appendRows</code>, <code>ctx.workspace.readRows</code>"
      ],
-     "plain": "Rows from an extension on a schedule An extension can fill a shared row space with nobody present, for example a feed of security alerts fetched every five minutes. An admin of the organism names the extension in the space's definition, and the extension asks for row access in its manifest, which the person installing it sees. Each row records the extension as its writer, and a row sent again with the same id replaces the earlier one, so a repeated fetch does not duplicate. Limits: the extension reaches only the row spaces that name it, its installer must be a member, and on a schedule it can neither read nor write records or documents. manifest workspace: { rows: true }, space extensions: [name], ctx.workspace.appendRows, ctx.workspace.readRows"
+     "plain": "Rows from an extension on a schedule An extension can fill a shared row space with nobody present, for example a feed of security alerts fetched every five minutes. An admin of the organism names the extension in the space's definition, and the extension asks for row access in its manifest, which the person installing it sees. Each row records the extension as its writer, and a row sent again with the same id replaces the earlier one, so a repeated fetch does not duplicate. Limits: the extension reaches only the row spaces that name it, its installer must be a member, and on a schedule it can neither read nor write records or documents. manifest workspace: { rows: true }, space extensions: [installer/name], ctx.workspace.appendRows, ctx.workspace.readRows"
     },
     {
      "slug": "g-6-organism-export-and-import",
@@ -1378,6 +1378,15 @@
       "<code>maxCostUsd</code> on <code>/v1/workflows/:id</code>, <code>aimeat_workflow_save</code>"
      ],
      "plain": "Workflow spending limit Cap what one run may spend on AI, in US dollars: its AI steps and your model judging its worded checks count together. Before an AI step asks the model, the run sets aside what one attempt of the step is expected to cost and starts it only when that fits in what is left, so AI steps that fit together still run side by side. What is set aside stays set aside until the model answers, even when the step has already timed out, been retried or been marked done. The estimate is the most one attempt of the step cost in the workflow's last ten runs, counting only runs where the step was set up as it is now; a step with no such run gets an equal share of what is left, so its first run can still go past the limit by what it costs beyond that share. A step expected to cost more than the whole limit runs once, alone, while the run has spent less than the limit. A step that does not fit waits for the model calls still open; when none is open, the run stops, keeps what the finished steps produced and says how much was spent and what the next step would have cost. Past the limit a worded check is not sent to the model, and it passes. Each step records its own AI cost, and the run records what the judging cost. The daily AI budget still applies to every AI call. maxCostUsd on /v1/workflows/:id, aimeat_workflow_save"
+    },
+    {
+     "slug": "g-8-an-extension-step-acts-on-what-came-before",
+     "cells": [
+      "<strong>An extension step acts on what came before</strong>",
+      "An extension step can take an earlier step's result or a person's answer as its input, so a workflow can propose an action, wait for your approval and then carry out exactly what you approved. The step names which stored results it takes; a result that is missing arrives as empty.",
+      "extension step <code>input_from</code> on <code>/v1/workflows/:id</code>, <code>aimeat_workflow_save</code>"
+     ],
+     "plain": "An extension step acts on what came before An extension step can take an earlier step's result or a person's answer as its input, so a workflow can propose an action, wait for your approval and then carry out exactly what you approved. The step names which stored results it takes; a result that is missing arrives as empty. extension step input_from on /v1/workflows/:id, aimeat_workflow_save"
     },
     {
      "slug": "g-8-workflow-human-decisions",
@@ -3808,6 +3817,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 377
+  "rows": 378
  }
 }

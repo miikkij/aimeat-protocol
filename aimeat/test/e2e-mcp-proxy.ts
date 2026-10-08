@@ -805,6 +805,19 @@ await test('read_only refuses a tool the server does not mark read-only, and nam
   assert(text.includes('echo') && /read-only/i.test(text), `the refusal names the read-only tools: ${text}`);
 });
 
+await test('read_only set through the node MCP tool aimeat_mcp_grant_set holds too', async () => {
+  // The MCP tool writes its own grant (src/mcp/mcp-proxy.ts), so the REST arms above say nothing
+  // about it: drop read_only from that writer and only this arm goes red.
+  const setter = await agentWithScopes({ name: ownerName, token: ownerToken }, 'mcpgrantsetter', ['mcp:read', 'mcp:use', 'mcp:manage']);
+  const session = await openMcpSession(setter.token);
+  const set = await mcpTool(session, 'aimeat_mcp_grant_set', { server: 'upstream', grantee: agentGaii, tools: '*', read_only: true });
+  assert(!set.isError, `grant_set over MCP: ${set.text}`);
+  const refused = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(), body: JSON.stringify({ tool: 'refuses' }),
+  });
+  assert(refused.status === 403 && /read-only/i.test(JSON.stringify(refused.body)), `expected the read-only refusal, got ${refused.status}: ${JSON.stringify(refused.body)}`);
+});
+
 await test('removing the read-only narrowing opens the other tool again', async () => {
   const del = await json(`/v1/mcp-servers/upstream/grants/${encodeURIComponent(agentGaii)}`, { method: 'DELETE', headers: ownerAuth() });
   assert(del.status === 200, `delete: ${del.status}`);

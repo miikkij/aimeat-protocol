@@ -176,7 +176,7 @@ async function authorizeApp(
  * (the extension acts as its caller) has no caller to act as. Lending it the installer's own
  * membership would put the owner's whole authority on a clock, which the scope guard on the
  * attended road exists to refuse. So an extension reaches a row space only when (1) the ORGANISM
- * named the extension in the space's `extensions` list, (2) its manifest declared `workspace.rows`,
+ * named the extension in the space's `extensions` list as `installer/name`, (2) its manifest declared `workspace.rows`,
  * which services/extension-workspace.ts checked before the call arrived and the install approval
  * showed, and (3) its INSTALLER is an active member. It appends to and reads that space; every other
  * space, and every record and document surface, stays closed to it. Decided 2026-10-08 so an alert
@@ -185,10 +185,13 @@ async function authorizeApp(
 async function authorizeExtension(
   deps: RowServiceDeps, caller: RowCaller, organismId: string, space: RowSpace,
 ): Promise<void> {
+  // The installer is half of the name: an extension name is free again after an uninstall, and the
+  // next member to take it must not inherit a space the organism opened to somebody else's code.
   const ext = (caller.extension ?? '').trim().toLowerCase();
-  if (!ext || !space.extensions.includes(ext)) {
+  const named = `${caller.owner.trim().toLowerCase()}/${ext}`;
+  if (!ext || !space.extensions.includes(named)) {
     throw new WorkspaceRowError('ACCESS_DENIED', 403,
-      `This space is not open to the extension ${ext || '(unnamed)'}. An organism admin names the extensions a row space accepts in the manifest (objectTypes[].extensions).`);
+      `This space is not open to the extension ${ext ? named : '(unnamed)'}. An organism admin names the extensions a row space accepts in the manifest, as installer/name (objectTypes[].extensions).`);
   }
   const membership = await deps.storage.getMembership(organismId, caller.owner);
   if (!membership || membership.status !== 'active') {

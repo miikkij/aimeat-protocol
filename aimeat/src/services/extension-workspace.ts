@@ -22,12 +22,12 @@
  *        as `config.__workspace`, a key a manifest's own `config:` cannot set. Undeclared means
  *        `ctx.workspace` is undefined; read-only means the writers throw PERMISSION.
  *     2. There is a real caller. A scheduled run and a workflow step have nobody present, so those
- *        code paths attach only the two row calls (buildUnattendedExtensionWorkspace), and only
+ *        code paths attach only the two row calls (extension-workspace-rows.ts), and only
  *        when the manifest declares `workspace.rows`.
  *
  *   THE ROW CALLS ARE THE EXCEPTION TO "AS THE CALLER". appendRows and readRows take the row
  *   service's extension path on every code path: the space names the extension
- *   (`objectTypes[].extensions`), the manifest declares `workspace.rows`, and the INSTALLER is an
+ *   (`objectTypes[].extensions`, as installer/name), the manifest declares `workspace.rows`, and the INSTALLER is an
  *   active member. The organism's naming is the grant, it opens one space and nothing else, and the
  *   caller of the action is not consulted, so an extension whose action is public decides itself
  *   (from ctx.caller) whose calls may append.
@@ -53,8 +53,9 @@
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
  *   v1.3.0 — 2026-10-08 — appendRows and readRows (manifest workspace.rows), through the row
- *     service's extension path; buildUnattendedExtensionWorkspace gives a schedule or a workflow
- *     step those two calls and nothing else. For the aimeat-soc alert ingest.
+ *     service's extension path, built in extension-workspace-rows.ts, which also gives a schedule or
+ *     a workflow step those two calls and nothing else (its own module, at the import cycle
+ *     extension-system-run.ts would otherwise close). For the aimeat-soc alert ingest.
  *   v1.2.0 — 2026-10-06 — publishRecords and deleteRecords: a batch in ONE host call, through
  *     services/workspace-tool-ops.ts, the functions the two batch routes run. 500 records were 1000
  *     calls through write() + publish() and could not fit the 500-call ceiling. A token needs
@@ -71,14 +72,14 @@ import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../utils/gaii.js';
-import { readerForCaller, systemReader, type ContentReader } from './classification/reader.js';
+import { readerForCaller } from './classification/reader.js';
 import { workspaceDeclarationOf, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import {
     workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp,
     publishRecordsBatchOp, deleteRecordsBatchOp,
     type WorkspaceOpRefusal, type WorkspaceOpsCaller,
 } from './workspace-tool-ops.js';
-import { appendRows, readRows, WorkspaceRowError, type RowCaller } from './workspace-rows/row-service.js';
+import { buildRowCalls, type ExtensionWorkspaceRefusal } from './extension-workspace-rows.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)
 // is the leaf module extension-workspace-declaration.ts, so the manifest builder and the CRUD
@@ -95,8 +96,8 @@ export const WORKSPACE_READ_SCOPE = 'organism:read';
 export const WORKSPACE_PURGE_SCOPE = 'memory:purge';
 
 /** A refusal the capability made, kept so the road can answer with the service's status and code
- *  rather than a generic EXTENSION_ERROR 500. */
-export interface ExtensionWorkspaceRefusal { status: number; code: string; message: string }
+ *  rather than a generic EXTENSION_ERROR 500. Declared in extension-workspace-rows.ts. */
+export type { ExtensionWorkspaceRefusal } from './extension-workspace-rows.js';
 
 export interface ExtensionWorkspaceDeps {
     config: AimeatConfig;
@@ -115,61 +116,6 @@ export interface ExtensionWorkspaceCapability {
     workspace: NonNullable<ExtensionCtx['workspace']>;
     /** The most recent refusal this capability threw, or null. */
     lastRefusal: () => ExtensionWorkspaceRefusal | null;
-}
-
-/** The two row calls, the same on every code path that runs the extension. */
-type RowCalls = Pick<NonNullable<ExtensionCtx['workspace']>, 'appendRows' | 'readRows'>;
-
-/**
- * appendRows and readRows, through the row service's EXTENSION path (row-service.ts,
- * authorizeExtension): the space must name this extension in `objectTypes[].extensions`, the
- * manifest must declare `workspace.rows`, and the installer must be an active member. The caller
- * of the action does not enter the decision, which is what makes the two calls work identically on
- * a call, a schedule and a workflow step. A row records `ext:<name>` as the writer.
- */
-function buildRowCalls(args: {
-    config: AimeatConfig; storage: Storage; extName: string; installer: string;
-    declaration: WorkspaceDeclaration; reader: ContentReader;
-    refuse: (status: number, code: string, message: string) => never;
-}): RowCalls {
-    const { config, storage, extName, installer, declaration, reader, refuse } = args;
-    const deps = { storage, config };
-    const rowCaller: RowCaller = {
-        principal: `ext:${extName}`, identity: `ext:${extName}`, owner: installer,
-        roles: ['extension'], extension: extName,
-    };
-    const allowRows = (): void => {
-        if (!declaration.rows) {
-            refuse(403, 'PERMISSION', `Extension "${extName}" does not declare row access (manifest workspace.rows).`);
-        }
-    };
-    const rowCall = async <T>(fn: () => Promise<T>): Promise<T> => {
-        try { return await fn(); } catch (err) {
-            if (err instanceof WorkspaceRowError) return refuse(err.statusCode, err.code, err.message);
-            throw err;
-        }
-    };
-    return {
-        appendRows: async (organismId, ws, space, rows) => {
-            allowRows();
-            if (!Array.isArray(rows) || rows.length === 0) refuse(400, 'NO_ROWS', 'appendRows() needs a non-empty array of { body, rowId?, occurredAt? }');
-            return rowCall(() => appendRows(deps, rowCaller, { organismId, wsId: ws, space, rows }));
-        },
-        readRows: async (organismId, ws, space, opts) => {
-            allowRows();
-            const o = opts ?? {};
-            return rowCall(() => readRows(deps, rowCaller, {
-                organismId, wsId: ws, space, reader,
-                ...(o.where ? { where: o.where } : {}),
-                ...(o.since ? { since: o.since } : {}),
-                ...(o.until ? { until: o.until } : {}),
-                ...(o.changedSince ? { changedSince: o.changedSince } : {}),
-                ...(o.limit ? { limit: o.limit } : {}),
-                ...(o.cursor ? { cursor: o.cursor } : {}),
-                ...(o.order ? { order: o.order } : {}),
-            }));
-        },
-    };
 }
 
 /**
@@ -275,48 +221,6 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         ...buildRowCalls({ config, storage, extName, installer: deps.installer, declaration, reader, refuse }),
     };
 
-    return { workspace, lastRefusal: () => last };
-}
-
-export interface UnattendedExtensionWorkspaceDeps {
-    config: AimeatConfig;
-    storage: Storage;
-    ext: Pick<ExtensionRecord, 'name' | 'config' | 'installedBy'>;
-    /** The installer's GHII: whose data space the classification reader reads in. */
-    ownerGhii: string;
-}
-
-/**
- * The capability a schedule or a workflow step gets: ONLY the two row calls, and only when the
- * manifest declares `workspace.rows`. Nobody is present, so nothing here acts as a caller: the
- * record and document calls throw PERMISSION, and the row calls take the extension path, where the
- * organism's naming of the extension is the grant (row-service.ts, authorizeExtension).
- */
-export function buildUnattendedExtensionWorkspace(deps: UnattendedExtensionWorkspaceDeps): Partial<ExtensionWorkspaceCapability> {
-    const declaration = workspaceDeclarationOf(deps.ext);
-    if (!declaration?.rows) return {};
-    const extName = deps.ext.name;
-    let last: ExtensionWorkspaceRefusal | null = null;
-    const refuse = (status: number, code: string, message: string): never => {
-        last = { status, code, message };
-        throw new Error(`${code}: ${message}`);
-    };
-    const unattended = (): never => refuse(403, 'PERMISSION',
-        `Extension "${extName}" runs with nobody present here (a schedule or a workflow step), so it may only append to and read row spaces that name it. Records and documents need a caller.`);
-    const rows = buildRowCalls({
-        config: deps.config, storage: deps.storage, extName, installer: deps.ext.installedBy,
-        declaration, reader: systemReader({ storage: deps.storage, config: deps.config }, deps.ownerGhii), refuse,
-    });
-    const workspace: NonNullable<ExtensionCtx['workspace']> = {
-        index: async () => unattended(),
-        get: async () => unattended(),
-        write: async () => unattended(),
-        writeDoc: async () => unattended(),
-        publish: async () => unattended(),
-        publishRecords: async () => unattended(),
-        deleteRecords: async () => unattended(),
-        ...rows,
-    };
     return { workspace, lastRefusal: () => last };
 }
 

@@ -7,12 +7,12 @@
  *   ingest stands on (wish-ydin-soc-lle-laajennuksen-rivikirjoitus-ajastettuna-mcp-vain).
  *
  *   Rows, the two-hand rule for an extension:
- *     - the space names the extension (objectTypes[].extensions) and the manifest declares
+ *     - the space names the extension as installer/name (objectTypes[].extensions) and the manifest declares
  *       workspace.rows → appendRows and readRows work on a call AND on a schedule, and each row
  *       records `ext:<name>` as its writer;
  *     - a repeated rowId replaces the stored row (the ingest's duplicate removal);
  *     - a schedule gets ONLY the row calls: a record write on the same run is PERMISSION;
- *     - a space that does not name the extension → 403 ACCESS_DENIED;
+ *     - a space that names the extension's name under another installer → 403 ACCESS_DENIED;
  *     - an extension whose installer is not a member → 403 ACCESS_DENIED;
  *     - an extension without workspace.rows, although named → 403 PERMISSION.
  *   Hosts, manifest network.hosts:
@@ -20,6 +20,9 @@
  *     - a redirect from a listed host to an unlisted one is refused on the hop;
  *     - a manifest naming a URL instead of a hostname, or hosts without network in capabilities,
  *       is refused at install.
+ *   A workflow's extension step, input_from:
+ *     - propose → a person approves → act: the act step receives the earlier step's result and the
+ *       person's answer as input, and appends the action as a row.
  *
  *   FIRST FAIL. Against the tree before this change, `ctx.workspace` is undefined on a schedule and
  *   has no appendRows on a call, the manifest refuses `workspace.rows` as an unknown field, and
@@ -91,6 +94,14 @@ const ROW_SCRIPTS = {
     }`,
     read: `export default async function(ctx, input){ return ctx.workspace.readRows(input.org, input.ws, 'alert', { where: { severity: 'high' } }); }`,
     write_record: `export default async function(ctx, input){ return ctx.workspace.write(input.org, input.ws, 'note', 'n1', { title: 'x' }); }`,
+    // A workflow's response step: it acts only on what the person picked, and records it as a row.
+    propose: `export default async function(ctx, input){ return { action: 'isolate_host', deviceId: 'dev-7' }; }`,
+    act: `export default async function(ctx, input){
+        if (!input.decision || !input.proposal) throw new Error('NO_INPUT: decision ' + JSON.stringify(input.decision) + ' proposal ' + JSON.stringify(input.proposal));
+        var approved = input.decision.pick === 'approve';
+        await ctx.workspace.appendRows(input.org, input.ws, 'alert', [{ rowId: 'act-' + input.run, body: { severity: 'info', source: 'soc', note: (approved ? 'done ' : 'skipped ') + input.proposal.action + ' ' + input.proposal.deviceId } }]);
+        return { approved: approved, action: input.proposal.action };
+    }`,
 };
 const FETCH_SCRIPTS = {
     fetch_listed: `export default async function(ctx, input){ var r = await ctx.fetch('http://localhost:' + input.port + '/ok'); return { status: r.status, text: r.text }; }`,
@@ -121,8 +132,10 @@ await test('Setup: two owners, an organism, a workspace whose alert space names 
         manifestVersion: '1.0', id: orgId, name: 'SOC', kind: 'project', status: 'active',
         objectTypes: [
             { name: 'alert', schemaRef: 'schema:alert@1', namespace: 'soc.alert', backing: 'rows', writeRole: 'member', mode: 'records',
-              indexOn: ['severity', 'source'], extensions: [EXT, EXT_X, EXT_NR] },
-            { name: 'other', schemaRef: 'schema:other@1', namespace: 'soc.other', backing: 'rows', writeRole: 'member', mode: 'records', indexOn: ['severity'] },
+              indexOn: ['severity', 'source'], extensions: [`${A.name}/${EXT}`, `${X.name}/${EXT_X}`, `${A.name}/${EXT_NR}`] },
+            // Names EXT under the wrong installer: the name alone must not open the space.
+            { name: 'other', schemaRef: 'schema:other@1', namespace: 'soc.other', backing: 'rows', writeRole: 'member', mode: 'records', indexOn: ['severity'],
+              extensions: [`${X.name}/${EXT}`] },
             { name: 'note', schemaRef: 'schema:note@1', namespace: 'soc.note', backing: 'memory', writeRole: 'member', mode: 'records' },
         ],
     };
@@ -199,7 +212,7 @@ await test('On a schedule, a record write is PERMISSION: only the row calls exis
     await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth(A.token) });
 });
 
-await test('A space that does not name the extension: 403 ACCESS_DENIED, nothing written', async () => {
+await test('A space naming the extension under another installer: 403 ACCESS_DENIED, nothing written', async () => {
     const r = await invoke(EXT, 'ingest', A.token, { ids: ['o1'], space: 'other' });
     assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(JSON.stringify(r.body).includes('ACCESS_DENIED'), `code: ${JSON.stringify(r.body?.error)}`);
@@ -248,6 +261,51 @@ await test('Hosts: a URL in place of a hostname, and hosts without network, are 
     const nonet = await json('/v1/extensions', { method: 'POST', headers: auth(A.token), body: JSON.stringify({
         manifest: manifestFor(`exrowsbad2${STAMP}`, FETCH_SCRIPTS, { capabilities: ['ai'], network: { hosts: ['localhost'] } }), scripts: FETCH_SCRIPTS }) });
     assert(nonet.status === 400 && /capabilities does not include network/.test(JSON.stringify(nonet.body)), `no network: ${nonet.status} ${JSON.stringify(nonet.body?.error)}`);
+});
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+async function runOf(wf: string, runId: string): Promise<any> {
+    const g = await json(`/v1/workflows/${wf}/runs/${runId}`, { headers: auth(A.token) });
+    return g.body.data?.run ?? g.body.data;
+}
+
+await test('Workflow: an extension step acts on an earlier result and a person\'s answer (input_from)', async () => {
+    const wf = `exr-wf-${STAMP}`;
+    const def = {
+        title: { en_US: 'Propose, decide, act' }, description: { en_US: 'input_from e2e' },
+        trigger: { kind: 'manual' }, vars: [{ name: 'run', type: 'string', description: { en_US: 'run tag' }, default: 'r1' }], on_step_fail: 'inspect',
+        steps: [
+            { id: 'propose', description: { en_US: 'Propose' }, required_to_function: 'none',
+              action: { kind: 'extension', extension: EXT, action: 'propose', input: {}, result_to_key: `exr.${STAMP}.{run}.proposal` } },
+            { id: 'decide', after: ['propose'], description: { en_US: 'Decide' },
+              action: { kind: 'human-input', question: { prompt: 'Isolate dev-7?', options: [{ id: 'approve', label: 'Approve' }, { id: 'reject', label: 'Reject' }] },
+                        answer_to_key: `exr.${STAMP}.{run}.decision`, reviews_key: `exr.${STAMP}.{run}.proposal` } },
+            { id: 'act', after: ['decide'], description: { en_US: 'Act' },
+              action: { kind: 'extension', extension: EXT, action: 'act', input: { org: orgId, ws: WS, run: '{run}' },
+                        input_from: { proposal: `exr.${STAMP}.{run}.proposal`, decision: `exr.${STAMP}.{run}.decision` },
+                        result_to_key: `exr.${STAMP}.{run}.acted` } },
+        ],
+    };
+    const put = await json(`/v1/workflows/${wf}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify(def) });
+    // Before this change the save passed too: zod strips the unknown key on this lax step kind, and
+    // the act step then threw NO_INPUT. The HOLE assertion below is the one that catches it.
+    assert(put.status === 200 || put.status === 201, `save ${put.status}: ${JSON.stringify(put.body?.error ?? put.body?.data?.errors)}`);
+    const r = await json(`/v1/workflows/${wf}/run`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ mode: 'full' }) });
+    const runId = r.body.data.run?.runId ?? r.body.data.runId;
+    assert(typeof runId === 'string', `run ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    let run: any;
+    for (let i = 0; i < 40; i++) { run = await runOf(wf, runId); if (run?.steps?.decide?.state === 'waiting-human') break; await sleep(250); }
+    assert(run.steps.decide.state === 'waiting-human', `decide waits, got ${run.steps.decide.state} (propose ${run.steps.propose.state})`);
+    const ans = await json(`/v1/workflows/${wf}/runs/${runId}/steps/decide/answer`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ picks: ['approve'] }) });
+    assert(ans.status === 200, `answer ${ans.status}: ${JSON.stringify(ans.body?.error)}`);
+    for (let i = 0; i < 40; i++) { run = await runOf(wf, runId); if (run && !['running', 'waiting-step'].includes(run.status)) break; await sleep(250); }
+    // HOLE: before this change the act step threw NO_INPUT and went red.
+    assert(run.steps.act.state === 'green', `act ${run.steps.act.state}: ${JSON.stringify(run.steps.act.error ?? run.steps.act.outputObserved ?? '')}`);
+    const acted = await json(`/v1/memory/${encodeURIComponent(`exr.${STAMP}.r1.acted`)}`, { headers: auth(A.token) });
+    assert(acted.body.data?.value?.approved === true && acted.body.data.value.action === 'isolate_host', `acted: ${JSON.stringify(acted.body.data?.value)}`);
+    const page = await rows();
+    assert((page.body.data.rows as Array<{ rowId: string; body: { note: string } }>).some(x => x.rowId === 'act-r1' && x.body.note === 'done isolate_host dev-7'), 'the action row landed');
+    await json(`/v1/workflows/${wf}`, { method: 'DELETE', headers: auth(A.token) });
 });
 
 // ─── Cleanup ───

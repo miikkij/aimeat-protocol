@@ -6,6 +6,8 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-08 — An extension step's `input_from` fills input fields from the owner's
+ *     memory at dispatch, through the classification reader (aimeat-soc).
  *   v1.9.0 — 2026-09-29 — The export-out step and the datapackage step pass their source record
  *     through the classification leave() (external to the app; export) before it goes out; a refusal
  *     is a red step whose log names the key and the reason (TARGET-082 V4).
@@ -295,6 +297,16 @@ export function dispatchExtensionStep(
 
   const fire = async (): Promise<ResultWrite | undefined> => {
     const base = templateInput(action.input, run.vars);
+    // input_from: an earlier step's deliverable or a person's answer, read from the owner's memory
+    // here because the sandbox cannot read it. Over `input`, so a vars default cannot shadow it.
+    // Read as the node's own work in the owner's space, through the classification reader, the
+    // same reader ctx.memory uses for the extension's own namespace (TARGET-082).
+    for (const [param, keyTmpl] of Object.entries(action.input_from ?? {})) {
+      const key = (run.keyPrefix ?? '') + template(keyTmpl, run.vars);
+      const rec = await deps.storage.getMemory(ownerGhii, key);
+      const shown = rec ? await systemReader(deps, ownerGhii).show([rec], r => memoryTarget(r.ownerGaii, r.key)) : [];
+      base[param] = shown.length ? (shown[0]!.value ?? null) : null;
+    }
     const out = action.paging
       ? await runPaged(action.paging, base, (input, page) => runOnce(input, `wf:${workflowId}:${stepId}:p${page}`))
       : action.for_each

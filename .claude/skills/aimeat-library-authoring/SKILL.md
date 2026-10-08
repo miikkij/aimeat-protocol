@@ -71,6 +71,8 @@ guest receives is missing from that table, so change the table in the same commi
   others `ctx.ai`, `ctx.email` and `ctx.buy` are `undefined`. A manifest without the field gets the
   list from a broad word match on the scripts (`fetch`, `ai`, `email`, `buy`), so a computed name
   gets nothing. The bridge's `__*` globals are deleted before the author's code runs (since 2026-10-05).
+  A top-level `network: { hosts: [api.example.com] }` limits `ctx.fetch` to those exact hostnames, a
+  redirect elsewhere included, and the approval lists them (since 2026-10-08).
 - `aimeat_extension_install` does not upsert: pass `update: true` (it survives the presigned path).
 - **The node does not check `input` against the action's `input` schema.** The schema is published
   for callers and the market; the script checks the fields it reads.
@@ -96,8 +98,11 @@ guest receives is missing from that table, so change the table in the same commi
   the manifest declares `workspace: { read: true, write: true }` at the top level, and `index`, `get`,
   `write`, `writeDoc` and `publish` then run the same operations `aimeat_workspace_read/_write/_publish`
   run, with the same refusals (membership, the contributor grant, `memory:write` on an agent or app
-  token, the locked schema, `ifVersion`, the publish gate) thrown as `CODE: message`. It is absent on
-  a scheduled run and absent without the declaration; check `if (!ctx.workspace)`. Do not reach a
+  token, the locked schema, `ifVersion`, the publish gate) thrown as `CODE: message`. It is absent
+  without the declaration; check `if (!ctx.workspace)`. A schedule or a workflow step gets only
+  `appendRows` and `readRows`, and only with `workspace: { rows: true }`: they reach a ROW space whose
+  manifest names the extension as `installer/name` in `objectTypes[].extensions`, they do not act as
+  the caller (a row records `ext:<name>`), and a repeated `rowId` replaces the row. Do not reach a
   workspace through `ctx.fetch` or `ctx.memory`: the first cannot reach the node and the second is
   fenced to `ext:`. Many records go through `publishRecords` (up to 1000, with `dryRun` and
   `createOnly`) and come out through `deleteRecords` (up to 2000, needs `memory:purge` on a token),
