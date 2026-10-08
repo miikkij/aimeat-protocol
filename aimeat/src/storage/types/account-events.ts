@@ -15,6 +15,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.8.0 — 2026-10-08 — app_fix_drafted: the fixing agent wrote a corrected draft of an app (AI
+ *     visibility, layer D). The live app is unchanged until the owner publishes the draft.
  *   v1.7.0 — 2026-10-04 — agent_task_declined: an agent refused a task and said why.
  *   v1.6.0 — 2026-09-25 — operator_admin_granted: the one-time migration gave the operator's
  *     full-access agents the permission to administer the node (services/operator-admin-migration.ts),
@@ -62,6 +64,8 @@ export type AccountEventKind =
   // What they built
   | 'app_published'
   | 'app_updated'
+  /** The fixing agent (AI visibility, layer D) wrote a corrected draft of an app; nothing is published. */
+  | 'app_fix_drafted'
   | 'workspace_record_published'
   // Who they are with
   | 'organism_joined'

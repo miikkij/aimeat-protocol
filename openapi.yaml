@@ -68264,6 +68264,95 @@ paths:
         '200': { description: 'The catalog (text/csv).' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/visibility/behaviour:
+    get:
+      operationId: readVisibilityBehaviour
+      tags: [Signals]
+      summary: What people do on the caller's apps
+      description: 'For each of the caller''s apps over the last `days` days (7 by default, at most 56): views by screen size (phone, tablet, desktop), views by the deepest quarter of the page reached, dead clicks (a click on something that looks clickable after which nothing on the page changed within a second) and rage clicks (three clicks in one spot within a moment) by screen size and element, and `findings`, one readable line each. With `app` it covers that app only and adds `heat`: clicks by screen size and grid cell (12 columns, rows a quarter of the screen high). `fixer` says whether the weekly fixing agent is on. Aggregates only: no address, cookie, visitor id, keystroke, input value, page text or recording; an element is named by its tag, id and first class. The MCP tool aimeat_visibility_behaviour returns the same object. Requires scope signals:read.'
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: app, in: query, required: false, schema: { type: string, maxLength: 200 } }
+        - { name: days, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 56 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/visibility/behaviour/settings:
+    get:
+      operationId: readVisibilityBehaviourSettings
+      tags: [Signals]
+      summary: The caller's on-page behaviour settings
+      description: '`off_apps` are the apps whose pages carry no behaviour script; `fixer` is the weekly fixing agent (off by default); `node_enabled` is the operator''s switch (AIMEAT_BEHAVIOUR); `runs` are the fixing agent''s last runs with their findings, whether a draft was written and why not. Requires scope signals:read.'
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: setVisibilityBehaviourSettings
+      tags: [Signals]
+      summary: Switch an app or the fixing agent
+      description: 'Only the fields given change. `app` with `app_enabled: false` removes the behaviour script from that app (what was counted stays); `true` puts it back. `fixer: true` switches on the weekly fixing agent, which spends the owner''s AI credit. 404 NOT_FOUND for an app the caller does not have. The MCP tool aimeat_visibility_behaviour_set does the same. Requires scope signals:write.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                app: { type: string, maxLength: 200, description: 'The app''s filename, with app_enabled.' }
+                app_enabled: { type: boolean }
+                fixer: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/visibility/behaviour/fix:
+    post:
+      operationId: runVisibilityBehaviourFix
+      tags: [Signals]
+      summary: Run the fixing agent on one app now
+      description: 'Reads the app''s findings of the last seven days, asks the owner''s own AI (their AI settings and credit) for a corrected app, and writes the answer as the app''s draft. It never publishes: the live app is unchanged until the owner publishes the draft. A draft the owner wrote is left alone. The answer is the run: `findings`, `draft` (whether one was written), `model` and `note` (why no draft was written). 403 FEATURE_DISABLED when the operator switched layer D off, 404 NOT_FOUND for an app the caller does not have. The MCP tool aimeat_visibility_behaviour_fix does the same. Requires scope signals:write.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [app]
+              properties:
+                app: { type: string, maxLength: 200 }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/signals/behaviour:
+    post:
+      operationId: signalBehaviourBeacon
+      tags: [Signals]
+      summary: One page view's on-page behaviour (PUBLIC, no auth)
+      description: 'Sent by the behaviour script the place adds to an owner''s apps, once, when the page is hidden (navigator.sendBeacon, text/plain). The body is JSON: `o` the owner GHII, `a` the app filename, `vc` the screen size, `s` the scroll bucket (25, 50, 75, 100), `h` clicks by screen size and grid cell, `d` and `r` dead and rage clicks by `screen|element`, and `x: 1` when the browser asks not to be followed. Answers 204 whatever happens, so the address discloses nothing. Every count is bounded per view and per day. A request with Sec-GPC: 1 or DNT: 1 counts as a view only. No address is stored.'
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema: { type: string, maxLength: 32768 }
+      responses:
+        '204': { description: 'Received. Nothing is said about whether it counted.' }
+        '429': { description: 'Too many beacons from one address.' }
+
   /v1/signals/{owner}/{streamId}/px.svg:
     get:
       operationId: signalPixel

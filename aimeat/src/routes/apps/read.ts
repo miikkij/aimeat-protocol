@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.19.0 — 2026-10-08 — A runnable HTML app carries the on-page behaviour script unless its owner switched it off (layer D).
  *   v1.18.0 — 2026-10-08 — The app download counts the visit for AI visibility (services/visibility/),
  *     and a runnable HTML app carries its owner's own analytics tags (layer B).
  *   v1.17.0 — 2026-10-06 — SECURITY: on a per-app origin GET /v1/apps/:owner/:filename runs only that
@@ -694,8 +695,9 @@ export function registerReadRoutes(
                 servedAt: new Date().toISOString(),
             });
         }
-        // The owner's own Clarity or GA4, waiting for consent when the banner is on (layer B).
-        if (runnable && isHtml) body = withOwnerTags(body, await ownerTagsFor(storage, config, app.ownerGaii));
+        // The owner's own Clarity or GA4, waiting for consent when the banner is on (layer B), and the
+        // on-page behaviour script unless the owner switched it off for this app (layer D).
+        if (runnable && isHtml) body = withOwnerTags(body, await ownerTagsFor(storage, config, app.ownerGaii, filename));
         // Last, so it is in front of everything the passes above added as well as the app's own lines.
         if (answer === 'sandboxed' && isHtml) body = withFrameShim(body);
         res.setHeader('Content-Length', body.length.toString());

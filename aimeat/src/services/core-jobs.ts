@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.13.0 — 2026-10-08 — behaviour-fixer: the weekly fixing agent of on-page behaviour (layer D).
  *   v1.12.0 — 2026-10-08 — ucp-upkeep: the UCP order webhooks that wait for another try.
  *   v1.11.0 — 2026-09-30 — classification-audit-prune is its own handler, registered on every node.
  *     It ran inside consent-audit-prune, which exists only with consent on, so a node with consent
@@ -104,6 +105,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('ucp-upkeep', async () => {
     const { runUcpUpkeep } = await import('../commerce/ucp-guest-checkout.js');
     await runUcpUpkeep(storage, config);
+  });
+  // The fixing agent of on-page behaviour (AI visibility, layer D), for the owners who switched it
+  // on: findings and a corrected draft per app, never a publish. Dynamic import for the same reason.
+  scheduler.registerCoreHandler('behaviour-fixer', async () => {
+    const { runWeeklyBehaviourFixer } = await import('./visibility/behaviour-fixer.js');
+    await runWeeklyBehaviourFixer(storage, config);
   });
 
   // The operator's monthly compliance report, built from the month that ended and stored under

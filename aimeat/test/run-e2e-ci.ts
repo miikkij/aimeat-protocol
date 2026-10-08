@@ -16,6 +16,7 @@
  *            (aiprov workstream E).
  *   2026-10-08 -- e2e-extension-rows.ts joins the list (ctx.workspace.appendRows on a row space that
  *     names the extension, also on a schedule; manifest network.hosts).
+ *   2026-10-08 -- e2e-behaviour.ts joins the list: on-page behaviour and the fixing agent's draft.
  *   2026-10-08 -- e2e-agent-checkout.ts joins the list: the product feeds for AI shopping agents.
  *   2026-10-08 -- e2e-ai-visibility.ts joins the list: channels, AI fetches, discovery files and
  *     purchases counted per owner with nothing that identifies a visitor at rest.
@@ -725,6 +726,7 @@ const ALL_SUITES = [
     'test/e2e-signals.ts',
     'test/e2e-ai-visibility.ts',
     'test/e2e-agent-checkout.ts',
+    'test/e2e-behaviour.ts',
     'test/e2e-app-visitors.ts',
     'test/e2e-outbound-organism-sender.ts',
     'test/e2e-companies.ts',
