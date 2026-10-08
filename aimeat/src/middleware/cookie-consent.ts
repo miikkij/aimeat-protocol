@@ -12,6 +12,8 @@
  *   - buildStandaloneSnippetJs(config): self-loading IIFE for GET /v1/portal/cookie-consent.js
  *
  * @version-history
+ *   v1.1.0 — 2026-10-08 — buildCookieConsentRunConfig is exported: an app served as bytes gets the
+ *     banner from the analytics tag snippet (services/visibility/analytics-tags.ts), same run config.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { RequestHandler, Request, Response, NextFunction } from 'express';
@@ -22,7 +24,7 @@ import type { AimeatConfig } from '../config.js';
  * Categories are built from config.cookieConsentCategories.
  * 'necessary' is always included as enabled + readOnly.
  */
-function buildCookieConsentRunConfig(config: AimeatConfig): string {
+export function buildCookieConsentRunConfig(config: Pick<AimeatConfig, 'cookieConsentCategories' | 'cookieConsentPolicyUrl'>): string {
   // Build categories object
   const categories: Record<string, { enabled?: boolean; readOnly?: boolean }> = {
     necessary: { enabled: true, readOnly: true },

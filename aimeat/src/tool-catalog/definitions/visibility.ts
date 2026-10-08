@@ -10,6 +10,7 @@
  * @structure visibilityTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes clarity_project_id and ga4_measurement_id (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
 import { z } from 'zod';
@@ -30,14 +31,16 @@ export const visibilityTools = [
     },
     {
         name: 'aimeat_visibility_settings_set',
-        description: 'Switch AI visibility counting off or on for the person\'s whole place (every app, the portfolio and company pages, the discovery files, purchases). It is on by default. Off stops new counting and keeps what was counted. Ask the person before you switch it off: the report is how they see whether AIs find them.',
+        description: 'Change the person\'s visibility settings; only the fields you give change. `enabled` switches AI visibility counting off or on for the whole place (every app, the portfolio and company pages, the discovery files, purchases); it is on by default, and off keeps what was counted. Ask the person before you switch it off: the report is how they see whether AIs find them. `clarity_project_id` and `ga4_measurement_id` add the person\'s OWN Microsoft Clarity or Google Analytics 4 to every page and app of the place (null removes one); the data goes to the person\'s own accounts. With the node\'s cookie banner on, the tags wait for the visitor\'s consent; without it the answer carries `tags_warning`, which you must tell the person: EU visitors need consent first.',
         caller: 'agent',
         visibility: agentEverywhere,
-        annotations: { title: 'AI Visibility On or Off', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        annotations: { title: 'AI Visibility Settings', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'signals:write',
         surfaces: ['appdev', 'commerce'],
         input: {
-            enabled: { type: 'boolean', required: true, description: 'true counts, false stops counting.' },
+            enabled: { type: 'boolean', description: 'true counts, false stops counting.' },
+            clarity_project_id: { type: 'string', description: 'The Microsoft Clarity project id (Clarity: Settings > Overview), 6 to 20 letters and digits. null removes it.', zod: z.string().max(40).nullable() },
+            ga4_measurement_id: { type: 'string', description: 'The Google Analytics 4 measurement id of a web data stream, such as G-ABC123XYZ9. null removes it.', zod: z.string().max(40).nullable() },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

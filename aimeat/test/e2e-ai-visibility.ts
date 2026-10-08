@@ -178,6 +178,7 @@ const S = await makeOwner('visseller');
 const B = await makeOwner('visbuyer');
 const readerAgent = await makeAgent(S, ['signals:read']);
 const narrowAgent = await makeAgent(S, ['memory:read']);
+const writerAgent = await makeAgent(S, ['signals:read', 'signals:write']);
 
 const filename = `visibility${Date.now().toString(36).slice(-5)}.html`;
 const appPath = `/v1/apps/${S.owner}/${filename}`;
@@ -377,9 +378,82 @@ await test('14. a second owner sees none of the seller\'s counts, and no token i
   assert(anon.status === 401, `expected 401, got ${anon.status}`);
 });
 
-console.log('\nPhase 6 — nothing that identifies a visitor is at rest');
+console.log('\nPhase 6 — the owner\'s own analytics tags (layer B)');
 
-await test('15. no IP address, Referer path or User-Agent is stored in any table of the node', async () => {
+/** The served app as a browser runs it: `mode=inline` is the runnable form (without it the apex
+ *  answers the file as an attachment, which carries no tags because nothing runs it). */
+async function page(path: string): Promise<string> {
+  const res = await fetch(`${BASE}${path}${path.includes('?') ? '&' : '?'}mode=inline`, { headers: { 'User-Agent': CHROME, Accept: 'text/html' }, redirect: 'manual' });
+  return await res.text();
+}
+const setTags = (token: string, body: Record<string, unknown>) =>
+  json('/v1/visibility/settings', { method: 'PUT', headers: authed(token), body: JSON.stringify(body) });
+const setBanner = (on: boolean) => json('/v1/admin/config', {
+  method: 'PUT', headers: authed(OP.token),
+  body: JSON.stringify({ changes: [{ path: 'cookies.consent_enabled', value: on }] }),
+});
+
+await test('15. an id of the wrong shape is refused on REST and on MCP, and nothing is stored', async () => {
+  const bad = await setTags(S.token, { clarity_project_id: '"><script>alert(1)</script>' });
+  assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${bad.status} ${JSON.stringify(bad.body)}`);
+  const badGa = await setTags(S.token, { ga4_measurement_id: 'UA-12345-1' });
+  assert(badGa.status === 400, `a Universal Analytics id is not a GA4 id, got ${badGa.status}`);
+  const session = await openSession(writerAgent);
+  const out = await callTool(session, 'aimeat_visibility_settings_set', { clarity_project_id: 'no' });
+  assert(out.isError && out.text.startsWith('INVALID_INPUT'), `the tool refuses too: ${out.text.slice(0, 160)}`);
+  assert(!(await page(appPath)).includes('data-aimeat-tags'), 'no tag reached the page');
+});
+
+await test('16. a Clarity id puts the tag on the app, loading at once without a banner, and the owner is warned', async () => {
+  const set = await setTags(S.token, { clarity_project_id: 'k7x2m9qp1a' });
+  assert(set.status === 200 && set.body.data.clarity_project_id === 'k7x2m9qp1a', `set: ${set.status} ${JSON.stringify(set.body)}`);
+  assert(typeof set.body.data.tags_warning === 'string' && set.body.data.tags_warning.includes('consent'), 'the answer warns about EU consent');
+  const html = await page(appPath);
+  assert(html.includes('data-aimeat-tags') && html.includes('"k7x2m9qp1a"') && html.includes('B=false'), 'the app carries the tag, not waiting for a banner');
+  // The fixture has no <head>: the tag goes after the doctype and before <body>.
+  assert(html.toLowerCase().startsWith('<!doctype html>') && html.indexOf('data-aimeat-tags') < html.indexOf('<body'), `after the doctype and before the body: ${html.slice(0, 120)}`);
+  const r = await report(S.token);
+  assert(r.tags.clarity_project_id === 'k7x2m9qp1a' && r.tags.active === true && typeof r.tags.warning === 'string', `the report shows it: ${JSON.stringify(r.tags)}`);
+  const other = await page(`/v1/apps/${S.owner}/${filename}`);
+  assert(other.includes('"k7x2m9qp1a"'), 'the same on every serve');
+});
+
+await test('17. an agent with signals:write adds GA4 over MCP; one holding only signals:read cannot', async () => {
+  const session = await openSession(writerAgent);
+  const out = await callTool(session, 'aimeat_visibility_settings_set', { ga4_measurement_id: 'G-ABC123XYZ9' });
+  assert(!out.isError && out.data.ga4_measurement_id === 'G-ABC123XYZ9' && out.data.clarity_project_id === 'k7x2m9qp1a', `only the field given changes: ${out.text.slice(0, 300)}`);
+  assert((await page(appPath)).includes('"G-ABC123XYZ9"'), 'the page carries GA4 too');
+  const reader = await openSession(readerAgent);
+  const refused = await callTool(reader, 'aimeat_visibility_settings_set', { ga4_measurement_id: null });
+  assert(refused.isError, 'a reader has no such tool');
+});
+
+await test('18. with the cookie banner on, the tag waits for consent to analytics and the banner comes with it', async () => {
+  const on = await setBanner(true);
+  assert(on.status === 200, `banner on: ${on.status} ${JSON.stringify(on.body)}`);
+  try {
+    const html = await page(appPath);
+    assert(html.includes('B=true') && html.includes("acceptedCategory('analytics')"), 'the tag waits for the analytics category');
+    assert(/CookieConsent\.run\(.*"analytics"/s.test(html), 'the banner offers analytics to accept');
+    assert(!/<script[^>]+(clarity\.ms|googletagmanager)/.test(html), 'no Clarity or Google script element is in the page before consent');
+    const r = await report(S.token);
+    assert(r.tags.consent_banner === true && r.tags.warning === null, `no warning with the banner: ${JSON.stringify(r.tags)}`);
+  } finally {
+    const off = await setBanner(false);
+    assert(off.status === 200, 'banner back off');
+  }
+});
+
+await test('19. null removes a tag, and with both removed the page carries none', async () => {
+  const cleared = await setTags(S.token, { clarity_project_id: null, ga4_measurement_id: null });
+  assert(cleared.status === 200 && cleared.body.data.clarity_project_id === null && cleared.body.data.ga4_measurement_id === null, `cleared: ${JSON.stringify(cleared.body)}`);
+  assert(cleared.body.data.enabled === true, 'counting is untouched');
+  assert(!(await page(appPath)).includes('data-aimeat-tags'), 'no tag left');
+});
+
+console.log('\nPhase 7 — nothing that identifies a visitor is at rest');
+
+await test('20. no IP address, Referer path or User-Agent is stored in any table of the node', async () => {
   await report(S.token);   // the report merges what this process still holds
   await report(OP.token);
   const provider = process.env.AIMEAT_DB ?? 'memory';

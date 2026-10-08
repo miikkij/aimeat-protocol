@@ -10,6 +10,7 @@
  * @structure registerVisibilityTools(mcp, storage, config, caller)
  * @usage import { registerVisibilityTools } from './visibility.js';
  * @version-history
+ *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes the Clarity and GA4 ids (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,7 +22,8 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { readVisibilityReport } from '../services/visibility/visibility-report.js';
-import { setVisibilitySettings, nodeCountsVisibility } from '../services/visibility/visibility-counter.js';
+import { setVisibilitySettings, VisibilitySettingsError } from '../services/visibility/visibility-settings.js';
+import { visibilitySettingsView } from '../services/visibility/analytics-tags.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -55,11 +57,18 @@ export function registerVisibilityTools(
     descriptionFor('aimeat_visibility_settings_set'),
     zodShapeFor('aimeat_visibility_settings_set'),
     annotationsFor('aimeat_visibility_settings_set'),
-    async ({ enabled }) => {
+    async ({ enabled, clarity_project_id, ga4_measurement_id }) => {
       const owner = ownerOf();
       if (!owner) return toolError('FORBIDDEN', NO_PLACE);
-      const settings = await setVisibilitySettings(storage, owner, { enabled });
-      return text({ ...settings, node_enabled: nodeCountsVisibility(config) });
+      try {
+        const settings = await setVisibilitySettings(storage, owner, {
+          enabled, clarityProjectId: clarity_project_id, ga4MeasurementId: ga4_measurement_id,
+        });
+        return text(visibilitySettingsView(config, settings));
+      } catch (e) {
+        if (e instanceof VisibilitySettingsError) return toolError(e.code, e.message);
+        throw e;
+      }
     },
   );
 }

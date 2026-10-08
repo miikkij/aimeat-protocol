@@ -14,6 +14,7 @@
  * @structure clampVisibilityDays · readVisibilityReport · VisibilityReport
  * @usage const report = await readVisibilityReport(storage, config, ownerGhii, { days: 30 });
  * @version-history
+ *   v1.1.0 — 2026-10-08 — `tags`: the owner's own Clarity and GA4 on the place's pages (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -23,7 +24,9 @@ import {
   emptyVisibilityDay, type VisibilityDay, type VisibilityMonthRecord, type VisitChannel,
 } from '../../models/visibility-schemas.js';
 import { monthOf } from '../../models/signal-schemas.js';
-import { flushVisibility, getVisibilitySettings, mergeDay, nodeCountsVisibility, sumOf } from './visibility-counter.js';
+import { flushVisibility, mergeDay, nodeCountsVisibility, sumOf } from './visibility-counter.js';
+import { getVisibilitySettings } from './visibility-settings.js';
+import { visibilitySettingsView } from './analytics-tags.js';
 
 /** 0 is "today only". Anything that is not a whole number in range is the default. */
 export function clampVisibilityDays(raw: unknown): number {
@@ -81,6 +84,15 @@ export interface VisibilityReport {
     day: string; people: number; ai_people: number; assistant: number; crawler: number;
     purchases: number; channels: Partial<Record<VisitChannel, number>>;
   }>;
+  /** The owner's own analytics tags on the place's pages (layer B), and whether they wait for consent. */
+  tags: {
+    clarity_project_id: string | null;
+    ga4_measurement_id: string | null;
+    active: boolean;
+    consent_banner: boolean;
+    /** Set when a tag loads with no banner: the owner must hear that EU visitors need consent. */
+    warning: string | null;
+  };
   reading: Record<'channels' | 'assistant' | 'crawler' | 'discovery' | 'purchases' | 'not_seen' | 'opted_out' | 'privacy', string>;
 }
 
@@ -146,6 +158,7 @@ export async function readVisibilityReport(
 
   const settings = await getVisibilitySettings(storage, ownerGhii);
   const nodeEnabled = nodeCountsVisibility(config);
+  const view = visibilitySettingsView(config, settings);
 
   return {
     counting: settings.enabled && nodeEnabled,
@@ -173,6 +186,13 @@ export async function readVisibilityReport(
       .sort((a, b) => b.fetches - a.fetches),
     purchases,
     series,
+    tags: {
+      clarity_project_id: settings.clarityProjectId,
+      ga4_measurement_id: settings.ga4MeasurementId,
+      active: view.tags_active === true,
+      consent_banner: view.consent_banner === true,
+      warning: (view.tags_warning as string | null) ?? null,
+    },
     reading: {
       channels: 'People only, by the page that sent them: an AI answer, a search engine, a social network, another site, or nothing (a typed address, a bookmark, an app that hides where it came from). Internal is a move between your own pages.',
       assistant: 'A person asked an AI something and it fetched this page to answer. Each one is a moment your business was part of an AI answer.',

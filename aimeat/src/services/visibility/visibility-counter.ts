@@ -7,7 +7,7 @@
  *   from. The counts go into the owner's own month record (models/visibility-schemas.ts).
  *
  *   ON BY DEFAULT, AND THAT IS ONLY POSSIBLE BECAUSE OF WHAT IS NOT KEPT. No address, no cookie, no
- *   visitor id, no Referer, no query string. The owner can switch it off (`setVisibilitySettings`)
+ *   visitor id, no Referer, no query string. The owner can switch it off (visibility-settings.ts)
  *   and the operator can switch it off for the node (AIMEAT_AI_VISIBILITY). A request that sends
  *   `Sec-GPC: 1` or `DNT: 1` is counted in the day's total and nowhere else.
  *
@@ -22,25 +22,28 @@
  *
  *   NEVER BLOCKS AND NEVER THROWS. The callers are serve paths; a counter must not cost anybody
  *   their page.
- * @structure settings (get/set + cache) · resolvePlaceOwner · countVisit · recordPurchase ·
+ * @structure ownerCounts · resolvePlaceOwner · countVisit · recordPurchase ·
  *   flushVisibility · mergeDay · resetVisibilityState (tests)
  * @usage countVisit(storage, config, { ownerGaii, target: app.filename, ...visit });
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The owner's settings moved to visibility-settings.ts, which also holds the
+ *     analytics tag ids of layer B.
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import {
   VISIBILITY_DOCS, PURCHASE_VIA, VISIT_CHANNELS, AI_FAMILIES, MAX_PATHS_PER_DAY, MAX_TARGET_LEN,
-  VISIBILITY_RETAIN_MONTHS, VISIBILITY_MONTH_PREFIX, VISIBILITY_SETTINGS_KEY, visibilityMonthKey,
+  VISIBILITY_RETAIN_MONTHS, VISIBILITY_MONTH_PREFIX, visibilityMonthKey,
   emptyVisibilityDay, emptyVisibilityMonth,
-  type VisibilityDay, type VisibilityDoc, type VisibilityMonthRecord, type VisibilitySettings,
+  type VisibilityDay, type VisibilityDoc, type VisibilityMonthRecord,
   type PurchaseVia, type VisitChannel, type AiFamily,
 } from '../../models/visibility-schemas.js';
 import { monthOf, dayOf } from '../../models/signal-schemas.js';
 import { classifyVisitor } from '../signals/visitor-class.js';
 import { withKeyLock } from '../signals/signal-service.js';
 import { classifyChannel } from './channel.js';
+import { cachedVisibilitySettings, resetVisibilitySettingsCache } from './visibility-settings.js';
 import { ownerGhiiOf, localAccountOf } from '../../utils/gaii.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 import { logger } from '../../utils/logger.js';
@@ -51,8 +54,6 @@ const FLUSH_MS = 10_000;
 const BUFFER_LIMIT = 500;
 /** How many times a merge re-reads after losing a swap to another process. */
 const CAS_ATTEMPTS = 25;
-/** How long an owner's switch is trusted from memory. A change made on this process is seen at once. */
-const SETTINGS_TTL_MS = 60_000;
 
 const nowIso = (): string => new Date().toISOString();
 
@@ -65,40 +66,9 @@ const bump = (obj: Record<string, number>, key: string, by = 1): void => {
 
 // ── The owner's switch ────────────────────────────────────────────────────────────────────────
 
-interface CachedSwitch { enabled: boolean; until: number }
-const switchCache = new Map<string, CachedSwitch>();
-
-/** The owner's settings. Absent means on. */
-export async function getVisibilitySettings(storage: Storage, ownerGhii: string): Promise<VisibilitySettings> {
-  const row = await storage.getMemory(ownerGhii, VISIBILITY_SETTINGS_KEY);
-  const value = row?.value as Partial<VisibilitySettings> | undefined;
-  return { enabled: value?.enabled !== false, updatedAt: value?.updatedAt ?? '' };
-}
-
-/** Switch counting on or off for one owner. What was counted stays; nothing new is counted while off. */
-export async function setVisibilitySettings(
-  storage: Storage, ownerGhii: string, input: { enabled: boolean },
-): Promise<VisibilitySettings> {
-  const now = nowIso();
-  const settings: VisibilitySettings = { enabled: input.enabled, updatedAt: now };
-  const existing = await storage.getMemory(ownerGhii, VISIBILITY_SETTINGS_KEY);
-  await storage.setMemory({
-    key: VISIBILITY_SETTINGS_KEY, ownerGaii: ownerGhii,
-    value: settings as unknown as Record<string, unknown>,
-    visibility: 'owner', tags: ['signal-visibility'], ttlHours: null,
-    version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-  } as MemoryRecord);
-  switchCache.set(ownerGhii, { enabled: input.enabled, until: Date.now() + SETTINGS_TTL_MS });
-  return settings;
-}
-
+/** Whether this owner counts, from the settings record (visibility-settings.ts). Absent means on. */
 async function ownerCounts(storage: Storage, ownerGhii: string): Promise<boolean> {
-  const cached = switchCache.get(ownerGhii);
-  if (cached && cached.until > Date.now()) return cached.enabled;
-  const { enabled } = await getVisibilitySettings(storage, ownerGhii);
-  if (switchCache.size > 10_000) switchCache.clear();
-  switchCache.set(ownerGhii, { enabled, until: Date.now() + SETTINGS_TTL_MS });
-  return enabled;
+  return (await cachedVisibilitySettings(storage, ownerGhii)).enabled;
 }
 
 /** Whether the operator left this layer on for the node. On unless set to false. */
@@ -434,6 +404,6 @@ export async function flushAllVisibility(): Promise<void> {
 /** Test seam: forget the caches. Buffered counts are flushed first. */
 export async function resetVisibilityState(storage?: Storage): Promise<void> {
   if (storage) await flushVisibility(storage);
-  switchCache.clear();
+  resetVisibilitySettingsCache();
   placeOwnerCache.clear();
 }

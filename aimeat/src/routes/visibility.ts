@@ -13,6 +13,8 @@
  * @structure visibilityRouter (GET /v1/visibility/report, GET|PUT /v1/visibility/settings) · countApexDocs
  * @usage app.use(visibilityRouter(config, storage)); router.use(countApexDocs(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The settings take the owner's Clarity project id and GA4 measurement id
+ *     (layer B), and answer in one view shared with the MCP tool.
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
 import { Router, type Request, type Response, type NextFunction, type RequestHandler } from 'express';
@@ -25,12 +27,17 @@ import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
 import { visitSignals } from '../utils/visit-signals.js';
 import type { VisibilityDoc } from '../models/visibility-schemas.js';
-import {
-  countVisit, getVisibilitySettings, setVisibilitySettings, nodeCountsVisibility, resolvePlaceOwner,
-} from '../services/visibility/visibility-counter.js';
+import { countVisit, nodeCountsVisibility, resolvePlaceOwner } from '../services/visibility/visibility-counter.js';
+import { getVisibilitySettings, setVisibilitySettings, VisibilitySettingsError } from '../services/visibility/visibility-settings.js';
+import { visibilitySettingsView } from '../services/visibility/analytics-tags.js';
 import { readVisibilityReport } from '../services/visibility/visibility-report.js';
 
-const SettingsSchema = z.object({ enabled: z.boolean() }).strict();
+/** Every field optional: only what is given changes. A null id removes it. */
+const SettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  clarity_project_id: z.string().max(40).nullable().optional(),
+  ga4_measurement_id: z.string().max(40).nullable().optional(),
+}).strict();
 
 /** The node's own discovery files, by the paths they are served on. */
 const APEX_DOCS: Record<string, VisibilityDoc> = {
@@ -89,8 +96,7 @@ export function visibilityRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/visibility/settings', requireAuth(), requireScope('signals:read'), async (req, res) => {
     const owner = ownerOf(req, res);
     if (!owner) return;
-    const settings = await getVisibilitySettings(storage, owner);
-    res.json(success(config.nodeId, { ...settings, node_enabled: nodeCountsVisibility(config) }));
+    res.json(success(config.nodeId, visibilitySettingsView(config, await getVisibilitySettings(storage, owner))));
   });
 
   router.put('/v1/visibility/settings', requireAuth(), requireScope('signals:write'), async (req, res) => {
@@ -101,8 +107,21 @@ export function visibilityRouter(config: AimeatConfig, storage: Storage): Router
     }
     const owner = ownerOf(req, res);
     if (!owner) return;
-    const settings = await setVisibilitySettings(storage, owner, { enabled: parsed.data.enabled });
-    res.json(success(config.nodeId, { ...settings, node_enabled: nodeCountsVisibility(config) }, [
+    let settings;
+    try {
+      settings = await setVisibilitySettings(storage, owner, {
+        enabled: parsed.data.enabled,
+        clarityProjectId: parsed.data.clarity_project_id,
+        ga4MeasurementId: parsed.data.ga4_measurement_id,
+      });
+    } catch (e) {
+      if (e instanceof VisibilitySettingsError) {
+        res.status(400).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      throw e;
+    }
+    res.json(success(config.nodeId, visibilitySettingsView(config, settings), [
       { description: 'Read the report', method: 'GET', url: '/v1/visibility/report' },
     ]));
   });
