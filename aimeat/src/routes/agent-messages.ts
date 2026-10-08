@@ -10,6 +10,10 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.7.0 -- 2026-10-08 -- POST /v1/agents/:name/messages takes ai_provenance and ai_provenance_id,
+ *     as aimeat_message_send does, with the session's scopes: 400 INVALID_PROVENANCE for a malformed
+ *     block, 403 SCOPE_DENIED for a declaration the caller may not make, and the stored message
+ *     answers with its record (aiprov D5).
  *   v1.6.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 -- 2026-08-15 -- PATCH /:name/messages/:id authorizes against the MESSAGE, not just the
  *     agent name in the path. canAccessAgent() answers "may you act as this agent", built against
@@ -50,6 +54,7 @@ import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
 import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { sendAgentMessage } from '../services/agent-message-send.js';
+import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -123,9 +128,24 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     // Validation, the record build, the provenance stamp and the push side effects live in the
     // service, which aimeat_message_send calls too, so the two doors cannot describe the same
     // message differently. What is left here is the HTTP answer.
+    // How the content was made, as aimeat_message_send takes it (aiprov D5): validated against the
+    // same block, and refused by the service before anything is stored when the caller may not
+    // declare it.
+    const declared = parseDeclaredProvenanceInput((req.body as { ai_provenance?: unknown } | undefined)?.ai_provenance);
+    if (!declared.ok) {
+      res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE',
+        'The ai_provenance block does not validate.', undefined, { violations: declared.violations }));
+      return;
+    }
+    const declaredId = (req.body as { ai_provenance_id?: unknown } | undefined)?.ai_provenance_id;
     const result = await sendAgentMessage(
       { storage, config, webhooks: webhookDispatcher, emitResourceUpdated },
-      { agentGaii, senderGaii, body: req.body, pipeline: 'rest.agent_message_send' },
+      {
+        agentGaii, senderGaii, body: req.body, pipeline: 'rest.agent_message_send',
+        declaredProvenance: declared.declared,
+        ...(typeof declaredId === 'string' ? { declaredProvenanceId: declaredId } : {}),
+        scopes: req.auth!.scopes ?? [],
+      },
     );
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
@@ -133,7 +153,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     }
     const created = result.message;
 
-    res.status(201).json(success(config.nodeId, { message: created }, [
+    res.status(201).json(success(config.nodeId, { message: (await withProvenance([created]))[0] }, [
       { description: 'View messages', method: 'GET', url: `/v1/agents/${agentName}/messages` },
       { description: 'View thread', method: 'GET', url: `/v1/agents/${agentName}/messages?thread_id=${created.threadId}` },
       { description: 'View inbox', method: 'GET', url: `/v1/agents/${agentName}/messages/inbox` },

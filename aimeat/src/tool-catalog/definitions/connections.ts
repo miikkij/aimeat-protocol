@@ -6,6 +6,7 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-08 — aimeat_mail_send takes ai_provenance_id (aiprov D9).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-28 — aimeat_mail_read takes store, filename, mime_type and key; the description
@@ -142,6 +143,7 @@ export const connectionTools = [
             reply_to: { type: 'string', description: 'Where a reply should go, when it is not the sending address.' },
             theme: { type: 'string', description: "Optional: what the message LOOKS like. A built-in id (clean, space, warm, paper) or one of the owner's own, and theirs wins where both exist. 'clean' is the default and is what went out before themes existed, so a send that names nothing looks exactly as it always did. An id that matches nothing falls back to the default rather than failing — decoration never refuses a send. Read the list, already validated, from GET /v1/outbound/themes." },
             ai_disclosure: { type: 'string', description: "Optional: mark the message as machine-written in a header. One of none | ai-assisted | ai-generated | autonomous. If YOU wrote the body, declare it — 'ai-generated' when you produced the text, 'ai-assisted' when a person wrote it and you edited. It goes in a HEADER and not in the text, because the audience for it is machines: nobody reading their inbox follows a link to a hash. Declaring it and then asking for it to be left out is not possible.", zod: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']) },
+            ai_provenance_id: { type: 'string', description: "Optional, with ai_disclosure: a provenance record of your own that describes this text, the id the node returned when it generated it for you. The header then links that record. A record that is not yours is not attached; the node stamps the message itself instead.", zod: z.string().max(80) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

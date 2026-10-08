@@ -16,6 +16,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.8.0 — 2026-10-08 — The listing's ai_provenance is the tool manifest record's own when it
+ *     carries one, the app's only otherwise (aiprov D18).
  *   v1.7.2 — 2026-10-07 — A priced tool's payment block carries every money price (`pricesMoney`,
  *     `priceMoney` its first). A tool sold only in `pricesMoney` answered 402 naming no price.
  *   v1.7.1 — 2026-10-07 — loadPublicManifest reads through publicManifestTools
@@ -87,9 +89,18 @@ async function loadPublicManifest(
   ownerName: string,
   filename: string,
 ): Promise<AppTool[] | null> {
+  return (await loadPublicManifestRecord(storage, config, ownerName, filename)).tools;
+}
+
+/** The public tools and the manifest record's own provenance id, when it carries one. */
+async function loadPublicManifestRecord(
+  storage: Storage, config: AimeatConfig, ownerName: string, filename: string,
+): Promise<{ tools: AppTool[] | null; aiProvenanceId?: string }> {
   // The same gate the commerce catalog lists through (commerce/app-tool-catalog.ts), so a tool
   // GET /v1/commerce/tools?include=own lists is one this route serves.
-  return publicManifestTools(await storage.getMemory(`${ownerName}@${config.nodeId}`, appToolsKey(filename)));
+  const rec = await storage.getMemory(`${ownerName}@${config.nodeId}`, appToolsKey(filename));
+  const tools = publicManifestTools(rec);
+  return { tools, ...(tools && rec?.aiProvenanceId ? { aiProvenanceId: rec.aiProvenanceId } : {}) };
 }
 
 /** One tool in the served listing: the WebMCP descriptor fields + the AIMEAT payment contract. */
@@ -136,7 +147,8 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/apps/:owner/:filename/webmcp', async (req, res) => {
     const ownerName = localAccountName(decodeURIComponent(req.params.owner as string));
     const filename = decodeURIComponent(req.params.filename as string);
-    const tools = await loadPublicManifest(storage, config, ownerName, filename);
+    const manifest = await loadPublicManifestRecord(storage, config, ownerName, filename);
+    const tools = manifest.tools;
     // The tool manifest is a memory-record convention keyed by filename, so a seller can declare
     // tools for an app this node does not host — that listing must keep working. The app record is
     // what the `app_surface` block needs, and only a RESTRICTED one (gated, priced, moderated away)
@@ -152,11 +164,13 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const b = config.baseUrl;
     const appRef = `${ownerName}/${filename}`;
-    // TARGET-058: how the app's bytes were made, on the agent plane. This listing is a WebMCP
+    // TARGET-058: how the listing's bytes were made, on the agent plane. This listing is a WebMCP
     // document rather than an AIMEAT envelope, so the record rides at the top level under the same
     // `ai_provenance` name the MCP surface uses — snake_case parameter, camelCase document, exactly
-    // as frozen. Absent means UNSTATED, which is never "a human wrote it".
-    const prov = await loadServedProvenance(storage, config, app?.aiProvenanceId);
+    // as frozen. Absent means UNSTATED, which is never "a human wrote it". The tool manifest's own
+    // record comes first, because the tools are what this document serves; the app's record, which
+    // describes the app's bytes, only when the manifest carries none (aiprov D18).
+    const prov = await loadServedProvenance(storage, config, manifest.aiProvenanceId ?? app?.aiProvenanceId);
     setProvenanceHeaders(res, prov);
     res.json({
       webmcp: { version: 'draft', spec: WEBMCP_SPEC },

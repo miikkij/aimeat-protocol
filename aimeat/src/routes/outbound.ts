@@ -13,6 +13,7 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-08 — POST /v1/outbound/send answers with the message's ai_provenance_id (aiprov D9).
  *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-10-05 — The per-minute send limit moves from this route into sendOutbound, counted per
  *     account, so the MCP tool shares it (secaudit 2026-10, C5).
@@ -330,6 +331,8 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       const sees = seesAccounts(req);
       res.json(success(config.nodeId, {
         message: publicMessage(result.log, sees), ...(sees ? { channel: result.channel } : {}), status: result.status,
+        // The record the message carries: the sender's own, attached or minted (aiprov D9).
+        ...(result.aiProvenanceId ? { ai_provenance_id: result.aiProvenanceId } : {}),
       }));
     } catch (e) {
       if (!sendErr(res, config, e, seesAccounts(req))) throw e;

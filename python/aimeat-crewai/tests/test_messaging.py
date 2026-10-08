@@ -54,13 +54,24 @@ def test_ask_builds_interactive_payload_and_returns_ids():
     api = _FakeApi()
     q = build_question("q1", "Pick one", [("a", "A"), ("b", "B")], required=True)
     out = ask(api, "alice@node", [q], body="intro", subject="Setup", submit_label="Go")
-    assert out == {"message_id": "m1", "conversation_id": "c1"}
+    assert out == {"message_id": "m1", "conversation_id": "c1", "ai_provenance_id": None}
     sent = api.posted["json"]
+    assert "ai_provenance" not in sent and "ai_provenance_id" not in sent
     assert api.posted["path"] == "/v1/messages"
     assert sent["to"] == "alice@node" and sent["body"] == "intro" and sent["subject"] == "Setup"
     assert sent["interactive"]["role"] == "questions"
     assert sent["interactive"]["submitLabel"] == "Go"
     assert sent["interactive"]["questions"][0]["id"] == "q1"
+
+
+def test_ask_sends_the_declaration_and_returns_the_recorded_id():
+    api = _FakeApi(post_resp=_Resp(201, {"data": {
+        "message": {"id": "m2", "conversationId": "c2"}, "ai_provenance_id": "prov-9"}}))
+    decl = {"level": "ai-generated", "model": "anthropic/claude-opus-5"}
+    out = ask(api, "alice@node", [build_question("q", "p", ["a"])], ai_provenance=decl, ai_provenance_id="prov-1")
+    sent = api.posted["json"]
+    assert sent["ai_provenance"] == decl and sent["ai_provenance_id"] == "prov-1"
+    assert out["ai_provenance_id"] == "prov-9"
 
 
 def test_ask_requires_questions():

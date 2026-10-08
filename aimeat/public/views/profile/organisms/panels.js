@@ -9,6 +9,8 @@
  * @structure OrgSearch, IncomingInvitations, BoardPreview
  * @usage import { OrgSearch, IncomingInvitations, BoardPreview } from '/views/profile/organisms/panels.js';
  * @version-history
+ *   v1.15.0 -- 2026-10-08 -- The board preview's messages hand their ai_provenance block to
+ *     BoardNotice, which shows the AI label when one is owed (aiprov D10).
  *   v1.14.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the search is the Search line with its loading mark and Clear, its hits the List under a Group heading per workspace (a hit's name opens it, its space a tag, its snippet the line under); the invitations the List with "invited by" as the small grey words beside the name; the board preview a Split with the Row of its description, the copy Icon and Open in Boards (openTab), and its composer the TextField with Send beside it (Enter sends). The page writes no class.
  *   v1.13.0 -- 2026-09-26 -- The board preview's messages are the BoardNotice component (components/BoardNotice.js): the same markup and look, given as data.
  *   v1.12.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -201,7 +203,7 @@ export function BoardPreview({ boardId, showToast }) {
         : latest.length === 0 ? html`<${Note} kind="quiet">${t('organisms.boardEmpty') || 'No messages yet — write the first one.'}<//>`
         : latest.map(p => html`<${BoardNotice} key=${p.id || ts(p)} kind=${p.category || null}
             words=${String(p.body || p.content || '').slice(0, 400)} who=${p.author_gaii || p.author || '?'}
-            time=${ts(p) ? relTime(ts(p)) : null} />`)}
+            time=${ts(p) ? relTime(ts(p)) : null} provenance=${p.ai_provenance} />`)}
       <${Space} above="medium">
         <${TextField} placeholder=${t('organisms.writePost') || 'Write a message…'} ariaLabel=${t('organisms.writePost') || 'Write a message…'}
           value=${text} onInput=${setText} onEnter=${send}

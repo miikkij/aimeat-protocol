@@ -13,6 +13,9 @@
  * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
  * @usage import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
  * @version-history
+ *   v1.7.0 — 2026-10-08 — broadcastProvenanceStamp() hashes with messageProvenanceContent(), the one
+ *     rule every message send uses (body plus the questions as stored), and takes the session's
+ *     scopes (aiprov D5, D14).
  *   v1.6.0 — 2026-10-06 — A broadcast names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.5.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.4.0 — 2026-09-24 — SECURITY (audit A5-3): broadcastFromPrincipal() counts the broadcast as ONE
@@ -37,6 +40,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { DirectMessageAttachment, InteractivePayload, SharingGroupRecord, Storage } from '../storage/interface.js';
 import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
+import { messageProvenanceContent } from './message-provenance.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { isAddressableRecipient } from '../utils/messaging.js';
 import type { DeliveryCtx } from './message-delivery.js';
@@ -186,8 +190,10 @@ export function broadcastProvenanceStamp(
   deps: { storage: Storage; config: AimeatConfig },
   input: {
     principal: string;
+    /** The session's own scopes, when the caller has them. */
+    scopes?: readonly string[];
     body?: string;
-    questions?: Array<{ header?: string; prompt?: string }>;
+    interactive?: { role: string; questions?: readonly unknown[] };
     pipeline: 'rest.messages_broadcast' | 'mcp.dm_broadcast';
     declaredId?: string;
     declared?: DeclaredProvenance;
@@ -196,9 +202,10 @@ export function broadcastProvenanceStamp(
   const { storage, config } = deps;
   return () => provenanceForWrite(storage, {
     principal: input.principal,
-    // The questions are content a person reads, exactly as in aimeat_dm_ask, so they are hashed
-    // with the body rather than left out of the record.
-    content: [input.body ?? '', ...(input.questions ?? []).map(q => `${q.header ?? ''} ${q.prompt ?? ''}`)].join('\n'),
+    scopes: input.scopes,
+    // The questions are content a person reads, so they are hashed with the body: the one rule
+    // every message send uses (services/message-provenance.ts).
+    content: messageProvenanceContent(input.body, input.interactive),
     declaredId: input.declaredId,
     declared: input.declared,
     pipeline: input.pipeline,

@@ -12,6 +12,9 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.6.0 — 2026-10-08 — GET /v1/work/:tc and POST /v1/work/:tc/deliver carry the output's
+ *     provenance record (ai_provenance_id and the ai_provenance block), which the node now stamps on
+ *     delivery (aiprov D8).
  *   v1.5.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.5.1 — 2026-09-26 — A person's inbox and sent list read their ecosystem apps' identities beside
@@ -70,6 +73,7 @@ import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
 import { identitiesActingFor } from '../services/db/owner-identity.js';
+import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 
 // The webhook log kept its address here when fireWebhook moved to the shared service.
 export { getWebhookLog } from '../services/work-lifecycle.js';
@@ -280,6 +284,10 @@ export async function createWorkItem(
 
 export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, notificationService?: MailboxNotificationService | null): Router {
   const router = Router();
+  /** A work item's output record, for its two parties: the id and the record itself. */
+  const outputProvenance = async (id: string | undefined) => (id
+    ? { ai_provenance_id: id, ...provenanceItemBlock(await loadServedProvenance(storage, config, id)) }
+    : {});
 
   // POST /v1/work/request — submit a work request (spec path)
   router.post('/v1/work/request', requireAuth(), requireExternalPrincipal(), requireScope('work:request'), validateBody(WorkRequestSchema, config.nodeId), async (req, res) => {
@@ -464,6 +472,9 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       ttl_expires_at: work.ttlExpiresAt,
       created_at: work.createdAt,
       updated_at: work.updatedAt,
+      // How the output was made, with the record itself: it is private, and the requester could
+      // not resolve the id at /v1/provenance/:id (aiprov D8).
+      ...(await outputProvenance(work.aiProvenanceId)),
     }));
   });
 
@@ -577,6 +588,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       tracking_code: delivered.work.trackingCode,
       status: delivered.work.status,
       output: delivered.work.output,
+      ...(await outputProvenance(delivered.work.aiProvenanceId)),
     }, [
       { description: 'Rate this delivery', method: 'POST', url: `/v1/work/${tc}/rate` },
     ]));

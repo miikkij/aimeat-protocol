@@ -11,6 +11,7 @@
  *   archiveConversations
  * @usage import * as messages from '/js/services/messages.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-08 -- send() takes aiProvenanceId and sends it as ai_provenance_id (aiprov D17).
  *   v1.5.0 -- 2026-09-13 -- getOrganize / updateOrganize / archiveConversations: the owner's archive
  *     and the rules for their Messages list (/v1/messages/organize).
  *   v1.4.0 -- 2026-08-01 -- Voice messages: uploadAttachment carries a recording's measured
@@ -37,10 +38,11 @@ const enc = encodeURIComponent;
 /** Send a direct message. `attachments` is an array of descriptors (storage_key, mime, size, kind, inline, id).
  *  `subject` opens a new topic thread; `conversationId` continues a specific existing thread.
  *  `interactive` carries a structured AskUserQuestion payload (a `questions` spec or the human's `answers`). */
-export async function send({ to, body, attachments, replyTo, subject, conversationId, interactive } = /** @type {{ to?: any, body?: any, attachments?: any, replyTo?: any, subject?: any, conversationId?: any, interactive?: any }} */ ({})) {
+export async function send({ to, body, attachments, replyTo, subject, conversationId, interactive, aiProvenanceId } = /** @type {{ to?: any, body?: any, attachments?: any, replyTo?: any, subject?: any, conversationId?: any, interactive?: any, aiProvenanceId?: any }} */ ({})) {
   return api('/v1/messages', {
     method: 'POST',
-    body: JSON.stringify({ to, body, attachments, reply_to: replyTo, subject, conversation_id: conversationId, interactive }),
+    // ai_provenance_id: the record of a suggested reply sent as it stands (one of the owner's own).
+    body: JSON.stringify({ to, body, attachments, reply_to: replyTo, subject, conversation_id: conversationId, interactive, ai_provenance_id: aiProvenanceId }),
   });
 }
 

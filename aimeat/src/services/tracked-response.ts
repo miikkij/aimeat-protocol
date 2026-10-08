@@ -19,6 +19,9 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.4.0 — 2026-10-08 — An approve-mode draft is stamped when it is built, like the auto reply
+ *     (stampReply), and carries its record id on the draft row and in its value, so the owner's send
+ *     of the draft as it stands attaches it (aiprov D17).
  *   v1.3.0 — 2026-09-29 — The watched record passes the classification leave() (destination: the
  *     peer) before its field is injected into the reply; a classified result is left out and the
  *     ledger records `result-withheld` with the key, label and reason (TARGET-082 V4).
@@ -102,13 +105,35 @@ const draftKey = (id: string) => `${DRAFT_PREFIX}${id}.latest`;
  *  same contract. Set before any await, so single-threaded JS guarantees mutual exclusion. */
 const inFlight = new Set<string>();
 
-async function upsert(storage: Storage, ownerGaii: string, key: string, value: unknown): Promise<void> {
+async function upsert(storage: Storage, ownerGaii: string, key: string, value: unknown, aiProvenanceId?: string): Promise<void> {
   const now = new Date().toISOString();
   const existing = await storage.getMemory(ownerGaii, key);
   await storage.setMemory({
     key, ownerGaii, value, visibility: 'private', tags: [],
     ttlHours: null, version: existing ? existing.version + 1 : 1,
     createdAt: existing?.createdAt ?? now, updatedAt: now,
+    ...(aiProvenanceId ? { aiProvenanceId } : {}),
+  });
+}
+
+/**
+ * The record of a reply the node composed from the owner's template. `assisted` rather than
+ * `ai-generated`: a person wrote the template and the node filled a slot in it. `humanInvolvement`
+ * stays `none`, for the auto reply that goes out unread AND for the approve-mode draft: pressing
+ * send on a pre-written draft is not a step where the substance is reviewed (stampAutonomousOutput).
+ */
+function stampReply(ctx: DeliveryCtx, c: TrackedResponse, body: string): Promise<string | undefined> {
+  return stampAutonomousOutput(ctx.storage, {
+    principal: c.source.ownerGhii,
+    content: body,
+    level: 'assisted',
+    method: 'rewritten',
+    pipeline: `tracked-response:${c.id}`,
+    surface: { visibility: 'private', humanAudience: true },
+    labelPolicy: ctx.config.aiLabelPublic,
+    nodeId: ctx.config.nodeId,
+    baseUrl: ctx.config.baseUrl,
+    enabled: ctx.config.aiProvenance,
   });
 }
 
@@ -227,8 +252,12 @@ async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse): Promise<v
     c.tracking.lastTriggeredAt = new Date().toISOString();
 
     if (c.response.mode === 'approve') {
-      // Draft the suggested reply for the owner to approve/edit; do NOT send.
-      await upsert(storage, c.ownerGaii, draftKey(c.id), { body, result, builtAt: c.tracking.lastTriggeredAt });
+      // Draft the suggested reply for the owner to approve/edit; do NOT send. The draft carries its
+      // record, on the row and in the value the draft read returns, so a send of the draft as it
+      // stands can attach it (aiprov D17); an edited draft is the owner's own words and attaches none.
+      const aiProvenanceId = await stampReply(ctx, c, body);
+      await upsert(storage, c.ownerGaii, draftKey(c.id),
+        { body, result, builtAt: c.tracking.lastTriggeredAt, ...(aiProvenanceId ? { aiProvenanceId } : {}) }, aiProvenanceId);
       c.delivery.draftKey = draftKey(c.id);
       c.state = 'awaiting-approval';
       ledger(c, 'awaiting-approval');
@@ -247,23 +276,8 @@ async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse): Promise<v
     await persist(storage, c);
     // TARGET-058. This is an automated reply DELIVERED to a person, and it goes out with nobody
     // having read it — the owner wrote the template once and configured the trigger, which is not
-    // the same as reading this message. So `humanInvolvement` stays `none`; the `approve` branch
-    // above returns before here precisely because a person is about to read that one.
-    //
-    // `assisted` rather than `ai-generated`: a human wrote the template and the node filled a slot
-    // in it. Claiming a model wrote the whole thing would be as false as claiming a person did.
-    const aiProvenanceId = await stampAutonomousOutput(storage, {
-      principal: c.source.ownerGhii,
-      content: body,
-      level: 'assisted',
-      method: 'rewritten',
-      pipeline: `tracked-response:${c.id}`,
-      surface: { visibility: 'private', humanAudience: true },
-      labelPolicy: ctx.config.aiLabelPublic,
-      nodeId: ctx.config.nodeId,
-      baseUrl: ctx.config.baseUrl,
-      enabled: ctx.config.aiProvenance,
-    });
+    // the same as reading this message. So `humanInvolvement` stays `none` (stampReply above).
+    const aiProvenanceId = await stampReply(ctx, c, body);
     const sent = await sendDirectMessage(ctx, {
       senderGhii: c.source.ownerGhii,
       recipientGhii: c.source.peerGhii,

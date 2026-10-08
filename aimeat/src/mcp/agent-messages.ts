@@ -8,6 +8,7 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   2026-10-08 — aimeat_message_send hands the session's scopes to the send service (aiprov D5).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 -- 2026-08-11 -- aimeat_message_send calls services/agent-message-send.ts, the same
  *     function POST /v1/agents/:name/messages calls, instead of building the record itself. Four
@@ -50,6 +51,8 @@ export function registerAgentMessageTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's scopes: a declaration needs provenance:write there as well as on the grant. */
+    scopes?: readonly string[],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -111,6 +114,7 @@ export function registerAgentMessageTools(
                     pipeline: 'mcp.message_send',
                     declaredProvenanceId: ai_provenance_id,
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
+                    scopes,
                 },
             );
             if (!result.ok) {

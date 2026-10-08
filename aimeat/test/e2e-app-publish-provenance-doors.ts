@@ -22,6 +22,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=app-publish-provenance-doors
  * @version-history
+ *   v1.3.0 — 2026-10-08 — aiprov D13: the board announcement of an agent's publish carries a
+ *     model-written record of its own text, found by hash; the owner's own announcement carries none.
+ *     aiprov D12: a fork of another owner's app behind an access code carries a copy of the record,
+ *     naming the forker, and the source's record stays private.
  *   v1.2.0 — 2026-09-26 — A declaration that says a model made the app and names no model is
  *     published with the `provenance-without-model` hint; one with a model, or level original, is not.
  *   v1.1.0 — 2026-08-16 — E2E quality, provenance-doors:284: the agent half of the silent door. That a
@@ -492,6 +496,51 @@ async function main() {
     await test('...and the human\'s silent app was not retroactively stamped', async () => {
         const { prov } = await storedRecord('door-silent.html');
         assert(!prov, `the owner's own silent app must still carry no record, got ${JSON.stringify(prov?.record?.level)}`);
+    });
+
+    // aiprov D13: the board post that announces a publish carries a record of ITS OWN words, which
+    // the node composes from the manifest the publisher wrote. The owner reads their own private
+    // records by hash, so the announcement's text finds its record, or does not.
+    const announcementHash = (name: string, description: string, file: string) => createHash('sha256')
+        .update(`\u{1F680} ${name} v1\n\n${description}\n\nDownload: /v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(file)}`, 'utf8')
+        .digest('hex');
+    await test('the announcement of an agent\'s publish carries a model-written record of its own text', async () => {
+        const r = await json(`/v1/provenance/by-hash/${announcementHash('Agent silent door', 'No declaration.', agentSilentFile)}`, { headers: auth(ownerToken) });
+        assert(r.status === 200 && r.body.data.count === 1, `the announcement's record: ${JSON.stringify(r.body.data ?? r.body.error)}`);
+        const rec = r.body.data.records[0].provenance;
+        assert(rec.level === 'ai-generated' && rec.generator?.principal === agentGaii && rec.generator?.pipeline === 'app.announce',
+            `model-written, by the agent, for the announcement: ${JSON.stringify(rec).slice(0, 400)}`);
+    });
+
+    // aiprov D12: a fork row is public, so carrying the record of an app nobody else can read made
+    // that owner's private record resolvable to anyone. The fork gets a copy of its own instead.
+    await test('forking another owner\'s app behind an access code carries a copy of its record, not the record', async () => {
+        const src = await storedRecord(inlineFile);
+        const sourceId = src.prov?.id as string;
+        assert(!!sourceId, 'the source app carries a record');
+        const patch = await json(`/v1/apps/${inlineFile}`, { method: 'PATCH', headers: auth(ownerToken), body: JSON.stringify({ access_code: 'forkcode123', forkable: true }) });
+        assert(patch.status === 200, `patch: ${patch.status} ${JSON.stringify(patch.body?.error)}`);
+        assert((await json(`/v1/provenance/${sourceId}`)).status === 404, 'behind an access code the source record is not public');
+
+        const other = `forker${Date.now() % 1000000}`;
+        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
+        assert(reg.status === 201, `register forker: ${reg.status}`);
+        const otherToken = await getOwnerToken(other, reg.body.data.private_key);
+        const fork = await json(`/v1/apps/${encodeURIComponent(owner)}/${inlineFile}/fork`, {
+            method: 'POST', headers: auth(otherToken), body: JSON.stringify({ new_filename: 'forked-private.html' }),
+        });
+        assert(fork.status === 200 || fork.status === 201, `fork: ${fork.status} ${JSON.stringify(fork.body?.error)}`);
+        const forked = await json(`/v1/apps/${encodeURIComponent(other)}/forked-private.html/versions`);
+        const forkProv = forked.body.meta?.provenance;
+        assert(!!forkProv?.id && forkProv.id !== sourceId, `the fork carries its own record: ${JSON.stringify(forkProv?.id)} vs ${sourceId}`);
+        assert(forkProv.record.level === 'assisted' && forkProv.record.generator?.principal === `${other}@${NODE_ID}`,
+            `the copy says the same level and names the forker: ${JSON.stringify(forkProv.record).slice(0, 400)}`);
+        assert((await json(`/v1/provenance/${sourceId}`)).status === 404, 'the source owner\'s record stays private after the fork');
+    });
+
+    await test('...and the announcement of the owner\'s own publish carries none', async () => {
+        const r = await json(`/v1/provenance/by-hash/${announcementHash('Silent door', 'No declaration.', 'door-silent.html')}`, { headers: auth(ownerToken) });
+        assert(r.status === 200 && r.body.data.count === 0, `a person's announcement must not be stamped: ${JSON.stringify(r.body.data ?? r.body.error)}`);
     });
 
     console.log(`\n${passed} passed, ${failed} failed\n`);

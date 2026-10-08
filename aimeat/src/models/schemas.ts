@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Board provenance — 2026-10-08 — BoardPostSchema and BoardReplySchema take ai_provenance and
+ *     ai_provenance_id (aiprov D5); the objects stripped both, so a REST declaration vanished.
  *   POST /v1/memory lock — 2026-10-06 — MemoryWriteSchema takes expected_version (secaudit 2026-10
  *     follow-up, Part B).
  *   Chunked upload binding — 2026-09-29 — ChunkedUploadInitSchema takes 'workspace' visibility and
@@ -32,6 +34,7 @@
  */
 import { z } from 'zod';
 import { annotationErrors } from '../utils/onto-context.js';
+import { AiProvenanceBodyFields } from '../tool-catalog/ai-provenance-schema.js';
 
 // ── Semantic Ontology (Phase 0.7b) ─────────────────────────
 
@@ -271,6 +274,7 @@ export const BoardPostSchema = z.object({
     category: z.string().max(64).optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().optional(),
+    ...AiProvenanceBodyFields,
 });
 
 export const BoardReactionSchema = z.object({
@@ -279,6 +283,7 @@ export const BoardReactionSchema = z.object({
 
 export const BoardReplySchema = z.object({
     body: z.string().min(1).max(200_000),
+    ...AiProvenanceBodyFields,
 });
 
 // ── Federation ──────────────────────────────────────────────

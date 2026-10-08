@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-08 — aimeat_work_deliver answers with the output's provenance record (aiprov D8).
  *   2026-10-08 — aimeat_memory_list names each item's ai_provenance_id (aiprov E14).
  *   2026-10-06 — aimeat_memory_write registers the catalog's schema, which now carries its bounds
  *     (secaudit 2026-10 follow-up, Part B).
@@ -702,7 +703,8 @@ export function registerCoreTools(
             // Wallet balance changed for both parties
             emitResourceUpdated(agentGaii, `aimeat://wallet/${encodeURIComponent(agentGaii)}`);
             emitResourceUpdated(delivered.work.requesterGaii, `aimeat://wallet/${encodeURIComponent(delivered.work.requesterGaii)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: delivered.work.status }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: delivered.work.status,
+                ...(await writeProvenanceEcho(storage, config, delivered.work.aiProvenanceId)) }, null, 2) }] };
         },
     );
 

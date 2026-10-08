@@ -18,6 +18,7 @@
  *   validateTaskInput() · validateStatusInput() · publicTask()
  * @usage const { ok, defects, task } = validateTaskInput(req.body);
  * @version-history
+ *   v1.1.0 — 2026-10-08 — publicTask() names the task's provenance record (aiProvenanceId, aiprov D8).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 import type { AgentV2TaskRecord, AgentV2TaskStatus, MessagePart } from '../storage/interface.js';
@@ -251,5 +252,8 @@ export function publicTask(task: AgentV2TaskRecord): Record<string, unknown> {
     ttlMs: task.ttlMs,
     pollIntervalMs: task.pollIntervalMs,
     metadata: task.metadata,
+    // The provenance record of the result and closing message, once the task settled with one
+    // (aiprov D8). Absent is unstated.
+    ...(task.aiProvenanceId ? { aiProvenanceId: task.aiProvenanceId } : {}),
   };
 }

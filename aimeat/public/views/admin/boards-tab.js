@@ -15,6 +15,8 @@
  *   - whoOf / readWord: how a row says whose a board is and who may read it
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.4.0 -- 2026-10-08 -- A notice hands its ai_provenance block to BoardNotice, which shows the AI
+ *     label when one is owed (aiprov D10).
  *   v2.3.0 -- 2026-09-27 -- On the library components (page group G5): the strip is the FigureStrip
  *     (the silent boards in coral), the headline the Verdict with its label and lead, the search the
  *     Search line with its magnifier, the five chips the filter Tabs (the silent one in the attention
@@ -352,7 +354,8 @@ function One({ board, posts, authors, total, busy, onBack, onFlip, onDelete, onA
               time=${since(p.created_at)}
               counts=${`${p.replies
     ? S('nReplies', { n: num(p.replies) })
-    : S('noReplies')}${thanks ? ' · ' + S('nThanks', { n: num(thanks) }) : ''}`} />`;
+    : S('noReplies')}${thanks ? ' · ' + S('nThanks', { n: num(thanks) }) : ''}`}
+              provenance=${p.ai_provenance} />`;
     })}
       ${total > posts.length && html`
         <${Note}>${S('moreNotices', { shown: num(posts.length), total: num(total) })}<//>`}
