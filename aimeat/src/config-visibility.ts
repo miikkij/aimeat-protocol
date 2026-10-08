@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.2.0 — 2026-10-08 — merchantFeedEnabled (layer E).
  *   v1.1.0 — 2026-10-08 — analyticsTagsEnabled (layer B).
  *   v1.0.0 — 2026-10-08 — Initial: aiVisibilityEnabled (layer A).
  */
@@ -29,11 +30,17 @@ export interface VisibilityConfig {
    * apps of their place. On by default; the tags wait for consent when the cookie banner is on.
    */
   analyticsTagsEnabled: boolean;
+  /**
+   * Layer E: an owner may publish their products as a Merchant Center feed and push them into their
+   * own Stripe for agent checkout (Copilot Checkout). On by default; each owner switches their own on.
+   */
+  merchantFeedEnabled: boolean;
 }
 
 export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): VisibilityConfig {
   return {
     aiVisibilityEnabled: env.AIMEAT_AI_VISIBILITY !== 'false',
     analyticsTagsEnabled: env.AIMEAT_ANALYTICS_TAGS !== 'false',
+    merchantFeedEnabled: env.AIMEAT_MERCHANT_FEED !== 'false',
   };
 }

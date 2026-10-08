@@ -1957,6 +1957,24 @@
       },
       "why": "Reviewed 2026-10-08 (AI visibility, layer B), the node's own read: the owner's visibility settings record (signals.visibility.settings, reserved prefix): the counting switch and the analytics tag ids. No content."
     },
+    "src/services/visibility/merchant-feed.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the owner's public, priced agent offers (agents.{name}.offers), the same records the public commerce feed lists. Only public offers reach a feed."
+    },
+    "src/services/visibility/merchant-feed-settings.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the owner's feed settings record (signals.visibility.feed, reserved prefix) and the sealed selling key (commerce.psp) for the owner's own Stripe call. No content."
+    },
+    "src/commerce/agent-order-intake.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the seller's order record (commerce.order.*) to stay idempotent and the sealed selling key (commerce.psp) for the seller's own Stripe call. No content."
+    },
     "src/services/visibility/visibility-report.ts": {
       "reads": {
         "listMemory": 1

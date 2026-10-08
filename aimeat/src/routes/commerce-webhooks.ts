@@ -12,6 +12,9 @@
  *   - payment_intent.succeeded → income voucher (source 'stripe'); when the intent's
  *     metadata.aimeat_reference matches one of the seller's sent invoices, the invoice
  *     is marked paid instead (which books the voucher WITH its VAT breakdown).
+ *   - checkout.session.completed → an AI shopping agent's order through Stripe's Agentic
+ *     Commerce Suite becomes an order and its fulfilment (commerce/agent-order-intake.ts) when
+ *     a line names a product of this seller's feed; any other checkout is left alone.
  *   - charge.refunded → expense voucher for the refunded amount.
  *   - payout.paid → TRANSFER voucher (Stripe balance → bank account; not revenue).
  *   Everything else acks 200 without booking — Stripe retries on non-2xx, and an
@@ -26,6 +29,7 @@
  * @structure verifyStripeSignature · event mapping · commerceWebhooksRouter
  * @usage app.use(commerceWebhooksRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.1.0 — 2026-10-08 — checkout.session.completed: agent orders from Stripe's Agentic Commerce Suite (AI visibility, layer E).
  *   v1.0.1 — 2026-09-16 — Opens the sealed webhook secret (commerce/psp-secrets.ts).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
@@ -41,6 +45,7 @@ import { openPspSecret } from '../commerce/psp-secrets.js';
 import { FinanceError } from '../services/finance/errors.js';
 import { bookVoucher } from '../services/finance/vouchers.js';
 import { markPaid } from '../services/finance/invoice-service.js';
+import { intakeAgentOrder } from '../commerce/agent-order-intake.js';
 
 const TOLERANCE_SECONDS = 300;
 
@@ -123,7 +128,7 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
     const date = isoDateOf(event.created);
 
     try {
-      let booked: { action: string; voucherId?: string; invoiceId?: string } = { action: 'ignored' };
+      let booked: { action: string; voucherId?: string; invoiceId?: string; orderId?: string } = { action: 'ignored' };
 
       if (event.type === 'payment_intent.succeeded') {
         const amount = Number(object.amount_received ?? object.amount ?? 0);
@@ -148,6 +153,13 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
             booked = { action: 'charge_booked', voucherId: voucher.id };
           }
         }
+      } else if (event.type === 'checkout.session.completed') {
+        // An AI shopping agent's order through Stripe's Agentic Commerce Suite becomes an order and
+        // its fulfilment here (commerce/agent-order-intake.ts). Any other checkout is left alone;
+        // its money is booked by payment_intent.succeeded as before.
+        const r = await intakeAgentOrder(storage, config, ownerGhii, object, event.id);
+        if (r.action === 'agent_order') booked = { action: 'agent_order', orderId: r.orderId };
+        else if (r.action === 'already_taken') booked = { action: 'agent_order_seen', orderId: r.orderId };
       } else if (event.type === 'charge.refunded') {
         const amount = Number(object.amount_refunded ?? 0);
         const intentId = typeof object.payment_intent === 'string' ? object.payment_intent : null;

@@ -10,6 +10,7 @@
  * @structure registerVisibilityTools(mcp, storage, config, caller)
  * @usage import { registerVisibilityTools } from './visibility.js';
  * @version-history
+ *   v1.2.0 — 2026-10-08 — aimeat_visibility_feed, over the same service functions as /v1/visibility/feed (layer E).
  *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes the Clarity and GA4 ids (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
@@ -24,6 +25,9 @@ import { toolError } from './tool-error.js';
 import { readVisibilityReport } from '../services/visibility/visibility-report.js';
 import { setVisibilitySettings, VisibilitySettingsError } from '../services/visibility/visibility-settings.js';
 import { visibilitySettingsView } from '../services/visibility/analytics-tags.js';
+import {
+  setFeedSettings, syncStripeCatalog, describeFeed, nodeAllowsFeeds, FeedSettingsError,
+} from '../services/visibility/merchant-feed-settings.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -67,6 +71,31 @@ export function registerVisibilityTools(
         return text(visibilitySettingsView(config, settings));
       } catch (e) {
         if (e instanceof VisibilitySettingsError) return toolError(e.code, e.message);
+        throw e;
+      }
+    },
+  );
+
+  mcp.tool(
+    'aimeat_visibility_feed',
+    descriptionFor('aimeat_visibility_feed'),
+    zodShapeFor('aimeat_visibility_feed'),
+    annotationsFor('aimeat_visibility_feed'),
+    async ({ enabled, brand, return_policy_label, store_url, product_links, stripe_sync }) => {
+      const c = caller();
+      if (c.visitor) return toolError('FORBIDDEN', 'A session from another node has no product feed here.');
+      try {
+        const change = { enabled, brand, returnPolicyLabel: return_policy_label, storeUrl: store_url, productLinks: product_links };
+        if (Object.values(change).some((v) => v !== undefined)) await setFeedSettings(storage, c.ownerGhii, change);
+        let stripe: unknown;
+        if (stripe_sync) {
+          if (!nodeAllowsFeeds(config)) return toolError('FEATURE_DISABLED', 'Product feeds are switched off on this node.');
+          stripe = await syncStripeCatalog(storage, config, c.ownerGhii, { checkOnly: stripe_sync === 'check' });
+        }
+        const feed = await describeFeed(storage, config, c.ownerGhii, c.owner);
+        return text(stripe ? { ...feed, stripe } : feed);
+      } catch (e) {
+        if (e instanceof FeedSettingsError) return toolError(e.code, e.message);
         throw e;
       }
     },

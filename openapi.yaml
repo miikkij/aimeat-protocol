@@ -67379,6 +67379,89 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/visibility/feed:
+    get:
+      operationId: readVisibilityFeed
+      tags: [Signals]
+      summary: The caller's product feeds for AI shopping agents
+      description: 'Whether the feeds are on, their two public addresses (a Microsoft Merchant Center feed for Copilot Checkout and a Stripe Agentic Commerce catalog), every product listed with its feed id, sku, USD price and page, what was left out and why, the last push to Stripe, and a `todo` list. Only public offers and app tools with a USD price in whole cents are listed; packages are not. The MCP tool aimeat_visibility_feed answers the same. Requires scope signals:read.'
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: setVisibilityFeed
+      tags: [Signals]
+      summary: Change the caller's product feeds
+      description: 'Only the fields given change. Answers the same view as GET. Requires scope signals:write.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean, description: 'true publishes both feeds; false answers 404 at both addresses.' }
+                brand: { type: string, maxLength: 70, nullable: true }
+                return_policy_label: { type: string, maxLength: 50, nullable: true, description: 'The return policy label set in Merchant Center (Store settings > UCP settings).' }
+                store_url: { type: string, nullable: true, description: 'Where a product with no page of its own links (https).' }
+                product_links: { type: object, additionalProperties: { type: string, nullable: true }, description: 'A product page per sku; a null value removes one.' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/visibility/feed/stripe-sync:
+    post:
+      operationId: syncVisibilityFeedToStripe
+      tags: [Signals]
+      summary: Push the caller's catalog into their own Stripe
+      description: 'Starts a product catalog import in the caller''s own Stripe (Agentic Commerce Suite, POST /v2/commerce/product_catalog/imports, mode replace) with the Stripe key they set for selling, and uploads the catalog. `check_only: true` reads the last import''s status instead. 409 PSP_NOT_CONFIGURED without a selling key, 409 FEED_OFF when the feed is off, 409 NOTHING_TO_SEND with no listable product, 403/502 STRIPE_REFUSED with Stripe''s own message. Requires scope signals:write.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                check_only: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: 'PSP_NOT_CONFIGURED, FEED_OFF or NOTHING_TO_SEND' }
+        '502': { description: 'STRIPE_REFUSED' }
+
+  /v1/visibility/feeds/{owner}/merchant-center.txt:
+    get:
+      operationId: merchantCenterFeed
+      tags: [Signals]
+      summary: An owner's Microsoft Merchant Center product feed (PUBLIC)
+      description: 'Tab-separated, one row per product, built at the moment of the fetch, with the columns id, title, description, link, image_link, price, availability, condition, brand, identifier_exists, product_type, seller_name, return_policy_labels. For "Automatically download file from URL" in the owner''s own Merchant Center account. 404 for every failure (unknown owner, feed off, node switch off).'
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 'The feed (text/plain; tab-separated).' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/visibility/feeds/{owner}/stripe-catalog.csv:
+    get:
+      operationId: stripeCatalogFeed
+      tags: [Signals]
+      summary: An owner's Stripe Agentic Commerce product catalog (PUBLIC)
+      description: 'Comma-separated, one row per product: id, title, description, link, image_link, availability, price, brand, mpn, google_product_category, inventory_not_tracked. The same file POST /v1/visibility/feed/stripe-sync uploads. 404 for every failure.'
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 'The catalog (text/csv).' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/signals/{owner}/{streamId}/px.svg:
     get:
       operationId: signalPixel

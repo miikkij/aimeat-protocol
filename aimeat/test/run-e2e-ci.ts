@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-08 -- e2e-agent-checkout.ts joins the list: the product feeds for AI shopping agents.
  *   2026-10-08 -- e2e-ai-visibility.ts joins the list: channels, AI fetches, discovery files and
  *     purchases counted per owner with nothing that identifies a visitor at rest.
  *   2026-10-06 -- e2e-app-tool-free-mcp.ts joins the list: unpriced calls agree with REST while
@@ -705,6 +706,7 @@ const ALL_SUITES = [
     'test/e2e-outbound.ts',
     'test/e2e-signals.ts',
     'test/e2e-ai-visibility.ts',
+    'test/e2e-agent-checkout.ts',
     'test/e2e-app-visitors.ts',
     'test/e2e-outbound-organism-sender.ts',
     'test/e2e-companies.ts',
