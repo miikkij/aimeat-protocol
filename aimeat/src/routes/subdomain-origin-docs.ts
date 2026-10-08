@@ -23,6 +23,7 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.3.1 — 2026-10-08 — A legal page's label is decided for a public surface when served (it is served without the access code).
  *   v1.3.0 — 2026-10-08 — llms.txt, AGENTS.md and the MCP server card count who fetched them for the
  *     app's owner (services/visibility/, AI visibility layer A).
  *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
@@ -129,8 +130,9 @@ export function registerAppOriginDocs(
     const page = renderLegalPage(app, kind, doc, { baseUrl: config.baseUrl, locale });
     if ('redirect' in page) { res.redirect(302, page.redirect); return; }
     // The record minted for this text rides out with it: headers, machine marks, and the visible
-    // label where the law asks, lifted by the app's named reviewer as on the app itself.
-    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId);
+    // label where the law asks, lifted by the app's named reviewer as on the app itself. Decided
+    // for a public surface: this page is served without the app's access code.
+    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId, { surface: { visibility: 'public' } });
     setProvenanceHeaders(res, prov);
     const body = applyServeMarks(page.html, {
       provenance: prov, visibleLabel: { config, locale }, reviewedBy: appReviewedBy(app.manifest),

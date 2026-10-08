@@ -46,7 +46,9 @@ __all__ = [
     "SPEC",
     "HumanInvolvement",
     "Level",
+    "MediaKind",
     "Method",
+    "ResemblesReal",
     "declare",
     "is_model_written",
     "read_provenance",
@@ -83,8 +85,43 @@ class Method:
     SYNTHESIZED = "synthesized"
     FULLY_GENERATED = "fully-generated"
     MULTI_AGENT = "multi-agent"
+    #: A model turned speech into this text.
+    TRANSCRIBED = "transcribed"
 
-    ALL = (HUMAN, REWRITTEN, SUMMARIZED, TRANSLATED, SYNTHESIZED, FULLY_GENERATED, MULTI_AGENT)
+    ALL = (HUMAN, REWRITTEN, SUMMARIZED, TRANSLATED, SYNTHESIZED, FULLY_GENERATED, MULTI_AGENT,
+           TRANSCRIBED)
+
+
+class MediaKind:
+    """What kind of thing the content is. Mirrors ``AI_MEDIA_KINDS``.
+
+    It decides the words of the label (a picture is not "this text") and whether the deep-fake rule
+    can apply, which reaches ``IMAGE``, ``AUDIO`` and ``VIDEO`` only. Say it for anything that is
+    not text.
+    """
+
+    TEXT = "text"
+    IMAGE = "image"
+    AUDIO = "audio"
+    VIDEO = "video"
+    CODE = "code"
+    DATA = "data"
+
+    ALL = (TEXT, IMAGE, AUDIO, VIDEO, CODE, DATA)
+
+
+class ResemblesReal:
+    """For image, audio or video: does it resemble a real person, place, object or event?
+
+    Mirrors ``AI_RESEMBLES_REAL``. Public synthetic media is labelled whatever the answer; ``YES``
+    makes the record cite the deep-fake rule, anything else records the label as a precaution.
+    """
+
+    YES = "yes"
+    NO = "no"
+    UNKNOWN = "unknown"
+
+    ALL = (YES, NO, UNKNOWN)
 
 
 class HumanInvolvement:
@@ -130,6 +167,9 @@ def declare(
     provider: str | None = None,
     sources: Iterable[Mapping[str, Any]] | None = None,
     notes: str | None = None,
+    media_kind: str | None = None,
+    media_type: str | None = None,
+    resembles_real: str | None = None,
 ) -> dict[str, Any]:
     """Build an ``ai_provenance`` block for a write tool.
 
@@ -148,6 +188,11 @@ def declare(
 
     ``notes`` must never carry prompt text or anything private: the record is published alongside
     the content it describes.
+
+    ``media_kind`` (:class:`MediaKind`) says what the content is, and ``media_type`` its IANA type
+    (``"audio/mpeg"``). Without them the node states text for text it stores and nothing for bytes,
+    and the label reads generic. ``resembles_real`` (:class:`ResemblesReal`) is for image, audio or
+    video that may look or sound like a real person or event.
     """
     if level not in Level.ALL:
         raise ValueError(f"level must be one of {Level.ALL}, got {level!r}")
@@ -156,8 +201,18 @@ def declare(
     if human_involvement not in HumanInvolvement.ALL:
         raise ValueError(
             f"human_involvement must be one of {HumanInvolvement.ALL}, got {human_involvement!r}")
+    if media_kind is not None and media_kind not in MediaKind.ALL:
+        raise ValueError(f"media_kind must be one of {MediaKind.ALL}, got {media_kind!r}")
+    if resembles_real is not None and resembles_real not in ResemblesReal.ALL:
+        raise ValueError(f"resembles_real must be one of {ResemblesReal.ALL}, got {resembles_real!r}")
 
     block: dict[str, Any] = {"level": level, "human_involvement": human_involvement}
+    if media_kind:
+        block["media_kind"] = media_kind
+    if media_type:
+        block["media_type"] = media_type
+    if resembles_real:
+        block["resembles_real"] = resembles_real
     if method:
         block["method"] = method
     if model:

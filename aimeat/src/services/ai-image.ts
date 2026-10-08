@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.8.0 -- 2026-10-08 -- The record states `mediaKind: image` and the picture's type, decided against the stored visibility.
  *   v2.7.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (services/ai/errors.ts):
  *     a moderation refusal is 422 CONTENT_REFUSED, another 4xx 422 PROVIDER_REJECTED (aiprov plan, A1).
  *     The result carries the picture's width and height from its header (A13).
@@ -231,6 +232,8 @@ export async function generateForOwner(
     costUsd, content: '',
     // The provenance record names the picture by its bytes, the way a voice reply names its audio.
     contentHash: contentHashOf(result.data),
+    // A picture, of the type the provider sent, decided against the visibility it was stored with.
+    media: { mediaKind: 'image', mediaType: result.mime, surface: { visibility, humanAudience: true } },
     appId: opts.appId, source: 'ai-image',
     units: { images: 1 }, costSource: price.costSource, priceRef: price.priceRef,
   });

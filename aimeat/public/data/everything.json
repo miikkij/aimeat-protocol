@@ -2885,19 +2885,19 @@
      "slug": "g-17-ai-provenance-records",
      "cells": [
       "<strong>AI provenance records</strong>",
-      "Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, and a hash of the exact bytes. Records are append-only. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/ai-transparency.md\" target=\"_blank\" rel=\"noopener\">ai-transparency.md</a>.",
+      "Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, what kind of thing it is (text, image, audio, video, app or data), and a hash of the exact bytes. Records are append-only. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/ai-transparency.md\" target=\"_blank\" rel=\"noopener\">ai-transparency.md</a>.",
       "<code>POST /v1/provenance</code>, <code>ai_provenance</code> on MCP write tools"
      ],
-     "plain": "AI provenance records Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, and a hash of the exact bytes. Records are append-only. See ai-transparency.md. POST /v1/provenance, ai_provenance on MCP write tools"
+     "plain": "AI provenance records Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, what kind of thing it is (text, image, audio, video, app or data), and a hash of the exact bytes. Records are append-only. See ai-transparency.md. POST /v1/provenance, ai_provenance on MCP write tools"
     },
     {
      "slug": "g-17-visible-labels",
      "cells": [
       "<strong>Visible labels</strong>",
-      "Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. Apps get it without writing code.",
+      "Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. The sentence names the kind of thing (&quot;AI made this audio&quot;), and whether a label is owed is decided when the content is served, so content made public later carries the label it now owes. Apps get it without writing code.",
       "served pages, <code>aimeat-ai</code>"
      ],
-     "plain": "Visible labels Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. Apps get it without writing code. served pages, aimeat-ai"
+     "plain": "Visible labels Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. The sentence names the kind of thing (\"AI made this audio\"), and whether a label is owed is decided when the content is served, so content made public later carries the label it now owes. Apps get it without writing code. served pages, aimeat-ai"
     },
     {
      "slug": "g-17-detection-by-hash",

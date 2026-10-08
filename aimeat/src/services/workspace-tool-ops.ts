@@ -30,6 +30,7 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.8.2 — 2026-10-08 — A record's provenance states its medium (mediaKindOfValue: text or data).
  *   v1.8.1 — 2026-10-06 — The caller carries the session's scopes; a declaration the session may not
  *     make is refused 403 SCOPE_DENIED before any write (secaudit 2026-10 last items, F2).
  *   v1.8.0 — 2026-10-06 — publishRecordsBatchOp and deleteRecordsBatchOp: the bodies of the batch
@@ -110,7 +111,7 @@ import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js'
 import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput, storeHeldProvenance, type DeclaredProvenance } from './ai-provenance.js';
-import type { AiProvenanceLevel, AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
+import { mediaKindOfValue, type AiProvenanceLevel, type AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes } from '../routes/memory/shared.js';
 import { logger } from '../utils/logger.js';
 
@@ -467,12 +468,12 @@ export async function writeWorkspaceDraftsOp(
             ? await stampAutonomousOutput(storage, {
                 principal: caller.principal, content: memoryContentBytes(v),
                 level: args.nodeStamp.level, method: args.nodeStamp.method, pipeline: args.pipeline,
-                ...provenanceSurface, held,
+                ...provenanceSurface, held, mediaKind: mediaKindOfValue(v),
             })
             : await provenanceForWrite(storage, {
                 principal: caller.principal, scopes: caller.scopes, content: memoryContentBytes(v),
                 declaredId: args.aiProvenanceId, declared: args.aiProvenance, pipeline: args.pipeline,
-                ...provenanceSurface, held,
+                ...provenanceSurface, held, mediaKind: mediaKindOfValue(v),
             });
         lastProvenanceId = provenanceId ?? lastProvenanceId;
         const prev = await findWorkspaceRecord(storage, key);
@@ -675,7 +676,7 @@ export async function publishRecordsBatchOp(
             if (args.nodeStamp && !args.dryRun) {
                 const held: AiProvenanceRecordRow[] = [];
                 aiProvenanceId = await stampAutonomousOutput(storage, {
-                    principal: publisher, content: memoryContentBytes(r.value),
+                    principal: publisher, content: memoryContentBytes(r.value), mediaKind: mediaKindOfValue(r.value),
                     level: args.nodeStamp.level, method: args.nodeStamp.method, pipeline: args.nodeStamp.pipeline,
                     surface: { visibility: visibility ?? 'owner', humanAudience: true },
                     labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl,

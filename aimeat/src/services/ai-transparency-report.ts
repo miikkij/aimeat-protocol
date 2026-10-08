@@ -30,9 +30,16 @@
  *   const report = await buildAiTransparencyReport(storage, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.1.0 — 2026-10-08 — `labelled` and `unlabelled` count the label each public record owes NOW
+ *     (the serve-time decision), not the `required` flag stored at mint: content made public after
+ *     its record was minted had counted as unlabelled while every surface labelled it. The options
+ *     take the node's `labelPolicy`.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8.
  */
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
+import { AI_PROVENANCE_SPEC_V1, type AiProvenance } from '../models/ai-provenance-schemas.js';
+import { disclosureFor, type DisclosureLabelPolicy } from './ai-disclosure.js';
+import { servedContext } from './ai-disclosure-served.js';
 
 /** The window the trend is computed over when a caller does not choose one. */
 export const DEFAULT_TREND_DAYS = 30;
@@ -71,10 +78,32 @@ export interface ReportOptions {
   ownerGhii?: string;
   /** Trend + filter window in days. */
   sinceDays?: number;
+  /** The node's label posture, `config.aiLabelPublic`. Each label is decided under it. */
+  labelPolicy?: DisclosureLabelPolicy;
 }
 
 function sinceIso(days: number): string {
   return new Date(Date.now() - days * 86_400_000).toISOString();
+}
+
+/**
+ * Does a PUBLIC record with these facts owe a label now? The same decision a serving surface makes
+ * (services/ai-provenance-marks.ts servedDisclosure), from the facts the facet query groups by: the
+ * stored `required` flag was decided against the surface the content had at mint, and content made
+ * public afterwards would otherwise count as unlabelled while every surface labels it.
+ */
+function owedWhenPublic(
+  f: { level: string; humanInvolvement: string; mediaKind: string | null; reason: string | null },
+  policy: DisclosureLabelPolicy,
+): boolean {
+  const record = {
+    spec: AI_PROVENANCE_SPEC_V1, level: f.level, humanInvolvement: f.humanInvolvement,
+    generatedAt: new Date(0).toISOString(),
+    ...(f.mediaKind ? { mediaKind: f.mediaKind } : {}),
+    ...(f.reason ? { disclosure: { required: false, reason: f.reason, short: { en: '-' } } } : {}),
+  } as AiProvenance;
+  // An unknown level or medium fails the schema in disclosureFor and reads as unstated: not owed.
+  return disclosureFor(record, servedContext(record, { visibility: 'public' }), policy).required;
 }
 
 /**
@@ -89,6 +118,7 @@ export async function buildAiTransparencyReport(
   const days = Math.min(Math.max(opts.sinceDays ?? DEFAULT_TREND_DAYS, 1), 3650);
   const since = sinceIso(days);
   const facets = await storage.aiProvenanceFacets({ ownerGhii: opts.ownerGhii, since });
+  const policy = opts.labelPolicy ?? 'light';
 
   const report: AiTransparencyReport = {
     scope: {
@@ -118,12 +148,13 @@ export async function buildAiTransparencyReport(
     report.public_by_level[f.level] = (report.public_by_level[f.level] ?? 0) + f.count;
 
     const reviewed = f.humanInvolvement === 'editorial-control' || f.humanInvolvement === 'full-human';
-    // Unlabelled means all three at once: public, unreviewed, and no label computed. A reviewed item
-    // without a label is not a failure — Art. 50(4) exempts it — so counting it here would inflate
-    // the one number an operator is meant to act on.
-    const unlabelled = !reviewed && !f.disclosureRequired ? f.count : 0;
+    // Unlabelled means all three at once: public, unreviewed, and no label owed as it is served now.
+    // A reviewed item without a label is not a failure — Art. 50(4) exempts it — so counting it
+    // here would inflate the one number an operator is meant to act on.
+    const owed = owedWhenPublic(f, policy);
+    const unlabelled = !reviewed && !owed ? f.count : 0;
     report.unlabelled += unlabelled;
-    if (f.disclosureRequired) report.labelled += f.count;
+    if (owed) report.labelled += f.count;
 
     const bucket = byDay.get(f.day) ?? { day: f.day, public: 0, unlabelled: 0 };
     bucket.public += f.count;
@@ -173,10 +204,39 @@ async function appsWithDisclosureGap(
 export async function listUnlabelledPublic(
   storage: Storage, opts: ReportOptions & { limit?: number } = {},
 ): Promise<{ items: AiProvenanceRecordRow[]; total: number }> {
-  return storage.listAiProvenance({
-    ownerGhii: opts.ownerGhii,
-    ...(opts.sinceDays ? { since: sinceIso(opts.sinceDays) } : {}),
-    unlabelledPublicOnly: true,
-    limit: opts.limit ?? 25,
-  });
+  const policy = opts.labelPolicy ?? 'light';
+  const since = opts.sinceDays ? sinceIso(opts.sinceDays) : undefined;
+  // The honest total comes from the facets, which cover the whole population in SQL. When it is
+  // zero (the usual case, since every public surface decides its label when it serves) nothing is
+  // scanned at all.
+  const facets = await storage.aiProvenanceFacets({ ownerGhii: opts.ownerGhii, since });
+  const total = facets
+    .filter((f) => f.publiclyLinked && (f.humanInvolvement === 'none' || f.humanInvolvement === 'light-review')
+      && !owedWhenPublic(f, policy))
+    .reduce((n, f) => n + f.count, 0);
+  const limit = opts.limit ?? 25;
+  const items: AiProvenanceRecordRow[] = [];
+  // The rows, newest first: the unreviewed public population, decided one by one with the same
+  // rule. Paged, and capped at UNLABELLED_SCAN_PAGES so a large node cannot turn the sweep into a
+  // full read; `total` above stays the whole count either way.
+  for (let page = 0; total > 0 && items.length < limit && page < UNLABELLED_SCAN_PAGES; page++) {
+    const { items: rows } = await storage.listAiProvenance({
+      ownerGhii: opts.ownerGhii, ...(since ? { since } : {}),
+      unreviewedPublicOnly: true, limit: UNLABELLED_SCAN_PAGE, offset: page * UNLABELLED_SCAN_PAGE,
+    });
+    for (const row of rows) {
+      const r = row.record;
+      const owed = owedWhenPublic({
+        level: r.level, humanInvolvement: r.humanInvolvement,
+        mediaKind: r.mediaKind ?? null, reason: r.disclosure?.reason ?? null,
+      }, policy);
+      if (!owed && items.length < limit) items.push(row);
+    }
+    if (rows.length < UNLABELLED_SCAN_PAGE) break;
+  }
+  return { items, total };
 }
+
+/** Rows read per page while collecting the unlabelled list, and the most pages read. */
+const UNLABELLED_SCAN_PAGE = 500;
+const UNLABELLED_SCAN_PAGES = 10;

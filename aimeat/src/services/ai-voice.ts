@@ -6,6 +6,7 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.11.0 - 2026-10-08 - The speech record states `mediaKind: audio` and the provider's content type, so its label reads as audio.
  *   v1.10.0 - 2026-10-08 - aiprov plan, workstream A. A provider's refusal goes through the one status
  *     table (services/ai/errors.ts): a permanent 4xx is 422 PROVIDER_REJECTED with the provider's
  *     reason (read, redacted, logged; the body was cancelled unread), a 429 is RATE_LIMITED with its
@@ -42,7 +43,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
-  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
+  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan, type AiCallOutcome,
 } from './ai/completion.js';
 import {
   providerFailureOf, providerReason, providerReasonFromText, providerStatusError, retryAfterHeader,
@@ -143,11 +144,13 @@ async function recordMoved(storage: Storage, config: AimeatConfig, gaii: string,
 }
 
 async function settled(storage: Storage, config: AimeatConfig, gaii: string, plan: AiCallPlan,
-  options: { app_id: string }, content: string, cost: number, tokens: { prompt: number; completion: number }, source: string, contentHash?: string) {
+  options: { app_id: string }, content: string, cost: number, tokens: { prompt: number; completion: number }, source: string, contentHash?: string,
+  media?: AiCallOutcome['media']) {
   // STT, LLM and TTS can complete concurrently. recordAiUsage serializes the shared counter update.
   const result = await settleAiCall(storage, config, gaii, plan, {
     model: plan.model, promptTokens: tokens.prompt, completionTokens: tokens.completion,
     totalTokens: tokens.prompt + tokens.completion, costUsd: cost, content, contentHash, appId: options.app_id, source,
+    ...(media ? { media } : {}),
   });
   // The owner's usage memory changed, including when a disconnected call settles.
   emitChange('memory', gaii);
@@ -337,7 +340,10 @@ export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii:
       catch (error) { logger.warn('[voice] exact speech cost unavailable; catalogue estimate retained', { error: String(error) }); }
     }
     result = await settled(storage, config, gaii, plan, options, '', cost ?? estimate, { prompt: 0, completion: 0 }, 'voice-speech',
-      size ? 'sha256:' + audioHash.digest('hex') : undefined);
+      size ? 'sha256:' + audioHash.digest('hex') : undefined,
+      // The record says it is audio, of the type the provider actually sent, so its label reads as
+      // audio and the deep-fake rule applies when the clip is published.
+      { mediaKind: 'audio', mediaType: audio.mime });
   }
   route.attempts[route.attempts.length - 1].costUsd = cost ?? estimate;
   await emit({ type: 'done', model: plan.model, bytes: size, audio, cost_usd: cost ?? estimate, key_source: plan.keyScope, cost_exact: cost !== undefined, cost_known: cost !== undefined || unitPrice !== undefined, syntheticAudio: true, route, ...result });

@@ -41,6 +41,7 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.4.0 — 2026-10-08 — toDeclaredProvenance maps `media_kind`, `media_type` and `resembles_real`.
  *   v1.3.0 — 2026-10-05 — AiProvenanceBlockSchema moved unchanged to src/tool-catalog/ai-provenance-schema.ts,
  *     the catalog's exact schema of the field, and is re-exported here (secaudit 2026-10, M3).
  *   v1.2.1 — 2026-09-26 — `model` asks the declarer for its OWN model id. A GPT-6 build of
@@ -132,6 +133,9 @@ export function toDeclaredProvenance(
     humanInvolvement: input.human_involvement,
     model: input.model,
     provider: input.provider,
+    ...(input.media_kind ? { mediaKind: input.media_kind } : {}),
+    ...(input.media_type ? { mediaType: input.media_type } : {}),
+    ...(input.resembles_real ? { resemblesReal: input.resembles_real } : {}),
     sources: input.sources?.map((s) => ({
       url: s.url,
       ...(s.title ? { title: s.title } : {}),

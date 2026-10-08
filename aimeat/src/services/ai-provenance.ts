@@ -44,6 +44,10 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.4.0 — 2026-10-08 — The record states its medium (mediaKind, mediaType, resemblesReal):
+ *     mintProvenance stores what it is given, and the three write helpers state `text` for a string
+ *     when nobody said otherwise; a declaration's own medium wins. buildDisclosure's words come from
+ *     disclosureWording() (ai-disclosure-served.ts), which picks them by medium.
  *   v1.3.6 — 2026-10-05 — A declaration's word is asked with scopeIsCovered, of the grant and, when the
  *     caller passes `scopes`, of the session too, so a narrower session does not gain the word from
  *     the stored grant (secaudit 2026-10, C3).
@@ -79,16 +83,42 @@ import {
   AI_PROVENANCE_SPEC_V1, AiProvenanceSchema,
   type AiProvenance, type AiProvenanceLevel, type AiProvenanceMethod, type AiHumanInvolvement,
   type AiStampedBy, type AiProvenanceGenerator, type AiProvenanceSource, type AiDisclosureBlock,
-  type LocalizedText,
+  type LocalizedText, type AiMediaKind, type AiResemblesReal,
 } from '../models/ai-provenance-schemas.js';
 import { disclosureFor, type SurfaceContext, type DisclosureLabelPolicy } from './ai-disclosure.js';
+import { disclosureWording } from './ai-disclosure-served.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { createT, LOCALES } from '../i18n.js';
 import { logger } from '../utils/logger.js';
 
+/** The medium of the bytes a record describes. Every member optional; see AI_MEDIA_KINDS. */
+export interface MediaStatement {
+  mediaKind?: AiMediaKind;
+  /** IANA media type, e.g. `audio/mpeg`. Parameters are dropped before it is stored. */
+  mediaType?: string;
+  /** The declarer's answer; the node never infers it. */
+  resemblesReal?: AiResemblesReal;
+}
+
+/**
+ * The medium a write path states when its caller said nothing: text for a string, unstated for
+ * bytes. A path that stores structured values passes mediaKindOfValue() instead.
+ */
+function mediaOf(content: string | Uint8Array, ...said: (MediaStatement | undefined)[]): MediaStatement {
+  const pick = <K extends keyof MediaStatement>(k: K): MediaStatement[K] => said.find((s) => s?.[k] !== undefined)?.[k];
+  const mediaKind = pick('mediaKind') ?? (typeof content === 'string' ? 'text' : undefined);
+  const mediaType = pick('mediaType');
+  const resemblesReal = pick('resemblesReal');
+  return {
+    ...(mediaKind ? { mediaKind } : {}),
+    ...(mediaType ? { mediaType } : {}),
+    ...(resemblesReal ? { resemblesReal } : {}),
+  };
+}
+
 /** What a caller may state. Everything the node can work out itself is deliberately absent. */
-export interface MintProvenanceInput {
+export interface MintProvenanceInput extends MediaStatement {
   /**
    * `node` = THIS node witnessed the generation. `principal` = a caller is declaring provenance for
    * content produced elsewhere. `attestation.observed` follows from this and cannot be set directly.
@@ -170,32 +200,7 @@ export function buildDisclosure(
   opts: { reviewer?: string } = {},
 ): AiDisclosureBlock {
   const decision = disclosureFor(record, ctx, policy);
-
-  let shortKey: string;
-  let longKey: string;
-  if (decision.reason === 'art50_1_interaction') {
-    shortKey = 'aiLabel.short'; longKey = 'aiLabel.chat';
-  } else if (decision.reason === 'policy') {
-    // Labelled beyond the law. The words must not overstate: this content was either reviewed by a
-    // person or declared outside the public-interest limb, so it gets the neutral "a model was
-    // involved" wording rather than the "no human editorial review" statement. And the chip itself
-    // says the review when there was one: "AI-generated" beside "a person reviewed it" was the
-    // label a reviewed board deck still carried on 2026-09-25.
-    const reviewed = ctx.editorialResponsibility === true
-      || record.humanInvolvement === 'editorial-control' || record.humanInvolvement === 'full-human';
-    shortKey = record.level === 'assisted' ? 'aiLabel.assisted'
-      : reviewed && opts.reviewer ? 'aiLabel.reviewed'
-      : reviewed ? 'aiLabel.reviewedShort' : 'aiLabel.short';
-    longKey = 'aiLabel.policyLong';
-  } else if (record.level === 'original') {
-    shortKey = 'aiLabel.original'; longKey = 'aiLabel.originalLong';
-  } else if (record.level === 'assisted') {
-    shortKey = 'aiLabel.assisted'; longKey = 'aiLabel.assistedLong';
-  } else if (record.humanInvolvement === 'editorial-control' || record.humanInvolvement === 'full-human') {
-    shortKey = 'aiLabel.short'; longKey = 'aiLabel.reviewedGeneric';
-  } else {
-    shortKey = 'aiLabel.short'; longKey = 'aiLabel.publicText';
-  }
+  const { shortKey, longKey } = disclosureWording(record, ctx, decision.reason, !!opts.reviewer);
 
   return {
     required: decision.required,
@@ -249,6 +254,11 @@ export async function mintProvenance(
     },
   };
   if (input.method) draft.method = input.method;
+  if (input.mediaKind) draft.mediaKind = input.mediaKind;
+  // Parameters (`; charset=…`, `; codecs=…`) are dropped: the record names the type, not a header.
+  const mediaType = input.mediaType?.split(';')[0]?.trim().toLowerCase();
+  if (mediaType) draft.mediaType = mediaType;
+  if (input.resemblesReal) draft.resemblesReal = input.resemblesReal;
   if (input.sources?.length) draft.sources = input.sources;
   if (input.derivedFrom?.length) draft.derivedFrom = input.derivedFrom;
   if (input.notes) draft.notes = input.notes;
@@ -306,6 +316,9 @@ export async function stampAgentWrite(
     principal: string;
     /** The exact bytes written, hashed here so a detection query can find them later. */
     content: string | Uint8Array;
+    /** What kind of thing the bytes are. Absent: text for a string, unstated for bytes. */
+    mediaKind?: AiMediaKind;
+    mediaType?: string;
     /** The job, crew, app or route that orchestrated the write. */
     pipeline?: string;
     /** The surface it will be served on, so the disclosure block is pre-rendered correctly. */
@@ -352,6 +365,7 @@ export async function stampAgentWrite(
     // whole design.
     observed: false,
     content: input.content,
+    ...mediaOf(input.content, input),
     generator: input.pipeline || model
       ? { ...(input.pipeline ? { pipeline: input.pipeline } : {}), ...(model ? { model } : {}) }
       : undefined,
@@ -375,8 +389,9 @@ export async function stampAgentWrite(
  * DTO and follows the house convention (snake on the wire, mapped at the boundary), whereas the
  * document it becomes is self-describing and keeps one spelling everywhere.
  */
-export interface DeclaredProvenance {
-  /** REQUIRED when a caller declares anything at all. The rest is optional detail. */
+export interface DeclaredProvenance extends MediaStatement {
+  /** REQUIRED when a caller declares anything at all. The rest is optional detail. The medium
+   *  (MediaStatement) wins over what the write path would state for itself. */
   level: AiProvenanceLevel;
   method?: AiProvenanceMethod;
   /**
@@ -479,6 +494,9 @@ export async function provenanceForWrite(
     scopes?: readonly string[];
     /** The exact bytes written, hashed so a detection query can find them later. */
     content: string | Uint8Array;
+    /** What kind of thing the bytes are, as the write path knows it. A declaration's own wins. */
+    mediaKind?: AiMediaKind;
+    mediaType?: string;
     /** A record id the caller asked to attach. Checked against the caller's own account. */
     declaredId?: string;
     /** What the caller said about how the content was made. */
@@ -520,6 +538,7 @@ export async function provenanceForWrite(
       humanInvolvement: input.declared.humanInvolvement ?? 'none',
       method: input.declared.method,
       content: input.content,
+      ...mediaOf(input.content, input.declared, input),
       generator: {
         ...(input.declared.model ? { model: input.declared.model } : {}),
         // The declarer's own answer to "who ran it". The record schema has always had the field;
@@ -542,6 +561,8 @@ export async function provenanceForWrite(
   return stampAgentWrite(storage, {
     principal: input.principal,
     content: input.content,
+    mediaKind: input.mediaKind,
+    mediaType: input.mediaType,
     pipeline: input.pipeline,
     surface: input.surface,
     labelPolicy: input.labelPolicy,
@@ -597,6 +618,8 @@ export async function stampAutonomousOutput(
     /** What the output is, in provenance terms. Defaults to `ai-generated`. */
     level?: AiProvenanceLevel;
     method?: AiProvenanceMethod;
+    /** What kind of thing the output is. Absent: text for a string, unstated for bytes. */
+    mediaKind?: AiMediaKind;
     /** The job, crew, automation or route that produced it. */
     pipeline: string;
     /**
@@ -627,6 +650,7 @@ export async function stampAutonomousOutput(
     humanInvolvement: reviewed ? 'editorial-control' : 'none',
     method: input.method,
     content: input.content,
+    ...mediaOf(input.content, input),
     generator: { pipeline: input.pipeline },
     notes: reviewed
       ? `Produced by an automated step (${input.pipeline}) and reviewed by ${reviewed.who} at "${reviewed.step}", `
@@ -687,8 +711,8 @@ export async function publiclyResolvable(storage: Storage, ids: string[]): Promi
 }
 
 /**
- * What a PUBLIC surface serves. `minimal` returns the four required fields plus the disclosure
- * block; the full record stays stored and stays visible to its owner.
+ * What a PUBLIC surface serves. `minimal` returns the four required fields, the medium and the
+ * disclosure block; the full record stays stored and stays visible to its owner.
  *
  * Two reasons this is a serving knob rather than a filling one. The Code of Practice pushes both
  * ways at once — Measure 1.3 encourages richer provenance metadata while Sub-measure 1.1.1 warns
@@ -705,6 +729,8 @@ export function projectForDetail(record: AiProvenance, detail: 'full' | 'minimal
     humanInvolvement: record.humanInvolvement,
     generatedAt: record.generatedAt,
   };
+  // The medium stays: it reveals nothing about the pipeline, and a renderer needs it for the words.
+  if (record.mediaKind) minimal.mediaKind = record.mediaKind;
   if (record.disclosure) minimal.disclosure = record.disclosure;
   return minimal;
 }

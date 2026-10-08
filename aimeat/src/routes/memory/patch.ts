@@ -25,6 +25,7 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.5.1 — 2026-10-08 — The stamp states the merged value's medium (text or data).
  *   v1.5.0 — 2026-09-29 — The merged value is scheduled for write-time classification
  *     (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.4.0 — 2026-09-29 — The answer echoes the value through presentMemory (TARGET-082).
@@ -72,6 +73,7 @@ import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { stampAgentWrite, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
+import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';
 
 /**
  * How many times a losing writer re-reads and re-merges before giving up with a 409.
@@ -245,6 +247,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const aiProvenanceId = await stampAgentWrite(storage, {
         principal: gaii,
         content: memoryContentBytes(merged),
+        mediaKind: mediaKindOfValue(merged),
         pipeline: 'memory.patch',
         surface: {
           visibility: (visibility ?? existing?.visibility ?? 'private') as MemoryRecord['visibility'],

@@ -63,9 +63,13 @@ the `Link` header instead. This is a real limit, not a bug you should keep retry
 ### The visible label
 
 Where a person reads it, they see the official **EU AI Office icon** plus plain-language text in
-English or Finnish, at first exposure, and — on the node's own surfaces — a "How this was made" link
-to the record. Whether a label is owed is decided once, on the server, and pre-rendered into the
-record; a surface renders it, it never re-decides it.
+English, Finnish or Spanish, at first exposure, and — on the node's own surfaces — a "How this was
+made" link to the record. Whether a label is owed is decided on the server when the content is
+served: against the content's visibility at that moment and the record's medium. A record keeps the
+block decided when it was minted, so content made public later is served with the label it now
+owes. The words follow the medium the record states (`mediaKind`: text, image, audio, video, code,
+data): a speech clip reads "AI made this audio", never "This text". A surface renders the block it
+is served; it never decides it.
 
 ### For an app builder, one call
 

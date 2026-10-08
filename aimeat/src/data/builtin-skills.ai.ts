@@ -9,6 +9,8 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   v1.4.2 — 2026-10-08 — ai-transparency: `media_kind`, `media_type` and `resembles_real` in the
+ *     declaration.
  *   v1.4.1 — 2026-10-05 — ai-transparency: a declaration needs provenance:write in the session as well
  *     as the grant (secaudit 2026-10, C3). configure-routing: a provider test counts against the
  *     account's AI call limit (C5).
@@ -73,6 +75,13 @@ the content. Take it from your own configuration; do not ask the person. The nod
 it in for you: it did not watch the generation. Without it the public record says only who
 served the model (\`provider\`), and an app publish answers with the \`provenance-without-model\`
 hint.
+
+**Say what it is in \`media_kind\`** when it is not text: \`image\`, \`audio\`, \`video\`, \`code\` or
+\`data\`, with \`media_type\` (\`audio/mpeg\`) when you know it. The label's words follow it, so a
+picture's label says "this image" and not "this text". For image, audio or video that may look
+or sound like a real person, place or event, answer \`resembles_real\` (\`yes\`, \`no\` or
+\`unknown\`). Public image, audio and video is labelled whatever you answer; the answer decides
+only which rule the record cites.
 
 Declaring needs the \`provenance:write\` scope, because a declaration can assert that a
 person wrote or reviewed something. You must hold it in your grant AND in the session you write

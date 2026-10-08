@@ -22,6 +22,7 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   v1.6.1 — 2026-10-08 — A legal page's label is decided for a public surface when served (it is served without the access code).
  *   v1.6.0 — 2026-10-05 — The audit archive and the keep setting's logic (the owner test, the
  *     refusals, the account-holder test for a limit that deletes) moved to services/app-audit-keep.ts;
  *     a non-owner operator's archive of a hidden app answers the same 404 without writing an operator
@@ -183,8 +184,10 @@ export function registerLegalRoutes(
     }
     // The record minted for this text rides out with it, the way an app's own record does: the
     // headers, the machine marks, and the visible label where the law asks — lifted by the app's
-    // named reviewer, the same act that lifts it on the app itself.
-    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId);
+    // named reviewer, the same act that lifts it on the app itself. The label is decided for this
+    // page as served: a legal page is pre-contract information, served to anyone who reaches it
+    // without the app's access code, so it is a public surface.
+    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId, { surface: { visibility: 'public' } });
     setProvenanceHeaders(res, prov);
     const body = applyServeMarks(page.html, {
       provenance: prov, visibleLabel: { config, locale }, reviewedBy: appReviewedBy(app.manifest),

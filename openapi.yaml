@@ -962,8 +962,26 @@ components:
             produced it.
         method:
           type: string
-          enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent]
+          enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent, transcribed]
           description: Optional detail under `level`.
+        media_kind:
+          type: string
+          enum: [text, image, audio, video, code, data]
+          description: >
+            What kind of thing this is. It gives the label its words (a picture is not "this text")
+            and decides whether the deep-fake rule applies, which reaches image, audio and video only.
+            Omitted: the node states text for text it stores, and nothing for bytes.
+        media_type:
+          type: string
+          description: The IANA media type of the bytes.
+          example: audio/mpeg
+        resembles_real:
+          type: string
+          enum: ['yes', 'no', unknown]
+          description: >
+            For image, audio or video: does it resemble a real person, place, object or event? Public
+            synthetic media is labelled either way; this decides only whether the record cites the
+            deep-fake rule.
         human_involvement:
           type: string
           enum: [none, light-review, editorial-control, full-human]
@@ -1052,7 +1070,7 @@ components:
           enum: [original, assisted, synthesized, ai-generated]
         method:
           type: string
-          enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent]
+          enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent, transcribed]
         humanInvolvement:
           type: string
           enum: [none, light-review, editorial-control, full-human]
@@ -1062,6 +1080,24 @@ components:
         generatedAt:
           type: string
           format: date-time
+        mediaKind:
+          type: string
+          enum: [text, image, audio, video, code, data]
+          description: >
+            What kind of thing the record describes. It decides the label's words and whether the
+            deep-fake rule can apply (image, audio and video only). Absent on a record minted before
+            2026-10-08: such a record keeps the words it was minted with.
+        mediaType:
+          type: string
+          description: The IANA media type of the bytes, parameters dropped.
+          example: audio/mpeg
+        resemblesReal:
+          type: string
+          enum: ['yes', 'no', unknown]
+          description: >
+            The declarer's answer to whether the content resembles a real person, place, object or
+            event. Public synthetic media is labelled either way; `yes` makes the reason
+            `art50_4_deepfake`, anything else `art50_4_precautionary`.
         generator:
           type: object
           properties:
@@ -1111,7 +1147,11 @@ components:
             recordUrl: { type: string, format: uri }
         disclosure:
           type: object
-          description: Computed by the node, never hand-written by a caller.
+          description: >
+            Computed by the node, never hand-written by a caller. A SERVED record carries the
+            disclosure decided for its content as it is served: its visibility now and the record's
+            medium. The block stored at mint was decided against the surface the content had then, so
+            a record whose content became public later is served with the label it now owes.
           required: [required, reason, short]
           properties:
             required: { type: boolean }
@@ -19161,7 +19201,23 @@ paths:
                     superficial check (spelling, formatting, a skim) is `light-review`.
                 method:
                   type: string
-                  enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent]
+                  enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent, transcribed]
+                mediaKind:
+                  type: string
+                  enum: [text, image, audio, video, code, data]
+                  description: >
+                    What kind of thing the content is. It gives the label its words and decides
+                    whether the deep-fake rule applies (image, audio and video). Omitted, the label
+                    reads medium-neutral.
+                mediaType:
+                  type: string
+                  description: The IANA media type of the bytes, e.g. `audio/mpeg`.
+                resemblesReal:
+                  type: string
+                  enum: ['yes', 'no', unknown]
+                  description: >
+                    For image, audio or video: does it resemble a real person, place, object or event?
+                    `yes` makes the reason `art50_4_deepfake`; the label is the same either way.
                 content:
                   type: string
                   description: The exact bytes, hashed server-side. Prefer this when you hold them.
@@ -19252,8 +19308,14 @@ paths:
         this node.
 
         `AIMEAT_AI_PROVENANCE_DETAIL=minimal` reduces what a NON-owner is served to the four required
-        fields plus the disclosure block. It never reduces what is stored, and the owner always sees
-        the whole record.
+        fields, `mediaKind` and the disclosure block. It never reduces what is stored, and the owner
+        always sees the whole record.
+
+        THE DISCLOSURE IS DECIDED WHEN SERVED. `provenance.disclosure` is decided for the content as it
+        is now: public while anything public points at the record, and the record's `mediaKind`. A
+        record minted while its content was private, and attached to content that went public later,
+        is served with the label it now owes (`required: true`); the stored block is not changed.
+        The by-hash lookup serves its records the same way.
 
         CONTENT NEGOTIATED. A visible AI label's "how this was made" link lands here, so a PERSON
         arrives at this URL. A client that ranks `text/html` above `application/json` - a browser -
