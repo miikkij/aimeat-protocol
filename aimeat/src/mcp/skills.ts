@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-08 — aimeat_skill_publish takes ai_provenance and ai_provenance_id, inline and in the ZIP
+ *     upload's token, and answers with the record SKILL.md carries (aiprov E12).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-06 — skill_list, skill_link and skill_unlink take the catalog's schema too.
  *   v1.4.0 -- 2026-10-06 -- aimeat_skill_list view=linked asks memory:read, as its route does (secaudit
@@ -48,6 +50,8 @@ import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { toolError } from './tool-error.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
 
 export function registerSkillsTools(
     mcp: McpServer,
@@ -82,7 +86,7 @@ export function registerSkillsTools(
         descriptionFor('aimeat_skill_publish'),
         zodShapeFor('aimeat_skill_publish'),
         annotationsFor('aimeat_skill_publish'),
-        async ({ skill_md, files, scope, visibility, organism_id, workspace_id }) => {
+        async ({ skill_md, files, scope, visibility, organism_id, workspace_id, ai_provenance, ai_provenance_id }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             const acc = await accessor();
             const targetScope: SkillScope = scope === 'node' ? 'node' : scope === 'workspace' ? 'workspace' : 'user';
@@ -102,6 +106,9 @@ export function registerSkillsTools(
                         scope: targetScope,
                         ...(visibility ? { visibility } : {}),
                         ...(targetScope === 'workspace' ? { organism: organism_id, ws: workspace_id } : {}),
+                        // How SKILL.md in the ZIP was written; routes/upload-skill.ts records it (aiprov E12).
+                        ...(ai_provenance ? { ai_provenance } : {}),
+                        ...(ai_provenance_id ? { ai_provenance_id } : {}),
                     },
                     maxBytes: 20 * 1024 * 1024,
                     contentType: 'application/zip',
@@ -127,13 +134,19 @@ export function registerSkillsTools(
                     files: fileMap,
                     visibility,
                     ...(targetScope === 'workspace' ? { organismId: organism_id, workspaceId: workspace_id, accessor: acc } : {}),
+                    // How SKILL.md was written, recorded as on POST /v1/skills (aiprov E12).
+                    provenance: {
+                        principal: agentGaii, scopes,
+                        ...(ai_provenance ? { declared: toDeclaredProvenance(ai_provenance) } : {}),
+                        ...(ai_provenance_id ? { declaredId: ai_provenance_id } : {}),
+                    },
                 });
                 // routes/skills.ts emits this on publish, link and unlink. A skill is an agent's
                 // operating guide, so the owner's skills view showing the old set is the wrong
                 // answer to "what does this agent know how to do".
                 emitChange('skills');
                 emitResourceListChanged(agentGaii);
-                return ok({ published: true, skill: summary });
+                return ok({ published: true, skill: summary, ...(await writeProvenanceEcho(storage, config, summary.aiProvenanceId)) });
             } catch (e) {
                 return err(`Skill publish failed: ${(e as Error).message}`);
             }

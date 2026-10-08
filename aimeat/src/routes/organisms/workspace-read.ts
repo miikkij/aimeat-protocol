@@ -28,6 +28,10 @@
  *   v1.7.0 — 2026-09-24 — The workspace read gates on, and answers with, the copies of the manifest,
  *     readme and apps records that count (services/workspace-meta.ts workspaceMetaReader) instead of
  *     the first copy the scan returned for the gate and the last one for the answer.
+ *   v1.8.0 — 2026-10-08 — POST /v1/organisms/:id/comments records provenance for the comment body
+ *     (provenanceForWrite: an `ai_provenance` declaration or an `ai_provenance_id` from the body, else
+ *     the node's stamp for an agent writer) and answers with `ai_provenance_id`. It stamped nothing,
+ *     so an agent's comment over REST read as a person's (aiprov E8).
  *   v1.9.0 — 2026-09-29 — The workspace read loads through services/workspace-content.ts, the one
  *     loader readWorkspaceOp uses too: decideWorkspaceRead makes the decision (which adds Gate 0, an
  *     agent the organism does not list), and the classification reader passes the records (TARGET-082).
@@ -64,6 +68,9 @@ import { buildInstructionBlocks } from '../../services/hello-mcp.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { loadServedProvenanceMany } from '../../services/ai-provenance-marks.js';
+import { provenanceForWrite, ProvenanceScopeError } from '../../services/ai-provenance.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 import { fresherRec } from './shared.js';
 import { loadWorkspaceContent } from '../../services/workspace-content.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -526,9 +533,33 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot comment in this workspace')); return;
     }
-    const comment = await addComment(storage, id, callerGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id });
+    // How the comment was made: the caller's declaration or an id from the body, else the node's
+    // stamp for an agent writer (an owner is not stamped). The body is stored truncated to 10 000
+    // characters, so the hash is taken over the same slice, as the MCP tool does.
+    const declaration = parseDeclaredProvenanceInput((req.body ?? {}).ai_provenance);
+    if (!declaration.ok) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The ai_provenance block does not parse.', 400, { violations: declaration.violations })); return;
+    }
+    const declaredId = typeof (req.body ?? {}).ai_provenance_id === 'string' ? (req.body as { ai_provenance_id: string }).ai_provenance_id : undefined;
+    let aiProvenanceId: string | undefined;
+    try {
+      aiProvenanceId = await provenanceForWrite(storage, {
+        principal: callerGaii, scopes: req.auth!.scopes, content: body.slice(0, 10_000),
+        declaredId, declared: declaration.declared, pipeline: 'rest.workspace_comment',
+        surface: { visibility: 'private', humanAudience: true },
+        labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl, enabled: config.aiProvenance,
+      });
+    } catch (err) {
+      // Refused before the comment is written: nothing lands when the declaration is not the caller's to make.
+      if (err instanceof ProvenanceScopeError) { res.status(403).json(error(config.nodeId, err.code, err.message)); return; }
+      throw err;
+    }
+    const comment = await addComment(storage, id, callerGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId });
     emitChange('organisms');
-    res.status(201).json(success(config.nodeId, { comment }));
+    res.status(201).json(success(config.nodeId, {
+      comment, ai_provenance_id: aiProvenanceId ?? null,
+      ...(await provenanceWriteEcho(storage, config, { storedId: aiProvenanceId, declared: declaration.declared, declaredId })),
+    }));
   });
 
   /* GET /v1/organisms/:id/comments?ws=&space=&instance_id= — list a target's thread */

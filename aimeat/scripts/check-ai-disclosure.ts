@@ -28,6 +28,7 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.7.1 — 2026-10-08 — aimeat_skill_publish is on the required list (aiprov E12).
  *   v1.7.0 — 2026-10-05 — Whether a tool carries ai_provenance, and whether it takes free text, is read from
  *     the schema each MCP surface registers (inventory/mcp-capture.ts), not from the registration
  *     source: the schemas come from the catalog through zodShapeFor() (secaudit 2026-10, M3).
@@ -283,6 +284,9 @@ const AI_PROVENANCE_REQUIRED = [
   // carries no authorship at all; the passage is the part that does.
   'aimeat_surface_layout_set',
   'aimeat_message_send',
+  // A skill's SKILL.md is prose people and agents load, a skill can be public, and an AI is exactly
+  // who is asked to write one (aiprov E12, 2026-10-08).
+  'aimeat_skill_publish',
   'aimeat_task_complete',
   'aimeat_workspace_comment',
   'aimeat_workspace_write',

@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-08 — aimeat_memory_list names each item's ai_provenance_id (aiprov E14).
  *   2026-10-06 — aimeat_memory_write registers the catalog's schema, which now carries its bounds
  *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -578,6 +579,8 @@ export function registerCoreTools(
                 tags: e.tags,
                 version: e.version,
                 updated_at: e.updatedAt,
+                // The provenance record per item, as GET /v1/memory lists it; null is UNSTATED (aiprov E14).
+                ai_provenance_id: e.aiProvenanceId ?? null,
             }));
             // This listing is METADATA ONLY — no values, on either path. With owner_scope that is
             // actively misleading: the caller sees a key it cannot then read, because

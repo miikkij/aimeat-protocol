@@ -5,6 +5,9 @@
  * @description Commit accepted batch rows with their provenance; restores retain source attribution.
  * @structure writeMemoryBatch
  * @version-history
+ *   1.2.0 2026-10-08 The import check accepts a source record whose hash matches the value in its
+ *     canonical form or in the form it was written in (utils/memory-content.ts), so a backup taken on
+ *     Postgres, where JSONB reorders object keys, keeps its provenance on restore (aiprov E4).
  *   1.1.0 2026-09-29 Rows that landed are scheduled for write-time classification
  *     (services/classify-on-write.ts, TARGET-082 V3).
  *   1.0.0 2026-09-27 Share the existing batch storage and provenance services.
@@ -12,8 +15,8 @@
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { MemoryDbService, BulkWriteItem, BulkWriteOptions } from './db/memory-db-service.js';
-import { provenanceForWrite, storeHeldProvenance, contentHashOf } from './ai-provenance.js';
-import { memoryContentBytes } from '../utils/memory-content.js';
+import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
+import { memoryContentBytes, memoryContentHashes } from '../utils/memory-content.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 
@@ -51,8 +54,10 @@ export async function writeMemoryBatch(
           for (const record of records) {
             const id = supplied.get(record.key) ?? existing.get(record.key)?.aiProvenanceId;
             const source = id ? sources.get(id) : undefined;
+            // Either hash form matches: the canonical one new records carry, or the as-written one
+            // a record minted before 2026-10-08 carries (utils/memory-content.ts).
             if (source?.ownerGhii === ownerGhiiOf(caller.principal)
-              && source.contentHash === contentHashOf(memoryContentBytes(record.value))) {
+              && !!source.contentHash && memoryContentHashes(record.value).includes(source.contentHash)) {
               record.aiProvenanceId = source.id;
             }
           }

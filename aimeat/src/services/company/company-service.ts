@@ -21,6 +21,8 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   2026-10-08 — The description's record is minted against the owner's surface, not a public one: no
+ *     public page shows it (aiprov E14).
  *   2026-10-05 — The description carries AI provenance (CompanyProvenanceInput): a declaration is refused
  *     before anything is written, and the record's id is kept on the company (secaudit 2026-10, M3
  *     follow-up; the developer's decision). The name is checked before any write on update.
@@ -136,8 +138,11 @@ async function descriptionProvenance(storage: Storage, description: string | nul
     declaredId: p.declaredId,
     declared: p.declared,
     pipeline: p.pipeline,
-    // The company address serves it to anyone.
-    surface: { visibility: 'public', humanAudience: true, mediaKind: 'text' },
+    // Read only by its owner today: every /v1/companies route needs a session with company:read, and
+    // no public page shows the description. Minted 'public', the record claimed a label owed on a
+    // surface nobody can reach; a public page that shows it decides the label when it serves it
+    // (aiprov E14).
+    surface: { visibility: 'owner', humanAudience: true, mediaKind: 'text' },
     labelPolicy: p.config.aiLabelPublic,
     nodeId: p.config.nodeId,
     baseUrl: p.config.baseUrl,
