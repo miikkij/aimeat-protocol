@@ -19,6 +19,7 @@
  *   - Phase 2: the tool list, cached and refreshed
  *   - Phase 3: calling — the happy path, and a tool saying no
  *   - Phase 4: the fences — cross-owner 404, and the scope split on an agent session
+ *   - Phase 4b/4c: grants — named tools, locked arguments, and read-only by the server's own marks
  *   - Phase 5: the directory and a published capability over a remote tool
  *   - Phase 5b: a server that belongs to a group, attached by an AGENT
  *   - Phase 5d: the node's own server — an ordinary owner uses it, and cannot change it on any door
@@ -30,6 +31,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.10.0 — 2026-10-08 — Phase 4c: a read_only grant admits `echo` (the server marks it
+ *     readOnlyHint) and refuses `refuses` (no mark) although `tools` is '*' (aimeat-soc).
  *   v1.9.0 — 2026-09-24 — An app grant of the server's owner, holding no mcp:use, is refused on the
  *     capability and WebMCP doors, and the owner in person is still answered on WebMCP.
  *   v1.8.0 — 2026-09-24 — A capability over the node's server, bought by a second owner, runs at
@@ -257,7 +260,8 @@ const upstream = http.createServer(async (req, res) => {
   if (!transport) {
     // A fresh McpServer per transport: one server instance binds to one transport.
     const srv = new McpServer({ name: 'e2e-upstream', version: '1.0.0' });
-    srv.tool('echo', 'Repeats its input.', { text: z.string() },
+    // `echo` says it only reads; `refuses` says nothing about itself. Phase 4c rests on the pair.
+    srv.tool('echo', 'Repeats its input.', { text: z.string() }, { readOnlyHint: true },
       async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
     srv.tool('refuses', 'Answers isError, the way a tool says no.', {},
       async () => ({ content: [{ type: 'text', text: 'not allowed' }], isError: true }));
@@ -769,6 +773,44 @@ await test('removing the narrowing WIDENS the agent again', async () => {
   });
   // Back to what its permissions allow, which is MORE than the grant allowed. The direction people
   // get wrong, which is why the tool description and the route response both say it.
+  assert(status === 200, `expected 200 after the narrowing went, got ${status}`);
+});
+
+// ─── Phase 4c: a read-only grant ───
+console.log('\nPhase 4c — Read-only: only the tools the server marks read-only');
+
+await test('read_only with tools "*" admits the tool the server marks read-only', async () => {
+  const put = await json('/v1/mcp-servers/upstream/grants', {
+    method: 'PUT', headers: ownerAuth(),
+    body: JSON.stringify({ grantee: agentGaii, tools: '*', read_only: true }),
+  });
+  assert(put.status === 200, `put: ${put.status}: ${JSON.stringify(put.body)}`);
+  // HOLE: before 2026-10-08 the field was dropped and the grant read as "every tool".
+  assert(put.body.data.grant.readOnly === true, `the grant keeps read_only: ${JSON.stringify(put.body.data.grant)}`);
+  const ok = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(),
+    body: JSON.stringify({ tool: 'echo', arguments: { text: 'reading' } }),
+  });
+  assert(ok.status === 200, `the read-only tool should work, got ${ok.status}: ${JSON.stringify(ok.body)}`);
+});
+
+await test('read_only refuses a tool the server does not mark read-only, and names the ones it may use', async () => {
+  const refused = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(), body: JSON.stringify({ tool: 'refuses' }),
+  });
+  // HOLE: 200 before 2026-10-08, because `tools: '*'` admitted everything.
+  assert(refused.status === 403, `expected 403, got ${refused.status}`);
+  const text = JSON.stringify(refused.body);
+  assert(text.includes('NOT_GRANTED'), `expected NOT_GRANTED: ${text}`);
+  assert(text.includes('echo') && /read-only/i.test(text), `the refusal names the read-only tools: ${text}`);
+});
+
+await test('removing the read-only narrowing opens the other tool again', async () => {
+  const del = await json(`/v1/mcp-servers/upstream/grants/${encodeURIComponent(agentGaii)}`, { method: 'DELETE', headers: ownerAuth() });
+  assert(del.status === 200, `delete: ${del.status}`);
+  const { status } = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: agentAuth(), body: JSON.stringify({ tool: 'refuses' }),
+  });
   assert(status === 200, `expected 200 after the narrowing went, got ${status}`);
 });
 

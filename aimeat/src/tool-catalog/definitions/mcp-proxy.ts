@@ -189,6 +189,7 @@ export const mcpProxyTools = [
             locked_input: { type: 'object', description: 'Arguments it may not choose. These win over whatever it sends.' },
             call_cap: { type: 'object', description: 'At most {count} calls in {windowHours} hours.', zod: z.object({ count: z.number(), windowHours: z.number() }) },
             expires: { type: 'string', description: 'An ISO date after which this stops applying.' },
+            read_only: { type: 'boolean', description: 'True: only tools the server itself marks read-only (readOnlyHint), on top of `tools`. A tool with no such mark is refused, and so is one the server adds later until it is marked.' },
         },
     },
     {

@@ -414,6 +414,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
           ? { lockedInput: b.locked_input as Record<string, unknown> } : {}),
         ...(b.call_cap && typeof b.call_cap === 'object'
           ? { callCap: b.call_cap as { count: number; windowHours: number } } : {}),
+        // Only tools the server marks read-only (services/mcp-client/grants.ts).
+        ...(b.read_only === true ? { readOnly: true } : {}),
         expires: typeof b.expires === 'string' ? b.expires : null,
         grantedBy: callerPrincipal(req.auth!, config.nodeId),
         grantedAt: new Date().toISOString(),

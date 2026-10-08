@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-08 -- e2e-extension-rows.ts joins the list (ctx.workspace.appendRows on a row space that
+ *     names the extension, also on a schedule; manifest network.hosts).
  *   2026-10-08 -- e2e-agent-checkout.ts joins the list: the product feeds for AI shopping agents.
  *   2026-10-08 -- e2e-ai-visibility.ts joins the list: channels, AI fetches, discovery files and
  *     purchases counted per owner with nothing that identifies a visitor at rest.
@@ -388,6 +390,9 @@ const ALL_SUITES = [
     'test/e2e-extension-workspace.ts',
     // Its batch: 500 records published in one action and removed in one, under the default limits.
     'test/e2e-extension-workspace-batch.ts',
+    // Its row calls: a row space that names the extension, on a call and on a schedule, and the
+    // hosts a manifest names as the only ones ctx.fetch reaches (aimeat-soc core).
+    'test/e2e-extension-rows.ts',
     // The same capability on the road that did not have it: an extension on a clock, writing bytes
     // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
     'test/e2e-scheduled-ext-files.ts',

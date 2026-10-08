@@ -25,6 +25,8 @@
  *   const caps = capabilitiesOfRecord(ext);
  *   buildExtensionCtx({ ..., capabilities: caps });
  * @version-history
+ *   v1.1.0 — 2026-10-08 — `hosts` (manifest `network: { hosts }`, stored as `__networkHosts`): the only
+ *     hostnames ctx.fetch reaches, checked on every redirect hop by safeFetch's allowHosts.
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, PKG-3, plan S8).
  */
 
@@ -34,8 +36,23 @@ export const CAPABILITY_DECLARATION_KEY = '__capabilities';
 export const EXTENSION_CAPABILITY_NAMES = ['network', 'ai', 'email', 'payments'] as const;
 export type ExtensionCapabilityName = typeof EXTENSION_CAPABILITY_NAMES[number];
 
-/** The four capabilities, and whether the manifest declared them (true) or the node inferred them (false). */
-export type ExtensionCapabilitySet = Record<ExtensionCapabilityName, boolean> & { declared: boolean };
+/** Where the manifest's `network: { hosts }` is stored on the record's config. __-prefixed, like the list. */
+export const NETWORK_HOSTS_KEY = '__networkHosts';
+
+/**
+ * The four capabilities, and whether the manifest declared them (true) or the node inferred them
+ * (false). `hosts`, when the manifest named them, is the only hostnames ctx.fetch may reach, on
+ * every redirect hop too; absent means any public address, as before.
+ */
+export type ExtensionCapabilitySet = Record<ExtensionCapabilityName, boolean> & { declared: boolean; hosts?: string[] };
+
+/** The manifest's `network.hosts` on an installed record, or undefined when it named none. */
+function networkHostsOf(config: Record<string, unknown> | undefined): string[] | undefined {
+  const raw = config?.[NETWORK_HOSTS_KEY];
+  if (!Array.isArray(raw)) return undefined;
+  const hosts = raw.filter((h): h is string => typeof h === 'string' && !!h).map(h => h.toLowerCase());
+  return hosts.length ? hosts : undefined;
+}
 
 /** The broad word each capability is inferred from. Matching more than the call is the safe side. */
 const INFERRED_FROM: Record<ExtensionCapabilityName, RegExp> = {
@@ -71,13 +88,14 @@ export function capabilitiesOfRecord(record: {
   config?: Record<string, unknown>; actions: Array<{ scriptContent?: string }>;
 }): ExtensionCapabilitySet {
   const declared = record.config?.[CAPABILITY_DECLARATION_KEY];
+  const hosts = networkHostsOf(record.config);
   if (Array.isArray(declared)) {
     const out = { declared: true } as ExtensionCapabilitySet;
     for (const name of EXTENSION_CAPABILITY_NAMES) out[name] = declared.includes(name);
-    return out;
+    return hosts ? { ...out, hosts } : out;
   }
   const code = record.actions.map(a => a.scriptContent ?? '').join('\n');
-  return { ...inferCapabilities(code), declared: false };
+  return { ...inferCapabilities(code), declared: false, ...(hosts ? { hosts } : {}) };
 }
 
 /** The refusal a script meets when it uses a capability its extension does not have. */

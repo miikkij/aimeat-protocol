@@ -3629,12 +3629,21 @@ components:
             exposes `ctx.workspace`, through which an action reads or writes the CALLER's organism
             workspace as the caller (the same operations aimeat_workspace_read / _write / _publish
             perform, behind the same membership, scope, schema and publish-gate checks). A
-            scheduled run never gets it. Stored on the record as `config.__workspace`.
+            scheduled run gets only the two row calls, and only with `rows`. Stored on the record
+            as `config.__workspace`.
           properties:
             read:
               type: boolean
             write:
               type: boolean
+            rows:
+              type: boolean
+              description: |
+                `ctx.workspace.appendRows` and `readRows` on a ROW space that names this extension in
+                its manifest (`objectTypes[].extensions`), while the installer is an active member
+                and within the space's writeRole. The caller of the action does not enter the
+                decision, so the two calls work the same on a call, a schedule and a workflow step.
+                A row records `ext:<name>` as its writer.
         installedBy:
           type: string
         installedAt:
@@ -38024,6 +38033,11 @@ paths:
         reads back that one space; a space that does not name the app answers 403 and says so, a
         grant without the scope is refused at the door, and nothing else on the organism opens.
 
+        An EXTENSION reaches a row space the same way, through `ctx.workspace.appendRows` and
+        `readRows` rather than this route: the organism names it in `objectTypes[].extensions`, its
+        manifest declares `workspace: { rows: true }`, and its installer is an active member. That
+        works on a schedule and a workflow step as well, where nobody is present.
+
         Refuses before writing: the space must exist and be a row space, the caller must pass the
         organism namespace rule and the space's `writeRole`, every row must be inside
         `quota.ws_rows_max_row_kb`, and the workspace row count and organism byte quota are measured
@@ -42445,7 +42459,11 @@ paths:
                     block declares that the extension may act on its CALLER's organism workspace
                     through `ctx.workspace`; without it the sandbox has no such capability. The
                     caller's own scopes still apply (`organism:read` to read, `memory:write` to
-                    write or publish, an owner session needs neither).
+                    write or publish, an owner session needs neither). `workspace: { rows: true }`
+                    adds `ctx.workspace.appendRows` / `readRows` on row spaces that name the
+                    extension (`objectTypes[].extensions`), also on a schedule or a workflow step.
+                    A top-level `network: { hosts: [api.example.com] }` limits `ctx.fetch` to those
+                    exact hostnames, on every redirect hop too; the package approval lists them.
                 scripts:
                   type: object
                   additionalProperties:
@@ -56204,7 +56222,10 @@ paths:
         server. `tools` is required and has no default, because a grant written without it would
         read as "every tool", which is the opposite of what somebody writing a grant means.
         `locked_input` values WIN over whatever the caller sends, which is what turns "may call
-        create_issue" into "may create issues in SUPPORT".
+        create_issue" into "may create issues in SUPPORT". `read_only: true` admits only tools the
+        server itself marks `readOnlyHint` in its cached tool list (a call to any other answers
+        NOT_GRANTED and names the read-only tools), so a tool the server adds later stays closed
+        until the server marks it read-only.
       tags: [MCP Servers]
       security:
         - BearerAuth: []
@@ -56248,6 +56269,9 @@ paths:
                       type: integer
                     windowHours:
                       type: integer
+                read_only:
+                  type: boolean
+                  description: Only tools the server marks readOnlyHint, on top of `tools`.
                 expires:
                   type: string
                   nullable: true

@@ -309,7 +309,7 @@ export function registerMcpProxyTools(
   mcp.tool('aimeat_mcp_grant_set', descriptionFor('aimeat_mcp_grant_set'),
     zodShapeFor('aimeat_mcp_grant_set'),
     annotationsFor('aimeat_mcp_grant_set'),
-    async ({ server, grantee, tools, locked_input, call_cap, expires }): Promise<TextResult> => {
+    async ({ server, grantee, tools, locked_input, call_cap, expires, read_only }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
       if (!row) return notFound(server);
 
@@ -321,6 +321,7 @@ export function registerMcpProxyTools(
         tools,
         ...(locked_input ? { lockedInput: locked_input } : {}),
         ...(call_cap ? { callCap: call_cap } : {}),
+        ...(read_only === true ? { readOnly: true } : {}),
         expires: expires ?? null,
         grantedBy: getAgentGaii(),
         grantedAt: new Date().toISOString(),

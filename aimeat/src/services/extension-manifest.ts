@@ -5,6 +5,10 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-08 — `workspace.rows`: append to and read the row spaces that name the
+ *                         extension, on a schedule or a workflow step too (aimeat-soc ingest).
+ *                         `network: { hosts }`: the only hostnames ctx.fetch may reach, stored as
+ *                         `config.__networkHosts`.
  *   v1.9.0 — 2026-10-05 — A manifest may declare `capabilities: [network, ai, email, payments]`,
  *                         stored as `config.__capabilities`; the sandbox allows only those, and the
  *                         package approval shows them (services/extension-capability-declaration.ts,
@@ -48,7 +52,7 @@ import { parse as parseYaml } from 'yaml';
 import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from './extension-secrets.js';
 import { MONEY_CURRENCIES } from '../commerce/money.js';
 import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
-import { CAPABILITY_DECLARATION_KEY, parseCapabilityDeclaration } from './extension-capability-declaration.js';
+import { CAPABILITY_DECLARATION_KEY, NETWORK_HOSTS_KEY, parseCapabilityDeclaration } from './extension-capability-declaration.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
   AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
@@ -564,19 +568,23 @@ export function buildExtensionRecordFromManifest(
   if (manifest.workspace !== undefined) {
     const w = manifest.workspace;
     if (typeof w !== 'object' || w === null || Array.isArray(w)) {
-      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'workspace must be a map with read and/or write booleans, e.g. workspace: { read: true, write: true }' };
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'workspace must be a map with read, write and/or rows booleans, e.g. workspace: { read: true, write: true }' };
     }
     const decl = w as Record<string, unknown>;
-    for (const field of ['read', 'write'] as const) {
+    for (const field of ['read', 'write', 'rows'] as const) {
       if (decl[field] !== undefined && typeof decl[field] !== 'boolean') {
         return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `workspace.${field} must be a boolean, got ${describeYamlValue(decl[field])}` };
       }
     }
-    const unknown = Object.keys(decl).filter(k => k !== 'read' && k !== 'write');
+    const unknown = Object.keys(decl).filter(k => k !== 'read' && k !== 'write' && k !== 'rows');
     if (unknown.length) {
-      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `workspace declares unknown field(s) ${unknown.join(', ')}; only read and write exist` };
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `workspace declares unknown field(s) ${unknown.join(', ')}; only read, write and rows exist` };
     }
-    if (decl.read === true || decl.write === true) workspaceDecl = { read: decl.read === true, write: decl.write === true };
+    // `rows: true` lets the scripts append to and read the row spaces that name this extension
+    // (objectTypes[].extensions), also on a schedule or a workflow step (extension-workspace.ts).
+    if (decl.read === true || decl.write === true || decl.rows === true) {
+      workspaceDecl = { read: decl.read === true, write: decl.write === true, rows: decl.rows === true };
+    }
   }
 
   // `provides: { ai_provider: … }` makes this extension usable as an AI provider (System 2 plan V6).
@@ -591,6 +599,26 @@ export function buildExtensionRecordFromManifest(
   // the scripts' text (services/extension-capability-declaration.ts).
   const capabilityDecl = parseCapabilityDeclaration(manifest.capabilities);
   if (!capabilityDecl.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: capabilityDecl.message };
+
+  // `network: { hosts: [...] }`: the only hostnames ctx.fetch may reach, on every redirect hop too
+  // (utils/url-validator.ts allowHosts). Bare hostnames, compared exactly, as provides.ai_provider.
+  let networkHosts: string[] | undefined;
+  if (manifest.network !== undefined) {
+    const n = manifest.network;
+    const hostsRaw = n && typeof n === 'object' && !Array.isArray(n) ? (n as Record<string, unknown>).hosts : undefined;
+    const extra = n && typeof n === 'object' && !Array.isArray(n) ? Object.keys(n).filter(k => k !== 'hosts') : [];
+    if (!Array.isArray(hostsRaw) || hostsRaw.length === 0 || hostsRaw.some(h => typeof h !== 'string') || extra.length) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'network must be a map with a non-empty hosts list and nothing else, e.g. network: { hosts: [api.example.com] }' };
+    }
+    for (const h of hostsRaw as string[]) {
+      const why = hostRefusal(h.toLowerCase());
+      if (why) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `network.hosts "${h}": ${why}` };
+    }
+    if (capabilityDecl.list && !capabilityDecl.list.includes('network')) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'network.hosts names hosts, and capabilities does not include network. Add network to capabilities, or remove network.hosts.' };
+    }
+    networkHosts = [...new Set((hostsRaw as string[]).map(h => h.toLowerCase()))].sort();
+  }
 
   for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
     const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
@@ -711,6 +739,7 @@ export function buildExtensionRecordFromManifest(
       ...(workspaceDecl ? { [WORKSPACE_DECLARATION_KEY]: workspaceDecl } : {}),
       ...(aiProviderDecl ? { [AI_PROVIDER_DECLARATION_KEY]: aiProviderDecl } : {}),
       ...(capabilityDecl.list ? { [CAPABILITY_DECLARATION_KEY]: capabilityDecl.list } : {}),
+      ...(networkHosts ? { [NETWORK_HOSTS_KEY]: networkHosts } : {}),
       // Record which config fields are `type: 'secret'` so the route can encrypt their values
       // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
       // lost by the flatten above). See services/extension-secrets.ts.

@@ -41,6 +41,8 @@
  *     absent objectives stay valid, but the defined subschema enforces the kind/op enums when present.
  *     Seed version bumped 3→4 so the stored system schema upgrades in place. Design:
  *     docs/internal/2026-06-23-organism-measurability-design.md.
+ *   v1.9.0 -- 2026-10-08 -- objectTypes[].extensions (row spaces): the installed extensions the
+ *     organism opens the space to, by name. Seed version 7. See row-service.ts authorizeExtension.
  *   v1.7.0 -- 2026-08-29 -- objectTypes[].apps (row spaces): the apps the organism opens the space
  *     to, as owner/filename. Seed version 6. See row-service.ts authorizeApp for the two-hand rule.
  *   v1.6.0 -- 2026-08-26 -- backing gains 'rows': a space whose instances live in a real table
@@ -80,7 +82,7 @@ export const MANIFEST_WS_SCHEMA_KEY = 'organism.*.w.*.meta.manifest';
  */
 /** Bump when the seeded schema changes in a way existing nodes must pick up (e.g. the backing
  *  enum). seedManifestSchema() upgrades any system-seeded record carrying an older version. */
-export const MANIFEST_SEED_VERSION = 6;
+export const MANIFEST_SEED_VERSION = 7;
 
 export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
   // Standard JSON Schema annotation (safe under ajv strict mode) doubling as the seed-version
@@ -143,6 +145,11 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           // this one space (services/workspace-rows/row-service.ts, authorizeApp). Decided
           // 2026-08-29 for the legal-pages demo's audit trail.
           apps: { type: 'array', items: { type: 'string', pattern: '^[^/]+/[^/]+$' }, maxItems: 20 },
+          // Row spaces only. The installed EXTENSIONS this space is open to, by name. A scheduled
+          // ingest has nobody present to borrow a membership from, so the organism names the
+          // extension here, its manifest declares workspace.rows, and its installer must be an active
+          // member (row-service.ts, authorizeExtension). Decided 2026-10-08 for the aimeat-soc alert queue.
+          extensions: { type: 'array', items: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$' }, maxItems: 20 },
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
           maxVersions: { type: 'number' },  // per-space history retention window (overrides AIMEAT_WS_MAX_VERSIONS; 0 = keep all; create_only spaces never pruned)
