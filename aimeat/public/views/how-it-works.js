@@ -9,6 +9,9 @@
  *   vertical variant renders on mobile. No protocol terms in body copy.
  * @usage routed at /v1/how-it-works by spa.html
  * @version-history
+ *   2026-10-08 -- The paper link uses site.paper when the operator set it (the catalog lookup opened
+ *     an old Sanomat copy on aimeat.io). "Shared place" in the diagram, as on the card. The assets
+ *     card no longer claims a machine the reader controls; the consent card loses a metaphor.
  *   2026-10-06 -- "See pricing" is a StoreDoor: "Opens soon" while the store does not take orders
  *     (site.store_status "soon").
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
@@ -86,7 +89,7 @@ const Arrow = (props) => {
 function Diagram() {
   const models = { title: tr('hiw.dModels', 'AI models'), lines: [tr('hiw.dModels1', 'Swappable:'), tr('hiw.dModels2', 'Claude, GPT, Grok'), tr('hiw.dModels3', 'CrewAI, your own')] };
   const agents = { title: tr('hiw.dAgents', 'Agents'), lines: [tr('hiw.dAgents1', 'A job for an AI:'), tr('hiw.dAgents2', 'identity, memory'), tr('hiw.dAgents3', 'task queue, schedule'), tr('hiw.dAgents4', 'budget, quality')] };
-  const org = { title: tr('hiw.dOrg', 'Organism'), lines: [tr('hiw.dOrg1', 'Shared truth:'), tr('hiw.dOrg2', 'workspaces, versions'), tr('hiw.dOrg3', 'humans + agents'), tr('hiw.dOrg4', 'publish gate')] };
+  const org = { title: tr('hiw.dOrg', 'Shared place'), lines: [tr('hiw.dOrg1', 'Shared truth:'), tr('hiw.dOrg2', 'workspaces, versions'), tr('hiw.dOrg3', 'humans + agents'), tr('hiw.dOrg4', 'publish gate')] };
   const assets = { title: tr('hiw.dAssets', 'Your assets'), lines: [tr('hiw.dAssets1', 'Versioned knowledge'), tr('hiw.dAssets2', 'apps and reports')] };
   const human = { title: tr('hiw.dHuman', 'Human at the gate'), lines: [tr('hiw.dHuman1', 'Decisions approved')] };
   // The chain used to stop at "your assets", which describes a tool. One more box is what
@@ -137,9 +140,12 @@ function Diagram() {
 }
 
 export default function HowItWorks({ navigate }) {
-  // Live example: find the public Sanomat app from the catalog (works without login).
+  // Live example: the paper this node's agents write. The operator's site.paper link wins, as on
+  // the business page; the catalog lookup is only for a node that has not set one, because the
+  // first catalog match is whichever Sanomat copy the list happens to return first.
   const [paper, setPaper] = useState(null);
   useEffect(() => {
+    if (hasSite('paper')) return;
     fetch('/v1/apps?limit=100').then(r => r.json()).then(j => {
       const apps = j?.data?.apps || [];
       setPaper(apps.find(a => /sanomat/i.test(a.filename || '') || /sanomat/i.test(a.name || '')) || null);
@@ -164,10 +170,10 @@ export default function HowItWorks({ navigate }) {
 
       <div class="ld-paths">
         ${card('hiw.cardAgentsTitle', 'Agents', 'hiw.cardAgentsText', 'An agent is not an AI — it is a job for an AI. It has an identity, a memory that persists, a task queue you feed in plain language, working hours and a spending cap. Quality can be reviewed afterwards. Run it on any model — CrewAI, Claude, GPT, your own runtime.')}
-        ${card('hiw.cardOrgTitle', 'Organisms', 'hiw.cardOrgText', "An organism turns agent output into assets. Workspaces, versioning and publish gates: agents get to do a lot, fast, but meaningful decisions pass through a human. Humans and agents work side by side, and every change is attributed to its author.")}
+        ${card('hiw.cardOrgTitle', 'Shared places', 'hiw.cardOrgText', 'A shared place is where the work turns into something you keep: one shared picture of a project that people and agents both write to. Agents get to do a lot and do it fast, and the decisions that matter wait for a person. Every change carries the name of whoever made it.')}
         ${card('hiw.cardAppsTitle', 'Apps', 'hiw.cardAppsText', 'Describe what you want and your AI builds it. The app runs on your node, isolated on its own address, versioned, with a link you can share. It reaches your data only through permissions you granted and can take back.')}
-        ${card('hiw.cardConsentTitle', 'Consent', 'hiw.cardConsentText', 'Every agent and every app works under named permissions, and every action is attributed to whoever took it. Take a permission back and the door closes. The audit is a report, not a project.')}
-        ${card('hiw.cardAssetsTitle', 'Your assets', 'hiw.cardAssetsText', 'Models come and go. Identity, memory, work history and results stay on your node. Swap Grok for Claude mid-flight — the agent picks up where it left off.')}
+        ${card('hiw.cardConsentTitle', 'Consent', 'hiw.cardConsentText', 'Every agent and every app works under named permissions, and every action is attributed to whoever took it. Take a permission back and the access ends. For an audit, that record is ready.')}
+        ${card('hiw.cardAssetsTitle', 'Your assets', 'hiw.cardAssetsText', 'Models come and go. Your identity, your memory, your work history and your results stay in your account, whichever AI does the work. Swap one AI for another mid-flight and the agent picks up where it left off.')}
       </div>
 
       <!-- Three examples from three layers, so the page shows more than one thing the
@@ -178,7 +184,9 @@ export default function HowItWorks({ navigate }) {
         <div class="ld-stats-line">${tr('hiw.exampleTitle', 'Examples from this node')}</div>
         <div class="ld-stats-own">
           ${tr('hiw.exampleText', 'AIMEAT Sanomat writes itself every evening. news-fetcher pulls raw material at 17:00, six writer agents produce the articles, and the paper ships with zero human hours.')}
-          ${paper && html`
+          ${hasSite('paper') ? html`
+            <a class="ld-stats-cta" href=${siteLink('paper')} target="_blank" rel="noopener">
+              ${tr('hiw.exampleCta', "Read tonight's paper →")}</a>` : paper && html`
             <a class="ld-stats-cta" href="#" role="button" onClick=${(e) => { e.preventDefault();
                 openAppSandboxed(`/v1/apps/${encodeURIComponent(paper.owner)}/${encodeURIComponent(paper.filename)}?mode=inline`, paper.filename); }}>
               ${tr('hiw.exampleCta', "Read tonight's paper →")}</a>`}
