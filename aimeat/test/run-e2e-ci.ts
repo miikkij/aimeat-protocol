@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-08 -- e2e-storage-file-provenance.ts joins the list: a stored file carries its AI-provenance record.
  *   2026-10-08 -- e2e-agent-checkout.ts joins the list: the product feeds for AI shopping agents.
  *   2026-10-08 -- e2e-ai-visibility.ts joins the list: channels, AI fetches, discovery files and
  *     purchases counted per owner with nothing that identifies a visitor at rest.
@@ -969,6 +970,9 @@ const ALL_SUITES = [
     'test/e2e-audio-speech.ts',
     'test/e2e-ai-transcribe.ts',
     'test/e2e-voice.ts',
+    // A stored file carries its AI-provenance record: speech made public in place, uploads that
+    // attach a record on REST, presigned and MCP, and the refusals (2026-10-08).
+    'test/e2e-storage-file-provenance.ts',
     'test/e2e-ai-image.ts',
     'test/e2e-chat.ts',
     // The other half of e2e-chat: a node that HAS an agent. Runs two nodes of its own (40300 and

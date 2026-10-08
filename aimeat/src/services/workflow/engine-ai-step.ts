@@ -50,6 +50,8 @@
  *   v1.12.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     A step's image and transcribe calls pass `limit: 'exempt'`: a run is the node's own work, and
  *     a fan-out of thirty steps must not hit a per-minute request limit.
+ *   v1.13.0 — 2026-10-08 — The answer written to result_to_key carries the provenance record the model
+ *     call minted (aiProvenanceId), for every op, as an AI job's result does.
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -110,7 +112,9 @@ export function dispatchAiStep(
   // The write of the step's answer to result_to_key. The engine makes it, and only while the step
   // still waits for the answer: once the step has ended, a later answer writes nothing (engine.ts
   // onPushTerminal). No result_to_key, no write: the step's own success_signal decides.
-  const landValue = (value: unknown): ResultWrite | undefined => {
+  // `provenanceId`: the record the model call minted while the node watched it answer, CARRIED onto
+  // the written answer as ai-jobs/service.ts does, so the record survives into the memory row.
+  const landValue = (value: unknown, provenanceId?: string): ResultWrite | undefined => {
     if (!action.result_to_key) return undefined;
     const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
     return async () => {
@@ -118,6 +122,7 @@ export function dispatchAiStep(
       const now = new Date().toISOString();
       await deps.storage.setMemory({
         key, ownerGaii: ownerGhii, value,
+        ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
         visibility: 'owner', tags: ['workflow-ai-result'], ttlHours: null,
         version: existing ? existing.version + 1 : 1,
         createdAt: existing?.createdAt ?? now, updatedAt: now,
@@ -143,7 +148,7 @@ export function dispatchAiStep(
     addSpend(r.usage.costUsd);
     return landValue(action.json
       ? { text: r.text, language: r.language ?? null, seconds: r.seconds, model: r.model }
-      : r.text);
+      : r.text, r.provenance?.id);
   };
 
   const fire = async (): Promise<ResultWrite | undefined> => {
@@ -199,7 +204,7 @@ export function dispatchAiStep(
         appId, ...await who(), limit: 'exempt',
       });
       addSpend(r.usage.costUsd);
-      return landValue({ storage_key: r.storageKey, url: r.fetchUrl, mime_type: r.mime, model: r.model });
+      return landValue({ storage_key: r.storageKey, url: r.fetchUrl, mime_type: r.mime, model: r.model }, r.provenance?.id);
     }
 
     // An empty answer never reaches here: the transport asks again and then throws with the
@@ -236,7 +241,7 @@ export function dispatchAiStep(
       if (!m) throw new Error(`ai step asked for json and the answer contained none, ${JSON_RETRIES + 1} attempts`);
       value = JSON.parse(m[0]);
     }
-    return landValue(value);
+    return landValue(value, r.provenance?.id);
   };
 
   reportOutcome(fire(),
