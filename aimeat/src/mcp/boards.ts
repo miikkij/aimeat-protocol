@@ -11,6 +11,8 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-08 — aimeat_board_reply hands the session's scopes to the reply service, so a declaration
+ *     needs provenance:write in the session as well as on the grant.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.8.0 -- 2026-10-05 -- Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). aimeat_board_rules_set on another person's board asks operatorOverride, as PATCH /v1/boards/:id/rules does.
@@ -352,7 +354,7 @@ export function registerBoardsTools(
             // 'public', so one on a private board carried a public-surface label), the record, the
             // change event and the subscriber fan-out.
             const session = caller();
-            const out = await createBoardReply({ storage, config }, { gaii: session.principal, roles: [...session.roles] }, {
+            const out = await createBoardReply({ storage, config }, { gaii: session.principal, roles: [...session.roles], scopes: session.scopes }, {
                 boardId: board_id, postId: post_id, body,
                 declaredProvenanceId: ai_provenance_id,
                 declaredProvenance: toDeclaredProvenance(ai_provenance),

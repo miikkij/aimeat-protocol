@@ -30,6 +30,9 @@
  *   const out = await createBoardPost({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.3.0 — 2026-10-08 — createBoardPost asks provenanceDeclarationRefusal before it debits the
+ *     public-board price: a declaration the session may not make cost the author the price of a post
+ *     that was never written. The caller carries the session's scopes into both provenance calls.
  *   v1.2.0 — 2026-08-30 — The board's own rules (RFC §27) decide who posts, which categories a
  *     notice may carry, how long it lives by default and what it costs; updateBoardPost() takes a
  *     notice down as handled or moves its expiry.
@@ -41,7 +44,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardPostRecord, BoardRecord } from '../storage/interface.js';
 import { executeHooks } from './hooks.js';
-import { provenanceForWrite } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from './ai-provenance.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { notifyBoardSubscribers } from './board-subscribers.js';
@@ -59,6 +62,9 @@ export interface BoardPostCaller {
     /** The resolved identity that authors the post. */
     gaii: string;
     roles: string[];
+    /** The session's own scopes, when the caller has them: a provenance declaration needs
+     *  provenance:write there as well as on the grant. */
+    scopes?: readonly string[];
 }
 
 export interface BoardPostInput {
@@ -169,6 +175,17 @@ export async function createBoardPost(
     const denied = boardPostAccessRefusal(board, caller);
     if (denied) return denied;
 
+    // The provenance refusal, BEFORE the price is debited (invariant 14). provenanceForWrite below
+    // throws the same refusal; when that was the first place it was asked, the author paid for a post
+    // that was never written.
+    const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+        principal: caller.gaii, declaredId: input.declaredProvenanceId, declared: input.declaredProvenance,
+        enabled: config.aiProvenance, scopes: caller.scopes,
+    });
+    if (provenanceRefused) {
+        return { ok: false, status: 403, code: provenanceRefused.code, message: provenanceRefused.message };
+    }
+
     // A public board costs, scaled by length. This is the anti-flood price on the one surface
     // everybody reads, and it applied only to the HTTP door. The board's own price, when its keeper
     // set one, replaces the node's base price; a board priced at 0 is free.
@@ -190,6 +207,7 @@ export async function createBoardPost(
     // The hash covers title + body together, which is the unit a reader sees.
     const aiProvenanceId = await provenanceForWrite(storage, {
         principal: caller.gaii,
+        scopes: caller.scopes,
         content: `${title}\n\n${body}`,
         declaredId: input.declaredProvenanceId,
         declared: input.declaredProvenance,
@@ -321,6 +339,7 @@ export async function createBoardReply(
 
     const aiProvenanceId = await provenanceForWrite(storage, {
         principal: caller.gaii,
+        scopes: caller.scopes,
         content: body,
         declaredId: input.declaredProvenanceId,
         declared: input.declaredProvenance,

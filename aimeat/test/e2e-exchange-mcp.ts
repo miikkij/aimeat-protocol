@@ -15,6 +15,9 @@
  *                                      consumer debited) · and a STALE session token (named error, no charge)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — aiprov D1: a delivery whose declaration the provider's agent may not make
+ *     is refused before the buyer is charged, the work stays open, and the same agent then delivers
+ *     once without a declaration. captureTools takes the session's scopes.
  *   v1.0.0 — 2026-07-21 — Initial: MCP parity for the act-on-exchange tools (work / proposals / app-tool invoke).
  *   v1.1.1 — 2026-10-08 — The no-contract case prices its tool: an unpriced tool is free to anyone
  *     since 2026-10-06, so it reached the missing capability instead of NO_CONTRACT.
@@ -80,10 +83,10 @@ async function balance(token: string): Promise<number> {
 }
 
 /** A capture-only mock McpServer: records each registered handler by tool name so the test can invoke it. */
-function captureTools(gaii: string, token: string): Record<string, (a: any) => Promise<any>> {
+function captureTools(gaii: string, token: string, scopes: string[] = []): Record<string, (a: any) => Promise<any>> {
     const handlers: Record<string, (a: any) => Promise<any>> = {};
     const mock = { tool: (name: string, _d: unknown, _s: unknown, _a: unknown, handler: (a: any) => Promise<any>) => { handlers[name] = handler; } } as unknown as McpServer;
-    registerExchangeRunTools(mock, storage, config, () => gaii, () => token);
+    registerExchangeRunTools(mock, storage, config, () => gaii, () => token, scopes);
     return handlers;
 }
 /** Parse a tool result: { data } from a success text blob, or { error } from an isError blob. */
@@ -183,6 +186,47 @@ await test('aimeat_exchange_work_deliver — a DECLARED provenance rides with th
     const mine = list.data?.work?.find((x: any) => x.work_id === id);
     assert(mine?.ai_provenance_id === echoed.id,
         `the buyer cannot see how the answer was made: ${JSON.stringify(mine)}`);
+});
+
+// ── A refused declaration charges nobody (aiprov D1) ──
+// provenanceForWrite threw its scope refusal AFTER authoriseMeteredCall had settled and accrued, so
+// the buyer was debited, the work stayed open, and each retry charged again. The provider's agent
+// below holds the exchange words and not provenance:write, so its declaration is refused; the
+// assertion is on the money and on the work state, not on the refusal text alone.
+await test('aimeat_exchange_work_deliver — a declaration the session may not make is refused BEFORE the buyer is charged', async () => {
+    const reg = await json('/v1/agents', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
+        name: `deliverer${Date.now() % 100000}`, owner: provider.name, capabilities: ['actions'], scopes: ['exchange:read', 'exchange:write'],
+    }) });
+    assert(reg.status === 201, `agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const agentGaii = reg.body.data.agent.gaii as string;
+    const A = captureTools(agentGaii, '', ['exchange:read', 'exchange:write']);
+
+    const started = parse(await C()['aimeat_exchange_work']({ offering_id: awOfferingId, input: { text: 'a third document' } }));
+    const id = started.data?.work?.work_id;
+    assert(!!id, `start ${JSON.stringify(started)}`);
+    const before = await balance(consumer.token);
+    // A throw is a refusal too (the MCP server turns it into an error result), so the money is
+    // asserted whichever way the handler refuses.
+    let refused: { error?: string; data?: any };
+    try {
+        refused = parse(await A['aimeat_exchange_work_deliver']({
+            work_id: id, output: { summary: 'A model wrote this.' },
+            ai_provenance: { level: 'original', human_involvement: 'full-human' },
+        }));
+    } catch (err) { refused = { error: `THROWN: ${(err as Error).message}` }; }
+    const spent = before - await balance(consumer.token);
+    assert(spent === 0, `the buyer was charged ${spent} for a delivery that was refused (${refused.error})`);
+    assert(!!refused.error && refused.error.startsWith('SCOPE_DENIED') && refused.error.includes('provenance:write'),
+        `expected SCOPE_DENIED naming provenance:write, got ${JSON.stringify(refused)}`);
+    const list = parse(await C()['aimeat_exchange_work_list']({}));
+    const item = list.data?.work?.find((x: any) => x.work_id === id);
+    assert(item?.state === 'open' && item.charged_units === 0, `the refused work must stay open and uncharged: ${JSON.stringify(item)}`);
+
+    // POSITIVE CONTROL: the same agent, saying nothing, delivers and settles once. A refusal that also
+    // refused this would pass the assertions above against a door that refuses everything.
+    const delivered = parse(await A['aimeat_exchange_work_deliver']({ work_id: id, output: { summary: 'Delivered.' } }));
+    assert(delivered.data?.work?.state === 'delivered' && delivered.data.work.charged_units === 5, `deliver: ${JSON.stringify(delivered)}`);
+    assert(await balance(consumer.token) === before - 5, 'one delivery, one charge of 5');
 });
 
 await test('aimeat_exchange_work_list — consumer sees the delivered task with its output', async () => {
