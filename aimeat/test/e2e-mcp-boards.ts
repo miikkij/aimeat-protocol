@@ -4,6 +4,9 @@
  *   Tests board creation, listing, posting, reactions, replies, subscriptions,
  *   member management, deletion, and the board posts resource.
  * @version-history
+ *   v1.3.0 — 2026-10-08 — aiprov D4: a declaration the agent may not make is refused before the
+ *     public board debits its price, so the owner's balance does not move; the same post without
+ *     the declaration is charged.
  *   v1.2.0 — 2026-09-13 — Phase 2b: board rules over MCP. The create answer states the seven-day
  *     default, rules given at creation are stored and give posts their lifetime, a misspelled rule
  *     is refused, the keeper replaces and clears them with aimeat_board_rules_set, an out-of-range
@@ -124,6 +127,7 @@ let clientSecret = '';
 // Board state
 let boardId = '';
 let postId = '';
+let publicBoardId = '';
 
 console.log('\n=== AIMEAT MCP Boards E2E Test ===\n');
 
@@ -284,6 +288,38 @@ await test('4. Create a public board succeeds (first owner is operator)', async 
     const result = JSON.parse(body.result.content[0].text);
     assert(result.visibility === 'public', `visibility: ${result.visibility}`);
     assert(typeof result.id === 'string', 'has id');
+    publicBoardId = result.id;
+});
+
+// ─── A refused declaration costs nothing (aiprov D4) ───
+// A public board charges its author before the post is written, and provenanceForWrite refused a
+// declaration the session may not make only AFTER that debit. This agent holds social:write and not
+// provenance:write, so its declaration is refused; the assertion is on the owner's balance.
+async function ownerBalance(): Promise<number> {
+    const r = await json('/v1/wallet', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    return Number(r.body.data?.balance ?? r.body.data?.total ?? 0);
+}
+
+await test('4a. A declaration the session may not make is refused BEFORE the public board charges for the post', async () => {
+    const before = await ownerBalance();
+    assert(before >= 10, `the owner needs morsels for the positive control: ${before}`);
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_board_post',
+        arguments: { board_id: publicBoardId, title: 'Declared', body: 'A person wrote this, says the agent.',
+            ai_provenance: { level: 'original', human_involvement: 'full-human' } },
+    }, 120);
+    const text: string = body.result?.content?.[0]?.text ?? JSON.stringify(body.error ?? body);
+    const spent = before - await ownerBalance();
+    assert(spent === 0, `the author was charged ${spent} for a post that was refused (${text.slice(0, 200)})`);
+    assert(body.result?.isError === true && text.includes('provenance:write'), `refused naming the scope: ${text.slice(0, 300)}`);
+
+    // POSITIVE CONTROL: the same post without the declaration is written and charged once.
+    const ok = await mcpRpc('tools/call', {
+        name: 'aimeat_board_post',
+        arguments: { board_id: publicBoardId, title: 'Undeclared', body: 'Posted without a declaration.' },
+    }, 121);
+    assert(ok.body.result?.isError !== true, `post refused: ${ok.body.result?.content?.[0]?.text}`);
+    assert(await ownerBalance() < before, 'a post on a public board is charged');
 });
 
 // ─── Phase 2b: The board's own rules, over MCP ───

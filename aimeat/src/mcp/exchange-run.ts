@@ -21,6 +21,9 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-08 — aimeat_exchange_work_deliver asks provenanceDeclarationRefusal BEFORE it settles: a
+ *     declaration the session may not make threw after the buyer was charged, left the work open, and
+ *     a retry charged again. The session's scopes reach both provenance calls.
  *   2026-10-06 — Unpriced cross-owner app tools use the REST price predicate and an unpriced
  *     internal pass. Existing contract refusals and action-level prices remain enforced.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -85,7 +88,7 @@ import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -302,6 +305,14 @@ export function registerExchangeRunTools(
             if (w.state !== 'open') return fail(`WORK_NOT_OPEN: work is ${w.state}`);
             const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
             if (!before || before.state !== 'active') return fail('CONTRACT_INACTIVE: the consumer contract is no longer active — cannot settle this delivery');
+            // The provenance refusal is asked BEFORE the settlement (invariant 14). provenanceForWrite
+            // below throws the same refusal, and when it ran after the charge the buyer was debited,
+            // the work stayed open, and a retry charged again.
+            const declared = toDeclaredProvenance(ai_provenance);
+            const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+                principal: callerGaii, declaredId: ai_provenance_id, declared, enabled: config.aiProvenance, scopes,
+            });
+            if (provenanceRefused) return fail(`${provenanceRefused.code}: ${provenanceRefused.message}`);
             const workLabel = `${w.agentGaii}:${w.taskType}`;
             const outcome = await authoriseMeteredCall({
                 config, storage, caller: w.consumerGaii,
@@ -326,9 +337,10 @@ export function registerExchangeRunTools(
                 // The RESOLVED caller, never a field off the work item: whoever holds this token is
                 // who delivered, and this is the one place an attribution could otherwise be planted.
                 principal: callerGaii,
+                scopes,
                 content: `${JSON.stringify(shared.result ?? null)}\n\n${note ?? ''}`,
                 declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+                declared,
                 pipeline: 'mcp.exchange_work_deliver',
                 // Delivered privately to one buyer, and a buyer is a person deciding what to do with
                 // an answer — which is what decides whether a label is owed.
