@@ -12,6 +12,8 @@
  *     agent_name, as the node's MCP does; they acted on the calling agent whatever was asked.
  *     skill_list's binding overrides the view, as the catalog says. skill_publish without skill_md
  *     and skill_get without ref or name say what is missing (secaudit 2026-10 follow-up, Part B).
+ *   v1.2.0 -- 2026-10-08 -- skill_publish forwards ai_provenance and ai_provenance_id, which
+ *     POST /v1/skills records (aiprov E12).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalBoolean } from './tool-call-helpers.js';
@@ -39,6 +41,9 @@ export const skillTools: ConnectCliToolDefinition[] = [
                 visibility: optionalString(input, 'visibility'),
                 organism: optionalString(input, 'organism_id'),
                 ws: optionalString(input, 'workspace_id'),
+                // POST /v1/skills records how SKILL.md was written (aiprov E12).
+                ...(input.ai_provenance && typeof input.ai_provenance === 'object' ? { ai_provenance: input.ai_provenance } : {}),
+                ...(optionalString(input, 'ai_provenance_id') ? { ai_provenance_id: optionalString(input, 'ai_provenance_id') } : {}),
             });
         },
     },

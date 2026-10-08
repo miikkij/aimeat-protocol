@@ -15,9 +15,13 @@
  *                                                 content that is publicly readable right now
  *   - aiProvenanceFacets(query)                -- SQL-side counts for the operator report + sweep
  *   - listAiProvenance(query)                  -- the records themselves, newest first
+ *   - workspaceProvenanceLinks(query)          -- published workspace records carrying a record:
+ *                                                 the candidates a share link may open
  * @usage
  *   import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
  * @version-history
+ *   v1.4.0 — 2026-10-08 — workspaceProvenanceLinks(): the candidates for a record a workspace share
+ *     link serves to anyone, which the SQL visibility rule cannot see (aiprov E1). No migration.
  *   v1.3.0 — 2026-10-08 — Facets carry the minted reason and the medium; the list filter is
  *     `unreviewedPublicOnly`, and the label is decided by the report, not read from the stored block.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the
@@ -99,4 +103,18 @@ export interface AiProvenanceRepository {
    * block stored at mint (services/ai-transparency-report.ts).
    */
   listAiProvenance(query?: AiProvenanceListQuery): Promise<{ items: AiProvenanceRecordRow[]; total: number }>;
+
+  /**
+   * The CANDIDATES for the workspace-share half of the visibility rule: the published workspace
+   * records (`organism.{org}.w.{ws}.{namespace}.{id}.latest`, not deleted, not archived) that carry
+   * one of these records (`ids`) or a record with this content hash (`contentHash`). A share link
+   * serves such a record to anyone without changing its stored visibility, so the SQL rule above
+   * cannot see it; whether the share actually opens a candidate is decided in
+   * routes/organisms/share-provenance.ts, by the same collectors the share routes serve with. Applies no
+   * authorization: a candidate is not an answer. At most `limit` rows (default 200).
+   */
+  workspaceProvenanceLinks(query: { ids?: string[]; contentHash?: string; limit?: number }): Promise<WorkspaceProvenanceLink[]>;
 }
+
+/** One published workspace record that carries a provenance record (workspaceProvenanceLinks). */
+export interface WorkspaceProvenanceLink { provenanceId: string; ownerGaii: string; key: string }

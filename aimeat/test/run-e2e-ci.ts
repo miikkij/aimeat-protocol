@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-08 -- e2e-ai-provenance-content.ts joins the list: AI provenance on the content surfaces
+ *            (aiprov workstream E).
  *   2026-10-08 -- e2e-extension-rows.ts joins the list (ctx.workspace.appendRows on a row space that
  *     names the extension, also on a schedule; manifest network.hosts).
  *   2026-10-08 -- e2e-agent-checkout.ts joins the list: the product feeds for AI shopping agents.
@@ -524,6 +526,9 @@ const ALL_SUITES = [
     // namespace refusals, the 413 and 422 arms, the CORS inheritance ladder and the bin listing.
     'test/e2e-memory-doors.ts',
     'test/e2e-memory-batch-provenance.ts',
+    // AI provenance on the content surfaces (aiprov workstream E, 2026-10-08): memory, workspace
+    // shares, the Design Book, knowledge, skills, site passages and comments.
+    'test/e2e-ai-provenance-content.ts',
     // The remote MCP proxy: attach against a real upstream MCP server this suite starts
     // itself, the tool cache, calling, the cross-owner 404 and the scope split. Here and
     // not only in the unit suites because those run on SQLite alone, and this is what

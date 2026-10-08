@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-08 — aimeat_workspace_comment forwards ai_provenance and ai_provenance_id, which
+ *     POST /v1/organisms/:id/comments records (aiprov E8).
  *   2026-10-01 — aimeat_organism_create forwards `shape` and `lang` (starting shapes).
  *   2026-09-30 — aimeat_workspace_comment_delete handler (DELETE /v1/organisms/:id/comments/:commentId).
  *   2026-09-28 — aimeat_organism_update passes agent_access.
@@ -195,6 +197,9 @@ export const organismTools: ConnectCliToolDefinition[] = [
             };
             if (input && typeof input === 'object' && 'anchor' in input && input.anchor != null) body.anchor = (input as JsonObject).anchor;
             const parentId = optionalString(input, 'parent_id'); if (parentId) body.parent_id = parentId;
+            // The route records the declaration and an id from the body (aiprov E8).
+            if (input.ai_provenance && typeof input.ai_provenance === 'object') body.ai_provenance = input.ai_provenance as JsonObject;
+            const provenanceId = optionalString(input, 'ai_provenance_id'); if (provenanceId) body.ai_provenance_id = provenanceId;
             return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/comments`, body);
         },
     },

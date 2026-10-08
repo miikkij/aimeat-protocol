@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-08 — aimeat_memory_write sends the `ai_provenance` declaration in the POST /v1/memory body,
+ *     which records it with the write (aiprov E7).
  *   2026-10-06 — aimeat_capabilities_invoke sends its arguments as body.input, which is where the
  *     route reads them; create and update forward status; aimeat_flag_report sends targetType and
  *     targetId, the names POST /v1/flags reads (secaudit 2026-10 follow-up, Part B).
@@ -156,10 +158,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
             // follow-up, Part B); before that this door dropped it and the write went through.
             const expectedVersion = optionalNumber(input, 'expected_version');
             if (expectedVersion !== undefined) body.expected_version = expectedVersion;
-            // POST /v1/memory takes a pre-minted record id directly (it checks the record belongs to
-            // this owner). An inline `ai_provenance` DECLARATION cannot ride here — the route has no
-            // field for it — so withProvenanceCarrying() records that one after the write, against
-            // this key. TARGET-058 Phase 11.
+            // POST /v1/memory takes a pre-minted record id (checked against this owner) and, since
+            // 2026-10-08, the `ai_provenance` declaration itself, recorded with the write wherever
+            // the write lands. Declaring after the write looked for the key in the caller's own
+            // namespace, which an owner_scope write is not in (aiprov E7).
+            if (input.ai_provenance && typeof input.ai_provenance === 'object') body.ai_provenance = input.ai_provenance as JsonObject;
             const provenanceId = optionalString(input, 'ai_provenance_id');
             if (provenanceId) body.ai_provenance_id = provenanceId;
             return client.post('/v1/memory', body);

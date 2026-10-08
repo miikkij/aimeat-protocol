@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.11.3 — 2026-10-08 — A declaration the caller may not make is answered as a refusal (403
+ *     SCOPE_DENIED, nothing written) instead of an exception, now that POST /v1/memory takes a
+ *     declaration inline (aiprov E7).
  *   v1.11.2 — 2026-10-08 — The provenance record states the value's medium: text for a string or a document, data otherwise.
  *   v1.11.1 — 2026-10-05 — The provenance declaration is asked of the session's words too (secaudit 2026-10, C3).
  *   v1.11.0 — 2026-09-29 — A landed write is scheduled for write-time classification
@@ -84,7 +87,7 @@ import { validateMemoryWrite } from './schema-validator.js';
 import { memoryCeilings } from './memory-ceilings.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 import { isKeyArchived } from './archive.js';
-import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance } from './ai-provenance.js';
 import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
 import { emitChange } from './event-bus.js';
@@ -433,7 +436,13 @@ export async function writeMemoryRecord(
         if (ownerCopy) shadowedBy = ownerCopy.ownerGaii;
     }
 
-    // 5. Provenance names WHO WROTE it, not whose namespace it lands in.
+    // 5. Provenance names WHO WROTE it, not whose namespace it lands in. A declaration the caller
+    //    may not make is a refusal, asked before anything is built or written.
+    const declarationRefusal = await provenanceDeclarationRefusal(storage, {
+        principal: caller.principal, declaredId: input.declaredProvenanceId, declared: input.declaredProvenance,
+        enabled: config.aiProvenance, scopes: caller.scopes,
+    });
+    if (declarationRefusal) return { ok: false, status: 403, code: 'SCOPE_DENIED', message: declarationRefusal.message };
     const held: AiProvenanceRecordRow[] = [];
     const aiProvenanceId = await provenanceForWrite(storage, {
         principal: caller.principal,

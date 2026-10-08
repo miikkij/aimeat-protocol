@@ -34,6 +34,9 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.10.2 — 2026-10-08 — setStatus() keeps the part's provenance record when it rewrites the part
+ *     with its new status. setMemory writes the column whole, so leaving it out erased the record of
+ *     who wrote the part, and the gallery label went with it (aiprov E2).
  *   v1.10.1 — 2026-09-26 — PART_KEY_PREFIX is defined in utils/own-door-keys.ts, beside the refusal the
  *     generic memory doors give for a part, and exported from here as before.
  *   v1.10.0 — 2026-09-26 — A COMPONENT is benched again when it is read (component.ts componentBench):
@@ -751,6 +754,9 @@ export class DesignBookService {
       createdAt: record.createdAt,
       updatedAt: now,
       trackable: true,
+      // A status change is a decision about the part, not new writing in it, so its record still
+      // describes it. setMemory writes the column whole: an omitted id is an erased one.
+      ...(record.aiProvenanceId ? { aiProvenanceId: record.aiProvenanceId } : {}),
     });
     return { id, status: next.status, previous };
   }

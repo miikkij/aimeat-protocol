@@ -17,6 +17,10 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.5.0 — 2026-10-08 — workspaceProvenanceLinks(): published workspace records carrying a record,
+ *     the candidates routes/organisms/share-provenance.ts checks against the share link (aiprov E1). A
+ *     separate method, not a clause in publiclyLinked: the share decision is not expressible here.
+ *     No migration.
  *   v1.4.0 — 2026-10-08 — Facets group by the minted reason and the record's medium too; the list
  *     filter `unreviewedPublicOnly` no longer reads the stored `required`, because the report
  *     decides each label for the content as it is now. Mirrors the SQLite provider.
@@ -36,6 +40,7 @@ import type {
   AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery,
 } from '../../../interface.js';
 import type { AiProvenance as AiProvenanceDoc } from '../../../../models/ai-provenance-schemas.js';
+import type { WorkspaceProvenanceLink } from '../../../repositories/ai-provenance.repository.js';
 import type { AiProvenance as AiProvenanceRow, Json } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
@@ -208,5 +213,26 @@ export const aiProvenanceMethods = {
       .offset(Math.max(query?.offset ?? 0, 0))
       .execute();
     return { items: rows.map(toRecord), total: Number(counted?.n ?? 0) };
+  },
+
+  // ── Workspace share candidates (aiprov E1) — kept apart from publiclyLinked above on purpose:
+  //    whether a share link opens one of these is decided in routes/organisms/share-provenance.ts. ──
+  async workspaceProvenanceLinks(
+    this: PostgresKyselyStorage, query: { ids?: string[]; contentHash?: string; limit?: number },
+  ): Promise<WorkspaceProvenanceLink[]> {
+    const ids = [...new Set(query.ids ?? [])].slice(0, ID_CHUNK);
+    if (ids.length === 0 && !query.contentHash) return [];
+    const limit = Math.min(Math.max(query.limit ?? 200, 1), 1000);
+    const match = sql<boolean>`(${sql.join([
+      ...(ids.length ? [sql`p."id" IN (${sql.join(ids)})`] : []),
+      ...(query.contentHash ? [sql`p."contentHash" = ${query.contentHash}`] : []),
+    ], sql` OR `)})`;
+    const rows = await sql<WorkspaceProvenanceLink>`
+      SELECT p."id" AS "provenanceId", m."ownerGaii" AS "ownerGaii", m."key" AS "key"
+        FROM "AiProvenance" p JOIN "Memory" m ON m."aiProvenanceId" = p."id"
+       WHERE ${match} AND m."deletedAt" IS NULL AND m."archived" = false
+         AND m."key" LIKE 'organism.%.w.%.latest'
+       LIMIT ${limit}`.execute(this.db);
+    return rows.rows;
   },
 };
