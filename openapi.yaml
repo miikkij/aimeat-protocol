@@ -1524,6 +1524,13 @@ components:
         ttlMs: { type: integer, nullable: true }
         pollIntervalMs: { type: integer, nullable: true }
         metadata: { type: object, nullable: true }
+        aiProvenanceId:
+          type: string
+          description: |
+            The provenance record of the result and closing status message, set when the task
+            settles completed or failed with something to read: an agent's answer is recorded as
+            model-written, a person's own is not stamped. Absent is unstated. The A2A projection
+            carries it as the result artifact's `metadata.ai_provenance_id`.
 
     AgentV2PushConfig:
       type: object
@@ -2137,6 +2144,17 @@ components:
         ttl_expires_at:
           type: string
           format: date-time
+        ai_provenance_id:
+          type: string
+          description: >
+            The provenance record of the delivered output, stamped when the provider delivers: an
+            agent's output is recorded as model-written, a person's own is not stamped. Absent is
+            unstated. `ai_provenance` beside it is the record itself, because the record is private
+            and the requester cannot resolve the id at /v1/provenance/{id}. On GET /v1/work/{tc} and
+            on the deliver answer.
+        ai_provenance:
+          type: object
+          description: '{ id, record, record_url } — the record named by ai_provenance_id.'
 
     WorkCost:
       type: object

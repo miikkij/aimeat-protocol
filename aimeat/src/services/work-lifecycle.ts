@@ -37,6 +37,8 @@
  *   const out = await acceptWork({ storage, config }, providerGaii, trackingCode);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-10-08 — deliverWork() stamps the delivered output with its provenance record and
+ *     stores the id on the work item (migration 0098, aiprov D8).
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8): the accept/deliver write moved out of
  *     src/mcp/core.ts and src/routes/work.ts into one place.
  */
@@ -48,6 +50,7 @@ import { emitChange } from './event-bus.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
+import { provenanceForWrite } from './ai-provenance.js';
 
 export interface WorkDeps {
     storage: Storage;
@@ -205,10 +208,26 @@ export async function deliverWork(
         cost: work.cost,
     });
 
+    // How the delivered output was made (aiprov D8). The requester acts on this output, and the
+    // node stamped nothing, so a work item answered by a model read the same as one a person wrote.
+    // The provider is the resolved caller; an agent that delivers is recorded as model-written, a
+    // person delivering in person is not stamped. The hash covers the output as stored.
+    const aiProvenanceId = await provenanceForWrite(storage, {
+        principal: providerGaii,
+        content: JSON.stringify(output ?? null),
+        pipeline: 'work.deliver',
+        surface: { visibility: 'private', humanAudience: true },
+        labelPolicy: config.aiLabelPublic,
+        nodeId: config.nodeId,
+        baseUrl: config.baseUrl,
+        enabled: config.aiProvenance,
+    });
+
     const updated = await storage.updateWork(trackingCode, {
         status: 'delivered',
         output,
         updatedAt: new Date().toISOString(),
+        ...(aiProvenanceId ? { aiProvenanceId } : {}),
     });
 
     // Fire callback webhook if provided (fire-and-forget)

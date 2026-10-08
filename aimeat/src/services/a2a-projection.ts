@@ -23,6 +23,8 @@
  * @structure toA2APart / fromA2APart · toA2AMessage · toA2ATaskState · toA2ATask · toA2APushConfig
  * @usage const task = toA2ATask(record, history);
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The result artifact names its provenance record in its metadata
+ *     (ai_provenance_id, aiprov D8).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a).
  */
 import { TaskState, Role, type Part, type Message, type Task, type TaskPushNotificationConfig } from '@a2a-js/sdk';
@@ -136,7 +138,8 @@ export function toA2ATask(task: AgentV2TaskRecord, history: AgentV2MessageRecord
         name: 'result',
         description: '',
         parts: (task.result as MessagePart[]).map(toA2APart),
-        metadata: undefined,
+        // The provenance record of what the work produced, on the artifact it describes (aiprov D8).
+        metadata: task.aiProvenanceId ? { ai_provenance_id: task.aiProvenanceId } : undefined,
         extensions: [],
       }]
       : [],

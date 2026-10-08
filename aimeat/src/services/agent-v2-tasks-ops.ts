@@ -23,6 +23,9 @@
  * @structure createTask() · listTasks() · getTask() · setTaskStatus() · cancelTask()
  * @usage const out = await createTask(storage, config, req.auth!, req.body);
  * @version-history
+ *   v1.1.0 — 2026-10-08 — setTaskStatus() stamps the result and closing message of a task that settles
+ *     completed or failed, held until the settle wins, and stores the id on the task (migration
+ *     0098, aiprov D8). An A2A caller reads the same task.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  *   v1.0.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
@@ -37,6 +40,8 @@ import { resolveRecipient, type Principal, type OpResult } from './agent-v2-mess
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { emitDelivery, emitTaskMoved } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
+import type { AiProvenanceRecordRow } from '../storage/interface.js';
 
 /** The tunnel `deliver` kinds for task news. Additive: the wire's `kind` is an open string. */
 export const TASK_ASSIGNED_KIND = 'v2.task.assigned';
@@ -192,6 +197,24 @@ export async function setTaskStatus(
 
   const now = new Date().toISOString();
   const terminal = isTerminal(change.status);
+  // How the answer was made (aiprov D8). A task that settles completed or failed with a result or a
+  // closing message hands back something its caller acts on, and an A2A caller reads the same
+  // record. The record is HELD and stored only if this call is the one that settles the task: the
+  // loser of the race below must not leave a record about an answer nobody kept.
+  const held: AiProvenanceRecordRow[] = [];
+  const aiProvenanceId = terminal && change.status !== 'cancelled' && (change.result || change.statusMessage)
+    ? await provenanceForWrite(storage, {
+      principal: self,
+      content: `${JSON.stringify(change.result ?? null)}\n\n${change.statusMessage ?? ''}`,
+      pipeline: 'agent-v2.task_status',
+      surface: { visibility: 'private', humanAudience: true },
+      labelPolicy: config.aiLabelPublic,
+      nodeId: config.nodeId,
+      baseUrl: config.baseUrl,
+      enabled: config.aiProvenance,
+      held,
+    })
+    : undefined;
   const moved = await storage.settleAgentV2Task(auth.owner, taskId, allowedFrom(), {
     status: change.status,
     statusMessage: change.statusMessage ?? task.statusMessage,
@@ -203,7 +226,9 @@ export async function setTaskStatus(
     completedAt: terminal ? now : undefined,
     ttlMs: change.ttlMs ?? undefined,
     pollIntervalMs: change.pollIntervalMs ?? undefined,
+    ...(aiProvenanceId ? { aiProvenanceId } : {}),
   }, now);
+  if (moved) await storeHeldProvenance(storage, held);
 
   if (!moved) {
     // Somebody else settled it between the read and the write. Saying so is the point: the loser of

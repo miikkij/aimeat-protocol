@@ -6,6 +6,7 @@
  * @structure agentV2TasksMethods — create / get / list / settle / deleteByOwner
  * @usage Object.assign(SqliteStorage.prototype, agentV2TasksMethods)
  * @version-history
+ *   v1.1.0 — 2026-10-08 — aiProvenanceId reads back and settles with the patch (aiprov D8).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 import type { AgentV2TaskRecord, AgentV2TaskStatus } from '../../../interface.js';
@@ -31,6 +32,7 @@ function toTask(row: Record<string, unknown>): AgentV2TaskRecord {
     ttlMs: row.ttlMs === null || row.ttlMs === undefined ? null : Number(row.ttlMs),
     pollIntervalMs: row.pollIntervalMs === null || row.pollIntervalMs === undefined ? null : Number(row.pollIntervalMs),
     metadata: row.metadata ? JSON.parse(row.metadata as string) as Record<string, unknown> : null,
+    aiProvenanceId: (row.aiProvenanceId as string) ?? null,
   };
 }
 
@@ -92,6 +94,7 @@ export const agentV2TasksMethods = {
     if (patch.completedAt !== undefined) { sets.push('completedAt = ?'); args.push(patch.completedAt ?? null); }
     if (patch.ttlMs !== undefined) { sets.push('ttlMs = ?'); args.push(patch.ttlMs ?? null); }
     if (patch.pollIntervalMs !== undefined) { sets.push('pollIntervalMs = ?'); args.push(patch.pollIntervalMs ?? null); }
+    if (patch.aiProvenanceId !== undefined) { sets.push('aiProvenanceId = ?'); args.push(patch.aiProvenanceId ?? null); }
     args.push(owner, taskId, ...fromStatuses);
     const res = this.db.prepare(
       `UPDATE agent_v2_tasks SET ${sets.join(', ')}

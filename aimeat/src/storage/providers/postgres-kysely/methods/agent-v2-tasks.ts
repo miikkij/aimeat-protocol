@@ -6,6 +6,8 @@
  * @structure agentV2TasksMethods — create / get / list / settle / deleteByOwner
  * @usage Object.assign(PostgresKyselyStorage.prototype, agentV2TasksMethods)
  * @version-history
+ *   v1.1.0 — 2026-10-08 — aiProvenanceId reads back and settles with the patch (migration 0098,
+ *     aiprov D8).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 import type { Selectable, UpdateObject } from 'kysely';
@@ -34,6 +36,7 @@ function toTask(r: Selectable<AgentV2Task>): AgentV2TaskRecord {
     ttlMs: r.ttlMs === null || r.ttlMs === undefined ? null : Number(r.ttlMs),
     pollIntervalMs: r.pollIntervalMs === null || r.pollIntervalMs === undefined ? null : Number(r.pollIntervalMs),
     metadata: (r.metadata ?? null) as Record<string, unknown> | null,
+    aiProvenanceId: r.aiProvenanceId ?? null,
   };
 }
 
@@ -89,6 +92,7 @@ export const agentV2TasksMethods = {
     if (patch.completedAt !== undefined) set.completedAt = patch.completedAt ?? null;
     if (patch.ttlMs !== undefined) set.ttlMs = patch.ttlMs ?? null;
     if (patch.pollIntervalMs !== undefined) set.pollIntervalMs = patch.pollIntervalMs ?? null;
+    if (patch.aiProvenanceId !== undefined) set.aiProvenanceId = patch.aiProvenanceId ?? null;
 
     const r = await this.db.updateTable('AgentV2Task').set(set)
       .where('owner', '=', owner).where('taskId', '=', taskId)

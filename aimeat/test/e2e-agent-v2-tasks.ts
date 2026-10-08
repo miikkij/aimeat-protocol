@@ -18,6 +18,9 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2-tasks
  * @version-history
+ *   v1.1.0 — 2026-10-08 — aiprov D8: a task an agent settles with a result names its provenance
+ *     record (model-written, by the worker, hashing the result); one the account holder settles in
+ *     person names none.
  *   v1.0.0 — 2026-09-01 — Initial, with the feature.
  */
 import { createHash } from 'node:crypto';
@@ -168,6 +171,26 @@ async function run(): Promise<void> {
         assert(t.terminal === true, 'and it is terminal');
         assert(typeof t.completedAt === 'string', 'with the moment it settled');
         assert(t.result[0].text === 'Here is the summary.', 'and the result it came back with');
+        // aiprov D8: the answer an agent hands back carries its provenance record, which says a
+        // model wrote it, names the worker, and hashes the result as stored.
+        assert(typeof t.aiProvenanceId === 'string', `the settled task names its record: ${JSON.stringify(t)}`);
+        const rec = await json(`/v1/provenance/${t.aiProvenanceId}`, { headers: authA });
+        assert(rec.status === 200, `the owner reads the record: ${rec.status}`);
+        const doc = rec.body.data.provenance ?? rec.body.data.record ?? rec.body.data;
+        assert(doc.level === 'ai-generated' && doc.generator?.principal === worker.gaii,
+            `an agent's answer is recorded as model-written, by the worker: ${JSON.stringify(doc).slice(0, 400)}`);
+        const expected = createHash('sha256').update(`${JSON.stringify(t.result)}\n\n`, 'utf8').digest('hex');
+        assert(doc.attestation?.contentHash === `sha256:${expected}`, `the hash covers the result: ${doc.attestation?.contentHash}`);
+    });
+
+    await test('the account holder settling a task in person is not stamped as model-written (aiprov D8)', async () => {
+        const task = await ask(authCaller, worker.gaii, 'Answer this one yourself.');
+        const done = await json(`/v1/agents/v2/tasks/${task.taskId}/status`, {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ status: 'completed', result: [{ kind: 'text', text: 'A person wrote this.' }] }),
+        });
+        assert(done.status === 200, `expected 200, got ${done.status}: ${JSON.stringify(done.body?.error)}`);
+        assert(done.body.data.task.aiProvenanceId === undefined, `a person's own answer carries no record: ${done.body.data.task.aiProvenanceId}`);
     });
 
     await test('a terminal task does not move again, whoever asks', async () => {
