@@ -11,6 +11,8 @@
  *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
  *
  * @version-history
+ *   v1.3.0 -- 2026-10-08 -- The /ucp/2026-08-25/ paths are left to their own idempotency, which is
+ *     durable, per platform and seller, and refuses a reused key with another body (UCP 2026-08-25).
  *   v1.2.0 -- 2026-09-16 -- Reserve before next(), retain interrupted/non-JSON work, expire on
  *     lookup, and let a refused credential be refreshed without caching its 401.
  *   v1.1.0 — 2026-08-15 — The cache key is principal + method + path + UUID, not the UUID alone.
@@ -74,6 +76,14 @@ export function idempotency() {
 
         const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
         if (!idempotencyKey) {
+            next();
+            return;
+        }
+
+        // The UCP 2026-08-25 checkout keeps its own keys (routes/ucp-checkout.ts): per platform and
+        // seller, in storage for 48 hours, and a key reused with another body is 409, as UCP asks.
+        // Its callers have no account, so here every one of them would be 'anon' in one cache.
+        if (req.path.startsWith('/ucp/2026-08-25/')) {
             next();
             return;
         }

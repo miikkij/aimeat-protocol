@@ -20,6 +20,9 @@
  * @structure STRIPE_HANDLER_ID · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   v1.4.0 — 2026-10-08 — collect charges a shared payment token (spt_…) as payment_method_data
+ *     under Stripe-Version 2026-09-30.preview, for the UCP guest checkout. Not run against Stripe
+ *     itself here: a test-mode SPT needs a seller's Stripe account with agentic commerce on.
  *   v1.3.0 — 2026-10-02 — collect with saveForLater keeps the card at Stripe on the seller's account (a
  *     customer and setup_future_usage off_session) and returns its ids; chargeSaved charges it for an
  *     automatic renewal, off_session. Not yet run against Stripe itself: the E2E uses the test handler.
@@ -43,6 +46,8 @@ type EncryptionConfig = { encryptionKey: string | null; totpSecretEncryptionKey:
 
 /** Reverse-DNS id advertised in the /.well-known/ucp payment_handlers list. */
 export const STRIPE_HANDLER_ID = 'com.stripe.spt';
+/** The version a shared payment token is charged under (docs.stripe.com shared-payment-tokens, read 2026-10-08). */
+export const SPT_STRIPE_VERSION = '2026-09-30.preview';
 
 /** The seller's own Stripe secret, or a 403 naming the fix. Never logged, never returned. The stored
  *  value is sealed (commerce/psp-secrets.ts) and opened here, at the one call that sends it. */
@@ -64,10 +69,11 @@ function sellerKey(config: EncryptionConfig, seller: { psp?: unknown } | undefin
  * auth failure or 5xx becomes a 502, because it is the seller's or Stripe's problem, not the call's.
  */
 async function stripeApi(
-  key: string, method: string, path: string, params?: Record<string, string>,
+  key: string, method: string, path: string, params?: Record<string, string>, version?: string,
 ): Promise<Record<string, unknown>> {
   const headers: Record<string, string> = { Authorization: `Bearer ${key}` };
   if (params) headers['Content-Type'] = 'application/x-www-form-urlencoded';
+  if (version) headers['Stripe-Version'] = version;
   const res = await safeFetch(`https://api.stripe.com/v1/${path}`, {
     method,
     headers,
@@ -124,18 +130,25 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
       const customer = saveForLater
         ? String((await stripeApi(key, 'POST', 'customers', { description: `AIMEAT buyer, checkout ${reference}` })).id)
         : null;
+      // A shared payment token (spt_…) is an AI platform's grant for this one charge (the UCP guest
+      // checkout, commerce/ucp-guest-checkout.ts): Stripe takes it as payment_method_data, under the
+      // preview version its agentic commerce guide names, and clones the buyer's card from it.
+      const isSpt = instrument.startsWith('spt_');
       const intent = await stripeApi(key, 'POST', 'payment_intents', {
         amount: String(stripeAmount),
         currency: currency.toLowerCase(),
-        payment_method: instrument,
+        ...(isSpt ? { 'payment_method_data[shared_payment_granted_token]': instrument } : { payment_method: instrument }),
         confirm: 'true',
         // The buyer is present at checkout, so disallow redirect-based methods: a card token
-        // confirms synchronously to `succeeded` without needing a return_url.
-        'automatic_payment_methods[enabled]': 'true',
-        'automatic_payment_methods[allow_redirects]': 'never',
+        // confirms synchronously to `succeeded` without needing a return_url. A shared payment
+        // token is sent the way Stripe's own example sends it, with nothing beside it.
+        ...(isSpt ? {} : {
+          'automatic_payment_methods[enabled]': 'true',
+          'automatic_payment_methods[allow_redirects]': 'never',
+        }),
         description: `AIMEAT checkout ${reference}`,
         ...(customer ? { customer, setup_future_usage: 'off_session' } : {}),
-      });
+      }, isSpt ? SPT_STRIPE_VERSION : undefined);
       if (intent.status !== 'succeeded') {
         throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
       }

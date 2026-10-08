@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.12.0 — 2026-10-08 — ucp-upkeep: the UCP order webhooks that wait for another try.
  *   v1.11.0 — 2026-09-30 — classification-audit-prune is its own handler, registered on every node.
  *     It ran inside consent-audit-prune, which exists only with consent on, so a node with consent
  *     off never pruned the classification audit log or the exceptions list.
@@ -97,6 +98,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('usage-visit-retention', async () => {
     const { runVisitRetentionJob } = await import('./usage/visit-retention.js');
     await runVisitRetentionJob(storage);
+  });
+  // The order webhooks of the UCP guest checkout that did not reach the platform yet: each is tried
+  // again when its wait is over. Dynamic import: a node nobody buys from never loads it.
+  scheduler.registerCoreHandler('ucp-upkeep', async () => {
+    const { runUcpUpkeep } = await import('../commerce/ucp-guest-checkout.js');
+    await runUcpUpkeep(storage, config);
   });
 
   // The operator's monthly compliance report, built from the month that ended and stored under

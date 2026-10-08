@@ -20,6 +20,8 @@
  * @structure caps · keys · VisibilityDay · VisibilityMonthRecord · VisibilitySettings · emptyVisibilityDay
  * @usage import { visibilityMonthKey, type VisibilityMonthRecord } from '../models/visibility-schemas.js';
  * @version-history
+ *   v1.2.0 — 2026-10-08 — The day keeps agents' checkouts by stage and where they failed, and outside
+ *     agents' calls to the owner's tools by outcome (layers E and C).
  *   v1.1.0 — 2026-10-08 — VisibilitySettings carries the owner's Clarity and GA4 ids (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
@@ -112,7 +114,21 @@ export interface VisibilityDay {
   discovery: Record<string, Record<string, number>>;
   /** Purchases keyed `channel|family|via`, each part from a closed list. */
   purchases: Record<string, VisibilityPurchaseCounts>;
+  /** AI agents' checkouts by family, then by stage (CHECKOUT_STAGES). Absent on days before 2026-10-08. */
+  checkouts?: Record<string, Record<string, number>>;
+  /** Where agents' checkouts failed: `family|code` → count. */
+  checkoutErrors?: Record<string, number>;
+  /** Outside agents' calls to the owner's tools by family, then by outcome (ok, refused, error). */
+  agentCalls?: Record<string, Record<string, number>>;
+  /** Why those calls did not succeed: `family|tool|reason` → count. */
+  agentErrors?: Record<string, number>;
 }
+
+/** The stages an agent's checkout passes, as the report counts them. */
+export const CHECKOUT_STAGES = ['created', 'updated', 'completed', 'canceled', 'expired', 'failed'] as const;
+export type CheckoutStage = (typeof CHECKOUT_STAGES)[number];
+/** Distinct error and tool keys kept per day, so a stranger's calls cannot grow a record without bound. */
+export const MAX_ERROR_KEYS_PER_DAY = 100;
 
 export interface VisibilityMonthRecord {
   type: 'aimeat.visibility.month';
@@ -142,6 +158,7 @@ export function emptyVisibilityDay(): VisibilityDay {
   return {
     total: 0, optedOut: 0, classes: {}, channels: {}, aiReferrals: {}, assistant: {}, crawler: {},
     paths: {}, pathsOther: 0, discovery: {}, purchases: {},
+    checkouts: {}, checkoutErrors: {}, agentCalls: {}, agentErrors: {},
   };
 }
 

@@ -33,6 +33,7 @@ const FeedSchema = z.object({
   brand: z.string().max(70).nullable().optional(),
   return_policy_label: z.string().max(50).nullable().optional(),
   store_url: z.string().max(2048).nullable().optional(),
+  stripe_profile_id: z.string().max(80).nullable().optional(),
   product_links: z.record(z.string().max(300), z.string().max(2048).nullable()).optional(),
 }).strict();
 
@@ -70,7 +71,7 @@ export function visibilityFeedRouter(config: AimeatConfig, storage: Storage): Ro
     try {
       await setFeedSettings(storage, owner.ghii, {
         enabled: parsed.data.enabled, brand: parsed.data.brand, returnPolicyLabel: parsed.data.return_policy_label,
-        storeUrl: parsed.data.store_url, productLinks: parsed.data.product_links,
+        storeUrl: parsed.data.store_url, productLinks: parsed.data.product_links, stripeProfileId: parsed.data.stripe_profile_id,
       });
     } catch (e) { fail(res, e); return; }
     res.json(success(config.nodeId, await describeFeed(storage, config, owner.ghii, owner.name), [

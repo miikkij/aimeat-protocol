@@ -59,6 +59,7 @@ export const visibilityTools = [
             return_policy_label: { type: 'string', description: 'The label of the return policy the person set in Merchant Center (Store settings > UCP settings), 50 characters. null removes it.', zod: z.string().max(50).nullable() },
             store_url: { type: 'string', description: 'Where a product with no page of its own links: an https address. Defaults to the place\'s front page. null resets.', zod: z.string().max(2048).nullable() },
             product_links: { type: 'object', description: 'A product page per sku (the `sku` of a listed product, as this tool reads it) to an https address. Merged; a null value removes that link.', zod: z.record(z.string().max(300), z.string().max(2048).nullable()) },
+            stripe_profile_id: { type: 'string', description: 'The person\'s Stripe network profile id (profile_…, Stripe Dashboard > Agentic commerce). With it and a selling key, the place\'s own UCP checkout takes Stripe shared payment tokens from AI platforms. null removes it.', zod: z.string().max(80).nullable() },
             stripe_sync: { type: 'string', description: '"send" pushes the catalog into the person\'s own Stripe now; "check" reads the last import\'s status.', enum: ['send', 'check'], zod: z.enum(['send', 'check']) },
         },
     },

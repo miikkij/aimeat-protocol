@@ -35,7 +35,7 @@ import type { AimeatConfig } from '../../config.js';
 import {
   VISIBILITY_DOCS, PURCHASE_VIA, VISIT_CHANNELS, AI_FAMILIES, MAX_PATHS_PER_DAY, MAX_TARGET_LEN,
   VISIBILITY_RETAIN_MONTHS, VISIBILITY_MONTH_PREFIX, visibilityMonthKey,
-  emptyVisibilityDay, emptyVisibilityMonth,
+  emptyVisibilityDay, emptyVisibilityMonth, CHECKOUT_STAGES, MAX_ERROR_KEYS_PER_DAY, type CheckoutStage,
   type VisibilityDay, type VisibilityDoc, type VisibilityMonthRecord,
   type PurchaseVia, type VisitChannel, type AiFamily,
 } from '../../models/visibility-schemas.js';
@@ -241,6 +241,58 @@ export function recordPurchase(storage: Storage, config: AimeatConfig, input: Pu
   })();
 }
 
+/** A short key part from a free string: the error code or tool name a caller gives. */
+const keyPart = (s: string | null | undefined, max: number): string =>
+  (s ?? '').replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, max) || 'none';
+
+/**
+ * Count one stage of an AI agent's checkout for the seller: created, updated, completed, canceled,
+ * expired, or failed with the error code. Layer C reads where agents' checkouts stop from these.
+ * Never throws.
+ */
+export function recordCheckoutStage(
+  storage: Storage, config: AimeatConfig,
+  input: { sellerGhii: string; family: string | null; stage: CheckoutStage; code?: string | null },
+): void {
+  if (!nodeCountsVisibility(config)) return;
+  void (async () => {
+    try {
+      const ownerGhii = ownerGhiiOf(input.sellerGhii);
+      if (!(await ownerCounts(storage, ownerGhii))) return;
+      if (!(CHECKOUT_STAGES as readonly string[]).includes(input.stage)) return;
+      const family = familyOrOther(input.family);
+      const d = deltaDay(storage, ownerGhii, dayOf(nowIso()));
+      bump((d.checkouts![family] ??= {}), input.stage);
+      if (input.stage === 'failed') bump(d.checkoutErrors!, `${family}|${keyPart(input.code, 60)}`);
+    } catch (e) {
+      logger.warn('visibility: a checkout stage could not be counted', { error: String(e) });
+    }
+  })();
+}
+
+/**
+ * Count one call an outside agent made to one of the owner's tools (layer C): by the agent's
+ * family and the outcome, and for a call that did not succeed, by tool and reason. Never throws.
+ */
+export function recordAgentCall(
+  storage: Storage, config: AimeatConfig,
+  input: { ownerGhii: string; family: string | null; tool: string; outcome: 'ok' | 'refused' | 'error'; reason?: string | null },
+): void {
+  if (!nodeCountsVisibility(config)) return;
+  void (async () => {
+    try {
+      const ownerGhii = ownerGhiiOf(input.ownerGhii);
+      if (!(await ownerCounts(storage, ownerGhii))) return;
+      const family = familyOrOther(input.family);
+      const d = deltaDay(storage, ownerGhii, dayOf(nowIso()));
+      bump((d.agentCalls![family] ??= {}), input.outcome);
+      if (input.outcome !== 'ok') bump(d.agentErrors!, `${family}|${keyPart(input.tool, 80)}|${keyPart(input.reason, 60)}`);
+    } catch (e) {
+      logger.warn('visibility: an agent call could not be counted', { error: String(e) });
+    }
+  })();
+}
+
 // ── Merging ───────────────────────────────────────────────────────────────────────────────────
 
 const addAll = (into: Record<string, number>, from: Record<string, number | undefined>): void => {
@@ -282,6 +334,27 @@ export function mergeDay(into: VisibilityDay, delta: VisibilityDay, pathCap = MA
     const slot = (into.purchases[key] ??= { n: 0, amounts: {} });
     slot.n += p.n;
     addAll(slot.amounts, p.amounts);
+  }
+  addNested((into.checkouts ??= {}), delta.checkouts ?? {});
+  addNested((into.agentCalls ??= {}), delta.agentCalls ?? {});
+  addCapped((into.checkoutErrors ??= {}), delta.checkoutErrors ?? {}, pathCap === Infinity ? Infinity : MAX_ERROR_KEYS_PER_DAY);
+  addCapped((into.agentErrors ??= {}), delta.agentErrors ?? {}, pathCap === Infinity ? Infinity : MAX_ERROR_KEYS_PER_DAY);
+}
+
+/** family → name → count, added in. */
+function addNested(into: Record<string, Record<string, number>>, from: Record<string, Record<string, number>>): void {
+  for (const [k, inner] of Object.entries(from)) {
+    if (FORBIDDEN_KEYS.has(k)) continue;
+    addAll((into[k] ??= {}), inner);
+  }
+}
+
+/** Counts added in, with no new key past `cap`; what does not fit is counted under `other`. */
+function addCapped(into: Record<string, number>, from: Record<string, number>, cap: number): void {
+  for (const [k, v] of Object.entries(from)) {
+    if (FORBIDDEN_KEYS.has(k)) continue;
+    const key = Object.hasOwn(into, k) || Object.keys(into).length < cap ? k : 'other';
+    bump(into, key, v ?? 0);
   }
 }
 

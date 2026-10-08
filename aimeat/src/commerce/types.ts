@@ -163,6 +163,18 @@ export interface CheckoutSessionRecord {
    * (`ucp`); `buyerOwner` and `buyerGhii` are then empty, and the contact is the seller's to fulfil.
    */
   guest?: { source: 'stripe-acs' | 'ucp'; platform: string; email: string | null; name: string | null; eventId?: string; profileUrl?: string };
+  /**
+   * The UCP order view of an order placed through the place's own UCP checkout
+   * (commerce/ucp-guest-checkout.ts): the checkout it came from, each line's UCP id and item id,
+   * the append-only fulfilment events, and how much of each line was delivered.
+   */
+  ucpOrder?: {
+    checkoutId: string;
+    lineIds: string[];
+    itemIds?: string[];
+    events: Array<Record<string, unknown>>;
+    fulfilled: Record<string, number>;
+  };
   createdAt: string;
   updatedAt: string;
   /** Open sessions expire lazily after this instant (checked on read + on complete). */

@@ -81,11 +81,11 @@ export function registerVisibilityTools(
     descriptionFor('aimeat_visibility_feed'),
     zodShapeFor('aimeat_visibility_feed'),
     annotationsFor('aimeat_visibility_feed'),
-    async ({ enabled, brand, return_policy_label, store_url, product_links, stripe_sync }) => {
+    async ({ enabled, brand, return_policy_label, store_url, product_links, stripe_profile_id, stripe_sync }) => {
       const c = caller();
       if (c.visitor) return toolError('FORBIDDEN', 'A session from another node has no product feed here.');
       try {
-        const change = { enabled, brand, returnPolicyLabel: return_policy_label, storeUrl: store_url, productLinks: product_links };
+        const change = { enabled, brand, returnPolicyLabel: return_policy_label, storeUrl: store_url, productLinks: product_links, stripeProfileId: stripe_profile_id };
         if (Object.values(change).some((v) => v !== undefined)) await setFeedSettings(storage, c.ownerGhii, change);
         let stripe: unknown;
         if (stripe_sync) {

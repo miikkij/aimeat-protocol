@@ -6,14 +6,25 @@
  *   uniform 404, a price change reaching the next fetch, the owner's choices, the push to the
  *   owner's own Stripe refused without a selling key, the same answer over MCP, and the refusals:
  *   a second owner, a wrong scope, no token.
+ *
+ *   Phase 2 is the place's own UCP 2026-08-25 checkout over HTTP, against a stand-in platform this
+ *   process serves (a profile with an Ed25519 key): the business profile, the refusals of the
+ *   protocol layer, idempotency, a signed update and a broken signature, the bound platform, a
+ *   payment that cannot go through, cancel, and the signed order read. A completed order and its
+ *   webhook need a real shared payment token at Stripe, so that path is the unit test
+ *   test/unit/ucp-guest-checkout.test.ts, against a stand-in for Stripe.
  * @version-history
+ *   v1.1.0 — 2026-10-08 — Phase 2: the own UCP checkout.
  *   v1.0.0 — 2026-10-08 — Initial: the feeds.
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-checkout
 
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync } from 'node:crypto';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import * as ed from '@noble/ed25519';
+import { signMessage } from '../src/services/ucp/http-signatures.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -224,6 +235,134 @@ await test('9. switched off, both public files answer 404 again', async () => {
   assert(off.status === 200 && off.body.data.enabled === false, 'off');
   assert((await json(feedUrl)).status === 404 && (await json(stripeUrl)).status === 404, 'both 404');
 });
+
+console.log('\nPhase 2 — the own UCP 2026-08-25 checkout, over HTTP, against a stand-in platform');
+
+// The platform: a profile with an Ed25519 key and an order webhook, served from this process.
+const platformKeys = generateKeyPairSync('ed25519');
+const platformJwk = { kty: 'OKP', crv: 'Ed25519', x: (platformKeys.publicKey.export({ format: 'jwk' }) as { x: string }).x, kid: 'plat-2026', use: 'sig', alg: 'EdDSA' };
+const received: Array<{ headers: Record<string, string | string[] | undefined>; body: string }> = [];
+const platform = createServer((req, res) => {
+  let body = '';
+  req.on('data', (c) => { body += c; });
+  req.on('end', () => {
+    if (req.url === '/.well-known/ucp') {
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({
+        ucp: { version: '2026-08-25', capabilities: { 'dev.ucp.shopping.order': [{ version: '2026-08-25', config: { webhook_url: `http://localhost:${(platform.address() as AddressInfo).port}/hooks` } }] } },
+        keys: [platformJwk],
+      }));
+      return;
+    }
+    if (req.url === '/hooks') { received.push({ headers: req.headers, body }); res.end('{}'); return; }
+    res.statusCode = 404; res.end();
+  });
+});
+await new Promise<void>((r) => platform.listen(0, '127.0.0.1', () => r()));
+const PROFILE = `http://localhost:${(platform.address() as AddressInfo).port}/.well-known/ucp`;
+const AGENT = `profile="${PROFILE}"`;
+const UCP = '/ucp/2026-08-25';
+
+async function ucp(method: string, path: string, body?: unknown, extra: Record<string, string> = {}, sign = false): Promise<{ status: number; body: any }> {
+  const text = body === undefined ? null : JSON.stringify(body);
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', 'UCP-Agent': AGENT, ...extra };
+  if (sign) {
+    const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+    Object.assign(headers, signMessage({ method, url: `${BASE}${path}`, headers: lower }, text, { kid: 'plat-2026', privateKey: platformKeys.privateKey }));
+  }
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${BASE}${path}`, { method, headers, ...(text === null ? {} : { body: text }) });
+    if (res.status === 429 && attempt < 6) { await new Promise((r) => setTimeout(r, 1200)); continue; }
+    const t = await res.text();
+    let b: any;
+    try { b = JSON.parse(t); } catch { b = { _raw: t }; }
+    return { status: res.status, body: b };
+  }
+}
+const lines = [{ item: { id: usdSku }, quantity: 1 }];
+let checkoutId = '';
+
+await test('10. /.well-known/ucp is the 2026-08-25 profile, and names the 2026-04-08 one it still answers', async () => {
+  const p = await json('/.well-known/ucp');
+  assert(p.status === 200 && p.body.ucp.version === '2026-08-25', `version: ${JSON.stringify(p.body.ucp?.version)}`);
+  const svc = p.body.ucp.services['dev.ucp.shopping']?.[0];
+  assert(svc?.transport === 'rest' && svc.endpoint.endsWith('/ucp/2026-08-25'), `service: ${JSON.stringify(svc)}`);
+  assert(p.body.ucp.capabilities['dev.ucp.shopping.checkout'] && p.body.ucp.capabilities['dev.ucp.shopping.order'], 'checkout and order capabilities');
+  assert(JSON.stringify(p.body.keys.map((k: any) => k.alg)) === JSON.stringify(['ES256', 'EdDSA']) && p.body.keys.every((k: any) => !k.d), `keys: ${JSON.stringify(p.body.keys)}`);
+  const old = p.body.ucp.supported_versions?.['2026-04-08'];
+  assert(typeof old === 'string' && old.endsWith('/.well-known/ucp/2026-04-08'), `supported_versions: ${JSON.stringify(p.body.ucp.supported_versions)}`);
+  const prev = await json('/.well-known/ucp/2026-04-08');
+  assert(prev.status === 200 && prev.body.ucp.version === '2026-04-08', 'the older profile still answers');
+});
+
+await test('11. a request with no UCP-Agent is refused with invalid_profile_url', async () => {
+  const res = await fetch(`${BASE}${UCP}/checkout-sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ line_items: lines }) });
+  const b = await res.json() as any;
+  assert(res.status === 400 && b.code === 'invalid_profile_url', `${res.status} ${JSON.stringify(b)}`);
+});
+
+await test('12. a platform creates a checkout with no account: incomplete without the buyer\'s email, in cents', async () => {
+  const r = await ucp('POST', `${UCP}/checkout-sessions`, { line_items: lines }, { 'Idempotency-Key': '7b0c9a8e-3c1f-4d6a-9e2b-1f4a5c6d7e80' });
+  assert(r.status === 201, `create ${r.status} ${JSON.stringify(r.body)}`);
+  checkoutId = r.body.id;
+  assert(/^ucs_/.test(checkoutId) && r.body.status === 'incomplete' && r.body.currency === 'USD', `checkout: ${JSON.stringify(r.body)}`);
+  assert(r.body.ucp.version === '2026-08-25' && r.body.line_items[0].item.price === 2450, `price in cents: ${JSON.stringify(r.body.line_items)}`);
+  const codes = r.body.messages.map((m: any) => m.code);
+  assert(codes.includes('missing') && codes.includes('payment_failed'), `email missing, no payment handler yet: ${JSON.stringify(r.body.messages)}`);
+  assert(r.body.links.some((l: any) => l.type === 'terms_of_service'), 'links carry the terms');
+});
+
+await test('13. the same Idempotency-Key answers the same checkout; with another body it is 409', async () => {
+  const again = await ucp('POST', `${UCP}/checkout-sessions`, { line_items: lines }, { 'Idempotency-Key': '7b0c9a8e-3c1f-4d6a-9e2b-1f4a5c6d7e80' });
+  assert(again.status === 201 && again.body.id === checkoutId, `replayed: ${again.status} ${again.body.id}`);
+  const other = await ucp('POST', `${UCP}/checkout-sessions`, { line_items: [{ item: { id: usdSku }, quantity: 2 }] }, { 'Idempotency-Key': '7b0c9a8e-3c1f-4d6a-9e2b-1f4a5c6d7e80' });
+  assert(other.status === 409 && other.body.code === 'idempotency_conflict', `${other.status} ${JSON.stringify(other.body)}`);
+});
+
+await test('14. a signed PUT with the buyer\'s email makes it ready; a broken signature is 401', async () => {
+  const r = await ucp('PUT', `${UCP}/checkout-sessions/${checkoutId}`, { line_items: lines, buyer: { email: 'pat@example.com', first_name: 'Pat' } }, {}, true);
+  assert(r.status === 200 && r.body.status === 'ready_for_complete', `${r.status} ${JSON.stringify(r.body)}`);
+  const forged = { line_items: lines, buyer: { email: 'mallory@example.com' } };
+  const input = 'sig1=("@method" "@authority" "@path" "ucp-agent" "content-digest" "content-type");keyid="plat-2026"';
+  const wrongDigest = await ucp('PUT', `${UCP}/checkout-sessions/${checkoutId}`, forged, { Signature: 'sig1=:AAAA:', 'Signature-Input': input, 'Content-Digest': 'sha-256=:x:' });
+  assert(wrongDigest.status === 400 && wrongDigest.body.code === 'digest_mismatch', `a digest that is not the body's: ${wrongDigest.status} ${JSON.stringify(wrongDigest.body)}`);
+  const digest = `sha-256=:${createHash('sha256').update(JSON.stringify(forged)).digest('base64')}:`;
+  const badSig = await ucp('PUT', `${UCP}/checkout-sessions/${checkoutId}`, forged, { Signature: `sig1=:${Buffer.alloc(64).toString('base64')}:`, 'Signature-Input': input, 'Content-Digest': digest });
+  assert(badSig.status === 401 && badSig.body.code === 'signature_invalid', `a forged signature: ${badSig.status} ${JSON.stringify(badSig.body)}`);
+  const read = await ucp('GET', `${UCP}/checkout-sessions/${checkoutId}`);
+  assert(read.body.buyer.email === 'pat@example.com', 'the refused change did not land');
+});
+
+await test('15. another platform cannot read the checkout', async () => {
+  const res = await fetch(`${BASE}${UCP}/checkout-sessions/${checkoutId}`, { headers: { 'UCP-Agent': 'profile="https://other-platform.example/ucp"' } });
+  const b = await res.json() as any;
+  assert(res.status === 404 && b.code === 'not_found', `${res.status} ${JSON.stringify(b)}`);
+});
+
+await test('16. complete with a token for a seller who takes no card payment: an open checkout and payment_failed', async () => {
+  const r = await ucp('POST', `${UCP}/checkout-sessions/${checkoutId}/complete`, { payment: { instruments: [{ id: 'i1', handler_id: 'stripe_payments', type: 'card', selected: true, credential: { type: 'stripe_payment_token', token: 'spt_e2e_000000' } }] } });
+  assert(r.status === 200 && r.body.ucp.status === 'error' && r.body.messages[0].code === 'payment_failed', `${r.status} ${JSON.stringify(r.body)}`);
+  const read = await ucp('GET', `${UCP}/checkout-sessions/${checkoutId}`);
+  assert(read.body.status === 'ready_for_complete', `still open: ${read.body.status}`);
+});
+
+await test('17. cancel closes it, and a change after that is a business outcome', async () => {
+  const c = await ucp('POST', `${UCP}/checkout-sessions/${checkoutId}/cancel`);
+  assert(c.status === 200 && c.body.status === 'canceled', `cancel: ${JSON.stringify(c.body)}`);
+  const put = await ucp('PUT', `${UCP}/checkout-sessions/${checkoutId}`, { line_items: lines });
+  assert(put.status === 200 && put.body.messages?.[0]?.code === 'checkout_closed', `after cancel: ${JSON.stringify(put.body)}`);
+});
+
+await test('18. an order is read only with the platform\'s signature, and a package is not sold here', async () => {
+  const unsigned = await ucp('GET', `${UCP}/orders/uco_x_00000000000000000000000000000000`);
+  assert(unsigned.status === 401 && unsigned.body.code === 'signature_missing', `${unsigned.status} ${JSON.stringify(unsigned.body)}`);
+  const signed = await ucp('GET', `${UCP}/orders/uco_x_00000000000000000000000000000000`, undefined, {}, true);
+  assert(signed.status === 200 && signed.body.ucp?.status === 'error' && signed.body.messages[0].code === 'not_found', `${signed.status} ${JSON.stringify(signed.body)}`);
+  const pkg = await ucp('POST', `${UCP}/checkout-sessions`, { line_items: [{ item: { id: 'package:repo|group|buy' } }] });
+  assert(pkg.status === 200 && pkg.body.messages[0].code === 'item_unavailable' && !pkg.body.id, `${pkg.status} ${JSON.stringify(pkg.body)}`);
+});
+
+platform.close();
 
 console.log(`\n═══ ${passed} passed, ${failed} failed ═══`);
 process.exit(failed > 0 ? 1 : 0);

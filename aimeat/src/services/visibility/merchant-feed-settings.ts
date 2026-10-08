@@ -60,7 +60,7 @@ export class FeedSettingsError extends Error {
 }
 
 const EMPTY: StoredFeed = {
-  enabled: false, brand: null, returnPolicyLabel: null, productLinks: {}, storeUrl: null,
+  enabled: false, brand: null, returnPolicyLabel: null, productLinks: {}, storeUrl: null, stripeProfileId: null,
   lastStripeImport: null, updatedAt: '',
 };
 
@@ -89,6 +89,7 @@ export interface FeedSettingsInput {
   brand?: string | null;
   returnPolicyLabel?: string | null;
   storeUrl?: string | null;
+  stripeProfileId?: string | null;
   /** Merged into the stored map; a null value removes that sku's link. */
   productLinks?: Record<string, string | null>;
 }
@@ -111,6 +112,13 @@ export async function setFeedSettings(storage: Storage, ownerGhii: string, input
     feed.returnPolicyLabel = input.returnPolicyLabel ? input.returnPolicyLabel.trim().slice(0, 50) || null : null;
   }
   if (input.storeUrl !== undefined) feed.storeUrl = input.storeUrl ? url(input.storeUrl, 'store_url') : null;
+  if (input.stripeProfileId !== undefined) {
+    const id = input.stripeProfileId ? input.stripeProfileId.trim() : '';
+    if (id && !/^profile_[A-Za-z0-9]{4,60}$/.test(id)) {
+      throw new FeedSettingsError('INVALID_INPUT', 400, 'stripe_profile_id is the Stripe network profile id from Agentic commerce in the Stripe Dashboard, profile_ followed by letters and digits.');
+    }
+    feed.stripeProfileId = id || null;
+  }
   if (input.productLinks) {
     for (const [sku, link] of Object.entries(input.productLinks)) {
       if (!sku || sku.length > 300 || ['__proto__', 'constructor', 'prototype'].includes(sku)) {
@@ -152,6 +160,7 @@ export async function describeFeed(
   const toStore = listing.products.filter((p) => p.linkIsStore).length;
   if (toStore) todo.push(`${toStore} product(s) link to the store's front page. Merchant Center expects a page per product with the same price: set product_links for them.`);
   if (!feed.returnPolicyLabel) todo.push('Set the return policy in Merchant Center (Store settings > UCP settings) and give its label here (return_policy_label); Microsoft requires one for Copilot Checkout.');
+  if (!feed.stripeProfileId) todo.push('For AI platforms that pay through this place\'s own UCP checkout (Stripe shared payment tokens), give your Stripe network profile id (stripe_profile_id, profile_…) from Agentic commerce in the Stripe Dashboard.');
   todo.push('In your own Merchant Center account, add a feed with "Automatically download file from URL" and the merchant_center address. Merchant Center fetches it once a day, so a price change reaches it by the next day.');
   return {
     enabled: feed.enabled,
@@ -159,6 +168,7 @@ export async function describeFeed(
     brand: feed.brand,
     return_policy_label: feed.returnPolicyLabel,
     store_url: feed.storeUrl,
+    stripe_profile_id: feed.stripeProfileId ?? null,
     product_links: feed.productLinks,
     urls: feedUrls(config, ownerName),
     products: listing.products.map((p) => ({

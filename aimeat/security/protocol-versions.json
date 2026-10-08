@@ -79,7 +79,19 @@
       "note": "3.2 exists. Nobody has read what it would give us. Separately and worth its own look: the served document is 1.6 MB, which is large enough that at least one agent-readiness scanner times out reading it and reports it as invalid JSON."
     },
     { "id": "acp", "name": "Agentic Commerce Protocol", "spec": "https://.well-known/acp.json", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /.well-known/acp.json. Nobody has compared it against the published spec." },
-    { "id": "ucp", "name": "Universal Commerce Profile", "spec": "https://.well-known/ucp", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /.well-known/ucp. Nobody has compared it against the published spec." },
+    {
+      "id": "ucp",
+      "name": "Universal Commerce Protocol",
+      "spec": "https://github.com/Universal-Commerce-Protocol/ucp/releases/tag/v2026-08-25",
+      "weDeclare": "2026-08-25",
+      "declaredIn": [
+        { "file": "src/commerce/ucp-guest-checkout.ts", "template": "export const UCP_VERSION = '{version}';" }
+      ],
+      "current": "2026-08-25",
+      "verifiedOn": "2026-10-08",
+      "verdict": "current",
+      "note": "Read at tag v2026-08-25 on 2026-10-08 (cc-jouni-aivis, layer E of the AI visibility wish): /.well-known/ucp is the 2026-08-25 business profile (services/ucp/business-profile.ts) with keys[] and supported_versions, the guest checkout at /ucp/2026-08-25 (create, get, PUT update, complete, cancel; orders with signed webhooks). The signed-in checkout at /ucp/v1 stays on 2026-04-08, its profile at /.well-known/ucp/2026-04-08; it still updates with PATCH, which 2026-04-08 already named PUT, and that is left for whoever next changes that surface."
+    },
     { "id": "webmcp", "name": "WebMCP", "spec": "https://github.com/webmachinelearning/webmcp", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Manifest at /.well-known/webmcp.json, library at /v1/libs/aimeat-webmcp.js. Form tool annotations are not implemented." },
     { "id": "web-bot-auth", "name": "Web Bot Auth", "spec": "https://datatracker.ietf.org/doc/draft-meunier-web-bot-auth-architecture/", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Signatures directory at /.well-known/http-message-signatures-directory. A draft that moves; nobody has followed it." },
     { "id": "agent-skills", "name": "Agent Skills", "spec": "https://.well-known/agent-skills/index.json", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Index served; skill.md carries YAML frontmatter. Nobody has checked the convention against its source." },

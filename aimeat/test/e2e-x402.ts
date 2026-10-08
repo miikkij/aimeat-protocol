@@ -121,8 +121,10 @@ await test('Setup: seller (USD offer + x402 payout address) + buyer', async () =
 });
 
 let advertised: string[] = [];
-await test('1. /.well-known/ucp advertises the x402 handler with BOTH settleable currencies', async () => {
-    const profile = await (await fetch(`${BASE}/.well-known/ucp`)).json() as any;
+// The node's own handlers are on the profile of the signed-in checkout (UCP 2026-04-08), which has
+// its own address since /.well-known/ucp became the 2026-08-25 guest checkout's profile.
+await test('1. /.well-known/ucp/2026-04-08 advertises the x402 handler with BOTH settleable currencies', async () => {
+    const profile = await (await fetch(`${BASE}/.well-known/ucp/2026-04-08`)).json() as any;
     const handlers = (profile.ucp?.payment_handlers || []).map((h: any) => h.id);
     assert(handlers.includes('com.coinbase.x402'), `x402 handler advertised: ${JSON.stringify(handlers)}`);
     const x402 = (profile.ucp.payment_handlers || []).find((h: any) => h.id === 'com.coinbase.x402');

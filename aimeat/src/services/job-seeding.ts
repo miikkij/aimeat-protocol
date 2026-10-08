@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.10.0 — 2026-10-08 — Seed core:ucp-upkeep (every 5 minutes): UCP order webhooks tried again.
  *   v1.9.0 — 2026-10-02 — Seed core:package-peer-cleanup (daily, 05:29): unused packages-only peers removed.
  *   v1.8.0 — 2026-10-02 — Seed core:package-renewals (daily, 05:13): automatic renewals of the package
  *     update services this node sold (package-renewals.ts).
@@ -114,6 +115,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // The privacy notice's thirteen months for a visit record that names an account. Nightly at 03:40,
   // after the archive sweep, so a row it folds is already where it will stay.
   jobs.push({ id: 'core:usage-visit-retention', name: 'Usage Visit Retention', coreHandler: 'usage-visit-retention', cron: '40 3 * * *' });
+  // UCP order webhooks that did not reach the platform yet, tried again when their wait is over.
+  // Every 5 minutes; a node with nothing waiting reads one key prefix and stops.
+  jobs.push({ id: 'core:ucp-upkeep', name: 'UCP Order Webhook Retry', coreHandler: 'ucp-upkeep', cron: '*/5 * * * *' });
   // The Content Classifier's queue (TARGET-082 V3), hourly at :25. Seeded on every node, because
   // seeding is create-if-absent and an operator may turn classification on later; the handler reads
   // nothing while AIMEAT_CLASSIFICATION is off.
