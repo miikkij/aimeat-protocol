@@ -28,6 +28,7 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.5.1 — 2026-10-08 — The report and the unlabelled lists are decided under the node's label posture (config.aiLabelPublic).
  *   v1.5.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-08-08 — The AI Office confirmed Overscale Solutions Oy's signature of Section 2
  *     (deployer; Section 1 deliberately not signed), so `code_of_practice` needed a way to say yes.
@@ -364,11 +365,11 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
     async (req: Request, res: Response) => {
       const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
       const report = await buildAiTransparencyReport(storage, {
-        sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined,
+        sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined, labelPolicy: config.aiLabelPublic,
       });
       const detail = await listUnlabelledPublic(storage, {
         sinceDays: Number.isFinite(sinceDays) ? sinceDays : DEFAULT_TREND_DAYS,
-        limit: 50,
+        limit: 50, labelPolicy: config.aiLabelPublic,
       });
       res.json(success(config.nodeId, {
         ...report,
@@ -391,7 +392,7 @@ export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Ro
   router.get('/v1/ai-transparency/mine', requireAuth(), requireScope('wallet:read'), async (req: Request, res: Response) => {
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
-    const opts = { ownerGhii, sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined };
+    const opts = { ownerGhii, sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined, labelPolicy: config.aiLabelPublic };
     const [report, recent, unlabelled] = await Promise.all([
       buildAiTransparencyReport(storage, opts),
       storage.listAiProvenance({ ownerGhii, limit: 25 }),

@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — Facets group by the minted reason and the record's medium too; the list
+ *     filter `unreviewedPublicOnly` no longer reads the stored `required`, because the report
+ *     decides each label for the content as it is now.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the read
  *     side for the operator report, the unlabelled-content sweep and the per-owner view. Grouped in
  *     SQL over the whole table — a capped page would make "how many public items carry no label" a
@@ -80,6 +83,8 @@ const HUMAN_INVOLVEMENT = "json_extract(p.record, '$.humanInvolvement')";
 const LEVEL = "json_extract(p.record, '$.level')";
 /** SQLite reads a JSON `true` as the integer 1. */
 const DISCLOSURE_REQUIRED = "json_extract(p.record, '$.disclosure.required') = 1";
+const REASON = "json_extract(p.record, '$.disclosure.reason')";
+const MEDIA_KIND = "json_extract(p.record, '$.mediaKind')";
 
 export const aiProvenanceMethods = {
   async createAiProvenance(this: SqliteStorage, row: AiProvenanceRecordRow): Promise<void> {
@@ -152,11 +157,12 @@ export const aiProvenanceMethods = {
       `SELECT ${HUMAN_INVOLVEMENT} AS hi, ${LEVEL} AS lvl, substr(p.generatedAt, 1, 10) AS day,
               CASE WHEN ${PUBLICLY_LINKED} THEN 1 ELSE 0 END AS pub,
               CASE WHEN ${DISCLOSURE_REQUIRED} THEN 1 ELSE 0 END AS req,
+              ${REASON} AS rsn, ${MEDIA_KIND} AS mk,
               COUNT(*) AS n
          FROM ai_provenance p
         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-        GROUP BY hi, lvl, day, pub, req`
-    ).all(...params) as Array<{ hi: string | null; lvl: string | null; day: string; pub: number; req: number; n: number }>;
+        GROUP BY hi, lvl, day, pub, req, rsn, mk`
+    ).all(...params) as Array<{ hi: string | null; lvl: string | null; day: string; pub: number; req: number; rsn: string | null; mk: string | null; n: number }>;
     return rows.map((r) => ({
       // `unstated` rather than null: a record whose document somehow lacks the field says nothing
       // about human involvement, and "nothing" must never be counted as "a human was involved".
@@ -165,6 +171,8 @@ export const aiProvenanceMethods = {
       day: r.day,
       publiclyLinked: r.pub === 1,
       disclosureRequired: r.req === 1,
+      reason: r.rsn ?? null,
+      mediaKind: r.mk ?? null,
       count: r.n,
     }));
   },
@@ -176,10 +184,9 @@ export const aiProvenanceMethods = {
     const params: unknown[] = [];
     if (query?.ownerGhii) { where.push('p.ownerGhii = ?'); params.push(query.ownerGhii); }
     if (query?.since) { where.push('p.generatedAt >= ?'); params.push(query.since); }
-    if (query?.unlabelledPublicOnly) {
+    if (query?.unreviewedPublicOnly) {
       where.push(PUBLICLY_LINKED);
       where.push(`${HUMAN_INVOLVEMENT} IN ('none', 'light-review')`);
-      where.push(`NOT (${DISCLOSURE_REQUIRED})`);
     }
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM ai_provenance p ${clause}`)

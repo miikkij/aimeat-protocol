@@ -258,6 +258,8 @@
  *            The overall exit code was already correct; the human-readable report was not, and the
  *            report is what anyone actually reads. Now marked "!  DID NOT RUN (exit N)" with a
  *            count under the totals.
+ *   v1.12.0 -- 2026-10-08 -- Add e2e-ai-provenance-served.ts: the disclosure decided when a record
+ *            is served, and the label's words by medium.
  */
 
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
@@ -970,6 +972,8 @@ const ALL_SUITES = [
     'test/e2e-ai-transcribe.ts',
     'test/e2e-voice.ts',
     'test/e2e-ai-image.ts',
+    // A record's disclosure decided for the item as it is served, and its words by medium.
+    'test/e2e-ai-provenance-served.ts',
     'test/e2e-chat.ts',
     // The other half of e2e-chat: a node that HAS an agent. Runs two nodes of its own (40300 and
     // 40301) with a fake ACP peer as goose, because AIMEAT_GOOSE_BIN is process-wide configuration.

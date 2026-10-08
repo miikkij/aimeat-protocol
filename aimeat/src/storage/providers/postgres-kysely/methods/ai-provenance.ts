@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — Facets group by the minted reason and the record's medium too; the list
+ *     filter `unreviewedPublicOnly` no longer reads the stored `required`, because the report
+ *     decides each label for the content as it is now. Mirrors the SQLite provider.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the read
  *     side for the operator report, the unlabelled-content sweep and the per-owner view. No
  *     migration — both read existing columns and the jsonb document.
@@ -78,6 +81,8 @@ const HUMAN_INVOLVEMENT = sql<string | null>`p."record"->>'humanInvolvement'`;
 const LEVEL = sql<string | null>`p."record"->>'level'`;
 /** COALESCE, because an ABSENT disclosure block means no label was computed as required. */
 const DISCLOSURE_REQUIRED = sql<boolean>`COALESCE((p."record"->'disclosure'->>'required')::boolean, false)`;
+const REASON = sql<string | null>`p."record"->'disclosure'->>'reason'`;
+const MEDIA_KIND = sql<string | null>`p."record"->>'mediaKind'`;
 
 export const aiProvenanceMethods = {
   async createAiProvenance(this: PostgresKyselyStorage, row: AiProvenanceRecordRow): Promise<void> {
@@ -152,9 +157,11 @@ export const aiProvenanceMethods = {
         sql<string>`substr(p."generatedAt", 1, 10)`.as('day'),
         publiclyLinked('p."id"').as('pub'),
         DISCLOSURE_REQUIRED.as('req'),
+        REASON.as('rsn'),
+        MEDIA_KIND.as('mk'),
         sql<string>`COUNT(*)`.as('n'),
       ])
-      .groupBy(['hi', 'lvl', 'day', 'pub', 'req']);
+      .groupBy(['hi', 'lvl', 'day', 'pub', 'req', 'rsn', 'mk']);
     if (query?.ownerGhii) q = q.where('p.ownerGhii', '=', query.ownerGhii);
     if (query?.since) q = q.where('p.generatedAt', '>=', query.since);
     const rows = await q.execute();
@@ -166,6 +173,8 @@ export const aiProvenanceMethods = {
       day: r.day,
       publiclyLinked: r.pub === true,
       disclosureRequired: r.req === true,
+      reason: r.rsn ?? null,
+      mediaKind: r.mk ?? null,
       // COUNT() comes back as a bigint string on this driver; Number() is exact well past any
       // plausible record count.
       count: Number(r.n),
@@ -181,10 +190,9 @@ export const aiProvenanceMethods = {
       sql`TRUE`,
       ...(query?.ownerGhii ? [sql`p."ownerGhii" = ${query.ownerGhii}`] : []),
       ...(query?.since ? [sql`p."generatedAt" >= ${query.since}`] : []),
-      ...(query?.unlabelledPublicOnly ? [
+      ...(query?.unreviewedPublicOnly ? [
         publiclyLinked('p."id"'),
         sql`${HUMAN_INVOLVEMENT} IN ('none', 'light-review')`,
-        sql`NOT ${DISCLOSURE_REQUIRED}`,
       ] : []),
     ], sql` AND `)}`;
 
