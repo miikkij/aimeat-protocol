@@ -30,6 +30,9 @@
  *   import { audienceOf } from '../middleware/message-audience.js';
  *   if (audienceOf(code) === 'person') { ...it must read like a sentence... }
  * @version-history
+ *   v1.2.0 — 2026-10-08 — PROVIDER_REJECTED (machine), CONTENT_REFUSED and PROVIDER_NO_CREDIT have
+ *     their next step. None ends in _ERROR, so none gets the "on us, try again" floor: the provider
+ *     answered no, and the same call gets the same answer (aiprov plan, A1).
  *   v1.1.0 — 2026-08-18 — SEALED_CONFIG has somewhere to go. The person hitting it is a customer
  *     looking at their own admin screen, so "View API documentation" would be the wrong floor.
  *   v1.0.0 — 2026-08-16 — Initial, from the classification of all 297 codes.
@@ -48,6 +51,9 @@ const MACHINE = [
     'INVALID_STATUS', 'IMPORT_INVALID', 'MISSING_FIELDS', 'SCHEMA_REQUIRED', 'INVALID_TARGET',
     'AGENT_NOT_FOUND', 'APP_NOT_FOUND', 'ACTION_NOT_FOUND', 'UNKNOWN_TOOL', 'UNKNOWN_PARAMETER',
     'INVALID_SIGNATURE', 'INVALID_ATTESTATION', 'INVALID_TOKEN', 'TOKEN_INVALID',
+    // The AI provider refused the request as sent (a model that does not make mp3, an unknown voice):
+    // the caller changes the call.
+    'PROVIDER_REJECTED',
 ];
 
 /**
@@ -184,6 +190,11 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     FEDERATION_AUTH_FAILED: 'The two nodes could not agree on who you are. Whoever runs them can fix it.',
     PROVIDER_ERROR: 'The service behind this did not answer. Not your doing — try again shortly.',
     OPENROUTER_ERROR: 'The AI service did not answer. Not your doing — try again shortly.',
+    // The AI provider answered, and said no. Sending the same call again gets the same no, so none of
+    // these says "try again" (services/ai/errors.ts providerStatusError; aiprov plan, A1).
+    PROVIDER_REJECTED: 'The same call fails again as it is. Change the model, the format or the voice, then send it.',
+    CONTENT_REFUSED: 'The AI provider will not make this. Change what you ask for; another try with the same words gets the same answer.',
+    PROVIDER_NO_CREDIT: 'The key that pays has no credit left with the AI provider. Add credit there, or use another key.',
 });
 
 /**

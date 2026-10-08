@@ -11,6 +11,8 @@
  * @usage const r = await AIMEAT.ai.stream({ app_id, prompt, onText: (d, all) => (el.textContent = all) });
  *   const s = await AIMEAT.ai.speak({ app_id, input: 'Hello' }); new Audio(URL.createObjectURL(s.blob)).play();
  * @version-history
+ *   v1.2.0 - 2026-10-08 - speak() returns `audio` (mime, sample_rate, channels, sample_format) from the
+ *     node's start and done frames, takes onStart, and types the blob by the provider's real mime.
  *   v1.1.0 - 2026-09-28 - stream() and speak() send `role`, the AI role the call runs as.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: stream() and speak() for apps.
  */
@@ -71,7 +73,7 @@ async function* ndjson(response) {
         pending = pending.slice(end + 1);
         if (!line.trim()) continue;
         const event = JSON.parse(line);
-        if (event.type === 'error') throw aiError({ error: { code: event.code, message: event.message } }, 'The AI stream failed');
+        if (event.type === 'error') throw aiError({ error: { code: event.code, message: event.message, details: event.details } }, 'The AI stream failed');
         if (event.type === 'done') { done = true; if (event.budget) noteBudget(event.budget); }
         yield event;
       }
@@ -144,8 +146,11 @@ export async function stream(opts) {
 const SPEECH_MIME = { mp3: 'audio/mpeg', pcm: 'audio/pcm' };
 
 /**
- * Speech from text. Resolves with { blob, mime_type, format, bytes, model, usage, budget, provenance }:
- * play it with new Audio(URL.createObjectURL(r.blob)) and revoke the URL afterwards.
+ * Speech from text. Resolves with { blob, mime_type, format, bytes, audio, model, usage, budget, provenance }:
+ * play it with new Audio(URL.createObjectURL(r.blob)) and revoke the URL afterwards. `audio` is
+ * { mime, sample_rate, channels, sample_format }: for 'pcm' the layout of the raw samples (null when
+ * the provider did not say), for 'mp3' the type and nulls. `onStart(frame)` receives the start frame,
+ * which carries the same `audio`, before the first chunk.
  *
  * `input` (or `text`) is the text, at most 4000 characters. `format` is 'mp3' (the default here, which
  * an audio element plays) or 'pcm' (raw samples for a Web Audio player). `voice` and `model` are
@@ -181,16 +186,21 @@ export async function speak(opts) {
     const chunks = [];
     let bytes = 0;
     let done = null;
+    let audio = null;
     for await (const event of ndjson(response)) {
-      if (event.type === 'audio' && typeof event.data === 'string') {
+      // The start frame says what the bytes are (mime, sample_rate, channels, sample_format), so a
+      // PCM player can be set up before the first chunk; onStart hands it on.
+      if (event.type === 'start') { audio = event.audio || null; if (opts.onStart) opts.onStart(event); }
+      else if (event.type === 'audio' && typeof event.data === 'string') {
         const chunk = Uint8Array.from(atob(event.data), c => c.charCodeAt(0));
         chunks.push(chunk);
         bytes += chunk.length;
         if (opts.onAudio) opts.onAudio(chunk);
       } else if (event.type === 'done') done = event;
     }
-    const mime = SPEECH_MIME[format] || 'application/octet-stream';
     const rest = withoutType(done);
-    return { ...rest, blob: new Blob(chunks, { type: mime }), mime_type: mime, format, bytes };
+    const said = (rest.audio || audio || {}).mime;
+    const mime = typeof said === 'string' && said ? said : SPEECH_MIME[format] || 'application/octet-stream';
+    return { ...rest, audio: rest.audio || audio, blob: new Blob(chunks, { type: mime }), mime_type: mime, format, bytes };
   });
 }

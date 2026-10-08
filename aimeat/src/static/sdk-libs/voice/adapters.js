@@ -3,7 +3,10 @@
  * @description Authenticated node adapters. Provider keys and endpoint selection remain on the server.
  * @structure request, events, nodeAdapters
  * @usage nodeAdapters(config, emit).complete(messages, { signal })
- * @version-history v1.0.0 - 2026-09-19 - STT plus NDJSON completion and speech streaming.
+ * @version-history
+ *   v1.1.0 - 2026-10-08 - speak() follows the start frame's audio.sample_rate and channels for PCM, and
+ *     a refused request keeps the node's details on the error.
+ *   v1.0.0 - 2026-09-19 - STT plus NDJSON completion and speech streaming.
  */
 import { getSession } from '../_core/session.js';
 import { NODE_URL } from '../_core/config.js';
@@ -18,7 +21,9 @@ async function request(body, path, signal) {
   if (response.status === 401 && session.refresh) { await session.refresh(); signal.throwIfAborted(); response = await send(); }
   if (!response.ok) {
     const envelope = await response.json();
-    throw Object.assign(new Error(envelope.error?.message || 'Voice request failed'), { code: envelope.error?.code || 'PROVIDER_ERROR' });
+    throw Object.assign(new Error(envelope.error?.message || 'Voice request failed'), {
+      code: envelope.error?.code || 'PROVIDER_ERROR', status: response.status, details: envelope.error?.details,
+    });
   }
   return response;
 }
@@ -35,7 +40,7 @@ async function* events(response, emit) {
         const line = pending.slice(0, end); pending = pending.slice(end + 1);
         if (!line.trim()) continue;
         const event = JSON.parse(line);
-        if (event.type === 'error') throw Object.assign(new Error(event.message), { code: event.code });
+        if (event.type === 'error') throw Object.assign(new Error(event.message), { code: event.code, details: event.details });
         if (event.type === 'done') { done = true; if (event.budget) noteBudget(event.budget); emit(event); }
         yield event;
       }
@@ -69,6 +74,12 @@ export function nodeAdapters(config, emit) {
         voice: config.tts.voice, response_format: config.tts.format, speed: config.tts.speed,
         instructions: config.tts.instructions }, '/v1/ai/speak', signal);
       for await (const event of events(response, e => emit({ ...e, stage: 'tts' }))) {
+        // The node's start frame says the PCM layout when the provider is known (24000 Hz mono for
+        // OpenAI and OpenRouter): the player follows it rather than the configured guess.
+        if (event.type === 'start' && event.audio && config.tts.format === 'pcm') {
+          if (event.audio.sample_rate) config.tts.sampleRate = event.audio.sample_rate;
+          if (event.audio.channels) config.tts.channels = event.audio.channels;
+        }
         if (event.type === 'audio') yield Uint8Array.from(atob(event.data), c => c.charCodeAt(0));
       }
     },

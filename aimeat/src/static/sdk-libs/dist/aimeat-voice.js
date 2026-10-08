@@ -822,7 +822,11 @@ registerProcessor('aimeat-voice-capture', AimeatVoiceCapture);
     }
     if (!response.ok) {
       const envelope = await response.json();
-      throw Object.assign(new Error(envelope.error?.message || "Voice request failed"), { code: envelope.error?.code || "PROVIDER_ERROR" });
+      throw Object.assign(new Error(envelope.error?.message || "Voice request failed"), {
+        code: envelope.error?.code || "PROVIDER_ERROR",
+        status: response.status,
+        details: envelope.error?.details
+      });
     }
     return response;
   }
@@ -842,7 +846,7 @@ registerProcessor('aimeat-voice-capture', AimeatVoiceCapture);
           pending = pending.slice(end + 1);
           if (!line.trim()) continue;
           const event = JSON.parse(line);
-          if (event.type === "error") throw Object.assign(new Error(event.message), { code: event.code });
+          if (event.type === "error") throw Object.assign(new Error(event.message), { code: event.code, details: event.details });
           if (event.type === "done") {
             done = true;
             if (event.budget) noteBudget(event.budget);
@@ -901,6 +905,10 @@ registerProcessor('aimeat-voice-capture', AimeatVoiceCapture);
           instructions: config.tts.instructions
         }, "/v1/ai/speak", signal);
         for await (const event of events(response, (e) => emit({ ...e, stage: "tts" }))) {
+          if (event.type === "start" && event.audio && config.tts.format === "pcm") {
+            if (event.audio.sample_rate) config.tts.sampleRate = event.audio.sample_rate;
+            if (event.audio.channels) config.tts.channels = event.audio.channels;
+          }
           if (event.type === "audio") yield Uint8Array.from(atob(event.data), (c) => c.charCodeAt(0));
         }
       }

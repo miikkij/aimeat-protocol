@@ -84,7 +84,7 @@
         "why": "UNREVIEWED"
       },
       "src/routes/llm-proxy.ts": {
-        "count": 2,
+        "count": 1,
         "why": "UNREVIEWED"
       },
       "src/routes/portal-spa.ts": {

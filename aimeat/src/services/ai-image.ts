@@ -21,6 +21,9 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.7.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (services/ai/errors.ts):
+ *     a moderation refusal is 422 CONTENT_REFUSED, another 4xx 422 PROVIDER_REJECTED (aiprov plan, A1).
+ *     The result carries the picture's width and height from its header (A13).
  *   v2.6.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v2.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
@@ -49,10 +52,11 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import {
-  AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
+  AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai/completion.js';
 import { image as gatewayImage } from './ai/gateway.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
+import { providerFailureOf } from './ai/errors.js';
 import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import { contentHashOf } from './ai-provenance.js';
@@ -111,6 +115,9 @@ export interface GenerateForOwnerResult {
   fetchUrl: string;
   mime: string;
   sizeBytes: number;
+  /** Pixel size from the file's header; null when the format's header could not be read. */
+  width: number | null;
+  height: number | null;
   model: string;
   visibility: 'public' | 'private';
   usage: { costUsd: number; costExact: boolean };
@@ -193,10 +200,9 @@ export async function generateForOwner(
   } catch (e) {
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
     if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-image' });
-    const status = (e as { status?: number }).status;
-    if (status === 401) throw new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, 'API key was rejected by the provider.');
-    if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
-    throw new AiCompletionError('PROVIDER_ERROR', 502, (e as Error).message);
+    // The one status table every AI path uses (services/ai/errors.ts): a moderation refusal is 422
+    // CONTENT_REFUSED, another 4xx 422 PROVIDER_REJECTED, never 502 "try again".
+    throw providerFailureOf(e);
   }
 
   // The provider's own charge, then the catalogue's price per picture (services/ai/catalog/price.ts).
@@ -239,6 +245,8 @@ export async function generateForOwner(
     fetchUrl: imageFetchUrl(visibility, gaii, key),
     mime: result.mime,
     sizeBytes: result.data.length,
+    width: result.width ?? null,
+    height: result.height ?? null,
     model: result.model,
     visibility,
     usage: { costUsd, costExact },

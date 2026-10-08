@@ -20,6 +20,8 @@
  *   answer in one stream. An answer of the wrong shape is a 502 naming the action and the field.
  * @structure extensionLanguageModel · extensionImageModel · extensionTranscriptionModel · extensionEmbeddingModel
  * @version-history
+ *   v1.1.0 — 2026-10-08 — A target without its runner is the node's 500 INTERNAL_ERROR, not a provider
+ *     status (aiprov plan, A8).
  *   v1.0.0 — 2026-09-28 — Initial (V6 of the System 2 plan).
  */
 import type {
@@ -29,6 +31,7 @@ import type {
 import type { AiOp, AiTarget } from '../types.js';
 import type { AimeatImageMetadata } from './image.js';
 import type { AimeatTranscriptionModel, AimeatTranscriptionOptions } from './audio.js';
+import { AiCompletionError } from '../errors.js';
 
 const PROVIDER = 'aimeat.extension';
 
@@ -37,7 +40,7 @@ function badAnswer(op: AiOp, field: string): Error {
 }
 
 function runnerOf(target: AiTarget): NonNullable<AiTarget['runExtension']> {
-  if (!target.runExtension) throw Object.assign(new Error('An extension provider was reached without its runner.'), { status: 500 });
+  if (!target.runExtension) throw new AiCompletionError('INTERNAL_ERROR', 500, 'An extension provider was reached without its runner.');
   return target.runExtension;
 }
 

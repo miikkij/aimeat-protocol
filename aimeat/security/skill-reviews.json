@@ -2,7 +2,7 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:aimeat-decide": {
-      "reviewedOn": "2026-10-07",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -10,17 +10,17 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:410b10853368b0489f0062f1"
+      "digest": "sha256:4c552bd97a805c904ca3c82b"
     },
     "node:aimeat-refinery": {
-      "reviewedOn": "2026-10-05",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/services/refinery/message.ts",
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:cbc8cf4f4b3e65b4f0fde68e"
+      "digest": "sha256:edaa280404d6d9201515c3ba"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-29",
@@ -88,11 +88,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-10-07",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:c4e63678cf5718d0153d2096"
+      "digest": "sha256:5290dfc81cac89fe0855670a"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-10-06",
@@ -273,13 +273,13 @@
       "digest": "sha256:fa25720b8336f6a783783826"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-10-05",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:9db979dc04039177ef67ef24"
+      "digest": "sha256:80e835c7e48a8d8b2cf7f9c0"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -291,14 +291,14 @@
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
     "node:aimeat-ai-capabilities": {
-      "reviewedOn": "2026-10-07",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/services/ai/capabilities.ts",
         "aimeat/src/services/ai-embed.ts",
         "aimeat/src/services/app-ai-capability-hints.ts",
         "aimeat/src/static/sdk-libs/ai/index.js"
       ],
-      "digest": "sha256:f6827d802606f2ee1bce67ec"
+      "digest": "sha256:dc13fe1eb8c843ea2e683887"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-10-05",
@@ -371,7 +371,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:2070216005d5609a1b7c9cc2"
+      "digest": "sha256:dd418a06a540fbb1d981902b"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -416,7 +416,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "10b7b9813cbd0abf"
+      "aimeat/src/services/ai/completion.ts": "aaa80fccdd57be35"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "ed807563afc973bf",
@@ -522,7 +522,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "f904258d99dcccd1",
+      "aimeat/src/routes/ai.ts": "8b4a9f4755ebe511",
       "aimeat/src/routes/ai-providers.ts": "7bcbba098542ad10",
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
@@ -560,7 +560,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
       ".githooks/pre-commit": "e8840eb33aa805c0",
-      "aimeat/src/services/build-extension-prompt.ts": "2e26d65fb078c508"
+      "aimeat/src/services/build-extension-prompt.ts": "a441eab35bce0b41"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
@@ -578,7 +578,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
-      "aimeat/src/services/decide/service.ts": "5e8017cb45a05401",
+      "aimeat/src/services/decide/service.ts": "b4dddc91e6899963",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "bb5b771bd7739ac0",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"
@@ -590,12 +590,12 @@
     },
     "node:aimeat-ai-capabilities": {
       "aimeat/src/services/ai/capabilities.ts": "c2bd2ada0b90307e",
-      "aimeat/src/services/ai-embed.ts": "9bef4a08ba631da3",
+      "aimeat/src/services/ai-embed.ts": "1f5aa10952622806",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
       "aimeat/src/static/sdk-libs/ai/index.js": "aca920503717cbca"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "f75b9c29c0c0f63f",
+      "aimeat/src/services/refinery/pipeline.ts": "a8fdffab0ffe379d",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "a2229bb9b8d28948",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"

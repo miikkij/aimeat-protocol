@@ -647,6 +647,13 @@ them. The response is NDJSON: a `start` line, `audio` lines with base64 chunks,
 and a `done` line. `?json=1` stores the audio as a private file in the caller's
 storage instead and answers with its `storage_key`.
 
+The `start` and `done` lines, and the `?json=1` answer, carry `audio: { mime,
+sample_rate, channels, sample_format }`. PCM has no header, so read the layout
+from there: OpenAI and OpenRouter send 24000 Hz, mono, `s16le`. When the
+provider does not say, the three are `null`. A model that does not make mp3
+answers `422 PROVIDER_REJECTED` with `details.hint`; ask for `pcm`. The same
+call gets the same answer, so do not repeat it as it is.
+
 ### `await AIMEAT.ai.transcribe(opts)`
 
 POST `/v1/ai/transcribe` with `{ app_id, storage_key }` for a recording in the

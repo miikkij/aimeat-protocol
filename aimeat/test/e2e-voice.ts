@@ -2,7 +2,12 @@
  * @file e2e-voice.ts
  * @description Real node, owner/app grants and local protocol peer: stream, speech, scope isolation,
  *   app attribution and concurrent accounting. No external provider calls or paid AI settings.
- * @version-history v1.0.0 - 2026-09-19 - Voice pipeline API integration contract.
+ * @version-history
+ *   v1.1.0 - 2026-10-08 - aiprov plan, workstream A: a provider's 400 is 422 PROVIDER_REJECTED with its
+ *     reason (it asserted 502 until then, the hole the omnituinen report found), mp3 refused with a pcm
+ *     hint on REST and MCP, 429 with the provider's Retry-After, a redacted reason, a moderation 403
+ *     as CONTENT_REFUSED, the audio block on start, done and json=1, key_source on the reply frames.
+ *   v1.0.0 - 2026-09-19 - Voice pipeline API integration contract.
  */
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
@@ -59,6 +64,10 @@ const peer = createServer(async (req, res) => {
   const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(chunk);
   if (req.url === '/chat/completions') {
     const input = JSON.parse(Buffer.concat(chunks).toString());
+    const said = input.messages[0].content;
+    // A refusal by content, and a refusal of the request: neither is "try again shortly".
+    if (said === 'moderate') { res.writeHead(403, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"Your input was flagged by moderation."}}'); return; }
+    if (said === 'permanent') { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"No endpoints found for this model."}}'); return; }
     res.writeHead(200, { 'Content-Type': 'text/event-stream' });
     res.write('data: ' + JSON.stringify({ choices: [{ delta: { content: 'Ensimmäinen lause. ' } }] }) + '\n\n');
     await new Promise(r => setTimeout(r, 30));
@@ -68,6 +77,11 @@ const peer = createServer(async (req, res) => {
     const input = JSON.parse(Buffer.concat(chunks).toString());
     if (input.voice === 'error') { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":"bad voice"}'); return; }
     if (input.voice === 'refused-key') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"User not found."}}'); return; }
+    // The omnituinen case (2026-10-08): a model that does not make mp3 refuses every mp3 call.
+    if (input.response_format === 'mp3') { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"Response format mp3 is not supported for this model.","code":400}}'); return; }
+    if (input.voice === 'busy') { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '7' }); res.end('{"error":{"message":"Too many requests."}}'); return; }
+    if (input.voice === 'leaky') { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end('{"error":{"message":"Invalid key sk-or-v1-0123456789abcdef0123456789abcdef in this request."}}'); return; }
+    if (input.voice === 'l16') { res.writeHead(200, { 'Content-Type': 'audio/L16; rate=16000; channels=1' }); res.end(Buffer.alloc(4800)); return; }
     res.writeHead(200, { 'Content-Type': 'audio/pcm' }); res.write(Buffer.alloc(2400));
     await new Promise(r => setTimeout(r, 20)); res.end(Buffer.alloc(2400));
   } else if (req.url === '/audio/transcriptions') {
@@ -101,7 +115,22 @@ try {
   }
   await test('JSON speech is a private downloadable and deletable artifact', async () => {
     const result = await call('/v1/ai/speak?json=1', speech, alice.token); assert(result.status === 200, result.text);
+    // A4: the result says what the bytes are. A custom provider that does not say its PCM layout
+    // answers null for it, never a guess.
+    const audio = result.data.data.audio;
+    assert(audio && audio.mime === 'audio/pcm' && audio.sample_rate === null && audio.channels === null && audio.sample_format === null, JSON.stringify(audio));
+    assert(result.data.data.mime_type === 'audio/pcm' && result.data.data.key_source === 'own', result.text);
     await checkPrivateAudio(result.data.data, alice.token);
+  });
+  await test('A4: the provider\'s content type names the PCM layout, and the start, done and json=1 answers carry it', async () => {
+    const result = await call('/v1/ai/speak', { ...speech, voice: 'l16' }, alice.token); assert(result.status === 200, result.text);
+    const frames = result.text.trim().split('\n').map(line => JSON.parse(line));
+    const expected = JSON.stringify({ mime: 'audio/l16', sample_rate: 16000, channels: 1, sample_format: 's16be' });
+    assert(frames[0].type === 'start' && JSON.stringify(frames[0].audio) === expected, `start: ${JSON.stringify(frames[0])}`);
+    assert(frames.at(-1).type === 'done' && JSON.stringify(frames.at(-1).audio) === expected, `done: ${JSON.stringify(frames.at(-1))}`);
+    const stored = await call('/v1/ai/speak?json=1', { ...speech, voice: 'l16' }, alice.token); assert(stored.status === 200, stored.text);
+    assert(JSON.stringify(stored.data.data.audio) === expected && stored.data.data.mime_type === 'audio/l16', stored.text);
+    await call(stored.data.data.fetch_url, undefined, alice.token, 'DELETE');
   });
   await test('Agent REST and node MCP use the owner budget and caller storage namespace', async () => {
     const token = await agent(alice, ['ai:use', 'storage:read', 'storage:write']);
@@ -134,6 +163,10 @@ try {
     const frames = result.text.trim().split('\n').map(line => JSON.parse(line));
     assert(frames.filter(row => row.type === 'text').length === 2, result.text);
     assert(frames.at(-1).type === 'done' && frames.at(-1).cost_exact, result.text);
+    // A12: key_source on the done frame, as the speech done frame has it; the start frame keeps
+    // keySource for the clients that read it and carries key_source too.
+    assert(frames.at(-1).key_source === 'own', `done key_source: ${JSON.stringify(frames.at(-1))}`);
+    assert(frames[0].type === 'start' && frames[0].keySource === 'own' && frames[0].key_source === 'own', `start: ${JSON.stringify(frames[0])}`);
   });
   await test('PCM stream carries audio, terminal metadata and no provider key', async () => {
     const result = await call('/v1/ai/speak', speech, alice.token); assert(result.status === 200, result.text);
@@ -143,13 +176,48 @@ try {
     assert(!frames.at(-1).provenance || JSON.stringify(frames.at(-1).provenance).includes(createHash('sha256').update(Buffer.alloc(4800)).digest('hex')), 'Provenance must identify the generated audio, not the input text');
   });
   await test('Provider failures and incomplete streams never become successful turns', async () => {
-    const bad = await call('/v1/ai/speak', { ...speech, voice: 'error' }, alice.token); assert(bad.status === 502, bad.text);
+    // A1/A2: a provider's 400 repeats on every retry, so it is 422 PROVIDER_REJECTED with the
+    // provider's own reason, not 502 "try again shortly" (it was 502 until 2026-10-08).
+    const bad = await call('/v1/ai/speak', { ...speech, voice: 'error' }, alice.token);
+    assert(bad.status === 422 && bad.data.error.code === 'PROVIDER_REJECTED', bad.text);
+    assert(bad.data.error.details?.provider_status === 400 && bad.data.error.details?.provider_message === 'bad voice', bad.text);
     // A provider's key refusal is 424 INVALID_API_KEY on every AI route, this one too: a 401 says the
     // caller's own credential failed, and the SDK's voice adapter refreshes the session on one (Jouni, 2026-10-07).
     const refused = await call('/v1/ai/speak', { ...speech, voice: 'refused-key' }, alice.token);
     assert(refused.status === 424 && refused.text.includes('INVALID_API_KEY'), refused.text);
     const cut = await call('/v1/ai/stream', { ...request, messages: [{ role: 'user', content: 'fail' }] }, alice.token);
     assert(cut.text.includes('"type":"error"') && !cut.text.includes('"type":"done"'), cut.text);
+    assert(cut.text.includes('"code":"PROVIDER_ERROR"'), `a stream the provider broke off is the provider's failure: ${cut.text}`);
+  });
+  await test('A1: the omnituinen case, mp3 the model does not make, is 422 PROVIDER_REJECTED with the reason and a pcm hint, on REST and MCP', async () => {
+    const before = providerCalls;
+    for (const path of ['/v1/ai/speak', '/v1/ai/speak?json=1']) {
+      const r = await call(path, { ...speech, response_format: 'mp3' }, alice.token);
+      assert(r.status === 422 && r.data.error.code === 'PROVIDER_REJECTED', `${path}: ${r.text}`);
+      assert(/mp3 is not supported/.test(r.data.error.details?.provider_message ?? '') && /pcm/.test(r.data.error.details?.hint ?? ''), `${path}: ${r.text}`);
+      assert(/pcm/.test(r.data.error.message) && !/try again shortly/i.test(r.text), `${path}: ${r.text}`);
+    }
+    assert(providerCalls - before === 2, `one provider call each, no retry: ${providerCalls - before}`);
+    const token = await agent(alice, ['ai:use', 'storage:read', 'storage:write']);
+    const spoken = await (await mcp(token))('aimeat_voice_speak', { ...speech, response_format: 'mp3' });
+    const text = spoken.result?.content?.[0]?.text ?? '';
+    assert(spoken.result?.isError && text.startsWith('PROVIDER_REJECTED:') && /pcm/.test(text), JSON.stringify(spoken));
+  });
+  await test('A3: a provider rate limit is 429 RATE_LIMITED with the provider\'s Retry-After', async () => {
+    const response = await fetch(BASE + '/v1/ai/speak', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${alice.token}` }, body: JSON.stringify({ ...speech, voice: 'busy' }) });
+    const body = await response.json() as any;
+    assert(response.status === 429 && body.error.code === 'RATE_LIMITED', JSON.stringify(body));
+    assert(response.headers.get('retry-after') === '7' && body.error.details?.retry_after_sec === 7, `Retry-After ${response.headers.get('retry-after')}: ${JSON.stringify(body.error)}`);
+  });
+  await test('A2: a key-shaped string in the provider\'s reason is redacted before it reaches the caller', async () => {
+    const r = await call('/v1/ai/speak', { ...speech, voice: 'leaky' }, alice.token);
+    assert(r.status === 422 && !r.text.includes('0123456789abcdef0123456789abcdef') && r.data.error.details?.provider_message?.includes('[redacted]'), r.text);
+  });
+  await test('A1: a moderation 403 is 422 CONTENT_REFUSED and a 404 is 422 PROVIDER_REJECTED on the reply', async () => {
+    const moderated = await call('/v1/ai/stream?json=1', { ...request, messages: [{ role: 'user', content: 'moderate' }] }, alice.token);
+    assert(moderated.status === 422 && moderated.data.error.code === 'CONTENT_REFUSED', moderated.text);
+    const permanent = await call('/v1/ai/stream', { ...request, messages: [{ role: 'user', content: 'permanent' }] }, alice.token);
+    assert(permanent.status === 422 && permanent.data.error.code === 'PROVIDER_REJECTED' && permanent.data.error.details?.provider_status === 404, permanent.text);
   });
   await test('Unknown parameters are refused', async () => {
     const result = await call('/v1/ai/speak', { ...speech, baseUrl: 'https://attacker.invalid' }, alice.token); assert(result.status === 400, result.text);
