@@ -8,6 +8,8 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   v1.4.0 — 2026-10-08 — A review re-stamp keeps the prior record's level and method instead of
+ *     forcing ai-generated (aiprov D16).
  *   v1.3.1 — 2026-09-27 — applyHumanAnswer throws on a step id that is not an own key of run.steps,
  *     so `__proto__` cannot make its writes land on Object.prototype (CodeQL
  *     js/prototype-polluting-assignment).
@@ -120,11 +122,16 @@ export async function applyHumanAnswer(
     const reviewed = await storage.getMemory(ownerGhii, reviewedKey);
     if (reviewed) {
       // Re-stamped rather than edited: a provenance record is an append-only statement about a set
-      // of bytes, so "a person has now reviewed this" is a NEW statement about the same bytes.
+      // of bytes, so "a person has now reviewed this" is a NEW statement about the same bytes. The
+      // review changes who looked, not how the bytes were made, so the level and method are the prior
+      // record's (aiprov D16): forcing `ai-generated` turned a person's own text, or an assisted
+      // one, into a model's the moment somebody reviewed it.
+      const prior = reviewed.aiProvenanceId ? await storage.getAiProvenance(reviewed.aiProvenanceId) : undefined;
       const provenanceId = await stampAutonomousOutput(storage, {
         principal: ownerGhii,
         content: typeof reviewed.value === 'string' ? reviewed.value : JSON.stringify(reviewed.value ?? null),
-        level: 'ai-generated',
+        level: prior?.record.level ?? 'ai-generated',
+        ...(prior?.record.method ? { method: prior.record.method } : {}),
         pipeline: `workflow:${run.defSnapshot.id}/${stepId}`,
         reviewedBy: { who: ans.by, step: stepId },
         surface: { visibility: reviewed.visibility, humanAudience: true },
