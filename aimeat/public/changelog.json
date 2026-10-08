@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-09",
+      "kind": "feature",
+      "title": {
+        "en": "See how people and AIs find you, and what they do on your apps",
+        "fi": "Näe, miten ihmiset ja tekoälyt löytävät sinut ja mitä he tekevät sovelluksissasi"
+      },
+      "body": {
+        "en": "A new Visibility page in Settings shows where the people who open your apps came from, and which AI answer sent them. It shows which of your pages an AI read because a person asked it, who read the files AIs use to learn your place, and which purchases followed. Your own AI reads the same report. It only counts: no address, cookie or visitor id is kept, so it works from the start. On your apps you see the clicks that changed nothing and the spots people clicked again and again, on phones and computers. You can switch on a weekly helper: your own AI writes a corrected draft of the app, and nothing changes until you publish it. You also see where AI agents stop when they buy from you or call your tools. You can add your own Microsoft Clarity or Google Analytics, and they wait for the visitor's consent when the cookie banner is on. Your products with a price in US dollars can go to Microsoft Copilot Checkout and to your own Stripe, and AI shopping services can buy through your own checkout.",
+        "fi": "Asetuksissa on uusi Näkyvyys-sivu. Se näyttää, mistä sovelluksiasi avaavat ihmiset tulivat ja minkä tekoälyn vastaus heidät lähetti. Se näyttää, mitkä sivusi tekoäly luki, koska ihminen kysyi siltä jotain. Näet myös, kuka luki tiedostot, joista tekoäly oppii paikkasi, ja mitä ostoja siitä seurasi. Oma tekoälysi lukee saman raportin. Sivu vain laskee: osoitetta, evästettä tai kävijän tunnistetta ei säilytetä, joten laskenta toimii heti. Sovelluksissasi näet klikkaukset, jotka eivät muuttaneet mitään, ja kohdat, joita klikattiin yhä uudelleen, puhelimilla ja tietokoneilla. Voit kytkeä päälle viikoittaisen apurin: oma tekoälysi kirjoittaa sovelluksesta korjatun luonnoksen, eikä mikään muutu ennen kuin julkaiset sen. Näet myös, missä tekoälyagentit pysähtyvät, kun ne ostavat sinulta tai kutsuvat työkalujasi. Voit lisätä oman Microsoft Clarityn tai Google Analyticsin, ja ne odottavat kävijän suostumusta, kun evästebanneri on päällä. Tuotteesi, joilla on hinta Yhdysvaltain dollareina, voivat näkyä Microsoft Copilot Checkoutissa ja omassa Stripessäsi, ja tekoälyn ostopalvelut voivat ostaa oman kassasi kautta."
+      }
+    },
+    {
       "date": "2026-10-06",
       "version": "3.25.0",
       "kind": "security",

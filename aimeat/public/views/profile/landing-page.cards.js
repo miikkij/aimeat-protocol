@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.23.0 -- 2026-10-09 -- Visibility under Business, after Usage.
  *   v1.22.0 -- 2026-10-03 -- The overview's next steps come from the person's path (journey.next first, then the open stages after it; views/home/journey-steps.js), with no emoji; the extensions promo shows once the apps stage is done or the person has three apps, and its cards lose their emoji marks (guidance A2).
  *   v1.21.0 -- 2026-10-01 -- The Packages page is "Get apps", right under Apps and in the basic menu (decision D8 of the user-journey review).
  *   v1.20.2 -- 2026-09-29 -- The build-an-app step opens /v1/appcat?create=1 instead of /app-catalog.html (Jouni).
@@ -623,6 +624,7 @@ export const SIDEBAR_GROUPS = [
     { id: 'companies', labelKey: 'profile.tabs.companies' },
     { id: 'pnl', labelKey: 'profile.tabs.pnl' },
     { id: 'usage', labelKey: 'profile.tabs.usage' },
+    { id: 'visibility', labelKey: 'profile.tabs.visibility' },
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
     { id: 'apps', labelKey: 'profile.tabs.apps' },
