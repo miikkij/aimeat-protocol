@@ -27,6 +27,11 @@
  *   const svc = new SurfaceLayoutService(config, storage);
  *   const { layout, degraded } = await svc.resolve('home');
  * @version-history
+ *   v1.2.0 — 2026-10-08 — A portal passage is stored public (the portal is read without a session), so
+ *     its provenance record resolves for a visitor; a member surface's stays 'owner'. Every passage gets
+ *     provenanceForWrite's answer (an undeclared agent passage is stamped) with the node's switch, the
+ *     session's scopes, the surface and the label policy. refuseProvenance() refuses, before the first
+ *     write, a declaration the writer may not make and one record id for more than one passage (aiprov E9).
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): callerIsOperator takes the principal and asks
  *     services/operator-principal.ts with site:layout-write, the question requireOperatorPrincipal
  *     asks on the HTTP door. It took an owner name and read the account's role alone.
@@ -37,7 +42,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, SiteChangeLogEntry } from '../../storage/interface.js';
 import type { MemoryVersionRecord } from '../../storage/repositories/memory.repository.js';
 import { emitChange } from '../event-bus.js';
-import { provenanceForWrite } from '../ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from '../ai-provenance.js';
 import type { DeclaredProvenance } from '../ai-provenance.js';
 import { SITE_OWNER_GAII, SiteError } from '../site.js';
 import { defaultLayout } from './registry.js';
@@ -69,6 +74,8 @@ export interface PreparedLayout {
 export interface PassageProvenance {
     /** The writer, resolved. A GHII, GAII or GEAI, never a bare owner name. */
     principal: string;
+    /** The session's own scopes: a declaration needs provenance:write there as well as on the grant. */
+    scopes?: readonly string[];
     /** An existing record the caller asked to attach. Checked against their own account. */
     declaredId?: string;
     /** What the caller said about how the words were produced. */
@@ -177,7 +184,29 @@ export class SurfaceLayoutService {
         source: SurfaceLayout['meta']['source'],
         provenance?: PassageProvenance,
     ): Promise<ResolvedLayout> {
-        return this.commit(this.prepare(surface, submission, changedBy, source), changedBy, provenance);
+        const prepared = this.prepare(surface, submission, changedBy, source);
+        await this.refuseProvenance([prepared], provenance);
+        return this.commit(prepared, changedBy, provenance);
+    }
+
+    /**
+     * What the writer said about the passages, refused before the first of them is stored: a
+     * declaration the writer may not make (403 SCOPE_DENIED), and one record id for more than one
+     * passage (422). A record describes one set of bytes, so attaching one id to every passage put a
+     * statement about one passage on the others (aiprov E9). `passages` counts what will be written.
+     */
+    async refuseProvenance(prepared: Array<Pick<PreparedLayout, 'bodies'>> | number, provenance?: PassageProvenance): Promise<void> {
+        if (!provenance) return;
+        const passages = typeof prepared === 'number' ? prepared : prepared.reduce((n, p) => n + Object.keys(p.bodies).length, 0);
+        if (provenance.declaredId && passages > 1) {
+            throw new SiteError('PROVENANCE_ID_AMBIGUOUS',
+                `One ai_provenance_id names one passage, and this write stores ${passages}. Declare with ai_provenance instead, or write the passages one at a time.`, 422);
+        }
+        const refusal = await provenanceDeclarationRefusal(this.storage, {
+            principal: provenance.principal, declaredId: provenance.declaredId, declared: provenance.declared,
+            enabled: this.config.aiProvenance, scopes: provenance.scopes,
+        });
+        if (refusal) throw new SiteError(refusal.code, refusal.message, 403);
     }
 
     /**
@@ -208,14 +237,18 @@ export class SurfaceLayoutService {
         return { surface, layout, bodies };
     }
 
-    /** Write what prepare() already accepted. Nothing here can refuse. */
+    /** Write what prepare() already accepted. Nothing here can refuse; refuseProvenance() runs first. */
     async commit(prepared: PreparedLayout, changedBy: string, provenance?: PassageProvenance): Promise<ResolvedLayout> {
         const { surface, layout, bodies } = prepared;
+        // The portal is served to anyone without a session (GET /v1/site/layout/portal), so its
+        // passages are public; the member surfaces are read signed in. Stored as 'owner' whatever
+        // the surface, a portal passage's provenance record could never be resolved by a visitor.
+        const visibility = surface === 'portal' ? 'public' : 'owner';
         for (const [blockKey, body] of Object.entries(bodies)) {
             const ref = layout.freeform?.[blockKey]?.ref;
             if (!ref) continue;
-            await this.putMemory(freeformKey(ref), body, 'owner', ['site', 'freeform'],
-                await this.provenanceIdFor(body, provenance));
+            await this.putMemory(freeformKey(ref), body, visibility, ['site', 'freeform'],
+                await this.provenanceIdFor(body, provenance, visibility));
         }
         await this.putMemory(layoutKey(surface), JSON.stringify(layout), 'public', ['site', 'layout']);
         await this.log('layout_set', `Set the ${surface} layout (${layout.blocks.length} blocks)`, changedBy);
@@ -230,8 +263,13 @@ export class SurfaceLayoutService {
                 `"${slug}" is not a usable name for a passage: lower-case letters, numbers and dashes.`, 422);
         }
         refuseMarkup(body, `the passage "${slug}"`);
-        await this.putMemory(freeformKey(slug), body, 'owner', ['site', 'freeform'],
-            await this.provenanceIdFor(body, provenance));
+        await this.refuseProvenance(1, provenance);
+        // Public when the portal, which anyone reads without a session, shows this passage.
+        const portal = await this.resolve('portal');
+        const onPortal = portal.source === 'stored' && Object.values(portal.layout.freeform ?? {}).some(e => e.ref === slug);
+        const visibility = onPortal ? 'public' : 'owner';
+        await this.putMemory(freeformKey(slug), body, visibility, ['site', 'freeform'],
+            await this.provenanceIdFor(body, provenance, visibility));
         await this.log('layout_set', `Set the passage ${slug} (${Buffer.byteLength(body, 'utf-8')} bytes)`, changedBy);
         emitChange('site');
     }
@@ -310,19 +348,25 @@ export class SurfaceLayoutService {
     }
 
     /**
-     * Mint a provenance record for a passage when its writer declared one. Undeclared stays
-     * undefined, which the record reads as UNSTATED rather than as a human's work.
+     * The provenance record of one passage: the writer's declaration or attached id, else the
+     * node's stamp for an agent writer (a person writing says nothing and is not stamped). An
+     * undeclared agent passage went unstamped until 2026-10-08, and the record was minted without
+     * the node's switch, the session's scopes, the surface or the label policy (aiprov E9).
      */
-    private async provenanceIdFor(body: string, provenance?: PassageProvenance): Promise<string | undefined> {
-        if (!provenance || (!provenance.declared && !provenance.declaredId)) return undefined;
+    private async provenanceIdFor(body: string, provenance: PassageProvenance | undefined, visibility: 'public' | 'owner'): Promise<string | undefined> {
+        if (!provenance) return undefined;
         return provenanceForWrite(this.storage, {
             principal: provenance.principal,
+            scopes: provenance.scopes,
             content: body,
             declaredId: provenance.declaredId,
             declared: provenance.declared,
             pipeline: 'surface.freeform',
+            surface: { visibility, humanAudience: true },
+            labelPolicy: this.config.aiLabelPublic,
             nodeId: this.config.nodeId,
             baseUrl: this.config.baseUrl,
+            enabled: this.config.aiProvenance,
         });
     }
 

@@ -22,6 +22,8 @@
  * @structure registerSurfaceLayoutTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-08 — aimeat_surface_layout_set passes the session's scopes with the passage provenance
+ *     (aiprov E9).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test at call time is asked of the
@@ -146,6 +148,8 @@ export function registerSurfaceLayoutTools(
                 // than becoming a claim that a person wrote it.
                 const result = await svc.write(target, submission, 'mcp', 'mcp', {
                     principal: getAgentGaii(),
+                    // The session's own scopes: a declaration needs provenance:write there too (aiprov E9).
+                    scopes: caller().scopes,
                     declaredId: ai_provenance_id,
                     declared: toDeclaredProvenance(ai_provenance),
                 });

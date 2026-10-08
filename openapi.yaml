@@ -1262,6 +1262,13 @@ components:
             note:
               type: string
               description: One line on what this change was for. Shown in the change log.
+        ai_provenance:
+          allOf:
+            - $ref: '#/components/schemas/AiProvenanceDeclaration'
+          description: How the free-form passages' words were made, recorded against each passage.
+        ai_provenance_id:
+          type: string
+          description: An existing provenance record of the caller's own account, for a layout that carries exactly one passage.
 
     ResolvedSurfaceLayout:
       type: object
@@ -41944,6 +41951,14 @@ paths:
         own record so the layout stays small. Those words are Markdown: script, iframe,
         object, embed, form, inline event handlers and `javascript:` links are refused.
 
+        Each passage gets a provenance record: the `ai_provenance` declaration or the
+        `ai_provenance_id` in the body, else the node's stamp when an agent writes it (a person
+        writing says nothing and is not stamped). A portal passage is stored public, because the
+        portal serves it without a session, so its record resolves for anyone; a member surface's
+        passage is stored for the owner. A block that does not parse is 400; a declaration the
+        writer may not make (provenance:write) is 403 SCOPE_DENIED, and one `ai_provenance_id` for
+        more than one passage is 422 PROVENANCE_ID_AMBIGUOUS, both before anything is stored.
+
         Needs the node operator, in person or as an agent carrying `site:layout-write` — a
         word no wildcard hands out, because this changes what everyone sees on arrival.
         Blocked in load-balancer mode.
@@ -41968,8 +41983,10 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/ResolvedSurfaceLayout'
+        '400':
+          description: The ai_provenance block does not parse (INVALID_INPUT)
         '403':
-          description: Not the node operator, or the principal does not carry `site:layout-write`
+          description: Not the node operator, the principal does not carry `site:layout-write`, or a provenance declaration the writer may not make (SCOPE_DENIED)
         '409':
           description: Portal is read-only (load-balancer mode)
         '422':
@@ -42135,7 +42152,10 @@ paths:
         surface, each holding blocks and, on a free-form block, its words inline.
 
         Every surface is checked before any of them is written, so a refusal on the second
-        cannot leave the first applied. Operator-only. Blocked in load-balancer mode.
+        cannot leave the first applied. Operator-only. Blocked in load-balancer mode. The
+        passages' provenance is recorded as on PUT /v1/site/layout/{surface}; one
+        `ai_provenance_id` for more than one passage across the paste is 422
+        PROVENANCE_ID_AMBIGUOUS, refused before the first surface is written.
 
         Deliberately separate from `POST /v1/site/import`, which keeps the template, portal
         records and KV pairs: that route is gated on the operator ROLE, and routing a layout
@@ -42157,6 +42177,13 @@ paths:
                   additionalProperties:
                     $ref: '#/components/schemas/SurfaceLayoutSubmission'
                   description: Keyed by surface name.
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the passages' words were made, recorded against each passage.
+                ai_provenance_id:
+                  type: string
+                  description: An existing record of the caller's own account, for a paste that holds exactly one passage.
       responses:
         '200':
           description: Which surfaces were written
@@ -42266,7 +42293,8 @@ paths:
         Store the words behind one free-form block without rewriting the layout around it.
         Markdown: script, iframe, object, embed, form, inline event handlers and
         `javascript:` links are refused, and so is a passage over 64 KB. Operator-only.
-        Blocked in load-balancer mode.
+        Blocked in load-balancer mode. The passage is stored public when the stored portal
+        layout shows it, and its provenance is recorded as on PUT /v1/site/layout/{surface}.
       tags: [Site]
       security:
         - BearerAuth: []
@@ -42284,6 +42312,13 @@ paths:
                 body:
                   type: string
                   description: The words, in Markdown.
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the words were made. A block that does not parse is 400.
+                ai_provenance_id:
+                  type: string
+                  description: An existing provenance record of the caller's own account to attach.
       responses:
         '200':
           description: Stored
@@ -43475,7 +43510,15 @@ paths:
     post:
       operationId: importKnowledgePackage
       summary: Import a knowledge package
-      description: Import a knowledge package from structured data.
+      description: >
+        Import a knowledge package from structured data.
+
+        The manifest and every entry get their own provenance record: the `ai_provenance`
+        declaration in the body; else the package's
+        `synthesis.level`, honoured as a declaration when the caller may declare
+        (`provenance:write`, owners always); else the node's stamp when an agent imports. A block
+        that does not parse is 400; an explicit declaration the caller may not make is 403
+        SCOPE_DENIED before anything is stored.
       tags: [Knowledge]
       security:
         - BearerAuth: []
@@ -43485,11 +43528,21 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                package: { type: object, description: The knowledge package (manifest plus entries) }
+                overrides: { type: object }
+                entry_data: { type: object }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the package's content was made, recorded against the manifest and each entry.
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/knowledge/{id}:
     get:
