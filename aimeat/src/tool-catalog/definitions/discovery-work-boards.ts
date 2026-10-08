@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-08 — aimeat_storage_upload takes ai_provenance and ai_provenance_id: a stored file carries
+ *     its AI-provenance record.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.14.0 — 2026-10-02 — aimeat_tools_find: the chat surface's door to the tools it keeps off.
@@ -279,7 +281,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_storage_upload',
-        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit data_base64 and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download. TO EMBED AN IMAGE IN A WORKSPACE DOCUMENT: use the embed_markdown / embed_url from the response (the owner-addressed /v1/pub/<owner>/<key> form) — NEVER hand-write a /v1/storage/<key> path, which loads for nobody but you. Saving an embedded image into a document automatically scopes the file to that workspace\'s members; it is not exposed to the public internet.',
+        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit data_base64 and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download. TO EMBED AN IMAGE IN A WORKSPACE DOCUMENT: use the embed_markdown / embed_url from the response (the owner-addressed /v1/pub/<owner>/<key> form) — NEVER hand-write a /v1/storage/<key> path, which loads for nobody but you. Saving an embedded image into a document automatically scopes the file to that workspace\'s members; it is not exposed to the public internet. To store a speech clip or a picture the node made for you, pass the ai_provenance_id it returned: the file then carries that record, and anyone who can read the file can see how it was made.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Upload Storage File', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -293,6 +295,7 @@ export const discoveryWorkBoardsTools = [
             visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public', 'workspace'], description: "Access control (default: private). Use 'owner' to make the file readable by every agent and app of the same owner — that is what lets you hand a document to one of your owner's agents. Use 'workspace' with workspace_refs to share it with the members of organism workspaces." },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
             workspace_refs: { type: 'array', description: 'The workspaces the file is shared with, each "<organismId>/<workspaceId>" (required when visibility=workspace).', zod: z.array(z.string()) },
+            ...aiProvenanceCatalogInput,
         },
     },
     {

@@ -6,6 +6,8 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.10.0 - 2026-10-08 - The reply and the speech take `agent`, passed to prepareAiCall: a voice call an
+ *     agent makes is attributed to the agent, as a completion is.
  *   v1.9.0 - 2026-10-07 - A speech provider's key refusal is 424 INVALID_API_KEY, not PROVIDER_ERROR at 401.
  *   v1.8.0 - 2026-10-05 - The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.7.0 - 2026-10-05 - `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
@@ -49,7 +51,7 @@ import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
 function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
   return {
     caller: o.caller, ...(o.verifiedApp ? { verifiedApp: o.verifiedApp } : {}),
-    ...(o.role ? { role: o.role } : {}),
+    ...(o.role ? { role: o.role } : {}), ...(o.agent ? { agent: o.agent } : {}),
   };
 }
 
@@ -59,6 +61,9 @@ export interface VoicePolicyCaller {
   caller: CallerClass; verifiedApp?: string;
   /** The AI role the call runs as (services/ai/roles.ts). A named model or provider wins over it. */
   role?: string;
+  /** The owner's agent that asked, by bare name (aiPayerOf): its own key pays first, its daily cap
+   *  applies, and the provenance record names it. Derived from the principal, never from a body. */
+  agent?: string;
 }
 export interface ReplyOptions extends VoicePolicyCaller {
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;

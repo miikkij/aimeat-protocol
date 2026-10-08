@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-08 — The storage tools receive the session's scopes, for a declared ai_provenance.
  *   2026-10-06 — aimeat_memory_write registers the catalog's schema, which now carries its bounds
  *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -726,7 +727,7 @@ export function registerCoreTools(
     registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
 
     // ── Storage Tools (upload/download) — extracted to ./core-storage.ts ──
-    registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes);
 
     // ── Data Package Tools (publish/export) — extracted to ./core-datapackage.ts ──
     registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);

@@ -56,6 +56,7 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.5 — 2026-10-08 — aimeat_storage_upload: recorded-by-route, POST /v1/storage.
  *   v1.3.4 — 2026-10-06 — `readsId` on the four not-carried tools whose route reads ai_provenance_id
  *     (design book propose and adopt, app draft publish, surface layout set): an id given alone is
  *     reported attached again; v1.3.3 told them it went nowhere (audit of the last items, finding 4).
@@ -175,6 +176,9 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // entry said not-carried while this tool wrote its batch with POST /v1/memory itself
   // (secaudit 2026-10 follow-up, Part B).
   aimeat_workspace_write: { kind: 'recorded-by-route', route: 'POST /v1/organisms/:id/workspace/drafts' },
+  // POST /v1/storage records the declaration or attaches the id against the stored bytes, inline and
+  // presigned (services/storage-file-write.ts), and names the record in its answer (2026-10-08).
+  aimeat_storage_upload: { kind: 'recorded-by-route', route: 'POST /v1/storage' },
 };
 
 /**
