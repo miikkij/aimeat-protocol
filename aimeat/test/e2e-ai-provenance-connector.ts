@@ -23,6 +23,9 @@
  *   bogus level · spoofed principal · attach-by-id · non-carrying tool · shell path · scope gate
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-connector
  * @version-history
+ *   v1.1.0 — 2026-10-08 — Phase 5 flips: POST /v1/boards/:id/posts records a declaration (aiprov D5),
+ *     so aimeat_board_post through the connector stores the crew's level and human involvement
+ *     instead of answering recorded:false. The case had asserted the gap this change closes.
  *   v1.0.1 — 2026-09-24 — Every call to the daemon and both MCP sessions carry the secret from
  *     serve.json, which the daemon now requires (secaudit 2026-09, A9-1).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 11.
@@ -418,10 +421,14 @@ await test('SHELL: /local/call/aimeat_memory_read returns the record too', async
     `shell read block is wrong: ${JSON.stringify(block)}`);
 });
 
-// ─── 5. The tools whose node door cannot carry a declaration say so ───
-console.log('\nPhase 5 — A door that cannot carry a declaration says so out loud');
+// ─── 5. A board post's declaration reaches the node through the connector ───
+// Until 2026-10-08 POST /v1/boards/:id/posts took no declaration, and this phase asserted the echo
+// said recorded:false. The route records it now (aiprov D5), and names the record in its answer,
+// so the case asserts the record the node STORED: the declaration's level and human involvement.
+// The not-carried echo stays proven in test/unit/provenance-carry-attached-id.test.ts.
+console.log('\nPhase 5 — A board post carries its declaration through the connector');
 
-await test('A write tool whose REST door takes no declaration reports recorded:false with a reason', async () => {
+await test('aimeat_board_post through the connector records the declaration the crew made', async () => {
   // SHARED rather than public. A PUBLIC board is operator-gated (services/board-write.ts), and this
   // probe has to be made by the DECLARER agent itself, because what it measures is what that agent's
   // own tool reports back. Swapping in an owner session to clear the gate would change the subject of
@@ -442,10 +449,11 @@ await test('A write tool whose REST door takes no declaration reports recorded:f
     ai_provenance: { level: 'original', human_involvement: 'full-human' },
   });
   assert(!r.isError, `board post failed: ${r.raw}`);
-  const echo = r.payload?.ai_provenance;
-  assert(!!echo, `the declaration vanished silently on aimeat_board_post — no echo in the result: ${r.raw.slice(0, 600)}`);
-  assert(echo.recorded === false, `echo says recorded=${echo.recorded} but this door cannot carry a declaration: ${JSON.stringify(echo)}`);
-  assert(typeof echo.reason === 'string' && echo.reason.length > 20, `the echo gives no usable reason: ${JSON.stringify(echo)}`);
+  const block = r.payload?.ai_provenance;
+  assert(!!block, `the declaration vanished silently on aimeat_board_post — no record in the result: ${r.raw.slice(0, 600)}`);
+  assert(block.record?.level === 'original' && block.record?.humanInvolvement === 'full-human',
+    `the node stored something other than the declaration: ${JSON.stringify(block)}`);
+  assert(r.payload?.ai_provenance_id === block.id, `the answer names the record: ${JSON.stringify(r.payload)}`);
 });
 
 // ─── 6. The shell-callable surface is the same code path's twin ───

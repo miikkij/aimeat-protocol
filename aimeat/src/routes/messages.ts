@@ -21,6 +21,13 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.18.0 -- 2026-10-08 -- POST /v1/messages and POST /v1/messages/broadcast take ai_provenance and
+ *     ai_provenance_id, as the aimeat_dm_* tools do, refuse a declaration the caller may not make
+ *     with 403 SCOPE_DENIED before the send turn is taken, and name the record in the answer
+ *     (aiprov D5). The 1:1 send mints its record held and stores it only when the send lands, so a
+ *     refused send leaves no record (D11), and hashes the body with the questions, the rule
+ *     aimeat_dm_ask uses (D14): services/message-provenance.ts. The owner's inbox and thread and the
+ *     agent's inbox and thread embed each message's record (D6).
  *   v1.17.0 -- 2026-10-05 -- POST /v1/messages/broadcast asks isOperatorCaller for the node-wide audience, as aimeat_dm_broadcast does: the operator's agent holding operator:admin passes as the operator in person (secaudit 2026-10, C2).
  *   v1.16.0 -- 2026-09-30 -- The transcribe route answers `classification_warnings` when the audio is
  *     warning-classified (TARGET-082 review, item 2).
@@ -101,7 +108,10 @@ import { takeSendTurn } from '../services/message-send-limit.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { provenanceDeclarationRefusal } from '../services/ai-provenance.js';
+import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
+import { mintMessageProvenance, withMessageProvenance } from '../services/message-provenance.js';
+import { toDeclaredProvenance } from '../mcp/ai-provenance-input.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
@@ -129,6 +139,11 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     res.status(429).json(error(config.nodeId, 'RATE_LIMITED', wait.message ?? 'This account has sent as many messages as it may this minute.'));
   };
 
+  /** The record a send carries, named in its answer: the id and the record itself, the writer's own. */
+  const sentProvenance = async (id: string | undefined) => (id
+    ? { ai_provenance_id: id, ...provenanceItemBlock(await loadServedProvenance(storage, config, id, { full: true })) }
+    : {});
+
   /* ── POST /v1/messages — send ── */
   router.post('/v1/messages', requireAuth(), requireLocalSession(), requireExternalPrincipal(), requireScope('messages:send'), async (req, res) => {
     const parsed = MessageSendSchema.safeParse(req.body);
@@ -139,8 +154,19 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     const input = parsed.data;
     const senderGhii = resolve(req);
-    // Counted before this door writes anything of its own (the provenance record below, a new
-    // support thread), and handed to the send service, which then does not count it again.
+    // How the body was made, as aimeat_dm_send takes it. A declaration the caller may not make is
+    // refused before the send turn is taken and before anything is written (aiprov D5).
+    const declared = toDeclaredProvenance(input.ai_provenance);
+    const scopes = req.auth!.scopes ?? [];
+    const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+      principal: senderGhii, declaredId: input.ai_provenance_id, declared, enabled: config.aiProvenance, scopes,
+    });
+    if (provenanceRefused) {
+      res.status(403).json(error(config.nodeId, provenanceRefused.code, provenanceRefused.message));
+      return;
+    }
+    // Counted before this door writes anything of its own (a new support thread), and handed to the
+    // send service, which then does not count it again.
     const turn = takeSendTurn(senderGhii);
     if (!turn.ok) {
       refuseSendLimit(res, turn);
@@ -152,21 +178,16 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     let threadSubject = input.subject;
 
     // TARGET-058. An agent or app sending through REST is doing exactly what it does through
-    // aimeat_dm_send: writing AI-authored text delivered to a named person. The MCP tool stamped it
-    // and this door did not, so the same act was recorded on one surface and unstated on the other —
-    // the drift the one-capability-one-implementation rule exists to prevent. It is also what makes
-    // "which model wrote this" answerable in the inbox. A human sender is left alone: the stamp is a
-    // no-op for a GHII principal, and stamping a person's own words would be a false statement.
-    const aiProvenanceId = await provenanceForWrite(storage, {
-      principal: senderGhii,
-      content: input.body ?? '',
-      pipeline: 'rest.messages_send',
-      surface: { visibility: 'private', humanAudience: true },
-      labelPolicy: config.aiLabelPublic,
-      nodeId: config.nodeId,
-      baseUrl: config.baseUrl,
-      enabled: config.aiProvenance,
+    // aimeat_dm_send: writing AI-authored text delivered to a named person, so it is stamped the same
+    // way, from the same service: declared when the caller said something, Mint-3 when an agent said
+    // nothing, and nothing for a person's own words. The record is HELD, and stored only once the
+    // send lands, so a send refused below leaves no record behind (aiprov D11). The hash covers the
+    // body and any questions, the rule aimeat_dm_ask has always used (aiprov D14).
+    const prov = await mintMessageProvenance({ storage, config }, {
+      principal: senderGhii, scopes, body: input.body, interactive: input.interactive,
+      declaredId: input.ai_provenance_id, declared, pipeline: 'rest.messages_send',
     });
+    const aiProvenanceId = prov.id;
 
     // A GROUP thread is addressed by its conversation, not by a person: continuing one is the same
     // door as starting one, so an agent that can send a DM can answer in a group without learning a
@@ -209,9 +230,11 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
           : 'You are not a participant in this conversation'));
         return;
       }
+      await prov.store();
       res.status(201).json(success(config.nodeId, {
         message_id: sent.messageId,
         conversation_id: group.conversation.id,
+        ...(await sentProvenance(aiProvenanceId)),
         participants: group.conversation.participants,
         delivered_to: sent.delivered,
         // A named thread can legitimately reach nobody (you are the only operator). Say so, or the
@@ -293,8 +316,10 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       return;
     }
 
+    await prov.store();
     res.status(201).json(success(config.nodeId, {
       message: result.message,
+      ...(await sentProvenance(aiProvenanceId)),
       // `delivered` and "they have read nothing yet" are both true of a first message to a stranger,
       // and a caller that sees only the first cannot tell the difference between a slow answer and a
       // gate. Additive: the status field is unchanged.
@@ -325,6 +350,15 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     const input = parsed.data;
     const senderGhii = resolve(req);
+    const declared = toDeclaredProvenance(input.ai_provenance);
+    const scopes = req.auth!.scopes ?? [];
+    const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+      principal: senderGhii, declaredId: input.ai_provenance_id, declared, enabled: config.aiProvenance, scopes,
+    });
+    if (provenanceRefused) {
+      res.status(403).json(error(config.nodeId, provenanceRefused.code, provenanceRefused.message));
+      return;
+    }
     const attachments = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
 
     // The whole send-to-many lives in the service, because aimeat_dm_broadcast calls the same five
@@ -332,8 +366,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     //
     // TARGET-058, same rule as the 1:1 door above: an agent broadcasting through REST is writing
     // AI-authored text delivered to named people, and one set of bytes goes to all of them, so every
-    // copy carries the SAME record. Stamped from the principal here; the MCP tool stamps the agent's
-    // own declaration instead. A human sender is a no-op. Handed over as a FUNCTION so the service
+    // copy carries the SAME record: the caller's declaration when it made one (aiprov D5), Mint-3 for
+    // an agent that said nothing, nothing for a person. Handed over as a FUNCTION so the service
     // runs it after its own refusals — stamping it writes a row, and this door was writing that row
     // before the service could say the audience was operator-only.
     const result = await broadcastFromPrincipal(deliveryCtx, {
@@ -342,8 +376,11 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       mode: input.mode, body: input.body, subject: input.subject, attachments, interactive: input.interactive,
       stampProvenance: broadcastProvenanceStamp({ storage, config }, {
         principal: senderGhii,
+        scopes,
         body: input.body,
-        questions: input.interactive?.role === 'questions' ? input.interactive.questions : undefined,
+        interactive: input.interactive,
+        declaredId: input.ai_provenance_id,
+        declared,
         pipeline: 'rest.messages_broadcast',
       }),
     });
@@ -357,6 +394,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     res.status(201).json(success(config.nodeId, {
       broadcast_id: result.broadcastId, recipients: result.recipients, sent: result.sent, failed: result.failed,
       federation_peers: result.federationPeers,
+      ...(await sentProvenance(result.aiProvenanceId)),
     }, [
       { description: 'View results', method: 'GET', url: `/v1/messages/broadcast/${result.broadcastId}` },
     ]));
@@ -411,7 +449,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
     // Each message says which model wrote it, when an agent wrote it and said so. A person reading
     // AI-written text addressed to them has been able to see THAT since TARGET-058 and not WHICH.
-    const { messages, total, unread } = await readOwnerInbox(storage, readerOf(req), { unreadOnly, page, perPage });
+    const { messages, total, unread } = await readOwnerInbox(storage, readerOf(req), { unreadOnly, page, perPage, config });
     res.json(success(config.nodeId, { messages, total, unread, page, per_page: perPage }));
   });
 
@@ -446,7 +484,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
     const asAgent = String(req.query.agent || '').trim();
     const result = await readOwnerThread(storage, readerOf(req), conversationId, {
-      page, perPage, ...(asAgent ? { agentGaii: asAgent } : {}),
+      page, perPage, config, ...(asAgent ? { agentGaii: asAgent } : {}),
     });
     if (!result.ok) {
       res.status(403).json(error(config.nodeId, result.code, result.message));
@@ -467,7 +505,9 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
     const { messages, total } = await readAgentDmInbox(storage, agentGhii, { page, perPage });
-    res.json(success(config.nodeId, { messages, total, page, per_page: perPage }));
+    // Each message carries its record: a private message's record resolves for nobody but its
+    // owner at /v1/provenance/:id, so the reading agent learns how it was made here (aiprov D6).
+    res.json(success(config.nodeId, { messages: await withMessageProvenance(storage, messages, config), total, page, per_page: perPage }));
   });
 
   /* ── GET /v1/messages/agent-thread/:conversationId — full DM thread as the calling agent sees it ── */
@@ -477,7 +517,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
     const { messages, total } = await readAgentDmThread(storage, agentGhii, conversationId, { page, perPage });
-    res.json(success(config.nodeId, { messages, total, page, per_page: perPage }));
+    res.json(success(config.nodeId, { messages: await withMessageProvenance(storage, messages, config), total, page, per_page: perPage }));
   });
 
   /* ── POST /v1/messages/conversations/:conversationId/read — mark thread read ── */

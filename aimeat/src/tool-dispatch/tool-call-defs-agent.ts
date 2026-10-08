@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-08 -- aimeat_message_send, aimeat_dm_send, aimeat_dm_broadcast, aimeat_dm_ask,
+ *     aimeat_dm_send_as_owner and aimeat_task_complete send ai_provenance and ai_provenance_id to
+ *     their routes, which record both now (aiprov D5).
  *   2026-10-06 -- aimeat_operator_agent_configure and aimeat_operator_ai_config report a refused write
  *     as a refusal; both read 'ok' whatever the route answered (secaudit 2026-10 follow-up, Part B).
  *   2026-10-06 -- aimeat_handbook_get reads an interface's handbook from its own route; aimeat_message_send
@@ -51,7 +54,7 @@ import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.j
 import type { ApiResponse } from './api-client.js';
 import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
 import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
-import { query, optionalString, requiredString, optionalArray, requiredArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload } from './tool-call-helpers.js';
+import { query, optionalString, requiredString, optionalArray, requiredArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload, withProvenanceFields } from './tool-call-helpers.js';
 import { organizePatchBody } from './tool-call-helpers-organize.js';
 import { handbookTierPath } from './handbook-path.js';
 
@@ -333,7 +336,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         handler: ({ client, agentPath }, input) => {
             const content = optionalString(input, 'content') ?? optionalString(input, 'body');
             if (!content) throw new Error('Missing required field: content');
-            return client.post(`/v1/agents/${agentPath}/messages`, {
+            return client.post(`/v1/agents/${agentPath}/messages`, withProvenanceFields({
                 content,
                 direction: 'outbound',
                 // The send service replies in this thread; dropped here, every reply opened a new
@@ -341,7 +344,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
                 ...(optionalString(input, 'thread_id') ? { thread_id: optionalString(input, 'thread_id') } : {}),
                 ...(optionalString(input, 'linked_task_id') ? { linked_task_id: optionalString(input, 'linked_task_id') } : {}),
                 ...(optionalRecord(input, 'metadata') ? { metadata: optionalRecord(input, 'metadata') } : {}),
-            });
+            }, input));
         },
     },
     // ── Agent v2 messaging: a turn between two principals of ONE account ──
@@ -374,7 +377,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
             const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
             const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
-            return client.post('/v1/messages', body);
+            return client.post('/v1/messages', withProvenanceFields(body, input));
         },
     },
     {
@@ -400,7 +403,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const text = optionalString(input, 'body'); if (text) body.body = text;
             const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
             const interactive = optionalRecord(input, 'interactive'); if (interactive) body.interactive = interactive;
-            return client.post('/v1/messages/broadcast', body);
+            return client.post('/v1/messages/broadcast', withProvenanceFields(body, input));
         },
     },
     {
@@ -416,7 +419,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const intro = optionalString(input, 'body'); if (intro) body.body = intro;
             const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
             const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
-            return client.post('/v1/messages', body);
+            return client.post('/v1/messages', withProvenanceFields(body, input));
         },
     },
     {
@@ -657,7 +660,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             };
             const deliverableKey = optionalString(input, 'deliverable_key');
             if (deliverableKey) body.deliverable_key = deliverableKey;
-            return client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/complete`, body);
+            return client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/complete`, withProvenanceFields(body, input));
         },
     },
     {
@@ -718,7 +721,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
             const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
             const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
-            return client.post('/v1/messages', body);
+            return client.post('/v1/messages', withProvenanceFields(body, input));
         },
     },
     // NOTE: the owner contacts (aimeat_contact_*) are NOT cliFallback — they are exposed on the connector

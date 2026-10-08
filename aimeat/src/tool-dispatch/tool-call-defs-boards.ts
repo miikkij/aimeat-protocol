@@ -8,6 +8,8 @@
  * @structure boardTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { boardTools } from './tool-call-defs-boards.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-08 -- aimeat_board_post and aimeat_board_reply send ai_provenance and
+ *     ai_provenance_id to their routes, which record both now (aiprov D5).
  *   v1.1.0 -- 2026-09-13 -- aimeat_board_create forwards `rules`, and aimeat_board_rules_set joins the
  *     table. The catalog now publishes both, and a parameter published there and not handled here is
  *     refused by withDeclaredInputOnly, so the two land together.
@@ -15,7 +17,7 @@
  *     that had been sitting apart from the rest (board_read, board_post) join them here.
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalRecord, requiredRecord } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalRecord, requiredRecord, withProvenanceFields } from './tool-call-helpers.js';
 
 export const boardTools: ConnectCliToolDefinition[] = [
     {
@@ -31,7 +33,7 @@ export const boardTools: ConnectCliToolDefinition[] = [
             const body: JsonObject = { title: requiredString(input, 'title'), body: requiredString(input, 'body') };
             const category = optionalString(input, 'category');
             if (category) body.category = category;
-            return client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`, body);
+            return client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`, withProvenanceFields(body, input));
         },
     },
     {
@@ -93,7 +95,7 @@ export const boardTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_board_reply',
         handler: ({ client }, input) => client.post(
             `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/replies`,
-            { body: requiredString(input, 'body') },
+            withProvenanceFields({ body: requiredString(input, 'body') }, input),
         ),
     },
     {

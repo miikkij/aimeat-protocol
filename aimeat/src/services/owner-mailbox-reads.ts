@@ -38,11 +38,15 @@
  *   if (!reader) → 403
  *   const { conversations } = await readOwnerConversations(storage, reader);
  * @version-history
+ *   v1.1.0 — 2026-10-08 — readOwnerInbox and readOwnerThread take the config, and each message then
+ *     carries its provenance record, not only the summary: a private message's record answers 404
+ *     at /v1/provenance/:id for its recipient (aiprov D6).
  *   v1.0.2 — 2026-09-26 — delegateReaderFor takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.0.0 — 2026-09-12 — Initial: messages:read-as-owner for agents, and the messages:read door for
  *     apps, on the four mailbox reads that were owner-session only.
  */
+import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord, ConversationRecord } from '../storage/interface.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isForeignPrincipal, localAccountName } from '../utils/gaii.js';
@@ -126,7 +130,8 @@ export function noteDelegatedRead(reader: MailboxReader, what: string, detail: R
 export async function readOwnerInbox(
   storage: Storage,
   reader: MailboxReader,
-  opts: { unreadOnly?: boolean; page: number; perPage: number },
+  /** `config`: each message then carries its record ({ id, record, record_url }), not only the summary. */
+  opts: { unreadOnly?: boolean; page: number; perPage: number; config?: AimeatConfig },
 ): Promise<{ messages: DirectMessageRecord[]; total: number; unread: number }> {
   const { messages, total, unread } = await storage.listInbox(reader.ownerGhii, {
     unreadOnly: opts.unreadOnly ?? false, page: opts.page, perPage: opts.perPage,
@@ -134,7 +139,7 @@ export async function readOwnerInbox(
   const pending = new Set((await storage.listContacts(reader.ownerGhii, { state: 'pending' })).map(c => c.contactId));
   const visible = messages.filter(m => !pending.has(m.senderGhii));
   noteDelegatedRead(reader, 'inbox', { page: opts.page });
-  return { messages: await withMessageProvenance(storage, visible), total, unread };
+  return { messages: await withMessageProvenance(storage, visible, opts.config), total, unread };
 }
 
 /** The conversation list. The owner in person also sees their agents' threads with other people. */
@@ -165,7 +170,8 @@ export async function readOwnerThread(
   storage: Storage,
   reader: MailboxReader,
   conversationId: string,
-  opts: { page: number; perPage: number; agentGaii?: string },
+  /** `config`: each message then carries its record ({ id, record, record_url }), not only the summary. */
+  opts: { page: number; perPage: number; agentGaii?: string; config?: AimeatConfig },
 ): Promise<OwnerThreadResult> {
   let readAs = reader.ownerGhii;
   if (opts.agentGaii) {
@@ -195,7 +201,7 @@ export async function readOwnerThread(
   noteDelegatedRead(reader, 'thread', { conversationId, page: opts.page });
   return {
     ok: true,
-    messages: await withMessageProvenance(storage, result.messages),
+    messages: await withMessageProvenance(storage, result.messages, opts.config),
     total: result.total,
     conversation: conversation ? {
       id: conversation.id, kind: conversation.kind, subject: conversation.subject,

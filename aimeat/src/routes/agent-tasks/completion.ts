@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-08 — POST …/complete takes ai_provenance and ai_provenance_id, as
+ *     aimeat_task_complete does, with the session's scopes: 400 INVALID_PROVENANCE for a malformed
+ *     block, 403 SCOPE_DENIED for a declaration the caller may not make (the task stays where it
+ *     was), and the answer names the record (aiprov D5).
  *   v1.6.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 — 2026-10-04 — POST …/decline: the agent refuses the request with its reason, and the task
  *     ends as 'declined' rather than 'failed'.
@@ -45,6 +49,8 @@ import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js'
 import { recordTaskEvent, setTodoStatus } from '../../services/agent-task-write.js';
 import { AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { loadServedProvenance, provenanceItemBlock } from '../../services/ai-provenance-marks.js';
 import type { TaskRouteHelpers } from './helpers.js';
 
 export function registerTaskCompletionRoutes(
@@ -110,11 +116,21 @@ export function registerTaskCompletionRoutes(
     // counter write landed inside the same tick and the race was invisible; on Postgres every query
     // is a round trip, the read arrived first and activityStats came back null for a task the caller
     // had been told was done.
+    // How the completion message was made, as aimeat_task_complete takes it (aiprov D5).
+    const declared = parseDeclaredProvenanceInput(req.body?.ai_provenance);
+    if (!declared.ok) {
+      res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE',
+        'The ai_provenance block does not validate.', undefined, { violations: declared.violations }));
+      return;
+    }
     const done = await completeTask({ storage, config }, task, {
       message: typeof req.body?.message === 'string' ? req.body.message : undefined,
       // The memory key, under the agent's namespace, where the deliverable was published. Lets the
       // owner UI link straight to the output, and puts a PUBLIC deliverable on the activity feed.
       deliverableKey: typeof req.body?.deliverable_key === 'string' ? req.body.deliverable_key : undefined,
+      declaredProvenance: declared.declared,
+      ...(typeof req.body?.ai_provenance_id === 'string' ? { declaredProvenanceId: req.body.ai_provenance_id } : {}),
+      scopes: req.auth!.scopes ?? [],
       pipeline: 'rest.task_complete',
     }, resolve(req));
     if (!done.ok) {
@@ -122,7 +138,14 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    res.json(success(config.nodeId, { task: done.task }));
+    res.json(success(config.nodeId, {
+      task: done.task,
+      // The record the completion message carries, named in the answer: the writer's own.
+      ...(done.aiProvenanceId ? {
+        ai_provenance_id: done.aiProvenanceId,
+        ...provenanceItemBlock(await loadServedProvenance(storage, config, done.aiProvenanceId, { full: true })),
+      } : {}),
+    }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/fail -- Fail task (active -> failed) ── */

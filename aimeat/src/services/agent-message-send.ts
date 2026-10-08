@@ -35,6 +35,9 @@
  *     { agentGaii, senderGaii, body: req.body, pipeline: 'rest.agent_message_send' });
  *   if (!result.ok) { res.status(result.status).json(error(config.nodeId, result.code, result.message)); return; }
  * @version-history
+ *   v1.1.0 — 2026-10-08 — Takes the session's scopes and answers a declaration the caller may not
+ *     make as a 403 SCOPE_DENIED result, before anything is minted or stored, so POST
+ *     /v1/agents/:name/messages can carry ai_provenance (aiprov D5).
  *   v1.0.0 — 2026-08-11 — Extracted from routes/agent-messages.ts and mcp/agent-messages.ts (August
  *     2026 MCP audit, step 8). Where the two copies disagreed the route's behaviour is the one kept:
  *     it is the copy with tests and users.
@@ -43,7 +46,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { AgentMessageCreateSchema } from '../models/agent-message-schemas.js';
-import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
 import { emitChange } from './event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
@@ -79,18 +82,21 @@ export interface AgentMessageSendInput {
   declaredProvenanceId?: string;
   /** What the caller stated about how the content was made. */
   declaredProvenance?: DeclaredProvenance;
+  /** The session's own scopes, when the caller has them: a declaration needs provenance:write there too. */
+  scopes?: readonly string[];
 }
 
 export type AgentMessageSendResult =
   | { ok: true; message: AgentMessageRecord }
-  | { ok: false; status: 400; code: 'INVALID_INPUT'; message: string };
+  | { ok: false; status: 400; code: 'INVALID_INPUT'; message: string }
+  | { ok: false; status: 403; code: 'SCOPE_DENIED'; message: string };
 
 /**
  * Create one agent message and fire what follows from it.
  *
- * Throws only what the provenance layer throws: a ProvenanceScopeError when a caller declares
- * provenance without holding `provenance:write`. That refusal is deliberate — a caller told its
- * declaration was accepted while the node recorded something else has been lied to by its own call.
+ * A caller that declares provenance without holding `provenance:write` is refused (403 SCOPE_DENIED)
+ * before anything is minted or stored. That refusal is deliberate — a caller told its declaration
+ * was accepted while the node recorded something else has been lied to by its own call.
  */
 export async function sendAgentMessage(
   deps: AgentMessageSendDeps,
@@ -109,6 +115,13 @@ export async function sendAgentMessage(
   }
   const body = parsed.data;
   const now = new Date().toISOString();
+
+  // Refused as a result rather than thrown, so the REST route answers 403 and not 500.
+  const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+    principal: input.senderGaii, declaredId: input.declaredProvenanceId, declared: input.declaredProvenance,
+    enabled: config.aiProvenance, scopes: input.scopes,
+  });
+  if (provenanceRefused) return { ok: false, status: 403, code: 'SCOPE_DENIED', message: provenanceRefused.message };
 
   // Thread = task: a message linked to a task with no explicit thread joins the task's thread, so a
   // task's whole conversation (the agent's clarifications, the owner's answers) stays in ONE thread
@@ -150,6 +163,7 @@ export async function sendAgentMessage(
     // is why the call is unconditional and carries no direction test.
     aiProvenanceId: await provenanceForWrite(storage, {
       principal: input.senderGaii,
+      scopes: input.scopes,
       content: body.content,
       declaredId: input.declaredProvenanceId,
       declared: input.declaredProvenance,
