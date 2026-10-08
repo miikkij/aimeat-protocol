@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-08 — storage_files.aiProvenanceId and its index (migration 0096).
  *   2026-10-04 — The scheduler's column block moves to schema-columns-scheduler.ts unchanged
  *     (max-file-lines), and gains scheduled_jobs.lastFireAt (migration 0093).
  *   2026-10-02 — agent_tasks.startPolicy, agents.taskStart: how a task starts (migration 0092 says why).
@@ -714,6 +715,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('ai_decisions', 'providerKind', 'TEXT');
   // The AI-provenance record of a company's current description. Mirrors Postgres 0095.
   safeAddColumn('companies', 'descriptionProvenanceId', 'TEXT');
+  // A stored file's AI-provenance record, and the index PUBLICLY_LINKED reads. Mirrors Postgres 0096.
+  safeAddColumn('storage_files', 'aiProvenanceId', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_storage_files_ai_provenance ON storage_files(aiProvenanceId) WHERE aiProvenanceId IS NOT NULL;');
   db.exec('CREATE INDEX IF NOT EXISTS idx_ai_decisions_provider ON ai_decisions(ownerGhii, provider, createdAt);');
 
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
