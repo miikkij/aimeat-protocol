@@ -21,6 +21,8 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.9.0 -- 2026-10-08 -- The stored picture names its provenance record (setStorageFileProvenance after
+ *     settlement), so /v1/pub serves its marks and a public picture's record resolves for anyone.
  *   v2.8.0 -- 2026-10-08 -- The record states `mediaKind: image` and the picture's type, decided against the stored visibility.
  *   v2.7.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (services/ai/errors.ts):
  *     a moderation refusal is 422 CONTENT_REFUSED, another 4xx 422 PROVIDER_REJECTED (aiprov plan, A1).
@@ -237,6 +239,12 @@ export async function generateForOwner(
     appId: opts.appId, source: 'ai-image',
     units: { images: 1 }, costSource: price.costSource, priceRef: price.priceRef,
   });
+  // The stored picture names its record, which is minted only at settlement, after the store. A
+  // public picture then makes its record resolvable by anyone (the PUBLICLY_LINKED storage clause).
+  if (settled.provenance) {
+    await storage.setStorageFileProvenance(gaii, key, settled.provenance.id).catch((err: unknown) =>
+      logger.warn(`[image] the picture was stored without its provenance link: ${String(err)}`, { key }));
+  }
 
   logger.info(`[image] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} `
     + `bytes=${result.data.length} cost=$${costUsd.toFixed(6)} day_total=$${settled.usage.total_cost_usd.toFixed(4)}`);

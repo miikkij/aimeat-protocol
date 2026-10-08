@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-08 -- e2e-storage-file-provenance.ts joins the list: a stored file carries its AI-provenance record.
  *   2026-10-08 -- e2e-ai-provenance-rest-declare.ts joins the list: the REST message, board and task
  *     routes take an ai_provenance declaration (aiprov D5).
  *   2026-10-08 -- e2e-ai-provenance-content.ts joins the list: AI provenance on the content surfaces
@@ -986,6 +987,9 @@ const ALL_SUITES = [
     'test/e2e-audio-speech.ts',
     'test/e2e-ai-transcribe.ts',
     'test/e2e-voice.ts',
+    // A stored file carries its AI-provenance record: speech made public in place, uploads that
+    // attach a record on REST, presigned and MCP, and the refusals (2026-10-08).
+    'test/e2e-storage-file-provenance.ts',
     'test/e2e-ai-image.ts',
     // A record's disclosure decided for the item as it is served, and its words by medium.
     'test/e2e-ai-provenance-served.ts',

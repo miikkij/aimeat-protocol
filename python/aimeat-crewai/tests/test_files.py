@@ -130,6 +130,22 @@ def test_upload_file_defaults_to_owner_visibility():
     assert got["ref"] == "crew#alice@n1/out/report.pdf"
 
 
+def test_upload_file_sends_provenance_and_returns_the_record():
+    record = {"id": "p1", "record": {"spec": "aimeat.provenance/v1"}, "record_url": "https://n/v1/provenance/p1"}
+    api = _FakeApi(post_resp=_Resp(201, {"data": {
+        "key": "voice/a.mp3", "owner_gaii": "crew#alice@n1", "visibility": "public", "size": 3,
+        "ai_provenance": record,
+    }}))
+    got = upload_file(api, "voice/a.mp3", b"abc", mime="audio/mpeg", visibility="public",
+                      ai_provenance={"level": "ai-generated", "model": "m"}, ai_provenance_id=None)
+    assert api.posted["json"]["ai_provenance"] == {"level": "ai-generated", "model": "m"}
+    assert "ai_provenance_id" not in api.posted["json"]
+    assert got["ai_provenance"] == record
+    upload_file(api, "voice/b.mp3", b"abc", ai_provenance_id="p1")
+    assert api.posted["json"]["ai_provenance_id"] == "p1"
+    assert "ai_provenance" not in api.posted["json"]
+
+
 def test_attachments_of_accepts_both_rest_and_mcp_shapes():
     rest = {"id": "m1", "conversationId": "c1", "attachments": [
         {"storageKey": "dm-out/x.pdf", "ownerGhii": "alice@n1", "mime": "application/pdf", "name": "x.pdf"},

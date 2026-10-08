@@ -21,6 +21,7 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-08 — The page is written with the agent as its writer, so it carries an AI-provenance record.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-10-03 — `enable: true` switches the page on, as the welcome-mat paste does, unless
  *     the person switched it off; the answer carries `served`. A card published here for a person who
@@ -90,7 +91,7 @@ export function registerPortfolioTools(
             // Same target the REST route writes, so the page an agent publishes is the same file the
             // browser reads. Resolving it anywhere else is how two "welcome pages" come to exist.
             const target = await portfolioWriteGaii(storage, owner, config.nodeId);
-            await writePortfolioHtml(storage, target, data);
+            await writePortfolioHtml(storage, target, data, { config, principal: getAgentGaii(), pipeline: 'mcp.portfolio_publish' });
             const served = await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, owner, target, enable === true);
             emitChange('portfolio');
             // Both addresses the node actually serves, and none it does not: the person is told

@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 -- 2026-10-08 -- POST takes ai_provenance / ai_provenance_id (inline and presigned), and the
+ *     inline write goes through services/storage-file-write.ts writeStorageFile, so the anonymous key
+ *     fence and the group binding apply here as on POST /v1/storage. The answer carries `ai_provenance`.
  *   v1.6.2 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.6.1 -- 2026-10-05 -- The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
@@ -34,7 +37,6 @@ import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
-import { checkStorageQuota, chargeOverage } from '../../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
 import { versionedAddress } from '../../utils/http-range.js';
@@ -42,7 +44,9 @@ import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
-import { removeStorageFile, appOwnedKeyRefusal } from '../../services/storage-file-write.js';
+import { removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal } from '../../services/storage-file-write.js';
+import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-provenance-input.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import type { MemoryRouteCtx } from './shared.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
@@ -82,19 +86,29 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspaceRef) as one or more "<organismId>/<workspaceId>"'));
       return;
     }
+    // How the bytes were made: the same statement POST /v1/storage takes, decided by the shared write.
+    const stated = storageProvenanceFromBody(req.body, gaii, 'rest.memory.files', req.auth!.scopes);
+    if (!stated.ok) {
+      res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', 'The ai_provenance block does not validate.', undefined, { violations: stated.violations }));
+      return;
+    }
 
     // ── PRESIGNED MODE: mint a one-shot URL, the caller PUTs the raw bytes to /v1/upload/:token ──
     // The bytes then skip body parsing entirely (server.ts excludes /v1/upload/), so the only ceiling
     // left is the one the operator actually set: quota.storage_max_file_size_mb.
     if (mode === 'presigned') {
+      const refused = await storageProvenanceMintRefusal({ storage, config }, stated.provenance);
+      if (refused) { res.status(refused.status).json(error(config.nodeId, refused.code, refused.message)); return; }
       const contentType = (mime_type as string) ?? 'application/octet-stream';
       const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
       const token = await generateUploadToken({
         sub: gaii,
+        actor: gaii,
         utype: 'storage',
         meta: buildUploadMeta('storage', {
           key, mime_type: contentType, visibility: visibility ?? 'private',
           group_id, tags, workspace_refs: wsRefStr,
+          ai_provenance: stated.provenance.wireBlock, ai_provenance_id: stated.provenance.declaredId,
         }),
         maxBytes,
         contentType,
@@ -115,40 +129,29 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // Per-file size limit
-    if (fileData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `File size exceeds ${config.storageMaxFileSizeMb}MB limit`));
-      return;
-    }
-
-    // Total storage quota enforcement
-    const storageQuota = await checkStorageQuota(config, storage, gaii, fileData.length);
-    if (!storageQuota.allowed) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', storageQuota.reason!));
-      return;
-    }
-
+    // The per-file ceiling, the account quota, the overage charge, the change events and the
+    // provenance decision are the shared write (services/storage-file-write.ts), as on
+    // POST /v1/storage. This door wrote its own copy until 2026-10-08, which took no statement about
+    // how the bytes were made.
     const parsedTags = Array.isArray(tags) ? tags : (typeof tags === 'string' ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []);
-    const file = await storage.createStorageFile({
+    const written = await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, {
       key,
-      ownerGaii: gaii,
+      data: fileData,
       visibility: (visibility as StorageFileRecord['visibility']) ?? 'private',
+      groupId: typeof group_id === 'string' ? group_id : undefined,
       workspaceRef: visibility === 'workspace' ? wsRefStr : undefined,
       mimeType: mime_type ?? 'application/octet-stream',
-      size: fileData.length,
-      data: fileData,
       tags: parsedTags.length > 0 ? parsedTags : undefined,
-      createdAt: new Date().toISOString(),
+      provenance: stated.provenance,
     });
-
-    if (storageQuota.overageMorsels > 0) {
-      await chargeOverage(storage, gaii, storageQuota.overageMorsels, 'storage_overage');
+    if (!written.ok) {
+      res.status(written.status).json(error(config.nodeId, written.code, written.message));
+      return;
     }
-
-    emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
-    emitResourceListChanged(gaii);
+    const file = written.file;
 
     res.status(201).json(success(config.nodeId, {
+      ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
       key: file.key,
       owner_gaii: file.ownerGaii,   // so a client can build the owner-addressed /v1/pub/<owner>/<key> embed URL
       size: file.size,
@@ -302,6 +305,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
     res.setHeader('Content-Length', file.size);
+    // How the bytes were made, as GET /v1/storage/{key} answers for the same file.
+    setProvenanceHeaders(res, await loadServedProvenance(storage, config, file.aiProvenanceId, { full: true }));
     res.end(file.data);
   });
 

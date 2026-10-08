@@ -28,6 +28,9 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   v1.1.0 -- 2026-10-08 -- The provenance record hashes the exact stored descriptor bytes (held until the
+ *     descriptor is written, then stored), the descriptor file and the catalogue rows carry its id, and a
+ *     re-publish of bytes already there stores no new record and names the one those bytes carry.
  *   v1.0.3 -- 2026-10-08 -- The package's provenance record states `mediaKind: data`.
  *   v1.0.2 -- 2026-09-26 -- The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.1 -- 2026-09-05 -- Notifies MCP through mcp/resource-events.ts, the leaf, rather than
@@ -36,10 +39,12 @@
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, A4/B1/B2).
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { writeStorageFile } from '../storage-file-write.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/resource-events.js';
-import { provenanceForWrite, type DeclaredProvenance } from '../ai-provenance.js';
+import {
+    provenanceForWrite, storeHeldProvenance, contentHashOf as recordHashOf, type DeclaredProvenance,
+} from '../ai-provenance.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
@@ -53,6 +58,20 @@ import { linkSourceImages } from './images.js';
 import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
+
+/**
+ * Point the held (not yet stored) records at the exact bytes that will be stored. The descriptor
+ * file carries its record's id, so its bytes exist only after the record was built; until 2026-10-08
+ * the record hashed a compact serialisation without the id, and the by-hash lookup of the bytes a
+ * reader downloads found nothing. A record the caller attached already exists and is not touched.
+ */
+function rehashHeldTo(held: AiProvenanceRecordRow[], bytes: Buffer): void {
+    const hash = recordHashOf(bytes);
+    for (const row of held) {
+        row.contentHash = hash;
+        if (row.record.attestation) row.record.attestation.contentHash = hash;
+    }
+}
 
 /** Who produced this version. Every road knows it; none of them may make it up. */
 export interface ProducedBy {
@@ -208,6 +227,11 @@ export async function publishPackage(
     // never stamped — so this is one call rather than a branch here. It lands AFTER the hash on
     // purpose: a provenance id is a fresh UUID, and putting it inside the identity would make two
     // identical runs produce two versions.
+    //
+    // A new record is HELD (B8): the stored descriptor carries the record's id, so the record's hash
+    // can only be taken of the exact stored bytes once the id is in them (rehashHeldTo below), and a
+    // re-publish of bytes already there stores no record at all.
+    const held: AiProvenanceRecordRow[] = [];
     const aiProvenanceId = await provenanceForWrite(storage, {
         principal: producedBy.gaii,
         content: stableStringify(descriptor),
@@ -222,6 +246,7 @@ export async function publishPackage(
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
         enabled: config.aiProvenance,
+        held,
     });
     if (aiProvenanceId) descriptor.aimeat.aiProvenanceId = aiProvenanceId;
 
@@ -236,6 +261,10 @@ export async function publishPackage(
         bytes: b.data.length,
     }));
     if (existing) {
+        // The bytes at this address are the earlier publish's, so the record they carry is the one
+        // this answer names; the record held above was never stored.
+        if (existing.aiProvenanceId) descriptor.aimeat.aiProvenanceId = existing.aiProvenanceId;
+        else delete descriptor.aimeat.aiProvenanceId;
         await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now);
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
         // out, and a re-publish of existing content pushed nothing out.
@@ -257,15 +286,20 @@ export async function publishPackage(
         }
     }
     const descriptorBytes = Buffer.from(JSON.stringify(descriptor, null, 2) + '\n', 'utf8');
+    rehashHeldTo(held, descriptorBytes);
     const wroteDescriptor = await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
         key: dKey,
         data: descriptorBytes,
         mimeType: 'application/json; charset=utf-8',
         visibility: 'public',
+        // The descriptor file names its record, so GET /v1/pub serves its marks and the by-hash
+        // lookup of the bytes a reader downloaded finds it.
+        ...(aiProvenanceId ? { aiProvenanceId } : {}),
     });
     if (!wroteDescriptor.ok) {
         return { ok: false, code: 'INVALID_INPUT', message: `storing the descriptor failed: ${wroteDescriptor.message}`, issues: [] };
     }
+    await storeHeldProvenance(storage, held);
 
     // The product sheet, projected from the descriptor and stored beside it. Generated rather than
     // authored: every field traces to something the descriptor already holds, so it cannot drift from
@@ -625,8 +659,11 @@ async function upsertCatalogueEntry(
             resources: descriptor.resources.map(r => ({ name: r.name, rowCount: r.rowCount, fields: r.schema.fields.length })),
         },
     };
+    // The catalogue rows carry the descriptor's record: they describe the same version, publicly.
+    const aiProvenanceId = descriptor.aimeat.aiProvenanceId;
     await deps.storage.setMemory({
         key, ownerGaii: ownerGhii, value: manifest,
+        ...(aiProvenanceId ? { aiProvenanceId } : {}),
         visibility: 'public', tags: ['knowledge-package', 'dataset', 'data-package'], ttlHours: null,
         version: existing ? existing.version + 1 : 1,
         createdAt: existing?.createdAt ?? now, updatedAt: now,
@@ -643,6 +680,7 @@ async function upsertCatalogueEntry(
                 schema: r.schema,
                 csvUrl: publicUrl(deps.config.baseUrl, ownerGhii, `${packageKeyRoot(descriptor.name)}/${bare(descriptor.aimeat.contentHash)}/${r.path}`),
             },
+            ...(aiProvenanceId ? { aiProvenanceId } : {}),
             visibility: 'public', tags: ['knowledge-entry', 'dataset'], ttlHours: null,
             version: prev ? prev.version + 1 : 1,
             createdAt: prev?.createdAt ?? now, updatedAt: now,

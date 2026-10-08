@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-08 — StorageFileRecord.aiProvenanceId: a stored file names its AI-provenance record.
  *   v1.4.0 — 2026-10-08 — WorkRecord.aiProvenanceId: the record of a work item's delivered output
  *     (migration 0098, aiprov D8).
  *   v1.3.0 — 2026-09-29 — ChunkedUploadRecord carries 'workspace' visibility and the group or
@@ -267,6 +268,10 @@ export interface StorageFileRecord {
   tags?: string[];
   createdAt: string;
   federate?: boolean;
+  /** The AI-provenance record about these bytes (TARGET-058). A public file makes its record
+   *  publicly resolvable, as a public memory row does. A new write under the same key carries its
+   *  own id or none: new bytes are a new statement. */
+  aiProvenanceId?: string;
 }
 
 export interface ChunkedUploadRecord {

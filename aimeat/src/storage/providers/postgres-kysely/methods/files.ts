@@ -12,6 +12,8 @@
  *   v1.2.0 — 2026-08-15 — TARGET-063: getStorageFileMeta and readStorageFileRange (database-side
  *     substring), and the UTF-8 verdict settled on write.
  *   v1.3.0 — 2026-10-03 — listFontFilesAcrossOwners: font files of every owner, one bounded query.
+ *   v1.4.0 — 2026-10-08 — aiProvenanceId is written, read on every path, and set alone by
+ *     setStorageFileProvenance. Schema: migrations/0096_storage_file_provenance.sql.
  */
 import { sql } from 'kysely';
 import type { ChunkedUploadRecord, StorageFileRecord } from '../../../interface.js';
@@ -25,6 +27,8 @@ export const fileMethods = {
       visibility: file.visibility, mimeType: file.mimeType, size: file.size, data: file.data,
       tags: file.tags || [], federate: file.federate ?? false, groupId: file.groupId ?? null,
       workspaceRef: file.workspaceRef ?? null, createdAt: new Date(file.createdAt), utf8Verified,
+      // A re-upload under the same key replaces the record too: new bytes, new statement or none.
+      aiProvenanceId: file.aiProvenanceId ?? null,
     };
     await this.db.insertInto('StorageFile').values({ key: file.key, ownerGaii: file.ownerGaii, ...shared })
       .onConflict(oc => oc.columns(['ownerGaii', 'key']).doUpdateSet(shared)).execute();
@@ -38,6 +42,7 @@ export const fileMethods = {
       key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
       groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
       size: r.size, data: Buffer.from(r.data), tags: r.tags || [], federate: r.federate ?? false,
+      aiProvenanceId: r.aiProvenanceId ?? undefined,
       utf8Verified: r.utf8Verified ?? undefined,
       createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
     };
@@ -45,13 +50,14 @@ export const fileMethods = {
 
   async getStorageFileMeta(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
     const r = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'createdAt'])
+      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'aiProvenanceId', 'createdAt'])
       .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
     if (!r) return null;
     return {
       key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
       groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
       size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
+      aiProvenanceId: r.aiProvenanceId ?? undefined,
       utf8Verified: r.utf8Verified ?? undefined,
       createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
     };
@@ -71,12 +77,13 @@ export const fileMethods = {
 
   async listStorageFiles(this: PostgresKyselyStorage, ownerGaii: string): Promise<StorageFileRecord[]> {
     const rows = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'createdAt'])
+      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'aiProvenanceId', 'createdAt'])
       .where('ownerGaii', '=', ownerGaii).execute();
     return rows.map(r => ({
       key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
       groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
       size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
+      aiProvenanceId: r.aiProvenanceId ?? undefined,
       createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
     }));
   },
@@ -86,13 +93,14 @@ export const fileMethods = {
     for (const g of ownerGaiis) out[g] = [];
     if (ownerGaiis.length === 0) return out;
     const rows = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'createdAt'])
+      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'aiProvenanceId', 'createdAt'])
       .where('ownerGaii', 'in', ownerGaiis).execute();
     for (const r of rows) {
       (out[r.ownerGaii] ??= []).push({
         key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
         groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
         size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
+        aiProvenanceId: r.aiProvenanceId ?? undefined,
         createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
       });
     }
@@ -111,7 +119,7 @@ export const fileMethods = {
     // One statement: the rows and, by a window count, how many matched. `data` is not selected, so
     // no bytea is read. The test for a font is the SQLite provider's (methods/files.ts).
     const rows = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'createdAt', sql<string>`count(*) over ()`.as('total')])
+      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'aiProvenanceId', 'createdAt', sql<string>`count(*) over ()`.as('total')])
       .where('ownerGaii', '!=', opts.excludeOwner ?? '')
       .where(sql<boolean>`(lower("mimeType") like 'font/%' or lower("mimeType") like 'application/font%' or lower("mimeType") like 'application/x-font%'
         or lower("key") like '%.woff2' or lower("key") like '%.woff' or lower("key") like '%.ttf' or lower("key") like '%.otf')`)
@@ -122,6 +130,7 @@ export const fileMethods = {
         key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
         groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
         size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
+        aiProvenanceId: r.aiProvenanceId ?? undefined,
         createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
       })),
     };
@@ -143,6 +152,12 @@ export const fileMethods = {
     const r = await this.db.updateTable('StorageFile').set(data).where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
     if (Number(r.numUpdatedRows ?? 0) === 0) return null;
     return this.getStorageFile(ownerGaii, key);
+  },
+
+  async setStorageFileProvenance(this: PostgresKyselyStorage, ownerGaii: string, key: string, aiProvenanceId: string): Promise<boolean> {
+    const r = await this.db.updateTable('StorageFile').set({ aiProvenanceId })
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
   },
 
   // ── Chunked uploads (transient, in-memory — matches the other backends) ──

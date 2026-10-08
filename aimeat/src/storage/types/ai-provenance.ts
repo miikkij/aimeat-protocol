@@ -29,6 +29,8 @@
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.4.0 — 2026-10-08 — `storage_files` joins the list: a public stored file is served to anyone
+ *     at /v1/pub, and its record answered 404 to the same visitor.
  *   v1.4.0 — 2026-10-08 — A facet carries the minted `reason` and the record's `mediaKind`, so the
  *     report decides each label for the content as it is now; the list filter is
  *     `unreviewedPublicOnly` (it no longer reads the stored `required`).
@@ -83,6 +85,17 @@ export const PUBLICLY_LINKED_CONTAINERS = [
     sqliteTable: 'board_posts',
     postgresTable: '"BoardPost"',
     publicWhen: "the post's board has visibility = 'public'",
+  },
+  {
+    /**
+     * Stored files: a public one is served to anyone at GET /v1/pub/{owner}/{key}, so a speech clip,
+     * a generated picture or a data package descriptor made public must have a record that resolves
+     * for the same stranger.
+     */
+    name: 'storage_files',
+    sqliteTable: 'storage_files',
+    postgresTable: '"StorageFile"',
+    publicWhen: "visibility = 'public'",
   },
 ] as const;
 

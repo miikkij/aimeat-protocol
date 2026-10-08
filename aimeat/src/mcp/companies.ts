@@ -14,6 +14,7 @@
  *   aimeat_company_list, _create, _update, _front_page, _portfolio_publish.
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-08 — aimeat_company_portfolio_publish passes the agent as the page's writer (AI provenance).
  *   2026-10-05 — aimeat_company_create and aimeat_company_update take ai_provenance and ai_provenance_id
  *     for the description and answer the record (secaudit 2026-10, M3 follow-up; the developer's decision).
  *     The update no longer sends the current description back, so only a new one gets a new record.
@@ -198,6 +199,7 @@ export function registerCompanyTools(
             try {
                 const { company, status } = await publishCompanyPortfolio(
                     config, storage, ownerGhii(), company_id, html,
+                    { principal: getAgentGaii(), pipeline: 'mcp.company_portfolio_publish' },
                 );
                 return ok({ company: wire(company), portfolio: status });
             } catch (e) { return fail(e); }

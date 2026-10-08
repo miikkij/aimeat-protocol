@@ -98,9 +98,16 @@
  *     visibility and consent decision, as GET /v1/memory/:gaii/:key now does, so an outsider leaves no
  *     refusal row in the owner's classification audit log. An admitted caller the label hides the
  *     file from still gets 404; a caller the access decision refuses gets that refusal, as for any file.
+ *   v1.19.0 -- 2026-10-08 -- AI provenance for stored files. POST /v1/storage (inline and presigned)
+ *     takes ai_provenance / ai_provenance_id and answers with the file's `ai_provenance` block. Every
+ *     door that serves a file's bytes or its handle sends AI-Disclosure and Link rel="ai-provenance"
+ *     after its access decision (GET /v1/pub both branches and ?mode=handle, GET and HEAD
+ *     /v1/storage, GET /v1/download/:token), and /v1/pub exposes both headers to scripts. PATCH
+ *     /v1/storage/{*key}/visibility takes a key with slashes, so ai-speech/ and ai-images/ files go
+ *     public in place.
  */
 import { Router } from 'express';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { setStoredFileHeaders, safeDownloadName } from '../utils/file-download-headers.js';
 import { storageChunkedUploadRouter } from './storage-files-chunked.js';
@@ -114,7 +121,9 @@ import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
-import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
+import { writeStorageFile, mintStorageUploadUrl, removeStorageFile, type StorageProvenanceInput } from '../services/storage-file-write.js';
+import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
+import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type ServedProvenance } from '../services/ai-provenance-marks.js';
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
@@ -164,6 +173,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         all: async () => (await storage.getStorageFile(ownerGaii, key))?.data ?? null,
     });
 
+    /** The file's AI-provenance marks (`AI-Disclosure`, `Link: rel="ai-provenance"`) on a response
+     *  whose read is ALREADY authorized: provenance travels with the content it describes. `full`
+     *  for the owner's own view; anyone else gets the record as AIMEAT_AI_PROVENANCE_DETAIL allows. */
+    const markProvenance = async (res: Response, file: StorageFileRecord, full: boolean): Promise<ServedProvenance | undefined> => {
+        const p = await loadServedProvenance(storage, config, file.aiProvenanceId, { full });
+        setProvenanceHeaders(res, p);
+        return p;
+    };
+
     // GET /v1/download/:token — presigned download (F11). No agent auth: the token IS the
     // capability and is scoped to one owner+key with a TTL. Lets binary bytes be fetched
     // out-of-band (handed off, embedded, streamed) instead of base64'd into the model context.
@@ -191,6 +209,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // are no longer audited (only denials + consent mutations — see consent-audit-buffer).
 
         res.setHeader('Cache-Control', 'private, max-age=300');
+        await markProvenance(res, file, false);
         // The token carries the save-as name when whoever minted it knew one. Content-Disposition
         // beats an anchor's `download` attribute in every browser, so a name the page knows is of no
         // use unless it reaches this response.
@@ -213,10 +232,19 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let federateFlag = false;
         let groupId: string | undefined;
         let workspaceRef: string | undefined;
+        // The writer, and what it said about how the bytes were made (services/storage-file-write.ts
+        // decides). A raw-body upload carries no statement: the writer alone decides its record.
+        let provenance: StorageProvenanceInput & { wireBlock?: unknown } = { actor: gaii, scopes: req.auth!.scopes, pipeline: 'rest.storage' };
 
         if (contentType.includes('application/json')) {
             const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef, workspace_refs: reqWorkspaceRefs } = req.body ?? {};
             federateFlag = reqFederate === true;
+            const stated = storageProvenanceFromBody(req.body, gaii, 'rest.storage', req.auth!.scopes);
+            if (!stated.ok) {
+                res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', 'The ai_provenance block does not validate.', undefined, { violations: stated.violations }));
+                return;
+            }
+            provenance = stated.provenance;
 
             // --- PRESIGNED MODE: return upload URL ---
             // The key fence and the token meta are the shared ones (services/storage-file-write.ts).
@@ -230,6 +258,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                     visibility: v as string | undefined,
                     groupId: reqGroupId as string | undefined,
                     workspaceRef: normalizeWorkspaceRefs(reqWorkspaceRefs, reqWorkspaceRef) || undefined,
+                    provenance,
                 });
                 if (!minted.ok) {
                     res.status(minted.status).json(error(config.nodeId, minted.code, minted.message));
@@ -285,6 +314,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             groupId,
             workspaceRef,
             federate: federateFlag === true,
+            provenance,
         });
         if (!written.ok) {
             res.status(written.status).json(error(config.nodeId, written.code, written.message));
@@ -293,6 +323,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         const { file, overageMorsels } = written;
 
         res.status(201).json(success(config.nodeId, {
+            // The record the file carries: the one attached, declared or stamped above.
+            ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
             key: file.key,
             owner_gaii: file.ownerGaii,
             size: file.size,
@@ -335,13 +367,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }));
     });
 
-    // PATCH /v1/storage/:key/visibility — change a file's visibility (owner of the file only).
-    // Mirrors PATCH /v1/memory/files/:key/visibility. `:key` (single segment) matches the dotted,
-    // slash-free keys used for workspace images; registered before the wildcard {*key} routes.
-    // Lets a document make its embedded images public so other viewers can load them.
-    router.patch('/v1/storage/:key/visibility', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
+    // PATCH /v1/storage/{*key}/visibility — change a file's visibility (owner of the file only).
+    // Mirrors PATCH /v1/memory/files/:key/visibility. Lets a document make its embedded images
+    // public so other viewers can load them, and a speech clip or a picture the node stored under
+    // ai-speech/ or ai-images/ go public in place: the key may hold slashes. It was a single-segment
+    // `:key` until 2026-10-08, so those keys answered 404 here. The file keeps its AI-provenance
+    // record, and a public file makes that record resolvable by anyone.
+    router.patch('/v1/storage/{*key}/visibility', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const gaii = resolve(req);
-        const key = req.params.key as string;
+        const key = extractKey(req.params);
         const { visibility } = req.body ?? {};
 
         if (!visibility || !['private', 'owner', 'public'].includes(visibility)) {
@@ -355,7 +389,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        res.json(success(config.nodeId, { key: updated.key, visibility: updated.visibility }));
+        res.json(success(config.nodeId, {
+            key: updated.key, visibility: updated.visibility,
+            ...await uploadProvenanceBlock(storage, config, updated.aiProvenanceId),
+        }));
         emitChange('memory');
     });
 
@@ -397,7 +434,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // a URL it can hand to a fetch, a document parser or a human. A file the caller does not own
         // gets the shorter TTL: the handle survives a revoked grant until it expires.
         const handleMode = (Array.isArray(req.query.mode) ? req.query.mode[0] : req.query.mode) === 'handle';
-        const sendHandle = async (accessorGaii: string): Promise<void> => {
+        const sendHandle = async (accessorGaii: string, prov: ServedProvenance | undefined): Promise<void> => {
             const ttl = accessorGaii === gaii ? OWN_HANDLE_TTL_SECONDS : FOREIGN_HANDLE_TTL_SECONDS;
             const token = await generateDownloadToken(
                 { sub: gaii, key, mimeType: file.mimeType, size: file.size, filename: requestedFilename(req) }, ttl,
@@ -408,6 +445,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 download_url: `${config.baseUrl}/v1/download/${token}`,
                 download_method: 'GET', expires_in_seconds: ttl,
                 note: 'Binary content is NOT inlined. GET download_url to fetch the bytes out-of-band.',
+                // How the bytes were made, the record and where it resolves (`ai_provenance`).
+                ...provenanceItemBlock(prov),
             }, [{ description: 'Fetch the file bytes', method: 'GET', url: `/v1/download/${token}` }]));
         };
 
@@ -425,7 +464,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
                 return;
             }
-            if (handleMode) { await sendHandle(req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : gaii); return; }
+            const viewer = req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : 'anonymous';
+            const prov = await markProvenance(res, file, viewer === gaii);
+            if (handleMode) { await sendHandle(req.auth?.sub ? viewer : gaii, prov); return; }
             // A public file is world-readable by definition, and for a long time only by <img>: a
             // script that fetched the same bytes got no Access-Control-Allow-Origin and was blocked.
             // The global CORS middleware resolves allowed origins from the CALLER's identity, and a
@@ -441,8 +482,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // from a browser at all — without it a fetch() sees the 206 and none of its geometry.
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-            // ETag and Last-Modified are exposed so a script can revalidate or compare what it holds.
-            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, ETag, Last-Modified');
+            // ETag and Last-Modified are exposed so a script can revalidate or compare what it holds,
+            // and AI-Disclosure and Link so a page that plays a public speech clip can read its label.
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length, ETag, Last-Modified, AI-Disclosure, Link');
             // Five minutes of freshness stays (decided 2026-09-13), and serveStoredFile adds the ETag
             // that lets a browser revalidate with a 304 once it runs out. A re-upload inside that
             // window is reached through the versioned address the upload answer hands out, since
@@ -511,7 +553,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        if (handleMode) { await sendHandle(accessorGaii); return; }
+        const consentedProv = await markProvenance(res, file, accessorGaii === gaii);
+        if (handleMode) { await sendHandle(accessorGaii, consentedProv); return; }
         // Same range contract as the public branch. A consented reader is reading the same kind of
         // artefact through a narrower door, and a door that answers ranges only when the file is
         // public would make "share this dataset with one buyer" a strictly worse product than
@@ -567,6 +610,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         res.setHeader('Content-Length', file.size);
         res.setHeader('X-AIMEAT-Visibility', file.visibility);
         res.setHeader('X-AIMEAT-Created', file.createdAt);
+        // The marks the GET sends, so a HEAD probe learns how the bytes were made without them.
+        await markProvenance(res, file, true);
         res.status(200).end();
     });
 
@@ -586,6 +631,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
+        // How the bytes were made, on every representation below: the owner's own file, its whole record.
+        const prov = await markProvenance(res, file, true);
         // F11: ?mode=handle | inline — return a JSON handle instead of raw bytes, so callers
         // (e.g. the connector MCP) never pull binary into the model context. Default = raw bytes.
         const mode = (Array.isArray(req.query.mode) ? req.query.mode[0] : req.query.mode) as string | undefined;
@@ -607,6 +654,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.json(success(config.nodeId, {
                     key: file.key, mime_type: file.mimeType, size: file.size, mode: 'inline',
                     content_text: whole.data.toString('utf8'), resource_uri: resourceUri,
+                    ...provenanceItemBlock(prov),
                 }));
                 return;
             }
@@ -619,6 +667,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 download_url: `${config.baseUrl}/v1/download/${token}`,
                 download_method: 'GET', expires_in_seconds: 3600, resource_uri: resourceUri,
                 note: 'Binary content is NOT inlined. GET download_url to fetch the bytes out-of-band.',
+                ...provenanceItemBlock(prov),
             }, [{ description: 'Fetch the file bytes', method: 'GET', url: `/v1/download/${token}` }]));
             return;
         }

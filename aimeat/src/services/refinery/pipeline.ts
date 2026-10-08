@@ -28,6 +28,8 @@
  *     words rate, limit, 429 or busy in any message (aiprov plan, A9).
  *   v1.0.4 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     The batch's decisions pass `limit: 'exempt'`: one batch is many calls, not one request each.
+ *   v1.0.5 — 2026-10-08 — The row's extractor block names the provenance record the extraction call
+ *     minted (provenanceId); a workspace row has no column for it.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -257,7 +259,10 @@ async function extract(ctx: Ctx, cls: RefineryClass, msg: MailMessage, att: { te
   let fields = parseJsonAnswer(r.content);
   if (!fields) { tries += 1; r = await ask(); fields = parseJsonAnswer(r.content); }
   if (!fields) throw new RefineryError('NO_JSON', 502, 'The model did not answer with the fields as JSON.');
-  return { fields, model: r.model, tries, files: att.fileKeys.length, attachmentChars: att.text.length };
+  // The record the extraction call minted. A workspace row has no provenance column, so the row's
+  // extractor block names it, and a reader resolves it at /v1/provenance/{id} like any other.
+  return { fields, model: r.model, tries, files: att.fileKeys.length, attachmentChars: att.text.length,
+    ...(r.provenance ? { provenanceId: r.provenance.id } : {}) };
 }
 
 async function processOne(ctx: Ctx, run: RunState, id: string, tick: () => void): Promise<Json> {
@@ -288,7 +293,8 @@ async function processOne(ctx: Ctx, run: RunState, id: string, tick: () => void)
     processedAt: new Date().toISOString(), automated: true, by: run.by,
     classifier: { by: cl.by, rule: cl.rule ?? '', model: cl.model ?? '', keySource: cl.keySource ?? '', probabilities: cl.probabilities ?? {},
       scrubbed: cl.scrubbed ?? 0, redacted: cl.redacted ?? 0, costUsd: cl.costUsd ?? null, cached: !!cl.cached },
-    extractor: ex ? { model: ex.model, tries: ex.tries, files: ex.files, attachmentChars: ex.attachmentChars } : null,
+    extractor: ex ? { model: ex.model, tries: ex.tries, files: ex.files, attachmentChars: ex.attachmentChars,
+      ...(ex.provenanceId ? { provenanceId: ex.provenanceId } : {}) } : null,
   };
   const rc = rowCaller(ctx.caller);
   await appendRows(ctx.deps, rc, { organismId: ctx.def.organismId, wsId: ctx.def.workspaceId, space: ctx.def.spaces.items,

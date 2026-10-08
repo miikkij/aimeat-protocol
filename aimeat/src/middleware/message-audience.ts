@@ -30,6 +30,8 @@
  *   import { audienceOf } from '../middleware/message-audience.js';
  *   if (audienceOf(code) === 'person') { ...it must read like a sentence... }
  * @version-history
+ *   v1.2.1 — 2026-10-09 — PROVENANCE_HASH_MISMATCH (machine) has its next step: attach the record made
+ *     for these bytes (aiprov plan, B12).
  *   v1.2.0 — 2026-10-08 — PROVIDER_REJECTED (machine), CONTENT_REFUSED and PROVIDER_NO_CREDIT have
  *     their next step. None ends in _ERROR, so none gets the "on us, try again" floor: the provider
  *     answered no, and the same call gets the same answer (aiprov plan, A1).
@@ -54,6 +56,8 @@ const MACHINE = [
     // The AI provider refused the request as sent (a model that does not make mp3, an unknown voice):
     // the caller changes the call.
     'PROVIDER_REJECTED',
+    // A provenance record attached to a file must name that file's bytes: the caller attaches another.
+    'PROVENANCE_HASH_MISMATCH',
 ];
 
 /**
@@ -195,6 +199,8 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     PROVIDER_REJECTED: 'The same call fails again as it is. Change the model, the format or the voice, then send it.',
     CONTENT_REFUSED: 'The AI provider will not make this. Change what you ask for; another try with the same words gets the same answer.',
     PROVIDER_NO_CREDIT: 'The key that pays has no credit left with the AI provider. Add credit there, or use another key.',
+    // A record names the exact bytes it describes by their SHA-256 (services/storage-file-write.ts).
+    PROVENANCE_HASH_MISMATCH: 'That provenance record describes other bytes. Attach the record made for this file, or declare a new one.',
 });
 
 /**

@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-08 — The result names the picture's provenance record: provenance_id and record_url.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 — 2026-09-28 — `role`, the AI role the call runs as, forwarded as on POST /v1/ai/image.
  *   v1.3.0 — 2026-09-28 — `provider` and `fallback`, forwarded as on POST /v1/ai/image (System 2, V3).
@@ -35,6 +36,7 @@ import { AiCompletionError } from '../services/ai/completion.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { recordUrlFor } from '../services/ai-provenance-marks.js';
 
 export function registerAiImageTool(
     mcp: McpServer,
@@ -87,6 +89,9 @@ export function registerAiImageTool(
                             cost_usd: r.usage.costUsd,
                             cost_exact: r.usage.costExact,
                             remaining_today_usd: r.budget.remainingUsd,
+                            // The record minted for the picture's bytes: the stored file names it, and
+                            // a public picture's record resolves for anyone at record_url.
+                            ...(r.provenance ? { provenance_id: r.provenance.id, record_url: recordUrlFor(config, r.provenance.id) } : {}),
                             note: r.visibility === 'public'
                                 ? 'Stored and publicly readable, so the URL can be handed to a vision model or used in an app.'
                                 : 'Stored privately. Pass public: true if a model or a page has to fetch it by URL.',
