@@ -21,6 +21,8 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.7.1 — 2026-10-08 — The browser bench's rewrite of a part keeps the part's provenance record
+ *     (aiprov E2): the bench result is the node's note on the part, not new writing in it.
  *   v1.7.0 — 2026-10-05 — The bench page's requests go through the headless browser's guard
  *     (headless-network.ts) and serveDocumentOnce, not the browser's own network (secaudit 2026-10,
  *     SSRF-1): a part's CSS or HTML is somebody's writing, and it ran on the node's machine.
@@ -303,6 +305,8 @@ export async function benchAndStamp(
     createdAt: record.createdAt,
     updatedAt: now,
     trackable: true,
+    // setMemory writes the column whole: an omitted id would erase how the part was made.
+    ...(record.aiProvenanceId ? { aiProvenanceId: record.aiProvenanceId } : {}),
   });
   return result;
 }

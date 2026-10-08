@@ -20,11 +20,15 @@
  *   READING THE PORTAL LAYOUT NEEDS NO SESSION, reading a member surface does. The portal's layout
  *   describes a page anyone can already look at, and the SPA fetches it before anybody has signed
  *   in. A member surface's layout is a statement about how this node's people work, which an
- *   enterprise operator has no reason to publish; the free-form passages behind it are private
- *   whatever this route does, because they are stored outside the world-readable prefix.
+ *   enterprise operator has no reason to publish; the free-form passages behind a member surface are
+ *   private whatever this route does, because they are stored outside the world-readable prefix. A
+ *   portal passage is stored public since 2026-10-08, because the portal serves it to anyone.
  * @structure siteLayoutRouter(config, storage)
  * @usage Mounted from siteRouter() so it inherits the site family's LB guard.
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The passage declaration is validated (400 on a block that does not parse)
+ *     and carries the session's scopes; the layout import refuses a declaration the writer may not
+ *     make, and one record id for more than one passage, before the first surface is written (aiprov E9).
  *   v1.0.1 — 2026-10-05 — Comments only: the older site routes ask requireOperator (askOperator with operator:admin) now, so the operator's agent holding operator:admin passes there as on MCP; the layout routes keep their own word (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -35,7 +39,7 @@ import { requireAuth, requireOperatorPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { SiteError } from '../services/site.js';
 import { SurfaceLayoutService, type LayoutSubmission, type PassageProvenance } from '../services/surface-layout/service.js';
-import { toDeclaredProvenance, type AiProvenanceToolInput } from '../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { blocksForSurface, defaultLayout, operatorLabelKey } from '../services/surface-layout/registry.js';
@@ -77,11 +81,19 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
      * travels, and silence stays UNSTATED rather than becoming a claim that a person wrote it.
      */
     function passageProvenance(req: Parameters<RequestHandler>[0]): PassageProvenance {
-        const body = (req.body ?? {}) as { ai_provenance?: AiProvenanceToolInput; ai_provenance_id?: unknown };
+        const body = (req.body ?? {}) as { ai_provenance?: unknown; ai_provenance_id?: unknown };
+        // Validated as every REST declaration is; it was mapped unchecked, so a bogus level reached
+        // the mint (aiprov E9). A block that does not parse is refused 400 by the caller of this.
+        const parsed = parseDeclaredProvenanceInput(body.ai_provenance);
+        if (!parsed.ok) {
+            throw new SiteError('INVALID_INPUT',
+                `The ai_provenance block does not parse: ${parsed.violations.map(v => `${v.path}: ${v.message}`).join('; ')}`, 400);
+        }
         return {
             principal: resolveIdentity(req.auth!, config.nodeId),
+            scopes: req.auth!.scopes,
             ...(typeof body.ai_provenance_id === 'string' ? { declaredId: body.ai_provenance_id } : {}),
-            ...(body.ai_provenance ? { declared: toDeclaredProvenance(body.ai_provenance) } : {}),
+            ...(parsed.declared ? { declared: parsed.declared } : {}),
         };
     }
 
@@ -231,6 +243,8 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
             const prepared = entries.map(([name, submission]) =>
                 svc.prepare(name as SurfaceId, submission, req.auth!.sub, 'import'));
             const declared = passageProvenance(req);
+            // Refused before the first surface is written, like every other refusal of a paste.
+            await svc.refuseProvenance(prepared, declared);
             const written: string[] = [];
             for (const p of prepared) {
                 await svc.commit(p, req.auth!.sub, declared);
