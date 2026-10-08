@@ -201,6 +201,15 @@
      "plain": "Narrow one agent to named tools Allow a coding agent to read Jira while withholding tools that change tickets. On a personal server, a grant can narrow one agent, one app or everyone acting for you to named tools. Fixed arguments override the caller's values, for example keeping requests in the SUPPORT project. An exact grant takes precedence over the default grant for everyone. Grants narrow existing permissions; they do not create access. aimeat_mcp_grant_list · aimeat_mcp_grant_set · GET /v1/mcp-servers/grants · PUT /v1/mcp-servers/{id}/grants · tools, locked_input, grantee"
     },
     {
+     "slug": "g-1-read-only-access-to-a-server",
+     "cells": [
+      "<strong>Read-only access to a server</strong>",
+      "Let an agent read from a server and never change anything on it, for example an agent that reads security alerts but must not block an address. A read-only grant admits only the tools the server itself marks as read-only. A tool without that mark is refused, and so is a tool the server adds later until the server marks it. Limits: the decision rests on the server's own description of each tool, so a server that marks a changing tool as read-only is trusted.",
+      "<code>aimeat_mcp_grant_set</code> with <code>read_only</code> · <code>PUT /v1/mcp-servers/{id}/grants</code> (<code>read_only</code>)"
+     ],
+     "plain": "Read-only access to a server Let an agent read from a server and never change anything on it, for example an agent that reads security alerts but must not block an address. A read-only grant admits only the tools the server itself marks as read-only. A tool without that mark is refused, and so is a tool the server adds later until the server marks it. Limits: the decision rests on the server's own description of each tool, so a server that marks a changing tool as read-only is trusted. aimeat_mcp_grant_set with read_only · PUT /v1/mcp-servers/{id}/grants (read_only)"
+    },
+    {
      "slug": "g-1-mcp-call-limits-and-grant-expiry",
      "cells": [
       "<strong>MCP call limits and grant expiry</strong>",
@@ -961,6 +970,15 @@
      "plain": "Extensions in a workspace An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removing records asks the agent for the permission to remove for good. extension manifest, ctx.workspace.publishRecords, ctx.workspace.deleteRecords, POST /v1/organisms/:id/workspace/records/publish (dry_run, create_only)"
     },
     {
+     "slug": "g-6-rows-from-an-extension-on-a-schedule",
+     "cells": [
+      "<strong>Rows from an extension on a schedule</strong>",
+      "An extension can fill a shared row space with nobody present, for example a feed of security alerts fetched every five minutes. An admin of the organism names the extension in the space's definition, and the extension asks for row access in its manifest, which the person installing it sees. Each row records the extension as its writer, and a row sent again with the same id replaces the earlier one, so a repeated fetch does not duplicate. Limits: the extension reaches only the row spaces that name it, its installer must be a member, and on a schedule it can neither read nor write records or documents.",
+      "manifest <code>workspace: { rows: true }</code>, space <code>extensions: [name]</code>, <code>ctx.workspace.appendRows</code>, <code>ctx.workspace.readRows</code>"
+     ],
+     "plain": "Rows from an extension on a schedule An extension can fill a shared row space with nobody present, for example a feed of security alerts fetched every five minutes. An admin of the organism names the extension in the space's definition, and the extension asks for row access in its manifest, which the person installing it sees. Each row records the extension as its writer, and a row sent again with the same id replaces the earlier one, so a repeated fetch does not duplicate. Limits: the extension reaches only the row spaces that name it, its installer must be a member, and on a schedule it can neither read nor write records or documents. manifest workspace: { rows: true }, space extensions: [name], ctx.workspace.appendRows, ctx.workspace.readRows"
+    },
+    {
      "slug": "g-6-organism-export-and-import",
      "cells": [
       "<strong>Organism export and import</strong>",
@@ -1378,6 +1396,15 @@
       "<code>/v1/extensions</code>, <code>/v1/ext/:name/:action</code>, <code>aimeat_extension_*</code>"
      ],
      "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_*"
+    },
+    {
+     "slug": "g-8-an-extension-names-the-services-it-calls",
+     "cells": [
+      "<strong>An extension names the services it calls</strong>",
+      "An extension can list the addresses it calls, and then it reaches those and no others, also when a service answers with a redirect elsewhere. The person installing it sees the list before approving.",
+      "manifest <code>network: { hosts: [...] }</code>"
+     ],
+     "plain": "An extension names the services it calls An extension can list the addresses it calls, and then it reaches those and no others, also when a service answers with a redirect elsewhere. The person installing it sees the list before approving. manifest network: { hosts: [...] }"
     },
     {
      "slug": "g-8-extension-hooks",
