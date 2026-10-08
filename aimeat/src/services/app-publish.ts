@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-08 — The board announcement post carries a provenance record of its own text (aiprov D13).
  *   2026-10-02 — The design spec's stamp is copied onto the new manifest, and `designSpecHint` says
  *     when a shared app has no spec or this version moved past the one it was written against
  *     (services/app-design-spec.ts). A hint, never a refusal.
@@ -667,15 +668,16 @@ export async function publishApp(
   // Board announcement — best-effort, never fails the publish.
   if (announces && config.appAnnouncementBoardId) {
     try {
+      const title = `${isUpdate ? '🔄' : '🚀'} ${manifest.name || filename} v${newVersion}`;
+      const body = `${manifest.description || 'A new app has been published.'}\n\nDownload: ${downloadUrl}`;
+      // aiprov D13: the post carries the record of its own words, stamped from the publisher (an agent's is model-written).
+      const postProvenanceId = await provenanceForWrite(storage, { principal: callerGaii, content: `${title}\n\n${body}`,
+        pipeline: 'app.announce', surface: { visibility: 'public', humanAudience: true }, labelPolicy: config.aiLabelPublic,
+        nodeId: config.nodeId, baseUrl: config.baseUrl, enabled: config.aiProvenance });
       await storage.createPost({
-        id: `post-${Date.now()}-${randomBytes(4).toString('hex')}`,
-        boardId: config.appAnnouncementBoardId,
-        authorGaii: callerGaii,
-        title: `${isUpdate ? '🔄' : '🚀'} ${manifest.name || filename} v${newVersion}`,
-        body: `${manifest.description || 'A new app has been published.'}\n\nDownload: ${downloadUrl}`,
-        tags: manifest.tags,
-        reactions: {},
-        createdAt: now,
+        id: `post-${Date.now()}-${randomBytes(4).toString('hex')}`, boardId: config.appAnnouncementBoardId,
+        authorGaii: callerGaii, title, body, tags: manifest.tags, reactions: {}, createdAt: now,
+        ...(postProvenanceId ? { aiProvenanceId: postProvenanceId } : {}),
       });
     } catch (err) { logger.warn('publishApp: board announcement is best-effort', { error: String(err) }); }
   }
