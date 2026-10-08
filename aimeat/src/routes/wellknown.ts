@@ -15,6 +15,10 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.9.0 — 2026-10-08 — GET /.well-known/ucp is the UCP 2026-08-25 business profile
+ *     (services/ucp/business-profile.ts): the guest checkout at /ucp/2026-08-25, the order
+ *     capability, keys[] and supported_versions. The 2026-04-08 profile moves, unchanged, to
+ *     /.well-known/ucp/2026-04-08.
  *   v1.8.1 — 2026-10-07 — The Server Card's commerce_tools note names /v1/commerce/tools?include=own,
  *     which adds the authenticated caller's own owner's unpriced callable tools.
  *   v1.8.0 — 2026-09-18 — GET /.well-known/ai-plugin.json is removed. ChatGPT stopped reading the
@@ -46,6 +50,7 @@ import { success } from '../middleware/envelope.js';
 import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { listPaymentHandlers } from '../commerce/payment-handlers.js';
+import { businessProfile } from '../services/ucp/business-profile.js';
 import {
   getWebBotAuthState, signatureDirectoryBody, signDirectoryResponse, SIGNATURES_DIRECTORY_MEDIA_TYPE,
 } from '../services/web-bot-auth.js';
@@ -232,7 +237,17 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
   // commerce transports (REST + MCP), the checkout capability, and every payment handler in the
   // commerce registry. The handler list is an honest edition indicator: a Community node
   // advertises only io.aimeat.morsels; an EE node's real-money handlers appear here automatically.
+  // The current profile, UCP 2026-08-25: the guest checkout for AI shopping platforms, the order
+  // capability, and the keys (services/ucp/business-profile.ts). It names the profile below in
+  // `supported_versions`.
   router.get('/.well-known/ucp', async (_req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.json(await businessProfile(storage, config));
+  });
+
+  // The 2026-04-08 profile, unchanged, for a platform still on that version: the signed-in checkout
+  // at /ucp/v1.
+  router.get('/.well-known/ucp/2026-04-08', async (_req, res) => {
     const b = config.baseUrl;
     const nodeKey = await storage.getNodeKey();
     const signingKeys = nodeKey

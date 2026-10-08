@@ -24767,12 +24767,32 @@ paths:
   /.well-known/ucp:
     get:
       operationId: ucpProfile
-      summary: UCP business profile (Universal Commerce Protocol)
+      summary: UCP business profile (Universal Commerce Protocol 2026-08-25)
       description: >-
-        UCP (2026-04-08) discovery profile of the commerce core — REST + MCP transports, the
-        checkout capability endpoints, every payment handler registered on this node (a
-        Community node advertises only io.aimeat.morsels; an Enterprise node's real-money
-        handlers appear automatically), and the node's Ed25519 signing key as a JWK.
+        The UCP 2026-08-25 business profile: the dev.ucp.shopping service over REST at
+        /ucp/2026-08-25 (the guest checkout for AI shopping platforms), the checkout and order
+        capabilities, the payment handlers the place's owner takes (Stripe's com.stripe.payments
+        once the owner gave their Stripe network profile and has a selling key), keys[] (the
+        ES256 key this node signs order webhooks with, and the node's Ed25519 key), and
+        supported_versions naming the 2026-04-08 profile.
+      tags: [Commerce]
+      responses:
+        '200':
+          description: UCP profile
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /.well-known/ucp/2026-04-08:
+    get:
+      operationId: ucpProfile20260408
+      summary: UCP business profile, version 2026-04-08 (the signed-in checkout)
+      description: >-
+        The profile of the signed-in checkout at /ucp/v1, unchanged from when it was the only
+        profile: REST transport, the checkout capability endpoints, every payment handler
+        registered on this node (morsels, cards on the seller's own Stripe, invoice, x402), and the
+        node's Ed25519 signing key.
       tags: [Commerce]
       responses:
         '200':
@@ -25573,6 +25593,129 @@ paths:
           description: No public manifest / unknown tool / missing backing capability
         '422':
           description: Unpriced tool with no capability binding
+
+  /ucp/2026-08-25/checkout-sessions:
+    post:
+      operationId: ucpGuestCreateCheckout
+      summary: UCP 2026-08-25 checkout for an AI shopping platform — create
+      description: >-
+        An AI shopping platform (Copilot, Gemini) creates a checkout for a person with no account
+        here. No bearer token: the UCP-Agent header (profile="https://…") names the platform, and a
+        request signed with RFC 9421 is verified against that profile's keys (401 when it does not
+        verify). Item ids are the feed ids of the place's product feed (aim…) or skus
+        ("offer:<agent GAII>:<offer id>", "app-tool:<owner>/<app>:<tool>"); USD only; packages are
+        not sold here. The response is the UCP checkout object (amounts in cents): `incomplete` until
+        buyer.email is given, then `ready_for_complete`. A business outcome (an item not sold here)
+        is HTTP 200 with `ucp.status: error` and `messages`. Idempotency-Key: a repeat with the same
+        body answers the stored response, with another body 409.
+      tags: [Commerce]
+      parameters:
+        - { name: UCP-Agent, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [line_items]
+              properties:
+                line_items:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    properties:
+                      item: { type: object, properties: { id: { type: string } } }
+                      quantity: { type: integer, minimum: 1, maximum: 100 }
+                buyer:
+                  type: object
+                  properties:
+                    first_name: { type: string }
+                    last_name: { type: string }
+                    email: { type: string }
+                    phone_number: { type: string }
+      responses:
+        '201': { description: 'The checkout (UCP 2026-08-25 checkout object).' }
+        '200': { description: 'A business outcome: ucp.status error with messages.' }
+        '400': { description: '{ code, content }: invalid_profile_url, invalid_request' }
+        '401': { description: '{ code, content }: signature_invalid, key_not_found' }
+        '409': { description: '{ code, content }: idempotency_conflict' }
+        '429': { description: '{ code, content }: rate_limited' }
+
+  /ucp/2026-08-25/checkout-sessions/{id}:
+    get:
+      operationId: ucpGuestGetCheckout
+      summary: UCP 2026-08-25 checkout — read
+      description: 'For the platform that created it (the same UCP-Agent profile). An open checkout past expires_at reads as canceled. 404 not_found for an unknown id and for another platform''s checkout alike.'
+      tags: [Commerce]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: UCP-Agent, in: header, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 'The checkout.' }
+        '404': { description: '{ code, content }: not_found' }
+    put:
+      operationId: ucpGuestUpdateCheckout
+      summary: UCP 2026-08-25 checkout — update (full replacement)
+      description: 'Replaces line_items and buyer. Refused while the checkout is being completed, and once it is completed or canceled.'
+      tags: [Commerce]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: UCP-Agent, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { line_items: { type: array, items: { type: object } }, buyer: { type: object } } }
+      responses:
+        '200': { description: 'The checkout, or a business outcome with messages.' }
+        '404': { description: '{ code, content }: not_found' }
+
+  /ucp/2026-08-25/checkout-sessions/{id}/complete:
+    post:
+      operationId: ucpGuestCompleteCheckout
+      summary: UCP 2026-08-25 checkout — complete (place the order)
+      description: 'payment.instruments: exactly one selected instrument whose credential is { type: stripe_payment_token, token: spt_… }. The token is charged on the SELLER''s own Stripe; the order is written with a fulfilment task per line, the seller''s side is booked, and the first order webhook goes to the platform''s webhook_url (its profile''s dev.ucp.shopping.order config), signed. A payment that fails is HTTP 200 with a payment_failed message and the checkout stays open.'
+      tags: [Commerce]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: UCP-Agent, in: header, required: true, schema: { type: string } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { payment: { type: object } } }
+      responses:
+        '200': { description: 'The completed checkout with `order`, or a business outcome with messages.' }
+        '404': { description: '{ code, content }: not_found' }
+
+  /ucp/2026-08-25/checkout-sessions/{id}/cancel:
+    post:
+      operationId: ucpGuestCancelCheckout
+      summary: UCP 2026-08-25 checkout — cancel
+      tags: [Commerce]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: UCP-Agent, in: header, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 'The canceled checkout, or a business outcome with messages.' }
+        '404': { description: '{ code, content }: not_found' }
+
+  /ucp/2026-08-25/orders/{id}:
+    get:
+      operationId: ucpGuestGetOrder
+      summary: UCP 2026-08-25 order — read
+      description: 'The full order snapshot (the same body the order webhook sends), for the platform that placed it. The request MUST be signed (RFC 9421) with a key of the platform''s profile: 401 signature_missing unsigned. An unknown order and another platform''s order answer 200 with ucp.status error, not_found.'
+      tags: [Commerce]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: UCP-Agent, in: header, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 'The order, or ucp.status error not_found.' }
+        '401': { description: '{ code, content }: signature_missing, signature_invalid' }
 
   /ucp/v1/checkout-sessions:
     post:
@@ -67441,6 +67584,7 @@ paths:
                 return_policy_label: { type: string, maxLength: 50, nullable: true, description: 'The return policy label set in Merchant Center (Store settings > UCP settings).' }
                 store_url: { type: string, nullable: true, description: 'Where a product with no page of its own links (https).' }
                 product_links: { type: object, additionalProperties: { type: string, nullable: true }, description: 'A product page per sku; a null value removes one.' }
+                stripe_profile_id: { type: string, nullable: true, pattern: '^profile_[A-Za-z0-9]{4,60}$', description: 'The Stripe network profile id (Stripe Dashboard > Agentic commerce). With it and a selling key, the UCP 2026-08-25 checkout offers com.stripe.payments.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.7.0 — 2026-10-08 — The /ucp/ paths keep the raw request body (req.rawBody) beside the parsed
+ *     one, for the Content-Digest of a signed UCP request (routes/ucp-checkout.ts).
  *   v1.6.0 — 2026-10-04 — appOriginSignIn() after CORS: the sign-in and registration routes refuse a
  *     request from an app (middleware/app-origin-sign-in.ts).
  *   v1.5.0 — 2026-10-01 — apexPageRedirect() after robotsHeader(): the node's content pages asked
@@ -172,7 +174,12 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     // (2026-09-08, e2e-mcp-dm-datapackage and e2e-mcp-extensions-apps).
     const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp');
     const limit = needsLargeBody ? `${config.jsonBodyLimitLargeMb}mb` : `${config.jsonBodyLimitMb}mb`;
-    express.json({ limit })(req, res, next);
+    // A UCP request may be signed (RFC 9421), and its Content-Digest is over the exact bytes, so the
+    // UCP paths keep the raw body beside the parsed one (routes/ucp-checkout.ts).
+    const keepRaw = req.path.startsWith('/ucp/')
+      ? (r: express.Request, _res: express.Response, buf: Buffer) => { (r as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf); }
+      : undefined;
+    express.json({ limit, ...(keepRaw ? { verify: keepRaw as never } : {}) })(req, res, next);
   });
   app.use((req, res, next) => {
     if (req.path.startsWith('/v1/upload/')) return next();

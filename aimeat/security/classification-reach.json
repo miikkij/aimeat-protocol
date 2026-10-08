@@ -1969,6 +1969,19 @@
       },
       "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the owner's feed settings record (signals.visibility.feed, reserved prefix) and the sealed selling key (commerce.psp) for the owner's own Stripe call. No content."
     },
+    "src/commerce/ucp-guest-checkout.ts": {
+      "reads": {
+        "getMemory": 9,
+        "listMemoryKeysByPrefix": 2
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the UCP guest checkout's own records under the seller (commerce.ucp.session.*, commerce.order.*, commerce.ucp.pending.*) and the sealed selling key (commerce.psp) for the seller's own Stripe charge; the key listing only counts open checkouts and finds webhooks that wait. No content."
+    },
+    "src/routes/ucp-checkout.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the stored answer to a repeated Idempotency-Key (commerce.ucp.idem.*) under the seller, written by this route. No content."
+    },
     "src/commerce/agent-order-intake.ts": {
       "reads": {
         "getMemory": 3

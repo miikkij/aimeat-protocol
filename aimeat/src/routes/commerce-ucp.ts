@@ -15,6 +15,7 @@
  *   - PATCH /ucp/v1/checkout-sessions/:id        update line_items OR { cancel: true }
  *   - POST  /ucp/v1/checkout-sessions/:id/complete  ({ payment: { handler?, instrument? } })
  * @version-history
+ *   v1.3.0 — 2026-10-08 — Mounts the UCP 2026-08-25 guest checkout (routes/ucp-checkout.ts).
  *   v1.2.0 — 2026-10-08 — A checkout opened here is attributed to the platform named in UCP-Agent, or
  *     the User-Agent (services/visibility/attribution.ts), for the seller's AI visibility report.
  *   v1.1.0 — 2026-08-10 — Security audit H-3: pass the completing principal to completeSession.
@@ -40,6 +41,7 @@ import type { SellableRef } from '../commerce/sellable-resolvers.js';
 import { PaymentError, listPaymentHandlers } from '../commerce/payment-handlers.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
+import { ucpCheckoutRouter } from './ucp-checkout.js';
 
 export const UCP_VERSION = '2026-04-08';
 const UCP_CAPABILITIES = [{ name: 'dev.ucp.shopping.checkout', version: '1' }];
@@ -233,6 +235,10 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
       res.json(ucpEnvelope(UCP_CAPABILITIES, { checkout_session: toUcpSession(completed) }));
     } catch (err) { sendUcpError(res, config, err); }
   });
+
+  // UCP 2026-08-25 for AI shopping platforms buying for a person with no account here (layer E),
+  // at /ucp/2026-08-25. This 2026-04-08 surface for signed-in AIMEAT buyers stays as it is.
+  router.use(ucpCheckoutRouter(config, storage));
 
   return router;
 }

@@ -60,7 +60,10 @@ USD-priced offers and app tools as a Microsoft Merchant Center feed (Copilot Che
 agent-commerce catalog. Read it, switch it on, set the brand, the return policy label and a page per
 product, and push the catalog into the owner's own Stripe with \`stripe_sync: "send"\`. Read its
 \`todo\` lines to the owner: they connect their own Merchant Center account to the feed address. An
-agent order through Stripe arrives as an order with a fulfilment task.
+agent order through Stripe arrives as an order with a fulfilment task. With the owner's Stripe network
+profile id (\`stripe_profile_id\`), AI platforms also buy directly through the place's own UCP checkout
+(/.well-known/ucp, version 2026-08-25) with Stripe shared payment tokens; those orders arrive the same
+way, and finishing the fulfilment task tells the platform the line was delivered.
 
 **Working state.** \`aimeat_memory_*\` for notes and state · \`aimeat_storage_upload\`/\`_download\`
 · \`aimeat_wallet_balance\`/\`_transactions\` · \`aimeat_handbook_get\`.

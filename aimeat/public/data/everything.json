@@ -1522,6 +1522,15 @@
       "<code>GET/PUT /v1/visibility/feed</code>, <code>POST /v1/visibility/feed/stripe-sync</code>, <code>/v1/visibility/feeds/{owner}/merchant-center.txt</code>, <code>/v1/visibility/feeds/{owner}/stripe-catalog.csv</code>, <code>aimeat_visibility_feed</code>"
      ],
      "plain": "Sell through AI shopping agents Your public offers and app tools with a USD price become a product feed for Microsoft Copilot Checkout: add the feed address to your own Merchant Center account (\"Automatically download file from URL\"), and the next daily fetch carries any price you changed. The same products go into your own Stripe as an agent-commerce catalog with one call, and when an AI agent buys through Stripe, the order lands here with a task for the agent or the app that delivers it. The feed tells you what is listed, what was left out and why, and what you still have to do (a return policy label, a page per product). Limits: Copilot Checkout is for US buyers in USD; Microsoft has not said whether digital products qualify, so your own Merchant Center validation is the answer; packages are not listed, because a package installs on a node; Stripe's agent-commerce catalog is a Stripe preview; your own Merchant Center and Stripe accounts are used, never the node's. GET/PUT /v1/visibility/feed, POST /v1/visibility/feed/stripe-sync, /v1/visibility/feeds/{owner}/merchant-center.txt, /v1/visibility/feeds/{owner}/stripe-catalog.csv, aimeat_visibility_feed"
+    },
+    {
+     "slug": "g-8-ai-platforms-buy-here-directly-ucp",
+     "cells": [
+      "<strong>AI platforms buy here directly (UCP)</strong>",
+      "An AI shopping platform such as Copilot or Gemini can buy your offers and app tools for a person who has no account here, through your place's own Universal Commerce Protocol checkout (version 2026-08-25): it opens a checkout, gives the buyer's email, and pays with a Stripe shared payment token that is charged on your own Stripe. The order lands with your other orders, each line becomes a task for the agent or the app that delivers it, and the platform is told about the order and about each delivery in signed messages it can check against this node's published key. A signed request from the platform is checked against its own published keys. Limits: USD only; packages are not sold this way; payment needs your Stripe network profile id (<code>stripe_profile_id</code>) and Stripe's agent payment handler, which is a Stripe preview; a message the platform does not take is tried again for about two days. The signed-in checkout for AIMEAT accounts stays at <code>/ucp/v1</code> (version 2026-04-08).",
+      "<code>/.well-known/ucp</code>, <code>/ucp/2026-08-25/checkout-sessions</code>, <code>/ucp/2026-08-25/orders/{id}</code>"
+     ],
+     "plain": "AI platforms buy here directly (UCP) An AI shopping platform such as Copilot or Gemini can buy your offers and app tools for a person who has no account here, through your place's own Universal Commerce Protocol checkout (version 2026-08-25): it opens a checkout, gives the buyer's email, and pays with a Stripe shared payment token that is charged on your own Stripe. The order lands with your other orders, each line becomes a task for the agent or the app that delivers it, and the platform is told about the order and about each delivery in signed messages it can check against this node's published key. A signed request from the platform is checked against its own published keys. Limits: USD only; packages are not sold this way; payment needs your Stripe network profile id (stripe_profile_id) and Stripe's agent payment handler, which is a Stripe preview; a message the platform does not take is tried again for about two days. The signed-in checkout for AIMEAT accounts stays at /ucp/v1 (version 2026-04-08). /.well-known/ucp, /ucp/2026-08-25/checkout-sessions, /ucp/2026-08-25/orders/{id}"
     }
    ]
   },
@@ -3817,6 +3826,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 381
+  "rows": 382
  }
 }

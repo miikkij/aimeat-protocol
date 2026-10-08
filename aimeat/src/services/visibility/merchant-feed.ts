@@ -52,6 +52,11 @@ export interface FeedSettings {
   productLinks: Record<string, string>;
   /** Where a product without a page of its own links. Defaults to the place's front page. */
   storeUrl: string | null;
+  /**
+   * The owner's Stripe network profile (`profile_…`, Stripe Dashboard > Agentic commerce). With it
+   * and a selling key, the place's own UCP checkout offers Stripe's `com.stripe.payments` handler.
+   */
+  stripeProfileId?: string | null;
 }
 
 export interface FeedProduct {

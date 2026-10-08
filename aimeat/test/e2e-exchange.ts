@@ -400,7 +400,8 @@ await test('Offerings list with ?stats=1 folds usage into each listing', async (
 // ── MONEY unit (real currency via the accrual rail) — needs a EUR money handler (test.money in E2E) ──
 let moneyEnabled = false;
 try {
-  const ucp = await fetch(`${BASE}/.well-known/ucp`).then((r) => r.json()) as any;
+  // The node's own handlers are on the profile of the signed-in checkout (UCP 2026-04-08).
+  const ucp = await fetch(`${BASE}/.well-known/ucp/2026-04-08`).then((r) => r.json()) as any;
   moneyEnabled = (ucp.ucp?.payment_handlers || []).some((h: any) =>
     Array.isArray(h.currencies) && h.currencies.includes('EUR'));
 } catch { /* leave false */ }

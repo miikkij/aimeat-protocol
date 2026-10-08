@@ -112,8 +112,10 @@ await test('Setup: operator-neutral + seller + buyer owners; seller publishes pr
     assert(pub.status === 200, `publish offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
 });
 
-await test('1. GET /.well-known/ucp — profile advertises checkout + the morsel handler', async () => {
-    const res = await fetch(`${BASE}/.well-known/ucp`);
+// The signed-in checkout at /ucp/v1 is written against UCP 2026-04-08, and its profile has its own
+// address since /.well-known/ucp became the 2026-08-25 profile of the guest checkout (2026-10-08).
+await test('1. GET /.well-known/ucp/2026-04-08 — profile advertises checkout + the morsel handler', async () => {
+    const res = await fetch(`${BASE}/.well-known/ucp/2026-04-08`);
     assert(res.status === 200, `status ${res.status}`);
     const profile = await res.json() as any;
     assert(typeof profile.ucp?.version === 'string', 'missing ucp.version');

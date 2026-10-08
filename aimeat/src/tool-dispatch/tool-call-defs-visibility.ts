@@ -59,6 +59,7 @@ export const visibilityCliTools: ConnectCliToolDefinition[] = [
       return_policy_label: { type: 'string', description: 'The Merchant Center return policy label. null removes it.' },
       store_url: { type: 'string', description: 'Where a product with no page of its own links. null resets.' },
       product_links: { type: 'object', description: 'A product page per sku; a null value removes one.' },
+      stripe_profile_id: { type: 'string', description: 'The Stripe network profile id (profile_...) for agent payments. null removes it.' },
       stripe_sync: { type: 'string', description: '"send" pushes the catalog into the person\'s own Stripe; "check" reads the last import.' },
     },
     handler: async ({ client }, input) => {
@@ -68,7 +69,7 @@ export const visibilityCliTools: ConnectCliToolDefinition[] = [
         if (enabled === undefined) throw new Error('enabled must be true or false');
         body.enabled = enabled;
       }
-      for (const key of ['brand', 'return_policy_label', 'store_url']) {
+      for (const key of ['brand', 'return_policy_label', 'store_url', 'stripe_profile_id']) {
         if (key in input) body[key] = input[key] === null ? null : String(requiredValue(input, key));
       }
       if ('product_links' in input) body.product_links = requiredValue(input, 'product_links');

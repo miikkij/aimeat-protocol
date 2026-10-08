@@ -38,6 +38,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.5.0 — 2026-10-08 — afterTaskCompleted marks a UCP order's line delivered and sends the order
+ *     webhook when the task fulfils an order an AI platform placed (commerce/ucp-guest-checkout.ts).
  *   v1.4.0 — 2026-10-04 — declineTask(): a task the agent refused with its reason ends as 'declined',
  *     not 'failed' (hosted fleet report, 2026-10-03).
  *   v1.3.0 — 2026-08-24 — completeTask() refuses a plan-less Hello Integration test task. It used to
@@ -67,6 +69,7 @@ import { isOnboardingTestTask } from './onboarding-test-task.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import { onUcpTaskDone } from '../commerce/ucp-guest-checkout.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
 
@@ -135,6 +138,11 @@ export async function afterTaskCompleted(
     // If this task was dispatched by a workflow, advance that run (output check → next step).
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
         .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));
+
+    // A fulfilment task of an order an AI platform placed over UCP: its line is delivered, and the
+    // platform hears it in the order webhook (commerce/ucp-guest-checkout.ts). Returns at once for
+    // any other task, and never throws.
+    void onUcpTaskDone(storage, config, updated ?? task);
 
     // The runner's live-progress record is spent now that the task is done: reclaim its key rather
     // than hold one per completed task forever. Safe to run concurrently with the workflow advance
