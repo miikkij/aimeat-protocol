@@ -27,6 +27,8 @@
  * @structure McpGrant · putMcpGrant · listMcpGrants · removeMcpGrant · resolveMcpAccess
  * @usage const verdict = await resolveMcpAccess({ storage, owner, server, grantee, tool, scopes });
  * @version-history
+ *   v1.2.0 — 2026-10-08 — `readOnly`: only tools the server marks readOnlyHint in its cached list,
+ *     so a log-reading agent can never reach a server's response tools (aimeat-soc).
  *   v1.1.0 — 2026-09-24 — The owner's pass needs `ownerInPerson` from the door: a caller whose name
  *     resolves to the owner's account (an app under a grant) holds only the scopes it was given.
  *   v1.0.0 — 2026-09-16 — Phase 2 of the MCP proxy.
@@ -68,6 +70,13 @@ export interface McpGrant {
   lockedInput?: Record<string, unknown>;
   /** A ceiling on calls in a rolling window. Counted from the usage stream, never from a counter. */
   callCap?: { count: number; windowHours: number };
+  /**
+   * Only tools the server itself marks `readOnlyHint: true` in its cached tool list. Applied on top
+   * of `tools`, so `'*'` with readOnly means every read-only tool, and a tool the server adds later
+   * stays closed until the server marks it read-only. A tool with no annotation is refused: the
+   * point is that a write never gets through because somebody forgot to say what a tool does.
+   */
+  readOnly?: boolean;
   expires: string | null;
   grantedBy: string;
   grantedAt: string;
@@ -117,7 +126,7 @@ export type McpAccess =
   | { allowed: true; lockedInput?: Record<string, unknown> }
   | { allowed: false; code: McpAccessRefusal; message: string };
 
-export type McpAccessRefusal = 'NO_SCOPE' | 'TOOL_NOT_GRANTED' | 'GRANT_EXPIRED' | 'CAP_REACHED';
+export type McpAccessRefusal = 'NO_SCOPE' | 'TOOL_NOT_GRANTED' | 'TOOL_NOT_READ_ONLY' | 'GRANT_EXPIRED' | 'CAP_REACHED';
 
 export interface AccessInput {
   storage: Storage;
@@ -191,6 +200,23 @@ export async function resolveMcpAccess(input: AccessInput): Promise<McpAccess> {
       message: `"${tool}" is not one of the tools this agent may use on "${server.slug}". `
         + `It may use: ${grant.tools.length ? grant.tools.join(', ') : 'none'}.`,
     };
+  }
+
+  // Read-only: decided by what the SERVER says the tool does, from the cached list, never by the
+  // tool's name. A tool missing from the cache or carrying no readOnlyHint is refused.
+  if (tool && grant.readOnly === true) {
+    const listed = (server.toolCache ?? []).find((t) => t.name === tool);
+    if (!listed || listed.annotations?.readOnlyHint !== true) {
+      const readable = (server.toolCache ?? [])
+        .filter((t) => t.annotations?.readOnlyHint === true && (grant.tools === '*' || grant.tools.includes(t.name)))
+        .map((t) => t.name);
+      return {
+        allowed: false,
+        code: 'TOOL_NOT_READ_ONLY',
+        message: `This agent may only read on "${server.slug}", and "${tool}" is not marked read-only by the server. `
+          + `It may use: ${readable.length ? readable.join(', ') : 'none'}.`,
+      };
+    }
   }
 
   if (grant.callCap && tool) {

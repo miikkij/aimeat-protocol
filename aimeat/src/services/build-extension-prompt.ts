@@ -18,6 +18,9 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.7 — 2026-10-08 — ADDITIVE: ctx.workspace.appendRows and readRows (workspace.rows,
+ *     objectTypes[].extensions) and `network: { hosts }`; the road table and one sentence that said a
+ *     scheduled run never has ctx.workspace now say it has the two row calls.
  *   v1.5.6 — 2026-10-06 — ADDITIVE: ctx.workspace.publishRecords and deleteRecords in the ctx table,
  *     and the rule that a batch goes in one call, never one record per call.
  *   v1.5.5 — 2026-10-05 — ADDITIVE: the manifest's `capabilities:` and what the sandbox does without
@@ -122,6 +125,8 @@ function sandboxSection(): string {
     '| `ctx.workspace.publish(orgId, ws, namespace, id, {expectedVersion})` | Publish the draft; `.latest` lands under the member |',
     '| `ctx.workspace.publishRecords(orgId, ws, namespace, [{id, value, visibility}], {expectedVersions, createOnly, dryRun})` | Publish up to 1000 records in ONE call. Answers `{published, skipped, failed, results: [{instance, ok, code, violations}]}`, one result per record. `dryRun` writes nothing; `createOnly` refuses an existing id (code `EXISTS`) |',
     '| `ctx.workspace.deleteRecords(orgId, ws, namespace, ids)` | Remove up to 2000 of the caller\'s own records in ONE call. Answers `{deleted: [{id, keys}], failed: [{id, reason}], rows_removed}` |',
+    '| `ctx.workspace.appendRows(orgId, ws, space, [{body, rowId, occurredAt}])` | Append up to 500 rows to a ROW space that names this extension (manifest `workspace: { rows: true }`). A repeated `rowId` replaces the stored row, which is how an ingest removes duplicates. Answers `{written, rowIds, pruned}`. Works on a schedule and a workflow step too |',
+    '| `ctx.workspace.readRows(orgId, ws, space, {where, since, until, changedSince, limit, cursor, order})` | One page of such a row space, newest first: `{rows, cursor, indexed}`. `where` takes only the space\'s `indexOn` fields |',
     '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
     '| `ctx.buy(appRef, tool, input)` | Buy one call of another owner\'s app tool, billed to this extension\'s owner. Needs a contract they already hold, else `{ok: false, code: \'NO_CONTRACT\'}` |',
     '| `ctx.wallet.consume(amount, reason)` | Spend the CALLER\'s morsels; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
@@ -182,7 +187,7 @@ function sandboxSection(): string {
     '| `wallet.consume`, `wallet.getBalance` | yes | yes | absent | absent |',
     '| `buy` | yes | absent | absent | absent |',
     '| `ai` | when the node runs background jobs | when the node runs background jobs | absent | yes |',
-    '| `workspace` | when the manifest declares it | when the manifest declares it | absent | absent |',
+    '| `workspace` | when the manifest declares it | when the manifest declares it | only `appendRows` and `readRows`, with `workspace: { rows: true }` | absent |',
     '| `instance` | on the instance address | when `instance_id` is passed | when the schedule or step names one | absent |',
     '',
     '**Test the method, not the object, and THROW when it is missing.** `ctx.wallet` is always an',
@@ -207,8 +212,21 @@ function sandboxSection(): string {
     'the organism, no contributor grant, an agent token without `memory:write`, a record the locked',
     'schema rejects, an `ifVersion` that no longer matches, the publish gate) reaches your script as a',
     'thrown `CODE: message`. Let it propagate and the caller gets the service\'s status and code; catch',
-    'it and answer in your own words. A scheduled run never has it. Every call costs one API call. A',
+    'it and answer in your own words. A scheduled run has only the two row calls below. Every call costs one API call. A',
     'record written this way carries provenance naming your extension, because a script produced it.',
+    '',
+    '**Rows on a schedule.** `workspace: { rows: true }` gives `ctx.workspace.appendRows` and `readRows`',
+    'on a ROW space whose manifest names your extension: `objectTypes[].extensions: [your-extension-name]`,',
+    'which an admin of the organism adds. Your installer must be an active member, and the space\'s',
+    '`writeRole` applies to them. These two calls do not act as the caller, so they work the same on a',
+    'request, a schedule and a workflow step, and a row records `ext:<name>` as its writer. On a request,',
+    'read `ctx.caller` yourself before you append on someone\'s behalf. Give each row a `rowId` derived',
+    'from the source event (`ctx.hash` of its id), so a repeated fetch replaces instead of duplicating.',
+    '',
+    '**Name the hosts you call.** A top-level `network: { hosts: [api.example.com] }` (with `network` in',
+    '`capabilities`) limits `ctx.fetch` to those exact hostnames, and a redirect to any other host is',
+    'refused with `Fetch blocked:`. The installer sees the list when they approve the package, so an',
+    'extension that names its hosts asks for less trust than one that may reach the whole internet.',
     '',
     '**A batch goes in one call, never one record per call.** A run has at most 500 API calls and 5',
     'seconds, and `write` + `publish` cost two calls per record, so 500 records that way cannot finish.',

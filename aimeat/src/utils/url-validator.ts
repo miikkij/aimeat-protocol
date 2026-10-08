@@ -10,6 +10,8 @@
  *   the request to an internal target.
  * @usage const resp = await safeFetch(url, { method, headers, body });
  * @version-history
+ *   v2.7.0 — 2026-10-08 — `allowHosts`: exact hostnames one call may reach, checked on every hop, so
+ *     an extension that declares `network: { hosts }` cannot be redirected off its list.
  *   v2.6.0 — 2026-09-23 — `allowOrigins`: the exact origins (scheme, host, port) ONE caller may reach
  *     although they are private, named by the operator. The decision provider call passes the
  *     origins in AIMEAT_DECIDE_PROVIDER_EGRESS, so a public node can reach its own model containers
@@ -194,6 +196,13 @@ export interface SafeFetchInit extends RequestInit {
    * out of the list is checked like any other address.
    */
   allowOrigins?: readonly string[];
+  /**
+   * Exact hostnames (lowercase, no port, no suffix match) this call may reach at all. Checked on
+   * EVERY hop before the SSRF validation, so a redirect to a host outside the list is refused rather
+   * than followed. It narrows and never widens: a listed host still passes validateOutboundUrl.
+   * An extension's manifest `network: { hosts }` is the caller that names it.
+   */
+  allowHosts?: readonly string[];
 }
 
 /**
@@ -223,7 +232,8 @@ export function setOutboundRequestSigner(signer: OutboundRequestSigner | null): 
  * vector — the practically exploitable one — is closed.
  */
 export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promise<Response> {
-  const { maxRedirects = 5, sensitiveHeaders = [], allowOrigins, ...fetchInit } = init;
+  const { maxRedirects = 5, sensitiveHeaders = [], allowOrigins, allowHosts, ...fetchInit } = init;
+  const hostList = allowHosts ? allowHosts.map(h => h.toLowerCase()) : null;
   let target = urlStr;
   // The origin the caller's headers were meant for. Once a redirect leaves it, anything the caller
   // named as sensitive is dropped: the SSRF re-validation below proves the new host is not
@@ -248,6 +258,12 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
   let body = fetchInit.body;
   let headers = fetchInit.headers;
   for (let hop = 0; hop <= maxRedirects; hop++) {
+    if (hostList) {
+      const h = URL.canParse(target) ? new URL(target).hostname.toLowerCase() : null;
+      if (!h || !hostList.includes(h)) {
+        throw new Error(`Fetch blocked: ${h ? `host ${h}` : 'this address'} is not one of the hosts this caller may reach (${hostList.join(', ')})${hop > 0 ? ', and a redirect named it' : ''}.`);
+      }
+    }
     const check = await validateOutboundUrl(target, allowOrigins ? { allowOrigins } : {});
     if (!check.valid) throw new Error(`Fetch blocked: ${check.reason}`);
     let hopHeaders = headers;

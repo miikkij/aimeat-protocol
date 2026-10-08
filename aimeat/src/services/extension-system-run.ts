@@ -33,6 +33,8 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.5.0 — 2026-10-08 — ctx.workspace with the two row calls only, when the manifest declares
+ *     workspace.rows (services/extension-workspace.ts, buildUnattendedExtensionWorkspace).
  *   v1.4.0 — 2026-10-05 — The run passes the extension's capabilities to buildExtensionCtx (secaudit
  *     2026-10, PKG-3).
  *   v1.3.0 -- 2026-09-28 -- System 2 plan, V6: `providerCall` (passed to buildExtensionCtx) and
@@ -55,6 +57,7 @@ import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail, sandboxLi
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 import type { ExtensionCtxDeps } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
+import { buildUnattendedExtensionWorkspace } from './extension-workspace.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
 import { getEncryptionKey } from './encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
@@ -175,10 +178,13 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey),
         instance: instanceCtx,
         logPrefix: `[ext:${ext.name}:${logLabel}]`,
-        // No wallet: see the file header. No workspace either: ctx.workspace acts on the CALLER's
-        // organism workspace as the caller, and an unattended run has nobody present to act as —
-        // a schedule naming the owner would be the owner's authority on a clock, which is what the
-        // scope guard on the attended roads exists to refuse.
+        // No wallet: see the file header. Of ctx.workspace, only the two row calls: the record and
+        // document calls act on the CALLER's workspace as the caller, an unattended run has nobody
+        // present to act as, and a schedule naming the owner would be the owner's authority on a
+        // clock, which is what the scope guard on the attended code paths exists to refuse. The row
+        // calls stand on the organism naming this extension in the space (row-service.ts,
+        // authorizeExtension) and on the manifest's workspace.rows, never on the owner's session.
+        workspace: buildUnattendedExtensionWorkspace({ config, storage, ext, ownerGhii: storageOwnerGhii }).workspace,
         files: makeExtensionFiles({
             config, storage, extName: ext.name,
             callerGaii: storageOwnerGhii,

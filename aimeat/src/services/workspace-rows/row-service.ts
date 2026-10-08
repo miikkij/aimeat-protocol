@@ -28,6 +28,10 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   v1.5.0 — 2026-10-08 — authorizeExtension + gate(): an extension caller (ctx.workspace.appendRows,
+ *     readRows) reaches one row space by the two-hand rule (the space names the extension, the
+ *     manifest declares workspace.rows, the installer holds an active membership), also when it
+ *     runs on a schedule or a workflow step.
  *   v1.4.0 — 2026-09-29 — readRows and readRow take a classification reader, which every row read
  *     passes (TARGET-082).
  *   v1.3.0 — 2026-09-24 — A write on the app path meets the space's writeRole too, with the person's
@@ -79,6 +83,11 @@ export interface RowCaller {
   roles: string[];
   /** For a role-'app' session: the app's own id, `owner/filename`, from the grant's `app` claim. */
   app?: string;
+  /**
+   * For an extension writing through `ctx.workspace.appendRows`: its installed name. Set only by
+   * services/extension-workspace.ts, never from a request, and `owner` is then the installer.
+   */
+  extension?: string;
 }
 
 export interface RowServiceDeps {
@@ -160,14 +169,44 @@ async function authorizeApp(
 }
 
 /**
- * Every entry point goes through here: the app path when the caller is one, else the member path.
- * Either way a write then meets the space's writeRole, with the membership of the person the caller
- * is or acts for: an app is never more than its person.
+ * The EXTENSION path: the same two hands as the app path, for a script that may run with nobody
+ * present.
+ *
+ * A schedule or a workflow step runs an extension with no session, and the attended road's rule
+ * (the extension acts as its caller) has no caller to act as. Lending it the installer's own
+ * membership would put the owner's whole authority on a clock, which the scope guard on the
+ * attended road exists to refuse. So an extension reaches a row space only when (1) the ORGANISM
+ * named the extension in the space's `extensions` list, (2) its manifest declared `workspace.rows`,
+ * which services/extension-workspace.ts checked before the call arrived and the install approval
+ * showed, and (3) its INSTALLER is an active member. It appends to and reads that space; every other
+ * space, and every record and document surface, stays closed to it. Decided 2026-10-08 so an alert
+ * ingest on a schedule can fill a SOC queue (aimeat-soc).
+ */
+async function authorizeExtension(
+  deps: RowServiceDeps, caller: RowCaller, organismId: string, space: RowSpace,
+): Promise<void> {
+  const ext = (caller.extension ?? '').trim().toLowerCase();
+  if (!ext || !space.extensions.includes(ext)) {
+    throw new WorkspaceRowError('ACCESS_DENIED', 403,
+      `This space is not open to the extension ${ext || '(unnamed)'}. An organism admin names the extensions a row space accepts in the manifest (objectTypes[].extensions).`);
+  }
+  const membership = await deps.storage.getMembership(organismId, caller.owner);
+  if (!membership || membership.status !== 'active') {
+    throw new WorkspaceRowError('ACCESS_DENIED', 403, 'The person who installed this extension is not an active member of this organism.');
+  }
+}
+
+/**
+ * Every entry point goes through here: the app path or the extension path when the caller is one,
+ * else the member path. Either way a write then meets the space's writeRole, with the membership of
+ * the person the caller is or acts for: an app or an extension is never more than its person.
  */
 async function gate(
   deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, space: RowSpace, mode: 'read' | 'write',
 ): Promise<void> {
-  if (caller.roles.includes('app')) {
+  if (caller.extension !== undefined) {
+    await authorizeExtension(deps, caller, organismId, space);
+  } else if (caller.roles.includes('app')) {
     await authorizeApp(deps, caller, organismId, space);
   } else {
     await authorize(deps, caller, organismId, wsId, space.namespace, mode);

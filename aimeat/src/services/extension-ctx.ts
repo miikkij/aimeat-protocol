@@ -29,6 +29,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.12.0 — 2026-10-08 — ctx.fetch reaches only `capabilities.hosts` when the manifest names
+ *     `network: { hosts }`, refused before any secret is resolved and on every redirect hop.
  *   v1.11.0 — 2026-10-05 — `capabilities` is required: ctx.fetch refuses without `network`, and
  *     ctx.ai, ctx.email and ctx.buy are attached only with `ai`, `email` and `payments`. The approval
  *     read the script text and the sandbox gave everything, so an aliased call got past it
@@ -672,8 +674,19 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
         // GUARD (2026-09-28, System 2 plan V6): in a provider run the host is checked against the
         // declared list BEFORE any secret is resolved, and the owner's provider key is added last,
         // after the vault placeholders, so nothing the script wrote can override it.
+        //
+        // GUARD (2026-10-08): a manifest that names `network: { hosts }` reaches only those hosts.
+        // Checked here before any secret is resolved, and again on every redirect hop by safeFetch.
         fetch: async (url, opts, host) => {
             if (deps.providerCall) assertProviderHost(deps.providerCall, url);
+            const declaredHosts = deps.capabilities.hosts;
+            if (declaredHosts) {
+                const h = URL.canParse(url) ? new URL(url).hostname.toLowerCase() : null;
+                if (!h || !declaredHosts.includes(h)) {
+                    throw new Error(`Fetch blocked: ${h ? `host ${h}` : 'this address'} is not one of the hosts this extension declared `
+                        + `(network.hosts: ${declaredHosts.join(', ')}).`);
+                }
+            }
             const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);
             const inject = deps.providerCall?.inject;
             // The owner's key never travels in clear text: over https only, or http to localhost on
@@ -693,6 +706,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 // The caller's deadline when it has one — the sandbox road hands over the run's own
                 // timeout and its teardown signal — and this file's ceiling when it does not.
                 signal: host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS),
+                ...(declaredHosts ? { allowHosts: declaredHosts } : {}),
             });
             // Opted in per extension, in its manifest config — so a feed reader keeps the forgiving
             // default and a package producer gets a failed run instead of a mojibake version.

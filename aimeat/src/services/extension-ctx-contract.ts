@@ -13,6 +13,8 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.6.0 — 2026-10-08 — `ctx.workspace.appendRows` and `readRows`: a row space that names the
+ *     extension, also on a schedule or a workflow step (services/extension-workspace.ts).
  *   v1.5.0 — 2026-10-06 — `ctx.workspace.publishRecords` and `deleteRecords`: a batch of records in
  *     one host call (services/workspace-tool-ops.ts).
  *   v1.4.0 — 2026-09-28 — `ctx.ai.start` takes `role`, the AI role the job's call runs as.
@@ -211,6 +213,15 @@ export interface ExtensionCtx {
         publishRecords(organismId: string, ws: string, namespace: string, records: Array<{ id: string; value: unknown; visibility?: string }>, opts?: { expectedVersions?: Record<string, number | null>; createOnly?: boolean; dryRun?: boolean }): Promise<unknown>;
         /** Remove up to 2000 records the caller owns in ONE call: `{ deleted: [{ id, keys }], failed: [{ id, reason }], rows_removed }`. */
         deleteRecords(organismId: string, ws: string, namespace: string, ids: string[]): Promise<unknown>;
+        /**
+         * Append up to 500 rows `[{ body, rowId?, occurredAt? }]` to a ROW space that names this
+         * extension (`objectTypes[].extensions`); manifest `workspace.rows`. A repeated `rowId`
+         * replaces the stored row. Works on a schedule and a workflow step too. Answers
+         * `{ written, rowIds, pruned }`.
+         */
+        appendRows(organismId: string, ws: string, space: string, rows: Array<{ body: Record<string, unknown>; rowId?: string; occurredAt?: string }>): Promise<unknown>;
+        /** One page of a row space that names this extension, newest first: `{ rows, cursor, indexed }`. */
+        readRows(organismId: string, ws: string, space: string, opts?: { where?: Record<string, unknown>; since?: string; until?: string; changedSince?: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' }): Promise<unknown>;
     };
     /**
      * Who invoked this action. `member` is their standing in the app this extension gates, resolved

@@ -9,14 +9,18 @@
  *   mcp/index → mcp/extensions → manifest.ts) closed an import cycle dependency-cruiser refused.
  * @structure WorkspaceDeclaration · WORKSPACE_DECLARATION_KEY · workspaceDeclarationOf()
  * @usage
- *   const decl = workspaceDeclarationOf(ext);   // { read, write } | null
+ *   const decl = workspaceDeclarationOf(ext);   // { read, write, rows } | null
  * @version-history
+ *   v1.1.0 — 2026-10-08 — `rows`: the extension may append to and read row spaces that name it in
+ *     their manifest (`objectTypes[].extensions`), on a schedule or a workflow step as well as on a
+ *     call. The organism's naming is the grant; this flag is what the install approval shows.
  *   v1.0.0 — 2026-09-05 — Initial, split out of extension-workspace.ts at the cycle.
  */
 import type { ExtensionRecord } from '../storage/interface.js';
 
-/** What a manifest may declare. Both default to false; absent means no capability at all. */
-export interface WorkspaceDeclaration { read: boolean; write: boolean }
+/** What a manifest may declare. All default to false; absent means no capability at all.
+ *  `rows` is the only one an unattended run (schedule, workflow step) gets. */
+export interface WorkspaceDeclaration { read: boolean; write: boolean; rows: boolean }
 
 /** The config key the manifest builder writes the declaration to. `__`-prefixed, so a manifest's
  *  own `config:` block cannot set it (services/extension-manifest.ts strips those). */
@@ -29,5 +33,6 @@ export function workspaceDeclarationOf(ext: Pick<ExtensionRecord, 'config'>): Wo
     const d = raw as Record<string, unknown>;
     const read = d.read === true;
     const write = d.write === true;
-    return read || write ? { read, write } : null;
+    const rows = d.rows === true;
+    return read || write || rows ? { read, write, rows } : null;
 }

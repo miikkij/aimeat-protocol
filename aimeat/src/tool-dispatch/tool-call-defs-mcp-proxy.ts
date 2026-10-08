@@ -144,6 +144,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
                 ...(input.locked_input ? { locked_input: input.locked_input } : {}),
                 ...(input.call_cap ? { call_cap: input.call_cap } : {}),
                 ...(optionalString(input, 'expires') ? { expires: optionalString(input, 'expires') } : {}),
+                ...(input.read_only === true ? { read_only: true } : {}),
             },
         ),
     },

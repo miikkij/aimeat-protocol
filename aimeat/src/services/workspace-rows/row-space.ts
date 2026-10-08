@@ -22,6 +22,8 @@
  *   - retentionOf                 -- the declared window, normalised
  * @usage const space = resolveRowSpace(manifest, 'mailmessage');
  * @version-history
+ *   v1.2.0 — 2026-10-08 — `extensions`: the installed extensions the organism opened the space to,
+ *     for an ingest that runs on a schedule (row-service.ts authorizeExtension).
  *   v1.1.0 — 2026-08-29 — `apps`: the apps the organism opened the space to, normalised to
  *     lowercase owner/filename.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -55,6 +57,13 @@ export interface RowObjectType {
    * scope at sign-in. Both hands, or neither. Read the design in row-service.ts (authorizeApp).
    */
   apps?: unknown;
+  /**
+   * Extensions this space is open to, by installed name. An extension that runs on a schedule or a
+   * workflow step has nobody present, so it can never borrow a caller's membership: the ORGANISM
+   * names the extension here, the extension's manifest declares `workspace.rows`, and its installer
+   * must be an active member. Read the design in row-service.ts (authorizeExtension).
+   */
+  extensions?: unknown;
 }
 
 /** A resolved row space: what to store into, what is indexed, and how long rows stay. */
@@ -67,6 +76,8 @@ export interface RowSpace {
   retention: { maxRows: number | null; maxDays: number | null };
   /** The apps the organism opened this space to (`owner/filename`, lowercase). Empty = none. */
   apps: string[];
+  /** The extensions the organism opened this space to (installed names, lowercase). Empty = none. */
+  extensions: string[];
 }
 
 /** The three columns, as the storage layer takes them. */
@@ -129,6 +140,10 @@ export function resolveRowSpace(
     // `owner/filename`, lowercased, so the comparison with the grant's `app` claim is exact.
     apps: Array.isArray(ot.apps)
       ? ot.apps.filter((a): a is string => typeof a === 'string' && a.includes('/')).map((a) => a.trim().toLowerCase())
+      : [],
+    // Installed extension names, lowercased; a name with a slash is an app, never an extension.
+    extensions: Array.isArray(ot.extensions)
+      ? ot.extensions.filter((e): e is string => typeof e === 'string' && !!e.trim() && !e.includes('/')).map((e) => e.trim().toLowerCase())
       : [],
   };
 }
