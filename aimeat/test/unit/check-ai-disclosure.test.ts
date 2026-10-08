@@ -7,6 +7,9 @@
  *   ai-provenance-marks.ts that names the forbidden vocabulary in order to forbid it.
  * @usage pnpm test -- check-ai-disclosure
  * @version-history
+ *   v1.3.1 — 2026-10-08 — The derived-visibility case removes every clause reading the apps table: the
+ *     legal-page clause (aiprov D3) also reads it, so removing one left the table covered and the
+ *     case green against a gate that had not been tripped. Its setup no longer matched the source.
  *   v1.3.0 — 2026-10-05 — The required-tool case drops the field from the catalog entry (both MCP surfaces
  *     register the catalog's schema) and runs the gate in a child process; the connector-read case
  *     breaks the fold inside withProvenanceCarrying(), which most connector reads run through now
@@ -161,8 +164,10 @@ describe('drop a label on purpose and the build fails', () => {
   });
 
   it('[derived-visibility] a provider predicate that stops covering apps', async () => {
+    // Every clause that reads the apps table goes: the published app's and, since 2026-10-08, its
+    // legal pages' (aiprov D3), which would otherwise keep the table covered.
     breakFile('src/storage/providers/sqlite/methods/ai-provenance.ts', (src) =>
-      src.replace(/OR EXISTS \(SELECT 1 FROM apps a[\s\S]*?accessCode IS NULL\)/, ''));
+      src.replace(/FROM apps a\b/g, 'FROM apps_gone a'));
     const { code, out } = await runGate();
     expect(code).toBe(1);
     expect(out).toContain('does not cover the "apps" container');
