@@ -14,6 +14,10 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.19.0 -- 2026-10-08 -- The model list answers a provider's status through the one table
+ *     (services/ai/errors.ts): a permanent 4xx is 422 PROVIDER_REJECTED, a 5xx OPENROUTER_ERROR 502,
+ *     a refused key 424. /test and /complete answer a failure that is not the provider's as 500
+ *     INTERNAL_ERROR, not 502 OPENROUTER_ERROR, and pass the refusal's details (aiprov plan, A1, A8).
  *   v1.18.0 -- 2026-10-07 -- The model list answers a provider's key refusal with 424 INVALID_API_KEY, not 401.
  *   v1.17.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     POST /v1/openrouter/complete counts the account on the route (aiCallLimit), not per principal.
@@ -95,7 +99,8 @@ import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
-import { completeForOwner, AiCompletionError, assertProviderAllowed, PROVIDER_KEY_REFUSED_STATUS } from '../services/ai/completion.js';
+import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai/completion.js';
+import { nodeFailureOf, providerFailureOf } from '../services/ai/errors.js';
 import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
 import { holdsImplicitFreeModel } from '../services/ai-model-defaults.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
@@ -144,12 +149,18 @@ const TEST_APP_ID = 'openrouter:test';
  * code string should keep working. Everything else — NO_API_KEY, INVALID_API_KEY, RATE_LIMITED,
  * ENCRYPTION_NOT_CONFIGURED — already shares a spelling with what this route returned before.
  */
-function completionError(e: AiCompletionError): { status: number; code: string; message: string } {
+function completionError(e: AiCompletionError): { status: number; code: string; message: string; details?: Record<string, unknown> } {
   return {
     status: e.status,
     code: e.code === 'PROVIDER_ERROR' ? 'OPENROUTER_ERROR' : e.code,
     message: e.message,
+    ...(e.details ? { details: e.details } : {}),
   };
+}
+
+/** A failed call on these routes: the typed refusal in this route's spelling, anything else the node's 500. */
+function routeFailure(e: unknown, where: string): { status: number; code: string; message: string; details?: Record<string, unknown> } {
+  return completionError(nodeFailureOf(e, where));
 }
 
 /**
@@ -478,11 +489,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         modelCache.set(cacheKey, { models, expiresAt: Date.now() + MODEL_CACHE_TTL });
         res.json(success(config.nodeId, { models, modality }));
       } catch (e) {
-        const status = (e as { status?: number }).status;
-        if (status === 401) {
-          return res.status(PROVIDER_KEY_REFUSED_STATUS).json(error(config.nodeId, 'INVALID_API_KEY', 'API key was rejected.'));
-        }
-        return res.status(502).json(error(config.nodeId, 'OPENROUTER_ERROR', (e as Error).message));
+        // The one status table every AI path uses (services/ai/errors.ts), in this route's spelling.
+        const m = completionError(providerFailureOf(e));
+        return res.status(m.status).json(error(config.nodeId, m.code, m.message, m.status, m.details));
       }
     });
 
@@ -513,11 +522,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         // The model this route was ASKED to test, not what the provider echoed — unchanged.
         res.json(success(config.nodeId, { ok: true, model }));
       } catch (e) {
-        if (e instanceof AiCompletionError) {
-          const m = completionError(e);
-          return res.status(m.status).json(error(config.nodeId, m.code, m.message));
-        }
-        return res.status(502).json(error(config.nodeId, 'OPENROUTER_ERROR', (e as Error).message));
+        const m = routeFailure(e, 'POST /v1/openrouter/test');
+        return res.status(m.status).json(error(config.nodeId, m.code, m.message, m.status, m.details));
       }
     });
 
@@ -588,11 +594,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
           },
         }, undefined, envelopeMeta(prov)));
       } catch (e) {
-        if (e instanceof AiCompletionError) {
-          const m = completionError(e);
-          return res.status(m.status).json(error(config.nodeId, m.code, m.message));
-        }
-        return res.status(502).json(error(config.nodeId, 'OPENROUTER_ERROR', (e as Error).message));
+        const m = routeFailure(e, 'POST /v1/openrouter/complete');
+        return res.status(m.status).json(error(config.nodeId, m.code, m.message, m.status, m.details));
       }
     });
 

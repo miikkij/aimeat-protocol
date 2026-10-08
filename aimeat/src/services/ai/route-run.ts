@@ -22,6 +22,9 @@
  * @structure
  *   AttemptRecord · AiRoute · classifyFailure · noCreditRetry · runRoute · routeOf
  * @version-history
+ *   v1.2.0 — 2026-10-08 — CONTENT_REFUSAL lives in ./errors.ts, so the failure class and the caller's
+ *     answer split a 403 the same way; the class reads the provider's reason when the transport
+ *     carried one (aiprov plan, A1).
  *   v1.1.0 — 2026-10-02 — `noCreditModel` on the context: a 402 from a provider on the owner's or the
  *     agent's key is retried once on that model, on the same provider, before any fallback.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
@@ -33,6 +36,7 @@ import { persistHealth } from './provider-store.js';
 import type { AiCandidate, ChosenBy } from './route-plan.js';
 import type { RoutingRules } from './routing.js';
 import type { AiCapability } from './types.js';
+import { CONTENT_REFUSAL } from './errors.js';
 
 export interface AttemptRecord {
   provider: string;
@@ -51,13 +55,18 @@ export interface AiRoute {
   fellBack: boolean;
 }
 
-const CONTENT_REFUSAL = /moderation|flagged|content[ _-]?policy|content_filter|safety system|responsible ai/i;
-
-/** What one failure was, as the rules name it. */
+/**
+ * What one failure was, as the rules name it. The same split the caller's answer makes
+ * (./errors.ts providerStatusError): a 4xx in moderation words is `content` (422 CONTENT_REFUSED,
+ * never moved past), 401 and any other 403 are `auth` (424 INVALID_API_KEY, the capability is
+ * skipped until the owner tests the key). The words are read from the provider's reason, which every
+ * transport carries in the error's message since 2026-10-08.
+ */
 export function classifyFailure(e: unknown, callerSignal?: AbortSignal): FailureClass {
   if (callerSignal?.aborted) return 'cancelled';
-  const err = e as { status?: unknown; name?: unknown; message?: unknown; empty?: unknown; code?: unknown; cause?: { code?: unknown } };
-  const message = typeof err?.message === 'string' ? err.message : String(e);
+  const err = e as { status?: unknown; name?: unknown; message?: unknown; empty?: unknown; code?: unknown; cause?: { code?: unknown }; providerMessage?: unknown };
+  const message = typeof err?.providerMessage === 'string' && err.providerMessage
+    ? err.providerMessage : typeof err?.message === 'string' ? err.message : String(e);
   if (err?.name === 'TimeoutError' || /timed? ?out|aborted due to timeout/i.test(message)) return 'timeout';
   if (err?.empty) return 'empty';
   const status = typeof err?.status === 'number' ? err.status : undefined;

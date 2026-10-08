@@ -17,6 +17,9 @@
  *   calls aimeat_ai_capabilities and gets a fix for a capability that is off.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-capabilities.ts
  * @version-history
+ *   v1.2.0 — 2026-10-08 — 10b (aiprov plan, A1, A4, A5, A6): an OpenRouter TTS model's PCM layout on
+ *     the start, done and json=1 answers; a voice the catalogue says it lacks refused before the call;
+ *     an mp3 refusal as 422 PROVIDER_REJECTED with a pcm hint; the speech fallback when allowed.
  *   v1.1.0 — 2026-10-02 — An UNTESTED capability leads the person to the test: `fix` is their sentence
  *     (no tool names) in the cookie's or the browser's language, `settingsUrl` opens the provider at
  *     its text test, `testProvider` names it, and a refused /v1/ai/complete carries the same in
@@ -36,7 +39,7 @@ import { join } from 'node:path';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
-import { startFakeAiProvider, chatJson, imageJson, anthropicJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
+import { startFakeAiProvider, chatJson, imageJson, anthropicJson, providerStatus, speechPcm, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -363,6 +366,52 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
       assert((await put(a, 'my-openai', openaiAll({ enabled: true, model: 'tts-1', pool: true }))).status === 200, 'provider without a voice');
       const none = await json('/v1/ai/speak?json=1', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ app_id: 'cap-e2e', input: 'hei' }) });
       assert(none.status === 400 && none.body.error.code === 'NO_TTS_VOICE', `no voice: ${none.status} ${JSON.stringify(none.body?.error)}`);
+    });
+
+    // aiprov plan, workstream A, on speech: what the PCM is (A4), the voice checked before the paid
+    // call (A6), an mp3 refusal named as one (A1) and the owner's speech fallback (A5).
+    await test('10b. speech: an OpenRouter TTS model says its PCM layout, refuses a voice it lacks before calling, names an mp3 refusal, and falls back when the owner allows another voice', async () => {
+      const e = await setupOwner('e');
+      const gemini = 'google/gemini-3.8-flash-tts';
+      assert((await put(e, 'e-or', { title: 'E OpenRouter', type: 'openrouter', capabilities: { speech: { enabled: true, model: gemini, voice: 'Kore', pool: true } } })).status === 200, 'put e-or');
+      assert((await setKey(e, 'e-or', 'sk-or-e')).status === 200, 'e-or key');
+      assert((await routing(e, { rules: { onlyTested: false } })).status === 200, 'rules');
+      const speak = (body: Record<string, unknown>, q = '') => json(`/v1/ai/speak${q}`, { method: 'POST', headers: auth(e.token), body: JSON.stringify({ app_id: 'cap-e2e', input: 'hei', ...body }) });
+
+      // A4: OpenRouter's PCM is 24000 Hz mono s16le, said on the start and done frames and the json=1 result.
+      stub.queue('speech', speechPcm(4800));
+      const streamed = await fetch(`${BASE}/v1/ai/speak`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(e.token) }, body: JSON.stringify({ app_id: 'cap-e2e', input: 'hei', response_format: 'pcm' }) });
+      const frames = (await streamed.text()).trim().split('\n').map(l => JSON.parse(l));
+      const pcm = JSON.stringify({ mime: 'audio/pcm', sample_rate: 24000, channels: 1, sample_format: 's16le' });
+      assert(streamed.status === 200 && JSON.stringify(frames[0].audio) === pcm && JSON.stringify(frames.at(-1).audio) === pcm, `frames: ${JSON.stringify([frames[0], frames.at(-1)])}`);
+      assert((stub.lastRequest('speech')?.json as any)?.voice === 'Kore', 'the provider\'s voice was sent');
+      stub.queue('speech', speechPcm(4800));
+      const stored = await speak({ response_format: 'pcm' }, '?json=1');
+      assert(stored.status === 200 && JSON.stringify(stored.body.data.audio) === pcm, `json=1: ${JSON.stringify(stored.body?.data?.audio ?? stored.body?.error)}`);
+
+      // A6: a voice the catalogue says the model lacks is refused before anything is sent or paid.
+      const heard = stub.requestsFor('speech').length;
+      const wrongVoice = await speak({ voice: 'alloy' });
+      assert(wrongVoice.status === 400 && wrongVoice.body.error?.code === 'INVALID_VOICE' && wrongVoice.body.error.details?.voices?.includes('Kore'),
+        `unknown voice: ${wrongVoice.status} ${JSON.stringify(wrongVoice.body?.error)}`);
+      assert(stub.requestsFor('speech').length === heard, 'the provider heard nothing');
+
+      // A1: the omnituinen case, mp3 the model does not make, is a refusal that names pcm.
+      stub.queue('speech', providerStatus(400, '{"error":{"message":"Provider returned error","metadata":{"raw":"{\\"error\\":{\\"message\\":\\"Unsupported response_format: mp3\\"}}"}}}'));
+      const mp3 = await speak({ response_format: 'mp3' });
+      assert(mp3.status === 422 && mp3.body.error?.code === 'PROVIDER_REJECTED' && /Unsupported response_format: mp3/.test(mp3.body.error.details?.provider_message ?? '')
+        && /pcm/.test(mp3.body.error.details?.hint ?? ''), `mp3: ${mp3.status} ${JSON.stringify(mp3.body?.error)}`);
+
+      // A5: with another voice allowed, a provider that fails moves to the next one, before the first byte.
+      assert((await put(e, 'e-oa', openaiAll())).status === 200, 'put e-oa');
+      assert((await setKey(e, 'e-oa', 'sk-e-openai')).status === 200, 'e-oa key');
+      assert((await routing(e, { defaults: { speech: ['e-or', 'e-oa'] }, rules: { onlyTested: false, speechVoiceMayChange: true } })).status === 200, 'fallback rules');
+      stub.queue('speech', providerStatus(503, '{"error":{"message":"upstream overloaded"}}'), r => r.pathname.startsWith('/v1/or'));
+      const moved = await speak({ response_format: 'mp3' }, '?json=1');
+      assert(moved.status === 200, `fallback: ${moved.status} ${JSON.stringify(moved.body?.error)}`);
+      const route = moved.body.data.route;
+      assert(route?.fellBack === true && route.answeredBy?.provider === 'e-oa' && route.attempts?.[0]?.provider === 'e-or', `route: ${JSON.stringify(route)}`);
+      assert((stub.lastRequest('speech')?.json as any)?.voice === 'alloy', 'the second provider\'s voice was used');
     });
 
     await test('11. GET /v1/ai/available reads the provider records', async () => {

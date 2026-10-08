@@ -56,6 +56,7 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   v1.4.8 -- 2026-10-08 -- A provider's 404 is 422 PROVIDER_REJECTED, as a 400 is, not 502 (aiprov plan, A10).
  *   v1.4.7 -- 2026-10-07 -- A refusal of the node's own key is 424 INVALID_API_KEY too, not 502 PROVIDER_ERROR.
  *   v1.4.6 -- 2026-10-07 -- A provider's refusal of the owner's or the agent's key is 424 INVALID_API_KEY, not 401.
  *   v1.4.5 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -363,8 +364,10 @@ function mapProviderError(e: SystemOneError, scope: AiDecisionKeyScope, provider
         : new DecideError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, `${name} refused this node's key. The operator has been told in the log.`, details);
     case 'JEV_RATE_LIMITED':
       return new DecideError('RATE_LIMITED', 429, `${name} is limiting requests right now. Try again shortly.`, details);
+    // A 404 (no such model or address) repeats on every retry, as a 400 does (aiprov plan, A10).
     case 'JEV_INVALID':
     case 'JEV_BAD_REQUEST':
+    case 'JEV_NOT_FOUND':
       return new DecideError('PROVIDER_REJECTED', 422, `${name} refused the request: ${e.message}`, details);
     // The provider did answer, with more than the node reads. The client's sentence names the
     // provider and the ceiling; the code stays the one every provider failure has on every road.

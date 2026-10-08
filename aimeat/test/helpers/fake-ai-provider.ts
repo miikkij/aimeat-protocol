@@ -42,6 +42,8 @@
  *   // … point the node at provider.baseUrl and drive it …
  *   await provider.close();
  * @version-history
+ *   v1.4.0 — 2026-10-08 — A json or text reply sends `headers` (a Retry-After on a 429), a text body
+ *     may be bytes, and speechPcm() answers raw PCM (aiprov plan, A1, A4).
  *   v1.3.0 — 2026-09-28 — Embeddings (POST …/embeddings, embeddingsJson) and speech (POST
  *     …/audio/speech, speechAudio) routes (System 2 plan, V5).
  *   v1.2.0 — 2026-09-28 — An Anthropic Messages route (POST …/messages) and its reply builders, for the
@@ -73,8 +75,9 @@ export interface RecordedRequest {
 }
 
 export type StubReply =
-    | { kind: 'json'; status?: number; body: unknown }
-    | { kind: 'text'; status: number; body: string; contentType?: string }
+    | { kind: 'json'; status?: number; body: unknown; headers?: Record<string, string> }
+    /** `headers` are sent beside the content type: a Retry-After on a 429, an x-generation-id. */
+    | { kind: 'text'; status: number; body: string | Buffer; contentType?: string; headers?: Record<string, string> }
     /** Server-sent events, written verbatim. `body` is the exact bytes, so a suite can compare. */
     | { kind: 'sse'; body: string }
     /** Hold the socket open until releaseHeld(), which is how a job is kept `running` on purpose. */
@@ -224,8 +227,13 @@ export function speechAudio(bytes = 'ID3-stub-audio'): StubReply {
 }
 
 /** A provider failure with a status and a body, which is how the node learns the reason. */
-export function providerStatus(status: number, body: string, contentType = 'application/json'): StubReply {
-    return { kind: 'text', status, body, contentType };
+export function providerStatus(status: number, body: string, contentType = 'application/json', headers?: Record<string, string>): StubReply {
+    return { kind: 'text', status, body, contentType, ...(headers ? { headers } : {}) };
+}
+
+/** Raw PCM as a provider sends it: `bytes` zero samples under the given content type. */
+export function speechPcm(bytes = 4800, contentType = 'audio/pcm'): StubReply {
+    return { kind: 'text', status: 200, body: Buffer.alloc(bytes), contentType };
 }
 
 // ── the Anthropic Messages reply shapes ──────────────────────────────────────
@@ -369,12 +377,12 @@ export async function startFakeAiProvider(port: number): Promise<FakeAiProvider>
 
     const write = (res: ServerResponse, reply: StubReply): void => {
         if (reply.kind === 'json') {
-            res.writeHead(reply.status ?? 200, { 'Content-Type': 'application/json' });
+            res.writeHead(reply.status ?? 200, { ...reply.headers, 'Content-Type': 'application/json' });
             res.end(JSON.stringify(reply.body));
             return;
         }
         if (reply.kind === 'text') {
-            res.writeHead(reply.status, { 'Content-Type': reply.contentType ?? 'text/plain' });
+            res.writeHead(reply.status, { ...reply.headers, 'Content-Type': reply.contentType ?? 'text/plain' });
             res.end(reply.body);
             return;
         }

@@ -6,6 +6,16 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.10.0 - 2026-10-08 - aiprov plan, workstream A. A provider's refusal goes through the one status
+ *     table (services/ai/errors.ts): a permanent 4xx is 422 PROVIDER_REJECTED with the provider's
+ *     reason (read, redacted, logged; the body was cancelled unread), a 429 is RATE_LIMITED with its
+ *     Retry-After, and a refused mp3 says to ask for pcm (A1-A3). The speech runs its candidates
+ *     through runRoute, so the owner's speech fallback works and failed attempts are recorded (A5);
+ *     a voice the catalogue says the model lacks is 400 INVALID_VOICE before the paid call (A6); the
+ *     start and done frames carry `audio` { mime, sample_rate, channels, sample_format } and the done
+ *     frame the route (A4). The reply retries a spent own key on the free router (A7), records failed
+ *     attempts on failure too, and both done frames carry key_source (A12). A failure after the first
+ *     byte is a typed refusal: TOO_LARGE 413 at a size cap, PROVIDER_ERROR 502 for a broken stream (A8).
  *   v1.9.0 - 2026-10-07 - A speech provider's key refusal is 424 INVALID_API_KEY, not PROVIDER_ERROR at 401.
  *   v1.8.0 - 2026-10-05 - The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.7.0 - 2026-10-05 - `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
@@ -32,11 +42,16 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
-  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, planFor, recordFailedAttempts, type AiCallPlan,
+  prepareAiCall, settleAiCall, getTodayUsage, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai/completion.js';
+import {
+  providerFailureOf, providerReason, providerReasonFromText, providerStatusError, retryAfterHeader,
+} from './ai/errors.js';
 import { chatCompletionRaw, speechRaw, generationCost, listModels } from './openrouter.js';
 import { openAiChat, speaksOpenAiChat } from './ai/gateway.js';
-import { runRoute } from './ai/route-run.js';
+import { runRoute, type AiRoute } from './ai/route-run.js';
+import type { AiCandidate } from './ai/route-plan.js';
+import { checkSpeechVoice, speechAudioOf, speechFormatHint } from './ai-voice-audio.js';
 import { callCost } from './ai/catalog/price.js';
 import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
@@ -82,21 +97,22 @@ export interface SpeakOptions extends VoicePolicyCaller {
 }
 
 /**
- * A speech provider's non-OK status as the node's refusal. A key refusal is INVALID_API_KEY at 424, as
- * on every other AI route (PROVIDER_KEY_REFUSED_STATUS); it was PROVIDER_ERROR at 401, which told the
- * caller its own credential had failed. The message stays generic: provider responses can echo
- * credentials or request content.
+ * A provider's non-OK answer as the error runRoute classifies and providerFailureOf maps
+ * (services/ai/errors.ts): the status, the reason read by the one policy (at most 4 KB, the JSON
+ * message, redacted, 300 characters), and the Retry-After. Until 2026-10-08 the body was cancelled
+ * unread and every speech refusal said only "HTTP 400" (aiprov plan, A2).
  */
-function speechProviderError(status: number): AiCompletionError {
-  const message = `Speech provider returned HTTP ${status}.`;
-  if (status === 401) return new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, message);
-  return new AiCompletionError('PROVIDER_ERROR', status === 429 ? 429 : 502, message);
+async function statusFailure(response: Response, what: string): Promise<Error> {
+  const reason = await providerReason(response);
+  const retryAfter = retryAfterHeader(response.headers);
+  return Object.assign(new Error(`${what} provider answered HTTP ${response.status}: ${reason}`), {
+    status: response.status, providerMessage: reason, ...(retryAfter !== undefined ? { retryAfter } : {}),
+  });
 }
 
-async function checkResponse(response: Response): Promise<void> {
-  if (response.ok && response.body) return;
-  await response.body?.cancel();
-  throw speechProviderError(response.status);
+/** A failure of the provider after the first byte: the provider's fault, said as one (502). */
+function streamFailure(message: string): AiCompletionError {
+  return new AiCompletionError('PROVIDER_ERROR', 502, message);
 }
 
 /** The provider uses SSE; emit only text and terminal metadata, never hidden reasoning. */
@@ -105,17 +121,25 @@ async function* sse(response: Response) {
   try {
     while (true) {
       const chunk = await reader.read(); buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-      if (buffer.length > 2_000_000) throw new Error('Provider stream frame exceeds 2 MB');
+      if (buffer.length > 2_000_000) throw streamFailure('A provider stream frame exceeds 2 MB.');
       let index;
       while ((index = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, index).trim(); buffer = buffer.slice(index + 1);
         if (!line.startsWith('data:')) continue;
         const data = line.slice(5).trim(); if (data === '[DONE]') return;
-        if (data) yield JSON.parse(data);
+        if (data) {
+          try { yield JSON.parse(data); } catch { throw streamFailure('The provider sent a stream frame that is not JSON.'); }
+        }
       }
-      if (chunk.done) { if (buffer.trim()) throw new Error('Incomplete provider stream frame'); return; }
+      if (chunk.done) { if (buffer.trim()) throw streamFailure('The provider stream ended inside a frame.'); return; }
     }
   } finally { await reader.cancel(); reader.releaseLock(); }
+}
+
+/** The attempts that failed before the answer, or before the last failure, are written to usage. */
+async function recordMoved(storage: Storage, config: AimeatConfig, gaii: string, plan: AiCallPlan, e: unknown, call: { appId: string; source: string }) {
+  const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
+  if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, call);
 }
 
 async function settled(storage: Storage, config: AimeatConfig, gaii: string, plan: AiCallPlan,
@@ -147,6 +171,8 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
     const run = await runRoute({
       storage, gaii, capability: first.capability, candidates: first.candidates, chosenBy: first.chosenBy,
       allowFallback: first.allowFallback, rules: first.rules, signal,
+      // A spent own key is tried once on the free router, as /v1/ai/complete does (aiprov plan, A7).
+      ...(first.noCreditModel ? { noCreditModel: first.noCreditModel } : {}),
     }, async (c) => {
       const body = { model: c.model, messages: options.messages,
         temperature: options.temperature, top_p: options.top_p, max_tokens: options.max_tokens,
@@ -154,28 +180,32 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
       const r = speaksOpenAiChat(c.provider.type)
         ? await chatCompletionRaw(c.target.key, c.target.baseUrl, body, signal)
         : await openAiChat(c.target, c.model, body, signal);
-      if (!r.ok) { await r.body?.cancel(); throw Object.assign(new Error(`Speech provider returned HTTP ${r.status}.`), { status: r.status }); }
+      if (!r.ok) throw await statusFailure(r, 'The conversation');
+      if (!r.body) throw Object.assign(new Error('The conversation provider sent no body.'), { status: 502 });
       return r;
     });
     plan = planFor(first, run.candidate);
     response = run.result;
     if (run.route.fellBack) await recordFailedAttempts(storage, config, gaii, first, run.failed, { appId: options.app_id, source: 'voice-complete' });
   } catch (e) {
-    const status = (e as { status?: number }).status;
-    if (typeof status !== 'number') throw e;
-    throw speechProviderError(status);
+    await recordMoved(storage, config, gaii, first, e, { appId: options.app_id, source: 'voice-complete' });
+    // The one status table every AI path uses (services/ai/errors.ts).
+    throw providerFailureOf(e);
   }
-  await checkResponse(response);
   let content = '', prompt = 0, completion = 0, cost: number | undefined, finish: string | null = null;
   let result;
   try {
-    await emit({ type: 'start', model: plan.model, keySource: plan.keyScope });
+    // `keySource` stays for the clients that read it; `key_source` is the spelling every done frame uses.
+    await emit({ type: 'start', model: plan.model, keySource: plan.keyScope, key_source: plan.keyScope });
     for await (const event of sse(response)) {
-      if (event.error) throw new Error('Conversation provider failed during the stream');
+      if (event.error) {
+        const status = typeof event.error?.code === 'number' ? event.error.code : 502;
+        throw providerStatusError(status >= 400 && status <= 599 ? status : 502, providerReasonFromText(JSON.stringify({ error: event.error })));
+      }
       const choice = event.choices?.[0];
       if (typeof choice?.delta?.content === 'string') {
         content += choice.delta.content;
-        if (content.length > 200000) throw new Error('Conversation answer exceeds 200k characters');
+        if (content.length > 200000) throw new AiCompletionError('TOO_LARGE', 413, 'The answer passed 200 000 characters. Set a lower max_tokens.');
         await emit({ type: 'text', text: choice.delta.content });
       }
       if (choice?.finish_reason) finish = choice.finish_reason;
@@ -184,8 +214,8 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
         if (typeof event.usage.cost === 'number' && event.usage.cost >= 0) cost = event.usage.cost;
       }
     }
-    if (!finish) throw new Error('Conversation stream ended without a finish reason');
-    if (!content.trim()) throw new Error('Conversation model returned no text');
+    if (!finish) throw streamFailure('The conversation stream ended without a finish reason.');
+    if (!content.trim()) throw new AiCompletionError('EMPTY_COMPLETION', 502, `The model returned no text (finish_reason=${finish}).`);
   } finally {
     // A disconnected client does not erase what was already generated or paid for.
     if (!prompt) prompt = Math.ceil(options.messages.reduce((n, m) => n + m.content.length, 0) / 4);
@@ -196,7 +226,7 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
       callCost({ type: plan.providerType, model: plan.model, promptTokens: prompt, completionTokens: completion, reported: cost }).costUsd,
       { prompt, completion }, 'voice-complete');
   }
-  await emit({ type: 'done', model: plan.model, finish_reason: finish, truncated: finish === 'length', cost_exact: cost !== undefined, ...result });
+  await emit({ type: 'done', model: plan.model, finish_reason: finish, truncated: finish === 'length', cost_exact: cost !== undefined, key_source: plan.keyScope, ...result });
 }
 
 const speechPrices = new Map<string, { at: number; price: number }>();
@@ -216,59 +246,90 @@ export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii:
   // POST /v1/ai/speak and aimeat_voice_speak both arrive here: one count per account, before any spend.
   requireAiCallTurn(config, gaii, options.limit);
   // A spoken reply asks for the speech capability: the owner's policy list for speech applies to it.
-  const plan = await prepareAiCall(storage, config, gaii, {
+  const first = await prepareAiCall(storage, config, gaii, {
     op: 'speak', model: options.model, appId: options.app_id, capability: 'speech', ...policyCallerOf(options),
     ...(options.provider ? { provider: options.provider, fallback: false } : {}),
   });
-  const voice = options.voice || plan.candidates[0]?.provider.capabilities.speech?.voice || resolveTtsVoice(config, plan.prefs);
-  if (!voice) {
-    throw new AiCompletionError('NO_TTS_VOICE', 400,
-      'No voice is set for speech. Name one in the call (`voice`), set one for speech on your AI provider, or ask the operator for a node default.');
+  // One candidate's whole preflight and request, before the first byte: its voice, the voice check
+  // against the catalogue (A6), its price and the budget, then the provider. A failure here moves to
+  // the next candidate when the owner's rules allow it; for speech that needs speechVoiceMayChange,
+  // which prepareAiCall already folded into allowFallback (route-plan.ts). Until 2026-10-08 the
+  // speech used the first candidate only, although the contract promised the fallback (A5).
+  const attempt = async (c: AiCandidate) => {
+    const plan = planFor(first, c);
+    const voice = options.voice || c.provider.capabilities.speech?.voice || resolveTtsVoice(config, first.prefs);
+    if (!voice) {
+      throw new AiCompletionError('NO_TTS_VOICE', 400,
+        'No voice is set for speech. Name one in the call (`voice`), set one for speech on your AI provider, or ask the operator for a node default.');
+    }
+    checkSpeechVoice(c, voice);
+    const unitPrice = await speechPrice(plan);
+    const estimate = (unitPrice ?? 0) * Array.from(options.input).length;
+    const usage = await getTodayUsage(storage, gaii);
+    const appSpent = appSpentToday(usage.per_app, options.app_id, gaii);
+    const appLimit = appQuotaFor(first.prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined, options.app_id, gaii, first.dailyBudgetUsd);
+    if (usage.total_cost_usd + estimate > first.dailyBudgetUsd || appSpent + estimate > appLimit) {
+      throw new AiCompletionError('QUOTA_EXHAUSTED', 402, 'This speech segment would exceed your AI budget.');
+    }
+    signal.throwIfAborted();
+    // An extension provider (V6) answers its ai.speak action with the whole audio; it becomes a
+    // Response here, so the streaming, the size cap, the hash and the settlement below apply unchanged.
+    let extCost: number | undefined;
+    let extAnswer: Record<string, unknown> | undefined;
+    const response = c.provider.type === 'extension' && c.target.runExtension
+      ? await (async () => {
+        const r = await c.target.runExtension!('speak', { model: c.model, text: options.input, voice,
+          format: options.response_format, speed: options.speed, ...(options.instructions ? { instructions: options.instructions } : {}) }, signal);
+        if (typeof r.audio !== 'string' || !r.audio) throw Object.assign(new Error('The extension answered ai.speak without `audio`.'), { status: 502 });
+        extCost = typeof r.costUsd === 'number' && r.costUsd >= 0 ? r.costUsd : undefined;
+        extAnswer = r;
+        const mime = typeof r.mimeType === 'string' && r.mimeType.startsWith('audio/') ? r.mimeType : options.response_format === 'mp3' ? 'audio/mpeg' : 'audio/pcm';
+        return new Response(new Uint8Array(Buffer.from(r.audio, 'base64')), { headers: { 'content-type': mime } });
+      })()
+      : await speechRaw(plan.key, plan.baseUrl, { model: c.model, input: options.input,
+        voice, response_format: options.response_format, speed: options.speed,
+        ...(options.instructions ? { provider: { options: { openai: { instructions: options.instructions } } } } : {}) }, signal);
+    if (!response.ok) throw await statusFailure(response, 'The speech');
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.body || (!contentType.startsWith('audio/') && !contentType.startsWith('application/octet-stream'))) {
+      await response.body?.cancel();
+      throw Object.assign(new Error(`The speech provider did not answer with audio (content type '${contentType.slice(0, 80)}').`), { status: 502 });
+    }
+    return { response, plan, unitPrice, estimate, extCost, audio: speechAudioOf(c, options.response_format, contentType, extAnswer) };
+  };
+
+  let answer: Awaited<ReturnType<typeof attempt>>;
+  let route: AiRoute;
+  try {
+    const run = await runRoute({
+      storage, gaii, capability: first.capability, candidates: first.candidates, chosenBy: first.chosenBy,
+      allowFallback: first.allowFallback, rules: first.rules, signal,
+    }, attempt);
+    answer = run.result;
+    route = run.route;
+    if (route.fellBack) await recordFailedAttempts(storage, config, gaii, first, run.failed, { appId: options.app_id, source: 'voice-speech' });
+  } catch (e) {
+    await recordMoved(storage, config, gaii, first, e, { appId: options.app_id, source: 'voice-speech' });
+    // The one status table every AI path uses (services/ai/errors.ts). A model that does not make
+    // mp3 refuses it every time: the refusal says to ask for pcm (A1).
+    throw providerFailureOf(e, { hint: speechFormatHint(options.response_format) });
   }
-  const unitPrice = await speechPrice(plan);
-  const estimate = (unitPrice ?? 0) * Array.from(options.input).length;
-  const usage = await getTodayUsage(storage, gaii);
-  const appSpent = appSpentToday(usage.per_app, options.app_id, gaii);
-  const appLimit = appQuotaFor(plan.prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined, options.app_id, gaii, plan.dailyBudgetUsd);
-  if (usage.total_cost_usd + estimate > plan.dailyBudgetUsd || appSpent + estimate > appLimit) {
-    throw new AiCompletionError('QUOTA_EXHAUSTED', 402, 'This speech segment would exceed your AI budget.');
-  }
-  signal.throwIfAborted();
-  // An extension provider (V6) answers its ai.speak action with the whole audio; it becomes a
-  // Response here, so the streaming, the size cap, the hash and the settlement below apply unchanged.
-  let extCost: number | undefined;
-  const response = plan.providerType === 'extension' && plan.target.runExtension
-    ? await (async () => {
-      const r = await plan.target.runExtension!('speak', { model: plan.model, text: options.input, voice,
-        format: options.response_format, speed: options.speed, ...(options.instructions ? { instructions: options.instructions } : {}) }, signal);
-      if (typeof r.audio !== 'string' || !r.audio) throw new AiCompletionError('PROVIDER_ERROR', 502, 'The extension answered ai.speak without `audio`.');
-      extCost = typeof r.costUsd === 'number' && r.costUsd >= 0 ? r.costUsd : undefined;
-      const mime = typeof r.mimeType === 'string' && r.mimeType.startsWith('audio/') ? r.mimeType : options.response_format === 'mp3' ? 'audio/mpeg' : 'audio/pcm';
-      return new Response(new Uint8Array(Buffer.from(r.audio, 'base64')), { headers: { 'content-type': mime } });
-    })()
-    : await speechRaw(plan.key, plan.baseUrl, { model: plan.model, input: options.input,
-      voice, response_format: options.response_format, speed: options.speed,
-      ...(options.instructions ? { provider: { options: { openai: { instructions: options.instructions } } } } : {}) }, signal);
-  await checkResponse(response);
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.startsWith('audio/') && !contentType.startsWith('application/octet-stream')) {
-    await response.body!.cancel(); throw new Error('Speech provider did not return audio');
-  }
+  const { response, plan, unitPrice, estimate, extCost, audio } = answer;
   const generation = response.headers.get('x-generation-id');
   const reader = response.body!.getReader(); let size = 0, cost: number | undefined = extCost, result;
   const audioHash = createHash('sha256');
   try {
-    await emit({ type: 'start', model: plan.model, format: options.response_format, syntheticAudio: true });
+    await emit({ type: 'start', model: plan.model, format: options.response_format, audio, key_source: plan.keyScope, syntheticAudio: true });
     while (true) {
       const chunk = await reader.read(); if (chunk.done) break;
       size += chunk.value.byteLength;
-      if (size > 16_000_000) throw new Error('Speech segment exceeds 16 MB');
+      if (size > 16_000_000) throw new AiCompletionError('TOO_LARGE', 413, 'The speech passed 16 MB. Send a shorter input.');
       audioHash.update(chunk.value);
       for (let offset = 0; offset < chunk.value.length; offset += 32768) {
         await emit({ type: 'audio', data: Buffer.from(chunk.value.subarray(offset, offset + 32768)).toString('base64') });
       }
     }
-    if (!size) throw new Error('Speech provider returned empty audio');
+    if (!size) throw streamFailure('The speech provider answered with no audio.');
   } finally {
     await reader.cancel().catch(error => logger.debug('[voice] cancelled audio reader', { error: String(error) })); reader.releaseLock();
     if (generation) {
@@ -278,5 +339,6 @@ export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii:
     result = await settled(storage, config, gaii, plan, options, '', cost ?? estimate, { prompt: 0, completion: 0 }, 'voice-speech',
       size ? 'sha256:' + audioHash.digest('hex') : undefined);
   }
-  await emit({ type: 'done', model: plan.model, bytes: size, cost_usd: cost ?? estimate, key_source: plan.keyScope, cost_exact: cost !== undefined, cost_known: cost !== undefined || unitPrice !== undefined, syntheticAudio: true, ...result });
+  route.attempts[route.attempts.length - 1].costUsd = cost ?? estimate;
+  await emit({ type: 'done', model: plan.model, bytes: size, audio, cost_usd: cost ?? estimate, key_source: plan.keyScope, cost_exact: cost !== undefined, cost_known: cost !== undefined || unitPrice !== undefined, syntheticAudio: true, route, ...result });
 }

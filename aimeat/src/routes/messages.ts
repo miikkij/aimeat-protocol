@@ -21,6 +21,9 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.18.0 -- 2026-10-08 -- The transcribe route answers the provider's refusal with its details and
+ *     Retry-After, and a failure that is not the provider's as 500 INTERNAL_ERROR, not 502 (aiprov
+ *     plan, A8). The transcript leaves `seconds` out when the provider did not measure the audio.
  *   v1.17.0 -- 2026-10-05 -- POST /v1/messages/broadcast asks isOperatorCaller for the node-wide audience, as aimeat_dm_broadcast does: the operator's agent holding operator:admin passes as the operator in person (secaudit 2026-10, C2).
  *   v1.16.0 -- 2026-09-30 -- The transcribe route answers `classification_warnings` when the audio is
  *     warning-classified (TARGET-082 review, item 2).
@@ -108,7 +111,8 @@ import { duplicateMessageAttachments } from '../services/attachment-duplication.
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner-mailbox-reads.js';
 import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
-import { AiCompletionError } from '../services/ai/completion.js';
+import { nodeFailureOf } from '../services/ai/errors.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { readAiFile } from '../services/ai-inputs.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
@@ -588,7 +592,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         by: (message.direction === 'outbound' ? 'sender' : 'recipient') as 'sender' | 'recipient',
         model: r.model,
         lang: r.language,
-        seconds: r.seconds,
+        ...(r.seconds !== null ? { seconds: r.seconds } : {}),
         at: new Date().toISOString(),
       };
       const next = attachments.map(a => (a.id === attId ? { ...a, transcript } : a));
@@ -608,11 +612,12 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         ...warningsNote(reader),
       }));
     } catch (e) {
-      if (e instanceof AiCompletionError) {
-        res.status(e.status).json(error(config.nodeId, e.code, e.message));
-        return;
-      }
-      res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+      // The provider's refusal with its own status and details (a Retry-After on a rate limit); a
+      // failure that is not the provider's is the node's 500, not 502 (aiprov plan, A8).
+      const f = nodeFailureOf(e, 'POST /v1/messages/:id/attachments/:attId/transcribe');
+      const retryAfter = retryAfterOf(f);
+      if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
+      res.status(f.status).json(error(config.nodeId, f.code, f.message, f.status, f.details));
     }
   });
 
