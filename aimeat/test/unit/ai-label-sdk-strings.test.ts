@@ -16,6 +16,7 @@
  * @structure every key × every locale resolves · Finnish is Finnish · unknown keys degrade honestly
  * @usage pnpm exec vitest run test/unit/ai-label-sdk-strings.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The thirteen words-by-medium keys, and Spanish, which the bundle has shipped since 2026-08-12.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import { describe, it, expect } from 'vitest';
@@ -30,6 +31,21 @@ const KEYS = [
   'aiLabel.detailsLink',
   'aiLabel.interactionTitle',
   'aiLabel.interactionBody',
+  // The words by medium (2026-10-08). A served record carries them already rendered; the SDK
+  // resolves them only as a fallback, and they must resolve all the same.
+  'aiLabel.syntheticImageLong',
+  'aiLabel.syntheticAudioLong',
+  'aiLabel.syntheticVideoLong',
+  'aiLabel.generatedAppLong',
+  'aiLabel.generatedDataLong',
+  'aiLabel.generatedContentLong',
+  'aiLabel.transcriptLong',
+  'aiLabel.reviewedMediaLong',
+  'aiLabel.assistedMediaLong',
+  'aiLabel.originalMedia',
+  'aiLabel.originalMediaLong',
+  'aiLabel.reviewedMade',
+  'aiLabel.reviewedMadeShort',
   // The four alt texts euIconFor() can return.
   'aiLabel.iconAlt.aiGenerated',
   'aiLabel.iconAlt.aiModified',
@@ -38,7 +54,7 @@ const KEYS = [
 ];
 
 describe('the SDK label resolves every string it can render', () => {
-  for (const loc of ['en', 'fi'] as const) {
+  for (const loc of ['en', 'fi', 'es'] as const) {
     for (const key of KEYS) {
       it(`${loc}: ${key}`, () => {
         const v = pick(key, loc);

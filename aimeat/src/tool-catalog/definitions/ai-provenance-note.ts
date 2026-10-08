@@ -21,6 +21,7 @@
  *   { name: 'aimeat_memory_write', description: 'Write a memory entry…' + AI_PROVENANCE_TOOL_NOTE,
  *     input: { key: {…}, ...aiProvenanceCatalogInput } }
  * @version-history
+ *   v1.2.0 — 2026-10-08 — The catalog entry names `media_kind`, `media_type` and `resembles_real`.
  *   v1.1.0 — 2026-10-05 — `ai_provenance` carries its exact schema, and the fragment keeps its literal type
  *     (`as const satisfies`), so zodShapeFor() types it (secaudit 2026-10, M3).
  *   v1.0.1 — 2026-09-26 — The catalog entry names `provider` and asks for the declarer's own model.
@@ -46,8 +47,10 @@ export const aiProvenanceCatalogInput = {
     type: 'object',
     zod: AiProvenanceBlockSchema,
     description:
-      'How this content was made: { level, method?, human_involvement?, model?, provider?, sources?, '
-      + 'notes? }. `level` is required when the block is present: original | assisted | synthesized | '
+      'How this content was made: { level, method?, human_involvement?, model?, provider?, media_kind?, '
+      + 'media_type?, resembles_real?, sources?, notes? }. `media_kind` (text | image | audio | video | '
+      + 'code | data) gives the label its words; say it for anything that is not text. '
+      + '`level` is required when the block is present: original | assisted | synthesized | '
       + 'ai-generated. `model` is YOUR OWN model id as your provider names it (self-identify, never '
       + 'ask the person); without it the record cannot say which model made this. `human_involvement` (none | light-review | editorial-control | full-human) '
       + 'counts only a step where a person read the SUBSTANCE and could reject it; omitted means '

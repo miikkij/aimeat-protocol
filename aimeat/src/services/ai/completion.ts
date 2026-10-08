@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.12.0 -- 2026-10-08 -- settleAiCall takes `media` (kind, IANA type, method, surface), so a
+ *     speech, image or transcription record says what it is; text is stated for a text output.
  *   v3.11.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (./errors.ts
  *     PROVIDER_KEY_REFUSED_STATUS, re-exported here).
  *   v3.10.0 — 2026-10-05 — prepareAiCall takes `estimate`, and a text call passes its prompt's size and
@@ -156,6 +158,8 @@ import { runRoute, type AiRoute } from './route-run.js';
 import { callCost } from './catalog/price.js';
 import { mintProvenance } from '../ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
+import type { AiMediaKind, AiProvenanceMethod } from '../../models/ai-provenance-schemas.js';
+import type { SurfaceContext } from '../ai-disclosure.js';
 import { logger } from '../../utils/logger.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { debitAllowance, nodeKeyStanding } from '../ai-allowance.js';
@@ -527,6 +531,9 @@ export interface AiCallOutcome {
   source: string;
   /** What was consumed besides tokens: audio seconds for a transcription, pictures for an image. */
   units?: { seconds?: number; images?: number };
+  /** The output's medium for the record (text when there is `content` and nobody says), its IANA
+   *  type, a method other than fully-generated (`transcribed`), and the surface it lands on. */
+  media?: { mediaKind?: AiMediaKind; mediaType?: string; method?: AiProvenanceMethod; surface?: SurfaceContext };
   /** Where `costUsd` came from (services/ai/types.ts). Logged with the settlement. */
   costSource?: CostSource;
   /** What the ledger cites for the price: the catalogue snapshot, `estimate`, … (services/ai/catalog/price.ts). */
@@ -592,7 +599,10 @@ export async function settleAiCall(
         principal: plan.agent ? `${plan.agent}#${gaii}` : gaii,
         level: 'ai-generated',
         humanInvolvement: 'none',
-        method: 'fully-generated',
+        method: outcome.media?.method ?? 'fully-generated',
+        mediaKind: outcome.media?.mediaKind ?? (outcome.contentHash ? undefined : 'text'),
+        mediaType: outcome.media?.mediaType,
+        surface: outcome.media?.surface,
         ...(outcome.contentHash ? { contentHash: outcome.contentHash } : { content: outcome.content }),
         generator: {
           model: outcome.model,

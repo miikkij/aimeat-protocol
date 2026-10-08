@@ -24,15 +24,21 @@
  * @structure
  *   - AI_PROVENANCE_SPEC_V1 — the spec string readers branch on
  *   - AI_PROVENANCE_LEVELS / _METHODS / AI_HUMAN_INVOLVEMENT / AI_UPSTREAM_MARKS / AI_STAMPED_BY /
- *     AI_DISCLOSURE_REASONS — the frozen enums, exported as const arrays so downstream code never
+ *     AI_DISCLOSURE_REASONS / AI_MEDIA_KINDS / AI_RESEMBLES_REAL — the frozen enums, exported as const arrays so downstream code never
  *     re-types the strings (same pattern as ODPS_SLA_DIMENSIONS in odps-schemas.ts)
  *   - AiProvenanceSchema (+ the nested source/generator/attestation/disclosure schemas) and the
  *     inferred types
  *   - asKnownProvenance(value) — the unknown-spec gate every consumer goes through
+ *   - isSyntheticMedia(kind) / mediaKindOfValue(value) — the medium helpers
  * @usage
  *   import { AiProvenanceSchema, asKnownProvenance } from '../models/ai-provenance-schemas.js';
  *   const parsed = AiProvenanceSchema.safeParse(req.body.provenance);
  * @version-history
+ *   v1.4.0 — 2026-10-08 — The record says what KIND of thing it describes: optional `mediaKind`
+ *     (AI_MEDIA_KINDS), `mediaType` (IANA) and the declarer's `resemblesReal`, and method
+ *     `transcribed`. All additive within v1. Every record had been worded as text, so a speech clip
+ *     read "This text was written by AI", and the deep-fake rule never ran because no record could
+ *     say it was a picture or a sound (reported by originalmiskate.com, 2026-10-08).
  *   v1.3.0 — 2026-08-02 — AI_DISCLOSURE_REASONS gains `art50_4_precautionary`: labelled because
  *     nobody established whether the limb applies, as distinct from `policy` (the law exempted
  *     it and the operator labelled anyway). Additive within v1, which the versioning promise above
@@ -68,11 +74,62 @@ export const AI_PROVENANCE_SPEC_V1 = 'aimeat.provenance/v1';
 export const AI_PROVENANCE_LEVELS = ['original', 'assisted', 'synthesized', 'ai-generated'] as const;
 export type AiProvenanceLevel = (typeof AI_PROVENANCE_LEVELS)[number];
 
-/** Optional detail under `level`. Frozen so adapters and validators can rely on it. */
+/**
+ * Optional detail under `level`. Frozen so adapters and validators can rely on it; values are only
+ * ever ADDED (the versioning promise below). `transcribed` (2026-10-08): a model turned speech into
+ * this text, which is neither writing nor summarising, and the label says so.
+ */
 export const AI_PROVENANCE_METHODS = [
   'human', 'rewritten', 'summarized', 'translated', 'synthesized', 'fully-generated', 'multi-agent',
+  'transcribed',
 ] as const;
 export type AiProvenanceMethod = (typeof AI_PROVENANCE_METHODS)[number];
+
+/**
+ * WHAT KIND of thing the record describes. It decides two things: the WORDS of the label (a
+ * picture is not "this text"), and whether Art. 50(4)'s first subparagraph can apply at all. Only
+ * `image`, `audio` and `video` can be a deep fake; `code` and `data` are read like text.
+ *
+ * OPTIONAL, and absence is not `text`: a record minted before 2026-10-08 says nothing about its
+ * medium, and its label keeps the words it was minted with. A reader that needs the medium of an
+ * old record reads the item it describes.
+ */
+export const AI_MEDIA_KINDS = ['text', 'image', 'audio', 'video', 'code', 'data'] as const;
+export type AiMediaKind = (typeof AI_MEDIA_KINDS)[number];
+
+/** The media kinds Art. 50(4) first subparagraph (deep fakes) can reach. */
+export const AI_SYNTHETIC_MEDIA_KINDS: readonly AiMediaKind[] = ['image', 'audio', 'video'];
+
+/** Is this a medium the deep-fake rule can reach? `undefined` (unstated) is not. */
+export function isSyntheticMedia(kind: AiMediaKind | undefined): boolean {
+  return kind !== undefined && AI_SYNTHETIC_MEDIA_KINDS.includes(kind);
+}
+
+/**
+ * Does the content resemble a real person, place, object or event? The declarer's answer, because
+ * the node cannot tell a generic text-to-speech voice from a cloned one. It changes the REASON the
+ * record gives for a label on public synthetic media (`art50_4_deepfake` only for `yes`), never
+ * whether the label is shown.
+ */
+export const AI_RESEMBLES_REAL = ['yes', 'no', 'unknown'] as const;
+export type AiResemblesReal = (typeof AI_RESEMBLES_REAL)[number];
+
+/** An IANA media type, `type/subtype`, parameters dropped. */
+export const MEDIA_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,63}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$/;
+
+/**
+ * The medium of a stored value, for a write path that stores whatever a caller sends: a string is
+ * text, a structured value is data, and a structured value that carries a document's text (a
+ * workspace document's `markdown`, a message `body`) is text.
+ */
+export function mediaKindOfValue(value: unknown): AiMediaKind {
+  if (typeof value === 'string') return 'text';
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const v = value as Record<string, unknown>;
+    if (typeof v.markdown === 'string' || typeof v.body === 'string' || typeof v.text === 'string') return 'text';
+  }
+  return 'data';
+}
 
 /**
  * The field that decides whether a visible label is owed.
@@ -242,6 +299,13 @@ export const AiProvenanceSchema = z.object({
   method: z.enum(AI_PROVENANCE_METHODS).optional(),
   humanInvolvement: z.enum(AI_HUMAN_INVOLVEMENT),
   generatedAt: isoInstant,
+
+  /** What kind of thing this is. Optional: an old record says nothing about its medium. */
+  mediaKind: z.enum(AI_MEDIA_KINDS).optional(),
+  /** The IANA media type of the bytes, when the node or the declarer knows it (`audio/mpeg`). */
+  mediaType: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').optional(),
+  /** Does it resemble a real person, place or event? Declared; the node never infers it. */
+  resemblesReal: z.enum(AI_RESEMBLES_REAL).optional(),
 
   generator: AiProvenanceGeneratorSchema.optional(),
   sources: z.array(AiProvenanceSourceSchema).max(100).optional(),

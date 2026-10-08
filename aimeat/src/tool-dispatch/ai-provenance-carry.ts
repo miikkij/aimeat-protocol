@@ -56,6 +56,8 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.5 — 2026-10-08 — toDeclareBody carries `media_kind`, `media_type` and `resembles_real` to
+ *     POST /v1/provenance as `mediaKind`, `mediaType` and `resemblesReal`.
  *   v1.3.4 — 2026-10-06 — `readsId` on the four not-carried tools whose route reads ai_provenance_id
  *     (design book propose and adopt, app draft publish, surface layout set): an id given alone is
  *     reported attached again; v1.3.3 told them it went nowhere (audit of the last items, finding 4).
@@ -226,7 +228,7 @@ export function carrierAttach(
 export function parseDeclarationInput(raw: unknown): AiProvenanceToolInput | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new ProvenanceCarryError('ai_provenance must be an object: { level, human_involvement?, method?, model?, provider?, sources?, notes? }');
+    throw new ProvenanceCarryError('ai_provenance must be an object: { level, human_involvement?, method?, model?, provider?, media_kind?, media_type?, resembles_real?, sources?, notes? }');
   }
   const parsed = AiProvenanceBlockSchema.safeParse(raw);
   if (!parsed.success) {
@@ -280,6 +282,9 @@ export function toDeclareBody(
       }
       : {}),
     ...(declared.notes ? { notes: declared.notes } : {}),
+    ...(declared.media_kind ? { mediaKind: declared.media_kind } : {}),
+    ...(declared.media_type ? { mediaType: declared.media_type } : {}),
+    ...(declared.resembles_real ? { resemblesReal: declared.resembles_real } : {}),
     content,
     ...(attachToMemoryKey ? { attachToMemoryKey } : {}),
   };

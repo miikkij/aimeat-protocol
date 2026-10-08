@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.3 — 2026-10-08 — A stamped update states the value's medium (text or data). A visibility-only update keeps its record, whose label is decided when it is served.
  *   v1.11.2 — 2026-10-07 — DELETE reads `?owner=` only as a single string; a repeated one is no override (code scanning alerts 1704-1707).
  *   v1.11.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.11.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). DELETE ?owner= computes its roles with rolesWithOperator and writes recordOperatorAccess, the trail the admin memory route writes.
@@ -72,6 +73,7 @@ import { stampAgentWrite, resolveAttachableProvenanceId, storeHeldProvenance } f
 import { ownerGhiiOf, isForeignPrincipal, isOwnerInPerson } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
+import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';
 import { logger } from '../../utils/logger.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { rolesWithOperator } from '../../services/operator-override.js';
@@ -472,6 +474,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         ? await stampAgentWrite(storage, {
           principal: effectiveGaii,
           content: memoryContentBytes(newValue),
+          mediaKind: mediaKindOfValue(newValue),
           pipeline: 'memory.update',
           surface: { visibility: effectiveVis, humanAudience: true },
           labelPolicy: config.aiLabelPublic,

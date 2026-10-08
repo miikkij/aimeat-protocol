@@ -29,6 +29,7 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.11.2 — 2026-10-08 — The provenance record states the value's medium: text for a string or a document, data otherwise.
  *   v1.11.1 — 2026-10-05 — The provenance declaration is asked of the session's words too (secaudit 2026-10, C3).
  *   v1.11.0 — 2026-09-29 — A landed write is scheduled for write-time classification
  *     (services/classify-on-write.ts, TARGET-082 V3): off the request path, and nothing while
@@ -84,6 +85,7 @@ import { memoryCeilings } from './memory-ceilings.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 import { isKeyArchived } from './archive.js';
 import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
+import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
 import { emitChange } from './event-bus.js';
 import { enqueueMemoryReplication } from './memory-replication.js';
@@ -440,6 +442,7 @@ export async function writeMemoryRecord(
         declaredId: input.declaredProvenanceId,
         declared: input.declaredProvenance,
         pipeline: input.pipeline,
+        mediaKind: mediaKindOfValue(input.value),
         surface: { visibility: input.visibility, humanAudience: true },
         labelPolicy: config.aiLabelPublic,
         nodeId: config.nodeId,

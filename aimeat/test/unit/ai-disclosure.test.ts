@@ -11,6 +11,8 @@
  *   - one describe per rule from 06-platform-design.md §4
  * @usage pnpm exec vitest run test/unit/ai-disclosure.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The deep-fake reason needs `resemblesReal: yes`; otherwise synthetic media
+ *     is labelled as a precaution. The record's own mediaKind engages the rule; code and data do not.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import { describe, it, expect } from 'vitest';
@@ -100,7 +102,7 @@ describe('`assisted` on a public-interest surface owes a LIGHT label (C2b)', () 
   });
 
   it('but an assisted DEEP FAKE is a full disclosure — a face-swap is not a light matter', () => {
-    const d = disclosureFor(rec('assisted', 'none'), { ...publicPage, mediaKind: 'image' });
+    const d = disclosureFor({ ...rec('assisted', 'none'), resemblesReal: 'yes' }, { ...publicPage, mediaKind: 'image' });
     expect(d).toEqual({ required: true, reason: 'art50_4_deepfake', strength: 'full' });
   });
 });
@@ -130,7 +132,7 @@ describe('the publisher declares editorial control; the node never infers it', (
   });
 
   it('but a declared editor does not make a deep fake unlabelled', () => {
-    const d = disclosureFor(rec('ai-generated', 'none'),
+    const d = disclosureFor({ ...rec('ai-generated', 'none'), resemblesReal: 'yes' },
       { ...publicPage, editorialResponsibility: true, mediaKind: 'image' });
     expect(d.required).toBe(true);
     expect(d.reason).toBe('art50_4_deepfake');
@@ -193,9 +195,29 @@ describe('Article 50(1): a person in a two-way exchange with a model', () => {
 describe('Article 50(4) first subparagraph: deepfakes', () => {
   for (const mediaKind of ['image', 'audio', 'video'] as const) {
     it(`${mediaKind} is labelled regardless of subject matter`, () => {
-      const d = disclosureFor(rec('ai-generated', 'none'),
+      const d = disclosureFor({ ...rec('ai-generated', 'none'), resemblesReal: 'yes' },
         { ...publicPage, mediaKind, publicInterest: 'no' });
       expect(d).toEqual({ required: true, reason: 'art50_4_deepfake', strength: 'full' });
+    });
+
+    it(`${mediaKind} that nobody said resembles something real is labelled as a precaution`, () => {
+      for (const resemblesReal of [undefined, 'no', 'unknown'] as const) {
+        const d = disclosureFor({ ...rec('ai-generated', 'none'), ...(resemblesReal ? { resemblesReal } : {}) },
+          { ...publicPage, mediaKind, publicInterest: 'no' });
+        expect(d).toEqual({ required: true, reason: 'art50_4_precautionary', strength: 'full' });
+      }
+    });
+
+    it(`${mediaKind} named by the RECORD engages the rule without the surface saying so`, () => {
+      const d = disclosureFor({ ...rec('ai-generated', 'editorial-control'), mediaKind }, publicPage);
+      expect(d.required).toBe(true);
+    });
+  }
+
+  for (const mediaKind of ['code', 'data'] as const) {
+    it(`${mediaKind} is not a deep fake: a declared no-public-interest exemption holds`, () => {
+      const d = disclosureFor({ ...rec('ai-generated', 'none'), mediaKind }, { ...publicPage, publicInterest: 'no' });
+      expect(d.required).toBe(false);
     });
   }
 
@@ -206,7 +228,7 @@ describe('Article 50(4) first subparagraph: deepfakes', () => {
   });
 
   it('a reviewed deepfake still carries the duty — 50(4) 1st subpara has no review exemption', () => {
-    const d = disclosureFor(rec('ai-generated', 'editorial-control'),
+    const d = disclosureFor({ ...rec('ai-generated', 'editorial-control'), resemblesReal: 'yes' },
       { ...publicPage, mediaKind: 'image' });
     expect(d.reason).toBe('art50_4_deepfake');
     expect(d.required).toBe(true);
@@ -267,7 +289,7 @@ describe('creative work: present, but not intrusive', () => {
   });
 
   it('a creative deepfake is still disclosed, lightly', () => {
-    const d = disclosureFor(rec('ai-generated', 'none'),
+    const d = disclosureFor({ ...rec('ai-generated', 'none'), resemblesReal: 'yes' },
       { ...publicPage, creativeWork: true, mediaKind: 'video' });
     expect(d).toEqual({ required: true, reason: 'art50_4_deepfake', strength: 'light' });
   });

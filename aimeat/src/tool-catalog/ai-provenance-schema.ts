@@ -18,11 +18,14 @@
  * @structure AiProvenanceBlockSchema
  * @usage import { AiProvenanceBlockSchema } from '../ai-provenance-schema.js';
  * @version-history
+ *   v1.1.0 — 2026-10-08 — Optional `media_kind`, `media_type` and `resembles_real`: a declaration can
+ *     say a picture is a picture, so its label says so and the deep-fake rule can apply.
  *   v1.0.0 — 2026-10-05 — Moved from src/mcp/ai-provenance-input.ts v1.2.1 (secaudit 2026-10, M3).
  */
 import { z } from 'zod';
 import {
   AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AiSourceUrlSchema,
+  AI_MEDIA_KINDS, AI_RESEMBLES_REAL, MEDIA_TYPE_PATTERN,
 } from '../models/ai-provenance-schemas.js';
 
 const sourceInput = z.object({
@@ -57,6 +60,17 @@ export const AiProvenanceBlockSchema = z.object({
     "Who served the model, when that is not obvious from its name — e.g. 'openrouter' in front of "
     + "someone else's model. Say it when you route through an intermediary, because 'which model' "
     + 'and "who ran it" are different questions and a reader chasing an output needs both.'),
+  media_kind: z.enum(AI_MEDIA_KINDS).optional().describe(
+    "What kind of thing this is: text | image | audio | video | code | data. It decides the label's "
+    + 'words (a picture is not "this text") and whether the deep-fake rule applies, which reaches '
+    + 'image, audio and video only. Omitted: the node states text for text it stores, and nothing '
+    + 'for bytes.'),
+  media_type: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'media_type must be an IANA media type such as audio/mpeg')
+    .optional().describe("The IANA media type of the bytes, e.g. 'audio/mpeg' or 'image/png'."),
+  resembles_real: z.enum(AI_RESEMBLES_REAL).optional().describe(
+    'For image, audio or video: does it resemble a real person, place, object or event (a cloned '
+    + "voice, a likeness)? 'yes' | 'no' | 'unknown'. Public synthetic media is labelled either way; "
+    + "this decides only whether the record cites the deep-fake rule ('yes') or labels as a precaution."),
   sources: z.array(sourceInput).max(100).optional().describe(
     'For synthesized content: where the material came from.'),
   notes: z.string().max(1_000).optional().describe(
