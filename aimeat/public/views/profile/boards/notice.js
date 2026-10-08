@@ -10,6 +10,8 @@
  * @structure renderNotice · replyBlock · toolsFold
  * @usage import { renderNotice } from './notice.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-08 -- The notice's text carries its AI label above it when one is owed
+ *     (BoardNoticeText provenance, aiprov D10).
  *   v1.12.0 -- 2026-09-26 -- On the component kit (page group G7): the crumb, the tags, the way back and the rail are data (the poster's standing is the rail's note line), the doors the Loud and Action, the reply row the Beside under the heavy rule with the TextArea and its send slab, the tools the Actions, the fold the Section fold. The notice's text and its replies stay the conversation family's. The file writes no class.
  *   v1.11.0 -- 2026-09-26 -- A reply is the Message component's board tone, the notice's text the BoardNoticeText (components/Message.js, BoardNotice.js): the same markup and look, given as data.
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -97,7 +99,7 @@ export function renderNotice(ctx, b, postId) {
     title: post.title, marks, doors, rail, back,
     after: html`<${ctx.ConfirmUI} />`,
     children: html`
-      <${BoardNoticeText}>${post.body}<//>
+      <${BoardNoticeText} provenance=${post.ai_provenance}>${post.body}<//>
       <${PageSection} id="bp-replies" num="01" title=${c('secReplies')} count=${replies.length}>
         ${!replies.length ? html`<${Note} kind="quiet">${c('noReplies')}<//>` : replies.map(r => replyBlock(ctx, r, authors))}
         <${Beside} id="bp-reply" align="end" rule above="large" pad="large"
