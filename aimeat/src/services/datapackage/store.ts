@@ -250,7 +250,7 @@ export async function publishPackage(
 
     // ── 3. Already published? The address carries the hash, so the same bytes are already there. ──
     const dKey = descriptorKey(input.name, contentHash);
-    const existing = await storage.getStorageFileMeta(ownerGhii, dKey);
+    const existing = await storage.getStorageFile(ownerGhii, dKey);
     const descriptorUrl = publicUrl(config.baseUrl, ownerGhii, dKey);
     const resourceUrls = bodies.map(b => ({
         name: b.name,
