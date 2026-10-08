@@ -73,6 +73,8 @@ async function ownerCounts(storage: Storage, ownerGhii: string): Promise<boolean
 
 /** Whether the operator left this layer on for the node. On unless set to false. */
 export const nodeCountsVisibility = (config: AimeatConfig): boolean => config.aiVisibilityEnabled !== false;
+/** Whether the operator left layer C (agents' calls and checkouts) on. On unless set to false. */
+export const nodeWatchesAgents = (config: AimeatConfig): boolean => config.agentExperienceEnabled !== false;
 
 // ── Whose place the apex is ───────────────────────────────────────────────────────────────────
 
@@ -254,7 +256,7 @@ export function recordCheckoutStage(
   storage: Storage, config: AimeatConfig,
   input: { sellerGhii: string; family: string | null; stage: CheckoutStage; code?: string | null },
 ): void {
-  if (!nodeCountsVisibility(config)) return;
+  if (!nodeCountsVisibility(config) || !nodeWatchesAgents(config)) return;
   void (async () => {
     try {
       const ownerGhii = ownerGhiiOf(input.sellerGhii);
@@ -278,7 +280,7 @@ export function recordAgentCall(
   storage: Storage, config: AimeatConfig,
   input: { ownerGhii: string; family: string | null; tool: string; outcome: 'ok' | 'refused' | 'error'; reason?: string | null },
 ): void {
-  if (!nodeCountsVisibility(config)) return;
+  if (!nodeCountsVisibility(config) || !nodeWatchesAgents(config)) return;
   void (async () => {
     try {
       const ownerGhii = ownerGhiiOf(input.ownerGhii);

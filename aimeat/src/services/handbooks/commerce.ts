@@ -7,6 +7,7 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   v2.5.0 — 2026-10-08 — The report's `agents` section: where AI agents stop at checkout and at the owner's tools.
  *   v2.4.0 — 2026-10-08 — aimeat_visibility_report and aimeat_visibility_settings_set: where the buyers come from.
  *   v2.3.0 — 2026-10-07 — GET /v1/commerce/tools?include=own lists the agent's own owner's free callable app tools.
  *   v2.2.0 — 2026-10-02 — An agent buys in money only within its daily purchase limit, and reads it from two records.
@@ -52,7 +53,10 @@ that link. Morsel prices are not limited.
 channel (an AI answer, search, social, another site, direct), which AIs fetched which pages, who read
 the place's llms.txt, AGENTS.md, MCP card and UCP profile, and completed purchases by the channel
 they came from (a person on a page, or an agent at a checkout). Read it when the owner asks why sales
-moved. It cannot show what a person asked the AI; say so. \`aimeat_visibility_settings_set\` switches
+moved. It cannot show what a person asked the AI; say so. Its \`agents\` section says where AI agents
+stop: their checkouts by stage with the error code of each failure, other people's agents' calls to
+the owner's tools by outcome, and one line per finding in \`agents.findings\`, which you can say to the
+owner in their language. \`aimeat_visibility_settings_set\` switches
 the counting off or on (scope signals:write); ask the owner first.
 
 **Sell through AI shopping agents (scope signals:write).** \`aimeat_visibility_feed\` — the owner's

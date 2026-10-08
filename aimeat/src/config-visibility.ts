@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.3.0 — 2026-10-08 — agentExperienceEnabled (layer C).
  *   v1.2.0 — 2026-10-08 — merchantFeedEnabled (layer E).
  *   v1.1.0 — 2026-10-08 — analyticsTagsEnabled (layer B).
  *   v1.0.0 — 2026-10-08 — Initial: aiVisibilityEnabled (layer A).
@@ -35,6 +36,11 @@ export interface VisibilityConfig {
    * own Stripe for agent checkout (Copilot Checkout). On by default; each owner switches their own on.
    */
   merchantFeedEnabled: boolean;
+  /**
+   * Layer C: count, for the owner, outside agents' calls to their tools by outcome and agents'
+   * checkouts by stage, and say where they stop. On by default: counts per AI family, no agent named.
+   */
+  agentExperienceEnabled: boolean;
 }
 
 export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): VisibilityConfig {
@@ -42,5 +48,6 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
     aiVisibilityEnabled: env.AIMEAT_AI_VISIBILITY !== 'false',
     analyticsTagsEnabled: env.AIMEAT_ANALYTICS_TAGS !== 'false',
     merchantFeedEnabled: env.AIMEAT_MERCHANT_FEED !== 'false',
+    agentExperienceEnabled: env.AIMEAT_AGENT_EXPERIENCE !== 'false',
   };
 }

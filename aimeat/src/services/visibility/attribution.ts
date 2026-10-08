@@ -13,9 +13,11 @@
  *
  *   A buyer whose browser sends `Sec-GPC: 1` or `DNT: 1` gets no attribution at all, so the
  *   purchase counts in the totals and under no channel.
- * @structure pageAttribution · agentAttribution · ucpAgentFamily
+ * @structure pageAttribution · agentAttribution · ucpAgentFamily · agentFamilyOf
  * @usage const attribution = pageAttribution({ referrer, utmSource, selfHosts, optedOut });
  * @version-history
+ *   v1.1.0 — 2026-10-08 — agentFamilyOf: an AIMEAT agent's family from its GAII, used when no
+ *     header names the AI (layer C).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
 import type { CheckoutAttribution } from '../../commerce/types.js';
@@ -67,9 +69,44 @@ export function ucpAgentFamily(header: string | null | undefined): string | null
 }
 
 /** An agent's checkout at a checkout endpoint. Always attributed: the buyer is an AI by definition. */
-export function agentAttribution(args: { ucpAgent?: string | null; userAgent?: string | null; family?: string | null }): CheckoutAttribution {
+export function agentAttribution(args: {
+  ucpAgent?: string | null; userAgent?: string | null; family?: string | null;
+  /** The buying agent's GAII when it is an AIMEAT agent: its name says which AI it is, when nothing else does. */
+  gaii?: string | null;
+}): CheckoutAttribution {
   const fromProfile = ucpAgentFamily(args.ucpAgent);
   const fromUa = classifyVisitor(args.userAgent).aiAgent;
-  const family = args.family ?? (fromProfile && fromProfile !== 'other' ? fromProfile : null) ?? fromUa ?? fromProfile ?? 'other';
+  const fromGaii = args.gaii ? agentFamilyOf(args.gaii) : null;
+  const family = args.family
+    ?? (fromProfile && fromProfile !== 'other' ? fromProfile : null)
+    ?? fromUa
+    ?? (fromGaii && fromGaii !== 'aimeat-agent' ? fromGaii : null)
+    ?? fromProfile ?? fromGaii ?? 'other';
   return { channel: 'ai', family, via: 'agent' };
+}
+
+/** Words in an agent's own name that say which AI it is. Checked in order; the first match wins. */
+const NAME_WORDS: Array<[RegExp, string]> = [
+  [/copilot|bing|microsoft/, 'copilot'],
+  [/claude|anthropic/, 'claude'],
+  [/chatgpt|openai|gpt|codex/, 'chatgpt'],
+  [/gemini|google|bard/, 'gemini'],
+  [/perplexity/, 'perplexity'],
+  [/mistral|le-chat/, 'mistral'],
+  [/grok|xai/, 'grok'],
+  [/deepseek/, 'deepseek'],
+  [/llama|meta/, 'meta-ai'],
+];
+
+/**
+ * The family of an AIMEAT agent from its GAII (`claude-code#alice@node` → `claude`). An agent whose
+ * name says nothing is `aimeat-agent`: an AI acting for an account here, which is still worth
+ * telling apart from a person. Only the family is kept, never the agent's name.
+ */
+export function agentFamilyOf(gaii: string | null | undefined): string {
+  const name = (gaii ?? '').split('#')[0]!.toLowerCase();
+  if (!name || !gaii?.includes('#')) return 'aimeat-agent';
+  if ((AI_FAMILIES as readonly string[]).includes(name)) return name;
+  for (const [re, family] of NAME_WORDS) if (re.test(name)) return family;
+  return 'aimeat-agent';
 }

@@ -279,7 +279,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
   async function loadOwnSession(req: Request): Promise<CheckoutSessionRecord> {
     const buyerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const id = decodeURIComponent(req.params.id as string);
-    const session = await getSession(storage, buyerGhii, id);
+    const session = await getSession(storage, buyerGhii, id, config);
     if (!session) throw new CommerceError('SESSION_NOT_FOUND', 404, `Checkout session not found: ${id}`);
     return session;
   }
@@ -293,7 +293,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
         buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
         items: parsed.data.items.map((i) => ({ ...parseSku(i.id), quantity: i.quantity ?? 1 })),
         note: parsed.data.note,
-        attribution: agentAttribution({ userAgent: req.get('user-agent') }),
+        attribution: agentAttribution({ userAgent: req.get('user-agent'), gaii: resolveIdentity(req.auth!, config.nodeId) }),
       });
       res.status(201).json(toAcpSession(session));
     } catch (err) { sendAcpError(res, config, err); }

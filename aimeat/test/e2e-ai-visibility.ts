@@ -14,6 +14,8 @@
  *   The refusals are measured: a second owner sees none of the first owner's counts, an agent
  *   holding the wrong scope is refused on REST and has no such tool on MCP, and no token is 401.
  * @version-history
+ *   v1.1.0 — 2026-10-08 — Phase 7 (layer C): an agent's completed, abandoned and failed checkouts
+ *     land in the seller's report by stage, by error code and as one readable line.
  *   v1.0.0 — 2026-10-08 — Initial.
  */
 
@@ -87,8 +89,8 @@ async function makeOwner(name: string): Promise<{ token: string; ghii: string; o
   }
 }
 
-async function makeAgent(ownerCtx: { token: string; owner: string }, scopes: string[]): Promise<string> {
-  const name = `visag${Date.now().toString(36).slice(-5)}${Math.floor(Math.random() * 900 + 100)}`;
+async function makeAgent(ownerCtx: { token: string; owner: string }, scopes: string[], agentName?: string): Promise<string> {
+  const name = agentName ?? `visag${Date.now().toString(36).slice(-5)}${Math.floor(Math.random() * 900 + 100)}`;
   const reg = await json('/v1/agents', {
     method: 'POST', headers: authed(ownerCtx.token),
     body: JSON.stringify({ name, owner: ownerCtx.owner, scopes }),
@@ -451,9 +453,58 @@ await test('19. null removes a tag, and with both removed the page carries none'
   assert(!(await page(appPath)).includes('data-aimeat-tags'), 'no tag left');
 });
 
-console.log('\nPhase 7 — nothing that identifies a visitor is at rest');
+console.log('\nPhase 7 — what AI agents meet at the checkout (layer C)');
 
-await test('20. no IP address, Referer path or User-Agent is stored in any table of the node', async () => {
+/** A buying agent whose own name says which AI it is, as an AIMEAT agent's usually does. */
+let shopper = '';
+const agentCheckout = async (): Promise<string> => {
+  const create = await json('/v1/commerce/checkout-sessions', {
+    method: 'POST', headers: authed(shopper),
+    body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'proofread' }] }),
+  });
+  assert(create.status === 201, `agent create ${create.status} ${JSON.stringify(create.body)}`);
+  return create.body.data.session.id as string;
+};
+
+await test('20. a Claude agent of the buyer completes one checkout, abandons one and fails one at payment', async () => {
+  shopper = await makeAgent(B, ['commerce:buy'], `claude-shopper${Date.now().toString(36).slice(-4)}`);
+  const done = await agentCheckout();
+  const ok = await json(`/v1/commerce/checkout-sessions/${done}/complete`, { method: 'POST', headers: authed(shopper), body: '{}' });
+  assert(ok.status === 200, `complete ${ok.status} ${JSON.stringify(ok.body)}`);
+  const left = await agentCheckout();
+  const cancel = await json(`/v1/commerce/checkout-sessions/${left}`, { method: 'PATCH', headers: authed(shopper), body: JSON.stringify({ cancel: true }) });
+  assert(cancel.status === 200, `cancel ${cancel.status} ${JSON.stringify(cancel.body)}`);
+  const bad = await agentCheckout();
+  const fail = await json(`/v1/commerce/checkout-sessions/${bad}/complete`, {
+    method: 'POST', headers: authed(shopper), body: JSON.stringify({ payment: { handler: 'com.example.none' } }),
+  });
+  assert(fail.status === 422, `an unknown payment handler fails the checkout, got ${fail.status} ${JSON.stringify(fail.body)}`);
+});
+
+await test('21. the seller\'s report shows the three under claude by stage, the failure by its code, and one readable line', async () => {
+  const r = await report(S.token);
+  const claude = r.agents.checkouts.find((c: any) => c.family === 'claude');
+  assert(claude, `a claude row, got ${JSON.stringify(r.agents.checkouts)}`);
+  assert(claude.started === 3 && claude.completed === 1 && claude.canceled === 1 && claude.failed === 1,
+    `started 3, completed 1, canceled 1, failed 1; got ${JSON.stringify(claude)}`);
+  const err = r.agents.checkout_errors.find((e: any) => e.family === 'claude');
+  assert(err && err.code === 'UNKNOWN_PAYMENT_HANDLER' && err.stage === 'at payment' && err.count === 1,
+    `the failure is kept as its code and its stage, got ${JSON.stringify(r.agents.checkout_errors)}`);
+  const line = r.agents.findings.find((f: any) => f.family === 'claude' && f.kind === 'checkout');
+  assert(line && /tried to buy 3 times/.test(line.text) && /UNKNOWN_PAYMENT_HANDLER/.test(line.text)
+    && /1 was abandoned/.test(line.text) && /1 completed/.test(line.text), `one readable line, got ${JSON.stringify(line)}`);
+  assert(!JSON.stringify(r.agents).includes('claude-shopper'), 'the agent is counted by its AI, never by its name');
+  // The control: a person's checkouts (tests 9 and 10) are purchases, not agents' checkouts. Only the
+  // Copilot agent of test 11 and this Claude agent are here.
+  const started = r.agents.checkouts.reduce((n: number, c: any) => n + c.started, 0);
+  assert(started === 4, `four agent checkouts in all (copilot 1, claude 3), got ${JSON.stringify(r.agents.checkouts)}`);
+  const mcp = await callTool(await openSession(readerAgent), 'aimeat_visibility_report', {});
+  assert(!mcp.isError && JSON.stringify(mcp.data.agents) === JSON.stringify(r.agents), 'MCP gives the same section');
+});
+
+console.log('\nPhase 8 — nothing that identifies a visitor is at rest');
+
+await test('22. no IP address, Referer path or User-Agent is stored in any table of the node', async () => {
   await report(S.token);   // the report merges what this process still holds
   await report(OP.token);
   const provider = process.env.AIMEAT_DB ?? 'memory';

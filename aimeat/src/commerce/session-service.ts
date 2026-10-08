@@ -68,7 +68,7 @@ import { takeDesignations } from './beneficiary-designation.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
-import { recordPurchase } from '../services/visibility/visibility-counter.js';
+import { recordPurchase, recordCheckoutStage } from '../services/visibility/visibility-counter.js';
 
 export { CommerceError } from './errors.js';
 
@@ -167,14 +167,31 @@ export async function createSession(
     expiresAt: new Date(now.getTime() + sessionTtlMs(config)).toISOString(),
   };
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), session);
+  agentStage(storage, config, session, 'created');
   return session;
 }
 
-/** Read a session; lazily flip an overdue `open` session to `expired` (persisted). */
+/**
+ * Count one stage of an AI agent's checkout for the seller (AI visibility, layer C): where agents'
+ * checkouts stop. A person's checkout is not counted here. Never throws.
+ */
+function agentStage(
+  storage: Storage, config: AimeatConfig | undefined, session: CheckoutSessionRecord,
+  stage: 'created' | 'updated' | 'completed' | 'canceled' | 'expired' | 'failed', code?: string,
+): void {
+  if (!config || session.attribution?.via !== 'agent') return;
+  recordCheckoutStage(storage, config, { sellerGhii: session.sellerGhii, family: session.attribution.family, stage, code });
+}
+
+/**
+ * Read a session; lazily flip an overdue `open` session to `expired` (persisted). With `config`, an
+ * agent's checkout that expired is counted for the seller.
+ */
 export async function getSession(
   storage: Storage,
   buyerGhii: string,
   id: string,
+  config?: AimeatConfig,
 ): Promise<CheckoutSessionRecord | null> {
   const rec = await storage.getMemory(buyerGhii, sessionKey(id));
   if (!rec) return null;
@@ -183,6 +200,7 @@ export async function getSession(
     session.status = 'expired';
     session.updatedAt = new Date().toISOString();
     await putRecord(storage, buyerGhii, sessionKey(id), session);
+    agentStage(storage, config, session, 'expired');
   }
   return session;
 }
@@ -323,12 +341,15 @@ export async function updateSessionItems(
     ...session, items, sellerOwner, sellerGhii, total, updatedAt: new Date().toISOString(),
   };
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), updated);
+  agentStage(storage, config, updated, 'updated');
   return updated;
 }
 
+/** Cancel an open session. With `config`, an agent's cancel is counted for the seller as abandoned. */
 export async function cancelSession(
   storage: Storage,
   session: CheckoutSessionRecord,
+  config?: AimeatConfig,
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
   const updated: CheckoutSessionRecord = { ...session, status: 'cancelled', updatedAt: new Date().toISOString() };
@@ -340,6 +361,7 @@ export async function cancelSession(
     data: { what: session.items.map(i => i.title).filter(Boolean).join(', ').slice(0, 120) },
   });
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), updated);
+  agentStage(storage, config, updated, 'canceled');
   return updated;
 }
 
@@ -416,6 +438,13 @@ async function bookCheckoutBeneficiaries(
   }
 }
 
+type CompletingCaller = { sub?: string; roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
+
+/**
+ * Complete a session: collect the payment, fulfil, settle. An agent's outcome is counted for each
+ * seller (AI visibility, layer C): `completed`, or `failed` with the code the checkout answered, or
+ * `expired` when it ran out of time. Only the code is kept, never the message or the input.
+ */
 export async function completeSession(
   storage: Storage,
   config: AimeatConfig,
@@ -427,7 +456,31 @@ export async function completeSession(
   callerJwt?: string,
   /** The completing principal. Present for every door that a granted app can reach; see the spend
    *  gate below. Omitted only where no external principal can be the caller. */
-  caller?: { sub?: string; roles: string[]; scopes: string[]; appGrantId?: string | null } | null,
+  caller?: CompletingCaller,
+): Promise<CheckoutSessionRecord> {
+  try {
+    const done = await completeSessionInner(storage, config, session, handlerId, instrument, callerJwt, caller);
+    agentStage(storage, config, done, 'completed');
+    return done;
+  } catch (e) {
+    const code = (e as { code?: unknown } | null)?.code;
+    // A retry against a session that already closed is not a new outcome: the first one was counted.
+    if (typeof code === 'string' && code !== 'SESSION_NOT_OPEN') {
+      if (code === 'SESSION_EXPIRED') agentStage(storage, config, session, 'expired');
+      else agentStage(storage, config, session, 'failed', code);
+    }
+    throw e;
+  }
+}
+
+async function completeSessionInner(
+  storage: Storage,
+  config: AimeatConfig,
+  session: CheckoutSessionRecord,
+  handlerId: string | undefined,
+  instrument: unknown,
+  callerJwt: string | undefined,
+  caller: CompletingCaller | undefined,
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
 

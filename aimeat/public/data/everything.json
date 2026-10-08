@@ -1506,6 +1506,15 @@
      "plain": "How people and AIs find you See, for your whole place and with no setup, where the people who open your apps, portfolio and company page came from (an AI answer and which AI, search, social, another site, or direct), which AI fetched which page because a person asked it or to build its index, who read your llms.txt, AGENTS.md, MCP card and UCP profile, and which completed purchases came from which channel, including purchases an AI agent made at your checkout. Your own AI reads the same report and can answer \"why did sales drop\". Counts only: no address, no cookie and no visitor id is kept, so it is on by default without a consent banner; a browser that sends Global Privacy Control or Do Not Track is counted in the total alone. You can switch it off for your place, and the operator for the node (AIMEAT_AI_VISIBILITY). Limits: the questions people asked the AI are not visible, only what the AI fetched; a purchase is placed in a channel only when the page that opened the checkout used the commerce library or an agent opened it; counts reach the report within ten seconds, and a node stopped without warning can lose the last ten seconds. GET /v1/visibility/report, /v1/visibility/settings, aimeat_visibility_report, aimeat_visibility_settings_set"
     },
     {
+     "slug": "g-8-where-ai-agents-stop",
+     "cells": [
+      "<strong>Where AI agents stop</strong>",
+      "See where AI agents give up at your place, which a browser script cannot show: how many checkouts each AI's agents started, changed, completed, abandoned, let expire or failed, the error each failure answered and the step it stopped at, and how many calls other people's agents made to your tools, with the ones refused or failed by tool and reason. The report says it in one line per finding, for example &quot;A copilot agent tried to buy 14 times; 9 checkouts failed at payment (PSP_ERROR), 2 were abandoned, 3 completed&quot;, and your own AI reads the same lines. An agent is counted by the AI it is (from its UCP profile, its User-Agent or its name), never by its name; an error is kept as its code, never its message or input. Your own agents and people are not counted here. Limits: a tool call is counted when it goes through the node's metering (app tools, extensions and exchange work that name you as the seller, and your attached MCP servers); at most 100 kinds of error a day. The operator can switch it off for the node (<code>AIMEAT_AGENT_EXPERIENCE</code>).",
+      "<code>GET /v1/visibility/report</code> (<code>agents</code>), <code>aimeat_visibility_report</code>"
+     ],
+     "plain": "Where AI agents stop See where AI agents give up at your place, which a browser script cannot show: how many checkouts each AI's agents started, changed, completed, abandoned, let expire or failed, the error each failure answered and the step it stopped at, and how many calls other people's agents made to your tools, with the ones refused or failed by tool and reason. The report says it in one line per finding, for example \"A copilot agent tried to buy 14 times; 9 checkouts failed at payment (PSP_ERROR), 2 were abandoned, 3 completed\", and your own AI reads the same lines. An agent is counted by the AI it is (from its UCP profile, its User-Agent or its name), never by its name; an error is kept as its code, never its message or input. Your own agents and people are not counted here. Limits: a tool call is counted when it goes through the node's metering (app tools, extensions and exchange work that name you as the seller, and your attached MCP servers); at most 100 kinds of error a day. The operator can switch it off for the node (AIMEAT_AGENT_EXPERIENCE). GET /v1/visibility/report (agents), aimeat_visibility_report"
+    },
+    {
      "slug": "g-8-bring-your-own-clarity-or-google-analytics",
      "cells": [
       "<strong>Bring your own Clarity or Google Analytics</strong>",
@@ -3826,6 +3835,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 382
+  "rows": 383
  }
 }

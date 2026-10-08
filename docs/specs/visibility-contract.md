@@ -4,6 +4,7 @@
   count is decided, and what each number is worth. Named by `spec` inside every month record, so an
   agent or another system can read and honour the shape without our code.
 @version-history
+  v1.2.0 — 2026-10-08 — What AI agents met here: checkouts by stage, tool calls by outcome (layer C).
   v1.1.0 — 2026-10-08 — The settings record and the owner's own analytics tags (layer B).
   v1.0.0 — 2026-10-08 — Initial, with layer A (channels, AI fetches, discovery files, purchases).
 -->
@@ -52,7 +53,12 @@ report says so in its `reading.not_seen` line.
         "ai|chatgpt|page":  { "n": 2, "amounts": { "EUR": 49000000 } },
         "ai|copilot|agent": { "n": 1, "amounts": { "USD": 19990000 } },
         "none||page":       { "n": 1, "amounts": { "EUR": 9900000 } }
-      }
+      },
+      // Layer C: what AI agents met here. Present once an agent did something.
+      "checkouts":      { "copilot": { "created": 14, "completed": 3, "canceled": 2, "failed": 9 } },
+      "checkoutErrors": { "copilot|PSP_ERROR": 9 },
+      "agentCalls":     { "claude": { "ok": 4, "refused": 2 } },
+      "agentErrors":    { "claude|apptool:alice/shop.html/quote|payment_required": 2 }
     }
   },
   "updatedAt": "…"
@@ -79,6 +85,17 @@ report says so in its `reading.not_seen` line.
   `UCP-Agent` profile address or its User-Agent), as `via: agent`. A buyer who opted out, or a
   checkout nothing could place, counts as `none`. Amounts are in the session's unit: 6-decimal
   micro-units for money, whole morsels for `MORSEL`.
+- **An agent's checkout** (layer C) counts at each stage, for the seller: `created`, `updated`,
+  `completed`, `canceled`, `expired`, `failed`. A failure keeps the error code the checkout answered
+  (`PSP_ERROR`, `UNKNOWN_PAYMENT_HANDLER`) and nothing of its message or input. A person's checkout
+  is not counted here. The agent is its AI family: from its `UCP-Agent` profile, its User-Agent, or
+  an AIMEAT agent's own name (`claude-code#…` is `claude`; a name that says nothing is
+  `aimeat-agent`). The name itself is never kept.
+- **An outside agent's call to the owner's tool** (layer C) counts from the usage stream every metered
+  call already writes: a sold app tool, an extension, capability or exchange call that names the
+  owner as the seller, and the owner's attached remote MCP server used by another account's agent.
+  It counts by family and outcome (`ok`, `refused`, `error`), and a call that did not succeed also
+  by tool and reason, at most 100 such keys a day. The owner's own agents and people are not counted.
 
 ## What is never kept
 
@@ -110,3 +127,8 @@ against its shape before it is stored and again before it is written into a page
 `GET /v1/visibility/report?days=30` and the MCP tool `aimeat_visibility_report` return the same
 object: totals, channels, AI referrals, assistant and crawler fetches, the top 25 targets, discovery
 fetches, purchases and a row per day, with a `reading` block that says what each number is worth.
+Its `agents` section (layer C) lists checkouts by family and stage, checkout errors with the step
+each one stopped at, tool calls by outcome, tool errors by tool and reason, and `findings`: one
+line per family, such as "A copilot agent tried to buy 14 times; 9 checkouts failed at payment
+(PSP_ERROR), 2 were abandoned, 3 completed." The operator switches layer C off with
+`AIMEAT_AGENT_EXPERIENCE=false`.

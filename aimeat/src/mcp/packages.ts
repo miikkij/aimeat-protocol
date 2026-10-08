@@ -162,7 +162,7 @@ function registerPackageSaleTools(
         try {
             const session = await createSession(storage, config, {
                 buyerOwner: owner, buyerIdentity: getAgentGaii(), currency: buy.currency,
-                attribution: agentAttribution({}),
+                attribution: agentAttribution({ gaii: getAgentGaii() }),
                 items: [{
                     kind: 'package', agent: repository, app: groupId,
                     offer_id: input.action === 'renew' ? `renew:${input.node_id ?? ''}` : 'buy',

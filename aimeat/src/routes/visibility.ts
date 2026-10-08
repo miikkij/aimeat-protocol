@@ -13,6 +13,7 @@
  * @structure visibilityRouter (GET /v1/visibility/report, GET|PUT /v1/visibility/settings) · countApexDocs
  * @usage app.use(visibilityRouter(config, storage)); router.use(countApexDocs(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-10-08 — Starts counting outside agents' calls to each owner's tools (layer C).
  *   v1.2.0 — 2026-10-08 — Mounts the product feed routes (routes/visibility-feed.ts, layer E).
  *   v1.1.0 — 2026-10-08 — The settings take the owner's Clarity project id and GA4 measurement id
  *     (layer B), and answer in one view shared with the MCP tool.
@@ -33,6 +34,7 @@ import { getVisibilitySettings, setVisibilitySettings, VisibilitySettingsError }
 import { visibilitySettingsView } from '../services/visibility/analytics-tags.js';
 import { readVisibilityReport } from '../services/visibility/visibility-report.js';
 import { visibilityFeedRouter } from './visibility-feed.js';
+import { watchAgentCalls } from '../services/visibility/agent-experience.js';
 
 /** Every field optional: only what is given changes. A null id removes it. */
 const SettingsSchema = z.object({
@@ -77,6 +79,9 @@ export function visibilityRouter(config: AimeatConfig, storage: Storage): Router
   const router = Router();
   // The owner's product feeds (layer E), in their own file.
   router.use(visibilityFeedRouter(config, storage));
+  // Outside agents' calls to the owner's tools, counted from the usage stream (layer C). Here because
+  // this router is built once per node with its storage and config.
+  watchAgentCalls(storage, config);
 
   /** The account whose report this is. A visitor from another node has none here. */
   function ownerOf(req: Request, res: Response): string | null {
