@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.6.2 — 2026-10-08 — Section 4: an agent approved without a connector waits and gets its key
+ *     when the connector next connects.
  *   v1.6.1 — 2026-10-02 — Section 4: the node adds ai:use when the person's crews think through it,
  *     and a resident ask is stored as spawn where the connector cannot keep an agent up.
  *   v1.5.0 — 2026-10-02 — Section 4: the agent is proposed here and never sent elsewhere, built on
@@ -157,8 +159,9 @@ Once it runs, section 2 applies: a schedule of \`kind: "agent_task"\` gives it t
 clock. How to write the definition and how to check it is in the skill \`node:add-a-crew-agent\`.
 
 Say what this needs before you propose it: a connector of theirs running on a machine of theirs,
-and a model that machine can reach. Without the connector the agent is created and nothing runs
-it, and the answer to the approval says so.
+and a model that machine can reach. Without the connector the agent is created and waits, and the
+answer to the approval says so; when their connector next connects, the node gives the agent its
+key and the connector starts it, with nothing for them to press.
 
 ## The rule underneath all of this
 

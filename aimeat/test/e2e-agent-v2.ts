@@ -19,6 +19,9 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   v1.5.0 — 2026-10-08 — Section 12: an agent approved with no connector connected waits, a
+ *     refusing connector leaves it waiting, another owner's connector is offered nothing, and the
+ *     next connect gives it its key with nothing pressed.
  *   v1.4.0 — 2026-10-02 — With no connector connected a `resident` ask stands uncorrected.
  *   v1.3.0 — 2026-10-02 — A proposal answers with approval_url, a next_step that names it, and
  *     already_waiting.
@@ -1828,6 +1831,109 @@ async function run() {
             d1.close();
             d2.close();
         }
+    }
+
+    // ── 12. An agent approved while the connector is down gets its key when it connects ──
+    //
+    // Measured 2026-10-08 on a hosted place: `crm` was approved while the place's connector was
+    // down, the connector came back serving the concierge only, and nothing ever offered crm its key.
+    // The approval is the consent, so the next connect of that owner's connector carries the offer,
+    // naming exactly the agents still waiting, with nobody pressing anything.
+    {
+        const e = await setupOwner('e');
+        const f = await setupOwner('f');
+        const authE = { Authorization: `Bearer ${e.ownerToken}` };
+        const daemonE = await addV1Agent(e.owner, e.ownerToken, 'serve-daemon-e');
+        const daemonF = await addV1Agent(f.owner, f.ownerToken, 'serve-daemon-f');
+        const DEF = {
+            readme_md: '# Watcher', tags: [], process: 'sequential' as const, listen_for: ['tasks'],
+            agents: [{ role: 'Watcher', goal: 'watch', backstory: 'You watch.', allow_delegation: false, tools: ['memory'] }],
+            tasks: [{ id: 'watch', description: 'Watch this: {{ctx.prompt}}', expected_output: 'notes', agent: 'Watcher' }],
+        };
+        const approveAsE = async (name: string) => {
+            const p = await json('/v1/agents/v2/agent-proposals', {
+                method: 'POST', headers: authE,
+                body: JSON.stringify({ name, purpose: 'Watches the sources and reports what changed.', scopes: ['memory:read'], crew_def: DEF }),
+            });
+            assert(p.status === 201, `propose ${name}: ${p.status} ${JSON.stringify(p.body?.error)}`);
+            return json(`/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, { method: 'POST', headers: authE });
+        };
+        const recordOf = async (name: string) => (await json('/v1/agents?owner=' + e.owner, { headers: authE }))
+            .body.data.agents.find((x: any) => x.name === name);
+        const until = async (what: string, cond: () => Promise<boolean>, ms = 25_000) => {
+            const end = Date.now() + ms;
+            while (Date.now() < end) { if (await cond()) return; await new Promise(r => setTimeout(r, 300)); }
+            throw new Error(`timed out waiting for ${what}`);
+        };
+        const closeAndWait = async (d: FakeDaemon) => { d.close(); await new Promise(r => setTimeout(r, 500)); };
+        const enrolE = async (offer: any) => {
+            const cards: string[] = [];
+            for (const offered of offer.agents) {
+                const key = await makeKey();
+                cards.push(await signWith(cardFor(offered, e.owner, key), key));
+            }
+            const res = await json('/v1/agents/v2/enrol', {
+                method: 'POST', headers: { Authorization: `Bearer ${daemonE.token}` },
+                body: JSON.stringify({ grant_id: offer.grant_id, cards }),
+            });
+            return res.status === 200 ? { ok: true, result: { attached: offer.agents.map((x: any) => x.name) } } : { ok: false, result: res.body?.error ?? null };
+        };
+
+        // One agent that already has its key, so the later offer can be shown NOT to name it.
+        let dE = await openDaemon(daemonE.token, 'e-laptop');
+        dE.onEnrol = enrolE;
+        const early = await approveAsE('early-watcher');
+        assert(early.body?.data?.attached === true, `setup: early-watcher should attach, got ${JSON.stringify(early.body?.data?.attach_problem)}`);
+        await closeAndWait(dE);
+
+        await test('approving with no connector connected leaves the agent waiting for it, and says so', async () => {
+            const r = await approveAsE('late-watcher');
+            assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+            assert(r.body.data.attached === false, 'nothing could take it on yet');
+            assert(r.body.data.attach_problem?.code === 'NO_DAEMON', `expected NO_DAEMON, got ${JSON.stringify(r.body.data.attach_problem)}`);
+            assert(r.body.data.waiting_for_connector === true, 'the answer should say it waits for the connector');
+            assert(/waiting for your connector/.test(r.body.data.next_step), `next_step: ${r.body.data.next_step}`);
+            const rec = await recordOf('late-watcher');
+            assert(rec && !rec.enrolled_at, `it has no key yet, got ${JSON.stringify(rec?.enrolled_at)}`);
+        });
+
+        await test('a connector that refuses leaves it waiting, and the offer named exactly the waiting agent', async () => {
+            const offers: string[][] = [];
+            dE = await openDaemon(daemonE.token, 'e-laptop');
+            dE.onEnrol = async (offer: any) => {
+                offers.push(offer.agents.map((x: any) => x.name));
+                return { ok: false, result: { code: 'NO_HANDLER', message: 'an older connector' } };
+            };
+            await until('the offer on connect', async () => offers.length > 0);
+            assert(JSON.stringify(offers[0]) === JSON.stringify(['late-watcher']),
+                `the offer must name only the agent still waiting, got ${JSON.stringify(offers[0])}`);
+            const rec = await recordOf('late-watcher');
+            assert(rec && !rec.enrolled_at, 'a refusal changes nothing on the record');
+            await closeAndWait(dE);
+        });
+
+        await test('another owner\'s connector connecting is offered nothing of this owner\'s', async () => {
+            const offers: unknown[] = [];
+            const dF = await openDaemon(daemonF.token, 'f-laptop');
+            dF.onEnrol = async (offer: any) => { offers.push(offer); return { ok: false, result: { code: 'NO_HANDLER', message: 'x' } }; };
+            await new Promise(r => setTimeout(r, 3_500));
+            dF.close();
+            assert(offers.length === 0, `owner f has nothing waiting and must be offered nothing, got ${JSON.stringify(offers)}`);
+            const rec = await recordOf('late-watcher');
+            assert(rec && !rec.enrolled_at, 'and the waiting agent of owner e is untouched');
+        });
+
+        await test('when the connector connects again, the waiting agent gets its key with nothing pressed', async () => {
+            dE = await openDaemon(daemonE.token, 'e-laptop');
+            dE.onEnrol = enrolE;
+            try {
+                await until('late-watcher to hold a key', async () => !!(await recordOf('late-watcher'))?.enrolled_at);
+                const early2 = await recordOf('early-watcher');
+                assert(!!early2?.enrolled_at, 'the agent that already had a key keeps it');
+            } finally {
+                dE.close();
+            }
+        });
     }
 
 }

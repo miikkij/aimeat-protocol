@@ -23,6 +23,8 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.5.0 — 2026-10-08 — With no connector connected, the answer carries `waiting_for_connector`
+ *     and says the agent gets its key when the connector connects (services/agent-pending-enrolment.ts).
  *   v1.4.0 — 2026-10-02 — Approval decides the run mode again against the connected connector
  *     (a `resident` proposal on a spawning connector is made as spawn, and the answer carries
  *     `run_mode_corrected`), and adds ai:use when the owner's crews think through the node
@@ -64,13 +66,23 @@ const VALID_RUN_MODES = ['resident', 'spawn'];
  * can land in. Written out rather than assembled from fragments because the wrong half of this
  * sentence is what cost six days: "start your connector and it will come up" was said about an
  * agent that had no credentials, so starting the connector changed nothing.
+ *
+ * `waiting` is the case with no connector connected at all. Since 2026-10-08 that one IS true to
+ * say "it starts when your connector connects": the connect offers the key on its own
+ * (services/agent-pending-enrolment.ts). A connector that was reached and did not take the agent
+ * is a different case, and it still needs the person.
  */
-function nextStep(displayName: string, defined: boolean, attached: boolean): string {
+function nextStep(displayName: string, defined: boolean, attached: boolean, waiting: boolean): string {
   if (attached && defined) return `${displayName} is running: it has its instructions and your connector has taken it on.`;
   if (attached) return `${displayName} exists and your connector has taken it on. It needs a crew definition before it can run.`;
-  if (defined) return `${displayName} exists and has its instructions, but nothing is running it: your connector could not be reached. Start it and press Attach.`;
-  return `${displayName} exists. It needs a crew definition, and your connector could not be reached to take it on.`;
+  if (waiting && defined) return `${displayName} exists and has its instructions. It is waiting for your connector: when your connector connects, it gets its key and starts, with nothing for you to press.`;
+  if (waiting) return `${displayName} exists and is waiting for your connector, which gives it its key when it connects. It needs a crew definition before it can run.`;
+  if (defined) return `${displayName} exists and has its instructions, but your connector did not take it on. Update your connector and press Attach.`;
+  return `${displayName} exists. It needs a crew definition, and your connector did not take it on.`;
 }
+
+/** The refusals that mean "no connector is connected", which the next connect repairs on its own. */
+const NO_CONNECTOR = new Set(['NO_DAEMON', 'DAEMON_NOT_CONNECTED']);
 
 export function registerAgentProposalRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── PROPOSE. Creates nothing; puts it in front of the owner. ────────────────
@@ -275,7 +287,10 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       // The reason, verbatim, when it is not attached: "unconnected" without a why sends the owner
       // looking at the wrong machine.
       attach_problem: enrolment.ok ? null : { code: enrolment.code, message: enrolment.message },
-      next_step: nextStep(proposal.display_name, !!proposal.crew_def, enrolment.ok),
+      // True when no connector was connected: the agent gets its key when one connects.
+      waiting_for_connector: !enrolment.ok && NO_CONNECTOR.has(enrolment.code),
+      next_step: nextStep(proposal.display_name, !!proposal.crew_def, enrolment.ok,
+        !enrolment.ok && NO_CONNECTOR.has(enrolment.code)),
     }, [
       { description: 'See it in your fleet', method: 'GET', url: `/v1/agents?owner=${owner}` },
       ...(enrolment.ok ? [] : [{

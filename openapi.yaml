@@ -8894,6 +8894,11 @@ paths:
         does NOT undo the approval: `attached` comes back false with the reason in `attach_problem`,
         and the agent is repaired in one press on
         `POST /v1/agents/v2/agents/{name}/attach`.
+
+        WITH NO CONNECTOR CONNECTED, NOTHING NEEDS PRESSING. The agent stays pending (`waiting_for_connector`
+        true), and when a connector of the same owner next connects, the node offers it the keys of
+        every pending agent of that owner, once per connect. A connector that refuses or is too old
+        leaves them pending, and the node log says why.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -8927,6 +8932,9 @@ paths:
                             properties:
                               code: { type: string }
                               message: { type: string }
+                          waiting_for_connector:
+                            type: boolean
+                            description: True when no connector was connected. The agent gets its key when one of the owner's connectors next connects.
                           next_step: { type: string }
                           agent: { type: object }
                           run_mode_corrected:

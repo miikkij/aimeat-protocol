@@ -25,6 +25,7 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.4.0 -- 2026-10-08 -- A socket opened by an upgrade is announced to connect-tunnel-hooks.ts listeners.
  *   v2.3.0 -- 2026-10-02 -- A connection carries the run modes its connector presented at upgrade
  *     (X-AIMEAT-Run-Modes), and daemonsForOwner reports them per daemon. The ConnectConnection type
  *     moved to ./connect-tunnel-connection.ts, verbatim (max-file-lines).
@@ -128,6 +129,7 @@ import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
 import { revokeByToken, revokeByGaii, revokeByOwner } from './connect-tunnel-revocation.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel-connection.js';
+import { emitTunnelSocketOpened } from './connect-tunnel-hooks.js';
 
 
 /**
@@ -275,6 +277,8 @@ export class ConnectTunnelManager {
 
     // Phase 2: drain queued tasks + pending messages, then live-push.
     void this.sendBacklog(conn);
+    // A connector arrived: listeners such as the pending-enrolment offer act on it (connect-tunnel-hooks.ts).
+    emitTunnelSocketOpened({ nodeId: this.config.nodeId, principal, owner: identity.owner, installId: conn.installId });
 
     // A frame arrives as no node, so it runs as THIS node (runAsNode). One node per process in production.
     ws.on('message', (data) => runAsNode(this.config.nodeId, () => {

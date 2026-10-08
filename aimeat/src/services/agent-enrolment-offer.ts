@@ -30,11 +30,13 @@
  *   approved proposal keeps the agent and says it is unconnected, because those are two different
  *   promises to the person pressing.
  * @structure ENROL_CAPABILITY · ENROL_INVOKE_TIMEOUT_MS · EnrolCandidate · EnrolmentOutcome ·
- *   offerEnrolment()
+ *   offerEnrolment() · isBeingOffered() · offerOnDaemon()
  * @usage
  *   const out = await offerEnrolment({ config, storage }, owner, candidates, { installId });
  *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.2.0 — 2026-10-08 — The agents an offer names are recorded while it runs (isBeingOffered), so
+ *     the offer a connector's connect starts for pending agents does not name them twice.
  *   v1.1.0 — 2026-10-02 — The offer carries the node's public key, which the connector compares with
  *     the card it reads at its own address (a hosted node's crew reaches it on loopback).
  *   v1.0.0 — 2026-09-08 — Extracted from routes/agents-v2/basic-agents.ts so the proposal approve
@@ -96,7 +98,6 @@ export async function offerEnrolment(
   agents: EnrolCandidate[],
   opts: { installId?: string; kind?: 'create' | 'migrate' } = {},
 ): Promise<EnrolmentOutcome> {
-  const { config, storage } = deps;
   if (agents.length === 0) {
     return { ok: false, status: 400, code: 'NOTHING_TO_ENROL', message: 'No agents were named.' };
   }
@@ -121,6 +122,35 @@ export async function offerEnrolment(
     };
   }
 
+  // Named as being offered until this call returns, so the offer a connector's connect starts for
+  // pending agents (agent-pending-enrolment.ts) does not name them a second time meanwhile.
+  const keys = agents.map(a => offeringKey(owner, a.name));
+  for (const k of keys) offering.add(k);
+  try {
+    return await offerOnDaemon(deps, owner, agents, chosen, opts.kind ?? 'create');
+  } finally {
+    for (const k of keys) offering.delete(k);
+  }
+}
+
+/** Agents an offer names right now, as `owner\nname`. Process-local, like the tunnel it rides. */
+const offering = new Set<string>();
+const offeringKey = (owner: string, name: string) => `${owner}\n${name}`;
+
+/** Whether an offer naming this agent is under way in this process. */
+export function isBeingOffered(owner: string, name: string): boolean {
+  return offering.has(offeringKey(owner, name));
+}
+
+/** The grant, the offer and the read-back, for a daemon already chosen. */
+async function offerOnDaemon(
+  deps: { config: AimeatConfig; storage: Storage },
+  owner: string,
+  agents: EnrolCandidate[],
+  chosen: { target: string },
+  kind: 'create' | 'migrate',
+): Promise<EnrolmentOutcome> {
+  const { config, storage } = deps;
   await storage.cleanupExpiredAgentEnrolmentGrants();
 
   // The grant: exactly these agents, for this owner, for a few minutes, once.
@@ -129,7 +159,7 @@ export async function offerEnrolment(
     id: grantId,
     owner,
     agents: agents.map(a => a.name),
-    kind: opts.kind ?? 'create',
+    kind,
     createdBy: owner,
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + config.agentEnrolmentGrantTtlSeconds * 1000).toISOString(),

@@ -20,11 +20,13 @@
  *
  *   THE CONNECTOR IS STATED, NOT DISCOVERED. Approving mints the agent's credentials on the owner's
  *   running connector. With none running the agent is still made and still defined, and the panel
- *   says it is not running yet and offers Attach, which is one call away once the connector is up.
+ *   says it is waiting for the connector, which gives it its key when it connects. Attach stays for
+ *   a connector that is running and did not take it on.
  *
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.15.0 -- 2026-10-08 -- An agent approved with no connector connected is "waiting for your connector": it gets its key when the connector connects, without a press.
  *   v2.14.0 -- 2026-10-02 -- The question marks that explain what the agent reaches and how it runs: access.scopes, agent.run_mode (components/HelpTip.js).
  *   v2.13.0 --2026-10-01 -- A `draft` from the page's examples fills the form; the section is 03, under
  *     the new "What should an agent do?" (guided journey P4).
@@ -130,9 +132,8 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
 
   /** What came back from an approval, said once, in the words of what is true now. */
   function announce(data, displayName) {
-    showToast(data?.attached
-      ? t('profile.agents.new.done').replace('{name}', displayName)
-      : t('profile.agents.new.madeNotRunning').replace('{name}', displayName));
+    const key = data?.attached ? 'done' : data?.waiting_for_connector ? 'madeWaiting' : 'madeNotRunning';
+    showToast(t('profile.agents.new.' + key).replaceAll('{name}', displayName));
   }
 
   async function create() {
@@ -201,7 +202,9 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
   const scopeList = SCOPE_TEMPLATES[form.scopes] ?? SCOPE_TEMPLATES.standard;
 
   // AGENTS THIS ACCOUNT OWNS THAT NOTHING IS RUNNING: created and defined, with no key, because the
-  // connector was down when they were approved. Read from the fleet listing rather than remembered
+  // connector was down when they were approved. Each one is waiting for the connector: the node
+  // offers its key when the connector connects (services/agent-pending-enrolment.ts), and Attach
+  // stays for a connector that is already running and did not take it on. Read from the fleet listing rather than remembered
   // from this session's own press — the person who approves on their phone and comes back tomorrow
   // is the ordinary case, and a repair only the creating tab knows about is no repair at all.
   const unattached = (agents ?? []).filter(a => a.identity_version === 2 && a.card_enrolled === false);
