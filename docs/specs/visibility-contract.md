@@ -4,6 +4,7 @@
   count is decided, and what each number is worth. Named by `spec` inside every month record, so an
   agent or another system can read and honour the shape without our code.
 @version-history
+  v1.3.0 — 2026-10-08 — On-page behaviour per app and the fixing agent's runs (layer D).
   v1.2.0 — 2026-10-08 — What AI agents met here: checkouts by stage, tool calls by outcome (layer C).
   v1.1.0 — 2026-10-08 — The settings record and the owner's own analytics tags (layer B).
   v1.0.0 — 2026-10-08 — Initial, with layer A (channels, AI fetches, discovery files, purchases).
@@ -121,6 +122,52 @@ owner's own account. With the node's cookie banner on, the tag waits for the vis
 always denied); without the banner it loads at once and the report's `tags.warning` says EU
 visitors need consent. A browser that sends Global Privacy Control gets no tag. Each id is checked
 against its shape before it is stored and again before it is written into a page.
+
+## On-page behaviour (layer D)
+
+One record per app, `signals.behaviour.app.<filename>`, visibility `owner`, holding the last 56
+days, so an owner's key count grows with their apps and never with time:
+
+```jsonc
+{
+  "type": "aimeat.behaviour.app",
+  "spec": "/docs/specs/visibility-contract.md",
+  "app": "shop.html",
+  "days": {
+    "2026-10-08": {
+      "views": 40, "optedOut": 2,
+      "vc": { "phone": 25, "tablet": 3, "desktop": 10 },          // screen size of each view
+      "scroll": { "25": 20, "50": 8, "75": 4, "100": 6 },         // the deepest quarter reached
+      "heat": { "phone": { "5,2": 31 } }, "heatOther": 0,         // clicks by grid cell column,row
+      "dead": { "phone|button#buy": 14 },                         // nothing changed within a second
+      "rage": { "desktop|a#more": 5 }                             // three clicks in one spot
+    }
+  },
+  "updatedAt": "…"
+}
+```
+
+- **The script** is added by the place to every app page it serves (unless the owner switched that
+  app off, `signals.behaviour.settings.offApps`) and sends one beacon to `POST /v1/signals/behaviour`
+  when the page is hidden. It keeps nothing in the browser.
+- **The grid** is 12 columns across the screen and rows a quarter of the screen high from the top of
+  the page, at most 40 rows. A pixel position is never sent.
+- **A dead click** is a click on a button, a link within the page, an element with `onclick` or a
+  button role, or anything with a pointer cursor, after which no element was added, removed or
+  changed and no navigation happened within one second. Form fields, links that leave the page and
+  links that open a new tab are never dead. **A rage click** is a third click within 800 ms and 32
+  pixels of two others.
+- **An element** is named `tag#id.firstclass`, the author's own names, never what the page says.
+- **Bounds.** One view adds at most 200 clicks and 20 elements; a stored day keeps at most 300 grid
+  cells per screen size (the rest count in `heatOther`) and 60 elements per kind (the rest under
+  `other|other`). A view whose browser sends Sec-GPC or DNT counts in `views` and `optedOut` only.
+- **The fixing agent** (`signals.behaviour.settings.fixer`, off by default) reads seven days of
+  findings, asks the owner's own AI for a corrected app and writes it as the app's draft. It never
+  publishes and never replaces a draft the owner wrote. Every run is kept, newest first, in
+  `signals.behaviour.runs` (at most 50): `{ app, at, by, findings, draft, model, note }`.
+
+`GET /v1/visibility/behaviour` and `aimeat_visibility_behaviour` return the same report: per app the
+views, screens, scroll, dead and rage clicks, and `findings`, one line each; with `app`, the grid too.
 
 ## Reading it
 

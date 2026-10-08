@@ -10,6 +10,7 @@
  * @structure visibilityTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.3.0 — 2026-10-08 — aimeat_visibility_behaviour, _behaviour_set and _behaviour_fix: on-page behaviour and the fixing agent (layer D).
  *   v1.2.0 — 2026-10-08 — aimeat_visibility_feed: the product feeds for Copilot Checkout and Stripe (layer E).
  *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes clarity_project_id and ga4_measurement_id (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
@@ -61,6 +62,46 @@ export const visibilityTools = [
             product_links: { type: 'object', description: 'A product page per sku (the `sku` of a listed product, as this tool reads it) to an https address. Merged; a null value removes that link.', zod: z.record(z.string().max(300), z.string().max(2048).nullable()) },
             stripe_profile_id: { type: 'string', description: 'The person\'s Stripe network profile id (profile_…, Stripe Dashboard > Agentic commerce). With it and a selling key, the place\'s own UCP checkout takes Stripe shared payment tokens from AI platforms. null removes it.', zod: z.string().max(80).nullable() },
             stripe_sync: { type: 'string', description: '"send" pushes the catalog into the person\'s own Stripe now; "check" reads the last import\'s status.', enum: ['send', 'check'], zod: z.enum(['send', 'check']) },
+        },
+    },
+    {
+        name: 'aimeat_visibility_behaviour',
+        description: 'What people do on the person\'s apps, over the last `days` days (7 by default, up to 56): views by screen size (phone, tablet, computer), how far the page was scrolled, dead clicks (a click on a button or something that looks clickable after which nothing changed) and rage clicks (three quick clicks in one spot), by element, and `findings`: one line each, such as "On phones, 14 clicks on button#buy changed nothing on the page." Say the findings to the person in their language. With `app` (a filename) it covers that app and adds the click grid. Counting is on by default for every app and keeps no address, cookie, visitor id, keystroke, page text or recording. `fixer` says whether the weekly fixing agent is on.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'On-page Behaviour', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'signals:read',
+        surfaces: ['appdev', 'commerce'],
+        input: {
+            app: { type: 'string', description: 'One app\'s filename, such as shop.html. Without it, every app of the person.', zod: z.string().min(1).max(200) },
+            days: { type: 'number', description: 'The window in days, counted back from today. Default 7, at most 56.', zod: z.number().int().min(0).max(56) },
+        },
+    },
+    {
+        name: 'aimeat_visibility_behaviour_set',
+        description: 'Change the person\'s on-page behaviour settings; only the fields you give change. `app` with `app_enabled: false` removes the behaviour script from that app (what was counted stays), `true` puts it back. `fixer: true` switches on the weekly fixing agent: once a week it reads each app\'s findings, asks the person\'s own AI for a corrected app, and writes it as the app\'s draft. It never publishes, and it leaves a draft the person wrote alone. Each run spends the person\'s AI credit, so ask the person before you switch it on. The answer carries the switches and the last runs.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'On-page Behaviour Settings', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'signals:write',
+        surfaces: ['appdev', 'commerce'],
+        input: {
+            app: { type: 'string', description: 'The app\'s filename, with app_enabled.', zod: z.string().min(1).max(200) },
+            app_enabled: { type: 'boolean', description: 'true counts the app, false removes the script from it. Given with app.' },
+            fixer: { type: 'boolean', description: 'true switches the weekly fixing agent on, false off. Off by default.' },
+        },
+    },
+    {
+        name: 'aimeat_visibility_behaviour_fix',
+        description: 'Run the fixing agent on one of the person\'s apps now: it reads the app\'s findings of the last seven days, asks the person\'s own AI for a corrected app, and writes it as the app\'s DRAFT. It never publishes: the live app stays as it is until the person publishes the draft (aimeat_app_draft_publish). It does not replace a draft the person wrote. The answer is the run: the findings, whether a draft was written, the model, and a note when none was. It spends the person\'s AI credit; ask before you run it.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        // Not idempotent: each run is a new AI call and may write a new draft. Open world: it calls the person's AI provider.
+        annotations: { title: 'Fix an App from its Findings', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        scope: 'signals:write',
+        surfaces: ['appdev', 'commerce'],
+        input: {
+            app: { type: 'string', description: 'The app\'s filename, such as shop.html.', required: true, zod: z.string().min(1).max(200) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

@@ -10,6 +10,7 @@
  * @structure registerVisibilityTools(mcp, storage, config, caller)
  * @usage import { registerVisibilityTools } from './visibility.js';
  * @version-history
+ *   v1.3.0 — 2026-10-08 — aimeat_visibility_behaviour, _behaviour_set and _behaviour_fix (layer D).
  *   v1.2.0 — 2026-10-08 — aimeat_visibility_feed, over the same service functions as /v1/visibility/feed (layer E).
  *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes the Clarity and GA4 ids (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
@@ -28,6 +29,9 @@ import { visibilitySettingsView } from '../services/visibility/analytics-tags.js
 import {
   setFeedSettings, syncStripeCatalog, describeFeed, nodeAllowsFeeds, FeedSettingsError,
 } from '../services/visibility/merchant-feed-settings.js';
+import { readBehaviour } from '../services/visibility/behaviour-report.js';
+import { setBehaviourSettings, BehaviourSettingsError } from '../services/visibility/behaviour-settings.js';
+import { runBehaviourFix, behaviourSettingsView, BehaviourFixError } from '../services/visibility/behaviour-fixer.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -96,6 +100,54 @@ export function registerVisibilityTools(
         return text(stripe ? { ...feed, stripe } : feed);
       } catch (e) {
         if (e instanceof FeedSettingsError) return toolError(e.code, e.message);
+        throw e;
+      }
+    },
+  );
+
+  // ── On-page behaviour (layer D), over the functions routes/visibility-behaviour.ts calls ────
+  mcp.tool(
+    'aimeat_visibility_behaviour',
+    descriptionFor('aimeat_visibility_behaviour'),
+    zodShapeFor('aimeat_visibility_behaviour'),
+    annotationsFor('aimeat_visibility_behaviour'),
+    async ({ app, days }) => {
+      const owner = ownerOf();
+      if (!owner) return toolError('FORBIDDEN', NO_PLACE);
+      return text(await readBehaviour(storage, config, owner, { app, days }));
+    },
+  );
+
+  mcp.tool(
+    'aimeat_visibility_behaviour_set',
+    descriptionFor('aimeat_visibility_behaviour_set'),
+    zodShapeFor('aimeat_visibility_behaviour_set'),
+    annotationsFor('aimeat_visibility_behaviour_set'),
+    async ({ app, app_enabled, fixer }) => {
+      const owner = ownerOf();
+      if (!owner) return toolError('FORBIDDEN', NO_PLACE);
+      try {
+        await setBehaviourSettings(storage, owner, { app, appEnabled: app_enabled, fixer });
+        return text(await behaviourSettingsView(storage, config, owner));
+      } catch (e) {
+        if (e instanceof BehaviourSettingsError) return toolError(e.code, e.message);
+        throw e;
+      }
+    },
+  );
+
+  mcp.tool(
+    'aimeat_visibility_behaviour_fix',
+    descriptionFor('aimeat_visibility_behaviour_fix'),
+    zodShapeFor('aimeat_visibility_behaviour_fix'),
+    annotationsFor('aimeat_visibility_behaviour_fix'),
+    async ({ app }) => {
+      const owner = ownerOf();
+      if (!owner) return toolError('FORBIDDEN', NO_PLACE);
+      try {
+        return text(await runBehaviourFix(storage, config, owner, app, 'owner'));
+      } catch (e) {
+        if (e instanceof BehaviourFixError) return toolError(e.code, e.message);
         throw e;
       }
     },

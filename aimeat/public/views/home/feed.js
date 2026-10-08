@@ -11,6 +11,7 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-08: app_fix_drafted, with the agents' news: the fixing agent wrote a corrected draft.
  *   2026-10-04: agent_task_declined, filed with the agents' news and not under trouble: the agent's
  *     refusal and its reason.
  *   2026-09-25: operator_admin_granted, filed under access: which of the operator's full-access agents
@@ -151,6 +152,9 @@ export function line(item) {
       return tr('home.feed.appPublished', 'You published {name}.').replace('{name}', d.name || '');
     case 'app_updated':
       return tr('home.feed.appUpdated', 'You updated {name}.').replace('{name}', d.name || '');
+    case 'app_fix_drafted':
+      return tr('home.feed.appFixDrafted', 'A corrected draft of {app} is waiting for you. Your app is unchanged until you publish it.')
+        .replace('{app}', d.app || '');
     case 'workspace_record_published':
       return tr('home.feed.recordPublished', 'You published {name}.').replace('{name}', d.name || '');
     case 'organism_joined':
@@ -250,7 +254,7 @@ export function kindCategory(kind) {
     'workflow_created', 'workflow_updated', 'workflow_deleted', 'skill_installed',
     'extension_installed', 'package_installed'].includes(k)) return 'made';
   if (['agent_connected', 'agent_knocking', 'agent_task_done', 'agent_task_declined', 'workflow_run_started',
-    'workflow_run_finished', 'app_tool_first_use'].includes(k)) return 'agent';
+    'workflow_run_finished', 'app_tool_first_use', 'app_fix_drafted'].includes(k)) return 'agent';
   // The operator reset sits with 'trouble' rather than with the other two: a second factor that
   // disappeared without the person doing it is the one row on this feed they must not scroll past.
   if (['agent_task_failed', 'workflow_run_failed', 'ai_budget_reached', 'checkout_cancelled',

@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.11.0 — 2026-10-08 — Seed core:behaviour-fixer (weekly, Monday 06:17): the on-page behaviour fixing agent.
  *   v1.10.0 — 2026-10-08 — Seed core:ucp-upkeep (every 5 minutes): UCP order webhooks tried again.
  *   v1.9.0 — 2026-10-02 — Seed core:package-peer-cleanup (daily, 05:29): unused packages-only peers removed.
  *   v1.8.0 — 2026-10-02 — Seed core:package-renewals (daily, 05:13): automatic renewals of the package
@@ -118,6 +119,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // UCP order webhooks that did not reach the platform yet, tried again when their wait is over.
   // Every 5 minutes; a node with nothing waiting reads one key prefix and stops.
   jobs.push({ id: 'core:ucp-upkeep', name: 'UCP Order Webhook Retry', coreHandler: 'ucp-upkeep', cron: '*/5 * * * *' });
+  // The fixing agent of on-page behaviour (AI visibility, layer D), weekly on Monday at 06:17. A node
+  // where no owner switched it on reads one key prefix and stops.
+  jobs.push({ id: 'core:behaviour-fixer', name: 'Behaviour Fixing Agent', coreHandler: 'behaviour-fixer', cron: '17 6 * * 1' });
   // The Content Classifier's queue (TARGET-082 V3), hourly at :25. Seeded on every node, because
   // seeding is create-if-absent and an operator may turn classification on later; the handler reads
   // nothing while AIMEAT_CLASSIFICATION is off.

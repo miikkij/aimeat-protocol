@@ -12799,6 +12799,7 @@
       "operatorAdminGrantedMany": "{names} got the permission to administer this installation because they had full access. You can take it away in each agent's settings.",
       "appPublished": "You published {name}.",
       "appUpdated": "You updated {name}.",
+      "appFixDrafted": "A corrected draft of {app} is waiting for you. Your app is unchanged until you publish it.",
       "recordPublished": "You published {name}.",
       "organismJoined": "You joined {name}.",
       "organismLeft": "You left {name}.",

@@ -1994,6 +1994,32 @@
       },
       "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the owner's own month count records (signals.visibility.month.*), returned to the owner. Counts only, no content."
     },
+    "src/services/visibility/behaviour-counter.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: one app's behaviour count record (signals.behaviour.app.*, reserved prefix), read to merge counts into it. Counts only, no content."
+    },
+    "src/services/visibility/behaviour-settings.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's behaviour settings record (signals.behaviour.settings, reserved prefix): the apps switched off and the fixing agent's switch. No content."
+    },
+    "src/services/visibility/behaviour-report.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's own behaviour count records (signals.behaviour.app.*), returned to the owner. Counts and the app author's element names only, no page content."
+    },
+    "src/services/visibility/behaviour-fixer.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemoryKeysByPrefix": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's fixing-agent run log (signals.behaviour.runs, reserved prefix), and the key listing of signals.behaviour.settings to find the owners who switched the weekly run on. The app the agent fixes is the owner's own app, read through getApp and sent to the owner's own AI at the owner's request. No other content."
+    },
     "src/services/site-tags.ts": {
       "reads": {
         "getMemory": 2
