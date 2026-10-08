@@ -1852,7 +1852,21 @@ components:
             When it is absent and the writer is an AGENT or ECOSYSTEM principal, the node stamps one
             itself (`ai-generated`, `humanInvolvement: none`, `stampedBy: node`, `observed: false`,
             with the inference stated in `notes`): silence from an agent must not read as "a human
-            wrote it". An OWNER principal is never stamped.
+            wrote it". An OWNER principal is never stamped. The writer is the caller, wherever the
+            record lands: an agent's `owner_scope` write is stamped as the agent's.
+        ai_provenance:
+          allOf:
+            - $ref: '#/components/schemas/AiProvenanceDeclaration'
+          description: >
+            How this value was made, declared with the write and recorded against the bytes stored,
+            wherever the write lands (owner_scope included). Needs `provenance:write` on the grant and
+            the session; without it the write is refused 403 SCOPE_DENIED and nothing is stored. A
+            block that does not parse is 400 INVALID_INPUT. The response names the record in
+            `ai_provenance_id`.
+
+            The hash of a value that is not a string is taken over its canonical JSON: object keys
+            sorted at every level (RFC 8785 order), no whitespace. A record minted before 2026-10-08
+            carries the hash of the value as it was written.
 
     MemoryWriteWarning:
       type: object
@@ -43068,6 +43082,13 @@ paths:
         license/compatibility/metadata) is validated against the shared contract; republishing
         the same name bumps the version. scope=node is operator-only. Additional files
         (scripts/, references/, assets/) are passed as relative-path -> content.
+
+        How SKILL.md was written is recorded: the `ai_provenance` declaration or the
+        `ai_provenance_id` in the body, else the node's stamp when an agent publishes (a person
+        publishing says nothing and is not stamped). The record is set on SKILL.md and the
+        manifest, the answer names it in `ai_provenance_id` (and `skill.aiProvenanceId`). A block
+        that does not parse is 400; a declaration the publisher may not make (provenance:write on
+        the grant and the session) is 403 SCOPE_DENIED before anything is stored.
       tags: [Skills]
       security:
         - BearerAuth: []
@@ -43098,6 +43119,13 @@ paths:
                 ws:
                   type: string
                   description: Workspace scope — the workspace id
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How SKILL.md was written.
+                ai_provenance_id:
+                  type: string
+                  description: An existing provenance record of the caller's own account to attach to SKILL.md.
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -44983,6 +45011,12 @@ paths:
         workspace meta namespace (excluded from workspace read + content search). Any active member
         or organism agent may comment. An owner session passes on being the account holder; every
         other principal (agent, ecosystem app, published app) needs the `organism:write` scope.
+
+        The body gets a provenance record: the `ai_provenance` declaration or the
+        `ai_provenance_id`, else the node's stamp when an agent comments (a person is not stamped).
+        The answer names it in `ai_provenance_id` and `comment.aiProvenanceId`; a listed comment
+        carries `aiProvenanceId` too. A block that does not parse is 400; a declaration the caller
+        may not make is 403 SCOPE_DENIED, and no comment is written.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -45007,6 +45041,13 @@ paths:
                     section: { type: string }
                     quote: { type: string }
                 parent_id: { type: string, description: Optional id of the comment this replies to }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the comment's body was made.
+                ai_provenance_id:
+                  type: string
+                  description: An existing provenance record of the caller's own account to attach.
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

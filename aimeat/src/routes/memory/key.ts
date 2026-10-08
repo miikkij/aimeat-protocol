@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.3 — 2026-10-08 — PUT stamps the caller (resolve(req)) as the writer; the agent namespace an
+ *     owner's edit lands in is only where it is stored. An owner correcting an agent's record was
+ *     stamped model-written under the agent's name (aiprov E6).
  *   v1.11.2 — 2026-10-07 — DELETE reads `?owner=` only as a single string; a repeated one is no override (code scanning alerts 1704-1707).
  *   v1.11.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.11.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). DELETE ?owner= computes its roles with rolesWithOperator and writes recordOperatorAccess, the trail the admin memory route writes.
@@ -470,7 +473,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const aiProvenanceId = attached
       ?? (value !== undefined
         ? await stampAgentWrite(storage, {
-          principal: effectiveGaii,
+          // The WRITER (`gaii`, the caller). `effectiveGaii` is the namespace the record lives in:
+          // an owner editing their agent's record is a person writing, and is not stamped.
+          principal: gaii,
           content: memoryContentBytes(newValue),
           pipeline: 'memory.update',
           surface: { visibility: effectiveVis, humanAudience: true },

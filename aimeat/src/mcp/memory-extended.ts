@@ -11,6 +11,8 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-08 — aimeat_memory_search names each hit's ai_provenance_id; aimeat_memory_read_public
+ *     answers with the public record's id and block, as the REST public read does (aiprov E14).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_memory_search + aimeat_memory_read_public
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -46,6 +48,7 @@ import { presentMemories, presentMemory } from '../services/classification/prese
 import { readerForAgent } from '../services/classification/reader.js';
 import { shareCarriesKey } from '../services/group-shares-classification.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { readProvenance } from './ai-provenance-result.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -108,7 +111,8 @@ export function registerMemoryExtendedTools(
                         query: q,
                         total: hits.length,
                         truncated: (include_versions ? typed.length : typed.filter(r => !isVersionKey(r.key)).length) > hits.length,
-                        hits: hits.map(r => searchHitShape(r, q)),
+                        // Each hit names its provenance record, as GET /v1/memory/search does (aiprov E14).
+                        hits: hits.map(r => ({ ...searchHitShape(r, q), ai_provenance_id: r.aiProvenanceId ?? null })),
                         // An empty answer has to say what it covered, or the agent goes looking
                         // for the place it did not search. The cold-agent baseline of 2026-09-18:
                         // asked for a record that did not exist, the agent took eleven and twelve
@@ -172,6 +176,10 @@ export function registerMemoryExtendedTools(
                         owner_gaii: record.ownerGaii,
                         created_at: record.createdAt,
                         updated_at: record.updatedAt,
+                        // The public record of how this was made, as GET /v1/memory/:gaii/:key serves
+                        // it: the item is public, so its record resolves for anyone (aiprov E14).
+                        ai_provenance_id: record.aiProvenanceId ?? null,
+                        ...(await readProvenance(storage, config, record.aiProvenanceId)),
                     }, null, 2),
                 }],
             };

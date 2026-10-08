@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 -- 2026-10-08 -- POST /v1/memory takes an inline `ai_provenance` declaration, validated
+ *     like every REST declaration and passed to the write service, and names the writer (the caller,
+ *     resolveIdentity) rather than the namespace as the principal: with owner_scope the namespace is
+ *     the owner, so an agent's write there was stamped as nobody's, and the connector's
+ *     write-then-declare step looked for the key in the agent's own namespace and failed. The answer
+ *     names the record (`ai_provenance_id`). GET /v1/memory and GET /v1/memory/search name each
+ *     item's record too (aiprov E7, E14).
  *   v1.11.0 -- 2026-10-06 -- POST /v1/memory takes expected_version, the optimistic lock the write
  *     service and the node's MCP already had (secaudit 2026-10 follow-up, Part B).
  *   v1.10.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
@@ -68,6 +75,8 @@ import { presentMemories } from '../../services/classification/present-memory.js
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { warningField } from '../../services/classification-exits.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -77,6 +86,16 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
     const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, workspace_refs, agent: agentParam, ai_provenance_id, expected_version } = req.body ?? {};
+
+    // How the content was made, declared with the write itself, validated as every REST declaration
+    // is. It rides with the write so it lands wherever the write lands: the connector used to write
+    // first and declare after, and that second step looked for the key in the caller's own
+    // namespace, which an owner_scope write is not in.
+    const declaration = parseDeclaredProvenanceInput((req.body ?? {}).ai_provenance);
+    if (!declaration.ok) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The ai_provenance block does not parse.', 400, { violations: declaration.violations }));
+      return;
+    }
 
     // Phase 2.3 — the organism.* access rule. It used to be run here by hand-driving the Express
     // middleware through a promise, because the key arrives in the body rather than in :key. The
@@ -181,7 +200,9 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       fromAgent: req.auth!.roles.includes('agent'),
       ownerName: req.auth!.owner as string,
     }, {
-      principal: gaii,
+      // The WRITER, which the provenance record names, is the caller. `gaii` is where the record
+      // lands: the owner's GHII on an owner_scope write, an agent's GAII when an owner writes for it.
+      principal: resolveIdentity(req.auth!, config.nodeId),
       targetGaii: gaii,
       scopes: req.auth!.scopes ?? [],
       roles: req.auth!.roles,
@@ -197,6 +218,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // The service's version check, the one the node's MCP has used since 2026-08-09.
       ...(typeof expected_version === 'number' ? { expectedVersion: expected_version } : {}),
       declaredProvenanceId: ai_provenance_id,
+      declaredProvenance: declaration.declared,
       pipeline: 'memory.write',
       // No `ownerScoped`. This said "there is no owner copy to shadow", which is true for an owner
       // session and false for an agent or an ecosystem app, whose own namespace is exactly where an
@@ -220,6 +242,11 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       version: record.version,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
+      // The provenance record the write carries (attached, declared or stamped), null for none, and,
+      // when the caller declared or named one, what was recorded (services/ai-provenance-echo.ts):
+      // the connector and the CLI dispatch hand that block back as it is.
+      ai_provenance_id: record.aiProvenanceId ?? null,
+      ...(await provenanceWriteEcho(storage, config, { storedId: record.aiProvenanceId, declared: declaration.declared, declaredId: ai_provenance_id })),
       // Stored, and something about it needs a person: an owner copy that owner-scope reads show
       // instead of this one (SHADOWED_BY_OWNER_COPY). The status stays 200/201 because the write did
       // happen; an agent, the connector and the CLI dispatch all post here, so this is where they
@@ -370,6 +397,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
           flagCount: r.flagCount ?? 0,
           created_at: r.createdAt,
           updated_at: r.updatedAt,
+          // The record of how this was made, per item; null is UNSTATED, never "a person wrote it".
+          ai_provenance_id: r.aiProvenanceId ?? null,
           // Same key under other same-owner identities; those copies are shadowed by this one
           // and appear nowhere else in the response (owner-scope listings only).
           ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
@@ -439,6 +468,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         flagCount: r.flagCount ?? 0,
         created_at: r.createdAt,
         updated_at: r.updatedAt,
+        ai_provenance_id: r.aiProvenanceId ?? null,
         // Same key under other same-owner identities; those copies are shadowed by this one
         // and appear nowhere else in the response (owner-scope listings only).
         ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
@@ -538,7 +568,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // meaning as the listing door beside it, fixed for the same reason on 2026-09-04 (pitfalls §44).
     if (req.query.include === 'meta') {
       res.json(success(config.nodeId, {
-        results: results.map(r => ({ ...searchHitShape(r, q), ...warningField(r) })),
+        results: results.map(r => ({ ...searchHitShape(r, q), ai_provenance_id: r.aiProvenanceId ?? null, ...warningField(r) })),
         total: results.length,
         query: q,
         hint: 'Snippets only. Read a full value with GET /v1/memory/{key}.',
@@ -557,6 +587,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         flagCount: r.flagCount ?? 0,
         created_at: r.createdAt,
         updated_at: r.updatedAt,
+        ai_provenance_id: r.aiProvenanceId ?? null,
         ...warningField(r),
       })),
       total: results.length,

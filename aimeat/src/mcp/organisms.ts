@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-08 — aimeat_workspace_comment asks a declaration's provenance:write of the session's scopes
+ *     too (aiprov E8).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The roster's operator answer is caller().operator(), which is isOperatorCaller for the session.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-05 — The roster checks (the organism resource, aimeat_organism_get, aimeat_organism_members)
@@ -490,6 +492,9 @@ export function registerOrganismsTools(
             // would never match a detection query.
             const aiProvenanceId = await provenanceForWrite(storage, {
                 principal: agentGaii,
+                // The session's own words: a declaration needs provenance:write there as well as
+                // on the grant, as on every other write tool (aiprov E8).
+                scopes: caller().scopes,
                 content: body.slice(0, 10_000),
                 declaredId: ai_provenance_id,
                 declared: toDeclaredProvenance(ai_provenance),
