@@ -165,6 +165,8 @@ class DecideRefused(DecideError):
       ``APP_QUOTA_EXHAUSTED``    the calling app's own daily cap is used up (402).
       ``AGENT_QUOTA_EXHAUSTED``  this agent's own daily cap is used up (402).
       ``RATE_LIMITED``           too many decisions this minute (429). ``retry_after`` says how long.
+      ``PROVIDER_REJECTED``      the decision provider refused the request as sent (422; a 404 from
+                                 it too since node 2026-10-08). The same call is refused again.
       ``DATAMAP_REQUIRED``       an app caller has not declared TypeSafe in its data map (403).
       ``RULE_NOT_FOUND``         no such rule on this account (404).
       ``RULE_NOT_FOR_CALLER``    the owner made this rule for the other kind of caller (403).

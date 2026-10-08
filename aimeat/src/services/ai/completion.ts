@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.12.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (./errors.ts): a
+ *     permanent 4xx is 422 PROVIDER_REJECTED with the provider's reason, not 502 (aiprov plan, A1).
  *   v3.11.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (./errors.ts
  *     PROVIDER_KEY_REFUSED_STATUS, re-exported here).
  *   v3.10.0 — 2026-10-05 — prepareAiCall takes `estimate`, and a text call passes its prompt's size and
@@ -146,7 +148,7 @@ import { text as gatewayText, type TextFile } from './gateway.js';
 import type { AiCapability, AiOp, CostSource } from './types.js';
 import { loadPolicyDecision, freeModelAllowed } from './policy-gate.js';
 import type { CallerClass } from './policy.js';
-import { AiCompletionError, PROVIDER_KEY_REFUSED_STATUS } from './errors.js';
+import { AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, providerFailureOf } from './errors.js';
 import { providersForOwner } from './provider-store.js';
 import { readRouting, rulesFor } from './routing.js';
 import { readRoles, rolesWithLegacy, resolveRole, noteRoleUsed, noteRoleRequest, bindingKey, type ResolvedRole } from './roles.js';
@@ -718,13 +720,12 @@ export async function completeForOwner(
   } catch (e) {
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
     if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
-    const status = (e as { status?: number }).status;
-    if (status === 401) throw new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, 'API key was rejected by the provider.');
-    if (status === 429) throw new AiCompletionError('RATE_LIMITED', 429, 'Provider rate limit hit. Try again later.');
     // The provider answered, every attempt, with nothing. Its own name so a caller can tell "the
     // model said nothing" from "the provider was down" and act on the finish_reason in the message.
     if ((e as { empty?: boolean }).empty) throw new AiCompletionError('EMPTY_COMPLETION', 502, (e as Error).message);
-    throw new AiCompletionError('PROVIDER_ERROR', 502, (e as Error).message);
+    // The one status table every AI path uses (./errors.ts): a permanent 4xx is 422 PROVIDER_REJECTED,
+    // a key refusal 424, a rate limit 429 with the provider's Retry-After, a server failure 502.
+    throw providerFailureOf(e);
   }
 
   const promptTok = result.usage.promptTokens ?? 0;

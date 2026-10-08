@@ -6,6 +6,9 @@
  * @structure registerVoiceRoutes; voiceAppId binds app tokens to their signed identity
  * @usage registerVoiceRoutes(router, config, storage)
  * @version-history
+ *   v1.3.0 - 2026-10-08 - A failure that is not a typed refusal is 500 INTERNAL_ERROR, not 502
+ *     PROVIDER_ERROR; the error frame after the first byte carries the refusal's details; a provider's
+ *     Retry-After reaches the header (aiprov plan, A3, A8, A12).
  *   v1.2.0 - 2026-10-05 - The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.1.0 - 2026-09-28 - Passes who is calling to the owner's model policy and returns a refusal's details.
  *   v1.0.0 - 2026-09-19 - NDJSON voice stages with backpressure and disconnect cancellation.
@@ -19,6 +22,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { ownerGhiiOf, resolveIdentity } from '../utils/gaii.js';
 import { error, success } from '../middleware/envelope.js';
 import { AiCompletionError } from '../services/ai/completion.js';
+import { nodeFailureOf } from '../services/ai/errors.js';
 import { retryAfterOf } from '../services/account-limits.js';
 import { streamReply, streamSpeech } from '../services/ai-voice.js';
 import { logger } from '../utils/logger.js';
@@ -40,7 +44,9 @@ export function voiceAppId(req: Request, requested?: string): string | undefined
 export function registerVoiceRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   async function run(req: Request, res: Response, kind: 'reply' | 'speech') {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(new Error('Voice request timed out')), 180000);
+    // The reason is a typed refusal, so a call cut by the clock answers as the provider's slowness
+    // (502) wherever it was cut, not as the node's own failure.
+    const timeout = setTimeout(() => controller.abort(new AiCompletionError('PROVIDER_ERROR', 502, 'The voice call took longer than 180 seconds.')), 180000);
     const closed = () => { if (!res.writableEnded) controller.abort(new Error('Voice client disconnected')); };
     res.on('close', closed);
     try {
@@ -69,14 +75,22 @@ export function registerVoiceRoutes(router: Router, config: AimeatConfig, storag
       } else res.end();
     } catch (failure) {
       if (res.destroyed) { logger.debug('[voice] disconnected request settled', { error: String(failure) }); return; }
-      const typed = failure instanceof AiCompletionError;
-      const code = typed ? failure.code : failure instanceof z.ZodError ? 'INVALID_BODY' : 'PROVIDER_ERROR';
-      const message = failure instanceof z.ZodError ? failure.issues.map(issue => issue.path.join('.') + ': ' + issue.message).join('; ') : (failure as Error).message;
-      if (res.headersSent) { res.end(JSON.stringify({ type: 'error', code, message }) + '\n'); return; }
-      // The account's AI call limit (services/account-limits.ts) says when to come back.
-      const retryAfter = retryAfterOf(failure);
+      // A body that does not parse is the caller's; a typed refusal keeps its own code and status (a
+      // provider's 4xx is 422 PROVIDER_REJECTED, services/ai/errors.ts); anything else is the node's
+      // 500 (nodeFailureOf). It was 502 PROVIDER_ERROR, which blamed the provider (aiprov plan, A8).
+      const f = failure instanceof z.ZodError
+        ? new AiCompletionError('INVALID_BODY', 400, failure.issues.map(issue => issue.path.join('.') + ': ' + issue.message).join('; '))
+        : nodeFailureOf(failure, kind === 'reply' ? 'POST /v1/ai/stream' : 'POST /v1/ai/speak');
+      // After the first frame the status is already 200: the refusal is an error frame with the same
+      // code, message and details (and the provider's status in them) as the envelope would carry.
+      if (res.headersSent) {
+        res.end(JSON.stringify({ type: 'error', code: f.code, message: f.message, ...(f.details ? { details: f.details } : {}) }) + '\n');
+        return;
+      }
+      // The account's AI call limit, or the provider's own Retry-After, says when to come back.
+      const retryAfter = retryAfterOf(f);
       if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
-      res.status(typed ? failure.status : code === 'INVALID_BODY' ? 400 : 502).json(error(config.nodeId, code, message, undefined, typed ? failure.details : undefined));
+      res.status(f.status).json(error(config.nodeId, f.code, f.message, f.status, f.details));
     } finally { clearTimeout(timeout); res.off('close', closed); }
   }
   // No path limiter: streamReply and streamSpeech count the account's AI call limit, which

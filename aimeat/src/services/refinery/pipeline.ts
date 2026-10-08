@@ -24,6 +24,8 @@
  *     through readAiFile (useForAi first); a refused one is named on the row and left out.
  *   v1.0.3 — 2026-10-05 — The extraction runs as whoever runs the batch, an app or an agent included
  *     (services/ai/caller-context.ts; secaudit 2026-10, AI-3).
+ *   v1.0.4 — 2026-10-08 — The extraction is tried again only on the code RATE_LIMITED, not on the
+ *     words rate, limit, 429 or busy in any message (aiprov plan, A9).
  *   v1.0.4 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     The batch's decisions pass `limit: 'exempt'`: one batch is many calls, not one request each.
  */
@@ -244,8 +246,10 @@ async function extract(ctx: Ctx, cls: RefineryClass, msg: MailMessage, att: { te
   let tries = 1;
   let r;
   try { r = await ask(); } catch (err) {
-    // A provider's rate limit is a wait, not a verdict: one more try after a pause.
-    if (!/rate|limit|429|busy/i.test(String((err as Error).message))) throw err;
+    // A provider's rate limit is a wait, not a verdict: one more try after a pause. Read from the code
+    // every AI path answers it with (services/ai/errors.ts), not from the message's words, which
+    // matched "limit" in any refusal that mentioned one (aiprov plan, A9).
+    if ((err as { code?: unknown })?.code !== 'RATE_LIMITED') throw err;
     await new Promise((ok) => setTimeout(ok, 8000));
     tries = 2;
     r = await ask();

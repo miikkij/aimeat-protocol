@@ -15,6 +15,8 @@
  *   Both need `ai:use` (an owner session passes), as every AI route does (auth/ai-gate.ts).
  * @structure aiCapabilitiesRouter(config, storage)
  * @version-history
+ *   v1.3.0 — 2026-10-08 — A failure that is not a provider's is 500 INTERNAL_ERROR (nodeFailureOf), not
+ *     502 PROVIDER_ERROR (aiprov plan, A8).
  *   v1.2.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.1.0 — 2026-09-28 — POST /v1/ai/embed takes `role`, the AI role the call runs as (readCallRole).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
@@ -28,7 +30,7 @@ import { success, error } from '../middleware/envelope.js';
 import { retryAfterOf } from '../services/account-limits.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
-import { AiCompletionError } from '../services/ai/errors.js';
+import { nodeFailureOf } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';
 import { embedForOwner } from '../services/ai-embed.js';
 import { readCallRole } from '../services/ai/call-guards.js';
@@ -36,11 +38,12 @@ import { aiCallerOf } from './ai-policy.js';
 
 export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  // A provider's refusal keeps the status the service gave it; anything else is the node's 500.
   const fail = (res: Response, e: unknown) => {
-    const retryAfter = retryAfterOf(e);
+    const f = nodeFailureOf(e, 'AI capabilities route');
+    const retryAfter = retryAfterOf(f);
     if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
-    if (e instanceof AiCompletionError) return res.status(e.status).json(error(config.nodeId, e.code, e.message, e.status, e.details));
-    return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+    return res.status(f.status).json(error(config.nodeId, f.code, f.message, f.status, f.details));
   };
 
   // ── GET /v1/ai/capabilities ──

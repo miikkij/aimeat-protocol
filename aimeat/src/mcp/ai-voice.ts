@@ -2,6 +2,9 @@
  * @file ai-voice.ts
  * @description Agent access to the same metered voice stages as browser streaming.
  * @version-history
+ *   v1.2.0 - 2026-10-08 - Every failure is `CODE: message`: INVALID_BODY for input that does not parse,
+ *     INTERNAL_ERROR for the node's own failure, where both were `{"error": …}` without a code (aiprov
+ *     plan, A11). The speech result carries `audio` (sample rate, channels, sample format) (A4).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 - 2026-10-05 - The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     A typed refusal answers `CODE: message` (RATE_LIMITED among them).
@@ -19,15 +22,19 @@ import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { AiCompletionError } from '../services/ai/errors.js';
+import { nodeFailureOf } from '../services/ai/errors.js';
+import { z } from 'zod';
 
 export function registerAiVoiceTools(mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string): void {
   const out = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
-  // A typed refusal reads `CODE: message`, so the account's AI call limit answers
-  // `RATE_LIMITED: …` here as on every other AI tool; anything else keeps its old shape.
-  const failed = (error: unknown) => error instanceof AiCompletionError
-    ? toolError(error.code, error.message)
-    : ({ ...out({ error: (error as Error).message }), isError: true });
+  // Every failure reads `CODE: message` with the code POST /v1/ai/stream and /speak answer: a typed
+  // refusal its own (RATE_LIMITED, PROVIDER_REJECTED…), an input that does not parse INVALID_BODY,
+  // anything else the node's INTERNAL_ERROR. The last two were `{"error": …}` with no code (aiprov plan, A11).
+  const failed = (error: unknown) => {
+    if (error instanceof z.ZodError) return toolError('INVALID_BODY', error.issues.map(i => i.path.join('.') + ': ' + i.message).join('; '));
+    const f = nodeFailureOf(error, 'aimeat_voice tool');
+    return toolError(f.code, f.message);
+  };
   mcp.tool('aimeat_voice_reply', descriptionFor('aimeat_voice_reply'), zodShapeFor('aimeat_voice_reply'),
     annotationsFor('aimeat_voice_reply'), async (input, extra) => {
       try {

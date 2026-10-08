@@ -27,6 +27,11 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.11.0 -- 2026-10-08 -- A provider's refusal goes through the one status table and reason policy
+ *     (services/ai/errors.ts): a permanent 4xx is 422 PROVIDER_REJECTED, a moderation 403 422
+ *     CONTENT_REFUSED, a 429 carries the provider's Retry-After; the reason is read from at most 4 KB,
+ *     redacted, where the whole body was read without a ceiling. A failure that is not the provider's
+ *     is the node's 500 (aiprov plan, A1, A2, A8).
  *   v1.10.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v1.9.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     POST /v1/llm/chat/completions counts the account on the route (aiCallLimit), not per principal.
@@ -68,9 +73,11 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOf } from './ai-policy.js';
 import {
-    prepareAiCall, settleAiCall, AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, planFor, recordFailedAttempts, type AiCallPlan,
+    prepareAiCall, settleAiCall, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
 } from '../services/ai/completion.js';
 import { readCallRole } from '../services/ai/call-guards.js';
+import { nodeFailureOf, providerFailureOf, providerReason, retryAfterHeader } from '../services/ai/errors.js';
+import { retryAfterOf } from '../services/account-limits.js';
 import { chatCompletionRaw, listModels } from '../services/openrouter.js';
 import { openAiChat, speaksOpenAiChat, type OpenAiChatBody } from '../services/ai/gateway.js';
 import { runRoute } from '../services/ai/route-run.js';
@@ -145,7 +152,8 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
                     .map((m) => ({ id: m.id, object: 'model', owned_by: plan.provider })),
             });
         } catch (err) {
-            sendError(res, config.nodeId, err);
+            // listModels throws the provider's status: the one table (services/ai/errors.ts).
+            sendError(res, config.nodeId, providerFailureOf(err));
         }
     });
 
@@ -249,19 +257,22 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
                     ? await chatCompletionRaw(c.target.key, c.target.baseUrl, routed, controller.signal)
                     : await openAiChat(c.target, c.model, { ...upstream, model: c.model } as OpenAiChatBody, controller.signal);
                 if (r.ok) return r;
-                // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable one is honestly reported as empty
-                const detail = await r.text().catch(() => '');
-                throw Object.assign(new Error(detail || `The provider answered ${r.status}.`), { status: r.status, detail });
+                // The reason by the one policy (services/ai/errors.ts): at most 4 KB read, the JSON
+                // message, redacted, 300 characters. It was the whole body, read without a ceiling.
+                const reason = await providerReason(r);
+                const retryAfter = retryAfterHeader(r.headers);
+                throw Object.assign(new Error(`Provider ${r.status}: ${reason}`), {
+                    status: r.status, providerMessage: reason, ...(retryAfter !== undefined ? { retryAfter } : {}),
+                });
             });
             provider = run.result;
             answered = planFor(plan, run.candidate);
             if (run.route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: 'llm-proxy', source: 'llm-proxy' });
         } catch (err) {
-            const e = err as { status?: number; detail?: string; route?: { fellBack: boolean }; failed?: Parameters<typeof recordFailedAttempts>[4] };
+            const e = err as { route?: { fellBack: boolean }; failed?: Parameters<typeof recordFailedAttempts>[4] };
             if (e.route?.fellBack && e.failed) await recordFailedAttempts(storage, config, gaii, plan, e.failed, { appId: 'llm-proxy', source: 'llm-proxy' });
-            sendError(res, config.nodeId, typeof e.status === 'number'
-                ? providerFailure(e.status, e.detail ?? '')
-                : new AiCompletionError('PROVIDER_ERROR', 502, (err as Error).message));
+            // The one status table every AI path uses (services/ai/errors.ts providerFailureOf).
+            sendError(res, config.nodeId, providerFailureOf(err));
             return;
         }
 
@@ -330,33 +341,15 @@ function proxyRole(req: Request): string | undefined {
     return fromBody ?? fromHeader;
 }
 
-/** A provider status turned into the node's own vocabulary, so a caller sees a named cause. */
-function providerFailure(status: number, detail: string): AiCompletionError {
-    const short = detail.slice(0, 300);
-    if (status === 401 || status === 403) {
-        // 424, not 401: the caller's own credential was fine. The connector detached a healthy agent
-        // on the 401 (2026-10-07). See PROVIDER_KEY_REFUSED_STATUS.
-        return new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, `The provider rejected the key. ${short}`);
-    }
-    if (status === 429) {
-        // The one a free model hits first: the free tier's request ceiling depends on what the
-        // account has bought, so this is a quota answer and not a fault in the request.
-        return new AiCompletionError('RATE_LIMITED', 429,
-            `The model is rate limited right now. Free models hit this first. ${short}`);
-    }
-    if (status === 502 || status === 503) {
-        return new AiCompletionError('PROVIDER_ERROR', 502,
-            `The model is overloaded or unavailable. ${short}`);
-    }
-    return new AiCompletionError('PROVIDER_ERROR', 502, `The provider answered ${status}. ${short}`);
-}
-
-/** Send whatever went wrong in the node's envelope, with its own code. */
+/**
+ * Send whatever went wrong in the node's envelope, with its own code. A failure the services did not
+ * name is the node's 500 (nodeFailureOf), and a rate limit carries the provider's Retry-After.
+ */
 function sendError(res: Response, nodeId: string, err: unknown): void {
-    const e = err as AiCompletionError;
-    const status = typeof e?.status === 'number' ? e.status : 500;
-    const code = typeof e?.code === 'string' ? e.code : 'INTERNAL_ERROR';
-    res.status(status).json(error(nodeId, code, e?.message || 'The completion failed.', status, e?.details));
+    const e = nodeFailureOf(err, '/v1/llm/chat/completions');
+    const retryAfter = retryAfterOf(e);
+    if (retryAfter !== undefined) res.setHeader('Retry-After', String(retryAfter));
+    res.status(e.status).json(error(nodeId, e.code, e.message || 'The completion failed.', e.status, e.details));
 }
 
 /** Whole-response: hand it on unchanged, and read the accounting out of it. */

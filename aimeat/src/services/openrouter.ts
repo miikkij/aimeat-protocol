@@ -12,7 +12,13 @@
  *   - transcribe(apiKey, model, audio, baseUrl?, opts?) — call audio transcriptions (STT)
  *   - chatCompletionRaw / speechRaw / generationCost — the proxy's and the voice stream's transport
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
+ *   - sniffImage(bytes) — a picture's format and pixel size from its header
  * @version-history
+ *   v4.1.0 — 2026-10-08 — A non-OK answer carries its status, its Retry-After and its reason by the one
+ *     policy (services/ai/errors.ts providerReason: 4 KB read, the JSON message, redacted, 300
+ *     characters), where it carried up to 64 KB of the raw body, and the model list carried none. A
+ *     picture is sniffed as PNG, GIF, WebP or JPEG with its pixel size; a verbose transcription returns
+ *     its timed segments, and its `duration` when usage gives no seconds (aiprov plan, A2, A13).
  *   v4.0.1 — 2026-10-05 — Every answer is read under a ceiling (readJson, readText; secaudit 2026-10, C6).
  *   v4.0.0 — 2026-09-28 — complete() is gone: text completions run through the System 2 gateway on
  *     the AI SDK (services/ai/gateway.ts), which keeps its empty-answer retry, its reasoning
@@ -60,14 +66,32 @@
  */
 import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
-import { readJson, readText } from '../utils/read-capped.js';
+import { readJson } from '../utils/read-capped.js';
+import { providerReason, providerReasonFromText, retryAfterHeader } from './ai/errors.js';
 
 /** The most of one answer this node reads from the AI provider: a model list, a transcript, images
  *  as base64. Read under a ceiling so the provider does not decide how much memory a call takes
  *  (secaudit 2026-10, C6). */
 const ANSWER_MAX_BYTES = 64 * 1024 * 1024;
-/** An error body, or a small status read: enough for the message, never more. */
+/** A small status read (the generation cost): enough for the answer, never more. */
 const ERROR_BODY_MAX_BYTES = 64 * 1024;
+
+/** A provider's non-OK answer as an error carrying its status, its Retry-After and its reason. */
+export interface ProviderStatusError extends Error {
+  status: number;
+  /** The reason by the one policy (services/ai/errors.ts): at most 4 KB read, redacted, 300 characters. */
+  providerMessage: string;
+  retryAfter?: number;
+}
+
+/** Read the reason out of a non-OK response (services/ai/errors.ts providerReason) and name the status. */
+async function statusError(resp: Response): Promise<ProviderStatusError> {
+  const reason = await providerReason(resp);
+  const retryAfter = retryAfterHeader(resp.headers);
+  return Object.assign(new Error(`Provider ${resp.status}: ${reason}`), {
+    status: resp.status, providerMessage: reason, ...(retryAfter !== undefined ? { retryAfter } : {}),
+  });
+}
 
 export interface OpenRouterModel {
   id: string;
@@ -89,9 +113,54 @@ export interface OpenRouterModel {
 export interface ImageGenerationResult {
   data: Buffer;
   mime: string;
+  /** Pixel size read from the file's header (PNG, GIF, WebP, JPEG), when it could be read. */
+  width?: number;
+  height?: number;
   model: string;
   /** Provider-reported cost in USD when it says; undefined otherwise, never estimated. */
   costUsd?: number;
+}
+
+/**
+ * What a picture's bytes are, from its magic number, and its pixel size from the header when that
+ * is cheap to read: PNG (IHDR), GIF (logical screen), WebP (VP8, VP8L, VP8X) and JPEG (the first SOF
+ * marker). An unknown format has no `mime`, and the transport then says JPEG as it did before
+ * 2026-10-08, when only PNG was sniffed and a WebP or GIF was stored as image/jpeg (aiprov plan, A13).
+ */
+export function sniffImage(b: Buffer): { mime?: string; width?: number; height?: number } {
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+    return b.length >= 24 && b.toString('latin1', 12, 16) === 'IHDR'
+      ? { mime: 'image/png', width: b.readUInt32BE(16), height: b.readUInt32BE(20) }
+      : { mime: 'image/png' };
+  }
+  if (b.length >= 10 && b.toString('latin1', 0, 4) === 'GIF8') {
+    return { mime: 'image/gif', width: b.readUInt16LE(6), height: b.readUInt16LE(8) };
+  }
+  if (b.length >= 16 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP') {
+    const kind = b.toString('latin1', 12, 16);
+    if (kind === 'VP8X' && b.length >= 30) return { mime: 'image/webp', width: 1 + b.readUIntLE(24, 3), height: 1 + b.readUIntLE(27, 3) };
+    if (kind === 'VP8L' && b.length >= 25) {
+      const bits = b.readUInt32LE(21);
+      return { mime: 'image/webp', width: 1 + (bits & 0x3fff), height: 1 + ((bits >> 14) & 0x3fff) };
+    }
+    if (kind === 'VP8 ' && b.length >= 30) return { mime: 'image/webp', width: b.readUInt16LE(26) & 0x3fff, height: b.readUInt16LE(28) & 0x3fff };
+    return { mime: 'image/webp' };
+  }
+  if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+    // Walk the markers to the first start-of-frame; at most the first 64 KB are read.
+    let i = 2;
+    while (i + 9 < b.length && i < 65536) {
+      if (b[i] !== 0xff) break;
+      const marker = b[i + 1];
+      const len = b.readUInt16BE(i + 2);
+      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { mime: 'image/jpeg', height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7) };
+      }
+      i += 2 + len;
+    }
+    return { mime: 'image/jpeg' };
+  }
+  return {};
 }
 
 /** How many times a moderation refusal is retried before the model is given up on. */
@@ -129,11 +198,8 @@ export async function generateImage(
       });
 
       if (!resp.ok) {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable body is honestly reported as empty
-        const body = await readText(resp, ERROR_BODY_MAX_BYTES).catch(() => '');
-        const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
-        err.status = resp.status;
-        if (!/moderat/i.test(body) || attempt === IMAGE_MODERATION_ATTEMPTS) throw err;
+        const err = await statusError(resp);
+        if (!/moderat/i.test(err.providerMessage) || attempt === IMAGE_MODERATION_ATTEMPTS) throw err;
         lastErr = err;
         logger.info(`[openrouter] image: moderation refusal on attempt ${attempt}, retrying`);
         continue;
@@ -155,10 +221,11 @@ export async function generateImage(
       const data = Buffer.from(b64, 'base64');
       // Sniff rather than trust: the response does not say which format came back, and a wrong
       // Content-Type on the stored file is what makes an image fail to render later.
-      const isPng = data.length > 8 && data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47;
+      const sniffed = sniffImage(data);
       return {
         data,
-        mime: isPng ? 'image/png' : 'image/jpeg',
+        mime: sniffed.mime ?? 'image/jpeg',
+        ...(sniffed.width && sniffed.height ? { width: sniffed.width, height: sniffed.height } : {}),
         model,
         costUsd: typeof json.usage?.cost === 'number' ? json.usage.cost : undefined,
       };
@@ -191,6 +258,8 @@ export interface TranscriptionResult {
   model: string;
   /** Detected (or echoed) language, present with response_format=verbose_json. */
   language?: string;
+  /** Timed segments in seconds, present with response_format=verbose_json when the provider gives them. */
+  segments?: Array<{ start: number; end: number; text: string }>;
   /**
    * Provider-reported usage. `seconds` is the measured audio duration and `cost_usd` the actual
    * charge — for STT this is the ONLY trustworthy price signal: the catalogue's `pricing.prompt`
@@ -380,42 +449,47 @@ export async function transcribe(
       signal: opts?.signal ? AbortSignal.any([controller.signal, opts.signal]) : controller.signal,
     });
 
-    if (!resp.ok) {
-      // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable body is honestly reported as empty
-      const body = await readText(resp, ERROR_BODY_MAX_BYTES).catch(() => '');
-      const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
-      err.status = resp.status;
-      throw err;
-    }
+    if (!resp.ok) throw await statusError(resp);
 
     const data = await readJson(resp, ANSWER_MAX_BYTES) as {
       text?: string;
       language?: string;
       model?: string;
+      duration?: number;
+      segments?: Array<{ start?: unknown; end?: unknown; text?: unknown }>;
       error?: { message?: string; code?: number };
       usage?: { seconds?: number; input_tokens?: number; output_tokens?: number; total_tokens?: number; cost?: number };
     };
 
     // Same trap as chat completions: a 200 can still carry an error body.
     if (data.error) {
-      logger.warn(`[openrouter] STT error body: ${JSON.stringify(data.error).slice(0, 500)}`);
-      const err = new Error(`OpenRouter error: ${data.error.message || JSON.stringify(data.error)}`) as Error & { status: number };
-      err.status = data.error.code || 502;
-      throw err;
+      const reason = providerReasonFromText(JSON.stringify({ error: data.error }));
+      logger.warn(`[openrouter] STT error body: ${reason}`);
+      const code = typeof data.error.code === 'number' && data.error.code >= 400 && data.error.code <= 599 ? data.error.code : 502;
+      throw Object.assign(new Error(`OpenRouter error: ${reason}`), { status: code, providerMessage: reason });
     }
 
     logger.info(`[openrouter] STT result: chars=${(data.text ?? '').length}, seconds=${data.usage?.seconds}, cost=${data.usage?.cost}`);
 
+    // verbose_json: the timed segments, when the provider gives them; its `duration` stands in for
+    // a usage.seconds the provider did not report.
+    const segments = Array.isArray(data.segments)
+      ? data.segments
+        .filter(s => s && typeof s.text === 'string' && typeof s.start === 'number' && typeof s.end === 'number')
+        .map(s => ({ start: s.start as number, end: s.end as number, text: (s.text as string).trim() }))
+      : undefined;
+    const usage = data.usage ?? (typeof data.duration === 'number' ? { seconds: data.duration } : undefined);
     return {
       text: data.text ?? '',
       model: data.model ?? model,
       language: data.language,
-      usage: data.usage ? {
-        seconds: data.usage.seconds,
-        input_tokens: data.usage.input_tokens,
-        output_tokens: data.usage.output_tokens,
-        total_tokens: data.usage.total_tokens,
-        cost_usd: typeof data.usage.cost === 'number' ? data.usage.cost : undefined,
+      ...(segments && segments.length ? { segments } : {}),
+      usage: usage ? {
+        seconds: 'seconds' in usage && typeof usage.seconds === 'number' ? usage.seconds : data.duration,
+        input_tokens: data.usage?.input_tokens,
+        output_tokens: data.usage?.output_tokens,
+        total_tokens: data.usage?.total_tokens,
+        cost_usd: typeof data.usage?.cost === 'number' ? data.usage.cost : undefined,
       } : undefined,
     };
   } finally {
@@ -442,11 +516,7 @@ export async function listModels(
   const qs = modality === 'chat' ? '' : `?output_modalities=${encodeURIComponent(modality)}`;
   const resp = await safeFetch(`${baseUrl}/models${qs}`, { headers });
 
-  if (!resp.ok) {
-    const err = new Error(`OpenRouter ${resp.status}`) as Error & { status: number };
-    err.status = resp.status;
-    throw err;
-  }
+  if (!resp.ok) throw await statusError(resp);
 
   type RawModel = OpenRouterModel & {
     owned_by?: string;

@@ -19,6 +19,7 @@
  *   - transcriptionModel() — a TranscriptionModelV4 that keeps the transport's whole result
  *   - AimeatTranscriptionOptions — what the gateway passes in providerOptions.aimeat
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The transport's timed segments reach the AI SDK result (aiprov plan, A13).
  *   v1.0.0 — 2026-09-28 — Initial, with the gateway (V1 of the System 2 plan).
  */
 import type { TranscriptionModelV4 } from '@ai-sdk/provider';
@@ -63,7 +64,7 @@ export function transcriptionModel(target: AiTarget, modelId: string): AimeatTra
       model.last = r;
       return {
         text: r.text,
-        segments: [],
+        segments: (r.segments ?? []).map(s => ({ text: s.text, startSecond: s.start, endSecond: s.end })),
         language: r.language,
         durationInSeconds: r.usage?.seconds,
         warnings: [],

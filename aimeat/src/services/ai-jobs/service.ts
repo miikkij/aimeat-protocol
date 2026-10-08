@@ -22,6 +22,7 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.9.0 — 2026-10-08 — A failed job's error keeps the refusal's status and details (aiprov plan, A11).
  *   v1.8.1 — 2026-10-06 — ctx.ai.start is counted too; only a chain's continuation is exempt
  *     (secaudit 2026-10 follow-up, A5).
  *   v1.8.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -360,10 +361,17 @@ export class AiJobService implements AiJobStarter {
                 await this.finish(jobId, { state: 'cancelled' });
                 return;
             }
-            const code = err instanceof AiCompletionError || err instanceof AiJobError ? err.code : 'AI_JOB_FAILED';
+            const typed = err instanceof AiCompletionError || err instanceof AiJobError ? err : undefined;
+            // The status and details a REST call would have answered (a provider's 422 with its
+            // provider_status and provider_message), so a reader of the job can tell a refusal that
+            // repeats from one worth retrying (aiprov plan, A11).
+            const details = err instanceof AiCompletionError ? err.details : undefined;
             await this.finish(jobId, {
                 state: 'failed',
-                error: { code, message: (err as Error).message },
+                error: {
+                    code: typed ? typed.code : 'AI_JOB_FAILED', message: (err as Error).message,
+                    ...(typed ? { status: typed.status } : {}), ...(details ? { details } : {}),
+                },
             });
         } finally {
             this.pool.release(owner);

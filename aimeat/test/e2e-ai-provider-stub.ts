@@ -39,6 +39,11 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.6.0 — 2026-10-08 — aiprov plan, workstream A. 5b asserted the hole: a moderation refusal and a
+ *     plain 400 both answered 502 "try again shortly"; they are 422 CONTENT_REFUSED and 422
+ *     PROVIDER_REJECTED with the provider's reason now. New: 2c3 (proxy 403 moderation and 400 with
+ *     OpenRouter's inner reason), 4c (415), 4d (verbose segments, seconds null when unmeasured), 5d2
+ *     (WebP and GIF sniffed with their pixel size), 6a2 (404, 402, 429 with Retry-After).
  *   v1.5.0 — 2026-10-04 — 5f: an agent's image and vision calls with no app id are filed under the agent
  *     and the endpoint (2026-10-03); 2d: parallel_tool_calls reaches the provider beside tools, and a
  *     custom provider gets no session_id.
@@ -394,6 +399,23 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(r.body.error?.code === 'RATE_LIMITED', `code ${r.body.error?.code}`);
     });
 
+    await test('2c3. A1/A2: the proxy answers a moderation 403 as 422 CONTENT_REFUSED and a 400 as 422 PROVIDER_REJECTED with the provider\'s reason', async () => {
+        provider.queue('chat', providerStatus(403, '{"error":{"message":"Your input was flagged by moderation."}}'), carries('MARK-PROXY-403'));
+        const flagged = await json('/v1/llm/chat/completions', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'MARK-PROXY-403' }] }),
+        });
+        assert(flagged.status === 422 && flagged.body.error?.code === 'CONTENT_REFUSED', `403 moderation: ${flagged.status} ${JSON.stringify(flagged.body?.error)}`);
+        provider.queue('chat', providerStatus(400, '{"error":{"message":"Provider returned error","metadata":{"raw":"{\\"error\\":{\\"message\\":\\"temperature is out of range\\"}}"}}}'), carries('MARK-PROXY-400'));
+        const bad = await json('/v1/llm/chat/completions', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'MARK-PROXY-400' }] }),
+        });
+        assert(bad.status === 422 && bad.body.error?.code === 'PROVIDER_REJECTED', `400: ${bad.status} ${JSON.stringify(bad.body?.error)}`);
+        // OpenRouter's own message is generic; the upstream reason in metadata.raw is the one carried.
+        assert(/temperature is out of range/.test(bad.body.error.details?.provider_message ?? ''), `the inner reason: ${JSON.stringify(bad.body.error.details)}`);
+    });
+
     // A provider's key refusal is 424 with the code INVALID_API_KEY. Not 401, which says the CALLER'S
     // credential failed: on 2026-10-07 the connector detached a healthy crm agent on it, and the
     // browser SDK refreshes the session and repeats the call. Not 502, which the OpenAI client and
@@ -568,6 +590,27 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         const rejected = await transcribe({});
         assert(rejected.status === 424, `a rejected key is 424, got ${rejected.status}`);
         assert(rejected.body.error?.code === 'INVALID_API_KEY', `code ${rejected.body.error?.code}`);
+        // A1: an audio format the model does not read repeats on every retry.
+        provider.queue('transcriptions', providerStatus(415, '{"error":{"message":"Unsupported audio format."}}'));
+        const format = await transcribe({});
+        assert(format.status === 422 && format.body.error?.code === 'PROVIDER_REJECTED' && format.body.error.details?.provider_status === 415,
+            `a 415 is 422 PROVIDER_REJECTED: ${format.status} ${JSON.stringify(format.body?.error)}`);
+    });
+
+    await test('4d. A13: a verbose transcript returns the provider\'s segments, and seconds is null when the provider did not measure them', async () => {
+        provider.queue('transcriptions', { kind: 'json', body: {
+            text: 'One. Two.', language: 'en', duration: 3.5,
+            segments: [{ id: 0, start: 0, end: 1.5, text: ' One.' }, { id: 1, start: 1.5, end: 3.5, text: ' Two.' }],
+        } });
+        const verbose = await transcribe({ verbose: true });
+        assert(verbose.status === 200, `verbose: ${verbose.status} ${JSON.stringify(verbose.body?.error)}`);
+        assert(JSON.stringify(verbose.body.data.segments) === JSON.stringify([{ start: 0, end: 1.5, text: 'One.' }, { start: 1.5, end: 3.5, text: 'Two.' }]),
+            `segments: ${JSON.stringify(verbose.body.data.segments)}`);
+        assert(verbose.body.data.seconds === 3.5, `the verbose duration stands in for usage.seconds: ${verbose.body.data.seconds}`);
+        provider.queue('transcriptions', transcriptionJson({ text: 'unmeasured' }));
+        const plain = await transcribe({});
+        assert(plain.status === 200 && plain.body.data.seconds === null && plain.body.data.segments === undefined,
+            `no measurement is null, not 0: ${JSON.stringify(plain.body.data)}`);
     });
 
     // ── 5. Images: the moderation retry, and what the bytes are ───────────────
@@ -604,17 +647,23 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(hash === expected, `the picture carries a provenance record hashed from its bytes: ${hash} vs ${expected}`);
     });
 
-    await test('5b. Three moderation refusals give up, and a non-moderation 400 gives up at once', async () => {
+    // Until 2026-10-08 both refusals below answered 502 PROVIDER_ERROR, "try again shortly", which is
+    // what the test asserted: the hole the aiprov plan's A1 names. A provider's 400 repeats on every
+    // retry, so it is 422 with the provider's reason; a moderation refusal is named as one.
+    await test('5b. Three moderation refusals give up as 422 CONTENT_REFUSED, and a non-moderation 400 gives up at once as 422 PROVIDER_REJECTED', async () => {
         const beforeGiveUp = imageCalls();
         for (let i = 0; i < 3; i++) provider.queue('images', providerStatus(400, '{"error":{"message":"moderation blocked this"}}'));
         const giveUp = await image();
-        assert(giveUp.status === 502, `expected 502, got ${giveUp.status}: ${JSON.stringify(giveUp.body?.error)}`);
+        assert(giveUp.status === 422 && giveUp.body.error?.code === 'CONTENT_REFUSED', `expected 422 CONTENT_REFUSED, got ${giveUp.status}: ${JSON.stringify(giveUp.body?.error)}`);
         assert(imageCalls() - beforeGiveUp === 3, `three attempts and no more, got ${imageCalls() - beforeGiveUp}`);
 
         const beforeHard = imageCalls();
         provider.queue('images', providerStatus(400, '{"error":{"message":"prompt is empty"}}'));
         const hard = await image();
-        assert(hard.status === 502, `expected 502, got ${hard.status}: ${JSON.stringify(hard.body?.error)}`);
+        assert(hard.status === 422 && hard.body.error?.code === 'PROVIDER_REJECTED', `expected 422 PROVIDER_REJECTED, got ${hard.status}: ${JSON.stringify(hard.body?.error)}`);
+        assert(hard.body.error.details?.provider_status === 400 && hard.body.error.details?.provider_message === 'prompt is empty',
+            `the provider's reason is carried: ${JSON.stringify(hard.body.error.details)}`);
+        assert(!/try again shortly/i.test(JSON.stringify(hard.body)), `a refusal that repeats never says "try again shortly": ${JSON.stringify(hard.body.hints)}`);
         // Retrying a real error only makes the person wait longer for it.
         assert(imageCalls() - beforeHard === 1, `one attempt for a non-moderation failure, got ${imageCalls() - beforeHard}`);
     });
@@ -639,6 +688,26 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         const empty = await image();
         assert(empty.status === 502, `expected 502, got ${empty.status}`);
         assert(/no image data/i.test(empty.body.error?.message ?? ''), `named: ${empty.body.error?.message}`);
+    });
+
+    await test('5d2. A13: WebP and GIF are sniffed as what they are, and the answer carries the pixel size from the header', async () => {
+        // A VP8X WebP header saying 640 x 480 (canvas size minus one, 24-bit little-endian).
+        const webp = Buffer.alloc(30);
+        webp.write('RIFF', 0, 'latin1'); webp.writeUInt32LE(22, 4); webp.write('WEBPVP8X', 8, 'latin1');
+        webp.writeUInt32LE(10, 16); webp.writeUIntLE(639, 24, 3); webp.writeUIntLE(479, 27, 3);
+        provider.queue('images', imageJson({ b64: webp.toString('base64') }));
+        const w = await image();
+        assert(w.status === 200 && w.body.data.mime_type === 'image/webp', `WebP: ${w.status} ${JSON.stringify(w.body?.data ?? w.body?.error)}`);
+        assert(w.body.data.width === 640 && w.body.data.height === 480, `WebP size: ${w.body.data.width} x ${w.body.data.height}`);
+        const gif = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x20, 0x00, 0x10, 0x00, 0, 0, 0]);
+        provider.queue('images', imageJson({ b64: gif.toString('base64') }));
+        const g = await image();
+        assert(g.status === 200 && g.body.data.mime_type === 'image/gif' && g.body.data.width === 32 && g.body.data.height === 16,
+            `GIF: ${JSON.stringify(g.body?.data ?? g.body?.error)}`);
+        // The 16-byte PNG fixture has no IHDR: PNG, size unknown.
+        provider.queue('images', imageJson({ b64: PNG }));
+        const p = await image();
+        assert(p.status === 200 && p.body.data.mime_type === 'image/png' && p.body.data.width === null, `PNG without IHDR: ${JSON.stringify(p.body?.data)}`);
     });
 
     // Jouni, 2026-09-28: the node's key pays for a picture, a transcript or another capability only
@@ -718,6 +787,20 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         const carried = await complete({ prompt: 'MARK-COMPLETE-200ERR', app_id: 'e2e-ai-stub' });
         assert(carried.status === 429, `the error body's own code decides the status, got ${carried.status}: ${JSON.stringify(carried.body?.error)}`);
         assert(carried.body.error?.code === 'RATE_LIMITED', `code ${carried.body.error?.code}`);
+    });
+
+    await test('6a2. A1: a 404 is 422 PROVIDER_REJECTED, a 402 is PROVIDER_NO_CREDIT, and a 429 passes the provider\'s Retry-After', async () => {
+        provider.queue('chat', providerStatus(404, '{"error":{"message":"No endpoints found for stub/test-model."}}'), carries('MARK-COMPLETE-404'));
+        const gone = await complete({ prompt: 'MARK-COMPLETE-404', app_id: 'e2e-ai-stub' });
+        assert(gone.status === 422 && gone.body.error?.code === 'PROVIDER_REJECTED', `404: ${gone.status} ${JSON.stringify(gone.body?.error)}`);
+        assert(/No endpoints found/.test(gone.body.error.details?.provider_message ?? ''), `the reason: ${JSON.stringify(gone.body.error.details)}`);
+        provider.queue('chat', providerStatus(402, '{"error":{"message":"Insufficient credits."}}'), carries('MARK-COMPLETE-402'));
+        const broke = await complete({ prompt: 'MARK-COMPLETE-402', app_id: 'e2e-ai-stub' });
+        assert(broke.status === 402 && broke.body.error?.code === 'PROVIDER_NO_CREDIT', `402: ${broke.status} ${JSON.stringify(broke.body?.error)}`);
+        provider.queue('chat', providerStatus(429, '{"error":{"message":"slow down"}}', 'application/json', { 'Retry-After': '11' }), carries('MARK-COMPLETE-429'));
+        const busy = await complete({ prompt: 'MARK-COMPLETE-429', app_id: 'e2e-ai-stub' });
+        assert(busy.status === 429 && busy.body.error?.code === 'RATE_LIMITED' && busy.headers.get('retry-after') === '11',
+            `429: ${busy.status} Retry-After ${busy.headers.get('retry-after')} ${JSON.stringify(busy.body?.error)}`);
     });
 
     // Until 2026-09-09 this test asserted the opposite: "an empty completion is answered as empty

@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.8 — 2026-10-08 — ADDITIVE: ai.speak may answer sampleRate, channels and sampleFormat, which the
+ *     node reports in the speech answer's `audio` block (aiprov plan, A4).
  *   v1.5.7 — 2026-10-08 — ADDITIVE: ctx.workspace.appendRows and readRows (workspace.rows,
  *     objectTypes[].extensions) and `network: { hosts }`; the road table and one sentence that said a
  *     scheduled run never has ctx.workspace now say it has the two row calls.
@@ -246,7 +248,8 @@ function sandboxSection(): string {
     'finishReason, usage: { inputTokens, outputTokens, costUsd? } }`; ai.embed `{ model, input: [texts] }` →',
     '`{ embeddings }`; ai.image `{ model, prompt, size }` → `{ images: [{ data (base64), mimeType }] }`;',
     'ai.transcribe `{ model, audio (base64), mimeType }` → `{ text }`; ai.speak `{ model, text, voice }` →',
-    '`{ audio (base64), mimeType }`. The owner then adds a provider of type `extension` naming it. Run',
+    '`{ audio (base64), mimeType, sampleRate?, channels?, sampleFormat? }` (the last three say the PCM',
+    'layout: s16le, s16be or f32le). The owner then adds a provider of type `extension` naming it. Run',
     'as a provider, ctx.fetch reaches only the listed hosts and the node adds the owner\'s key there',
     'itself: never read or ask for a key. One run lasts at most the node\'s extension timeout.',
     '',

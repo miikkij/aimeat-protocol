@@ -17,6 +17,8 @@
  *   fallback price.
  * @structure CAPABILITY_OP · assertOwnExtensionProvider() · extensionRunner()
  * @version-history
+ *   v1.1.0 — 2026-10-08 — An operation the manifest does not list is the node's 400 INVALID_PROVIDER,
+ *     not a provider status that a caller would answer as 502 (aiprov plan, A8).
  *   v1.0.0 — 2026-09-28 — Initial (V6 of the System 2 plan).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -104,7 +106,8 @@ export function extensionRunner(
     const ext = await storage.getExtension(name);
     const decl = ext ? aiProviderDeclarationOf(ext) : null;
     if (!ext || !decl) throw Object.assign(new Error(`The extension '${name}' is gone or no longer declares provides.ai_provider.`), { status: 503 });
-    if (!decl.ops.includes(op as never)) throw Object.assign(new Error(`The extension '${name}' does not serve ai.${op}.`), { status: 400 });
+    // The node's own refusal (the manifest does not list the operation), never a provider status.
+    if (!decl.ops.includes(op as never)) throw new AiCompletionError('INVALID_PROVIDER', 400, `The extension '${name}' does not serve ai.${op}.`);
     const inject = key ? (decl.authHeader ? { name: decl.authHeader, value: key } : { name: 'Authorization', value: `Bearer ${key}` }) : undefined;
     let result: unknown;
     try {
