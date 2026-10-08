@@ -8,6 +8,8 @@
  * @structure SITE_LINK_CONFIG_FIELDS
  * @usage import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
  * @version-history
+ *   v1.2.1 — 2026-10-08 — site.store_soon_code's description: the store checks the code (ext:shop's
+ *     DISCOUNT_CODE), not Stripe; a Stripe coupon makes the store refuse the payment.
  *   v1.2.0 — 2026-10-06 — site.store_soon_code: the shared discount code "Opens soon" shows when pressed.
  *   v1.1.0 — 2026-10-06 — site.store_status ('open' | 'soon') and site.store_note_en / _fi / _es: the
  *     front page shows the store and its prices while the store does not take orders yet.
@@ -19,7 +21,7 @@ import { isEmptyOrHttpUrl, isContactList, oneOf } from './config-schema-validato
 
 /** A note is one sentence on the front page: plain text, short. */
 const isStoreNote = (v: unknown) => typeof v === 'string' && v.length <= 300;
-/** A discount code as a payment provider takes one: letters, digits, - and _, at most 40; empty is none. */
+/** A discount code as the store takes one: letters, digits, - and _, at most 40; empty is none. */
 const isSoonCode = (v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{0,40}$/.test(v);
 
 export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLinksConfig}`>[] = [
@@ -48,9 +50,11 @@ export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLi
   { key: 'siteLinks.storeNoteEn', dotPath: 'site.store_note_en', envVar: 'AIMEAT_SITE_STORE_NOTE_EN', type: 'string', validate: isStoreNote, immutable: false, description: 'The English sentence the store section shows while the store status is "soon". Empty shows the default: "The marketplace opens soon."' },
   { key: 'siteLinks.storeNoteFi', dotPath: 'site.store_note_fi', envVar: 'AIMEAT_SITE_STORE_NOTE_FI', type: 'string', validate: isStoreNote, immutable: false, description: 'The Finnish sentence the store section shows while the store status is "soon". Empty shows the default: "Kauppapaikka aukeaa pian."' },
   { key: 'siteLinks.storeNoteEs', dotPath: 'site.store_note_es', envVar: 'AIMEAT_SITE_STORE_NOTE_ES', type: 'string', validate: isStoreNote, immutable: false, description: 'The Spanish sentence the store section shows while the store status is "soon". Empty shows the default: "El mercado abre pronto."' },
-  // One discount code for everybody, created in the store's payment provider by the operator. This
-  // node only shows it: a visitor who presses "Opens soon" gets it to use when the store opens.
-  { key: 'siteLinks.storeSoonCode', dotPath: 'site.store_soon_code', envVar: 'AIMEAT_SITE_STORE_SOON_CODE', type: 'string', validate: isSoonCode, immutable: false, description: 'The discount code a visitor gets by pressing "Opens soon" while the store status is "soon": one code for everybody, which you create in the store\'s payment provider (Stripe) yourself. Letters, digits, - and _, at most 40. Empty keeps "Opens soon" a label with nothing to press' },
+  // One discount code for everybody. The store checks it (ext:shop's secret config field DISCOUNT_CODE)
+  // and takes the discount off the first payment; a Stripe coupon would make the Stripe total differ
+  // from the order, and the store would refuse to settle. This node only shows it: a visitor who
+  // presses "Opens soon" gets it to use when the store opens.
+  { key: 'siteLinks.storeSoonCode', dotPath: 'site.store_soon_code', envVar: 'AIMEAT_SITE_STORE_SOON_CODE', type: 'string', validate: isSoonCode, immutable: false, description: 'The discount code a visitor gets by pressing "Opens soon" while the store status is "soon": one code for everybody. Set the same code in the store\'s own setting DISCOUNT_CODE (the shop extension); the store checks the code and takes the discount off the first payment. Do not make it a Stripe coupon: the Stripe total then differs from the order and the store refuses the payment. This node only shows the code. Letters, digits, - and _, at most 40. Empty keeps "Opens soon" a label with nothing to press' },
   { key: 'siteLinks.signage', dotPath: 'site.signage_url', envVar: 'AIMEAT_SITE_SIGNAGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The signage screen the front page frames as its "built by asking" example. Empty hides the example; aimeat.io sets its own screen here' },
   { key: 'siteLinks.signageAdmin', dotPath: 'site.signage_admin_url', envVar: 'AIMEAT_SITE_SIGNAGE_ADMIN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The admin panel the front page\'s signage example was made in (its second door)' },
   { key: 'siteLinks.incubator', dotPath: 'site.incubator_url', envVar: 'AIMEAT_SITE_INCUBATOR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The agent incubator (adopt a ready-made helper): the "start here" door on the front page\'s incubator card' },
