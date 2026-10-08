@@ -95,12 +95,12 @@
       "digest": "sha256:c4e63678cf5718d0153d2096"
     },
     "node:aimeat-mail-to-data": {
-      "reviewedOn": "2026-10-06",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/tool-catalog/definitions/connections.ts",
         "aimeat/src/services/connections/providers.ts"
       ],
-      "digest": "sha256:f6b57fac68f43146614efc9f"
+      "digest": "sha256:269d6a418e6ae4125cc80df7"
     },
     "node:aimeat-app-workstation": {
       "reviewedOn": "2026-10-07",
@@ -239,12 +239,12 @@
       "digest": "sha256:a2bf41c7125d8baa4ca17098"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-06",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:27c2133a56dd7359501d914c"
+      "digest": "sha256:3ba76e66538f78d07ba8faca"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-05",
@@ -419,7 +419,7 @@
       "aimeat/src/services/ai/completion.ts": "10b7b9813cbd0abf"
     },
     "node:aimeat-mail-to-data": {
-      "aimeat/src/tool-catalog/definitions/connections.ts": "ed807563afc973bf",
+      "aimeat/src/tool-catalog/definitions/connections.ts": "8b4789068c4516e9",
       "aimeat/src/services/connections/providers.ts": "9350b01985108cad"
     },
     "node:aimeat-app-workstation": {
@@ -504,7 +504,7 @@
       "aimeat/src/mcp/core-admin.ts": "fd3a6da1b1490f40"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "9885f6a0a257a73f",
+      "aimeat/src/mcp/core.ts": "be1d0329fb82e2a0",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "33e900e23cb50fb6"
     },
     "node:manage-my-profile-data": {
