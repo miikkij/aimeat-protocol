@@ -158,6 +158,7 @@ export interface AgentV2Task {
   ttlMs: number | null;
   pollIntervalMs: number | null;
   metadata: Json | null;
+  aiProvenanceId: string | null;
 }
 
 export interface AgentActivity {
@@ -2308,6 +2309,7 @@ export interface Work {
   trackingCode: string;
   ttlExpiresAt: Timestamp;
   updatedAt: Timestamp;
+  aiProvenanceId: string | null;
 }
 
 export interface DB {

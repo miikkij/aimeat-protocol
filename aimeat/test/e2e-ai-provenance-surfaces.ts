@@ -15,6 +15,8 @@
  * @structure owner + agent setup · agent publishes an app · four fetches · serve-time HTML
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-surfaces
  * @version-history
+ *   v1.4.0 — 2026-10-08 — aiprov D18: a stored agent face is served with its own record, and the
+ *     WebMCP listing with the tool manifest's, the app's only when the manifest carries none.
  *   v1.3.0 — 2026-09-29 — The marks share one row at the bottom-left: the label declares its width
  *     and the bolt is placed after it, and the tapped statement opens above the chip while the chip
  *     stays put (was: the whole label moved to bottom:58px on a narrow viewport).
@@ -533,6 +535,43 @@ const APP_HTML = [
         const mine = await json(`/v1/provenance/by-hash/${bare}`, { headers: auth(o.token) });
         assert((mine.body.data.records ?? []).some((x: any) => x.id === privProvId),
             'the owner cannot find their own record by hash — the assertion above would pass on a broken lookup');
+    });
+
+    // ── aiprov D18: a document made of other bytes carries its own record ──
+    // The markdown face and the WebMCP listing served the APP's record although the face is its own
+    // text and the listing is the tool manifest's. Each now prefers the record of the bytes it serves.
+    await test('A stored agent face is served with ITS record, not the app\'s', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(agent.token),
+            body: JSON.stringify({ key: `apps.${filename}.agentface`, value: '# Surface test\n\nWritten for agents by the agent.', visibility: 'public' }),
+        });
+        assert(w.status === 201 || w.status === 200, `face write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+        const read = await json(`/v1/memory/apps.${filename}.agentface`, { headers: auth(agent.token) });
+        const faceProvId = read.body.data?.ai_provenance_id ?? read.body.meta?.provenance?.id;
+        assert(typeof faceProvId === 'string' && faceProvId !== appProvId, `the agent's face carries its own record: ${faceProvId}`);
+        const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(filename)}?format=md`);
+        const text = await res.text();
+        assert(text.includes('Written for agents by the agent.'), 'the stored face is what is served');
+        assert(text.includes(`/v1/provenance/${faceProvId}`) && !text.includes(`/v1/provenance/${appProvId}`),
+            `the face names its own record, not the app's: ${text.slice(0, 400)}`);
+        assert((res.headers.get('link') ?? '').includes(faceProvId), `the Link header names the face's record: ${res.headers.get('link')}`);
+    });
+
+    await test('The WebMCP listing carries the tool manifest\'s record, and the app\'s only when the manifest has none', async () => {
+        const base = `/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(filename)}/webmcp`;
+        const manifest = { tools: [{ name: 'echo', description: 'echo', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }] };
+        // FALLBACK: a manifest the owner wrote with no record leaves the app's record in place.
+        const plain = await json('/v1/memory', { method: 'POST', headers: auth(o.token), body: JSON.stringify({ key: `apps.${filename}.tools`, value: manifest, visibility: 'public' }) });
+        assert(plain.status === 201 || plain.status === 200, `manifest write ${plain.status}: ${JSON.stringify(plain.body?.error)}`);
+        const before = await json(base);
+        assert(before.body.ai_provenance_url?.endsWith(`/v1/provenance/${appProvId}`), `with no manifest record, the app's: ${before.body.ai_provenance_url}`);
+        // The owner's own record of the manifest, attached to it: the listing names that one.
+        const mint = await json('/v1/provenance', { method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ level: 'assisted', humanInvolvement: 'editorial-control', content: JSON.stringify(manifest), attachToMemoryKey: `apps.${filename}.tools` }) });
+        assert(mint.status === 201 || mint.status === 200, `declare ${mint.status}: ${JSON.stringify(mint.body?.error)}`);
+        const after = await json(base);
+        assert(after.body.ai_provenance_url?.endsWith(`/v1/provenance/${mint.body.data.id}`),
+            `the listing names the manifest's record: ${after.body.ai_provenance_url} (app ${appProvId})`);
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

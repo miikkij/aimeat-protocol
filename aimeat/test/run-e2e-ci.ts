@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-08 -- e2e-ai-provenance-rest-declare.ts joins the list: the REST message, board and task
+ *     routes take an ai_provenance declaration (aiprov D5).
  *   2026-10-08 -- e2e-ai-provenance-content.ts joins the list: AI provenance on the content surfaces
  *            (aiprov workstream E).
  *   2026-10-08 -- e2e-extension-rows.ts joins the list (ctx.workspace.appendRows on a row space that
@@ -638,6 +640,9 @@ const ALL_SUITES = [
     'test/e2e-ai-provenance.ts',
     'test/e2e-ai-provenance-surfaces.ts',
     'test/e2e-ai-provenance-agent-plane.ts',
+    // The REST bodies an agent writes messages, posts and task completions through take the same
+    // declaration the MCP tools take, refuse it without provenance:write, and leave no orphan record.
+    'test/e2e-ai-provenance-rest-declare.ts',
     // Spawns the real `aimeat connect serve --http` daemon: the CONNECTOR's two tool surfaces
     // (MCP + shell-callable) are separate code from src/mcp/, and they carried no provenance at all.
     'test/e2e-ai-provenance-connector.ts',

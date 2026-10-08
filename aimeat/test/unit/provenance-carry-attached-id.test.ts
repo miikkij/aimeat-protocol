@@ -8,6 +8,9 @@
  *   with the reason, as it does for a declaration on those tools (secaudit 2026-10 last items, F4).
  * @usage pnpm test -- provenance-carry-attached-id
  * @version-history
+ *   v1.2.0 — 2026-10-08 — Board post and reply, the dm tools, message send, task complete and
+ *     exchange delivery are recorded-by-route (aiprov D2, D5): an id given alone is reported
+ *     attached. The not-carried sample is aimeat_workspace_comment.
  *   v1.1.0 — 2026-10-06 — The four not-carried tools whose route reads the id (design book propose
  *     and adopt, app draft publish, surface layout set) are reported attached; F4 had told them the
  *     id went nowhere (audit of the last items, finding 4).
@@ -35,10 +38,22 @@ describe('an ai_provenance_id given alone', () => {
         }
     });
 
+    it('is reported attached on a tool whose route records provenance itself', async () => {
+        // Board post and reply, the dm tools, message send and task complete read the id from the
+        // body since 2026-10-08 (aiprov D5), and the dispatch definitions send it.
+        for (const tool of ['aimeat_board_post', 'aimeat_dm_send', 'aimeat_task_complete', 'aimeat_exchange_work_deliver']) {
+            expect(CONNECTOR_PROVENANCE_CARRIERS[tool]?.kind, tool).toBe('recorded-by-route');
+            const echo = await carryDeclaration(noClient, { tool, declaredId: 'prov-1' });
+            expect(echo, tool).toMatchObject({ recorded: true, id: 'prov-1', via: 'attached' });
+        }
+    });
+
     it('is reported NOT recorded on every other tool whose route reads no provenance', async () => {
         const notCarried = Object.entries(CONNECTOR_PROVENANCE_CARRIERS)
             .filter(([tool, c]) => c.kind === 'not-carried' && !READS_ID.includes(tool)).map(([tool]) => tool);
-        expect(notCarried).toContain('aimeat_board_post');
+        // aimeat_workspace_comment left this list on 2026-10-08: POST /v1/organisms/:id/comments
+        // records the declaration itself (aiprov E8). Knowledge contribute has no REST route.
+        expect(notCarried).toContain('aimeat_knowledge_contribute');
         for (const tool of notCarried) {
             const echo = await carryDeclaration(noClient, { tool, declaredId: 'prov-1' });
             expect(echo, tool).toMatchObject({ recorded: false, declared: { ai_provenance_id: 'prov-1' } });

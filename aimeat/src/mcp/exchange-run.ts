@@ -21,6 +21,11 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-08 — aimeat_exchange_work_deliver asks provenanceDeclarationRefusal BEFORE it settles: a
+ *     declaration the session may not make threw after the buyer was charged, left the work open, and
+ *     a retry charged again. The session's scopes reach both provenance calls. The work view is the
+ *     shared one in services/exchange-work.ts and embeds the delivery's private record, which the
+ *     buyer could not resolve from the bare id (aiprov D6).
  *   2026-10-06 — Unpriced cross-owner app tools use the REST price predicate and an unpriced
  *     internal pass. Existing contract refusals and action-level prices remain enforced.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -68,7 +73,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { readEntitlementForCall } from '../services/metered-entitlements.js';
 import { getOffering } from '../services/exchange-market.js';
 import {
-    type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
+    type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
 } from '../services/exchange-work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import {
@@ -85,7 +90,7 @@ import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -136,17 +141,9 @@ export function registerExchangeRunTools(
         } catch (err) { logger.warn('notify: notification failure must never fail the action', { error: String(err) }); }
     }
 
-    function workView(w: AgentWork) {
-        return {
-            work_id: w.workId, offering_id: w.offeringId, consumer: w.consumerGaii, provider: w.providerGhii,
-            agent: w.agentGaii, task_type: w.taskType, ext: w.ext, action: w.action, input: w.input, output: w.output,
-            note: w.note, state: w.state, unit: w.unit, currency: w.currency, charged_units: w.chargedUnits,
-            // TARGET-058: how the delivered answer was made. Absent until delivery, and absent is
-            // UNSTATED — never a claim that a person wrote it.
-            ...(w.aiProvenanceId ? { ai_provenance_id: w.aiProvenanceId } : {}),
-            created_at: w.createdAt, delivered_at: w.deliveredAt,
-        };
-    }
+    // The one wire shape of a work item (services/exchange-work.ts), shared with the REST routes. It
+    // embeds the delivery's record, which is private, so the buyer can read it.
+    const view = (w: AgentWork) => workView(storage, config, w);
 
     // ── aimeat_app_tool_invoke — call an app's offered tool through your metered contract ──────────────
     mcp.tool(
@@ -286,7 +283,7 @@ export function registerExchangeRunTools(
             await putWork(storage, work);
             await notify(o.providerOwner, 'EXCHANGE — new agent work started',
                 `${owner} started a "${s.taskType}" task for your agent ${s.agentName} (work ${work.workId}). Deliver it to get paid.`);
-            return ok({ work: workView(work) });
+            return ok({ work: await view(work) });
         },
     );
 
@@ -302,6 +299,14 @@ export function registerExchangeRunTools(
             if (w.state !== 'open') return fail(`WORK_NOT_OPEN: work is ${w.state}`);
             const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
             if (!before || before.state !== 'active') return fail('CONTRACT_INACTIVE: the consumer contract is no longer active — cannot settle this delivery');
+            // The provenance refusal is asked BEFORE the settlement (invariant 14). provenanceForWrite
+            // below throws the same refusal, and when it ran after the charge the buyer was debited,
+            // the work stayed open, and a retry charged again.
+            const declared = toDeclaredProvenance(ai_provenance);
+            const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+                principal: callerGaii, declaredId: ai_provenance_id, declared, enabled: config.aiProvenance, scopes,
+            });
+            if (provenanceRefused) return fail(`${provenanceRefused.code}: ${provenanceRefused.message}`);
             const workLabel = `${w.agentGaii}:${w.taskType}`;
             const outcome = await authoriseMeteredCall({
                 config, storage, caller: w.consumerGaii,
@@ -326,9 +331,10 @@ export function registerExchangeRunTools(
                 // The RESOLVED caller, never a field off the work item: whoever holds this token is
                 // who delivered, and this is the one place an attribution could otherwise be planted.
                 principal: callerGaii,
+                scopes,
                 content: `${JSON.stringify(shared.result ?? null)}\n\n${note ?? ''}`,
                 declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+                declared,
                 pipeline: 'mcp.exchange_work_deliver',
                 // Delivered privately to one buyer, and a buyer is a person deciding what to do with
                 // an answer — which is what decides whether a label is owed.
@@ -344,7 +350,7 @@ export function registerExchangeRunTools(
             await putWork(storage, w);
             await notify(w.consumerOwner, 'EXCHANGE — your agent work was delivered',
                 `Your "${w.taskType}" task (work ${w.workId}) was delivered by ${owner} and charged to your contract.`);
-            return ok({ work: workView(w), ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) });
+            return ok({ work: await view(w), ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) });
         },
     );
 
@@ -356,7 +362,7 @@ export function registerExchangeRunTools(
         annotationsFor('aimeat_exchange_work_list'),
         async ({ role }) => {
             const items = role === 'provider' ? await listWorkByProvider(storage, owner) : await listWorkByConsumer(storage, owner);
-            return ok({ work: items.map(workView), count: items.length, role: role ?? 'consumer' });
+            return ok({ work: await workViews(storage, config, items), count: items.length, role: role ?? 'consumer' });
         },
     );
 

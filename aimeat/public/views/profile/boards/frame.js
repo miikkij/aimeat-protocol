@@ -9,6 +9,8 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-08 -- A notice's row hands its ai_provenance block to BoardNotice, which shows
+ *     the AI label when one is owed (aiprov D10).
  *   v1.11.0 -- 2026-09-26 -- On the component kit (page group G7): the boards table is the List (the name's line cut to one line, the empty counts faint), the crumb and the sibling pages are data, and a board's or a notice's page is the SettingsPage in its page cut with the rail as data. The file writes no class.
  *   v1.10.0 -- 2026-09-26 -- A notice's row is the BoardNotice component (components/BoardNotice.js): the same markup and look, given as data.
  *   v1.9.0 -- 2026-09-26 -- The boards table is the Listing (listing, listing-row and its head row, name, words and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
@@ -132,7 +134,8 @@ export function noticeRow(ctx, boardId, p, authors, withBoard) {
     who=${w.label} whoNote=${authors?.[p.author_gaii] ? standingWords(authors[p.author_gaii]) : ''}
     board=${board ? { name: board.name, onOpen: () => ctx.pickView({ kind: 'board', id: boardId }) } : null}
     time=${rel(p.created_at)} left=${leftWords(p.ttl_expires_at)}
-    counts=${`${p.replies ? c('repliesN', { n: p.replies }) + ' · ' : ''}${c('thanksN', { n: thanks })}`} />`;
+    counts=${`${p.replies ? c('repliesN', { n: p.replies }) + ' · ' : ''}${c('thanksN', { n: thanks })}`}
+    provenance=${p.ai_provenance} />`;
 }
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */

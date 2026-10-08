@@ -9,6 +9,11 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.7.0 — 2026-10-08 — aiprov D2, D6: REST delivery records how the answer was made. A declaration
+ *     the provider's agent may not make is 403 SCOPE_DENIED with the buyer uncharged and the work
+ *     open; the same agent saying nothing is stamped model-written; the owner's declaration reaches
+ *     the buyer's listing as the embedded record although /v1/provenance/:id is 404 for the buyer; a
+ *     malformed block is 400 INVALID_PROVENANCE; another owner's record id is not attached.
  *   v1.6.0 — 2026-09-26 — Agent work obeys the work rule: the provider, holding a contract on their own
  *     agent-work offering, is refused SAME_OWNER_WORK and no work is stored.
  *   v1.5.0 — 2026-09-13 — The ODPS length case asserted the behaviour the write refusal replaced: a new
@@ -774,6 +779,85 @@ await test('Work lists: consumer sees it (consumer role); provider sees it deliv
   assert(cw.status === 200 && cw.body.data.work.some((w: any) => w.work_id === awWorkId), 'consumer work list');
   const pw = await json('/v1/exchange/work?role=provider', { headers: auth(provider.token) });
   assert(pw.status === 200 && pw.body.data.work.some((w: any) => w.work_id === awWorkId && w.state === 'delivered'), 'provider work list shows delivered');
+});
+
+// ── How the delivered answer was made, over REST (aiprov D2, D6) ──
+// POST /v1/exchange/work/:id/deliver minted nothing, so a provider's agent delivering over REST left the
+// buyer with no record at all, and the declaration aimeat_exchange_work_deliver takes had no REST form.
+// The record is private, so the buyer reads it on the work item: GET /v1/provenance/:id is the owner's.
+let deliverer: { gaii: string; token: string };
+const startAwWork = async (text: string): Promise<string> => {
+  const st = await json('/v1/exchange/work', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: awOfferingId, input: { text } }) });
+  assert(st.status === 201, `start work ${st.status}: ${JSON.stringify(st.body?.error)}`);
+  return st.body.data.work.work_id as string;
+};
+await test('Setup: the provider\'s delivering agent holds exchange words and not provenance:write', async () => {
+  const r = await json('/v1/agents', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ name: `deliverer${Date.now() % 100000}`, owner: provider.name, capabilities: ['actions'], scopes: ['exchange:read', 'exchange:write'] }) });
+  assert(r.status === 201, `agent ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const gaii = r.body.data.agent.gaii as string;
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(r.body.data.private_key, gaii + ts) }) });
+  assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body?.error)}`);
+  deliverer = { gaii, token: tok.body.data.token as string };
+});
+
+await test('REST deliver: a declaration the agent may not make → 403 SCOPE_DENIED, buyer NOT charged, work stays open', async () => {
+  const id = await startAwWork('a document for the refused delivery');
+  const cb = await balance(buyer.token);
+  const r = await json(`/v1/exchange/work/${id}/deliver`, { method: 'POST', headers: auth(deliverer.token),
+    body: JSON.stringify({ output: { summary: 'x' }, ai_provenance: { level: 'original', human_involvement: 'full-human' } }) });
+  assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED' && String(r.body?.error?.message).includes('provenance:write'),
+    `expected 403 SCOPE_DENIED naming provenance:write, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+  assert(await balance(buyer.token) === cb, 'the buyer was charged for a delivery that was refused');
+  const list = await json('/v1/exchange/work', { headers: auth(buyer.token) });
+  const w = list.body.data.work.find((x: any) => x.work_id === id);
+  assert(w?.state === 'open' && w.charged_units === 0, `the refused work stays open and uncharged: ${JSON.stringify(w)}`);
+
+  // POSITIVE CONTROL, and the Mint-3 case: the same agent saying nothing delivers, is charged once,
+  // and the node records the answer as model-written because an agent wrote it.
+  const ok = await json(`/v1/exchange/work/${id}/deliver`, { method: 'POST', headers: auth(deliverer.token), body: JSON.stringify({ output: { summary: 'Done.' } }) });
+  assert(ok.status === 200 && ok.body.data.work.charged_units === 12, `deliver ${ok.status}: ${JSON.stringify(ok.body?.error ?? ok.body.data?.work)}`);
+  assert(await balance(buyer.token) === cb - 12, 'one delivery, one charge of 12');
+  const pid = ok.body.data.work.ai_provenance_id;
+  assert(typeof pid === 'string' && ok.body.data.work.ai_provenance?.id === pid, `the work carries its record: ${JSON.stringify(ok.body.data.work)}`);
+  assert(ok.body.data.work.ai_provenance.record?.level === 'ai-generated', `an agent that said nothing is model-written: ${JSON.stringify(ok.body.data.work.ai_provenance.record)}`);
+});
+
+await test('REST deliver: the owner\'s declaration is recorded, and the BUYER reads it on the work list though the record itself is private', async () => {
+  const id = await startAwWork('a document the provider summarises with a model');
+  const r = await json(`/v1/exchange/work/${id}/deliver`, { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ output: { summary: 'A model wrote this.' }, ai_provenance: { level: 'ai-generated', human_involvement: 'light-review', model: 'stub/rest-model' } }) });
+  assert(r.status === 200, `deliver ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const pid = r.body.data.work.ai_provenance_id as string;
+  assert(!!pid && r.body.data.work.ai_provenance?.record?.generator?.model === 'stub/rest-model', `declared record: ${JSON.stringify(r.body.data.work.ai_provenance)}`);
+  const list = await json('/v1/exchange/work', { headers: auth(buyer.token) });
+  const w = list.body.data.work.find((x: any) => x.work_id === id);
+  assert(w?.ai_provenance?.id === pid && w.ai_provenance.record?.humanInvolvement === 'light-review',
+    `the buyer's listing embeds the record: ${JSON.stringify(w?.ai_provenance)}`);
+  // Why it is embedded: the resolve endpoint is not the buyer's to read.
+  const direct = await json(`/v1/provenance/${pid}`, { headers: auth(buyer.token) });
+  assert(direct.status === 404, `a private delivery's record does not resolve for the buyer: ${direct.status}`);
+});
+
+await test('REST deliver: a malformed ai_provenance → 400 INVALID_PROVENANCE, nothing settles', async () => {
+  const id = await startAwWork('a document for a malformed declaration');
+  const cb = await balance(buyer.token);
+  const r = await json(`/v1/exchange/work/${id}/deliver`, { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ output: {}, ai_provenance: { level: 'mostly-human' } }) });
+  assert(r.status === 400 && r.body?.error?.code === 'INVALID_PROVENANCE', `expected 400 INVALID_PROVENANCE, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+  assert(await balance(buyer.token) === cb, 'a refused delivery charges nothing');
+  // CROSS-OWNER: the buyer's own record cannot be attached to the provider's delivery. The id is not
+  // the provider's, so the node does not attach it and stamps from the principal instead (the owner
+  // here: no stamp), the rule every write route applies (resolveAttachableProvenanceId).
+  const mint = await json('/v1/provenance', { method: 'POST', headers: auth(buyer.token),
+    body: JSON.stringify({ level: 'original', humanInvolvement: 'full-human', content: 'the buyer\'s own words' }) });
+  assert(mint.status === 201 || mint.status === 200, `buyer mints a record: ${mint.status} ${JSON.stringify(mint.body?.error)}`);
+  const foreign = mint.body.data.id as string;
+  const d = await json(`/v1/exchange/work/${id}/deliver`, { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ output: { summary: 'x' }, ai_provenance_id: foreign }) });
+  assert(d.status === 200, `deliver ${d.status}: ${JSON.stringify(d.body?.error)}`);
+  assert(d.body.data.work.ai_provenance_id !== foreign, `another owner's record must not be attached: ${JSON.stringify(d.body.data.work)}`);
 });
 
 // No work between a person and their own agents, whichever endpoint would create it: the work queue

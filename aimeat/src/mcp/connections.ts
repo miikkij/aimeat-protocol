@@ -23,6 +23,8 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-08 — aimeat_mail_send takes ai_provenance_id beside ai_disclosure and answers with the
+ *     record the message carries (aiprov D9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 — 2026-09-28 — aimeat_mail_read takes store (with filename, mime_type, key): the attachment
  *     becomes a private file up to the node's per-file limit, through services/connections/attachment-store.ts.
@@ -225,7 +227,7 @@ export function registerConnectionTools(
         mcp.tool('aimeat_mail_send', descriptionFor('aimeat_mail_send'),
             zodShapeFor('aimeat_mail_send'),
             annotationsFor('aimeat_mail_send'),
-            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, theme }): Promise<TextResult> => {
+            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, ai_provenance_id, theme }): Promise<TextResult> => {
                 try {
                     // THE OUTBOUND DOOR, NOT AROUND IT. Saved contact, suppression, opt-out, the
                     // daily allowance, the unsubscribe link and the append-only log all happen in
@@ -240,7 +242,7 @@ export function registerConnectionTools(
                         ...(connection_id ? { connectionId: connection_id } : {}),
                         ...(from_alias ? { fromAlias: from_alias } : {}),
                         ...(reply_to ? { replyTo: reply_to } : {}),
-                        ...(ai_disclosure ? { aiDisclosure: { level: ai_disclosure } } : {}),
+                        ...(ai_disclosure ? { aiDisclosure: { level: ai_disclosure, ...(ai_provenance_id ? { provenanceId: ai_provenance_id } : {}) } } : {}),
                         ...(theme ? { theme } : {}),
                     });
                     // No `channel`: it says whether the address has an account here, which only the
@@ -248,6 +250,7 @@ export function registerConnectionTools(
                     // always an agent.
                     return ok({
                         status: result.status, message_id: result.log.id,
+                        ...(result.aiProvenanceId ? { ai_provenance_id: result.aiProvenanceId } : {}),
                         note: 'Handed over to the provider. Delivery is theirs from here; a bounce shows up on the contact.',
                     });
                 } catch (err) {

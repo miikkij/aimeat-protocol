@@ -9,6 +9,8 @@
  *   unit-covered (test/unit/workflow-human-input.test.ts — the 60s sweep isn't black-box-able). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows-human
  * @version-history
+ *   v1.2.0 — 2026-10-08 — aiprov D16: a review keeps the reviewed content's level (an assisted draft
+ *     stays assisted) and adds editorial control.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: the gate step declares `reviews_key`, and a new test
  *     proves that answering it stamps the REVIEWED content with humanInvolvement
  *     'editorial-control' naming the reviewer — the only upgrade path the engine has.
@@ -245,6 +247,39 @@ async function run() {
     const { status, body } = await json(`/v1/workflows/gated/runs/${approveRunId}/steps/gate/answer`, { method: 'POST', headers: auth, body: JSON.stringify({ picks: ['approve'] }) });
     assert(status === 409, `expected 409, got ${status}: ${JSON.stringify(body)}`);
     assert(body.error?.code === 'WORKFLOW_STEP_NOT_WAITING', `expected WORKFLOW_STEP_NOT_WAITING, got ${body.error?.code}`);
+  });
+
+  // aiprov D16: a review changes who looked, not how the bytes were made. The re-stamp forced
+  // `ai-generated`, so a draft a person wrote with a model's help became a model's the moment it was
+  // reviewed.
+  await test('a review keeps the reviewed content\'s level: an assisted draft stays assisted', async () => {
+    await json('/v1/memory/plan.draft', { method: 'DELETE', headers: auth });
+    await json('/v1/memory/plan.shipped', { method: 'DELETE', headers: auth });
+    await json('/v1/memory/gate.decision', { method: 'DELETE', headers: auth });
+    const runId = await startAndReachGate('full');
+    const declared = await json('/v1/provenance', {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ level: 'assisted', humanInvolvement: 'none', content: 'the draft plan', attachToMemoryKey: 'plan.draft' }),
+    });
+    assert(declared.status === 201 || declared.status === 200, `declare: ${declared.status} ${JSON.stringify(declared.body?.error)}`);
+    const ok = await json(`/v1/workflows/gated/runs/${runId}/steps/gate/answer`, { method: 'POST', headers: auth, body: JSON.stringify({ picks: ['approve'] }) });
+    assert(ok.status === 200, `answer ${ok.status}: ${JSON.stringify(ok.body)}`);
+    await sleep(300);
+    try {
+      const mem = await json('/v1/memory/plan.draft', { headers: auth });
+      const rec = mem.body.meta?.provenance?.record;
+      assert(rec?.humanInvolvement === 'editorial-control', `the review is recorded: ${rec?.humanInvolvement}`);
+      assert(rec?.level === 'assisted', `the level is the prior record's, got ${rec?.level}`);
+    } finally {
+      // Finish the run whatever the assertions said, so the next test starts a fresh one.
+      const { body: r } = await json(`/v1/workflows/gated/runs/${runId}`, { headers: auth });
+      const shipTask = r.data.steps.ship.taskIds?.[0];
+      await writeMem('plan.shipped', 'shipped');
+      if (typeof shipTask === 'string') {
+        await json(`/v1/agents/${agentName}/tasks/${shipTask}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+      }
+      await sleep(700);
+    }
   });
 
   // ── decline path ──

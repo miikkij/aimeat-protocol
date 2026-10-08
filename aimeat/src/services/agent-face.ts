@@ -17,6 +17,7 @@
  *   - agentFaceKey(filename)             — the convention memory key
  *   - AGENT_FACE_MAX_BYTES               — 256 KB cap on the served face
  *   - loadPublicAgentFace(storage, nodeId, ownerName, filename) — the record, or null (private = absent)
+ *   - loadPublicAgentFaceRecord(…) — the same, with the face record's own provenance id
  *   - buildAgentAffordances(config, ownerName, filename) — the footer both variants carry
  *   - serveAppAgentFace(res, config, storage, app) — negotiate + send; false = caller serves bytes
  * @usage
@@ -25,6 +26,9 @@
  *     if (await serveAppAgentFace(res, config, storage, app)) return;
  *   }
  * @version-history
+ *   v1.5.0 — 2026-10-08 — A stored face is served with its own record when it carries one; the app's
+ *     record, which describes the app's bytes, only for the converted page, the app's extension
+ *     output, or a face without one (aiprov D18).
  *   v1.4.0 — 2026-10-02 — An app that declares aimeat-format-md answers itself: the owner's extension
  *     action runs first (services/app-format-md.ts), the stored face and the converted page after it.
  *   v1.3.1 — 2026-09-29 — The app catalogue line points to /v1/appcat instead of /app-catalog.html (Jouni).
@@ -75,11 +79,18 @@ export async function loadPublicAgentFace(
   ownerName: string,
   filename: string,
 ): Promise<string | null> {
+  return (await loadPublicAgentFaceRecord(storage, nodeId, ownerName, filename))?.text ?? null;
+}
+
+/** The same face, with the face record's own provenance id when it carries one (aiprov D18). */
+export async function loadPublicAgentFaceRecord(
+  storage: Storage, nodeId: string, ownerName: string, filename: string,
+): Promise<{ text: string; aiProvenanceId?: string } | null> {
   const rec = await getOwnerScopePublicMemory(storage, nodeId, ownerName, agentFaceKey(filename));
   if (!rec) return null;
   if (typeof rec.value !== 'string' || rec.value.length === 0) return null;
   if (Buffer.byteLength(rec.value, 'utf-8') > AGENT_FACE_MAX_BYTES) return null;
-  return rec.value;
+  return { text: rec.value, ...(rec.aiProvenanceId ? { aiProvenanceId: rec.aiProvenanceId } : {}) };
 }
 
 /**
@@ -123,17 +134,24 @@ export async function buildAppAgentFace(
   config: AimeatConfig,
   storage: Storage,
   app: AppRecord,
-): Promise<{ markdown: string; fromFace: boolean } | null> {
+): Promise<{ markdown: string; fromFace: boolean; provenanceId?: string } | null> {
   const isHtml = /html/i.test(app.mimeType);
   return cached(
     `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}`,
     TTL.public,
-    async (): Promise<{ markdown: string; fromFace: boolean } | null> => {
+    async (): Promise<{ markdown: string; fromFace: boolean; provenanceId?: string } | null> => {
       // The app's own answer comes first (services/app-format-md.ts): an action of the owner's
       // extension, declared with aimeat-format-md. Null when the app declares none or the run
       // gave nothing, and then the stored face or the converted page answers as before.
-      const face = await renderAppMarkdown({ storage, config }, app)
-        ?? await loadPublicAgentFace(storage, config.nodeId, app.ownerName, app.filename);
+      const rendered = await renderAppMarkdown({ storage, config }, app);
+      const stored = rendered === null
+        ? await loadPublicAgentFaceRecord(storage, config.nodeId, app.ownerName, app.filename) : null;
+      const face = rendered ?? stored?.text ?? null;
+      // WHICH RECORD (aiprov D18): a stored face is its own text, written by whoever wrote that
+      // record, so its own record comes first; the app's record describes the app's bytes, and is
+      // the statement for the page converted from them, for the app's own extension output, and for
+      // a stored face that carries no record of its own.
+      const provenanceId = stored?.aiProvenanceId ?? app.aiProvenanceId;
       if (face === null && !isHtml) return null;
       const footer = buildAgentAffordances(config, app.ownerName, app.filename);
       const body = face ?? htmlToMarkdown(appHtml(app)).trimEnd();
@@ -142,10 +160,10 @@ export async function buildAppAgentFace(
       // the metadata, so a statement that lives only in frontmatter stops existing the moment the
       // page is retold. It goes in here rather than in serveAppAgentFace() so the per-origin
       // llms.txt / AGENTS.md documents, which compose this same body, carry it too.
-      const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
+      const prov = await loadServedProvenance(storage, config, provenanceId);
       const note = provenanceMarkdownNote(prov);
       const noteBlock = note ? ['', '', note, ''].join('\n') : '';
-      return { markdown: body + noteBlock + footer, fromFace: face !== null };
+      return { markdown: body + noteBlock + footer, fromFace: face !== null, ...(provenanceId ? { provenanceId } : {}) };
     },
     ['domain:memory', 'domain:apps'],
   );
@@ -162,7 +180,7 @@ export async function serveAppAgentFace(
   // The machine-readable half of the same statement: YAML frontmatter carrying the whole record, and
   // the AI-Disclosure / Link headers. Two layers on purpose — strip the frontmatter and the record
   // is still addressable; take the record offline and the frontmatter still says what was claimed.
-  const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
+  const prov = await loadServedProvenance(storage, config, built.provenanceId);
   setProvenanceHeaders(res, prov);
   const frontmatter = provenanceFrontmatter(prov);
   const doc = frontmatter.length

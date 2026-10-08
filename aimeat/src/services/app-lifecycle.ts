@@ -40,6 +40,9 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.4.0 — 2026-10-08 — A fork of another owner's app that nobody else can read carries a copy of
+ *     its provenance record (forkProvenance) instead of the record itself, which the public fork row
+ *     would have made resolvable to anyone (aiprov D12).
  *   v1.0.2 — 2026-10-02 — A fork drops `formatMd`: the ?format=md handler is the source owner's extension.
  *   v1.0.1 — 2026-09-20 — resolveAppOwnerScope and AppOwnerScope moved whole to app-owner-scope.ts
  *     and are re-exported from here: two services that needed only them depended, through this
@@ -70,7 +73,7 @@ import { appQuotaRefusal } from './install-quotas.js';
 import { lintAppAiDisclosure } from './app-ai-posture.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { publishApp, type PublishAppRefusal, type PublishAppResult } from './app-publish.js';
-import type { DeclaredProvenance } from './ai-provenance.js';
+import { mintProvenance, type DeclaredProvenance } from './ai-provenance.js';
 import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from './dependency-map.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
 
@@ -337,6 +340,36 @@ export interface ForkedApp {
  * removed, the bytes and the screenshot come across unchanged, and the fork is written into the
  * append-only lineage log, the change log and the public feed.
  */
+/**
+ * The record a fork carries (aiprov D12). The source's own record when the source is served to
+ * anyone or the forker owns it. From another owner's app that is NOT served to anyone (parked,
+ * operator-hidden or behind an access code), the fork row would be public and would make that
+ * owner's private record resolvable by anyone, principal and notes included, so the fork gets a copy
+ * instead: the forker's own record, saying the same level and model about the same bytes, derived
+ * from the source's id, and naming the forker rather than the source's writer.
+ */
+async function forkProvenance(
+  storage: Storage, config: AimeatConfig, source: AppRecord, callerGhii: string,
+): Promise<string | undefined> {
+  if (!source.aiProvenanceId) return undefined;
+  const servedToAnyone = !source.parked && !source.operatorHidden && !source.accessCode;
+  if (servedToAnyone || source.ownerGaii === callerGhii || config.aiProvenance === false) return source.aiProvenanceId;
+  const row = await storage.getAiProvenance(source.aiProvenanceId);
+  if (!row) return undefined;
+  const rec = row.record;
+  const copy = await mintProvenance(storage, {
+    stampedBy: 'node', observed: false, ownerGhii: callerGhii, principal: callerGhii,
+    level: rec.level, humanInvolvement: rec.humanInvolvement, method: rec.method,
+    content: Buffer.from(source.data),
+    generator: { ...(rec.generator?.model ? { model: rec.generator.model } : {}), pipeline: 'app.fork' },
+    derivedFrom: [row.id],
+    notes: 'Copied when a private app was forked: the bytes are the source app\'s, and this states what its record said about them.',
+    surface: { visibility: 'public', humanAudience: true },
+    labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl,
+  });
+  return copy.id;
+}
+
 export async function forkApp(
   storage: Storage, config: AimeatConfig, input: ForkAppInput,
 ): Promise<ForkedApp | PublishAppRefusal> {
@@ -403,6 +436,8 @@ export async function forkApp(
     ).posture;
   }
 
+  const forkProvenanceId = await forkProvenance(storage, config, source, callerGhii);
+
   await storage.createApp({
     ownerGaii: callerGhii,
     ownerName: callerOwner,
@@ -418,7 +453,8 @@ export async function forkApp(
     // The record describes how these BYTES were made, and a fork copies the bytes exactly, so the
     // statement travels with them. A fresh mint here would claim the forker's agent produced content
     // it merely copied; a dropped one would read as unstated content that is known to be model-written.
-    ...(source.aiProvenanceId ? { aiProvenanceId: source.aiProvenanceId } : {}),
+    // From a source nobody else can read, the statement travels as a copy (forkProvenance below).
+    ...(forkProvenanceId ? { aiProvenanceId: forkProvenanceId } : {}),
   });
 
   // The fork's bytes are the source's, so its dependencies are too; the map gets its own row set.

@@ -12,6 +12,11 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-10-08 — aimeat_dm_send, aimeat_dm_send_as_owner and aimeat_dm_ask mint their record through
+ *     services/message-provenance.ts: held, and stored only once the send lands, so a refused send
+ *     leaves no record (aiprov D11), with the session's scopes, and with one hash rule, body plus
+ *     questions (D14). aimeat_dm_broadcast hands the session's scopes and the questions to the same
+ *     rule. The comment on attachment provenance says what is true (D15).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). aimeat_dm_broadcast asks caller().operator(), which is isOperatorCaller for the session.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.12.0 -- 2026-10-05 -- aimeat_dm_broadcast asks isOperatorCaller with the session (the caller's GAII, roles ['agent'], its scopes), as POST /v1/messages/broadcast now does: the operator's agent holding operator:admin may send to a node-wide audience (secaudit 2026-10, C2). The register function takes the session's scopes.
@@ -86,7 +91,7 @@ import { fileRefFor } from '../services/file-refs.js';
 import type { DirectMessageAttachment } from '../storage/interface.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { mintMessageProvenance } from '../services/message-provenance.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -172,22 +177,15 @@ export function registerDmMessageTools(
             const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
             // TARGET-058. A message an agent sends is AI-written text delivered to a named person, so
             // it is stamped like any other write: declared if the agent said something, Mint-3 if it
-            // said nothing. The record describes the BODY — attachments carry their own provenance
-            // wherever they are stored.
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: senderGhii,
-                content: body ?? '',
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+            // said nothing. The record describes the BODY; an attached file is stored by its own
+            // upload, which records its own provenance where its route takes one. The record is
+            // HELD and stored once the send lands (services/message-provenance.ts, aiprov D11).
+            const prov = await mintMessageProvenance({ storage, config }, {
+                principal: senderGhii, scopes: caller().scopes, body,
+                declaredId: ai_provenance_id, declared: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.dm_send',
-                // A DM is never public, but it IS delivered to a person — which is what decides
-                // whether a label is owed, not whether the world can read it.
-                surface: { visibility: 'private', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
             });
+            const aiProvenanceId = prov.id;
             // A named group address (support@operators) or a group conversation id goes to the group
             // path — the same resolver POST /v1/messages uses, so the two doors cannot drift.
             const group = await resolveGroupTarget(ctx, config, senderGhii, {
@@ -215,6 +213,7 @@ export function registerDmMessageTools(
                 if (!sent.ok) {
                     return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: sent.code === 'CONVERSATION_NOT_FOUND' ? 'No such conversation' : 'You are not a participant in this conversation', code: sent.code }) }] };
                 }
+                await prov.store();
                 return {
                     content: [{
                         type: 'text' as const,
@@ -247,6 +246,7 @@ export function registerDmMessageTools(
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
             }
 
+            await prov.store();
             return {
                 content: [{
                     type: 'text' as const,
@@ -306,8 +306,9 @@ export function registerDmMessageTools(
                 // row, and this tool was writing it before the service could refuse the audience.
                 stampProvenance: broadcastProvenanceStamp({ storage, config }, {
                     principal: senderGhii,
+                    scopes: caller().scopes,
                     body,
-                    questions: interactive?.questions,
+                    interactive,
                     declaredId: ai_provenance_id,
                     declared: toDeclaredProvenance(ai_provenance),
                     pipeline: 'mcp.dm_broadcast',
@@ -379,18 +380,12 @@ export function registerDmMessageTools(
             // Delegation is not review: holding `messages:send-as-owner` says the owner allowed the
             // agent to speak for them, not that anyone read this text before it went out. An owner
             // who did read it can say so by declaring human_involvement:"editorial-control".
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content: body ?? '',
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+            const prov = await mintMessageProvenance({ storage, config }, {
+                principal: agentGaii, scopes: caller().scopes, body,
+                declaredId: ai_provenance_id, declared: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.dm_send_as_owner',
-                surface: { visibility: 'private', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
             });
+            const aiProvenanceId = prov.id;
             const result = await sendDirectMessage(ctx, {
                 senderGhii: ownerGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
                 conversationId: conversation_id, subject, aiProvenanceId,
@@ -409,6 +404,7 @@ export function registerDmMessageTools(
                     : 'The recipient is not accepting messages (blocked or pending first-contact approval).');
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
             }
+            await prov.store();
 
             // Audit: an agent posted on the owner's behalf. The message displays as from the owner; this
             // log is the durable record of WHICH agent acted (a persisted per-message field is a follow-up).
@@ -571,23 +567,17 @@ export function registerDmMessageTools(
             // TARGET-058. A structured question is not a lesser kind of message: the framing and the
             // options are what a person reads, and the options are what they are steered to choose
             // between. So the hash covers the intro AND the questions — hashing the body alone would
-            // describe the one part that is often empty.
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: senderGhii,
-                content: `${body ?? ''}\n\n${JSON.stringify(questions)}`,
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+            // describe the one part that is often empty. The same rule as every message send.
+            const interactive = { role: 'questions' as const, v: 1, questions, submitLabel: submit_label };
+            const prov = await mintMessageProvenance({ storage, config }, {
+                principal: senderGhii, scopes: caller().scopes, body, interactive,
+                declaredId: ai_provenance_id, declared: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.dm_ask',
-                surface: { visibility: 'private', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
             });
+            const aiProvenanceId = prov.id;
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', conversationId: conversation_id, subject,
-                interactive: { role: 'questions', v: 1, questions, submitLabel: submit_label },
-                aiProvenanceId, sendLimit: turn,
+                interactive, aiProvenanceId, sendLimit: turn,
             });
             if (!result.ok) {
                 if (result.code === 'RATE_LIMITED') return sendLimitRefused({ message: result.reason });
@@ -596,6 +586,7 @@ export function registerDmMessageTools(
                     : 'The recipient is not accepting messages from you (blocked or pending first-contact approval).');
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
             }
+            await prov.store();
             return {
                 content: [{
                     type: 'text' as const,

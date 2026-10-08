@@ -22,8 +22,9 @@
  *     - `POST /v1/provenance` mints it (scope-gated, `stampedBy: 'principal'`), and
  *       `attachToMemoryKey` binds it to one of the caller's OWN memory keys.
  *     - `POST /v1/memory` accepts a pre-minted `ai_provenance_id`.
- *   Every other write route — boards, DMs, tasks, apps, knowledge, workspaces — stamps from the
- *   principal and accepts nothing. So a declaration sent to those tools CANNOT be honoured, and the
+ *   Every other write route stamped from the principal and accepted nothing (since then most of them
+ *   record a declaration themselves: the `recorded-by-route` entries below). So a declaration sent to
+ *   a `not-carried` tool CANNOT be honoured, and the
  *   thing this file guarantees is that it does not *look* honoured: the tool result always carries an
  *   `ai_provenance` echo saying what was actually recorded, or that nothing was.
  *
@@ -56,6 +57,11 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.6 — 2026-10-08 — aimeat_board_post, aimeat_board_reply, aimeat_dm_ask, aimeat_dm_send,
+ *     aimeat_dm_broadcast, aimeat_dm_send_as_owner, aimeat_message_send and aimeat_task_complete:
+ *     recorded-by-route; their REST routes take the declaration and the id (aiprov D5).
+ *   v1.3.5 — 2026-10-08 — aimeat_exchange_work_deliver: recorded-by-route, POST
+ *     /v1/exchange/work/:id/deliver (aiprov D2).
  *   v1.4.0 — 2026-10-08 — aimeat_memory_write and aimeat_workspace_comment are recorded-by-route:
  *     POST /v1/memory and POST /v1/organisms/:id/comments record the declaration with the write
  *     (aiprov E7, E8). aimeat_skill_publish joins, POST /v1/skills records it (aiprov E12). No tool
@@ -160,16 +166,21 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // routes/designbook.ts provenanceOf() reads ai_provenance_id from the body of both.
   aimeat_designbook_propose: { kind: 'not-carried', route: 'POST /v1/designbook', readsId: true },
   aimeat_designbook_adopt: { kind: 'not-carried', route: 'POST /v1/designbook/:id/adopt', readsId: true },
-  aimeat_board_post: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts' },
-  aimeat_board_reply: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts/:postId/replies' },
-  aimeat_dm_ask: { kind: 'not-carried', route: 'POST /v1/messages' },
-  aimeat_dm_send: { kind: 'not-carried', route: 'POST /v1/messages' },
-  aimeat_dm_broadcast: { kind: 'not-carried', route: 'POST /v1/messages/broadcast' },
-  aimeat_dm_send_as_owner: { kind: 'not-carried', route: 'POST /v1/messages' },
-  aimeat_exchange_work_deliver: { kind: 'not-carried', route: 'POST /v1/exchange/work/:id/deliver' },
+  // The board, message and task routes below record the declaration and attach an id from the body
+  // (refusing a declaration the caller may not make before anything is written or charged), and
+  // name the record in their answer; the dispatch definitions send both fields (aiprov D5).
+  aimeat_board_post: { kind: 'recorded-by-route', route: 'POST /v1/boards/:id/posts' },
+  aimeat_board_reply: { kind: 'recorded-by-route', route: 'POST /v1/boards/:id/posts/:postId/replies' },
+  aimeat_dm_ask: { kind: 'recorded-by-route', route: 'POST /v1/messages' },
+  aimeat_dm_send: { kind: 'recorded-by-route', route: 'POST /v1/messages' },
+  aimeat_dm_broadcast: { kind: 'recorded-by-route', route: 'POST /v1/messages/broadcast' },
+  aimeat_dm_send_as_owner: { kind: 'recorded-by-route', route: 'POST /v1/messages' },
+  // The route records the declaration and attaches an id from the body, refuses a declaration the
+  // caller may not make before it settles, and embeds the record in the work it answers (aiprov D2).
+  aimeat_exchange_work_deliver: { kind: 'recorded-by-route', route: 'POST /v1/exchange/work/:id/deliver' },
   aimeat_knowledge_contribute: { kind: 'not-carried', route: 'POST /v1/knowledge/:id/contribute' },
-  aimeat_message_send: { kind: 'not-carried', route: 'POST /v1/agents/:agent/messages' },
-  aimeat_task_complete: { kind: 'not-carried', route: 'POST /v1/agents/:agent/tasks/:id/complete' },
+  aimeat_message_send: { kind: 'recorded-by-route', route: 'POST /v1/agents/:agent/messages' },
+  aimeat_task_complete: { kind: 'recorded-by-route', route: 'POST /v1/agents/:agent/tasks/:id/complete' },
   // Same shape as aimeat_app_draft_publish above: the node route ACCEPTS a declaration
   // (routes/site-layout.ts passes it to the layout service, which mints it against the passage's own
   // bytes), and this side does send the block. What is not proved yet is the echo — telling the

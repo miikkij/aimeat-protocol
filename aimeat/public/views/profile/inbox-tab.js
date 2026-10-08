@@ -15,6 +15,7 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.10.0 -- 2026-10-08 -- A suggested reply sent as it stands carries the draft's provenance record (aiprov D17).
  *   v2.9.1 -- 2026-09-26 -- The head's ways on are the action link's Settings family, as main's og-door and og-door--quiet (Jouni's decision "Action link in Settings"): Broadcast small; Tracked responses (small until one waits), Results and List rules small soft.
  *   v2.9.0 -- 2026-09-26 -- Rebuilt on the conversation components (component plan C2): the list is
  *     ConversationList, a message the Message in a Thread, the composer the Composer's message tone;
@@ -249,6 +250,7 @@ export default function InboxTab({ showToast }) {
   const [cmdFill, setCmdFill] = useState(null);           // a command being filled in (param form)
   const [schedOpen, setSchedOpen] = useState(false);      // schedule panel open (own agent, Phase B)
   const [replyingTrId, setReplyingTrId] = useState(null); // contract id whose approved reply is being sent
+  const [draftProvenance, setDraftProvenance] = useState(null); // { body, id }: the suggested reply's record, attached when sent unchanged
   const [awaitingDrafts, setAwaitingDrafts] = useState({}); // tr.id → suggested reply body (for the bubble)
   const msgsRef = useRef(null);
   // Resolved attachment URLs cached per conversation, so a refresh / new message reuses them instead of
@@ -345,6 +347,7 @@ export default function InboxTab({ showToast }) {
     const d = await tracked.getTrackedResponseDraft(tr.id).catch(err => { swallowed('inbox-tab: startSuggestedReply', err); return null; });
     setDraftPrefill(d?.draft?.body || awaitingDrafts[tr.id] || '');
     setReplyingTrId(tr.id);
+    setDraftProvenance(d?.draft?.aiProvenanceId ? { body: String(d.draft.body || '').trim(), id: d.draft.aiProvenanceId } : null);
   };
 
   // Jump to the workspace record this tracked response watches (straight to the bug it is about).
@@ -648,7 +651,8 @@ export default function InboxTab({ showToast }) {
       const conversationId = (mode === 'thread' && activeConv) ? activeConv.conversationId : undefined;
       // A quoted reply (↩) pins reply_to to the quoted message — the bubble renders the quote from it.
       const replyTo = (mode === 'thread' && replyQuote) ? replyQuote.id : undefined;
-      const resp = await messages.send({ to: recipient, body, attachments, subject, conversationId, replyTo });
+      const aiProvenanceId = replyingTrId && draftProvenance && body === draftProvenance.body ? draftProvenance.id : undefined;
+      const resp = await messages.send({ to: recipient, body, attachments, subject, conversationId, replyTo, aiProvenanceId });
       if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
       else {
         reset?.();

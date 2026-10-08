@@ -9,6 +9,8 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-08 — aimeat_task_complete hands the session's scopes to completeTask(), so a declaration
+ *     needs provenance:write in the session as well as on the grant (aiprov D5).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.13.0 — 2026-10-04 — aimeat_task_decline: the agent refuses a task with its reason, and the task
  *     ends as 'declined'; aimeat_task_list filters by it.
@@ -548,6 +550,7 @@ export function registerAgentTaskTools(
                 deliverableKey: deliverable_key,
                 declaredProvenanceId: ai_provenance_id,
                 declaredProvenance: toDeclaredProvenance(ai_provenance),
+                scopes: sessionScopes,
                 pipeline: 'mcp.task_complete',
             }, agentGaii);
             if (!done.ok) return { content: [{ type: 'text' as const, text: `${done.code}: ${done.message}` }], isError: true };

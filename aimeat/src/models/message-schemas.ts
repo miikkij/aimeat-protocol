@@ -9,6 +9,9 @@
  * @structure MessageAttachmentInputSchema, InteractivePayloadSchema, MessageSendSchema
  * @usage import { MessageSendSchema } from '../models/message-schemas.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-08 -- MessageSendSchema and BroadcastSendSchema take ai_provenance and
+ *     ai_provenance_id (aiprov D5). The objects stripped them, so a REST or connector sender's
+ *     declaration vanished and the message was stamped from the principal alone.
  *   v1.4.0 -- 2026-09-06 -- BroadcastSendSchema takes `subject`. Without it a broadcast could only
  *     open the nameless per-pair thread, so anyone who wanted a titled announcement looped the 1:1
  *     send instead and produced N threads with no shared id for a list to fold.
@@ -24,6 +27,7 @@
  */
 
 import { z } from 'zod';
+import { AiProvenanceBodyFields } from '../tool-catalog/ai-provenance-schema.js';
 
 /**
  * A media attachment descriptor supplied by the sender. The bytes are uploaded out-of-band via the
@@ -123,6 +127,8 @@ export const MessageSendSchema = z.object({
   attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
   /** Interactive payload — a question set (agent asks) or the human's answers (reply). */
   interactive: InteractivePayloadSchema.optional(),
+  /** How the body was made, and an existing record to attach: what aimeat_dm_send takes. */
+  ...AiProvenanceBodyFields,
 }).refine(
   d => (d.body?.trim().length ?? 0) > 0 || (d.attachments?.length ?? 0) > 0 || d.interactive != null,
   { message: 'A message must have a body, an attachment, or an interactive payload' },
@@ -145,6 +151,7 @@ export const BroadcastSendSchema = z.object({
   body: z.string().max(200_000).optional().default(''),
   attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
   interactive: InteractivePayloadSchema.optional(),
+  ...AiProvenanceBodyFields,
 }).refine(
   d => (d.to?.length ?? 0) > 0 || !!d.group_id || !!d.audience,
   { message: 'A broadcast needs recipients (to[], group_id, or audience)' },

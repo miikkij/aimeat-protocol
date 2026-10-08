@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared types + input-coercion helpers for the connect-call REST tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 -- 2026-10-08 -- withProvenanceFields(): ai_provenance and ai_provenance_id onto a write
+ *     body, for the routes that record them (aiprov D5).
  *   v1.1.0 -- 2026-10-02 -- taskTodoPayload carries each todo's `effects` (spend, send_as_owner,
  *     delete): a plan that declares one waits for the owner's OK.
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
@@ -133,6 +135,17 @@ export function genDocId(): string {
 }
 export function genWsId(): string {
     return 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+}
+
+/**
+ * A write body with the caller's `ai_provenance` and `ai_provenance_id` added, for a route that
+ * records them itself (a `recorded-by-route` carrier in ai-provenance-carry.ts). The block goes as
+ * the caller wrote it: the route validates it against the same schema the MCP tools register.
+ */
+export function withProvenanceFields(body: JsonObject, input: JsonObject): JsonObject {
+    const declared = optionalRecord(input, 'ai_provenance');
+    const declaredId = optionalString(input, 'ai_provenance_id');
+    return { ...body, ...(declared ? { ai_provenance: declared } : {}), ...(declaredId ? { ai_provenance_id: declaredId } : {}) };
 }
 
 export function taskTodoPayload(input: JsonObject): JsonObject {

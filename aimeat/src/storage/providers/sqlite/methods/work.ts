@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge. The board
  *   history below now belongs to methods/boards.ts.
  * @version-history
+ *   v1.8.0 — 2026-10-08 — Work round-trips aiProvenanceId, the record of the delivered output
+ *     (migration 0098, aiprov D8).
  *   v1.7.0 — 2026-10-05 — createAction, getAction, listActions, deleteAction, listActionsByProvider,
  *     countActionsForProviders, updateAction, deserializeAction moved to actions.ts; addTransaction,
  *     getTransactions, findTransactionByTrackingCode, listAllTransactions, deserializeTransaction moved to
@@ -48,8 +50,8 @@ export const workMethods = {
 
   async createWork(this: SqliteStorage, work: WorkRecord): Promise<WorkRecord> {
     this.db.prepare(
-      `INSERT INTO work (trackingCode, status, actionId, providerGaii, requesterGaii, input, output, cost, ttlExpiresAt, callbackUrl, rating, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO work (trackingCode, status, actionId, providerGaii, requesterGaii, input, output, cost, ttlExpiresAt, callbackUrl, rating, createdAt, updatedAt, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       work.trackingCode, work.status, work.actionId,
       work.providerGaii, work.requesterGaii,
@@ -58,6 +60,7 @@ export const workMethods = {
       work.callbackUrl ?? null,
       work.rating ? JSON.stringify(work.rating) : null,
       work.createdAt, work.updatedAt,
+      work.aiProvenanceId ?? null,
     );
     return work;
   },
@@ -74,7 +77,7 @@ export const workMethods = {
     this.db.prepare(
       `UPDATE work SET status = ?, actionId = ?, providerGaii = ?, requesterGaii = ?,
        input = ?, output = ?, cost = ?, ttlExpiresAt = ?, callbackUrl = ?, rating = ?,
-       createdAt = ?, updatedAt = ? WHERE trackingCode = ?`
+       createdAt = ?, updatedAt = ?, aiProvenanceId = ? WHERE trackingCode = ?`
     ).run(
       updated.status, updated.actionId, updated.providerGaii, updated.requesterGaii,
       JSON.stringify(updated.input), updated.output ? JSON.stringify(updated.output) : null,
@@ -82,6 +85,7 @@ export const workMethods = {
       updated.callbackUrl ?? null,
       updated.rating ? JSON.stringify(updated.rating) : null,
       updated.createdAt, updated.updatedAt,
+      updated.aiProvenanceId ?? null,
       trackingCode,
     );
     return updated;
@@ -141,6 +145,7 @@ export const workMethods = {
     if (row.output) record.output = JSON.parse(row.output as string);
     if (row.callbackUrl) record.callbackUrl = row.callbackUrl as string;
     if (row.rating) record.rating = JSON.parse(row.rating as string);
+    if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
     return record;
   },
 };

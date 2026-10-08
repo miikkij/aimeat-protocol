@@ -31,6 +31,8 @@
  * @structure V2_TASK_STATUSES · AgentV2TaskStatus · AgentV2TaskRecord
  * @usage import type { AgentV2TaskRecord } from '../interface.js';
  * @version-history
+ *   v1.1.0 — 2026-10-08 — aiProvenanceId: the record of the result a settled task hands back
+ *     (migration 0098, aiprov D8).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 
@@ -87,4 +89,9 @@ export interface AgentV2TaskRecord {
   pollIntervalMs: number | null;
   /** Anything the caller wants carried along. Never read by the node. */
   metadata: Record<string, unknown> | null;
+  /**
+   * The AI-provenance record of the result and closing status message, set when the task settles
+   * completed or failed with something to read. Absent is UNSTATED, never "a person wrote it".
+   */
+  aiProvenanceId?: string | null;
 }

@@ -1,6 +1,8 @@
 // E2E Tests for Tracked Responses (Memory Contract): inbox message → watched record → federated/local reply.
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=tracked-response
 // v1.0.0 -- 2026-06-21 -- Auto + approve reply paths, idempotency, condition-not-met + cancel (failure modes).
+// v1.1.0 -- 2026-10-08 -- aiprov D17: an approve-mode draft names its record (assisted, no human
+//   involvement), and the owner's send of the draft as it stands carries it.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -211,6 +213,7 @@ await test('6. Idempotent: re-evaluating does NOT send a second reply', async ()
 console.log('\nPhase 2 -- Approve mode drafts a reply, does not auto-send');
 let apprBugKey = '';
 let apprTrId = '';
+let apprDraftProvenanceId = '';
 await test('7. Create an APPROVE Tracked Response + mark the work done', async () => {
     apprBugKey = `tr-bug-appr.${stamp}.latest`;
     await writeMemory(alice.token, apprBugKey, { id: 'appr', status: 'open' });
@@ -233,11 +236,20 @@ await test('8. Approve contract is awaiting-approval with a draft, NO reply sent
     assert(!c.delivery.sentMessageId, 'no reply sent yet');
     const d = await json(`/v1/tracked-responses/${apprTrId}/draft`, { headers: authA() });
     assert(/patched/.test(d.body?.data?.draft?.body || ''), `draft carries the result, got ${JSON.stringify(d.body?.data?.draft)}`);
+    // aiprov D17: the draft is stamped when it is built, as the auto reply is: the node filled the
+    // owner's template, so `assisted`, and nobody has read it yet, so no human involvement.
+    apprDraftProvenanceId = d.body?.data?.draft?.aiProvenanceId;
+    assert(typeof apprDraftProvenanceId === 'string', `the draft names its record: ${JSON.stringify(d.body?.data?.draft)}`);
+    const rec = await json(`/v1/provenance/${apprDraftProvenanceId}`, { headers: authA() });
+    assert(rec.status === 200 && rec.body.data.provenance?.level === 'assisted' && rec.body.data.provenance?.humanInvolvement === 'none',
+        `the draft's record: ${JSON.stringify(rec.body.data?.provenance ?? rec.body.error)}`);
 });
 
 await test('9. After the owner sends, marking replied transitions to replied', async () => {
-    const send = await json('/v1/messages', { method: 'POST', headers: authA(), body: JSON.stringify({ to: bob.ghii, body: 'Done — second bug. patched', reply_to: reporterMsgId }) });
+    // The draft as it stands, with its record: the message goes out carrying it (aiprov D17).
+    const send = await json('/v1/messages', { method: 'POST', headers: authA(), body: JSON.stringify({ to: bob.ghii, body: 'Done — second bug. patched', reply_to: reporterMsgId, ai_provenance_id: apprDraftProvenanceId }) });
     assert(send.status === 201, `send: ${send.status}`);
+    assert(send.body.data.message.aiProvenanceId === apprDraftProvenanceId, `the sent draft carries its record: ${send.body.data.message.aiProvenanceId}`);
     const mark = await json(`/v1/tracked-responses/${apprTrId}/replied`, { method: 'POST', headers: authA(), body: JSON.stringify({ sent_message_id: send.body.data.message.id }) });
     assert(mark.status === 200, `mark replied: ${mark.status}`);
     const c = await getContract(apprTrId);
