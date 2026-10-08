@@ -8,6 +8,7 @@
  * @structure ShareAccess · ShareMeta · ResolvedShare · PublicDoc · PublicRecord
  * @usage import type { ResolvedShare } from './share-types.js';
  * @version-history
+ *   v1.1.0 — 2026-10-08 — PublicDoc and PublicRecord carry the row's aiProvenanceId (aiprov E1).
  *   v1.0.0 — 2026-09-29 — Moved from routes/organisms/shared.ts (TARGET-082 V1).
  */
 
@@ -20,5 +21,7 @@ export type ResolvedShare = {
   public: boolean; spaces: Record<string, boolean>; docs: Record<string, boolean>;
   access: ShareAccess; passwordHash: string | null;
 };
-export type PublicDoc = { type: string; id: string; title: string; markdown: string };
-export type PublicRecord = { type: string; id: string; value: unknown };
+/** `aiProvenanceId`: the provenance record the published row carries, which the route serves as the
+ *  item's `ai_provenance` block (and never as this field). */
+export type PublicDoc = { type: string; id: string; title: string; markdown: string; aiProvenanceId?: string | null };
+export type PublicRecord = { type: string; id: string; value: unknown; aiProvenanceId?: string | null };

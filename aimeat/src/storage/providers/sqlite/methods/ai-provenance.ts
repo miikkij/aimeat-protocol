@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — workspaceProvenanceLinks(): published workspace records carrying a record,
+ *     the candidates routes/organisms/share-provenance.ts checks against the share link (aiprov E1). A
+ *     separate method, not a clause in PUBLICLY_LINKED: the share decision is not expressible here.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the read
  *     side for the operator report, the unlabelled-content sweep and the per-owner view. Grouped in
  *     SQL over the whole table — a capped page would make "how many public items carry no label" a
@@ -33,6 +36,7 @@ import type {
   AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery,
 } from '../../../interface.js';
 import type { AiProvenance } from '../../../../models/ai-provenance-schemas.js';
+import type { WorkspaceProvenanceLink } from '../../../repositories/ai-provenance.repository.js';
 import type { SqliteStorage } from '../index.js';
 
 function deserialize(row: Record<string, unknown>): AiProvenanceRecordRow {
@@ -189,5 +193,26 @@ export const aiProvenanceMethods = {
       `SELECT p.* FROM ai_provenance p ${clause} ORDER BY p.generatedAt DESC LIMIT ? OFFSET ?`
     ).all(...params, limit, Math.max(query?.offset ?? 0, 0)) as Record<string, unknown>[];
     return { items: rows.map(deserialize), total };
+  },
+
+  // ── Workspace share candidates (aiprov E1) — kept apart from PUBLICLY_LINKED above on purpose:
+  //    whether a share link opens one of these is decided in routes/organisms/share-provenance.ts. ──
+  async workspaceProvenanceLinks(
+    this: SqliteStorage, query: { ids?: string[]; contentHash?: string; limit?: number },
+  ): Promise<WorkspaceProvenanceLink[]> {
+    const ids = [...new Set(query.ids ?? [])].slice(0, ID_CHUNK);
+    if (ids.length === 0 && !query.contentHash) return [];
+    const limit = Math.min(Math.max(query.limit ?? 200, 1), 1000);
+    const match: string[] = [];
+    const params: unknown[] = [];
+    if (ids.length) { match.push(`p.id IN (${ids.map(() => '?').join(',')})`); params.push(...ids); }
+    if (query.contentHash) { match.push('p.contentHash = ?'); params.push(query.contentHash); }
+    return this.db.prepare(
+      `SELECT p.id AS provenanceId, m.ownerGaii AS ownerGaii, m.key AS key
+         FROM ai_provenance p JOIN memory m ON m.aiProvenanceId = p.id
+        WHERE (${match.join(' OR ')}) AND m.deletedAt IS NULL AND m.archived = 0
+          AND m.key LIKE 'organism.%.w.%.latest'
+        LIMIT ?`
+    ).all(...params, limit) as WorkspaceProvenanceLink[];
   },
 };

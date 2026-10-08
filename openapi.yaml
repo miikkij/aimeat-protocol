@@ -19110,6 +19110,11 @@ paths:
         remember to do. There is no stored visibility flag on the record and no way for a caller to
         set one. The owner can always resolve their own records.
 
+        A published workspace record that an OPEN workspace share (meta.share, access `open`) serves
+        to anyone counts as public too, decided by the same collectors the share routes serve with:
+        the share's own space and document switches, the copy of the share that counts, and the
+        record's classification. A password or account share does not make a record public.
+
         Returns an IDENTICAL 404 for "no such record", "that record is not yours" and "its content
         is not public" - different answers would turn this into an oracle for which ids exist on
         this node.
@@ -19149,8 +19154,15 @@ paths:
         having handed them an identifier first - the join key is the content hash, not a database id.
 
         "Public" is derived, not stored: a record is listed here exactly while some publicly
-        readable item points at it. An authenticated caller additionally sees their own records; the
+        readable item points at it, an open workspace share's records included (see
+        /v1/provenance/{id}). An authenticated caller additionally sees their own records; the
         widening happens in SQL, so a third party's non-public row never enters the process.
+
+        WHICH BYTES TO HASH. A memory value that is a string: its UTF-8 bytes. Any other memory value:
+        its canonical JSON, object keys sorted at every level (RFC 8785 order) and no whitespace,
+        because Postgres reorders the keys of a stored object and the order a reader receives is not
+        the order it was written in. A record minted before 2026-10-08 carries the hash of the value
+        as it was written. A workspace DOCUMENT: its `markdown`, the text a reader is served.
 
         An empty `records` list is a real answer: "this node has no statement about these bytes". It
         is NOT "a human wrote it" - absence reads as UNSTATED, always.
@@ -37660,6 +37672,19 @@ paths:
                       id: { type: string }
                       value: {}
                       visibility: { type: string, enum: [private, owner, group, members, public, workspace] }
+                      ai_provenance:
+                        allOf:
+                          - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                        description: >
+                          How this record's value was made. Recorded against the value (a document
+                          space: its `markdown`). Without it an agent's or app's record carries the
+                          node's stamp (model-written, no review) and a person's carries none. A block
+                          that does not parse fails this record alone (INVALID); a declaration the
+                          caller may not make (no provenance:write on the grant and the session)
+                          refuses the whole batch 403 SCOPE_DENIED before anything is written.
+                      ai_provenance_id:
+                        type: string
+                        description: An existing provenance record of the caller's own account to attach to this record.
                 expected_versions:
                   type: object
                   additionalProperties: { type: integer, nullable: true }
@@ -37682,7 +37707,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: not an active member, meta.* without admin/creator, or (records) an agent or app token without the workspace creator's contributor grant (CONSENT_REQUIRED)
+          description: not an active member, meta.* without admin/creator, (records) an agent or app token without the workspace creator's contributor grant (CONSENT_REQUIRED), or a record's ai_provenance declaration the caller may not make (SCOPE_DENIED)
         '404':
           description: organism not found
         '409':
@@ -37922,6 +37947,10 @@ paths:
         JSON. Returns 404 (no disclosure) when nothing is public. When the share's `access` mode gates
         the read, returns 401 `SHARE_PASSWORD_REQUIRED` (send a valid `X-Share-Token` from the unlock
         endpoint) or 401 `SHARE_ACCOUNT_REQUIRED` (authenticate with any account on this node).
+
+        Each document carries an `ai_provenance` block (AiProvenanceItemBlock) when the page has a
+        provenance record: how it was made, and the URL it resolves at. Under an `open` share the
+        record resolves for anyone at /v1/provenance/{id}.
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -37944,6 +37973,10 @@ paths:
         or not marked public. When the share's `access` mode gates the read, returns 401
         `SHARE_PASSWORD_REQUIRED` (send a valid `X-Share-Token` from the unlock endpoint) or 401
         `SHARE_ACCOUNT_REQUIRED` (authenticate with any account on this node).
+
+        One page is one piece of content, so when it has a provenance record the answer carries it in
+        both formats: the `AI-Disclosure` and `Link: <record>; rel="ai-provenance"` headers, and in
+        JSON `meta.provenance` plus the document's `ai_provenance` block.
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -37970,7 +38003,8 @@ paths:
         share's `access` mode gates the read, returns 401 `SHARE_PASSWORD_REQUIRED` (send a valid
         `X-Share-Token` from the unlock endpoint) or 401 `SHARE_ACCOUNT_REQUIRED` (authenticate with any
         account on this node). This is the generic anonymous read for public record spaces — any public
-        showroom / catalogue / knowledge client reads its structured data through it.
+        showroom / catalogue / knowledge client reads its structured data through it. An entry whose
+        record has a provenance record carries it as `ai_provenance` (AiProvenanceItemBlock).
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -37995,7 +38029,7 @@ paths:
         curriculum) for the signed-in user, with access granted/revoked per user via workspace
         membership. Agents use the MCP workspace_read surface instead. `?space=` limits to one records
         space. Returns 404 (no disclosure) for a missing organism/workspace AND for an unauthorized
-        caller.
+        caller. An entry with a provenance record carries it as `ai_provenance` (AiProvenanceItemBlock).
       tags: [Organisms]
       security: [{ bearerAuth: [] }]
       parameters:
