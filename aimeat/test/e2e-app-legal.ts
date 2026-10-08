@@ -24,6 +24,9 @@
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.4.0 — 2026-10-08 — Phase 4 (aiprov D3): the record behind an AI-drafted legal page resolves
+ *     anonymously and by hash while the page is served, access code or not, and answers 404 once
+ *     the page is removed.
  *   v1.3.0 — 2026-10-01 — Phase 3, the archive and the owner's limit (IAM round 2 leftover 7). All
  *     three cases failed before the change.
  *   v1.2.0 — 2026-09-26 — Every legal page runs sandboxed with the app frame's flags (A7-1). Failed
@@ -470,6 +473,40 @@ await test('An agent in the owner\'s name reads the setting, archives and keeps 
     assert(all.status === 200 && all.body.data.deleted === 0, `keeping all is the agent's to set: ${all.status}`);
     const moved = await json(`/v1/apps/me/${FILE}/audit/archive`, agentAuthed({ method: 'POST', body: JSON.stringify({ before: new Date(Date.now() + 60_000).toISOString() }) }));
     assert(moved.status === 200 && moved.body.data.moved === totalBefore, `the agent archives through me: ${moved.status} ${JSON.stringify(moved.body?.error ?? moved.body.data)}`);
+});
+
+console.log('\nPhase 4: the record behind a legal page resolves for the people the page is served to');
+
+// aiprov D3. The page sent `Link: <…/v1/provenance/:id>; rel="ai-provenance"` and its label linked
+// the same record, but the record's id lived only in the app manifest, which the visibility rule
+// never read: every third party who followed the link got 404. The page is served to anyone while
+// the app is not operator-hidden, access code or not, so the record resolves for them as long.
+await test('An AI-drafted legal page\'s record resolves anonymously, behind an access code too, and goes back to 404 with the page', async () => {
+    const content = '# Accessibility\n\nWe test with a screen reader every release.';
+    assert((await patchA({ access_code: 'phase4code1' })).status === 200, 'code set');
+    const set = await patchA({
+        legal: { accessibility: { format: 'markdown', content } },
+        ai_provenance: { level: 'ai-generated', method: 'fully-generated', human_involvement: 'none', model: 'test/model' },
+    });
+    assert(set.status === 200, `set status ${set.status}: ${JSON.stringify(set.body)}`);
+    const provId = set.body.data.legal.accessibility?.aiProvenanceId as string;
+    assert(typeof provId === 'string' && provId.length > 0, `the page carries a record: ${JSON.stringify(set.body.data.legal.accessibility)}`);
+    const served = await page('accessibility');
+    assert(served.status === 200 && (served.headers.get('link') ?? '').includes(`/v1/provenance/${provId}`), `the page links its record: ${served.headers.get('link')}`);
+
+    const anon = await json(`/v1/provenance/${provId}`);
+    assert(anon.status === 200, `the record behind a served page resolves for anyone: ${anon.status} ${JSON.stringify(anon.body?.error)}`);
+    const hash = createHash('sha256').update(content, 'utf8').digest('hex');
+    const byHash = await json(`/v1/provenance/by-hash/${hash}`);
+    assert(byHash.status === 200 && (byHash.body.data.records ?? []).some((r: any) => r.id === provId),
+        `the detection lookup finds it: ${JSON.stringify(byHash.body?.data ?? byHash.body?.error)}`);
+
+    // FAILURE MODE: the page is removed, nothing public points at the record, and it answers the one
+    // 404 every non-public record answers.
+    assert((await patchA({ legal: { accessibility: null } })).status === 200, 'page removed');
+    const gone = await json(`/v1/provenance/${provId}`);
+    assert(gone.status === 404, `a removed page's record is private again: ${gone.status}`);
+    assert((await patchA({ access_code: '' })).status === 200, 'code removed');
 });
 
 console.log('\nCleanup');

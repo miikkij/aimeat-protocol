@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — PUBLICLY_LINKED covers an app's legal pages: a record named in
+ *     manifest.legal.<kind>.aiProvenanceId is public while the app is not operator-hidden, because the
+ *     page is served to anyone then. The pages sent a Link to a record that answered 404 (aiprov D3).
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the read
  *     side for the operator report, the unlabelled-content sweep and the per-owner view. Grouped in
  *     SQL over the whole table — a capped page would make "how many public items carry no label" a
@@ -65,6 +68,12 @@ const PUBLICLY_LINKED = `(
           AND m.deletedAt IS NULL)
   OR EXISTS (SELECT 1 FROM apps a WHERE a.aiProvenanceId = p.id
              AND a.parked = 0 AND a.operatorHidden = 0 AND a.accessCode IS NULL)
+  /* app legal pages (aiprov D3): manifest.legal.<kind>.aiProvenanceId, public while the app is not
+     operator-hidden; served without the access code and while parked (pre-contract information). */
+  OR EXISTS (SELECT 1 FROM apps a, json_each(CASE WHEN json_valid(a.manifest) THEN a.manifest ELSE '{}' END, '$.legal') lg
+             WHERE a.operatorHidden = 0 AND instr(a.manifest, p.id) > 0
+             AND json_extract(lg.value, '$.aiProvenanceId') = p.id)
+  /* end app legal pages */
   OR EXISTS (SELECT 1 FROM board_posts bp JOIN boards b ON b.id = bp.boardId
              WHERE bp.aiProvenanceId = p.id AND b.visibility = 'public')
 )`;
