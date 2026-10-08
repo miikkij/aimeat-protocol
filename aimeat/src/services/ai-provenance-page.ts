@@ -17,9 +17,11 @@
  *   its three lines are deliberately minimal. Negotiating here fixes every app on the node at once
  *   and touches no app.
  *
- *   THE WORDING IS THE RECORD'S OWN. `disclosure.short` and `.long` are pre-rendered at mint time in
- *   every locale, so the page says exactly what the chip said. Writing fresh sentences here would
- *   create a second source of truth for a compliance statement, and the two would drift.
+ *   THE WORDING IS THE RECORD'S OWN. `disclosure.short` and `.long` are rendered in every locale,
+ *   at mint and again when the route decides the disclosure for this reader's surface, so the page
+ *   says exactly what the chip said. Writing fresh sentences here would create a second source of
+ *   truth for a compliance statement, and the two would drift. The page's own chrome and the
+ *   readable names of the record's values are `aiLabel.page.*` in the locale files.
  *
  *   WHAT IS DELIBERATELY NOT HERE: any field the JSON would not have served to the same caller. The
  *   route decides `isOwner` and projects the record BEFORE calling this; a page that reached past
@@ -29,17 +31,21 @@
  * @usage
  *   if (prefersHtmlPage(req)) return res.type('html').send(provenancePage(serve(row, isOwner), {...}));
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The copy moved into the locale files (`aiLabel.page.*`), Spanish added; the
+ *     level, method, human involvement and the new medium row show a readable name beside the
+ *     token; a record that owes no label says so instead of printing the chip's words. The Finnish
+ *     copy no longer says "solmu".
  *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-02 — Initial. LUOTAIN finding: the label's second layer was machine-only.
  */
 import type { AiProvenance } from '../models/ai-provenance-schemas.js';
-import type { Locale } from '../i18n.js';
+import { createT, type Locale } from '../i18n.js';
 import { escapeHtml } from '../utils/html-escape.js';
 
 export interface ProvenancePageOptions {
   /** The node's apex, for the links out. */
   baseUrl: string;
-  /** Reader language, from Accept-Language. Only 'en' and 'fi' are rendered. */
+  /** Reader language, from Accept-Language. Every language the node ships is rendered. */
   locale: Locale;
   /** The record's addressable URL, shown so a reader can cite or re-fetch it. */
   recordUrl: string;
@@ -75,55 +81,29 @@ export function safeHref(url: unknown): string | null {
   return esc(parsed.href);
 }
 
-/** Localized copy. Only the CHROME lives here; every statement of fact comes off the record. */
-const COPY = {
-  en: {
-    title: 'How this was made',
-    unstated: 'This record does not state it.',
-    fields: 'What the record says',
-    level: 'How much a model made', method: 'Method', human: 'Human involvement',
-    model: 'Model', provider: 'Served by', generatedAt: 'Recorded', pipeline: 'Pipeline',
-    principal: 'Recorded for', stampedBy: 'Stated by', sources: 'Sources',
-    hash: 'Content fingerprint',
-    hashNote: 'The record is bound to these exact bytes. Content that has changed since is not what '
-      + 'this record describes.',
-    stampedNode: 'the node, which did not witness the generation and inferred this',
-    stampedPrincipal: 'the account that produced it, as its own statement',
-    wrongTitle: 'Is this label wrong, or missing somewhere?',
-    wrongBody: 'Anyone can report it. Quote the record id below.',
-    reportBtn: 'How to report it',
-    howNode: 'How this node marks AI content',
-    recordId: 'Record id',
-    machine: 'The same record as JSON',
-    noneOwed: 'No visible label is owed for this content.',
-    gone: 'No such record',
-    goneBody: 'There is no provenance record at this address, or it is not public. If you arrived '
-      + 'from a label, the content it described may have been unpublished.',
-  },
-  fi: {
-    title: 'Miten tämä on tehty',
-    unstated: 'Tietue ei kerro sitä.',
-    fields: 'Mitä tietue kertoo',
-    level: 'Kuinka paljon malli teki', method: 'Menetelmä', human: 'Ihmisen osuus',
-    model: 'Malli', provider: 'Tarjoaja', generatedAt: 'Kirjattu', pipeline: 'Tuotantoketju',
-    principal: 'Kirjattu tilille', stampedBy: 'Kertonut', sources: 'Lähteet',
-    hash: 'Sisällön sormenjälki',
-    hashNote: 'Tietue on sidottu juuri näihin tavuihin. Sen jälkeen muuttunut sisältö ei ole se, '
-      + 'mitä tämä tietue kuvaa.',
-    stampedNode: 'solmu, joka ei nähnyt tuottamista vaan päätteli tämän',
-    stampedPrincipal: 'sisällön tuottanut tili omana ilmoituksenaan',
-    wrongTitle: 'Onko merkintä väärä tai puuttuuko se jostain?',
-    wrongBody: 'Kuka tahansa voi ilmoittaa siitä. Mainitse alla oleva tietueen tunnus.',
-    reportBtn: 'Miten ilmoitat',
-    howNode: 'Miten tämä solmu merkitsee tekoälysisältöä',
-    recordId: 'Tietueen tunnus',
-    machine: 'Sama tietue JSONina',
-    noneOwed: 'Tälle sisällölle ei ole näkyvää merkintää velvoitettu.',
-    gone: 'Tietuetta ei ole',
-    goneBody: 'Tässä osoitteessa ei ole alkuperätietuetta, tai se ei ole julkinen. Jos tulit '
-      + 'merkinnästä, sen kuvaama sisältö on voitu poistaa julkaisusta.',
-  },
-} as const;
+/**
+ * The page's copy, `aiLabel.page.*` in the locale files. Only the CHROME and the readable names of
+ * the record's enum values live there; every statement of fact comes off the record.
+ */
+function copyFor(locale: Locale): (key: string) => string {
+  const t = createT(locale);
+  return (key) => t(`aiLabel.page.${key}`);
+}
+
+/** `ai-generated` → `aiGenerated`: the locale files key the enum values in camelCase. */
+const camel = (token: string): string => token.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
+
+/**
+ * A readable name for an enum value, with the value itself beside it in code type, so a reader
+ * sees what the sentence means and a fact-checker can still quote the token the record carries.
+ */
+function enumCell(t: (key: string) => string, group: string, token: string | undefined): string {
+  if (!token) return '';
+  const key = `${group}.${camel(token)}`;
+  const name = t(key);
+  // An unknown value (a newer node's vocabulary) shows as the token alone.
+  return name === `aiLabel.page.${key}` ? `<code>${esc(token)}</code>` : `${esc(name)} <code>${esc(token)}</code>`;
+}
 
 const STYLE = `
 :root{color-scheme:light dark;--fg:#14151a;--dim:#5b6070;--line:#dfe2ea;--bg:#fbfbfd;--card:#fff;--accent:#8b2500}
@@ -165,24 +145,24 @@ function row(dt: string, dd: string | undefined | null): string {
  * about the record: there is nothing it could differ on.
  */
 export function provenanceNotFoundPage(opts: { baseUrl: string; locale: Locale }): string {
-  const t = COPY[opts.locale === 'fi' ? 'fi' : 'en'];
-  const lang = opts.locale === 'fi' ? 'fi' : 'en';
+  const t = copyFor(opts.locale);
+  const lang = opts.locale;
   const base = opts.baseUrl.replace(/\/+$/, '');
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(t.gone)}</title>
+<title>${esc(t('gone'))}</title>
 <meta name="robots" content="noindex">
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
-<h1>${esc(t.gone)}</h1>
-<p class="lede">${esc(t.goneBody)}</p>
+<h1>${esc(t('gone'))}</h1>
+<p class="lede">${esc(t('goneBody'))}</p>
 <div class="card"><div class="actions">
-<a href="${esc(base)}/v1/ai-transparency">${esc(t.howNode)}</a>
+<a href="${esc(base)}/v1/ai-transparency">${esc(t('howNode'))}</a>
 </div></div>
 </main>
 </body>
@@ -194,50 +174,56 @@ export function provenanceNotFoundPage(opts: { baseUrl: string; locale: Locale }
  * have served, never the raw row.
  */
 export function provenancePage(record: AiProvenance, opts: ProvenancePageOptions): string {
-  const t = COPY[opts.locale === 'fi' ? 'fi' : 'en'];
-  const lang = opts.locale === 'fi' ? 'fi' : 'en';
+  const t = copyFor(opts.locale);
+  const lang = opts.locale;
   const base = opts.baseUrl.replace(/\/+$/, '');
   const d = record.disclosure;
   const g = record.generator;
 
-  // The chip's own sentence, in the reader's language, with the record's fallbacks.
+  // The chip's own sentence, in the reader's language, with the record's fallbacks. When no label
+  // is owed there is no chip, and the page says so instead of printing a label nobody is shown.
+  // The disclosure here was decided for this reader's surface by the route (servedDisclosure).
   const short = d?.short?.[lang] ?? d?.short?.en ?? '';
   const long = d?.long?.[lang] ?? d?.long?.en ?? '';
-  const lede = d?.required === false && !short ? t.noneOwed : [short, long].filter(Boolean).join('. ');
+  const lede = !d?.required ? t('noneOwed') : [short, long].filter(Boolean).join('. ');
 
   const sources = (record.sources ?? []).filter(s => s?.url);
-  const stamped = record.attestation?.stampedBy === 'node' ? t.stampedNode
-    : record.attestation?.stampedBy === 'principal' ? t.stampedPrincipal : null;
+  const stamped = record.attestation?.stampedBy === 'node' ? t('stampedNode')
+    : record.attestation?.stampedBy === 'principal' ? t('stampedPrincipal') : null;
+  const medium = record.mediaKind
+    ? `${enumCell(t, 'media', record.mediaKind)}${record.mediaType ? ` · <code>${esc(record.mediaType)}</code>` : ''}`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>${esc(t.title)}</title>
+<title>${esc(t('title'))}</title>
 <meta name="robots" content="noindex">
 <link rel="alternate" type="application/json" href="${esc(opts.recordUrl)}">
 <style>${STYLE}</style>
 </head>
 <body>
 <main>
-<h1>${esc(t.title)}</h1>
+<h1>${esc(t('title'))}</h1>
 <p class="lede">${esc(lede)}</p>
 
-<h2>${esc(t.fields)}</h2>
+<h2>${esc(t('fields'))}</h2>
 <div class="card"><dl>
-${row(t.level, esc(record.level))}
-${row(t.method, record.method ? esc(record.method) : '')}
-${row(t.human, esc(record.humanInvolvement))}
-${row(t.model, g?.model ? `<code>${esc(g.model)}</code>` : '')}
-${row(t.provider, g?.provider ? esc(g.provider) : '')}
-${row(t.pipeline, g?.pipeline ? `<code>${esc(g.pipeline)}</code>` : '')}
-${row(t.principal, g?.principal ? `<code>${esc(g.principal)}</code>` : '')}
-${row(t.generatedAt, record.generatedAt ? esc(record.generatedAt) : '')}
-${row(t.stampedBy, stamped ? esc(stamped) : '')}
+${row(t('level'), enumCell(t, 'levels', record.level))}
+${row(t('medium'), medium)}
+${row(t('method'), enumCell(t, 'methods', record.method))}
+${row(t('human'), enumCell(t, 'involvement', record.humanInvolvement))}
+${row(t('model'), g?.model ? `<code>${esc(g.model)}</code>` : '')}
+${row(t('provider'), g?.provider ? esc(g.provider) : '')}
+${row(t('pipeline'), g?.pipeline ? `<code>${esc(g.pipeline)}</code>` : '')}
+${row(t('principal'), g?.principal ? `<code>${esc(g.principal)}</code>` : '')}
+${row(t('generatedAt'), record.generatedAt ? esc(record.generatedAt) : '')}
+${row(t('stampedBy'), stamped ? esc(stamped) : '')}
 </dl></div>
 
-${sources.length ? `<h2>${esc(t.sources)}</h2>
+${sources.length ? `<h2>${esc(t('sources'))}</h2>
 <div class="card"><ol>
 ${sources.map(s => {
   const href = safeHref(s.url);
@@ -251,20 +237,20 @@ ${sources.map(s => {
 }).join('\n')}
 </ol></div>` : ''}
 
-${record.attestation?.contentHash ? `<h2>${esc(t.hash)}</h2>
+${record.attestation?.contentHash ? `<h2>${esc(t('hash'))}</h2>
 <div class="card"><code>${esc(record.attestation.contentHash)}</code>
-<p class="note">${esc(t.hashNote)}</p></div>` : ''}
+<p class="note">${esc(t('hashNote'))}</p></div>` : ''}
 
 ${record.notes ? `<div class="card" style="margin-top:1rem"><p class="note" style="margin:0">${esc(record.notes)}</p></div>` : ''}
 
-<h2>${esc(t.wrongTitle)}</h2>
+<h2>${esc(t('wrongTitle'))}</h2>
 <div class="card">
-<p style="margin:0">${esc(t.wrongBody)}</p>
-<p class="note">${esc(t.recordId)}: <code>${esc(opts.recordUrl.split('/').pop() ?? '')}</code></p>
+<p style="margin:0">${esc(t('wrongBody'))}</p>
+<p class="note">${esc(t('recordId'))}: <code>${esc(opts.recordUrl.split('/').pop() ?? '')}</code></p>
 <div class="actions">
-<a href="${esc(base)}/v1/ai-transparency">${esc(t.howNode)}</a>
-<a href="${esc(base)}/v1/docs#post-v1flags">${esc(t.reportBtn)}</a>
-<a href="${esc(opts.recordUrl)}">${esc(t.machine)}</a>
+<a href="${esc(base)}/v1/ai-transparency">${esc(t('howNode'))}</a>
+<a href="${esc(base)}/v1/docs#post-v1flags">${esc(t('reportBtn'))}</a>
+<a href="${esc(opts.recordUrl)}">${esc(t('machine'))}</a>
 </div>
 </div>
 </main>

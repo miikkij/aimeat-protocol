@@ -30,6 +30,10 @@
  *   import { disclosureFor } from './ai-disclosure.js';
  *   const d = disclosureFor(record, { visibility: 'public', humanAudience: true }, config.aiLabelPublic);
  * @version-history
+ *   v1.4.0 — 2026-10-08 — The deep-fake rule reads the record's own `mediaKind` (the surface may
+ *     still say better) and reaches image, audio and video only; code and data had been counted as
+ *     deep fakes. Its reason is `art50_4_deepfake` only when the declarer said the content
+ *     resembles something real, `art50_4_precautionary` otherwise; the label is the same.
  *   v1.3.0 — 2026-08-02 — The recorded REASON splits from the label. An absent or `unknown`
  *     publicInterest still labels (D4 over-labels on purpose) but now records
  *     `art50_4_precautionary` instead of asserting Article 50(4)'s text limb. It had been
@@ -47,7 +51,10 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1. Rules from docs/internal/EUAct/06-platform-design.md
  *     §4 and decision D4 (over-labelling) in 21-decisions-2026-08-01.md.
  */
-import { asKnownProvenance, type MaybeAiProvenance, type AiDisclosureReason } from '../models/ai-provenance-schemas.js';
+import {
+  asKnownProvenance, isSyntheticMedia,
+  type MaybeAiProvenance, type AiDisclosureReason, type AiMediaKind,
+} from '../models/ai-provenance-schemas.js';
 
 export type DisclosureStrength = 'full' | 'light' | 'none';
 
@@ -89,8 +96,12 @@ export interface SurfaceContext {
   creativeWork?: boolean;
   /** A person is in a two-way exchange with a model AT THIS MOMENT (Art. 50(1)). */
   interactive?: boolean;
-  /** What kind of content this is. Non-text engages Art. 50(4) 1st subpara (deep fakes). */
-  mediaKind?: 'text' | 'image' | 'audio' | 'video';
+  /**
+   * What kind of content this is, when the SURFACE knows better than the record. The record's own
+   * `mediaKind` is used otherwise. Image, audio and video engage Art. 50(4) 1st subpara (deep
+   * fakes); code and data are read like text.
+   */
+  mediaKind?: AiMediaKind;
 }
 
 export interface DisclosureDecision {
@@ -167,10 +178,16 @@ export function disclosureFor(
   const publiclyReadable = ctx.visibility === 'public';
 
   // 4 — Art. 50(4) 1st subpara: deep fakes. `assisted` counts — a face-swap is precisely a
-  // pre-existing human image partially modified by AI.
-  const isDeepFake = ctx.mediaKind !== undefined && ctx.mediaKind !== 'text';
-  if (publiclyReadable && isDeepFake) {
-    return { required: true, reason: 'art50_4_deepfake', strength: strengthFor(ctx) };
+  // pre-existing human image partially modified by AI. Only image, audio and video: code and data
+  // were counted here until 2026-10-08, which nothing noticed because no caller passed a medium.
+  //
+  // The LABEL does not depend on whether the content resembles a real person or event; the REASON
+  // does. The node cannot tell a generic text-to-speech voice from a cloned one, so the statutory
+  // deep-fake basis is recorded only when the declarer said `resemblesReal: yes`, and the
+  // precautionary one otherwise. No review exemption applies here, whichever reason is recorded.
+  if (publiclyReadable && isSyntheticMedia(ctx.mediaKind ?? p.mediaKind)) {
+    const reason: AiDisclosureReason = p.resemblesReal === 'yes' ? 'art50_4_deepfake' : 'art50_4_precautionary';
+    return { required: true, reason, strength: strengthFor(ctx) };
   }
 
   // Rules 5 and 6 below are the three EXEMPTIONS the law grants. Each one hands off to the node

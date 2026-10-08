@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.7.0 -- 2026-10-08 -- The record states `mediaKind: image` and the picture's type, decided against the stored visibility.
  *   v2.6.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v2.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
@@ -225,6 +226,8 @@ export async function generateForOwner(
     costUsd, content: '',
     // The provenance record names the picture by its bytes, the way a voice reply names its audio.
     contentHash: contentHashOf(result.data),
+    // A picture, of the type the provider sent, decided against the visibility it was stored with.
+    media: { mediaKind: 'image', mediaType: result.mime, surface: { visibility, humanAudience: true } },
     appId: opts.appId, source: 'ai-image',
     units: { images: 1 }, costSource: price.costSource, priceRef: price.priceRef,
   });

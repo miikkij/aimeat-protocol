@@ -13,6 +13,7 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v2.7.0 -- 2026-10-08 -- The record states text with method `transcribed`, so its label says a model transcribed it.
  *   v2.6.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v2.5.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v2.4.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
@@ -200,6 +201,8 @@ export async function transcribeForOwner(
     // transcription is not a hole in the per-model report.
     model: result.model, promptTokens: 0, completionTokens: totalTok, totalTokens: totalTok,
     costUsd, content: result.text, appId: opts.appId, source: 'ai-transcribe',
+    // Text a model heard rather than wrote: its label says it was transcribed.
+    media: { mediaKind: 'text', mediaType: 'text/plain', method: 'transcribed' },
     units: { seconds }, costSource: price.costSource, priceRef: price.priceRef,
   });
   const updated = settled.usage;
