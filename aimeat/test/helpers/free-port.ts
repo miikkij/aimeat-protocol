@@ -1,33 +1,33 @@
 /**
  * @file free-port.ts
- * @description A port nothing listens on at this moment, chosen by the operating system, for a node
- *   a suite spawns for itself.
+ * @description The port for a node a suite starts for itself: a block of a hundred that belongs to
+ *   that suite, plus the last two digits of the lane's own port, so two lanes never share one.
  *
- *   WHY NOT A PORT DERIVED FROM THE LANE. e2e-capabilities (41000 + lane % 100) and
- *   e2e-capability-webhook-update (41100 + lane % 100) took fixed numbers, and on Linux those sit
- *   inside the range the kernel hands out as the local port of an outgoing connection (32768-60999).
- *   The Postgres sweep holds many connections to one address, which tends to get the same local
- *   ports night after night, and on 2026-09-30 and 2026-10-02 one of them held 41104 when the
- *   allowlist node tried to listen there: EADDRINUSE, seven assertions red, on that backend only.
- *   A port the kernel just handed us is one no connection holds.
+ *   WHY BELOW 32768. Linux hands out every port from 32768 to 60999 on its own: as the local port of
+ *   an outgoing connection, and to any `listen(0)`. Windows and macOS do the same from 49152. A
+ *   fixed number in that range was taken by a database connection on the Postgres sweeps of
+ *   2026-09-30 and 2026-10-02 (41104, EADDRINUSE). Asking the system for a free port instead
+ *   (v1.0.0) lost a race: the probe closes, the node takes seconds to boot, and on 2026-10-08
+ *   another suite's stub server got the same number from its own `listen(0)` first, so the node
+ *   could not bind and the suite talked to the stub (`{"ok":true}` to everything). Nothing hands out
+ *   a port below 32768 by itself, so a number there stays free until the suite that owns it binds.
  *
- *   THE PROBE BINDS WHAT THE NODE BINDS. The node listens with no host, which is `::` and every
- *   address; a probe on 127.0.0.1 alone can call a port free that is held on `::` (pitfalls §77b).
- * @usage const port = await freePort();
+ *   THE BLOCKS. 31000 e2e-capabilities, 31100 e2e-capability-webhook-update, 31200 and 31300
+ *   e2e-federation-packages (nodes A and B). A new suite takes the next free hundred below 32700.
+ * @usage const port = suitePort(31000, BASE);
  * @version-history
+ *   v2.0.0 — 2026-10-08 — suitePort(block, base) replaces freePort(): a fixed port below the range
+ *     the system hands out, because the probe-then-boot window lost to another suite's listen(0).
  *   v1.0.0 — 2026-10-02 — Initial, from e2e-peer-registration-proof.ts's own copy.
  */
-import { createServer } from 'node:net';
-import type { AddressInfo } from 'node:net';
 
-/** A port nothing listens on at this moment. */
-export async function freePort(): Promise<number> {
-    const s = createServer();
-    await new Promise<void>((resolve, reject) => {
-        s.once('error', reject);
-        s.listen(0, () => resolve());
-    });
-    const port = (s.address() as AddressInfo).port;
-    await new Promise<void>(resolve => s.close(() => resolve()));
-    return port;
+/**
+ * `block` (a multiple of 100 from 30000 to 32600) plus the last two digits of the lane's port, read
+ * from the suite's base URL.
+ */
+export function suitePort(block: number, base: string): number {
+    if (!Number.isInteger(block) || block % 100 !== 0 || block < 30000 || block > 32600) {
+        throw new Error(`suitePort: block must be a multiple of 100 from 30000 to 32600, got ${block}`);
+    }
+    return block + (Number(new URL(base).port || '80') % 100);
 }

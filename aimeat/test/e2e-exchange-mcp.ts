@@ -16,6 +16,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
  *   v1.0.0 — 2026-07-21 — Initial: MCP parity for the act-on-exchange tools (work / proposals / app-tool invoke).
+ *   v1.1.1 — 2026-10-08 — The no-contract case prices its tool: an unpriced tool is free to anyone
+ *     since 2026-10-06, so it reached the missing capability instead of NO_CONTRACT.
  *   v1.1.0 — 2026-07-25 — Cover aimeat_app_tool_invoke's happy path and its stale-token failure. The suite
  *     previously treated the happy path as "identical to the WebMCP invoke" and skipped it — but WebMCP reads
  *     the token off the live request while the MCP tool replays its session's token, and that one difference
@@ -214,9 +216,11 @@ await test('aimeat_exchange_proposals + _proposal_decide — accept a renegotiat
 
 await test('aimeat_app_tool_invoke — no contract for the app-tool → NO_CONTRACT (failure mode)', async () => {
     // Publish a minimal app-tool manifest so the tool resolves, but hold no contract → must refuse before any charge.
+    // The tool carries a price: since 2026-10-06 an UNPRICED tool is free to anyone (mcp-free-app-tools),
+    // so only a priced one needs a contract, and without a price this reached the missing capability.
     const put = await json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
         key: 'apps.brief.tools', visibility: 'public',
-        value: { tools: [{ name: 'getBrief', action_id: 'cap-x', description: 'brief', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }] },
+        value: { tools: [{ name: 'getBrief', action_id: 'cap-x', description: 'brief', price: { morsels: 5 }, inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }] },
     }) });
     assert(put.status === 200 || put.status === 201, `manifest put ${put.status}`);
     const res = parse(await C()['aimeat_app_tool_invoke']({ owner: provider.name, app: 'brief', tool: 'getBrief', input: {} }));

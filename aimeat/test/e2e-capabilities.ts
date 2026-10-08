@@ -6,6 +6,8 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   v1.1.2 — 2026-10-08 — The allowlist node listens on 31000 + lane % 100 (suitePort): the port the
+ *     system picked was taken by another suite's stub server while the node booted.
  *   v1.1.1 — 2026-10-02 — The allowlist node listens on a port the operating system picks
  *     (helpers/free-port.ts) instead of 41000 + lane % 100.
  *   v1.1.0 — 2026-08-14 —Phase 11: the webhook policy gate. A body carrying a webhookUrl and no
@@ -57,7 +59,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
-import { freePort } from './helpers/free-port.js';
+import { suitePort } from './helpers/free-port.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -964,13 +966,11 @@ await test('Webhooks disabled: refused with AND without `source`, and nothing is
     }
 });
 
-// The allowlist branch is a boot-time setting, so it needs a node of its own, on a port the operating
-// system picks. Two derived schemes failed in turn: offsets one apart (`+ 500` here, `+ 501` in
-// e2e-capability-webhook-update) put lanes 1 and 2 on 41002 on the sweep of 2026-09-20, and the
-// fixed blocks that replaced them sit where Linux gives out the local ports of outgoing connections,
-// which is how 41104 was taken on the Postgres sweeps of 2026-09-30 and 2026-10-02
-// (helpers/free-port.ts).
-const ALT_PORT = String(await freePort());
+// The allowlist branch is a boot-time setting, so it needs a node of its own, on this suite's block
+// below 32768 (helpers/free-port.ts says why: offsets one apart collided on 2026-09-20, a block at
+// 41000 met a database connection's port, and a port asked of the system lost a race to another
+// suite's stub server on 2026-10-08).
+const ALT_PORT = String(suitePort(31000, BASE));
 const ALT_BASE = `http://127.0.0.1:${ALT_PORT}`;
 const ALT_DB = resolve(process.cwd(), `test/.caps-allowlist-${ALT_PORT}.db`);
 let altNode: ChildProcess | null = null;

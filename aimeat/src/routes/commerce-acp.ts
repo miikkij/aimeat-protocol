@@ -19,6 +19,8 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.5.1 — 2026-10-08 — GET /v1/commerce/tools?include=own treats the anonymous identity as no
+ *     caller, so an anonymous request gets the priced catalog instead of 500.
  *   v1.5.0 — 2026-10-07 — GET /v1/commerce/tools?include=own: an authenticated caller also gets its
  *     own owner's unpriced callable app tools (price null, own: true), so an agent sees its owner's
  *     free tools in the same read as the priced ones (wish-commerce-tool-catalog-includes-the-caller-
@@ -241,7 +243,9 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
   // served even when commerce is off; the priced half is then empty.
   router.get('/v1/commerce/tools', async (req, res) => {
     const include = typeof req.query.include === 'string' ? req.query.include.split(',') : [];
-    const caller = include.includes('own') && req.auth ? callerOf(req, config.nodeId, storage) : null;
+    // The anonymous identity anonymous mode injects is no caller: callerOf refuses it (v1.0.1), and
+    // asking anyway answered 500 to every anonymous ?include=own on such a node.
+    const caller = include.includes('own') && req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null;
     const ownerGhii = caller && caller.kind !== 'anonymous' && !caller.visitor ? caller.ownerGhii : null;
     if (!config.commerceEnabled && !ownerGhii) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Commerce is disabled on this node')); return;

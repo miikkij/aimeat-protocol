@@ -15,7 +15,8 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capability-webhook-update
  * @version-history
- *   v1.0.1 — 2026-10-02 — The allowlist node listens on a port the operating system picks
+ *   v1.0.2 — 2026-10-08 — The allowlist node listens on 31100 + lane % 100 (suitePort).
+ *   v1.0.1 — 2026-10-02 —The allowlist node listens on a port the operating system picks
  *     (helpers/free-port.ts); 41104 was held by a database connection on two Postgres sweeps.
  *   v1.0.0 — 2026-08-14 —Written with the August 2026 audit fix to routes/capabilities.ts.
  */
@@ -25,7 +26,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
-import { freePort } from './helpers/free-port.js';
+import { suitePort } from './helpers/free-port.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!';
@@ -165,12 +166,12 @@ await test('The two-step way in is closed: a parked webhook cannot be turned man
 });
 
 // ─── Phase 2: a node with an ALLOWLIST ───
-// A boot-time setting, so it needs a node of its own, on a port the operating system picks. A port
-// derived from the lane (41100 + lane % 100) was held by a database connection's local port on the
-// Postgres sweeps of 2026-09-30 and 2026-10-02 (helpers/free-port.ts says why).
+// A boot-time setting, so it needs a node of its own, on this suite's block below 32768
+// (helpers/free-port.ts says why: 41104 met a database connection's port on two Postgres sweeps,
+// and a port asked of the system lost a race to another suite's stub server).
 console.log('\nPhase 2 — capabilityWebhooks=allowlist_only');
 
-const ALT_PORT = String(await freePort());
+const ALT_PORT = String(suitePort(31100, BASE));
 const ALT_BASE = `http://127.0.0.1:${ALT_PORT}`;
 const ALT_DB = resolve(process.cwd(), `test/.hookupd-allowlist-${ALT_PORT}.db`);
 const ALLOWED = 'https://hooks.example.test/first';
