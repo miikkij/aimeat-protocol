@@ -391,7 +391,7 @@ export function registerCommerceTools(
             try {
                 const session = await createSession(storage, config, {
                     buyerOwner: owner, buyerIdentity: agentGaii, items, note, currency,
-                    attribution: agentAttribution({}),
+                    attribution: agentAttribution({ gaii: agentGaii }),
                 });
                 return ok({ session });
             } catch (err) { return commerceFail(err); }
@@ -406,7 +406,7 @@ export function registerCommerceTools(
         async ({ session_id, handler }) => {
             if (!config.commerceEnabled) return fail('FEATURE_DISABLED: commerce is disabled on this node');
             try {
-                const session = await getSession(storage, ownerGhii, session_id);
+                const session = await getSession(storage, ownerGhii, session_id, config);
                 if (!session) return fail(`SESSION_NOT_FOUND: ${session_id}`);
                 // Callable app-tool fulfillment authenticates its capability invoke with the
                 // buyer's token. The MCP layer holds no forwardable bearer, so mint a SHORT-LIVED

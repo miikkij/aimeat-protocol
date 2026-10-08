@@ -184,7 +184,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
   async function loadOwnSession(req: Request): Promise<CheckoutSessionRecord> {
     const buyerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const id = decodeURIComponent(req.params.id as string);
-    const session = await getSession(storage, buyerGhii, id);
+    const session = await getSession(storage, buyerGhii, id, config);
     if (!session) throw new CommerceError('SESSION_NOT_FOUND', 404, `Checkout session not found: ${id}`);
     return session;
   }
@@ -200,7 +200,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
         items: toRefs(parsed.data.line_items),
         note: parsed.data.note,
         currency: parsed.data.currency,
-        attribution: agentAttribution({ ucpAgent: req.get('ucp-agent'), userAgent: req.get('user-agent') }),
+        attribution: agentAttribution({ ucpAgent: req.get('ucp-agent'), userAgent: req.get('user-agent'), gaii: resolveIdentity(req.auth!, config.nodeId) }),
       });
       res.status(201).json(ucpEnvelope(capabilities, { checkout_session: toUcpSession(session) }));
     } catch (err) { sendUcpError(res, config, err); }
@@ -219,7 +219,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     try {
       let session = await loadOwnSession(req);
       session = parsed.data.cancel === true
-        ? await cancelSession(storage, session)
+        ? await cancelSession(storage, session, config)
         : await updateSessionItems(storage, config, session, toRefs(parsed.data.line_items!));
       res.json(ucpEnvelope(UCP_CAPABILITIES, { checkout_session: toUcpSession(session) }));
     } catch (err) { sendUcpError(res, config, err); }

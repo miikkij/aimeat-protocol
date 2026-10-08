@@ -169,7 +169,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   async function loadOwnSession(req: Request): Promise<CheckoutSessionRecord> {
     const buyerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const id = decodeURIComponent(req.params.id as string);
-    const session = await getSession(storage, buyerGhii, id);
+    const session = await getSession(storage, buyerGhii, id, config);
     if (!session) throw new CommerceError('SESSION_NOT_FOUND', 404, `Checkout session not found: ${id}`);
     return session;
   }
@@ -334,7 +334,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
       const given = parsed.data.attribution;
       const attribution = given
         ? pageAttribution({ referrer: given.referrer, utmSource: given.utm_source, selfHosts: visit.selfHosts, optedOut: visit.optedOut })
-        : (callerOf(req, config.nodeId, storage).kind === 'agent' ? agentAttribution({ userAgent: visit.userAgent }) : undefined);
+        : (callerOf(req, config.nodeId, storage).kind === 'agent' ? agentAttribution({ userAgent: visit.userAgent, gaii: resolveIdentity(req.auth!, config.nodeId) }) : undefined);
       const session = await createSession(storage, config, {
         buyerOwner: req.auth!.owner as string,
         buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
@@ -381,7 +381,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     try {
       let session = await loadOwnSession(req);
       session = parsed.data.cancel === true
-        ? await cancelSession(storage, session)
+        ? await cancelSession(storage, session, config)
         : await updateSessionItems(storage, config, session, parsed.data.items!);
       res.json(success(config.nodeId, { session }));
     } catch (err) { sendCommerceError(res, config, err); }

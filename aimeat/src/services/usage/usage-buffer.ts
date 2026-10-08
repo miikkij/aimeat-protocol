@@ -25,6 +25,7 @@
  *   import { recordUsageCall } from '../services/usage/usage-buffer.js';
  *   recordUsageCall({ ownerGhii, surface: 'mcp', coordinate: toolName, outcome: 'ok', durationMs });
  * @version-history
+ *   v1.1.0 — 2026-10-08 — onUsageRecorded(): a listener told of every call as it is recorded.
  *   v1.0.0 — 2026-08-14 — Initial: the buffered ingest door for the usage call stream.
  */
 import { randomUUID } from 'node:crypto';
@@ -46,6 +47,20 @@ let flushTimer: ReturnType<typeof setInterval> | null = null;
 let flushing = false;
 let buffer: UsageCallRecord[] = [];
 let droppedSinceLastWarning = 0;
+const listeners: Array<(call: UsageCallRecord) => void> = [];
+
+/**
+ * Be told of every call as it is recorded, synchronously. For a counter that reads the same stream
+ * (AI visibility's agent calls, services/visibility/agent-experience.ts). A listener must be cheap
+ * and must not throw; a throw is logged and the call is recorded anyway. Returns the unsubscribe.
+ */
+export function onUsageRecorded(listener: (call: UsageCallRecord) => void): () => void {
+  listeners.push(listener);
+  return () => {
+    const i = listeners.indexOf(listener);
+    if (i >= 0) listeners.splice(i, 1);
+  };
+}
 
 /**
  * Buffer one call. Never throws and never blocks: a door records what happened and gets on with
@@ -53,7 +68,7 @@ let droppedSinceLastWarning = 0;
  */
 export function recordUsageCall(input: UsageCallInput): void {
   try {
-    buffer.push({
+    const record: UsageCallRecord = {
       id: randomUUID(),
       ts: input.ts ?? new Date().toISOString(),
       ownerGhii: input.ownerGhii,
@@ -72,7 +87,14 @@ export function recordUsageCall(input: UsageCallInput): void {
       entitlementId: input.entitlementId ?? '',
       runId: input.runId ?? '',
       meta: input.meta ?? {},
-    });
+    };
+    buffer.push(record);
+    for (const listener of listeners) {
+      try { listener(record); } catch (e) {
+        // A listener reads a copy of what happened; its failure is its own and the call stands.
+        logger.warn('usage-buffer: a listener failed', { error: String(e) });
+      }
+    }
 
     if (buffer.length > MAX_BUFFERED) {
       const overflow = buffer.length - MAX_BUFFERED;

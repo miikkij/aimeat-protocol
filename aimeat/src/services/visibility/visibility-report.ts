@@ -14,6 +14,7 @@
  * @structure clampVisibilityDays · readVisibilityReport · VisibilityReport
  * @usage const report = await readVisibilityReport(storage, config, ownerGhii, { days: 30 });
  * @version-history
+ *   v1.2.0 — 2026-10-08 — `agents`: what AI agents met here, with one readable line per finding (layer C).
  *   v1.1.0 — 2026-10-08 — `tags`: the owner's own Clarity and GA4 on the place's pages (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
@@ -27,6 +28,7 @@ import { monthOf } from '../../models/signal-schemas.js';
 import { flushVisibility, mergeDay, nodeCountsVisibility, sumOf } from './visibility-counter.js';
 import { getVisibilitySettings } from './visibility-settings.js';
 import { visibilitySettingsView } from './analytics-tags.js';
+import { agentExperienceSection, type AgentExperience } from './agent-experience.js';
 
 /** 0 is "today only". Anything that is not a whole number in range is the default. */
 export function clampVisibilityDays(raw: unknown): number {
@@ -84,6 +86,8 @@ export interface VisibilityReport {
     day: string; people: number; ai_people: number; assistant: number; crawler: number;
     purchases: number; channels: Partial<Record<VisitChannel, number>>;
   }>;
+  /** What AI agents met here (layer C): their calls to the owner's tools and their checkouts by stage. */
+  agents: AgentExperience;
   /** The owner's own analytics tags on the place's pages (layer B), and whether they wait for consent. */
   tags: {
     clarity_project_id: string | null;
@@ -93,7 +97,7 @@ export interface VisibilityReport {
     /** Set when a tag loads with no banner: the owner must hear that EU visitors need consent. */
     warning: string | null;
   };
-  reading: Record<'channels' | 'assistant' | 'crawler' | 'discovery' | 'purchases' | 'not_seen' | 'opted_out' | 'privacy', string>;
+  reading: Record<'channels' | 'assistant' | 'crawler' | 'discovery' | 'purchases' | 'agents' | 'not_seen' | 'opted_out' | 'privacy', string>;
 }
 
 const dayStr = (d: Date): string => d.toISOString().slice(0, 10);
@@ -186,6 +190,7 @@ export async function readVisibilityReport(
       .sort((a, b) => b.fetches - a.fetches),
     purchases,
     series,
+    agents: agentExperienceSection(sum),
     tags: {
       clarity_project_id: settings.clarityProjectId,
       ga4_measurement_id: settings.ga4MeasurementId,
@@ -202,6 +207,7 @@ export async function readVisibilityReport(
       not_seen: 'The questions people asked the AI are not visible here. Only whoever runs the AI sees them. This report shows which pages and tools the AI fetched, when, on whose behalf, and what followed.',
       opted_out: 'Visitors whose browser asks not to be followed (Global Privacy Control or Do Not Track) are in the request total only.',
       privacy: 'No address, no cookie and no visitor id is kept. Each visit is a count under a channel and an AI name, nothing more.',
+      agents: 'What AI agents met here: calls other people\'s agents made to your tools, by outcome and reason, and agents\' checkouts by stage, with where they stopped. Agents are counted by the AI they are, never named. A failed tool call or a checkout that stopped is an agent\'s version of a frustrated click.',
     },
   };
 }
