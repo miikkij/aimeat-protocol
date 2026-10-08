@@ -12,7 +12,9 @@
  *     shareCatalogue off, a stranger node, a changed key, federation off
  *   - Phase 5: scope and identity refusals
  * @version-history
- *   v1.0.1 — 2026-10-06 — The two nodes listen on ports the operating system hands out, so the suite
+ *   v1.0.2 — 2026-10-08 — The two nodes listen on 31200 and 31300 plus the lane's last two digits
+ *     (suitePort): a port handed out by the system can be taken by another suite while a node boots.
+ *   v1.0.1 — 2026-10-06 —The two nodes listen on ports the operating system hands out, so the suite
  *     runs beside others (secaudit 2026-10 follow-up, Part C).
  *   v1.0.0 — 2026-09-05 — Initial.
  */
@@ -25,7 +27,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
 import type { Server } from 'node:http';
-import { freePort } from './helpers/free-port.js';
+import { suitePort } from './helpers/free-port.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -125,12 +127,14 @@ let firstPublishedAt = '';
 console.log('Setup');
 
 await test('Boot A (publisher) and B (puller) with an owner each', async () => {
-    // Ports the operating system hands out (helpers/free-port.ts), so this suite runs beside any
-    // other. It held 40701/40702, which kept two sessions from running it at once, and a collision
-    // does not fail loudly: every assertion then runs against somebody else's node (incident
-    // 2026-09-05-port-40262-app-origin).
-    A = await bootNode(await freePort(), `aimeat-test-001-fedpka${ts}`, true);
-    B = await bootNode(await freePort(), `aimeat-test-001-fedpkb${ts}`, true);
+    // This suite's two blocks plus the lane's last two digits (helpers/free-port.ts), so it runs
+    // beside any other lane and any other session's run. It held 40701/40702, which kept two
+    // sessions from running it at once, and a collision does not fail loudly: every assertion then
+    // runs against somebody else's node (incident 2026-09-05-port-40262-app-origin). A port asked of
+    // the system lost a race to another suite's stub server on 2026-10-08 (e2e-capabilities).
+    const lane = process.env.E2E_BASE ?? 'http://localhost:40251';
+    A = await bootNode(suitePort(31200, lane), `aimeat-test-001-fedpka${ts}`, true);
+    B = await bootNode(suitePort(31300, lane), `aimeat-test-001-fedpkb${ts}`, true);
     await setupOwner(A, `fpa${ts}`);
     await setupOwner(B, `fpb${ts}`);
 });

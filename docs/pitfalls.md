@@ -85,7 +85,7 @@ number is never reused.
 | 89 | A new storage method file turns check:deps red with an import cycle | 2 |
 | 90 | A door nobody touched loses its field-reach twin or becomes a finding | 2 |
 | 98 | Anthropic answers stop near 4096 tokens, and only a warning says why | 1 |
-| 105 | A suite's own node gets EADDRINUSE on a number no file names, Postgres sweep only | 5 |
+| 105 | A suite's own node gets EADDRINUSE on a number no file names, or a stub answers for it | 5 |
 | 107 | An app's record read beside it comes back empty, though the app has one | 1 |
 | 108 | Gate green, pushed, and an unrelated unit test red on the next full run | 2 |
 | 109 | A dialog opened from a label reads in the label's capitals and colour | · |
@@ -473,8 +473,9 @@ Two SESSIONS in one checkout is forbidden now (`CLAUDE.md`), so the case below i
 
 - **The case.** e2e-capability-webhook-update started its allowlist node on `41100 + lane port % 100`, and e2e-capabilities on `41000 + …`. Both blocks were chosen to keep the two suites apart. On the Postgres sweeps of 2026-09-30 and 2026-10-02 port 41104 was taken anyway, and no suite names it.
 - **The cause.** Linux gives out the local port of every outgoing TCP connection from 32768 to 60999, a Postgres pool socket and an HTTP client alike. The Postgres sweep keeps many connections open to one address, and Linux picks local ports for connections to one address from a starting point derived from that address, so the same numbers come up night after night. A port in that range is free only until a connection takes it. The SQLite sweep opens far fewer connections, which is why it never failed.
-- **The rule.** A node a suite starts for itself takes a port from the operating system: `freePort()` in `aimeat/test/helpers/free-port.ts`, which binds port 0 on every address, as the node does (§77b). A fixed number between 32768 and 60999 is never safe on Linux, however carefully it is kept apart from the other suites.
-- **The tell.** `EADDRINUSE` on a number no file names, in one backend's sweep only.
+- **The first fix was wrong.** Asking the system for a free port (bind port 0, read it, close, start the node on it) lost a race on 2026-10-08: the node boots for seconds after the probe closes, and in that window another suite's stub server got the same number from its own `listen(0)`. The node could not bind, and e2e-capabilities talked to the stub, which answers `{"ok":true}` to everything: "alt node policy: undefined", 200 where 201 and 403 were asserted.
+- **The rule.** A node a suite starts for itself listens on a port below 32768, which no system hands out on its own (Linux from 32768, Windows and macOS from 49152): `suitePort(block, BASE)` in `aimeat/test/helpers/free-port.ts`, a block of a hundred per suite plus the lane's last two digits. A fixed number from 32768 up, and a port asked of the system for a process that starts later, are both unsafe.
+- **The tell.** `EADDRINUSE` on a number no file names, in one backend's sweep only; or a spawned node's assertions answered by something that is not a node.
 
 ## 107. An app's tool list and its data map are keyed by two different names
 
