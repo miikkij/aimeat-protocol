@@ -39,6 +39,9 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.6.0 — 2026-10-08 — 2a: a whole proxy answer names its provenance record (X-AIMEAT-Provenance-Id,
+ *     Link, AI-Disclosure). 2b: the streamed frames stay byte for byte and are followed by one SSE
+ *     comment naming the record; the exact-equality assertion no longer matched what the node sends.
  *   v1.5.0 — 2026-10-04 — 5f: an agent's image and vision calls with no app id are filed under the agent
  *     and the endpoint (2026-10-03); 2d: parallel_tool_calls reaches the provider beside tools, and a
  *     custom provider gets no session_id.
@@ -360,6 +363,11 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert((sent.json as any)?.temperature === 0.3, 'temperature rode along');
         const usage = await json('/v1/ai/usage', { headers: auth(a.token) });
         assert(usage.body.data.total_calls >= 1, `the turn was recorded, total_calls=${usage.body.data.total_calls}`);
+        // The answer names the record minted for it (B5): the id, and the marks every AI answer carries.
+        const id = r.headers.get('x-aimeat-provenance-id') ?? '';
+        assert(/^[0-9a-f-]{36}$/.test(id), `X-AIMEAT-Provenance-Id: ${id}`);
+        assert((r.headers.get('link') ?? '').includes(`/v1/provenance/${id}>; rel="ai-provenance"`), `Link: ${r.headers.get('link')}`);
+        assert((r.headers.get('ai-disclosure') ?? '').includes('mode=machine-generated'), `AI-Disclosure: ${r.headers.get('ai-disclosure')}`);
     });
 
     await test('2b. A streamed completion is forwarded FRAME FOR FRAME, and the usage is read out of it', async () => {
@@ -375,8 +383,13 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert((res.headers.get('content-type') ?? '').includes('text/event-stream'), `the answer is an event stream, got ${res.headers.get('content-type')}`);
         const text = await res.text();
         // Byte for byte. A client that understands OpenAI's stream understands this one, and
-        // anything rewritten in the middle would be a second dialect to keep in step.
-        assert(text === stream.body, `the frames were rewritten:\n  sent: ${JSON.stringify(stream.body)}\n  got:  ${JSON.stringify(text)}`);
+        // anything rewritten in the middle would be a second dialect to keep in step. After the
+        // provider's last frame the node adds ONE SSE comment naming the answer's provenance record
+        // (2026-10-08, workstream B5): a comment line is skipped by every SSE reader, OpenRouter sends
+        // its own, and nothing before it changes. This assertion asked for exact equality until then.
+        const comment = /^: aimeat-provenance id=[0-9a-f-]{36} record_url=\S+\/v1\/provenance\/[0-9a-f-]{36}\n\n$/;
+        assert(text.startsWith(stream.body) && comment.test(text.slice(stream.body.length)),
+            `the frames were rewritten:\n  sent: ${JSON.stringify(stream.body)}\n  got:  ${JSON.stringify(text)}`);
         const sent = provider.lastRequest('chat')!;
         assert((sent.json as any)?.stream === true && !!(sent.json as any)?.stream_options,
             'the node asked for usage in the stream, which is how it knows what the turn cost');

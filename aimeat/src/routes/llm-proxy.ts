@@ -27,6 +27,9 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.11.0 -- 2026-10-08 -- The answer names its AI-provenance record: a whole answer is settled before it is
+ *     sent and carries AI-Disclosure, Link rel="ai-provenance" and X-AIMEAT-Provenance-Id; a stream ends
+ *     with an SSE comment `: aimeat-provenance id=… record_url=…` after the provider's last frame.
  *   v1.10.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
  *   v1.9.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     POST /v1/llm/chat/completions counts the account on the route (aiCallLimit), not per principal.
@@ -77,6 +80,7 @@ import { runRoute } from '../services/ai/route-run.js';
 import { callCost } from '../services/ai/catalog/price.js';
 import type { CostSource } from '../services/ai/types.js';
 import { logger } from '../utils/logger.js';
+import { servedProvenanceOf, setProvenanceHeaders, recordUrlFor } from '../services/ai-provenance-marks.js';
 
 /** A turn can take minutes when the model is reasoning; the default socket timeout is not enough. */
 const TURN_TIMEOUT_MS = 10 * 60_000;
@@ -266,12 +270,29 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         try {
-            const outcome = body.stream
-                ? await pipeStream(provider, res, answered)
-                : await passWhole(provider, res, answered);
-            await settleAiCall(storage, config, gaii, answered, {
-                ...outcome, appId: 'llm-proxy', source: 'llm-proxy',
-            });
+            if (body.stream) {
+                const outcome = await pipeStream(provider, res, answered);
+                const settled = await settleAiCall(storage, config, gaii, answered, {
+                    ...outcome, appId: 'llm-proxy', source: 'llm-proxy',
+                });
+                // The record exists only once the stream has ended, so it is named in an SSE comment
+                // after the provider's last frame: a client reading OpenAI's stream skips a comment.
+                if (settled.provenance) {
+                    res.write(`: aimeat-provenance id=${settled.provenance.id} record_url=${recordUrlFor(config, settled.provenance.id)}\n\n`);
+                }
+                res.end();
+            } else {
+                const whole = await readWhole(provider, answered);
+                // Settled BEFORE the answer is sent, so the answer can name its record. A failed
+                // settlement still sends the answer the caller paid for, and says so in the log.
+                const settled = await settleAiCall(storage, config, gaii, answered, {
+                    ...whole.outcome, appId: 'llm-proxy', source: 'llm-proxy',
+                }).catch((err: unknown) => { logger.warn(`[llm-proxy] ${gaii}: settlement failed: ${(err as Error).message}`); return undefined; });
+                const prov = settled?.provenance ? servedProvenanceOf(config, settled.provenance, { full: true }) : undefined;
+                setProvenanceHeaders(res, prov);
+                if (prov) res.setHeader('X-AIMEAT-Provenance-Id', prov.id);
+                res.json(whole.json);
+            }
         } catch (err) {
             // The provider may already have written half an answer, so there is nothing to send but
             // the log line. Never swallowed: an operator seeing this knows a turn was spent and not
@@ -359,17 +380,17 @@ function sendError(res: Response, nodeId: string, err: unknown): void {
     res.status(status).json(error(nodeId, code, e?.message || 'The completion failed.', status, e?.details));
 }
 
-/** Whole-response: hand it on unchanged, and read the accounting out of it. */
-async function passWhole(
-    provider: globalThis.Response, res: Response, plan: AiCallPlan,
-): Promise<ProviderOutcome> {
+/** Whole-response: the provider's answer, unchanged, and the accounting read out of it. The caller
+ *  sends it once the call is settled, so the answer can carry its provenance record's headers. */
+async function readWhole(
+    provider: globalThis.Response, plan: AiCallPlan,
+): Promise<{ json: unknown; outcome: ProviderOutcome }> {
     const json = await provider.json() as {
         model?: string;
         choices?: Array<{ message?: { content?: string } }>;
         usage?: ProviderUsage;
     };
-    res.json(json);
-    return readUsage(json.model ?? plan.model, json.choices?.[0]?.message?.content ?? '', json.usage, plan);
+    return { json, outcome: readUsage(json.model ?? plan.model, json.choices?.[0]?.message?.content ?? '', json.usage, plan) };
 }
 
 /**
@@ -437,7 +458,7 @@ async function pipeStream(
             }
         }
     }
-    res.end();
+    // Not ended here: the caller names the provenance record in a comment, then ends the stream.
     return readUsage(model, content, usage, plan);
 }
 

@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   v1.4.0 -- 2026-10-08 -- Complete takes ai_provenance / ai_provenance_id and answers with the
+ *     file's `ai_provenance` block; the shared write decides the record with the completing writer.
  *   v1.3.0 -- 2026-09-29 -- A chunked upload lands bound like POST /v1/storage: init takes 'workspace'
  *     visibility and group_id / workspace_ref / workspace_refs (refusing a workspace file that names
  *     no workspace before any chunk), and complete writes through writeStorageFile. Complete used to
@@ -41,6 +43,7 @@ import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
 import { versionedAddress } from '../utils/http-range.js';
 import { pubEmbedUrl } from '../services/doc-images.js';
+import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -193,6 +196,12 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No chunks uploaded'));
             return;
         }
+        // How the bytes were made, stated where the whole file is first known: here.
+        const stated = storageProvenanceFromBody(req.body, resolve(req), 'rest.storage.chunked', req.auth!.scopes);
+        if (!stated.ok) {
+            res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', 'The ai_provenance block does not validate.', undefined, { violations: stated.violations }));
+            return;
+        }
 
         // Assemble in order
         const sortedIndices = [...upload.receivedChunks.keys()].sort((a, b) => a - b);
@@ -223,6 +232,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             visibility: upload.visibility,
             groupId: upload.groupId,
             workspaceRef: upload.workspaceRef,
+            provenance: stated.provenance,
         });
         if (!written.ok) {
             res.status(written.status).json(error(config.nodeId, written.code, written.message));
@@ -234,6 +244,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         await storage.deleteChunkedUpload(uploadId);
 
         res.status(201).json(success(config.nodeId, {
+            ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
             key: file.key,
             owner_gaii: file.ownerGaii,
             size: file.size,

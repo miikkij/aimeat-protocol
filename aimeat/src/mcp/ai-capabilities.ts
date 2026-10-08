@@ -11,6 +11,7 @@
  *   storage and the call is paid by the owner, in the agent's name, as the REST route does.
  * @structure registerAiCapabilityTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-10-08 — aimeat_ai_transcribe names the transcript's provenance record: provenance_id and record_url.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-30 — aimeat_ai_transcribe answers `classification_warnings` when the audio is
  *     warning-classified, as POST /v1/ai/transcribe does (TARGET-082 review, item 2); audio no model
@@ -35,6 +36,7 @@ import { readCallerAudio } from '../services/ai/call-files.js';
 import { readerForAgent, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { recordUrlFor } from '../services/ai-provenance-marks.js';
 
 export function registerAiCapabilityTools(
   mcp: McpServer,
@@ -86,6 +88,8 @@ export function registerAiCapabilityTools(
       return text({
         text: r.text, model: r.model, language: r.language ?? null, seconds: r.seconds, route: r.route,
         usage: { cost_usd: r.usage.costUsd, cost_exact: r.usage.costExact },
+        // The record minted for the transcript: attach it (ai_provenance_id) where the text is written.
+        ...(r.provenance ? { provenance_id: r.provenance.id, record_url: recordUrlFor(config, r.provenance.id) } : {}),
         ...warningsNote(reader),
       });
     } catch (e) { return refusal(e); }

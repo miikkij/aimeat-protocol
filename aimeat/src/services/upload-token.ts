@@ -12,6 +12,7 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.9.0 — 2026-10-08 — PRESIGNED_META_KEYS.storage carries `ai_provenance` and `ai_provenance_id`.
  *   v1.8.0 — 2026-10-03 — utype 'font': a theme face's file for the font manager (services/themes/fonts.ts).
  *   v1.7.0 — 2026-09-13 — PRESIGNED_META_KEYS.app carries `cortex_agents`, validated at the mint and
  *     again at the PUT, so an app's crew-defs survive the upload road the docs recommend.
@@ -161,7 +162,10 @@ export const PRESIGNED_META_KEYS = {
     // now, so what it carries is no longer bounded by a JWT's size.
     app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version',
           'ai_provenance', 'ai_provenance_id', 'spec_token', 'spec_ack', 'roadmap', 'cortex_agents'],
-    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs'],
+    // `ai_provenance` / `ai_provenance_id` for the same reason as `app` above: the presigned door is
+    // the one recommended for anything over 1 KB, so a speech clip or picture uploaded that way must
+    // carry its statement too (2026-10-08).
+    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
     skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],

@@ -15,7 +15,7 @@
  * @structure
  *   - uploadRouter() — Express router factory with single PUT endpoint
  *   - handleAppUpload() — process HTML app uploads
- *   - handleStorageUpload() — process generic file uploads
+ *   - handleStorageUpload() — process generic file uploads (routes/upload-storage.ts)
  *   - handleExtensionUpload() — process extension ZIP uploads
  *   - handleSkillUpload() — process skill-directory ZIP uploads
  *   - handleCortexUpload() — process cortex ZIP uploads
@@ -24,6 +24,8 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.24.0 — 2026-10-08 — The storage handler and declaredFromMeta moved to routes/upload-storage.ts
+ *     (max-file-lines); the storage upload passes the token's actor and carries ai_provenance.
  *   v1.23.0 — 2026-10-03 — utype 'font': a theme face's woff2 for the font manager (services/themes/fonts.ts).
  *   v1.22.0 — 2026-10-02 — design_spec_hint in the app answer (services/app-design-spec.ts).
  *   v1.21.0 — 2026-09-28 — The extension ZIP refuses other code for an extension a managed package install owns.
@@ -132,13 +134,13 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord, StorageFileRecord, CortexExtensionRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { installCortex } from '../services/cortex-lifecycle.js';
 import { upsertCortex } from './cortex/upsert.js';
 import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
-import { writeStorageFile } from '../services/storage-file-write.js';
+import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
@@ -149,12 +151,8 @@ import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { effectiveDevLevel, mayAct } from '../services/app-dev-grant.js';
 import { accountOf } from '../services/app-members.js';
-import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
-import type { DeclaredProvenance } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
-import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
-import { versionedAddress } from '../utils/http-range.js';
+import { emitResourceListChanged } from '../mcp/index.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
@@ -219,7 +217,7 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
                     await handleAppUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
                     return;
                 case 'storage':
-                    await handleStorageUpload(res, config, storage, verified.sub, verified.meta, data);
+                    await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
                     return;
                 case 'extension':
                     await handleExtensionUpload(res, config, storage, verified.sub, verified.meta, data);
@@ -254,25 +252,6 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     return router;
-}
-
-/**
- * The `ai_provenance` block a presigned token carries, mapped to the mint path's input — or
- * undefined when there is none, or when what is there no longer validates.
- *
- * Shared by every utype that grows a declaration, which is why it sits here rather than inside
- * handleAppUpload: the app door is simply the first one to need it, and the next one must not
- * hand-roll a second reading of the same key.
- */
-function declaredFromMeta(meta: Record<string, unknown>): DeclaredProvenance | undefined {
-    const parsed = parseDeclaredProvenanceInput(meta.ai_provenance);
-    if (!parsed.ok) {
-        logger.warn('Upload token carried an ai_provenance block that no longer validates — publishing without it', {
-            violations: parsed.violations.map((v) => `${v.path}: ${v.message}`).join('; '),
-        });
-        return undefined;
-    }
-    return parsed.declared;
 }
 
 // ── Handler: App ──
@@ -398,63 +377,7 @@ async function handleAppUpload(
     });
 }
 
-// ── Handler: Storage ──
-
-async function handleStorageUpload(
-    res: Response, config: AimeatConfig, storage: Storage,
-    sub: string, meta: Record<string, unknown>, data: Buffer,
-): Promise<void> {
-    // tags + workspace_refs ride in the token meta (PRESIGNED_META_KEYS.storage). Dropping them here
-    // is how a presigned upload of a workspace-shared file would land as an untagged private one —
-    // the file exists, nobody it was meant for can see it, and nothing says why.
-    const tags = Array.isArray(meta.tags)
-        ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
-        : undefined;
-
-    // The key fence, the two size ceilings, the account-wide quota, the record shape, the overage
-    // charge and the change events are services/storage-file-write.ts, shared with POST /v1/storage
-    // and aimeat_storage_upload. This door's own business is reading the token meta and rendering
-    // the answer. `sub` is the token subject, set server-side at mint from resolveIdentity(), so the
-    // owner the file lands under is never anything a client sent.
-    const written = await writeStorageFile(
-        { storage, config, emitResourceUpdated, emitResourceListChanged },
-        sub,
-        {
-            key: meta.key as string,
-            data,
-            mimeType: (meta.mime_type as string) ?? 'application/octet-stream',
-            visibility: (meta.visibility as StorageFileRecord['visibility']) ?? 'private',
-            groupId: typeof meta.group_id === 'string' ? meta.group_id : undefined,
-            workspaceRef: typeof meta.workspace_refs === 'string' ? meta.workspace_refs : undefined,
-            tags,
-        },
-    );
-    if (!written.ok) {
-        res.status(written.status).json({ success: false, error: written.code, message: written.message });
-        return;
-    }
-    const { file, overageMorsels } = written;
-
-    res.json({
-        success: true,
-        type: 'storage',
-        key: file.key,
-        owner_gaii: file.ownerGaii,
-        size: file.size,
-        mime_type: file.mimeType,
-        visibility: file.visibility,
-        // What the account-wide quota cost this upload. The charge already happened on this path;
-        // reporting it is what tells the caller their balance moved.
-        ...(overageMorsels > 0 ? { overage_charged: overageMorsels } : {}),
-        // Ready-to-embed, owner-addressed URL. Embedding this in a workspace document scopes the file to
-        // that workspace's members on save (never the public internet) — use it, not /v1/storage/<key>.
-        embed_url: pubEmbedUrl(file.ownerGaii, file.key),
-        embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
-        // The same address with ?v=<this write>, as POST /v1/storage answers: a re-upload under this
-        // key is a new URL to every cache, and GET /v1/pub ignores the query.
-        versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
-    });
-}
+// ── Handler: Storage ── routes/upload-storage.ts (handleStorageUpload, declaredFromMeta)
 
 // ── Handler: Extension ──
 

@@ -36,6 +36,8 @@ Mirrors the node contract in aimeat/src/services/file-refs.ts and aimeat/src/ser
 (the node schema wins on any mismatch).
 
 Changelog:
+  unreleased -- upload_file() takes ai_provenance / ai_provenance_id and returns the stored file's
+    ai_provenance block. Requires a node whose POST /v1/storage reads them (2026-10-08).
   0.17.0 -- New: read_file() / file_handle() / upload_file() / attachments_of() / inbox_files() /
     task_files() / delegate_file(). Requires an AIMEAT node with `?mode=handle` on /v1/pub and
     `resources.files` on tasks; read_file falls back to a direct authed byte fetch on older nodes.
@@ -157,31 +159,44 @@ def upload_file(
     *,
     mime: str = "application/octet-stream",
     visibility: str = "owner",
+    ai_provenance: Mapping[str, Any] | None = None,
+    ai_provenance_id: str | None = None,
 ) -> dict[str, Any]:
-    """Store bytes under the calling agent's namespace and return {key, ref, visibility, size}.
+    """Store bytes under the calling agent's namespace and return {key, ref, visibility, size}, plus
+    `ai_provenance` ({id, record, record_url}) when the stored file carries a provenance record.
 
     `visibility` defaults to 'owner', not 'private': a result meant for the owner or a sibling agent is
     useless if nobody else may read it, and that is the failure this whole module exists to remove.
-    Pass visibility='private' deliberately when the file is for this agent alone."""
-    resp = api.post(
-        "/v1/storage",
-        json={
-            "key": key,
-            "data": base64.b64encode(data).decode("ascii"),
-            "mime_type": mime,
-            "visibility": visibility,
-        },
-    )
+    Pass visibility='private' deliberately when the file is for this agent alone.
+
+    `ai_provenance` says how the bytes were made ({"level": "ai-generated", "model": ...}); it needs
+    the provenance:write scope. `ai_provenance_id` attaches a record the node already minted for these
+    exact bytes (a speech clip or a picture it made for you); the node refuses another owner's record
+    and a record about other bytes. Without either, an agent's upload is recorded as model-written."""
+    body: dict[str, Any] = {
+        "key": key,
+        "data": base64.b64encode(data).decode("ascii"),
+        "mime_type": mime,
+        "visibility": visibility,
+    }
+    if ai_provenance is not None:
+        body["ai_provenance"] = dict(ai_provenance)
+    if ai_provenance_id:
+        body["ai_provenance_id"] = ai_provenance_id
+    resp = api.post("/v1/storage", json=body)
     if resp.status_code >= 300:
         raise AimeatFileError(f"upload of {key} failed: HTTP {resp.status_code} {resp.text[:200]}")
     body = _json(resp).get("data") or {}
     owner = body.get("owner_gaii") or ""
-    return {
+    out: dict[str, Any] = {
         "key": body.get("key", key),
         "ref": f"{owner}/{body.get('key', key)}" if owner else body.get("key", key),
         "visibility": body.get("visibility", visibility),
         "size": body.get("size", len(data)),
     }
+    if isinstance(body.get("ai_provenance"), Mapping):
+        out["ai_provenance"] = body["ai_provenance"]
+    return out
 
 
 def attachments_of(message: Mapping[str, Any]) -> list[dict[str, Any]]:

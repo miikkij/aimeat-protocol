@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Connector provenance checks extracted unchanged from the disclosure gate.
  * @version-history
+ *   v1.3.0 -- 2026-10-08 -- ENVELOPE_PROVENANCE_ROUTES names src/routes/ai-voice.ts (the ?json=1 voice result).
  *   v1.2.0 -- 2026-10-05 -- Both surfaces' carrying of ai_provenance is read from their registered schemas
  *     (keysOf); a connector tool served over its CLI dispatch definition folds read provenance inside
  *     withProvenanceCarrying() (secaudit 2026-10, M3).
@@ -189,6 +190,10 @@ const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
     + 'reads r.meta.provenance directly (sdk-libs/ai/index.js).',
   'src/routes/openrouter.ts':
     'POST /v1/openrouter/complete — owner-facing, same as ai.ts: no connector tool.',
+  'src/routes/ai-voice.ts':
+    'POST /v1/ai/speak?json=1 and /v1/ai/stream?json=1 — shell path and connector MCP: aimeat_voice_speak '
+    + 'and aimeat_voice_reply over their CLI dispatch definitions, folded inside withProvenanceCarrying. '
+    + 'The result also carries `provenance` and `record_url` in data.',
 };
 
 /** Connector MCP read tools that MUST fold the envelope carrier onto their payload. */
