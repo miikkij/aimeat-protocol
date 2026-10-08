@@ -6,6 +6,8 @@
  *   aimeat_storage_download and aimeat_storage_delete, thin proxies over /v1/storage and /v1/pub.
  *   Moved from tool-call-defs-core.ts, which had reached the 800-line limit.
  * @version-history
+ *   v1.3.0 — 2026-10-08 — aimeat_storage_upload forwards ai_provenance (validated here first) and
+ *     ai_provenance_id; POST /v1/storage records them (recorded-by-route).
  *   v1.2.0 — 2026-10-06 — aimeat_storage_upload without data_base64 asks for a presigned upload_url;
  *     aimeat_storage_download always names `mode` (handle or inline), the query GET /v1/storage/:key
  *     reads, and reads a reference as a handle. The connector MCP runs these now (secaudit 2026-10
@@ -16,6 +18,7 @@
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { requiredString, optionalString, optionalBoolean, optionalArray } from './tool-call-helpers.js';
+import { parseDeclarationInput } from './ai-provenance-carry.js';
 
 export const storageCliTools: ConnectCliToolDefinition[] = [
     {
@@ -33,6 +36,11 @@ export const storageCliTools: ConnectCliToolDefinition[] = [
             const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
             const groupId = optionalString(input, 'group_id'); if (groupId) body.group_id = groupId;
             const workspaceRefs = optionalArray(input, 'workspace_refs'); if (workspaceRefs) body.workspace_refs = workspaceRefs as JsonObject[keyof JsonObject];
+            // How the bytes were made: POST /v1/storage records it in both modes and names the record
+            // in its answer (`ai_provenance`), so it travels in the body (recorded-by-route).
+            const declared = parseDeclarationInput(input.ai_provenance);
+            if (declared) body.ai_provenance = input.ai_provenance as JsonObject[keyof JsonObject];
+            const provenanceId = optionalString(input, 'ai_provenance_id'); if (provenanceId) body.ai_provenance_id = provenanceId;
             return client.post('/v1/storage', body);
         },
     },

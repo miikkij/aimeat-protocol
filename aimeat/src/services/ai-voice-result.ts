@@ -2,6 +2,7 @@
  * @file ai-voice-result.ts
  * @description Collect streamed voice results for agents; audio becomes a private file, never base64 in model context.
  * @version-history
+ *   v1.2.0 - 2026-10-08 - The stored speech clip carries the provenance record minted for its bytes.
  *   v1.1.0 - 2026-10-08 - The stored file's type is the one the provider sent (done.audio.mime), and the
  *     result carries `audio` { mime, sample_rate, channels, sample_format } from the done frame instead
  *     of a note saying the PCM layout "follows the provider". A size cap is 413 TOO_LARGE and a stream
@@ -37,8 +38,12 @@ export function createVoiceResult() {
       // PCM that came as audio/L16 is stored as what it is.
       const said = (done.audio as { mime?: unknown } | undefined)?.mime;
       const mime = typeof said === 'string' && said.startsWith('audio/') ? said : format === 'mp3' ? 'audio/mpeg' : 'audio/pcm';
+      // The record the node minted while it watched these exact bytes stream past: the stored clip
+      // names it, so made public in place, the clip's record resolves for anyone who hears it.
+      const provenanceId = (done.provenance as { id?: unknown } | undefined)?.id;
       const stored = await writeStorageFile({ storage, config }, owner, { key, visibility: 'private', mimeType: mime,
-        data: Buffer.concat(audio), tags: ['ai-generated', 'voice'] });
+        data: Buffer.concat(audio), tags: ['ai-generated', 'voice'],
+        ...(typeof provenanceId === 'string' ? { aiProvenanceId: provenanceId } : {}) });
       if (!stored.ok) throw new AiCompletionError(stored.code, stored.status, stored.message);
       return { ...done, storage_key: key, mime_type: mime, size_bytes: size, visibility: 'private',
         fetch_url: '/v1/storage/' + encodeURIComponent(key),

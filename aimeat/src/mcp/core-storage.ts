@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-08 — aimeat_storage_upload takes ai_provenance / ai_provenance_id (inline and presigned) and
+ *     answers with the file's `ai_provenance` block; a provenance refusal is toolError(code).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-29 — aimeat_storage_upload takes visibility 'workspace' with workspace_refs,
  *     the binding POST /v1/storage takes; it had no way to name a workspace.
@@ -52,6 +54,9 @@ import { decodeStrictBase64 } from '../utils/base64.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, jsonContent } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { toDeclaredProvenance } from './ai-provenance-input.js';
+import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
+import { toolError } from './tool-error.js';
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
  *  handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
@@ -68,6 +73,7 @@ export function registerCoreStorageTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -77,18 +83,26 @@ export function registerCoreStorageTools(
         descriptionFor('aimeat_storage_upload'),
         zodShapeFor('aimeat_storage_upload'),
         annotationsFor('aimeat_storage_upload'),
-        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs }) => {
+        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id }) => {
             const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
             // The same binding POST /v1/storage takes; the shared write refuses a workspace file
             // that names none.
             const workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(workspace_refs, undefined) || undefined : undefined;
+            // The writer and its statement, decided by the shared write as on POST /v1/storage.
+            const declared = toDeclaredProvenance(ai_provenance);
+            const provenance = {
+                actor: agentGaii, scopes: sessionScopes, pipeline: 'mcp.storage_upload',
+                ...(ai_provenance_id ? { declaredId: ai_provenance_id } : {}),
+                ...(declared ? { declared, wireBlock: ai_provenance } : {}),
+            };
 
             // --- UPLOAD MODE ---
             if (!data_base64) {
                 const minted = await mintStorageUploadUrl(deps, agentGaii, {
-                    key, mimeType: mime_type, visibility, groupId: group_id, workspaceRef,
+                    key, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
                 });
                 if (!minted.ok) {
+                    if (minted.code === 'SCOPE_DENIED' || minted.code === 'NOT_FOUND') return toolError(minted.code, minted.message);
                     return { content: [{ type: 'text' as const, text: minted.message }], isError: true };
                 }
                 return {
@@ -120,9 +134,13 @@ export function registerCoreStorageTools(
             }
 
             const written = await writeStorageFile(deps, agentGaii, {
-                key, data: fileData, mimeType: mime_type, visibility, groupId: group_id, workspaceRef,
+                key, data: fileData, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
             });
             if (!written.ok) {
+                // A provenance refusal answers `CODE: message`, the code REST answers.
+                if (written.code === 'SCOPE_DENIED' || written.code === 'NOT_FOUND' || written.code === 'PROVENANCE_HASH_MISMATCH') {
+                    return toolError(written.code, written.message);
+                }
                 // Only the per-file ceiling has an answer the caller can act on. Offering the
                 // presigned URL against the ACCOUNT quota would send an agent round a loop that
                 // ends in the same refusal, since that door checks the same ceiling.
@@ -133,9 +151,12 @@ export function registerCoreStorageTools(
             }
 
             const file = written.file;
+            const prov = await loadServedProvenance(storage, config, file.aiProvenanceId, { full: true });
             return {
                 content: [{ type: 'text' as const, text: JSON.stringify({
                     mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, uploaded: true,
+                    // The record the file carries: attached, declared or stamped by the shared write.
+                    ...provenanceItemBlock(prov),
                     ...(written.overageMorsels > 0 ? { overage_charged: written.overageMorsels } : {}),
                     // To embed this image in a workspace document, use embed_markdown / embed_url — NOT the raw
                     // /v1/storage/<key> path. Saving it into a document scopes the file to that workspace's

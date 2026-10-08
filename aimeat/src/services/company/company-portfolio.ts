@@ -17,13 +17,17 @@
  *   exists only because the data model has two fields.
  *
  * @structure companyPortfolioKey · publishCompanyPortfolio · getCompanyPortfolio ·
- *   readCompanyPortfolioHtml · deleteCompanyPortfolio
+ *   readCompanyPortfolioPage · deleteCompanyPortfolio
  * @usage await publishCompanyPortfolio(config, storage, ownerGhii, companyId, html);
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The page carries an AI-provenance record decided from its writer
+ *     (provenanceForWrite); readCompanyPortfolioPage replaces readCompanyPortfolioHtml and gives the
+ *     serving path the page and its record.
  *   v1.0.0 — 2026-08-08 — A company's own front page as raw HTML.
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
+import { provenanceForWrite, storeHeldProvenance } from '../ai-provenance.js';
 import type { CompanyRecord } from '../../models/company-schemas.js';
 import { CompanyError, requireOwnCompany } from './company-service.js';
 
@@ -49,6 +53,9 @@ function maxBytes(config: AimeatConfig): number {
  */
 export async function publishCompanyPortfolio(
   config: AimeatConfig, storage: Storage, ownerGhii: string, companyId: string, html: string,
+  /** Who wrote the page (GHII, GAII or GEAI), for its AI-provenance record. An agent that says
+   *  nothing is stamped model-written (Mint-3); a person writing in person is not. */
+  writer?: { principal: string; pipeline: string },
 ): Promise<{ company: CompanyRecord; status: CompanyPortfolioStatus }> {
   const company = await requireOwnCompany(storage, ownerGhii, companyId);
 
@@ -66,6 +73,14 @@ export async function publishCompanyPortfolio(
   }
 
   const key = companyPortfolioKey(company.id);
+  // The record is held until the page has landed: a public page makes it resolvable by anyone.
+  const held: AiProvenanceRecordRow[] = [];
+  const aiProvenanceId = writer ? await provenanceForWrite(storage, {
+    principal: writer.principal, content: data, pipeline: writer.pipeline,
+    surface: { visibility: 'public', humanAudience: true },
+    labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl,
+    enabled: config.aiProvenance, held,
+  }) : undefined;
   await storage.deleteStorageFile(ownerGhii, key);
   const now = new Date().toISOString();
   await storage.createStorageFile({
@@ -76,7 +91,9 @@ export async function publishCompanyPortfolio(
     size: data.length,
     data,
     createdAt: now,
+    ...(aiProvenanceId ? { aiProvenanceId } : {}),
   });
+  await storeHeldProvenance(storage, held);
 
   let updated = company;
   if (company.frontPage.kind !== 'portfolio') {
@@ -97,12 +114,15 @@ export async function getCompanyPortfolio(
 }
 
 /**
- * The bytes, for the serving path. Takes the company record (the co origin already resolved
- * it from the slug) so serving never needs a second ownership check.
+ * The page and its AI-provenance record, for the serving path, which sends the record's marks.
+ * Takes the company record (the co origin already resolved it from the slug) so serving never
+ * needs a second ownership check.
  */
-export async function readCompanyPortfolioHtml(storage: Storage, company: CompanyRecord): Promise<string | null> {
+export async function readCompanyPortfolioPage(
+  storage: Storage, company: CompanyRecord,
+): Promise<{ html: string; aiProvenanceId?: string } | null> {
   const file = await storage.getStorageFile(company.ownerGhii, companyPortfolioKey(company.id));
-  return file ? file.data.toString('utf-8') : null;
+  return file ? { html: file.data.toString('utf-8'), ...(file.aiProvenanceId ? { aiProvenanceId: file.aiProvenanceId } : {}) } : null;
 }
 
 /**

@@ -13,6 +13,7 @@
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
  *   2026-10-08 — work.aiProvenanceId and agent_v2_tasks.aiProvenanceId (migration 0098).
+ *   2026-10-08 — storage_files.aiProvenanceId and its index (migration 0096).
  *   2026-10-04 — The scheduler's column block moves to schema-columns-scheduler.ts unchanged
  *     (max-file-lines), and gains scheduled_jobs.lastFireAt (migration 0093).
  *   2026-10-02 — agent_tasks.startPolicy, agents.taskStart: how a task starts (migration 0092 says why).
@@ -715,6 +716,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('ai_decisions', 'providerKind', 'TEXT');
   // The AI-provenance record of a company's current description. Mirrors Postgres 0095.
   safeAddColumn('companies', 'descriptionProvenanceId', 'TEXT');
+  // A stored file's AI-provenance record, and the index PUBLICLY_LINKED reads. Mirrors Postgres 0096.
+  safeAddColumn('storage_files', 'aiProvenanceId', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_storage_files_ai_provenance ON storage_files(aiProvenanceId) WHERE aiProvenanceId IS NOT NULL;');
   // The AI-provenance record of delivered work and a settled v2 task. Mirrors Postgres 0098.
   safeAddColumn('work', 'aiProvenanceId', 'TEXT');
   safeAddColumn('agent_v2_tasks', 'aiProvenanceId', 'TEXT');

@@ -13,6 +13,7 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-08 — PUT /v1/companies/:id/portfolio passes the writer, so the page carries an AI-provenance record.
  *   2026-10-05 — POST and PUT /v1/companies[/:id] take ai_provenance and ai_provenance_id for the description;
  *     the service records it, and the company answers descriptionProvenanceId (secaudit 2026-10, M3
  *     follow-up; the developer's decision).
@@ -421,6 +422,7 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
       }
       const { company, status } = await publishCompanyPortfolio(
         config, storage, resolve(req), req.params.id as string, parsed.data.html,
+        { principal: resolveIdentity(req.auth!, config.nodeId), pipeline: 'rest.companies.portfolio' },
       );
       emitChange('companies', resolve(req));
       res.json(success(config.nodeId, { company: withAddress(config, company), portfolio: status }, [

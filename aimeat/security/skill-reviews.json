@@ -20,7 +20,7 @@
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:edaa280404d6d9201515c3ba"
+      "digest": "sha256:4334c120a702b1135a31f02b"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-29",
@@ -67,11 +67,11 @@
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
-      "reviewedOn": "2026-10-05",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/mcp/portfolio.ts"
       ],
-      "digest": "sha256:3a134ff51b311fbfa1f5d479"
+      "digest": "sha256:fc2334431d1009e278a73c47"
     },
     "node:aimeat-activating-a-person": {
       "reviewedOn": "2026-09-19",
@@ -244,7 +244,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:7d3c9bcf9e32ba06269527b7"
+      "digest": "sha256:a0e69024dca833f486e46593"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-05",
@@ -409,7 +409,7 @@
       "aimeat/src/services/model-recommendation.ts": "d81eaca4a619f479"
     },
     "node:aimeat-welcome-pages": {
-      "aimeat/src/mcp/portfolio.ts": "ae0365a979772632"
+      "aimeat/src/mcp/portfolio.ts": "41af2dc564ddaf06"
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {
@@ -504,7 +504,7 @@
       "aimeat/src/mcp/core-admin.ts": "fd3a6da1b1490f40"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "35f9fef645433f94",
+      "aimeat/src/mcp/core.ts": "2553620cd34667a9",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "33e900e23cb50fb6"
     },
     "node:manage-my-profile-data": {
@@ -595,7 +595,7 @@
       "aimeat/src/static/sdk-libs/ai/index.js": "aca920503717cbca"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "a8fdffab0ffe379d",
+      "aimeat/src/services/refinery/pipeline.ts": "3d0c7d06c76b0e3d",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "a2229bb9b8d28948",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"

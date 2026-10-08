@@ -2,6 +2,7 @@
  * @file ai-voice.ts
  * @description Agent access to the same metered voice stages as browser streaming.
  * @version-history
+ *   2026-10-08 — The reply and the speech pass the agent that asked (aiPayerOf), as completions do.
  *   v1.2.0 - 2026-10-08 - Every failure is `CODE: message`: INVALID_BODY for input that does not parse,
  *     INTERNAL_ERROR for the node's own failure, where both were `{"error": …}` without a code (aiprov
  *     plan, A11). The speech result carries `audio` (sample rate, channels, sample format) (A4).
@@ -23,9 +24,12 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
+import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { z } from 'zod';
 
 export function registerAiVoiceTools(mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string): void {
+  // The agent that asked, by bare name: its own key pays first, its cap applies, the record names it.
+  const agentOf = (): { agent?: string } => { const { agent } = aiPayerOf(getAgentGaii()); return agent ? { agent } : {}; };
   const out = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
   // Every failure reads `CODE: message` with the code POST /v1/ai/stream and /speak answer: a typed
   // refusal its own (RATE_LIMITED, PROVIDER_REJECTED…), an input that does not parse INVALID_BODY,
@@ -41,14 +45,14 @@ export function registerAiVoiceTools(mcp: McpServer, storage: Storage, config: A
         const result = createVoiceResult();
         const signal = AbortSignal.any([extra.signal, AbortSignal.timeout(180000)]);
         await streamReply(storage, config, ownerGhiiOf(getAgentGaii()),
-          { ...voiceReplySchema.parse(input), caller: aiCallerOfPrincipal(getAgentGaii()).caller }, signal, result.emit);
+          { ...voiceReplySchema.parse(input), caller: aiCallerOfPrincipal(getAgentGaii()).caller, ...agentOf() }, signal, result.emit);
         return out(result.reply());
       } catch (error) { return failed(error); }
     });
   mcp.tool('aimeat_voice_speak', descriptionFor('aimeat_voice_speak'), zodShapeFor('aimeat_voice_speak'),
     annotationsFor('aimeat_voice_speak'), async (input, extra) => {
       try {
-        const options = { ...voiceSpeechSchema.parse(input), caller: aiCallerOfPrincipal(getAgentGaii()).caller }, result = createVoiceResult();
+        const options = { ...voiceSpeechSchema.parse(input), caller: aiCallerOfPrincipal(getAgentGaii()).caller, ...agentOf() }, result = createVoiceResult();
         const owner = ownerGhiiOf(getAgentGaii());
         const signal = AbortSignal.any([extra.signal, AbortSignal.timeout(180000)]);
         await streamSpeech(storage, config, owner, options, signal, result.emit);

@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — PUBLICLY_LINKED covers a public stored file (storage_files.aiProvenanceId):
+ *     a speech clip or picture made public in place answered 404 at its own record.
  *   v1.4.0 — 2026-10-08 — PUBLICLY_LINKED covers an app's legal pages: a record named in
  *     manifest.legal.<kind>.aiProvenanceId is public while the app is not operator-hidden, because the
  *     page is served to anyone then. The pages sent a Link to a record that answered 404 (aiprov D3).
@@ -69,6 +71,9 @@ function deserialize(row: Record<string, unknown>): AiProvenanceRecordRow {
  * A DELETED memory record is not readable by anyone, so it cannot keep a provenance record public.
  * The clause said `visibility = 'public'` and nothing else until 2026-09-04, so deleting the public
  * thing left its provenance answering "yes, somebody can read this" about a row that had gone.
+ *
+ * A stored file counts when it is public: GET /v1/pub serves it to anyone. A deleted file has no
+ * row at all (the delete is physical), so it needs no `deletedAt` test.
  */
 const PUBLICLY_LINKED = `(
   EXISTS (SELECT 1 FROM memory m WHERE m.aiProvenanceId = p.id AND m.visibility = 'public'
@@ -83,6 +88,7 @@ const PUBLICLY_LINKED = `(
   /* end app legal pages */
   OR EXISTS (SELECT 1 FROM board_posts bp JOIN boards b ON b.id = bp.boardId
              WHERE bp.aiProvenanceId = p.id AND b.visibility = 'public')
+  OR EXISTS (SELECT 1 FROM storage_files sf WHERE sf.aiProvenanceId = p.id AND sf.visibility = 'public')
 )`;
 
 /** Bound-parameter budget for one `IN (...)` statement. Well under SQLite's 999-parameter default. */

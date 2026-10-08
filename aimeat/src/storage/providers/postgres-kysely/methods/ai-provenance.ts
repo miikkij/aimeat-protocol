@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — publiclyLinked covers a public stored file ("StorageFile"."aiProvenanceId",
+ *     migrations/0096_storage_file_provenance.sql).
  *   v1.4.0 — 2026-10-08 — publiclyLinked covers an app's legal pages: a record named in
  *     manifest.legal.<kind>.aiProvenanceId is public while the app is not operator-hidden, because the
  *     page is served to anyone then. The pages sent a Link to a record that answered 404 (aiprov D3).
@@ -67,7 +69,8 @@ function toRecord(r: Selectable<AiProvenanceRow>): AiProvenanceRecordRow {
  * A public memory record covers memory, workspace records, agent faces and WebMCP tool manifests
  * (all memory-backed). An app counts when it is actually served to anyone who asks: not parked, not
  * operator-hidden, and not behind an access code. A board post counts when its BOARD is public —
- * the visibility lives one table up, which is why this clause is the only one that joins.
+ * the visibility lives one table up, which is why this clause is the only one that joins. A stored
+ * file counts when it is public: GET /v1/pub serves it to anyone, and its delete is physical.
  */
 const publiclyLinked = (idColumn: string) => sql<boolean>`(
   EXISTS (SELECT 1 FROM "Memory" m WHERE m."aiProvenanceId" = ${sql.raw(idColumn)} AND m."visibility" = 'public'
@@ -82,6 +85,8 @@ const publiclyLinked = (idColumn: string) => sql<boolean>`(
   /* end app legal pages */
   OR EXISTS (SELECT 1 FROM "BoardPost" bp JOIN "Board" b ON b."boardId" = bp."boardId"
              WHERE bp."aiProvenanceId" = ${sql.raw(idColumn)} AND b."visibility" = 'public')
+  OR EXISTS (SELECT 1 FROM "StorageFile" sf WHERE sf."aiProvenanceId" = ${sql.raw(idColumn)}
+             AND sf."visibility" = 'public')
 )`;
 
 /** Bind-parameter budget for one `IN (...)` statement. Well under the Postgres 65535 ceiling. */

@@ -11807,7 +11807,16 @@ paths:
                 response_format: { type: object }
       responses:
         '200':
-          description: An OpenAI chat completion, or its SSE stream when `stream` is true
+          description: >
+            An OpenAI chat completion, or its SSE stream when `stream` is true. The answer names its
+            AI-provenance record: a whole answer carries `AI-Disclosure`, `Link: <record_url>;
+            rel="ai-provenance"` and `X-AIMEAT-Provenance-Id`; a stream ends, after the provider's last
+            frame, with the SSE comment `: aimeat-provenance id=<id> record_url=<url>`, which an
+            OpenAI stream reader skips.
+          headers:
+            X-AIMEAT-Provenance-Id:
+              description: The provenance record minted for this answer (whole answers only).
+              schema: { type: string }
           content:
             application/json:
               schema: { type: object }
@@ -18898,6 +18907,14 @@ paths:
                   - type: object
                     properties:
                       data: { type: object, description: 'Final text, model, usage, budget and provenance.' }
+          headers:
+            AI-Disclosure:
+              description: >
+                The stream sends the IETF structured field for a model generating (`mode=machine-generated;
+                model="..."`); with json=1 it is the minted record's own value, beside
+                `Link: <record_url>; rel="ai-provenance"` and `meta.provenance`. The done frame and the
+                json=1 data carry `record_url`.
+              schema: { type: string }
         '400': { description: 'Invalid parameters, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)' }
         '401': { description: Authentication required }
         '402': { description: 'AI budget exhausted (QUOTA_EXHAUSTED), or the provider says the key that pays has no credit left (PROVIDER_NO_CREDIT)' }
@@ -18979,10 +18996,20 @@ paths:
                     properties:
                       data:
                         type: object
-                        description: 'Private storage_key, fetch_url, mime_type, size_bytes, audio, usage, budget, route and provenance.'
+                        description: 'Private storage_key, fetch_url, mime_type, size_bytes, audio, usage, budget, route, provenance and record_url.'
                         properties:
                           audio:
                             $ref: '#/components/schemas/SpeechAudio'
+          headers:
+            AI-Disclosure:
+              description: >
+                The stream sends the IETF structured field for a model generating (`mode=machine-generated;
+                model="..."`), set before the record exists. With json=1 it is the minted record's own
+                value, beside `Link: <record_url>; rel="ai-provenance"` and `meta.provenance` on the
+                envelope. The done frame and the json=1 data carry `record_url`. The stored clip
+                (json=1) carries the record: PATCH /v1/storage/{key}/visibility public makes it
+                resolvable by anyone at `/v1/provenance/{id}` and by the SHA-256 of the audio bytes.
+              schema: { type: string }
         '400': { description: 'Invalid parameters, unknown speech model, INVALID_VOICE (details.voices lists the model''s voices), or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)' }
         '401': { description: Authentication required }
         '402': { description: 'AI budget exhausted (QUOTA_EXHAUSTED), or the provider says the key that pays has no credit left (PROVIDER_NO_CREDIT)' }
@@ -22392,19 +22419,30 @@ paths:
                 group_id:
                   type: string
                   description: 'For `visibility: group`.'
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the bytes were made; the same rules as on POST /v1/storage, in both modes.
+                ai_provenance_id:
+                  type: string
+                  description: Attach an existing record of your own whose content hash is these bytes' (as on POST /v1/storage).
       responses:
         '200':
           description: Presigned mode — `{ upload_url, upload_method, content_type, max_size_bytes, expires_in_seconds }`.
           $ref: '#/components/responses/AimeatSuccess'
         '201':
-          description: Inline mode — the stored file record.
+          description: Inline mode — the stored file record, with `ai_provenance` when the file carries a record.
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
           description: >
             The key is under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and
-            screenshot doors write, because they check that the bytes are a picture.
+            screenshot doors write, because they check that the bytes are a picture; an anonymous
+            principal wrote outside `anonymous/*`; or SCOPE_DENIED, a declaration without
+            `provenance:write`.
+        '404':
+          description: NOT_FOUND — `ai_provenance_id` names no provenance record of the caller's own.
         '413':
           description: File exceeds the per-file limit or the account storage quota.
     get:
@@ -22611,7 +22649,11 @@ paths:
         '200':
           description: >-
             Upload processed successfully. A storage upload answers with key, owner_gaii, size,
-            mime_type, visibility, embed_url, embed_markdown and versioned_url (see POST /v1/storage).
+            mime_type, visibility, embed_url, embed_markdown and versioned_url (see POST /v1/storage),
+            and `ai_provenance` (AiProvenanceItemBlock) when the file carries a record: the
+            `ai_provenance` / `ai_provenance_id` asked for at the mint ride in the token and are
+            decided against these bytes (400 PROVENANCE_HASH_MISMATCH when an attached record names
+            other bytes; a declaration refused for scope is refused at the mint already).
             An app upload answers with the publish fields, including `served_marks_removed` and
             `served_marks_note` when the body was a served copy. A cortex ZIP under the name of a
             cortex the uploader installed replaces it the way PUT /v1/cortex/{name} does: an active
@@ -22684,7 +22726,8 @@ paths:
         No Authorization header needed; supports Range headers. Not single-use — the handle
         may be fetched multiple times within its TTL (e.g. Range requests, resumes).
         Each fetch is written to the file owner's consent audit log when the consent
-        layer is enabled.
+        layer is enabled. A file that carries an AI-provenance record is answered with
+        `AI-Disclosure` and `Link: <record>; rel="ai-provenance"`.
       tags: [Storage]
       parameters:
         - name: token
@@ -23123,6 +23166,25 @@ paths:
                     'workspace').
                 federate:
                   type: boolean
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: >
+                    How the file's bytes were made. Needs `provenance:write` for an agent or an
+                    ecosystem app (403 SCOPE_DENIED otherwise, before any byte is stored). Honoured in
+                    BOTH modes: with `mode: presigned` it rides in the signed upload token and is
+                    recorded when the bytes arrive. Omitted, an agent's upload is stamped
+                    model-written by the node and an owner's gets no record. A malformed block is
+                    400 INVALID_PROVENANCE.
+                ai_provenance_id:
+                  type: string
+                  description: >
+                    Attach an EXISTING provenance record instead, e.g. the id POST /v1/ai/speak or
+                    POST /v1/ai/image returned for these exact bytes. Only your own record (404
+                    NOT_FOUND otherwise, one answer for a missing and a foreign id); when the record
+                    names a content hash it must be the SHA-256 of the uploaded bytes (400
+                    PROVENANCE_HASH_MISMATCH). A public file makes its record publicly resolvable at
+                    `/v1/provenance/{id}` and by hash.
           multipart/form-data:
             schema:
               type: object
@@ -23168,12 +23230,25 @@ paths:
                           embed_url: { type: string }
                           embed_markdown: { type: string }
                           versioned_url: { type: string }
+                          ai_provenance:
+                            allOf:
+                              - $ref: '#/components/schemas/AiProvenanceItemBlock'
+                            description: >
+                              The record the stored file carries (attached, declared, or stamped by
+                              the node for an agent writer). Absent when the file has none.
+        '400':
+          description: >
+            INVALID_INPUT (no key, data not base64), INVALID_PROVENANCE (the ai_provenance block does
+            not validate), or PROVENANCE_HASH_MISMATCH (the attached record names other bytes).
         '403':
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or any caller targeted a key
             under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot
             doors write, because they check that the bytes are a picture. Applies to both the inline
             and the presigned form: the namespace fence is on the write, not on the representation.
+            SCOPE_DENIED: an agent or app declared ai_provenance without `provenance:write`.
+        '404':
+          description: NOT_FOUND — `ai_provenance_id` names no provenance record of the caller's own.
         '413':
           description: Storage quota exceeded, or the file exceeds the per-file size limit
 
@@ -23193,8 +23268,11 @@ paths:
       summary: Update storage file visibility
       description: >
         Change a storage file's visibility (file owner only). Used so a document can make its
-        embedded images public, letting other viewers load them. `key` is a single path segment
-        (the dotted, slash-free keys used for workspace images).
+        embedded images public, letting other viewers load them, and so a speech clip or a picture
+        the node stored (`ai-speech/<uuid>.mp3`, `ai-images/...`) goes public in place. `key` may
+        hold slashes (`/v1/storage/ai-speech/<uuid>.mp3/visibility`). The file keeps its
+        AI-provenance record; made public, the record resolves for anyone at `/v1/provenance/{id}`
+        and by hash, and the answer carries it as `ai_provenance`.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -23231,6 +23309,8 @@ paths:
                             type: string
                           visibility:
                             type: string
+                          ai_provenance:
+                            $ref: '#/components/schemas/AiProvenanceItemBlock'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -23253,6 +23333,11 @@ paths:
         file someone else owns (an owner's upload for one of their agents, a DM or task
         attachment, a group/workspace share) use `GET /v1/pub/{gaii}/{key}`, which runs the
         consent/visibility guard.
+
+
+        A file that carries an AI-provenance record is answered with `AI-Disclosure` (the IETF
+        structured field) and `Link: <record>; rel="ai-provenance"` on every representation, and
+        the handle and inline JSON carry `ai_provenance` (AiProvenanceItemBlock).
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -23288,6 +23373,9 @@ paths:
     head:
       operationId: fileMetadata
       summary: File metadata
+      description: >
+        The headers the GET sends, without the bytes, including `AI-Disclosure` and
+        `Link: rel="ai-provenance"` when the file carries an AI-provenance record.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -27586,7 +27674,10 @@ paths:
     post:
       operationId: completeChunkedUpload
       summary: Finalize chunked upload
-      description: Assemble all uploaded chunks into the final file.
+      description: >
+        Assemble all uploaded chunks into the final file, through the same write as POST
+        /v1/storage. `ai_provenance` / `ai_provenance_id` say how the assembled bytes were made, with
+        the same rules and refusals as there; the answer carries the file's `ai_provenance`.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -27596,9 +27687,26 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                checksum_sha256:
+                  type: string
+                  description: Hex SHA-256 of the assembled file; refused with CHECKSUM_MISMATCH when it differs.
+                ai_provenance:
+                  $ref: '#/components/schemas/AiProvenanceDeclaration'
+                ai_provenance_id:
+                  type: string
+                  description: Attach an existing record of your own whose content hash is these bytes'.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '201':
+          description: Assembled and stored; `data` carries key, owner_gaii, size, visibility, versioned_url and `ai_provenance`.
 
   /v1/storage/upload/{id}:
     delete:
@@ -45797,6 +45905,13 @@ paths:
         ETag and Last-Modified. If-None-Match / If-Modified-Since that still match answer 304 with
         no body; an If-Range that no longer matches sends the whole file. Query parameters other
         than mode and filename are ignored, so an upload's versioned_url (?v=) serves the same file.
+
+        A file that carries an AI-provenance record (a speech clip, a generated picture, an upload
+        with `ai_provenance`) is answered with `AI-Disclosure` (the IETF structured field, e.g.
+        `mode=machine-generated; model="..."`) and `Link: <record>; rel="ai-provenance"` once the
+        read is allowed, on the bytes, a range, HEAD and the handle; the public branch exposes both
+        headers to scripts (Access-Control-Expose-Headers), and the handle carries `ai_provenance`.
+        A public file's record resolves anonymously at `/v1/provenance/{id}` and by hash.
       tags: [Storage]
       parameters:
         - name: gaii
@@ -45845,6 +45960,15 @@ paths:
                           download_url: { type: string }
                           download_method: { type: string, enum: [GET] }
                           expires_in_seconds: { type: integer }
+                          ai_provenance:
+                            $ref: '#/components/schemas/AiProvenanceItemBlock'
+          headers:
+            AI-Disclosure:
+              description: The file's AI-provenance statement as an IETF structured field, when it has a record.
+              schema: { type: string }
+            Link:
+              description: '`<record_url>; rel="ai-provenance"`, when the file has a record.'
+              schema: { type: string }
         '304':
           description: Not modified. The If-None-Match or If-Modified-Since validator still matches.
         '403':
@@ -63485,6 +63609,13 @@ paths:
                           avatar: { type: string }
                           has_html: { type: boolean }
                           portfolio_html: { type: string, nullable: true }
+                          ai_provenance:
+                            allOf:
+                              - $ref: '#/components/schemas/AiProvenanceItemBlock'
+                            description: >
+                              How the page was made, when it carries a record (an agent that published
+                              it without a declaration is stamped model-written). The portfolio and
+                              company origins serve the page with the same record's marks.
                           viewer_authenticated: { type: boolean }
                           viewer_is_owner: { type: boolean }
                           owner_gaiis: { type: array, items: { type: string } }

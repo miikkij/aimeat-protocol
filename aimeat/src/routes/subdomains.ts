@@ -14,6 +14,7 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.26.0 — 2026-10-08 — The portfolio and the company page are served with their AI-provenance marks.
  *   v1.25.0 — 2026-10-08 — The owner's own analytics tags (services/visibility/analytics-tags.ts) on the
  *     app, the portfolio and the company page. servePortfolio moved to serve-portfolio.ts unchanged.
  *   v1.24.0 — 2026-10-08 — serveApp, the portfolio and the company page count the visit for AI
@@ -119,7 +120,7 @@ import type { AimeatConfig } from '../config.js';
 import { applyAppProtection, hasAnyProtection } from '../utils/app-protect.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { error } from '../middleware/envelope.js';
-import { readCompanyPortfolioHtml } from '../services/company/company-portfolio.js';
+import { readCompanyPortfolioPage } from '../services/company/company-portfolio.js';
 import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
 } from '../services/ai-provenance-marks.js';
@@ -139,7 +140,7 @@ import type { SignalGeoInput } from '../models/signal-schemas.js';
 import { countVisit } from '../services/visibility/visibility-counter.js';
 import { visitSignals, type VisitSignals } from '../utils/visit-signals.js';
 import { countApexDocs } from './visibility.js';
-import { servePortfolio } from './serve-portfolio.js';
+import { servePortfolio, portfolioMarks } from './serve-portfolio.js';
 import { ownerTagsFor, withOwnerTags, ownerTagsIntoHtml } from '../services/visibility/analytics-tags.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
@@ -574,7 +575,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
       countVisit(storage, config, { ownerGaii: `${sub}@${config.nodeId}`, target: 'portfolio', ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
-      servePortfolio(res, ownerTagsIntoHtml(resolved.html, await ownerTagsFor(storage, config, `${sub}@${config.nodeId}`)), resolved.portfolioConfig.showBadge !== false && servedBadgeOn(config), csp);
+      servePortfolio(res, ownerTagsIntoHtml(resolved.html, await ownerTagsFor(storage, config, `${sub}@${config.nodeId}`)), resolved.portfolioConfig.showBadge !== false && servedBadgeOn(config), csp, await portfolioMarks(storage, config, resolved.aiProvenanceId, req.headers['accept-language']));
       return;
     }
 
@@ -604,10 +605,10 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (company.frontPage.kind === 'portfolio') {
         // The company's own document, served exactly the way a personal portfolio is served on
         // the portfolio origin: same bridge, same CSP, same isolated session-less host.
-        const html = await readCompanyPortfolioHtml(storage, company);
-        if (!html) return companyNotFound();
+        const page = await readCompanyPortfolioPage(storage, company);
+        if (!page) return companyNotFound();
         countVisit(storage, config, { ownerGaii: company.ownerGhii, target: `company:${sub}`, ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
-        servePortfolio(res, ownerTagsIntoHtml(html, await ownerTagsFor(storage, config, company.ownerGhii)), servedBadgeOn(config), csp);
+        servePortfolio(res, ownerTagsIntoHtml(page.html, await ownerTagsFor(storage, config, company.ownerGhii)), servedBadgeOn(config), csp, await portfolioMarks(storage, config, page.aiProvenanceId, req.headers['accept-language']));
         return;
       }
       // 'none' answers exactly like an unmapped address: reserving a name and publishing a
