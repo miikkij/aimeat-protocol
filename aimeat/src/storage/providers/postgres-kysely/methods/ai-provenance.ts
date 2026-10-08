@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.4.0 — 2026-10-08 — publiclyLinked covers a public stored file ("StorageFile"."aiProvenanceId",
+ *     migrations/0096_storage_file_provenance.sql).
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the read
  *     side for the operator report, the unlabelled-content sweep and the per-owner view. No
  *     migration — both read existing columns and the jsonb document.
@@ -56,7 +58,8 @@ function toRecord(r: Selectable<AiProvenanceRow>): AiProvenanceRecordRow {
  * A public memory record covers memory, workspace records, agent faces and WebMCP tool manifests
  * (all memory-backed). An app counts when it is actually served to anyone who asks: not parked, not
  * operator-hidden, and not behind an access code. A board post counts when its BOARD is public —
- * the visibility lives one table up, which is why this clause is the only one that joins.
+ * the visibility lives one table up, which is why this clause is the only one that joins. A stored
+ * file counts when it is public: GET /v1/pub serves it to anyone, and its delete is physical.
  */
 const publiclyLinked = (idColumn: string) => sql<boolean>`(
   EXISTS (SELECT 1 FROM "Memory" m WHERE m."aiProvenanceId" = ${sql.raw(idColumn)} AND m."visibility" = 'public'
@@ -65,6 +68,8 @@ const publiclyLinked = (idColumn: string) => sql<boolean>`(
              AND a."parked" = false AND a."operatorHidden" = false AND a."accessCode" IS NULL)
   OR EXISTS (SELECT 1 FROM "BoardPost" bp JOIN "Board" b ON b."boardId" = bp."boardId"
              WHERE bp."aiProvenanceId" = ${sql.raw(idColumn)} AND b."visibility" = 'public')
+  OR EXISTS (SELECT 1 FROM "StorageFile" sf WHERE sf."aiProvenanceId" = ${sql.raw(idColumn)}
+             AND sf."visibility" = 'public')
 )`;
 
 /** Bind-parameter budget for one `IN (...)` statement. Well under the Postgres 65535 ceiling. */

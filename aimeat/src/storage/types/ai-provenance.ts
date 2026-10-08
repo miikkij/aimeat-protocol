@@ -29,6 +29,8 @@
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.4.0 — 2026-10-08 — `storage_files` joins the list: a public stored file is served to anyone
+ *     at /v1/pub, and its record answered 404 to the same visitor.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. `board_posts` joins the list: a post on a public
  *     board is served unauthenticated, so leaving it out meant the one surface an anonymous visitor
  *     reads had a record that would not resolve for them. Agent messages got the same column in the
@@ -80,6 +82,17 @@ export const PUBLICLY_LINKED_CONTAINERS = [
     sqliteTable: 'board_posts',
     postgresTable: '"BoardPost"',
     publicWhen: "the post's board has visibility = 'public'",
+  },
+  {
+    /**
+     * Stored files: a public one is served to anyone at GET /v1/pub/{owner}/{key}, so a speech clip,
+     * a generated picture or a data package descriptor made public must have a record that resolves
+     * for the same stranger.
+     */
+    name: 'storage_files',
+    sqliteTable: 'storage_files',
+    postgresTable: '"StorageFile"',
+    publicWhen: "visibility = 'public'",
   },
 ] as const;
 

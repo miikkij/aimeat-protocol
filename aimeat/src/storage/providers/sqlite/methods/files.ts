@@ -8,6 +8,8 @@
  * @structure fileMethods
  * @usage Object.assign(SqliteStorage.prototype, fileMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-08 — aiProvenanceId is written, read on every path, and set alone by
+ *     setStorageFileProvenance (AI provenance for stored files; Postgres 0096).
  *   v1.0.0 — 2026-10-05 — createChunkedUpload, getChunkedUpload, addChunk, deleteChunkedUpload moved here
  *     from identity-nodes.ts; 11 methods (createStorageFile, getStorageFile, getStorageFileMeta, …) moved
  *     here from storage-files.ts so the file mirrors postgres-kysely/methods/files.ts (secaudit 2026-10, M8).
@@ -37,12 +39,13 @@ function fileRowToRecord(r: Record<string, unknown>, data: Buffer): StorageFileR
   // SQLite has no boolean: 1/0 is the verdict, NULL is "never established" and must stay undefined
   // rather than collapsing into false, which would claim we had checked.
   if (r.utf8Verified !== null && r.utf8Verified !== undefined) record.utf8Verified = r.utf8Verified === 1;
+  if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId as string;
   return record;
 }
 
 /** Everything except the bytes — the columns a metadata read, a listing and a range reply all need. */
 const META_COLUMNS =
-  'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, createdAt';
+  'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, aiProvenanceId, createdAt';
 
 /** What a font file is, by its name or by its type. The same test on Postgres (methods/files.ts). */
 const FONT_FILE_WHERE =
@@ -94,14 +97,15 @@ export const fileMethods = {
       // which have their own field and their own doors. Removed from the record on 2026-09-06
       // (review item 5.7) rather than mirrored into Postgres: a field nothing keeps is the same
       // false promise that hid the two real ones beside it, and the column is always NULL.
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, tags, createdAt, federate, utf8Verified)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, tags, createdAt, federate, utf8Verified, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       file.ownerGaii, file.key, file.visibility, file.groupId ?? null, file.workspaceRef ?? null,
       file.mimeType, file.size, file.data,
       JSON.stringify(file.tags || []), file.createdAt,
       file.federate ? 1 : 0,
       utf8Verified === null ? null : (utf8Verified ? 1 : 0),
+      file.aiProvenanceId ?? null,
     );
     return { ...file, utf8Verified: utf8Verified ?? undefined };
   },
@@ -192,5 +196,12 @@ export const fileMethods = {
       : this.db.prepare('UPDATE storage_files SET visibility = ?, workspaceRef = ? WHERE ownerGaii = ? AND key = ?').run(visibility, workspaceRef || null, ownerGaii, key);
     if (result.changes === 0) return null;
     return this.getStorageFile(ownerGaii, key);
+  },
+
+  async setStorageFileProvenance(this: SqliteStorage, ownerGaii: string, key: string, aiProvenanceId: string): Promise<boolean> {
+    const result = this.db.prepare(
+      'UPDATE storage_files SET aiProvenanceId = ? WHERE ownerGaii = ? AND key = ?',
+    ).run(aiProvenanceId, ownerGaii, key);
+    return result.changes > 0;
   },
 };

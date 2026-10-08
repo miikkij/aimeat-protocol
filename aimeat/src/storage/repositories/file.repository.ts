@@ -16,6 +16,8 @@
  *   v1.2.0 — 2026-08-15 — TARGET-063: getStorageFileMeta + readStorageFileRange, so serving a byte
  *     range stops reading the whole file to answer it.
  *   v1.3.0 — 2026-10-03 — listFontFilesAcrossOwners: the font manager's inventory of owners' fonts.
+ *   v1.4.0 — 2026-10-08 — setStorageFileProvenance, and StorageFileRecord.aiProvenanceId on every
+ *     read (AI provenance for stored files).
  */
 import type { StorageFileRecord, ChunkedUploadRecord } from '../interface.js';
 
@@ -49,6 +51,9 @@ export interface FileRepository {
   deleteStorageFile(ownerGaii: string, key: string): Promise<boolean>;
   updateFileTagsByKey(ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null>;
   updateFileVisibility(ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null>;
+  /** Point a stored file at its AI-provenance record, for a write whose record is minted only after
+   *  the bytes landed (image generation settles after the store). False when no such file. */
+  setStorageFileProvenance(ownerGaii: string, key: string, aiProvenanceId: string): Promise<boolean>;
   createChunkedUpload(record: ChunkedUploadRecord): Promise<ChunkedUploadRecord>;
   getChunkedUpload(uploadId: string): Promise<ChunkedUploadRecord | null>;
   addChunk(uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean>;
