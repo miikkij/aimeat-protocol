@@ -14,7 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
- *   v1.26.0 — 2026-10-08 — The portfolio and the company page are served with their AI-provenance marks.
+ *   v1.27.0 — 2026-10-08 — The portfolio and the company page are served with their AI-provenance marks.
+ *   v1.26.0 — 2026-10-08 — An app carries the on-page behaviour script unless its owner switched it off (layer D).
  *   v1.25.0 — 2026-10-08 — The owner's own analytics tags (services/visibility/analytics-tags.ts) on the
  *     app, the portfolio and the company page. servePortfolio moved to serve-portfolio.ts unchanged.
  *   v1.24.0 — 2026-10-08 — serveApp, the portfolio and the company page count the visit for AI
@@ -471,8 +472,9 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
         servedAt: new Date().toISOString(),
       });
     }
-    // The owner's own Clarity or GA4, waiting for consent when the banner is on (layer B).
-    buf = withOwnerTags(buf, await ownerTagsFor(storage, protect.config, app.ownerGaii));
+    // The owner's own Clarity or GA4, waiting for consent when the banner is on (layer B), and the
+    // on-page behaviour script unless the owner switched it off for this app (layer D).
+    buf = withOwnerTags(buf, await ownerTagsFor(storage, protect.config, app.ownerGaii, app.filename));
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;

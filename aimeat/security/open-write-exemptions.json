@@ -44,7 +44,8 @@
     "POST /v1/owners": "REGISTRATION — the direct door, refused by the node's registration mode in 'invite' and 'closed'. Body validated. No account exists to authenticate against.",
     "POST /v1/registration-invites": "SELF-SERVICE INVITE REQUEST — anyone may ask; the node's registration mode refuses it in 'invite' and 'closed'. A per-IP limit on the route and a per-address limit in the service, so rotating IPs still cannot bury one inbox.",
     "POST /v1/setup/init": "FIRST RUN ONLY — an IP check, and a 403 the moment a single owner exists. The door closes itself and cannot be reopened from outside.",
-    "POST /v1/signals/:owner/:streamId/hit": "A BEACON — counting a click from a person who has no account is what it is for. Rate limited per IP at 120 a minute, and it writes a counter and nothing else.",
+    "POST /v1/signals/behaviour": "A BEACON — the on-page behaviour script on an owner's app sends one when a page view ends, from a visitor who has no account. Rate limited per IP at 60 a minute; it counts only for an existing app of this node's account that has counting on, every map is bounded per view and per day, and it writes that app's one count record and nothing else (AI visibility, layer D).",
+    "POST /v1/signals/:owner/:streamId/hit":"A BEACON — counting a click from a person who has no account is what it is for. Rate limited per IP at 120 a minute, and it writes a counter and nothing else.",
     "POST /v1/validate": "WRITES NOTHING — a stateless schema check: it takes a body and an endpoint name and answers valid or invalid. It is in this population because the population is 'not a GET', which is the right way to draw it; this is the one member where the verb is the only thing write-shaped about it.",
     "PUT /v1/upload/:token": "THE PRE-SIGNED TOKEN IS THE CREDENTIAL — that is what presigning means. 401 when it does not verify, 409 when it has been used, 410 when it has expired."
   }

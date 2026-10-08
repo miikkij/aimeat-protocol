@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-08 — aimeat_visibility_behaviour, _behaviour_fix and _behaviour_set: what people do on the owner's apps.
  *   2026-10-08 — aimeat_visibility_report: how people and AIs find the owner's apps.
  *   2026-10-04 — The design spec is shown on the app's own page in the App Catalog.
  *   2026-10-02 — The app's design spec: read it with aimeat_app_manage spec before changing a shared
@@ -78,6 +79,14 @@ with every problem named at once.
 app at once, with no setup: people by channel (an AI answer, search, social, another site, direct), which
 AI fetched which app because someone asked it or to build its index, who read the llms.txt, AGENTS.md
 and MCP card, and purchases by channel. One app's own opens and places are \`aimeat_app_manage\` visitors.
+
+**What people do on the owner's apps.** \`aimeat_visibility_behaviour\` (with \`app\` for one app and its
+click grid): views by screen size, scroll depth, dead clicks (a click on a button after which nothing
+changed) and rage clicks by element, and \`findings\`, one line each, to say to the owner. Read it before
+you change an app that people use. \`aimeat_visibility_behaviour_fix\` asks the owner's own AI for a
+corrected app from those findings and writes it as the DRAFT; it never publishes, and it leaves the
+owner's own draft alone. It spends the owner's AI credit, so ask first. \`aimeat_visibility_behaviour_set\`
+switches the script off per app, or the weekly fixing agent on.
 
 **Component packages are a different thing** and have their own tools: \`aimeat_package_list\` ·
 \`aimeat_package_get\` · \`aimeat_package_compose\` · \`aimeat_package_status_set\` ·

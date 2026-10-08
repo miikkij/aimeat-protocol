@@ -24,6 +24,7 @@
  * @structure visibilitySettingsView · nodeAllowsTags · tagsActive · ownerTagsSnippet · withOwnerTags · ownerTagsFor
  * @usage buf = withOwnerTags(buf, ownerTagsSnippet(config, settings));
  * @version-history
+ *   v1.1.0 — 2026-10-08 — ownerTagsFor takes the app's filename and adds the behaviour script (layer D).
  *   v1.0.0 — 2026-10-08 — Initial (layer B).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -33,6 +34,8 @@ import { CLARITY_ID_RE, GA4_ID_RE, cachedVisibilitySettings } from './visibility
 import type { Storage } from '../../storage/interface.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { behaviourOnFor } from './behaviour-settings.js';
+import { behaviourSnippet } from './behaviour-script.js';
 
 /**
  * The owner's settings as REST and MCP answer them, with what the node decides beside them: whether
@@ -118,15 +121,26 @@ export function ownerTagsSnippet(config: AimeatConfig, settings: VisibilitySetti
 
 /**
  * The snippet for the owner of a page, for the serve paths. Never throws: a page is served without
- * tags rather than not served.
+ * tags rather than not served. With `app` (an app's filename) it also carries the on-page behaviour
+ * script (layer D), first, so a page that already loads the cookie banner keeps it when the
+ * banner part is cut (ownerTagsIntoHtml).
  */
-export async function ownerTagsFor(storage: Storage, config: AimeatConfig, ownerGaii: string): Promise<string> {
-  if (!nodeAllowsTags(config)) return '';
+export async function ownerTagsFor(storage: Storage, config: AimeatConfig, ownerGaii: string, app?: string): Promise<string> {
+  const ownerGhii = ownerGhiiOf(ownerGaii);
+  let behaviour = '';
+  if (app) {
+    try {
+      if (await behaviourOnFor(storage, config, ownerGhii, app)) behaviour = behaviourSnippet(config.baseUrl, ownerGhii, app);
+    } catch (e) {
+      logger.warn('visibility: the behaviour switch could not be read', { error: String(e) });
+    }
+  }
+  if (!nodeAllowsTags(config)) return behaviour;
   try {
-    return ownerTagsSnippet(config, await cachedVisibilitySettings(storage, ownerGhiiOf(ownerGaii)));
+    return behaviour + ownerTagsSnippet(config, await cachedVisibilitySettings(storage, ownerGhii));
   } catch (e) {
     logger.warn('visibility: the owner\'s analytics tags could not be read', { error: String(e) });
-    return '';
+    return behaviour;
   }
 }
 

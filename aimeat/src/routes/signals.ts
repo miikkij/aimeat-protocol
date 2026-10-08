@@ -24,6 +24,7 @@
  * @structure PIXEL_SVG · signalsRouter (streams CRUD · report · public pixel · public hit)
  * @usage app.use(signalsRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.3.0 — 2026-10-08 — Mounts the on-page behaviour routes (routes/visibility-behaviour.ts, layer D).
  *   v1.2.0 — 2026-10-08 — Mounts the AI visibility routes (routes/visibility.ts).
  *   v1.1.0 — 2026-09-18 — A stream takes `geo` (off, country, region, city), and both public doors
  *     hand the hit the place the proxy reported. The report takes a day window (`from_day`, `to_day`).
@@ -45,6 +46,7 @@ import {
 import { SIGNAL_CHANNELS, SIGNAL_EVENTS, SIGNAL_GEO_LEVELS } from '../models/signal-schemas.js';
 import { geoFromHeaders } from '../utils/geo-headers.js';
 import { visibilityRouter } from './visibility.js';
+import { visibilityBehaviourRouter } from './visibility-behaviour.js';
 
 /**
  * A 1x1 fully transparent SVG. SVG rather than a GIF because it is text, so it is readable in the
@@ -98,6 +100,10 @@ export function signalsRouter(config: AimeatConfig, storage: Storage): Router {
   // AI visibility, the counting every owner has by default, mounted here because it is the same
   // family and the route loader is at its line ceiling.
   router.use(visibilityRouter(config, storage));
+  // On-page behaviour (layer D) is mounted here, not from visibilityRouter: routes/subdomains.ts
+  // imports visibility.ts, and the fixing agent reaches subdomains.ts through app-publish, which
+  // would close an import cycle.
+  router.use(visibilityBehaviourRouter(config, storage));
 
   // ── Owner side: what is measured ────────────────────────────────────────────────────────────
 

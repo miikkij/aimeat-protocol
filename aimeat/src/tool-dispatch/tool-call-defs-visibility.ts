@@ -8,6 +8,7 @@
  * @structure visibilityCliTools[]
  * @usage import { visibilityCliTools } from './tool-call-defs-visibility.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-08 -- aimeat_visibility_behaviour, _behaviour_set and _behaviour_fix (layer D).
  *   v1.1.0 -- 2026-10-08 -- aimeat_visibility_settings_set forwards clarity_project_id and ga4_measurement_id.
  *   v1.0.0 -- 2026-10-08 -- Initial, for AI visibility (layer A).
  */
@@ -82,5 +83,52 @@ export const visibilityCliTools: ConnectCliToolDefinition[] = [
       if (sync) return client.post('/v1/visibility/feed/stripe-sync', { check_only: sync === 'check' });
       return client.get('/v1/visibility/feed');
     },
+  },
+  {
+    // → GET /v1/visibility/behaviour?app=&days=
+    name: 'aimeat_visibility_behaviour',
+    description: 'What people do on the person\'s apps: views by screen size, scroll depth, dead and rage clicks by element, and one line per finding.',
+    input: {
+      app: { type: 'string', description: 'One app\'s filename. Without it, every app.' },
+      days: { type: 'number', description: 'The window in days. Default 7, at most 56.' },
+    },
+    handler: ({ client }, input) => {
+      const q = new URLSearchParams();
+      if ('app' in input) q.set('app', String(requiredValue(input, 'app')));
+      const days = optionalNumber(input, 'days');
+      if (days !== undefined) q.set('days', String(days));
+      const qs = q.toString();
+      return client.get(`/v1/visibility/behaviour${qs ? `?${qs}` : ''}`);
+    },
+  },
+  {
+    // → PUT /v1/visibility/behaviour/settings
+    name: 'aimeat_visibility_behaviour_set',
+    description: 'Switch the behaviour script off or on for one app, or the weekly fixing agent off or on. Only the fields given change.',
+    input: {
+      app: { type: 'string', description: 'The app\'s filename, with app_enabled.' },
+      app_enabled: { type: 'boolean', description: 'true counts the app, false removes the script from it.' },
+      fixer: { type: 'boolean', description: 'true switches the weekly fixing agent on.' },
+    },
+    handler: ({ client }, input) => {
+      const body: Record<string, unknown> = {};
+      if ('app' in input) body.app = String(requiredValue(input, 'app'));
+      for (const key of ['app_enabled', 'fixer']) {
+        if (!(key in input)) continue;
+        const v = optionalBoolean(input, key);
+        if (v === undefined) throw new Error(`${key} must be true or false`);
+        body[key] = v;
+      }
+      return client.put('/v1/visibility/behaviour/settings', body);
+    },
+  },
+  {
+    // → POST /v1/visibility/behaviour/fix
+    name: 'aimeat_visibility_behaviour_fix',
+    description: 'Run the fixing agent on one app now: findings and a corrected draft, never a publish.',
+    input: {
+      app: { type: 'string', description: 'The app\'s filename.', required: true },
+    },
+    handler: ({ client }, input) => client.post('/v1/visibility/behaviour/fix', { app: String(requiredValue(input, 'app')) }),
   },
 ];

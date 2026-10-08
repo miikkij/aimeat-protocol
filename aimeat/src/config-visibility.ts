@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.4.0 — 2026-10-08 — behaviourEnabled (layer D).
  *   v1.3.0 — 2026-10-08 — agentExperienceEnabled (layer C).
  *   v1.2.0 — 2026-10-08 — merchantFeedEnabled (layer E).
  *   v1.1.0 — 2026-10-08 — analyticsTagsEnabled (layer B).
@@ -41,6 +42,12 @@ export interface VisibilityConfig {
    * checkouts by stage, and say where they stop. On by default: counts per AI family, no agent named.
    */
   agentExperienceEnabled: boolean;
+  /**
+   * Layer D: a script on every owner's apps counts clicks on a coarse grid, scroll depth, dead and
+   * rage clicks and the screen size, and the owner's opt-in fixing agent writes a corrected draft.
+   * On by default: aggregates only, no identifier, keystroke, page text or recording.
+   */
+  behaviourEnabled: boolean;
 }
 
 export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): VisibilityConfig {
@@ -49,5 +56,6 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
     analyticsTagsEnabled: env.AIMEAT_ANALYTICS_TAGS !== 'false',
     merchantFeedEnabled: env.AIMEAT_MERCHANT_FEED !== 'false',
     agentExperienceEnabled: env.AIMEAT_AGENT_EXPERIENCE !== 'false',
+    behaviourEnabled: env.AIMEAT_BEHAVIOUR !== 'false',
   };
 }

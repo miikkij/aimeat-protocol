@@ -51,6 +51,9 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.2.0 — 2026-10-08 — The owner's analytics tags with their cookie banner (AI visibility layer B)
+ *     and the on-page behaviour script (layer D) are marks too: a served copy republished by another
+ *     owner would otherwise carry the first owner's analytics ids and counts into the copy.
  *   v1.1.0 — 2026-09-25 — The isolated frame's support script (utils/app-frame-assets.ts, audit A7-1)
  *     is a mark too: a copy of an app as the frame received it is stored without it.
  *   v1.0.0 — 2026-09-13 — Initial: the developer's decision that a served copy is stripped at
@@ -62,11 +65,12 @@ import { APP_REF_MARK, DISCOVERY_MARK } from '../utils/app-agent-discovery.js';
 import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
 import { REVIEWED_MARK } from './app-serve-marks.js';
 import { FRAME_SUPPORT_MARK } from '../utils/app-frame-assets.js';
+import { BEHAVIOUR_MARK } from './visibility/behaviour-script.js';
 
 /** Which of the node's marks a removal was. One word per block the serve pass writes. */
 export type ServedMarkKind =
   | 'chrome-reserve' | 'badge' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by'
-  | 'frame-support';
+  | 'frame-support' | 'owner-tags' | 'behaviour';
 
 /** One kind of mark taken out of an upload, with everything of that kind summed. */
 export interface ServedMarkRemoval {
@@ -110,6 +114,15 @@ const APP_REF_OPEN = `<script type="application/json" ${APP_REF_MARK}>`;
 const REVIEWED_META = new RegExp(`<meta ${REVIEWED_MARK} content="([^"<>]*)">`, 'y');
 const REVIEWED_OPEN = `<meta ${REVIEWED_MARK} content="`;
 const FRAME_SUPPORT_OPEN = `<script ${FRAME_SUPPORT_MARK}>`;
+/**
+ * The owner's analytics tags (services/visibility/analytics-tags.ts). Spelled here rather than
+ * imported, because that module reads settings and the cookie banner; the round trip in
+ * test/unit/app-serve-marks-strip.test.ts goes red if the snippet's opening tag changes.
+ */
+const OWNER_TAGS_OPEN = '<script data-aimeat-tags>';
+/** The cookie banner the tags bring when the node shows one: a stylesheet, the library and its start. */
+const OWNER_TAGS_BANNER = /<link rel="stylesheet" href="[^"<>]*\/cookieconsent\.css"><script src="[^"<>]*\/cookieconsent\.umd\.js"><\/script><script>\(function\(\)\{function r\(\)\{CookieConsent\.run\(/y;
+const BEHAVIOUR_OPEN = `<script ${BEHAVIOUR_MARK}>`;
 
 /** The order removals are reported in, so one upload always reads the same way. */
 const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string }> = [
@@ -121,6 +134,8 @@ const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string
   { mark: 'app-ref', marker: APP_REF_MARK, words: 'the app identity block (#aimeat-app-ref)' },
   { mark: 'reviewed-by', marker: REVIEWED_MARK, words: 'the reviewer tags' },
   { mark: 'frame-support', marker: FRAME_SUPPORT_MARK, words: 'the isolated frame\'s support script' },
+  { mark: 'owner-tags', marker: 'data-aimeat-tags', words: 'the owner\'s own analytics tags and the cookie banner they bring' },
+  { mark: 'behaviour', marker: BEHAVIOUR_MARK, words: 'the on-page behaviour script' },
 ];
 
 /** Where markDocumentElement looks for the `<html>` tag, in the document it marks. */
@@ -301,6 +316,27 @@ function findCuts(text: string): Cut[] {
   for (const at of anchors(FRAME_SUPPORT_OPEN)) {
     const end = scriptEnd(at + FRAME_SUPPORT_OPEN.length);
     if (end > 0) cut('frame-support', at, end);
+  }
+
+  // The owner's analytics tags: one inline script whose source holds no `</script>`, and, when the
+  // node shows a cookie banner, its three companions directly after it.
+  for (const at of anchors(OWNER_TAGS_OPEN)) {
+    let end = scriptEnd(at + OWNER_TAGS_OPEN.length);
+    if (end < 0) continue;
+    OWNER_TAGS_BANNER.lastIndex = end;
+    const banner = OWNER_TAGS_BANNER.exec(text);
+    if (banner) {
+      const close = scriptEnd(end + banner[0].length);
+      if (close > 0) end = close;
+    }
+    cut('owner-tags', at, end);
+  }
+
+  // The on-page behaviour script: one inline script; its literals escape `<`, so the first
+  // `</script>` after the tag is its end.
+  for (const at of anchors(BEHAVIOUR_OPEN)) {
+    const end = scriptEnd(at + BEHAVIOUR_OPEN.length);
+    if (end > 0) cut('behaviour', at, end);
   }
 
   // Sorted, and an overlap keeps the earlier cut: no rule above can produce one from a real serve,
