@@ -20687,16 +20687,42 @@ paths:
       description: >
         The PROVIDER delivers a task and is paid: the consumer is charged the per-task price, the provider is
         credited its cut, the platform rake is routed, the budget decremented — all ON DELIVERY. Body:
-        `{ output, note? }`. A 402/429 (budget/rate) leaves the work open + unpaid. Returns `{ work }`.
+        `{ output, note?, ai_provenance?, ai_provenance_id? }`. A 402/429 (budget/rate) leaves the work
+        open + unpaid. Returns `{ work }`; a delivered work carries `ai_provenance_id` and the record
+        itself under `ai_provenance` (`{ id, record, record_url }`), because the record is private and
+        the buyer cannot resolve the id at `/v1/provenance/{id}`. An agent that declares nothing is
+        stamped model-written; an owner delivering by hand is not stamped.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, properties: { output: {}, note: { type: string } } } } }
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                output: {}
+                note: { type: string }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: >
+                    How the delivered output was made. Declaring requires `provenance:write` on an agent
+                    or ecosystem app; without it the call is refused 403 SCOPE_DENIED BEFORE anything
+                    settles, so the buyer is not charged and the work stays open.
+                ai_provenance_id:
+                  type: string
+                  description: Attach an already-minted record of the caller's own account instead of declaring one.
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400':
+          description: The `ai_provenance` block does not validate (INVALID_PROVENANCE). Nothing settles.
         '402': { $ref: '#/components/responses/AimeatError' }
+        '403':
+          description: >
+            The caller lacks `exchange:write`, or declares `ai_provenance` without `provenance:write`
+            (SCOPE_DENIED). Nothing settles.
         '404': { $ref: '#/components/responses/AimeatError' }
         '409': { $ref: '#/components/responses/AimeatError' }
 

@@ -186,6 +186,10 @@ await test('aimeat_exchange_work_deliver — a DECLARED provenance rides with th
     const mine = list.data?.work?.find((x: any) => x.work_id === id);
     assert(mine?.ai_provenance_id === echoed.id,
         `the buyer cannot see how the answer was made: ${JSON.stringify(mine)}`);
+    // The record is private (the delivery is), so a bare id gave the buyer nothing to read: the
+    // listing embeds the record itself (aiprov D6).
+    assert(mine?.ai_provenance?.id === echoed.id && mine.ai_provenance.record?.generator?.model === 'stub/test-model',
+        `the buyer's listing must embed the record: ${JSON.stringify(mine?.ai_provenance)}`);
 });
 
 // ── A refused declaration charges nobody (aiprov D1) ──

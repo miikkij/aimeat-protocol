@@ -11,6 +11,12 @@
  * @usage
  *   registerExchangeAgentWorkRoutes(router, config, storage, notify);
  * @version-history
+ *   v1.2.0 — 2026-10-08 — POST /v1/exchange/work/:id/deliver records how the answer was made, as
+ *     aimeat_exchange_work_deliver does: it takes ai_provenance and ai_provenance_id, refuses a
+ *     declaration the caller may not make (403 SCOPE_DENIED) before anything settles, stamps the
+ *     delivery on both the prepaid and the settled branch, and stores the record id on the work. It
+ *     minted nothing before, so an agent delivering over REST left the buyer with no record. Every
+ *     work view is services/exchange-work.ts workView, with the record embedded.
  *   v1.1.0 — 2026-09-26 — POST /v1/exchange/work refuses SELF_WORK and SAME_OWNER_WORK (400) when the
  *     consumer and the agent that does the work belong to the same owner, before it reads the
  *     contract: the rule for every endpoint that creates work, from services/work-parties.ts
@@ -28,23 +34,18 @@ import { readEntitlementForCall } from '../services/metered-entitlements.js';
 import { getOffering } from '../services/exchange-market.js';
 import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
 import {
-  type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
+  type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
 } from '../services/exchange-work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
+import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai-provenance.js';
 
 /** Deliver a same-node inbox message about a work event: exchangeRouter's own `notify`. */
 export type ExchangeNotify = (senderOwner: string, recipientOwner: string, subject: string, body: string) => Promise<void>;
 
 export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatConfig, storage: Storage, notify: ExchangeNotify): void {
   // ── AGENT WORK (async surface — settled per delivered task, Gap 2) ───────────
-  function workView(w: AgentWork) {
-    return {
-      work_id: w.workId, offering_id: w.offeringId, consumer: w.consumerGaii, provider: w.providerGhii,
-      agent: w.agentGaii, task_type: w.taskType, ext: w.ext, action: w.action, input: w.input, output: w.output,
-      note: w.note, state: w.state, unit: w.unit, currency: w.currency, charged_units: w.chargedUnits,
-      created_at: w.createdAt, delivered_at: w.deliveredAt,
-    };
-  }
+  const view = (w: AgentWork) => workView(storage, config, w);
 
   /**
    * POST /v1/exchange/work — the CONSUMER starts a task under an agent-work contract. Body:
@@ -84,13 +85,14 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     await putWork(storage, work);
     await notify(owner, o.providerOwner, 'EXCHANGE — new agent work started',
       `${owner} started a "${s.taskType}" task for your agent ${s.agentName} (work ${work.workId}). Deliver it in the EXCHANGE app to get paid.`);
-    return res.status(201).json(success(config.nodeId, { work: workView(work) }));
+    return res.status(201).json(success(config.nodeId, { work: await view(work) }));
   });
 
   /**
    * POST /v1/exchange/work/:id/deliver — the PROVIDER delivers a task → settle ON DELIVERY (charge the
    * consumer the per-task price, credit the provider, route the rake, decrement the budget). Body:
-   * `{ output, note? }`. A 402/429 (budget/rate) leaves the work open and unpaid.
+   * `{ output, note?, ai_provenance?, ai_provenance_id? }`. A 402/429 (budget/rate) leaves the work
+   * open and unpaid, and so does a 403 for a declaration the caller may not make.
    */
   router.post('/v1/exchange/work/:id/deliver', requireAuth(), requireScope('exchange:write'), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
@@ -98,6 +100,41 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     if (!w || w.providerOwner !== owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such work of yours to deliver'));
     if (w.state !== 'open') return res.status(409).json(error(config.nodeId, 'WORK_NOT_OPEN', `This work is ${w.state}, so it cannot be changed now. Open it to see where it got to.`));
     const b = (req.body ?? {}) as Record<string, unknown>;
+
+    // How the delivered answer was made: the same declaration aimeat_exchange_work_deliver takes.
+    // Validated, and the scope refusal asked, BEFORE anything settles (invariant 14): a refusal heard
+    // after the charge leaves the buyer paying for work that is still open.
+    const parsedProvenance = parseDeclaredProvenanceInput(b.ai_provenance);
+    if (!parsedProvenance.ok) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE',
+        'The ai_provenance block does not validate.', undefined, { violations: parsedProvenance.violations }));
+    }
+    const declared = parsedProvenance.declared;
+    const declaredId = typeof b.ai_provenance_id === 'string' ? b.ai_provenance_id : undefined;
+    // The RESOLVED caller, never a field off the work item: whoever holds this token delivered.
+    const principal = resolveIdentity(req.auth!, config.nodeId);
+    const scopes = req.auth!.scopes ?? [];
+    const provenanceRefused = await provenanceDeclarationRefusal(storage, {
+      principal, declaredId, declared, enabled: config.aiProvenance, scopes,
+    });
+    if (provenanceRefused) {
+      return res.status(403).json(error(config.nodeId, provenanceRefused.code, provenanceRefused.message));
+    }
+    // The hash covers the output as stored plus the note, which is what the buyer receives and reads:
+    // the same bytes the MCP tool hashes.
+    const stampDelivery = (output: unknown, note: string): Promise<string | undefined> => provenanceForWrite(storage, {
+      principal, scopes,
+      content: `${JSON.stringify(output ?? null)}\n\n${note}`,
+      declaredId, declared,
+      pipeline: 'rest.exchange_work_deliver',
+      // Delivered privately to one buyer, a person deciding what to do with an answer.
+      surface: { visibility: 'private', humanAudience: true },
+      labelPolicy: config.aiLabelPublic,
+      nodeId: config.nodeId,
+      baseUrl: config.baseUrl,
+      enabled: config.aiProvenance,
+    });
+    const noteOf = (): string => (typeof b.note === 'string' ? b.note : '');
 
     // WORK PAID UP FRONT SETTLES ONCE, AND IT ALREADY HAS. A buyer from another node holds no
     // contract and no balance here — its money moved onchain at the A2A door before the work was
@@ -108,12 +145,14 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     // settles.
     const prepaid = w.consumerOwner === '' && w.chargedUnits > 0;
     if (prepaid) {
+      const aiProvenanceId = await stampDelivery(b.output ?? null, noteOf());
       w.state = 'delivered'; w.output = b.output ?? null; w.deliveredAt = new Date().toISOString();
+      if (aiProvenanceId) w.aiProvenanceId = aiProvenanceId;
       if (typeof b.note === 'string' && b.note) w.note = b.note.slice(0, 2000);
       await putWork(storage, w);
       // No notification: there is nobody on this node to tell. The buyer reads the result at the
-      // A2A door it created the work through.
-      return res.json(success(config.nodeId, { work: workView(w) }));
+      // A2A endpoint it created the work through.
+      return res.json(success(config.nodeId, { work: await view(w) }));
     }
 
     // Settle the per-task price against the CONSUMER's contract (the consumer pays; the provider is credited).
@@ -129,12 +168,14 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     if (!outcome.ok) return; // 402/429 already sent (budget/rate) — work stays open
     const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
     const charged = after && before ? Math.max(0, (after.budget.spentUnits) - (before.budget.spentUnits)) : 0;
+    const aiProvenanceId = await stampDelivery(b.output ?? null, noteOf());
     w.state = 'delivered'; w.output = b.output ?? null; w.chargedUnits = charged; w.deliveredAt = new Date().toISOString();
+    if (aiProvenanceId) w.aiProvenanceId = aiProvenanceId;
     if (typeof b.note === 'string' && b.note) w.note = b.note.slice(0, 2000);
     await putWork(storage, w);
     await notify(owner, w.consumerOwner, 'EXCHANGE — your agent work was delivered',
       `Your "${w.taskType}" task (work ${w.workId}) was delivered by ${owner} and charged to your contract. See it in the EXCHANGE app.`);
-    return res.json(success(config.nodeId, { work: workView(w) }));
+    return res.json(success(config.nodeId, { work: await view(w) }));
   });
 
   /** GET /v1/exchange/work?role=consumer|provider — the caller-owner's agent-work items (default: consumer). */
@@ -142,6 +183,6 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     const owner = req.auth!.owner;
     const role = req.query.role === 'provider' ? 'provider' : 'consumer';
     const items = role === 'provider' ? await listWorkByProvider(storage, owner) : await listWorkByConsumer(storage, owner);
-    return res.json(success(config.nodeId, { work: items.map(workView), count: items.length, role }));
+    return res.json(success(config.nodeId, { work: await workViews(storage, config, items), count: items.length, role }));
   });
 }

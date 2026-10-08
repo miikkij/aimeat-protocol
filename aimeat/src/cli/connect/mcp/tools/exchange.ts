@@ -8,6 +8,8 @@
  *   provider lineage locally. Thin REST proxies over the /v1/exchange/* routes (src/routes/exchange.ts +
  *   exchange-market.ts) — server-side authz + authoritative pricing unchanged.
  * @version-history
+ *   2026-10-08 — aimeat_exchange_work_deliver sends ai_provenance and ai_provenance_id in the body of
+ *     POST /v1/exchange/work/:id/deliver, which records them and embeds the record in the work it answers.
  *   2026-10-06 — aimeat_exchange_accept and aimeat_exchange_need_post run their dispatch definition (secaudit
  *     2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -48,6 +50,9 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     const body: Record<string, unknown> = {};
     if (output !== undefined) body.output = output;
     if (note) body.note = note;
+    // The route records both since 2026-10-08 and names the record on the work it answers.
+    if (ai_provenance) body.ai_provenance = ai_provenance;
+    if (ai_provenance_id) body.ai_provenance_id = ai_provenance_id;
     const resp = await client.post(`/v1/exchange/work/${encodeURIComponent(work_id)}/deliver`, body);
     if (resp.ok === false) return out(resp);
     return provenanceEchoedResult(client,

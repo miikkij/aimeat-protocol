@@ -23,7 +23,9 @@
  * @version-history
  *   2026-10-08 — aimeat_exchange_work_deliver asks provenanceDeclarationRefusal BEFORE it settles: a
  *     declaration the session may not make threw after the buyer was charged, left the work open, and
- *     a retry charged again. The session's scopes reach both provenance calls.
+ *     a retry charged again. The session's scopes reach both provenance calls. The work view is the
+ *     shared one in services/exchange-work.ts and embeds the delivery's private record, which the
+ *     buyer could not resolve from the bare id (aiprov D6).
  *   2026-10-06 — Unpriced cross-owner app tools use the REST price predicate and an unpriced
  *     internal pass. Existing contract refusals and action-level prices remain enforced.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -71,7 +73,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { readEntitlementForCall } from '../services/metered-entitlements.js';
 import { getOffering } from '../services/exchange-market.js';
 import {
-    type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
+    type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
 } from '../services/exchange-work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import {
@@ -139,17 +141,9 @@ export function registerExchangeRunTools(
         } catch (err) { logger.warn('notify: notification failure must never fail the action', { error: String(err) }); }
     }
 
-    function workView(w: AgentWork) {
-        return {
-            work_id: w.workId, offering_id: w.offeringId, consumer: w.consumerGaii, provider: w.providerGhii,
-            agent: w.agentGaii, task_type: w.taskType, ext: w.ext, action: w.action, input: w.input, output: w.output,
-            note: w.note, state: w.state, unit: w.unit, currency: w.currency, charged_units: w.chargedUnits,
-            // TARGET-058: how the delivered answer was made. Absent until delivery, and absent is
-            // UNSTATED — never a claim that a person wrote it.
-            ...(w.aiProvenanceId ? { ai_provenance_id: w.aiProvenanceId } : {}),
-            created_at: w.createdAt, delivered_at: w.deliveredAt,
-        };
-    }
+    // The one wire shape of a work item (services/exchange-work.ts), shared with the REST routes. It
+    // embeds the delivery's record, which is private, so the buyer can read it.
+    const view = (w: AgentWork) => workView(storage, config, w);
 
     // ── aimeat_app_tool_invoke — call an app's offered tool through your metered contract ──────────────
     mcp.tool(
@@ -289,7 +283,7 @@ export function registerExchangeRunTools(
             await putWork(storage, work);
             await notify(o.providerOwner, 'EXCHANGE — new agent work started',
                 `${owner} started a "${s.taskType}" task for your agent ${s.agentName} (work ${work.workId}). Deliver it to get paid.`);
-            return ok({ work: workView(work) });
+            return ok({ work: await view(work) });
         },
     );
 
@@ -356,7 +350,7 @@ export function registerExchangeRunTools(
             await putWork(storage, w);
             await notify(w.consumerOwner, 'EXCHANGE — your agent work was delivered',
                 `Your "${w.taskType}" task (work ${w.workId}) was delivered by ${owner} and charged to your contract.`);
-            return ok({ work: workView(w), ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) });
+            return ok({ work: await view(w), ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) });
         },
     );
 
@@ -368,7 +362,7 @@ export function registerExchangeRunTools(
         annotationsFor('aimeat_exchange_work_list'),
         async ({ role }) => {
             const items = role === 'provider' ? await listWorkByProvider(storage, owner) : await listWorkByConsumer(storage, owner);
-            return ok({ work: items.map(workView), count: items.length, role: role ?? 'consumer' });
+            return ok({ work: await workViews(storage, config, items), count: items.length, role: role ?? 'consumer' });
         },
     );
 
