@@ -1316,6 +1316,13 @@ components:
             note:
               type: string
               description: One line on what this change was for. Shown in the change log.
+        ai_provenance:
+          allOf:
+            - $ref: '#/components/schemas/AiProvenanceDeclaration'
+          description: How the free-form passages' words were made, recorded against each passage.
+        ai_provenance_id:
+          type: string
+          description: An existing provenance record of the caller's own account, for a layout that carries exactly one passage.
 
     ResolvedSurfaceLayout:
       type: object
@@ -1906,7 +1913,21 @@ components:
             When it is absent and the writer is an AGENT or ECOSYSTEM principal, the node stamps one
             itself (`ai-generated`, `humanInvolvement: none`, `stampedBy: node`, `observed: false`,
             with the inference stated in `notes`): silence from an agent must not read as "a human
-            wrote it". An OWNER principal is never stamped.
+            wrote it". An OWNER principal is never stamped. The writer is the caller, wherever the
+            record lands: an agent's `owner_scope` write is stamped as the agent's.
+        ai_provenance:
+          allOf:
+            - $ref: '#/components/schemas/AiProvenanceDeclaration'
+          description: >
+            How this value was made, declared with the write and recorded against the bytes stored,
+            wherever the write lands (owner_scope included). Needs `provenance:write` on the grant and
+            the session; without it the write is refused 403 SCOPE_DENIED and nothing is stored. A
+            block that does not parse is 400 INVALID_INPUT. The response names the record in
+            `ai_provenance_id`.
+
+            The hash of a value that is not a string is taken over its canonical JSON: object keys
+            sorted at every level (RFC 8785 order), no whitespace. A record minted before 2026-10-08
+            carries the hash of the value as it was written.
 
     MemoryWriteWarning:
       type: object
@@ -19303,6 +19324,11 @@ paths:
         remember to do. There is no stored visibility flag on the record and no way for a caller to
         set one. The owner can always resolve their own records.
 
+        A published workspace record that an OPEN workspace share (meta.share, access `open`) serves
+        to anyone counts as public too, decided by the same collectors the share routes serve with:
+        the share's own space and document switches, the copy of the share that counts, and the
+        record's classification. A password or account share does not make a record public.
+
         Returns an IDENTICAL 404 for "no such record", "that record is not yours" and "its content
         is not public" - different answers would turn this into an oracle for which ids exist on
         this node.
@@ -19348,8 +19374,15 @@ paths:
         having handed them an identifier first - the join key is the content hash, not a database id.
 
         "Public" is derived, not stored: a record is listed here exactly while some publicly
-        readable item points at it. An authenticated caller additionally sees their own records; the
+        readable item points at it, an open workspace share's records included (see
+        /v1/provenance/{id}). An authenticated caller additionally sees their own records; the
         widening happens in SQL, so a third party's non-public row never enters the process.
+
+        WHICH BYTES TO HASH. A memory value that is a string: its UTF-8 bytes. Any other memory value:
+        its canonical JSON, object keys sorted at every level (RFC 8785 order) and no whitespace,
+        because Postgres reorders the keys of a stored object and the order a reader receives is not
+        the order it was written in. A record minted before 2026-10-08 carries the hash of the value
+        as it was written. A workspace DOCUMENT: its `markdown`, the text a reader is served.
 
         An empty `records` list is a real answer: "this node has no statement about these bytes". It
         is NOT "a human wrote it" - absence reads as UNSTATED, always.
@@ -38002,6 +38035,19 @@ paths:
                       id: { type: string }
                       value: {}
                       visibility: { type: string, enum: [private, owner, group, members, public, workspace] }
+                      ai_provenance:
+                        allOf:
+                          - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                        description: >
+                          How this record's value was made. Recorded against the value (a document
+                          space: its `markdown`). Without it an agent's or app's record carries the
+                          node's stamp (model-written, no review) and a person's carries none. A block
+                          that does not parse fails this record alone (INVALID); a declaration the
+                          caller may not make (no provenance:write on the grant and the session)
+                          refuses the whole batch 403 SCOPE_DENIED before anything is written.
+                      ai_provenance_id:
+                        type: string
+                        description: An existing provenance record of the caller's own account to attach to this record.
                 expected_versions:
                   type: object
                   additionalProperties: { type: integer, nullable: true }
@@ -38024,7 +38070,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: not an active member, meta.* without admin/creator, or (records) an agent or app token without the workspace creator's contributor grant (CONSENT_REQUIRED)
+          description: not an active member, meta.* without admin/creator, (records) an agent or app token without the workspace creator's contributor grant (CONSENT_REQUIRED), or a record's ai_provenance declaration the caller may not make (SCOPE_DENIED)
         '404':
           description: organism not found
         '409':
@@ -38264,6 +38310,10 @@ paths:
         JSON. Returns 404 (no disclosure) when nothing is public. When the share's `access` mode gates
         the read, returns 401 `SHARE_PASSWORD_REQUIRED` (send a valid `X-Share-Token` from the unlock
         endpoint) or 401 `SHARE_ACCOUNT_REQUIRED` (authenticate with any account on this node).
+
+        Each document carries an `ai_provenance` block (AiProvenanceItemBlock) when the page has a
+        provenance record: how it was made, and the URL it resolves at. Under an `open` share the
+        record resolves for anyone at /v1/provenance/{id}.
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -38286,6 +38336,10 @@ paths:
         or not marked public. When the share's `access` mode gates the read, returns 401
         `SHARE_PASSWORD_REQUIRED` (send a valid `X-Share-Token` from the unlock endpoint) or 401
         `SHARE_ACCOUNT_REQUIRED` (authenticate with any account on this node).
+
+        One page is one piece of content, so when it has a provenance record the answer carries it in
+        both formats: the `AI-Disclosure` and `Link: <record>; rel="ai-provenance"` headers, and in
+        JSON `meta.provenance` plus the document's `ai_provenance` block.
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -38312,7 +38366,8 @@ paths:
         share's `access` mode gates the read, returns 401 `SHARE_PASSWORD_REQUIRED` (send a valid
         `X-Share-Token` from the unlock endpoint) or 401 `SHARE_ACCOUNT_REQUIRED` (authenticate with any
         account on this node). This is the generic anonymous read for public record spaces — any public
-        showroom / catalogue / knowledge client reads its structured data through it.
+        showroom / catalogue / knowledge client reads its structured data through it. An entry whose
+        record has a provenance record carries it as `ai_provenance` (AiProvenanceItemBlock).
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -38337,7 +38392,7 @@ paths:
         curriculum) for the signed-in user, with access granted/revoked per user via workspace
         membership. Agents use the MCP workspace_read surface instead. `?space=` limits to one records
         space. Returns 404 (no disclosure) for a missing organism/workspace AND for an unauthorized
-        caller.
+        caller. An entry with a provenance record carries it as `ai_provenance` (AiProvenanceItemBlock).
       tags: [Organisms]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -42257,6 +42312,14 @@ paths:
         own record so the layout stays small. Those words are Markdown: script, iframe,
         object, embed, form, inline event handlers and `javascript:` links are refused.
 
+        Each passage gets a provenance record: the `ai_provenance` declaration or the
+        `ai_provenance_id` in the body, else the node's stamp when an agent writes it (a person
+        writing says nothing and is not stamped). A portal passage is stored public, because the
+        portal serves it without a session, so its record resolves for anyone; a member surface's
+        passage is stored for the owner. A block that does not parse is 400; a declaration the
+        writer may not make (provenance:write) is 403 SCOPE_DENIED, and one `ai_provenance_id` for
+        more than one passage is 422 PROVENANCE_ID_AMBIGUOUS, both before anything is stored.
+
         Needs the node operator, in person or as an agent carrying `site:layout-write` — a
         word no wildcard hands out, because this changes what everyone sees on arrival.
         Blocked in load-balancer mode.
@@ -42281,8 +42344,10 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/ResolvedSurfaceLayout'
+        '400':
+          description: The ai_provenance block does not parse (INVALID_INPUT)
         '403':
-          description: Not the node operator, or the principal does not carry `site:layout-write`
+          description: Not the node operator, the principal does not carry `site:layout-write`, or a provenance declaration the writer may not make (SCOPE_DENIED)
         '409':
           description: Portal is read-only (load-balancer mode)
         '422':
@@ -42448,7 +42513,10 @@ paths:
         surface, each holding blocks and, on a free-form block, its words inline.
 
         Every surface is checked before any of them is written, so a refusal on the second
-        cannot leave the first applied. Operator-only. Blocked in load-balancer mode.
+        cannot leave the first applied. Operator-only. Blocked in load-balancer mode. The
+        passages' provenance is recorded as on PUT /v1/site/layout/{surface}; one
+        `ai_provenance_id` for more than one passage across the paste is 422
+        PROVENANCE_ID_AMBIGUOUS, refused before the first surface is written.
 
         Deliberately separate from `POST /v1/site/import`, which keeps the template, portal
         records and KV pairs: that route is gated on the operator ROLE, and routing a layout
@@ -42470,6 +42538,13 @@ paths:
                   additionalProperties:
                     $ref: '#/components/schemas/SurfaceLayoutSubmission'
                   description: Keyed by surface name.
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the passages' words were made, recorded against each passage.
+                ai_provenance_id:
+                  type: string
+                  description: An existing record of the caller's own account, for a paste that holds exactly one passage.
       responses:
         '200':
           description: Which surfaces were written
@@ -42579,7 +42654,8 @@ paths:
         Store the words behind one free-form block without rewriting the layout around it.
         Markdown: script, iframe, object, embed, form, inline event handlers and
         `javascript:` links are refused, and so is a passage over 64 KB. Operator-only.
-        Blocked in load-balancer mode.
+        Blocked in load-balancer mode. The passage is stored public when the stored portal
+        layout shows it, and its provenance is recorded as on PUT /v1/site/layout/{surface}.
       tags: [Site]
       security:
         - BearerAuth: []
@@ -42597,6 +42673,13 @@ paths:
                 body:
                   type: string
                   description: The words, in Markdown.
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the words were made. A block that does not parse is 400.
+                ai_provenance_id:
+                  type: string
+                  description: An existing provenance record of the caller's own account to attach.
       responses:
         '200':
           description: Stored
@@ -43433,6 +43516,13 @@ paths:
         license/compatibility/metadata) is validated against the shared contract; republishing
         the same name bumps the version. scope=node is operator-only. Additional files
         (scripts/, references/, assets/) are passed as relative-path -> content.
+
+        How SKILL.md was written is recorded: the `ai_provenance` declaration or the
+        `ai_provenance_id` in the body, else the node's stamp when an agent publishes (a person
+        publishing says nothing and is not stamped). The record is set on SKILL.md and the
+        manifest, the answer names it in `ai_provenance_id` (and `skill.aiProvenanceId`). A block
+        that does not parse is 400; a declaration the publisher may not make (provenance:write on
+        the grant and the session) is 403 SCOPE_DENIED before anything is stored.
       tags: [Skills]
       security:
         - BearerAuth: []
@@ -43463,6 +43553,13 @@ paths:
                 ws:
                   type: string
                   description: Workspace scope — the workspace id
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How SKILL.md was written.
+                ai_provenance_id:
+                  type: string
+                  description: An existing provenance record of the caller's own account to attach to SKILL.md.
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -43778,7 +43875,15 @@ paths:
     post:
       operationId: importKnowledgePackage
       summary: Import a knowledge package
-      description: Import a knowledge package from structured data.
+      description: >
+        Import a knowledge package from structured data.
+
+        The manifest and every entry get their own provenance record: the `ai_provenance`
+        declaration in the body; else the package's
+        `synthesis.level`, honoured as a declaration when the caller may declare
+        (`provenance:write`, owners always); else the node's stamp when an agent imports. A block
+        that does not parse is 400; an explicit declaration the caller may not make is 403
+        SCOPE_DENIED before anything is stored.
       tags: [Knowledge]
       security:
         - BearerAuth: []
@@ -43788,11 +43893,21 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                package: { type: object, description: The knowledge package (manifest plus entries) }
+                overrides: { type: object }
+                entry_data: { type: object }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the package's content was made, recorded against the manifest and each entry.
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/knowledge/{id}:
     get:
@@ -45348,6 +45463,12 @@ paths:
         workspace meta namespace (excluded from workspace read + content search). Any active member
         or organism agent may comment. An owner session passes on being the account holder; every
         other principal (agent, ecosystem app, published app) needs the `organism:write` scope.
+
+        The body gets a provenance record: the `ai_provenance` declaration or the
+        `ai_provenance_id`, else the node's stamp when an agent comments (a person is not stamped).
+        The answer names it in `ai_provenance_id` and `comment.aiProvenanceId`; a listed comment
+        carries `aiProvenanceId` too. A block that does not parse is 400; a declaration the caller
+        may not make is 403 SCOPE_DENIED, and no comment is written.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -45372,6 +45493,13 @@ paths:
                     section: { type: string }
                     quote: { type: string }
                 parent_id: { type: string, description: Optional id of the comment this replies to }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the comment's body was made.
+                ai_provenance_id:
+                  type: string
+                  description: An existing provenance record of the caller's own account to attach.
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

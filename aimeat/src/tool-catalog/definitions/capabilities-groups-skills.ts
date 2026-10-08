@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-08 — aimeat_skill_publish takes ai_provenance and ai_provenance_id: SKILL.md is prose a
+ *     reader loads and a skill can be public, so how it was written is recorded (aiprov E12).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -628,7 +630,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_publish',
-        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.',
+        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -641,6 +643,7 @@ export const capabilitiesGroupsSkillsTools = [
             visibility: { type: 'string', enum: ['owner', 'members', 'public'], description: 'Registry visibility (node/user). Defaults: user->owner, node->members. public = federated.' },
             organism_id: { type: 'string', description: 'Workspace scope: the organism id.' },
             workspace_id: { type: 'string', description: 'Workspace scope: the workspace id.' },
+            ...aiProvenanceCatalogInput,
         },
     },
     {

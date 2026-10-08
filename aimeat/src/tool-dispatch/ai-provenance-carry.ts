@@ -56,6 +56,12 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.4.0 — 2026-10-08 — aimeat_memory_write and aimeat_workspace_comment are recorded-by-route:
+ *     POST /v1/memory and POST /v1/organisms/:id/comments record the declaration with the write
+ *     (aiprov E7, E8). aimeat_skill_publish joins, POST /v1/skills records it (aiprov E12). No tool
+ *     uses `attach-memory` any more; the kind stays for a tool whose route can only be declared after.
+ *     withProvenanceEcho() keeps the `ai_provenance` block a route answered with instead of
+ *     replacing it with an echo built here.
  *   v1.3.5 — 2026-10-08 — toDeclareBody carries `media_kind`, `media_type` and `resembles_real` to
  *     POST /v1/provenance as `mediaKind`, `mediaType` and `resemblesReal`.
  *   v1.3.4 — 2026-10-06 — `readsId` on the four not-carried tools whose route reads ai_provenance_id
@@ -123,12 +129,11 @@ export type ProvenanceCarrier =
   | { kind: 'recorded-by-route'; route: string };
 
 export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = {
-  aimeat_memory_write: {
-    kind: 'attach-memory',
-    attachFrom: (input) => (typeof input.key === 'string' && input.key
-      ? { memoryKey: input.key, content: memoryContentBytes(input.value) }
-      : undefined),
-  },
+  // POST /v1/memory records the declaration with the write and names the record in its answer
+  // (`ai_provenance_id`). It was `attach-memory` until 2026-10-08: write, then POST /v1/provenance
+  // with attachToMemoryKey, which looks the key up in the caller's own namespace, so an owner_scope
+  // write (stored under the owner) was refused after it had landed (aiprov E7).
+  aimeat_memory_write: { kind: 'recorded-by-route', route: 'POST /v1/memory' },
 
   // READY TO MOVE. The route ACCEPTS a declaration and an id (routes/apps/drafts.ts), and since the
   // connector runs the dispatch definition (secaudit 2026-10 follow-up, Part B) the body carries both.
@@ -171,7 +176,11 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   // caller `recorded: true` with the record's id — and promoting an entry means proving that, not
   // asserting it. Only a free-form passage carries prose at all; the rest of a layout is block names.
   aimeat_surface_layout_set: { kind: 'not-carried', route: 'PUT /v1/site/layout/:surface', readsId: true },
-  aimeat_workspace_comment: { kind: 'not-carried', route: 'POST /v1/organisms/:id/comments' },
+  // The comment route records the declaration and an id from the body and names the record on the
+  // comment it answers with (aiprov E8). The not-carried entry told a caller the node had stamped it.
+  aimeat_workspace_comment: { kind: 'recorded-by-route', route: 'POST /v1/organisms/:id/comments' },
+  // POST /v1/skills records the declaration against the SKILL.md it publishes (aiprov E12).
+  aimeat_skill_publish: { kind: 'recorded-by-route', route: 'POST /v1/skills' },
   // POST /v1/organisms/:id/workspace/drafts runs writeWorkspaceDraftsOp, the node MCP tool's own
   // function, which records the declaration once per item and names the records in its answer. The
   // entry said not-carried while this tool wrote its batch with POST /v1/memory itself
@@ -395,6 +404,10 @@ export async function carryDeclaration(
 export function withProvenanceEcho(payload: unknown, echo: ProvenanceEcho | undefined): unknown {
   if (!echo) return payload;
   if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    // A route that recorded the declaration answers with its own block (services/ai-provenance-echo.ts).
+    // That answer is what was stored, so it stands; an echo built here could only say less.
+    const own = (payload as Record<string, unknown>).ai_provenance;
+    if (own && typeof own === 'object') return payload;
     return { ...(payload as Record<string, unknown>), ai_provenance: echo };
   }
   return { result: payload, ai_provenance: echo };

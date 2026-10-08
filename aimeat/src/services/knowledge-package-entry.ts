@@ -39,6 +39,7 @@
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8, unit: knowledge). The entry build, the
  *     reserved-package guard and the manifest index line move out of src/mcp/knowledge.ts, and the
  *     manifest write joins the entry write inside services/memory-write.ts.
+ *   v1.0.1 — 2026-10-08 — The manifest rewrite keeps the manifest's provenance record (aiprov E10).
  */
 import type { MemoryRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
@@ -184,6 +185,10 @@ export async function addKnowledgePackageEntry(
             ttlHours: manifest.ttlHours,
             ...(manifest.groupId ? { groupId: manifest.groupId } : {}),
             ...(manifest.workspaceRef ? { workspaceRef: manifest.workspaceRef } : {}),
+            // An index line added is not new writing in the package: the record of how the package
+            // was made stays on its manifest. Without this the rewrite dropped it, or replaced it with
+            // a stamp about the contributor (aiprov E10).
+            ...(manifest.aiProvenanceId ? { declaredProvenanceId: manifest.aiProvenanceId } : {}),
             pipeline: input.pipeline,
             ownerScoped: true,
         });

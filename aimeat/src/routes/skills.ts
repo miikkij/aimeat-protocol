@@ -19,6 +19,9 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.5.0 -- 2026-10-08 -- POST /v1/skills takes `ai_provenance` and `ai_provenance_id`, records how
+ *     SKILL.md was written (the node's stamp for an agent publisher) and answers `ai_provenance_id`;
+ *     a declaration the publisher may not make is 403 SCOPE_DENIED before anything is stored (aiprov E12).
  *   v1.4.0 -- 2026-10-05 -- Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: the skill accessor carries the caller's ContentReader, so
  *     the registry filters user and workspace skills through it; GET /v1/agents/:name/skills passes
@@ -43,6 +46,9 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SkillValidationError } from '../services/skill-md.js';
+import { ProvenanceScopeError } from '../services/ai-provenance.js';
+import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { provenanceWriteEcho } from '../services/ai-provenance-echo.js';
 import { readerFor } from '../services/classification/reader.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import {
@@ -82,6 +88,11 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
     if (err instanceof SkillAccessError) {
       const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'FORBIDDEN' ? 403 : 400;
       res.status(status).json(error(config.nodeId, err.code, err.message));
+      return;
+    }
+    // A provenance declaration the publisher may not make, refused before the skill's first write.
+    if (err instanceof ProvenanceScopeError) {
+      res.status(403).json(error(config.nodeId, err.code, err.message));
       return;
     }
     logger.error('Skills route failed', { error: (err as Error).message, stack: (err as Error).stack });
@@ -150,6 +161,14 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be owner, members, or public'));
         return;
       }
+      // How SKILL.md was written: a declaration or an attached record id, validated as every REST
+      // declaration is; publishSkill records it, or the node's stamp for an agent publisher.
+      const declaration = parseDeclaredProvenanceInput((req.body ?? {}).ai_provenance);
+      if (!declaration.ok) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The ai_provenance block does not parse.', 400, { violations: declaration.violations }));
+        return;
+      }
+      const provenanceIdIn = (req.body ?? {}).ai_provenance_id;
       const files = new Map<string, string>([['SKILL.md', skill_md]]);
       if (extraFiles && typeof extraFiles === 'object' && !Array.isArray(extraFiles)) {
         for (const [path, content] of Object.entries(extraFiles as Record<string, unknown>)) {
@@ -167,9 +186,20 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         files,
         visibility: visibility as 'owner' | 'members' | 'public' | undefined,
         ...(scope === 'workspace' ? { organismId: organism, workspaceId: ws, accessor } : {}),
+        provenance: {
+          principal: resolveIdentity(req.auth!, config.nodeId), scopes: req.auth!.scopes,
+          ...(declaration.declared ? { declared: declaration.declared } : {}),
+          ...(typeof provenanceIdIn === 'string' && provenanceIdIn ? { declaredId: provenanceIdIn } : {}),
+        },
       });
       emitChange('skills');
-      res.status(201).json(success(config.nodeId, { skill: summary }, [
+      res.status(201).json(success(config.nodeId, {
+        skill: summary, ai_provenance_id: summary.aiProvenanceId ?? null,
+        ...(await provenanceWriteEcho(storage, config, {
+          storedId: summary.aiProvenanceId, declared: declaration.declared,
+          declaredId: typeof provenanceIdIn === 'string' && provenanceIdIn ? provenanceIdIn : undefined,
+        })),
+      }, [
         { description: 'Resolve this skill', method: 'GET', url: `/v1/skills/${summary.name}?scope=${summary.scope}` },
       ]));
     } catch (err) {

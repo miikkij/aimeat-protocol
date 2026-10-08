@@ -32,6 +32,9 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.7.0 -- 2026-10-08 -- publishSkill records how SKILL.md was made (skill-provenance.ts) and sets
+ *     the record on the SKILL.md file and the manifest; the summary names it (aiprov E12).
+ *     listAcrossOwners and freshestByKey moved to skill-records.ts (max-file-lines).
  *   v1.6.0 -- 2026-10-02 -- `fromPackage` may carry the package's `author` and `originNode`.
  *   v1.5.0 -- 2026-09-30 -- `fromPackage` on the manifest and the summary: the package install that
  *     published a user skill (package-skill-component.ts). A republish without it keeps the tag.
@@ -60,6 +63,8 @@ import { canReadWorkspace } from './workspace-access.js';
 import { localAccountName } from '../utils/gaii.js';
 import type { ContentReader } from './classification/reader.js';
 import { showSkillRecords } from './skill-reader.js';
+import { listAcrossOwners, freshestByKey } from './skill-records.js';
+import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenance.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
 import {
@@ -140,6 +145,8 @@ export interface SkillSummary {
   visibility: MemoryRecord['visibility'];
   files: Array<{ path: string; size: number }>;
   updatedAt: string;
+  /** The provenance record of SKILL.md, from the manifest row; absent is UNSTATED (skill-provenance.ts). */
+  aiProvenanceId?: string;
 }
 
 export interface ResolvedSkill extends SkillSummary {
@@ -192,6 +199,7 @@ function toSummary(record: MemoryRecord, scope: SkillScope, owner: string | null
   if (v.binding) summary.binding = v.binding;
   if (v.supersededBy) summary.supersededBy = v.supersededBy;
   if (v.fromPackage) summary.fromPackage = v.fromPackage;
+  if (record.aiProvenanceId) summary.aiProvenanceId = record.aiProvenanceId;
   return summary;
 }
 
@@ -214,23 +222,6 @@ async function mayReadWs(
   if (!organism) return false;
   const a = fullAccessor(config, accessor);
   return canReadWorkspace(storage, config, organism, a.sub, a.ownerName ?? undefined, a.gaii, ws);
-}
-
-/** All owners' copies of the records under a key prefix (workspace records may be
- *  published by different members — the organism content-ownership invariant). */
-async function listAcrossOwners(storage: Storage, prefix: string): Promise<MemoryRecord[]> {
-  const { items } = await storage.listAllMemory({ prefix, limit: 2000 });
-  return items;
-}
-
-/** Collapse multi-owner copies of the same key to the freshest one (freshest-wins). */
-function freshestByKey(records: MemoryRecord[]): Map<string, MemoryRecord> {
-  const best = new Map<string, MemoryRecord>();
-  for (const r of records) {
-    const cur = best.get(r.key);
-    if (!cur || String(r.updatedAt) > String(cur.updatedAt)) best.set(r.key, r);
-  }
-  return best;
 }
 
 /** Visibility gate shared by resolve/list. Owner of the skill always reads their own. */
@@ -267,6 +258,8 @@ export interface PublishSkillOpts {
   accessor?: SkillAccessor;
   /** User scope: the package install publishing this skill. Absent keeps the tag the skill had. */
   fromPackage?: SkillPackageTag;
+  /** Who writes SKILL.md and what they declared (skill-provenance.ts). Absent records nothing. */
+  provenance?: SkillPublishProvenance;
 }
 
 export async function publishSkill(
@@ -325,6 +318,8 @@ export async function publishSkill(
     ? 'workspace'
     : (opts.visibility ?? existing?.visibility ?? (opts.scope === 'node' ? 'members' : 'owner'));
   const workspaceRef = isWs ? `${org}/${ws}` : undefined;
+  // How SKILL.md was made, decided before the first write so a refused declaration stores nothing.
+  const aiProvenanceId = await skillProvenanceId(storage, config, opts.provenance, String(opts.files.get('SKILL.md') ?? ''), visibility);
 
   // Write file records (mirroring the manifest's visibility), then remove stale ones (own copies).
   const fileIndex: Array<{ path: string; size: number }> = [];
@@ -345,6 +340,7 @@ export async function publishSkill(
       version: (prior?.version ?? 0) + 1,
       createdAt: prior?.createdAt ?? now,
       updatedAt: now,
+      ...(path === 'SKILL.md' && aiProvenanceId ? { aiProvenanceId } : {}),
     });
   }
   const stale = (existingValue?.files ?? []).filter(f => !opts.files.has(f.path));
@@ -383,6 +379,7 @@ export async function publishSkill(
     version: (ownExisting?.version ?? 0) + 1,
     createdAt: ownExisting?.createdAt ?? now,
     updatedAt: now,
+    ...(aiProvenanceId ? { aiProvenanceId } : {}),
   });
 
   // Version snapshot for `@{semver}` pins: an immutable {manifest, files} copy per publish,

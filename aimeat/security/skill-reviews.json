@@ -92,7 +92,7 @@
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:5290dfc81cac89fe0855670a"
+      "digest": "sha256:c21039590693b69a201dfc6a"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-10-06",
@@ -224,12 +224,12 @@
       "digest": "sha256:967b7c66acdd5745ed2fc73a"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-10-05",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:9cb4a6b22044411852ad5e74"
+      "digest": "sha256:0092723e2fe67ae43fa2e2a3"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-10-05",
@@ -239,12 +239,12 @@
       "digest": "sha256:a2bf41c7125d8baa4ca17098"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-06",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:27c2133a56dd7359501d914c"
+      "digest": "sha256:fb0a6a3e0df4906babe98c15"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-05",
@@ -301,11 +301,11 @@
       "digest": "sha256:dc13fe1eb8c843ea2e683887"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-10-05",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:244117badcb99723124f1924"
+      "digest": "sha256:b17d1ead73c903c7a8a00ee0"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-09-19",
@@ -380,11 +380,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-06",
+      "reviewedOn": "2026-10-08",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:c70929e0970b54b84ecccdd3"
+      "digest": "sha256:d440a41fd857fb8344bf4b84"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -416,7 +416,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "aaa80fccdd57be35"
+      "aimeat/src/services/ai/completion.ts": "f6c2d7e866accea2"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "ed807563afc973bf",
@@ -497,14 +497,14 @@
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
     "node:ai-transparency": {
-      "aimeat/src/mcp/ai-provenance-input.ts": "dfd9bc9ddb962338",
-      "aimeat/src/services/ai-provenance.ts": "966aef506342bfbc"
+      "aimeat/src/mcp/ai-provenance-input.ts": "d2c8dbd9f1ff0642",
+      "aimeat/src/services/ai-provenance.ts": "1166828aaa1e9308"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "fd3a6da1b1490f40"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "9885f6a0a257a73f",
+      "aimeat/src/mcp/core.ts": "1800969cb8596817",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "33e900e23cb50fb6"
     },
     "node:manage-my-profile-data": {
@@ -527,7 +527,7 @@
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "90323ec4f71d924f"
+      "aimeat/src/routes/skills.ts": "a9089527addd6f1b"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
@@ -564,7 +564,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "966f62318a86ccfe"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "61669baeab8b64a8"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {

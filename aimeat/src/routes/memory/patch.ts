@@ -25,6 +25,9 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.5.2 — 2026-10-08 — The provenance stamp names the caller (resolveIdentity), not the namespace
+ *     the write lands in. With owner_scope the namespace is the owner's GHII, so an agent's PATCH into
+ *     its owner's records was never stamped as model-written (aiprov E5).
  *   v1.5.1 — 2026-10-08 — The stamp states the merged value's medium (text or data).
  *   v1.5.0 — 2026-09-29 — The merged value is scheduled for write-time classification
  *     (services/classify-on-write.ts, TARGET-082 V3).
@@ -244,8 +247,10 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // stored. A statement about only the patch would be a statement about something nobody can read
       // back. An existing record's id is dropped: the value changed, so the old statement is no longer
       // about these bytes (same rule as POST).
+      // The WRITER, never the namespace: with owner_scope `gaii` is the owner's GHII, which is never
+      // stamped, so an agent writing into its owner's records came out as a person's writing.
       const aiProvenanceId = await stampAgentWrite(storage, {
-        principal: gaii,
+        principal: resolveIdentity(req.auth!, config.nodeId),
         content: memoryContentBytes(merged),
         mediaKind: mediaKindOfValue(merged),
         pipeline: 'memory.patch',

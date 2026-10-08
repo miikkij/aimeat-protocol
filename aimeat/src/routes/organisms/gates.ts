@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-10-08 — The batch publish route hands the session's scopes to publishRecordsBatchOp,
+ *     which now records provenance for each direct value and takes a record's own `ai_provenance` /
+ *     `ai_provenance_id` (aiprov E3).
  *   v1.5.0 — 2026-10-06 — The batch publish route runs publishRecordsBatchOp
  *     (services/workspace-tool-ops.ts), the function ctx.workspace.publishRecords runs, and takes
  *     `dry_run` and `create_only`. Its GATE_ENABLED refusal says what to do instead.
@@ -47,6 +50,7 @@ import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../
 import { logger } from '../../utils/logger.js';
 import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace-tool-ops.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 
 /**
  * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
@@ -295,7 +299,9 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   router.post('/v1/organisms/:id/workspace/records/publish', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const who = callerOf(req, config.nodeId, storage);
     if (who.visitor) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node is not a member of this organism.')); return; }
-    const caller = workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles] }, config);
+    // The session's scopes ride along: a record's provenance declaration needs provenance:write in
+    // the session as well as on the grant (aiprov E3).
+    const caller = workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles], scopes: who.scopes }, config);
     const body = (req.body ?? {}) as Record<string, unknown>;
     // Two shapes: `instances` (draft ids, publish each record's existing draft) OR `records`
     // ([{id, value, visibility?}], DRAFT-LESS import: publish the supplied values directly, no draft
@@ -310,6 +316,8 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       expectedVersions: body.expected_versions && typeof body.expected_versions === 'object' ? body.expected_versions as Record<string, number | null> : undefined,
       createOnly: body.create_only === true,
       dryRun: body.dry_run === true,
+      // A record's own `ai_provenance`, validated by the parser every REST declaration goes through.
+      parseDeclaration: parseDeclaredProvenanceInput,
     });
     if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details)); return; }
     res.json(success(config.nodeId, r.data));

@@ -19,6 +19,11 @@
  *   v1.4.0 — 2026-09-29 — TARGET-082 V4: GET /:id passes the manifest it found through the caller's
  *     classification reader (readerFor, presentMemory): one the caller may not see answers 404 like a
  *     missing one, and one shown to an AI under a warning label carries `classificationWarning`.
+ *   v1.5.0 — 2026-10-08 — POST /v1/knowledge/import records provenance through provenanceForWrite for
+ *     the manifest and each entry: `ai_provenance` from the body (a declaration
+ *     the caller may not make is 403 before anything is stored), else the synthesis level as a
+ *     declaration for a caller who may declare, else the node's stamp for an agent. It minted
+ *     directly, past the provenance:write gate, and stamped no entry (aiprov E10).
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,9 +35,10 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import type { KnowledgeHelpers } from './helpers.js';
 import { validateManifest } from './manifest-validator.js';
-import { mintProvenance } from '../../services/ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from '../../services/ai-provenance.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
-import { ownerGhiiOf } from '../../utils/gaii.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { memoryContentBytes } from '../../utils/memory-content.js';
 import { logger } from '../../utils/logger.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { presentMemory, classificationWarningOf } from '../../services/classification/present-memory.js';
@@ -148,43 +154,44 @@ export function registerPackagesCoreRoutes(
     manifest.created = now;
     manifest.updated = now;
 
-    // TARGET-058. A knowledge package's `synthesis.level` is the SAME vocabulary as the provenance
-    // record's `level` — the record borrowed it from here — so a package that declares anything
-    // other than `original` is already stating AI involvement, and it should carry an addressable
-    // record rather than a badge the viewer invents from a string.
-    //
-    // `stampedBy: 'principal'`: the AUTHOR declares this. The node did not watch a model produce the
-    // package, and mintProvenance forces `observed: false` for a principal stamp so the claim cannot
-    // dress itself up as something we witnessed. `humanInvolvement: 'none'` is the honest reading of
-    // silence — the manifest schema has no field for review, so nobody has told us a person read the
-    // substance, and under decision D4 the unlabelled reading is the one we do not take.
-    let aiProvenanceId: string | undefined;
-    if (config.aiProvenance && manifest.synthesis && manifest.synthesis.level !== 'original') {
-      try {
-        const row = await mintProvenance(storage, {
-          stampedBy: 'principal',
-          ownerGhii: ownerGhiiOf(ownerGaii),
-          principal: ownerGaii,
-          level: manifest.synthesis.level,
-          humanInvolvement: 'none',
-          content: JSON.stringify(manifest),
-          generator: manifest.synthesis.model ? { model: manifest.synthesis.model } : undefined,
-          notes: manifest.synthesis.description,
-          surface: {
-            visibility: manifest.sharing.catalog_listed ? 'public' : 'owner',
-            humanAudience: true,
-          },
-          labelPolicy: config.aiLabelPublic,
-          nodeId: config.nodeId,
-          baseUrl: config.baseUrl,
-        });
-        aiProvenanceId = row.id;
-      } catch (err) {
-        // An import the user is waiting on must not fail because the label bookkeeping did. Logged,
-        // never swallowed: an operator who sees this knows a package went out unmarked.
-        logger.warn('POST /v1/knowledge/import: provenance mint failed, package stored unmarked', { error: String(err) });
-      }
+    // TARGET-058, through THE write decision (provenanceForWrite) since 2026-10-08 (aiprov E10). It
+    // called mintProvenance directly, which skipped the provenance:write gate, gave an agent's
+    // undeclared package no stamp, stamped none of the entries, and took no declaration.
+    //   - `ai_provenance` in the body is the caller's own statement, and a declaration the caller
+    //     may not make is refused before anything is stored.
+    //   - `synthesis.level` is the SAME vocabulary as the record's `level` (the record borrowed it
+    //     from here), so a package saying anything other than `original` states AI involvement. It is
+    //     honoured as a declaration by a caller who may declare; for an agent that may not, the
+    //     node's own stamp (model-written, no review) says the same without taking its word.
+    //   - `humanInvolvement` defaults to `none`: the manifest has no field for review, so nobody has
+    //     told us a person read the substance (decision D4).
+    // The manifest and every entry get their own record, because each is a different set of bytes.
+    const principal = ownerGaii;
+    const declaration = parseDeclaredProvenanceInput((req.body ?? {}).ai_provenance);
+    if (!declaration.ok) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The ai_provenance block does not parse.', 400, { violations: declaration.violations }));
+      return;
     }
+    const explicitRefusal = await provenanceDeclarationRefusal(storage, {
+      principal, declared: declaration.declared, enabled: config.aiProvenance, scopes: req.auth!.scopes,
+    });
+    if (explicitRefusal) { res.status(403).json(error(config.nodeId, explicitRefusal.code, explicitRefusal.message)); return; }
+    let declared: DeclaredProvenance | undefined = declaration.declared;
+    if (!declared && manifest.synthesis && manifest.synthesis.level !== 'original') {
+      const fromSynthesis: DeclaredProvenance = {
+        level: manifest.synthesis.level,
+        ...(manifest.synthesis.model ? { model: manifest.synthesis.model } : {}),
+        ...(manifest.synthesis.description ? { notes: manifest.synthesis.description } : {}),
+      };
+      const mayNot = await provenanceDeclarationRefusal(storage, { principal, declared: fromSynthesis, enabled: config.aiProvenance, scopes: req.auth!.scopes });
+      if (!mayNot) declared = fromSynthesis;
+    }
+    const recordFor = (content: unknown, visibility: KnowledgeManifest['entries'][number]['visibility']) => provenanceForWrite(storage, {
+      principal, scopes: req.auth!.scopes, content: memoryContentBytes(content), declared,
+      pipeline: 'knowledge.import', surface: { visibility, humanAudience: true },
+      labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl, enabled: config.aiProvenance,
+    });
+    const aiProvenanceId = await recordFor(manifest, manifest.sharing.catalog_listed ? 'public' : 'owner');
 
     await storage.setMemory({
       key: manifestKey,
@@ -204,6 +211,8 @@ export function registerPackagesCoreRoutes(
     for (const entry of manifest.entries) {
       const shortKey = entry.key.split('/').pop() ?? '';
       const data = entryData[entry.key] ?? entryData[shortKey] ?? {};
+      // Each entry's own record: the package's declaration about these bytes, or the stamp.
+      const entryProvenanceId = await recordFor(data, entry.visibility);
       await storage.setMemory({
         key: entry.key,
         ownerGaii,
@@ -214,6 +223,7 @@ export function registerPackagesCoreRoutes(
         version: 1,
         createdAt: now,
         updatedAt: now,
+        ...(entryProvenanceId ? { aiProvenanceId: entryProvenanceId } : {}),
       });
       createdEntries.push(entry.key);
     }

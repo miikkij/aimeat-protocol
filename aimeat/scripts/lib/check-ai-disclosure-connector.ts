@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Connector provenance checks extracted unchanged from the disclosure gate.
  * @version-history
+ *   v1.2.1 -- 2026-10-08 -- ENVELOPE_PROVENANCE_ROUTES names the public share read of one document
+ *     (routes/organisms/workspace-ops.ts), which serves meta.provenance since aiprov E1.
  *   v1.2.0 -- 2026-10-05 -- Both surfaces' carrying of ai_provenance is read from their registered schemas
  *     (keysOf); a connector tool served over its CLI dispatch definition folds read provenance inside
  *     withProvenanceCarrying() (secaudit 2026-10, M3).
@@ -189,6 +191,10 @@ const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
     + 'reads r.meta.provenance directly (sdk-libs/ai/index.js).',
   'src/routes/openrouter.ts':
     'POST /v1/openrouter/complete — owner-facing, same as ai.ts: no connector tool.',
+  'src/routes/organisms/workspace-ops.ts':
+    'GET /v1/organisms/:id/workspace/public/document, the anonymous share read of one page — no '
+    + 'connector tool wraps it; the document also carries its record as the `ai_provenance` block in '
+    + 'data, which survives `resp.data ?? resp` (aiprov E1, 2026-10-08).',
 };
 
 /** Connector MCP read tools that MUST fold the envelope carrier onto their payload. */

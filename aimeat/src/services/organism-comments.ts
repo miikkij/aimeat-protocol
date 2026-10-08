@@ -14,6 +14,8 @@
  *   - addComment(...) / listComments(storage, reader, ...) -- create + read a target's thread
  *   - deleteComment(...) -- author or creator/admin removes one comment
  * @version-history
+ *   v1.4.0 -- 2026-10-08 -- addComment() and listComments() return each comment's `aiProvenanceId`,
+ *     read from its row, so a reader of a thread can resolve how a comment was made (aiprov E8).
  *   v1.3.0 -- 2026-09-30 -- deleteComment(): moved out of the DELETE route so the new MCP tool
  *     aimeat_workspace_comment_delete runs the same checks. It also requires the workspace gate that
  *     reading and writing a comment require, so deleting one takes no less than writing one.
@@ -41,6 +43,8 @@ export interface WorkspaceComment {
   parentId: string | null; createdAt: string;
   /** Set on a listed comment when an AI reader was shown it under a warning classification. */
   classificationWarning?: { label: string; name: string; says: string };
+  /** The provenance record of the body, read from the comment's row; null is UNSTATED. Never stored in the value. */
+  aiProvenanceId?: string | null;
 }
 
 export const commentPrefix = (id: string, ws: string, space: string, instanceId: string): string =>
@@ -88,7 +92,7 @@ export async function addComment(
     ...(input.aiProvenanceId ? { aiProvenanceId: input.aiProvenanceId } : {}),
     ttlHours: null, version: 1, createdAt: now, updatedAt: now,
   });
-  return comment;
+  return { ...comment, aiProvenanceId: input.aiProvenanceId ?? null };
 }
 
 export type DeleteCommentResult =
@@ -133,7 +137,9 @@ export async function listComments(
       // An AI shown a warning-classified comment gets the warning on the comment itself.
       const w = classificationWarningOf(r);
       const c = r.value as unknown as WorkspaceComment;
-      return w && c && typeof c === 'object' ? { ...c, classificationWarning: w } : c;
+      if (!c || typeof c !== 'object') return c;
+      // The record of how the body was made lives on the row, so a reader can resolve its label.
+      return { ...c, aiProvenanceId: r.aiProvenanceId ?? null, ...(w ? { classificationWarning: w } : {}) };
     })
     .filter(v => v && typeof v === 'object')
     .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
