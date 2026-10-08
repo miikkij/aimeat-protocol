@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-08 — WorkRecord.aiProvenanceId: the record of a work item's delivered output
+ *     (migration 0098, aiprov D8).
  *   v1.3.0 — 2026-09-29 — ChunkedUploadRecord carries 'workspace' visibility and the group or
  *     workspace binding, so a chunked upload lands bound like POST /v1/storage.
  *   v1.2.0 — 2026-09-09 — ListingRecord, PurchaseRecord and EscrowHoldRecord deleted with the
@@ -131,6 +133,8 @@ export interface WorkRecord {
   rating?: { score: number; comment?: string };
   createdAt: string;
   updatedAt: string;
+  /** The AI-provenance record of the delivered output. Absent is UNSTATED (migration 0098). */
+  aiProvenanceId?: string;
 }
 
 export interface WalletTransaction {

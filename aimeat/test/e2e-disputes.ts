@@ -6,6 +6,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-disputes
  * @version-history
+ *   v1.2.0 — 2026-10-08 — aiprov D8: the delivered output names its provenance record, and the
+ *     requester reads the record on the work item while /v1/provenance/:id stays 404 for it.
  *   v1.0.0 — 2026-08-14 — Header added; file pre-dates header standard.
  *   v1.1.0 — 2026-08-14 — Phase 8 removed with the routes it covered. GET accept-redelivery?otk=
  *     and GET escalate?otk= are deleted, so tests 20 and 21 and their two setups are deleted too.
@@ -239,6 +241,20 @@ await test('Provider auth token', async () => {
 await test('Create delivered work item for Phase 1-3', async () => {
     const tc = await createDeliveredWork();
     trackingCodes.push(tc); // trackingCodes[0]
+});
+
+// aiprov D8: the output the requester disputes over says how it was made. The provider is an agent,
+// so the node records the output as model-written, and the requester (another owner's agent) reads
+// the record on the work item, because /v1/provenance/:id is the provider's owner's to resolve.
+await test('The delivered output carries its provenance record, readable by the requester', async () => {
+    const { status, body } = await json(`/v1/work/${trackingCodes[0]}`, { headers: { Authorization: `Bearer ${requesterToken}` } });
+    assert(status === 200, `work read: ${status} ${JSON.stringify(body.error)}`);
+    const id = body.data.ai_provenance_id;
+    assert(typeof id === 'string' && body.data.ai_provenance?.id === id, `the work names its record: ${JSON.stringify(body.data)}`);
+    assert(body.data.ai_provenance.record?.level === 'ai-generated' && body.data.ai_provenance.record?.generator?.principal === providerGaii,
+        `an agent's output is model-written, by the provider: ${JSON.stringify(body.data.ai_provenance.record)}`);
+    const direct = await json(`/v1/provenance/${id}`, { headers: { Authorization: `Bearer ${requesterToken}` } });
+    assert(direct.status === 404, `the record is not the requester's to resolve directly: ${direct.status}`);
 });
 
 // ─── Phase 1: Dispute Opening & Viewing ───

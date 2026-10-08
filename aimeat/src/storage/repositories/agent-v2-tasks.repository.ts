@@ -17,6 +17,7 @@
  * @structure AgentV2TasksRepository — create / get / list / update / settle / deleteByOwner
  * @usage const task = await storage.getAgentV2Task(owner, taskId);
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The patch carries aiProvenanceId (aiprov D8).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 import type { AgentV2TaskRecord, AgentV2TaskStatus } from '../interface.js';
@@ -44,6 +45,7 @@ export interface AgentV2TaskPatch {
   completedAt?: string | null;
   ttlMs?: number | null;
   pollIntervalMs?: number | null;
+  aiProvenanceId?: string | null;
 }
 
 export interface AgentV2TasksRepository {

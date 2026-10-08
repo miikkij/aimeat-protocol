@@ -6,6 +6,8 @@
  *   inbox/sent + the owner delete/usage cascades. Translated 1:1 from the Prisma implementation; the
  *   flat cost columns fold back into the nested `cost` object. Replaces the listWorkBy* placeholders.
  * @version-history
+ *   v1.1.0 — 2026-10-08 — Work round-trips aiProvenanceId, the record of the delivered output
+ *     (migration 0098, aiprov D8).
  *   v1.0.0 — 2026-07-15 — Phase 5: work domain on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -25,6 +27,7 @@ function toWork(r: Selectable<Work>): WorkRecord {
     ttlExpiresAt: iso(r.ttlExpiresAt), callbackUrl: r.callbackUrl ?? undefined,
     rating: r.ratingScore != null ? { score: r.ratingScore, comment: r.ratingComment ?? undefined } : undefined,
     createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
+    ...(r.aiProvenanceId ? { aiProvenanceId: r.aiProvenanceId } : {}),
   };
 }
 
@@ -34,6 +37,7 @@ export const workMethods = {
       trackingCode: w.trackingCode, status: w.status, actionId: w.actionId, providerGaii: w.providerGaii, requesterGaii: w.requesterGaii,
       input: jsonb(w.input), costBasePrice: w.cost.basePrice, costNetworkFee: w.cost.networkFee, costTotal: w.cost.total, costInEscrow: w.cost.inEscrow,
       ttlExpiresAt: new Date(w.ttlExpiresAt), callbackUrl: w.callbackUrl ?? null, createdAt: new Date(w.createdAt), updatedAt: new Date(w.updatedAt),
+      aiProvenanceId: w.aiProvenanceId ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();
     return toWork(row);
@@ -48,6 +52,7 @@ export const workMethods = {
     if (updates.output) data.output = jsonb(updates.output);
     if (updates.updatedAt) data.updatedAt = new Date(updates.updatedAt);
     if (updates.rating) { data.ratingScore = updates.rating.score; data.ratingComment = updates.rating.comment ?? null; }
+    if (updates.aiProvenanceId) data.aiProvenanceId = updates.aiProvenanceId;
     if (Object.keys(data).length === 0) return this.getWork(trackingCode);
     const rows = await this.db.updateTable('Work').set(data as never).where('trackingCode', '=', trackingCode).returningAll().execute();
     return rows[0] ? toWork(rows[0]) : null;
