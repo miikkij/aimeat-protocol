@@ -216,7 +216,7 @@ function sandboxSection(): string {
     'record written this way carries provenance naming your extension, because a script produced it.',
     '',
     '**Rows on a schedule.** `workspace: { rows: true }` gives `ctx.workspace.appendRows` and `readRows`',
-    'on a ROW space whose manifest names your extension: `objectTypes[].extensions: [your-extension-name]`,',
+    'on a ROW space whose manifest names your extension: `objectTypes[].extensions: [installer/your-extension-name]`,',
     'which an admin of the organism adds. Your installer must be an active member, and the space\'s',
     '`writeRole` applies to them. These two calls do not act as the caller, so they work the same on a',
     'request, a schedule and a workflow step, and a row records `ext:<name>` as its writer. On a request,',

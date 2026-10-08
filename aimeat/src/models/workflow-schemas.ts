@@ -70,6 +70,9 @@
  *   v1.17.0 — 2026-09-28 — System 2 plan, V5: the `ai` step action's type and schema moved unchanged
  *     to workflow-ai-step.ts (max-file-lines), where they gain `op`, `provider`, `audio_key`,
  *     `language` and `size`.
+ *   v1.19.0 — 2026-10-08 — The extension step's `input_from`: input fields filled from owner memory
+ *     at dispatch, so an extension step can act on an earlier step's deliverable or a person's
+ *     answer (aimeat-soc: the response action after the human decision).
  *   v1.18.0 — 2026-10-05 — WorkflowRun.aiCaller: who the run's AI calls run as, decided at its start
  *     (services/workflow/ai-caller.ts; secaudit 2026-10, AI-3).
  */
@@ -159,6 +162,15 @@ export type WorkflowStepAction =
   | {
       kind: 'extension'; extension: string; action: string; instance_id?: string;
       input?: Record<string, unknown>; result_to_key?: string;
+      /**
+       * Input fields filled from the OWNER's memory at dispatch: `{ param: key }` puts the value of
+       * that owner-namespace key (templated, sandbox-prefix-honoring) into `input[param]`, over
+       * whatever `input` had. This is how a step hands an earlier step's deliverable, or a person's
+       * answer, to an extension: the sandbox cannot read the owner's private memory, and `input` is
+       * templated with vars only. A missing key arrives as null. The extension is always the
+       * owner's own (extension-system-run.ts), so nothing crosses to anybody else.
+       */
+      input_from?: Record<string, string>;
       /**
        * Call the action repeatedly and merge the pages into one result.
        *
@@ -628,6 +640,9 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     /** Owner-namespace key the action's return value is written to, so a signal can gate on it.
      *  See the type above for why an extension step needs this and an agent step does not. */
     result_to_key: z.string().min(1).max(400).optional(),
+    /** `{ param: owner key }`: input fields filled from the owner's memory at dispatch. See the type. */
+    input_from: z.record(z.string().min(1).max(64), z.string().min(1).max(400))
+      .refine(m => Object.keys(m).length <= 20, 'input_from names at most 20 fields').optional(),
     /** Call the action repeatedly and merge the pages. See the type above for why a step needs it:
      *  a producer that caps at 500 rows on a set of 718 otherwise publishes five-sevenths of the
      *  data with nothing saying so. */

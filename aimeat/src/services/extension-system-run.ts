@@ -57,7 +57,7 @@ import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail, sandboxLi
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 import type { ExtensionCtxDeps } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
-import { buildUnattendedExtensionWorkspace } from './extension-workspace.js';
+import { buildUnattendedExtensionWorkspace } from './extension-workspace-rows.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
 import { getEncryptionKey } from './encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';

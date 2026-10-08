@@ -3640,7 +3640,7 @@ components:
               type: boolean
               description: |
                 `ctx.workspace.appendRows` and `readRows` on a ROW space that names this extension in
-                its manifest (`objectTypes[].extensions`), while the installer is an active member
+                its manifest as `installer/name` (`objectTypes[].extensions`), while the installer is an active member
                 and within the space's writeRole. The caller of the action does not enter the
                 decision, so the two calls work the same on a call, a schedule and a workflow step.
                 A row records `ext:<name>` as its writer.
@@ -5787,6 +5787,14 @@ components:
               description: >-
                 trigger-geai: capability input. extension: the action's input, with `{var}` substituted
                 into its string leaves at dispatch (numbers and booleans pass through unchanged).
+            input_from:
+              type: object
+              additionalProperties: { type: string, maxLength: 400 }
+              description: >-
+                extension: `{ param: key }`, at most 20. At dispatch each param of the action's input is
+                set to the value of that owner-namespace key (templated, sandbox-prefix-honoring), over
+                `input`; a missing key arrives as null. This is how an extension step acts on an earlier
+                step's `result_to_key` or a person's `answer_to_key`, which the sandbox cannot read.
             extension: { type: string, maxLength: 120, description: 'extension: the extension name — must be installed by this workflow''s owner.' }
             action: { type: string, maxLength: 120, description: 'extension: the action id on that extension.' }
             instance_id: { type: string, maxLength: 120, description: 'extension: run against this named instance (its config, secrets decrypted, arrives as ctx.instance).' }
@@ -38034,7 +38042,7 @@ paths:
         grant without the scope is refused at the door, and nothing else on the organism opens.
 
         An EXTENSION reaches a row space the same way, through `ctx.workspace.appendRows` and
-        `readRows` rather than this route: the organism names it in `objectTypes[].extensions`, its
+        `readRows` rather than this route: the organism names it as `installer/name` in `objectTypes[].extensions`, its
         manifest declares `workspace: { rows: true }`, and its installer is an active member. That
         works on a schedule and a workflow step as well, where nobody is present.
 
@@ -42461,7 +42469,7 @@ paths:
                     caller's own scopes still apply (`organism:read` to read, `memory:write` to
                     write or publish, an owner session needs neither). `workspace: { rows: true }`
                     adds `ctx.workspace.appendRows` / `readRows` on row spaces that name the
-                    extension (`objectTypes[].extensions`), also on a schedule or a workflow step.
+                    extension as `installer/name` (`objectTypes[].extensions`), also on a schedule or a workflow step.
                     A top-level `network: { hosts: [api.example.com] }` limits `ctx.fetch` to those
                     exact hostnames, on every redirect hop too; the package approval lists them.
                 scripts:

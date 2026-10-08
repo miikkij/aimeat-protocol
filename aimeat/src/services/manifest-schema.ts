@@ -145,11 +145,12 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           // this one space (services/workspace-rows/row-service.ts, authorizeApp). Decided
           // 2026-08-29 for the legal-pages demo's audit trail.
           apps: { type: 'array', items: { type: 'string', pattern: '^[^/]+/[^/]+$' }, maxItems: 20 },
-          // Row spaces only. The installed EXTENSIONS this space is open to, by name. A scheduled
-          // ingest has nobody present to borrow a membership from, so the organism names the
+          // Row spaces only. The installed EXTENSIONS this space is open to, as `installer/name`. A
+          // scheduled ingest has nobody present to borrow a membership from, so the organism names the
           // extension here, its manifest declares workspace.rows, and its installer must be an active
-          // member (row-service.ts, authorizeExtension). Decided 2026-10-08 for the aimeat-soc alert queue.
-          extensions: { type: 'array', items: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$' }, maxItems: 20 },
+          // member (row-service.ts, authorizeExtension). The installer is in the name because an
+          // extension name is free again after an uninstall. Decided 2026-10-08 for the aimeat-soc alert queue.
+          extensions: { type: 'array', items: { type: 'string', pattern: '^[^/]+/[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$' }, maxItems: 20 },
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
           maxVersions: { type: 'number' },  // per-space history retention window (overrides AIMEAT_WS_MAX_VERSIONS; 0 = keep all; create_only spaces never pruned)

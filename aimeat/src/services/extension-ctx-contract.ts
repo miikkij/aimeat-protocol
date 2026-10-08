@@ -215,7 +215,7 @@ export interface ExtensionCtx {
         deleteRecords(organismId: string, ws: string, namespace: string, ids: string[]): Promise<unknown>;
         /**
          * Append up to 500 rows `[{ body, rowId?, occurredAt? }]` to a ROW space that names this
-         * extension (`objectTypes[].extensions`); manifest `workspace.rows`. A repeated `rowId`
+         * extension as `installer/name` (`objectTypes[].extensions`); manifest `workspace.rows`. A repeated `rowId`
          * replaces the stored row. Works on a schedule and a workflow step too. Answers
          * `{ written, rowIds, pruned }`.
          */
