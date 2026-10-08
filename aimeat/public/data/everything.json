@@ -1043,10 +1043,10 @@
      "slug": "g-7-basic-agents-and-runtime-attachment",
      "cells": [
       "<strong>Basic agents and runtime attachment</strong>",
-      "The owner can create the basic agent set and enrol it through a connected runtime. An existing agent can be attached when its runtime becomes available. The response states whether the runtime accepted the agent.",
+      "The owner can create the basic agent set and enrol it through a connected runtime. An existing agent can be attached when its runtime becomes available. The response states whether the runtime accepted the agent. An agent approved while no connector was running waits for it: when one of the owner's connectors next connects, the node offers it the keys of those waiting agents, and nobody has to press Attach. A connector that refuses leaves them waiting, and the node log says why.",
       "<code>/v1/agents/v2/basic-agents</code>, <code>/v1/agents/v2/agents/:name/attach</code>, <code>aimeat_agent_basics_get</code>, <code>aimeat_agent_basics_request</code>"
      ],
-     "plain": "Basic agents and runtime attachment The owner can create the basic agent set and enrol it through a connected runtime. An existing agent can be attached when its runtime becomes available. The response states whether the runtime accepted the agent. /v1/agents/v2/basic-agents, /v1/agents/v2/agents/:name/attach, aimeat_agent_basics_get, aimeat_agent_basics_request"
+     "plain": "Basic agents and runtime attachment The owner can create the basic agent set and enrol it through a connected runtime. An existing agent can be attached when its runtime becomes available. The response states whether the runtime accepted the agent. An agent approved while no connector was running waits for it: when one of the owner's connectors next connects, the node offers it the keys of those waiting agents, and nobody has to press Attach. A connector that refuses leaves them waiting, and the node log says why. /v1/agents/v2/basic-agents, /v1/agents/v2/agents/:name/attach, aimeat_agent_basics_get, aimeat_agent_basics_request"
     },
     {
      "slug": "g-7-agent-proposals",

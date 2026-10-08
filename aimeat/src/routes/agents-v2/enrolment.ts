@@ -34,6 +34,8 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-08 — A create grant refuses an agent that already has a key, so a second offer
+ *     naming it cannot pin a second key over the first.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import type { Router } from 'express';
@@ -173,6 +175,11 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
           defects.push({ field: 'name', reason: 'That agent is not a key-and-card agent.' });
         } else if (grant.kind === 'migrate' && record.identityVersion === 2 && record.enrolledAt) {
           defects.push({ field: 'name', reason: 'That agent has already moved to a key and card.' });
+        } else if (grant.kind !== 'migrate' && record.enrolledAt) {
+          // Two offers can name one agent: the approve route's, and the one a connector's connect
+          // starts for pending agents (services/agent-pending-enrolment.ts). The second must not pin
+          // a second key over the first, which is the attach route's ALREADY_ATTACHED rule.
+          defects.push({ field: 'name', reason: 'That agent already has its own key.' });
         } else if (record.owner !== grant.owner) {
           defects.push({ field: 'owner', reason: 'That agent belongs to another account.' });
         }

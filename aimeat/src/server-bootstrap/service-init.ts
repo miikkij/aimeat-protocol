@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   v1.16.0 — 2026-10-08 — startPendingEnrolment(): a connector connecting gets the offer for its
+ *     owner's approved agents that have no key yet (services/agent-pending-enrolment.ts).
  *   v1.15.0 — 2026-10-02 — migrateImplicitFreeModelOnce(): once per node, the free router a key-only
  *     save wrote as the owner's chat model is cleared (services/openrouter-settings-migration.ts).
  *   v1.0.0 — pre-2026-06 — Initial service bootstrap extraction
@@ -77,6 +79,7 @@ import { assembleBook, pullBook } from '../services/federation-book.js';
 import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { ConnectTunnelManager, setActiveConnectTunnelManager } from '../services/connect-tunnel.js';
+import { startPendingEnrolment } from '../services/agent-pending-enrolment.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
 import { seedCsmTemplates } from '../services/csm-seed.js';
 import { seedManifestSchema } from '../services/manifest-schema.js';
@@ -578,6 +581,8 @@ export async function initializeServices(
     connectTunnelManager = new ConnectTunnelManager(config, storage);
     connectTunnelManager.startHeartbeatMonitor();
     setActiveConnectTunnelManager(connectTunnelManager);
+    // An agent approved while the owner's connector was down gets its key when the connector connects.
+    startPendingEnrolment({ config, storage });
     logger.info('Connector forward tunnel enabled');
   }
 

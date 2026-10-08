@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.23.7 -- 2026-10-08 -- add-a-crew-agent: an agent approved with no connector connected waits and
+ *     gets its key when the connector next connects; Attach is for a connector that refused it.
  *   v1.23.6 -- 2026-10-05 -- diagnose-a-workflow: a run's ai steps ask the model as its aiCaller, so
  *     the owner's rules for that agent or app apply (secaudit 2026-10, AI-3).
  *   v1.23.5 -- 2026-10-05 -- diagnose-a-workflow: a 402 QUOTA_EXHAUSTED on the node's key names a
@@ -398,8 +400,10 @@ not a product they do not use.
    proposal waits, and \`next_step\`, a sentence written for them. Give them both in their own
    words. Their one press there creates the agent, gives it the definition and hands it to their
    connector, which runs it on their own machine (\`aimeat connect serve\`). The approval's answer
-   says which of four states it ended in. If the connector could not be reached, the agent exists
-   with its instructions and nothing runs it: the owner starts the connector and presses Attach.
+   says which state it ended in. If no connector was connected (\`waiting_for_connector\` true), the
+   agent exists with its instructions and waits: when the owner's connector next connects, the node
+   gives it its key and the connector starts it, with nothing to press. If a connector was reached
+   and did not take it on, the owner updates the connector and presses Attach.
 5. **Work on a clock comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
    agent (\`aimeat_schedule_create\`), made once the agent exists. Say so when you propose it.
 

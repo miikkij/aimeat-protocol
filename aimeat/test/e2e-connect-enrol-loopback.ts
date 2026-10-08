@@ -24,7 +24,10 @@
  *     - an approved proposal answers attached, its record carries an enrolment, and the daemon
  *       lists it online too.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=connect-enrol-loopback
+ *     - an agent approved while the connector is stopped comes up on it when it starts again, with
+ *       its own key, and nobody presses Attach.
  * @version-history
+ *   v1.1.0 — 2026-10-08 — An agent approved while the connector is down is taken on at its next start.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -109,6 +112,35 @@ async function waitOnline(gaii: string, timeoutMs = 20_000): Promise<any> {
   return row;
 }
 
+/** Start `aimeat connect serve` on the temp home and wait for its serve.json. */
+async function startDaemon(): Promise<void> {
+  const file = join(home, 'serve.json');
+  rmSync(file, { force: true });
+  daemon = spawn('node', [...nodeEntryArgs(), 'connect', 'serve', '--http'], {
+    cwd: process.cwd(), env: { ...process.env, AIMEAT_HOME: home }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  daemon.stdout?.on('data', (d) => { daemonOut += d.toString(); });
+  daemon.stderr?.on('data', (d) => { daemonOut += d.toString(); });
+
+  const start = Date.now();
+  let disc: any = null;
+  while (!disc && Date.now() - start < 30_000) {
+    if (existsSync(file)) { try { disc = JSON.parse(readFileSync(file, 'utf-8')); } catch { /* mid-write */ } }
+    if (!disc) await sleep(150);
+  }
+  assert(!!disc, `serve.json did not appear\n--- daemon output ---\n${daemonOut}`);
+  daemonBase = `http://127.0.0.1:${disc.port}`;
+  daemonSecret = disc.secret;
+}
+
+/** Stop the daemon the way an operator does, and wait for it to exit. */
+async function stopDaemon(): Promise<void> {
+  if (daemonBase) await json(daemonBase, '/local/shutdown', { method: 'POST' }).catch(() => null);
+  if (daemon && !(await waitForExit(daemon))) daemon.kill('SIGKILL');
+  daemon = null;
+  daemonBase = '';
+}
+
 console.log('\n=== Connector on a loopback address takes on new agents ===\n');
 console.log(`  node base URL ${BASE}, connector node URL ${LOOPBACK}`);
 
@@ -130,22 +162,7 @@ await test('setup: an owner, one agent connected the way the sale connects one, 
   writeFileSync(join(home, 'agents', firstAgent, 'config.yaml'),
     yamlStringify({ agent: firstAgent, owner: ownerName, node_url: LOOPBACK, primary: true }), 'utf-8');
 
-  daemon = spawn('node', [...nodeEntryArgs(), 'connect', 'serve', '--http'], {
-    cwd: process.cwd(), env: { ...process.env, AIMEAT_HOME: home }, stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  daemon.stdout?.on('data', (d) => { daemonOut += d.toString(); });
-  daemon.stderr?.on('data', (d) => { daemonOut += d.toString(); });
-
-  const file = join(home, 'serve.json');
-  const start = Date.now();
-  let disc: any = null;
-  while (!disc && Date.now() - start < 30_000) {
-    if (existsSync(file)) { try { disc = JSON.parse(readFileSync(file, 'utf-8')); } catch { /* mid-write */ } }
-    if (!disc) await sleep(150);
-  }
-  assert(!!disc, `serve.json did not appear\n--- daemon output ---\n${daemonOut}`);
-  daemonBase = `http://127.0.0.1:${disc.port}`;
-  daemonSecret = disc.secret;
+  await startDaemon();
   const row = await waitOnline(`${firstAgent}#${ownerName}@${NODE_ID}`);
   assert(row?.tunnel_status === 'online', `the first agent should be online, got ${JSON.stringify(row)}\n--- daemon output ---\n${daemonOut}`);
 });
@@ -206,11 +223,35 @@ await test('an approved agent proposal is taken on by the same connector', async
   assert(row?.tunnel_status === 'online', `${name} should be online on the daemon, got ${JSON.stringify(row)}`);
 });
 
+await test('an agent approved while the connector is down is taken on when it starts, with nothing pressed', async () => {
+  // The hosted place of 2026-10-08: `crm` approved while the place's connector was down; it came
+  // back serving the concierge only and nothing ever offered crm its key.
+  const name = 'loop-late';
+  await stopDaemon();
+  await sleep(500);
+  const p = await json(BASE, '/v1/agents/v2/agent-proposals', {
+    method: 'POST', headers: authOwner(),
+    body: JSON.stringify({ name, purpose: 'Approved while the connector was down.', scopes: ['memory:read'], crew_def: PROPOSED_DEF }),
+  });
+  assert(p.status === 201, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+  const r = await json(BASE, `/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, { method: 'POST', headers: authOwner() });
+  assert(r.status === 200 && r.body.data.attached === false && r.body.data.attach_problem?.code === 'NO_DAEMON',
+    `with the connector down the agent is made and waits: ${r.status} ${JSON.stringify(r.body?.data?.attach_problem ?? r.body?.error)}`);
+
+  await startDaemon();
+  const row = await waitOnline(`${name}#${ownerName}@${NODE_ID}`, 30_000);
+  assert(row?.tunnel_status === 'online',
+    `${name} should come up on the restarted connector, got ${JSON.stringify(row)}\n--- daemon output ---\n${daemonOut.slice(-3000)}`);
+  assert(existsSync(join(home, 'keys', `${name}@${ownerName}.key`)), `${name} should hold its own key`);
+  const rec = (await json(BASE, `/v1/agents?owner=${ownerName}`, { headers: authOwner() }))
+    .body.data.agents.find((x: any) => x.name === name);
+  assert(!!rec?.enrolled_at, `the record should carry an enrolment, got ${JSON.stringify(rec)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('stop the daemon, delete the owner, remove the temp home', async () => {
-  if (daemonBase) await json(daemonBase, '/local/shutdown', { method: 'POST' }).catch(() => null);
-  if (daemon && !(await waitForExit(daemon))) daemon.kill('SIGKILL');
+  await stopDaemon();
   const del = await json(BASE, `/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: authOwner() });
   assert(del.status === 200, `owner delete ${del.status}`);
   await sleep(300);
