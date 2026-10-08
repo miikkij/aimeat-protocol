@@ -18,6 +18,8 @@
  * @usage
  *   import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
  * @version-history
+ *   v1.3.0 — 2026-10-08 — Facets carry the minted reason and the medium; the list filter is
+ *     `unreviewedPublicOnly`, and the label is decided by the report, not read from the stored block.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the
  *     read side the operator report, the unlabelled-content sweep and the per-owner view need.
  *     Counted in SQL, because a capped page would turn "how many public items carry no label" into
@@ -91,10 +93,10 @@ export interface AiProvenanceRepository {
    * the sweep's notification (what exactly is unlabelled) and the owner's own "what my agents
    * published" view.
    *
-   * `unlabelledPublicOnly` is the sweep's filter and the report's detail list — a record whose
-   * content is publicly readable, where nobody reviewed the substance, and whose pre-rendered
-   * disclosure block does not say a label was required. That combination is the case nobody thought
-   * of, and on the evidence of Phases 4, 5 and 6 it keeps existing.
+   * `unreviewedPublicOnly` is the population the sweep and the report's detail list decide about —
+   * a record whose content is publicly readable and where nobody reviewed the substance. Whether
+   * each one owes a label is decided by the caller for the content as it is now, not read from the
+   * block stored at mint (services/ai-transparency-report.ts).
    */
   listAiProvenance(query?: AiProvenanceListQuery): Promise<{ items: AiProvenanceRecordRow[]; total: number }>;
 }

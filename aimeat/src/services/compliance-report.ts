@@ -35,6 +35,7 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.1.1 — 2026-10-08 — The transparency roll-up and the unlabelled detail take the node's label posture.
  *   v1.1.0 — 2026-10-03 — Gap kind font-licence-unknown: a face the operator added without a licence
  *     or a copyright holder (the font manager, services/themes/fonts.ts), in the node-wide report.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
@@ -418,7 +419,7 @@ export async function buildComplianceReport(
   const owner = opts.ownerGhii;
   const questionnaire = await effectiveQuestionnaire(storage, config.nodeId);
   const [transparency, usage, consent, rawUseCases] = await Promise.all([
-    buildAiTransparencyReport(storage, { sinceDays: window.days, ownerGhii: owner }),
+    buildAiTransparencyReport(storage, { sinceDays: window.days, ownerGhii: owner, labelPolicy: config.aiLabelPublic }),
     aiUsage(storage, window.from, window.to, owner),
     consentTotals(storage, config, window.from, owner),
     readUseCases(storage, config.nodeId),
@@ -460,9 +461,9 @@ export async function buildComplianceReport(
 
 /** The unlabelled rows behind the count, for the surface that shows a list rather than a number. */
 export async function complianceUnlabelledDetail(
-  storage: Storage, sinceDays: number, limit = 50,
+  storage: Storage, sinceDays: number, limit = 50, labelPolicy?: AimeatConfig['aiLabelPublic'],
 ): Promise<{ total: number; shown: number; items: unknown[] }> {
-  const found = await listUnlabelledPublic(storage, { sinceDays, limit });
+  const found = await listUnlabelledPublic(storage, { sinceDays, limit, labelPolicy });
   // `total` beside a capped list, always: a truncated list without one reads as the whole story,
   // which is exactly how a compliance report comes to overstate its own coverage.
   return { total: found.total, shown: found.items.length, items: found.items };

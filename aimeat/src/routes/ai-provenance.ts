@@ -36,6 +36,10 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-10-08 — The disclosure each read serves is decided for the record's content as it is
+ *     now (servedDisclosure): `GET /v1/provenance/:id`, the by-hash lookup and the readable page no
+ *     longer show the block minted for a surface the content has since left. A declaration may state
+ *     `mediaKind`, `mediaType` and `resemblesReal`.
  *   v1.3.0 — 2026-08-02 — GET /v1/provenance/:id is content-negotiated. A visible AI label's
  *     "how this was made" link lands here, so a PERSON arrives — and the route answered
  *     application/json to everyone, leaving the correction procedure it offers stranded in
@@ -61,8 +65,10 @@ import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
   AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AI_UPSTREAM_MARKS,
   AiProvenanceSourceSchema, CONTENT_HASH_PATTERN, aiProvenanceJsonSchema, AI_PROVENANCE_SCHEMA_PATH,
+  AI_MEDIA_KINDS, AI_RESEMBLES_REAL, MEDIA_TYPE_PATTERN,
 } from '../models/ai-provenance-schemas.js';
 import { mintProvenance, projectForDetail, publiclyResolvable } from '../services/ai-provenance.js';
+import { servedDisclosure } from '../services/ai-provenance-marks.js';
 import { prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { provenancePage, provenanceNotFoundPage } from '../services/ai-provenance-page.js';
 import { detectLocale } from '../i18n.js';
@@ -77,6 +83,11 @@ const DeclareProvenanceSchema = z.object({
   level: z.enum(AI_PROVENANCE_LEVELS),
   humanInvolvement: z.enum(AI_HUMAN_INVOLVEMENT),
   method: z.enum(AI_PROVENANCE_METHODS).optional(),
+  /** What kind of thing it is. Decides the label's words, and whether the deep-fake rule applies. */
+  mediaKind: z.enum(AI_MEDIA_KINDS).optional(),
+  mediaType: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').optional(),
+  /** Does it resemble a real person, place or event? Only the declarer can say. */
+  resemblesReal: z.enum(AI_RESEMBLES_REAL).optional(),
   /** The exact bytes, hashed server-side. Prefer this over `contentHash` when you hold them. */
   content: z.string().max(2_000_000).optional(),
   /** A pre-computed `sha256:<64 lower-case hex>`, when the declarer holds bytes we should not see. */
@@ -145,11 +156,19 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     return ownerGhiiOf(resolve(req));
   }
 
-  /** Serve a record, projected to what this surface is allowed to show. */
-  function serve(row: AiProvenanceRecordRow, isOwner: boolean) {
+  /**
+   * Serve a record, projected to what this surface is allowed to show, with its disclosure decided
+   * for its content as it is now: `public` when anything public points at the record. The stored
+   * block is what was decided at mint; a record whose item went public later owes the label now.
+   */
+  function serve(row: AiProvenanceRecordRow, isOwner: boolean, isPublic: boolean) {
+    const decided = {
+      ...row.record,
+      disclosure: servedDisclosure(row.record, { visibility: isPublic ? 'public' : 'private' }, config.aiLabelPublic),
+    };
     // AIMEAT_AI_PROVENANCE_DETAIL governs what a PUBLIC surface serves and nothing else: the owner
     // always sees the whole record, and the stored record is never reduced.
-    const record = isOwner ? row.record : projectForDetail(row.record, config.aiProvenanceDetail);
+    const record = isOwner ? decided : projectForDetail(decided, config.aiProvenanceDetail);
     return {
       id: row.id,
       content_hash: row.contentHash,
@@ -184,12 +203,14 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
 
     const owner = callerOwner(req);
     const rows = await storage.findAiProvenanceByHash(hash, owner ? { ownerGhii: owner } : undefined);
+    // An anonymous caller only ever receives public rows; an owner's own may be private.
+    const pub = owner ? await publiclyResolvable(storage, rows.map((r) => r.id)) : undefined;
     res.json(success(config.nodeId, {
       content_hash: hash,
       // An empty list is a real, useful answer here: "this node has no statement about these bytes".
       // It is NOT "a human wrote it" — absence is unstated, and the caller must read it that way.
       count: rows.length,
-      records: rows.map((r) => serve(r, !!owner && r.ownerGhii === owner)),
+      records: rows.map((r) => serve(r, !!owner && r.ownerGhii === owner, pub ? pub.has(r.id) : true)),
     }, [
       { description: 'The record schema', method: 'GET', url: AI_PROVENANCE_SCHEMA_PATH },
     ]));
@@ -204,7 +225,9 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     // VISIBILITY FOLLOWS THE CONTENT. Not a flag on the record — a live question about whether
     // anything public points at it. Publishing the content makes this resolve; unpublishing takes
     // it straight back to the 404 below, with nothing to remember to do.
-    const isPublic = !!row && !isOwner && (await publiclyResolvable(storage, [row.id])).has(row.id);
+    // Asked for the owner too: the answer is also the surface the disclosure is decided against.
+    const linkedPublic = !!row && (await publiclyResolvable(storage, [row.id])).has(row.id);
+    const isPublic = linkedPublic && !isOwner;
 
     // A person may be reading this: the visible label's "details" link lands here. Negotiated the
     // same way /v1/ai-transparency does — only a client that ranks text/html ABOVE application/json
@@ -232,7 +255,7 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     if (asPage) {
       // `.provenance` off the SAME projection the JSON branch sends — not `row.record`. One
       // expression decides what this caller may see, in both formats.
-      sendProvenanceHtml(res, provenancePage(serve(row, isOwner).provenance, {
+      sendProvenanceHtml(res, provenancePage(serve(row, isOwner, linkedPublic).provenance, {
         baseUrl: config.baseUrl,
         locale: detectLocale(req.headers['accept-language']),
         recordUrl: `${config.baseUrl.replace(/\/+$/, '')}/v1/provenance/${row.id}`,
@@ -242,7 +265,7 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     // The correction procedure, offered where a person actually arrives: a visible label's "details"
     // link lands here, so this is the one page where somebody who thinks a label is wrong or missing
     // already has the identifier in front of them (Code of Practice Section 2, Commitment 2).
-    res.json(success(config.nodeId, serve(row, isOwner), [
+    res.json(success(config.nodeId, serve(row, isOwner, linkedPublic), [
       {
         description: 'Report this as mislabelled or undisclosed AI content',
         method: 'POST',
@@ -304,6 +327,9 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
         level: input.level,
         humanInvolvement: input.humanInvolvement,
         method: input.method,
+        mediaKind: input.mediaKind,
+        mediaType: input.mediaType,
+        resemblesReal: input.resemblesReal,
         content: input.content,
         contentHash: input.contentHash,
         generatedAt: input.generatedAt,
@@ -324,7 +350,7 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
         }
       }
 
-      res.status(201).json(success(config.nodeId, serve(row, true), [
+      res.status(201).json(success(config.nodeId, serve(row, true, surface.visibility === 'public'), [
         { description: 'Resolve this record', method: 'GET', url: `/v1/provenance/${row.id}` },
         ...(row.contentHash
           ? [{ description: 'Look it up by content hash', method: 'GET', url: `/v1/provenance/by-hash/${row.contentHash.replace('sha256:', '')}` }]

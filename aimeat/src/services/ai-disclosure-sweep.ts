@@ -26,6 +26,7 @@
  *   - sweepUndisclosedPublicContent(storage, config) → { scanned, owners, notified }
  * @usage started from server-bootstrap/service-init.ts on a low-frequency timer
  * @version-history
+ *   v1.0.1 — 2026-10-08 — The sweep decides each label under the node's label posture, for the content as it is now.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8.
  */
 import type { AimeatConfig } from '../config.js';
@@ -66,7 +67,7 @@ export async function sweepUndisclosedPublicContent(
 
   let found: { items: AiProvenanceRecordRow[]; total: number };
   try {
-    found = await listUnlabelledPublic(storage, { sinceDays: SWEEP_WINDOW_DAYS, limit: SWEEP_LIMIT });
+    found = await listUnlabelledPublic(storage, { sinceDays: SWEEP_WINDOW_DAYS, limit: SWEEP_LIMIT, labelPolicy: config.aiLabelPublic });
   } catch (err) {
     // A sweep that cannot read is a sweep that reports nothing; saying so beats an empty result that
     // reads as "nothing to report".
