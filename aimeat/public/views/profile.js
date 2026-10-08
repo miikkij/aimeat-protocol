@@ -10,6 +10,7 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-10-09 — The Visibility tab (views/profile/visibility-tab.js): AI visibility and on-page behaviour.
  *   2026-10-01 — The packages tab is shown from the 'new' tier: the menu names it "Get apps" (decision D8).
  *   2026-09-26 — The root and the toast pill are components (SettingsRoot in components/SettingsFrame.js,
  *     ToastBox in components/Toast.js): this file writes no class (page group G8).
@@ -67,6 +68,7 @@ import ChatSessionsTab from './profile/chat-sessions-tab.js';
 import McpTab from './profile/mcp-tab.js';
 import WalletTab from './profile/wallet-tab.js';
 import UsageTab from './profile/usage-tab.js';
+import VisibilityTab from './profile/visibility-tab.js';
 import { PnlTab } from './profile/pnl-tab.js';
 import { CompaniesTab } from './profile/companies-tab.js';
 import MemoryTab from './profile/memory-tab.js';
@@ -140,6 +142,7 @@ const TABS = [
   { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'new' },
   { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },
   { id: 'usage',         key: 'profile.tabs.usage',          component: UsageTab,          minTier: 'new' },
+  { id: 'visibility',    key: 'profile.tabs.visibility',     component: VisibilityTab,     minTier: 'new' },
   { id: 'pnl',           key: 'profile.tabs.pnl',            component: PnlTab,            minTier: 'active' },
   { id: 'companies',     key: 'profile.tabs.companies',      component: CompaniesTab,      minTier: 'active' },
   { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },
