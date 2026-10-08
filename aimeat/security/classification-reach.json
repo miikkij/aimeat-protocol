@@ -2046,9 +2046,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Seed fingerprint stamps."
     },
+    "src/services/skill-records.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Moved out of skills.ts unchanged on 2026-10-09 (max-file-lines, aiprov E12); reviewed there 2026-09-29 (TARGET-082 V4): listAcrossOwners collects the registry's own records under a skill key prefix, and the bodies it returns pass the reader (skill-reader.ts) in listing, resolve and pinned reads."
+    },
     "src/services/skills.ts": {
       "reads": {
-        "listAllMemory": 1,
         "getMemory": 10,
         "listMemory": 8
       },
