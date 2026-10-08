@@ -34,6 +34,8 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-10-08 - /v1/how-it-works: the description says what the page covers; it promised memory
+ *     visibility rules and federation, which the page never mentions.
  *   2026-09-17 - TARGET-078: align homepage metadata and Markdown with the ownership promise.
  *   v1.7.0 - 2026-09-15 - Everything reads its complete generated Markdown and static HTML.
  *   v1.6.0 — 2026-09-11 — Every title long enough to summarise its own page. Eleven of them were
@@ -173,7 +175,7 @@ See also [How it works]({{BASE_URL}}/v1/how-it-works) and the [glossary]({{BASE_
   {
     path: '/v1/how-it-works',
     title: 'How AIMEAT works — identities, memory and consent explained',
-    description: 'The protocol in plain terms: identities for humans and their agents, memory with visibility rules, consent, and how nodes federate.',
+    description: 'Any AI you connect gets an identity, a memory and tasks, and a person approves what matters. Shared places, apps you describe, permissions you can take back, and work that can carry a price.',
     changefreq: 'monthly',
     priority: '0.8',
     markdown: `AIMEAT in plain terms.
