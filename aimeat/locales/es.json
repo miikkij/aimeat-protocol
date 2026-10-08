@@ -11106,6 +11106,7 @@
       "operatorAdminGrantedMany": "{names} recibieron el permiso para administrar esta instalación porque tenían acceso total. Puedes quitárselo en la configuración de cada agente.",
       "appPublished": "Publicaste {name}.",
       "appUpdated": "Actualizaste {name}.",
+      "appFixDrafted": "Te espera un borrador corregido de {app}. Tu app no cambia hasta que publiques el borrador.",
       "recordPublished": "Publicaste {name}.",
       "organismJoined": "Te uniste a {name}.",
       "organismLeft": "Saliste de {name}.",

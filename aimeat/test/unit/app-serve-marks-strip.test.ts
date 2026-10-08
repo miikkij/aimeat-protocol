@@ -15,6 +15,9 @@
  *   silence: an app's own element that only looks like a mark is never touched.
  * @usage pnpm exec vitest run test/unit/app-serve-marks-strip.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-08 — The owner's analytics tags with their banner, and the behaviour script,
+ *     round-trip through the real snippet functions (AI visibility layers B and D; e2e-app-marks
+ *     went red on the behaviour script before the strip knew it).
  *   v1.0.0 — 2026-09-13 — Initial. Every case here was run against a strip that removed nothing and
  *     failed on its assertion before the implementation existed (the silence cases passed, as a
  *     strip that removes nothing is trivially silent; they guard the implementation, not the stub).
@@ -26,6 +29,9 @@ import {
 } from '../../src/services/app-serve-marks-strip.js';
 import { agentDiscoverySnippet, type AppDiscoverySpec } from '../../src/utils/app-agent-discovery.js';
 import { SERVE_MARK_CASES, FIXTURE_CONFIG, provFixture } from './serve-marks-fixtures.js';
+import { ownerTagsSnippet, ownerTagsIntoHtml } from '../../src/services/visibility/analytics-tags.js';
+import { behaviourSnippet } from '../../src/services/visibility/behaviour-script.js';
+import type { AimeatConfig } from '../../src/config.js';
 
 const strip = (s: string | Buffer) => stripServedMarks(typeof s === 'string' ? Buffer.from(s, 'utf-8') : s);
 const kinds = (s: string | Buffer): ServedMarkKind[] => strip(s).removed.map((r) => r.mark).sort();
@@ -265,6 +271,36 @@ describe('stripServedMarks: the head metadata the app-origin serve adds', () => 
     expect(c).toBeTruthy();
     const served = applyServeMarks(c!.html, { badge: true, headMeta: c!.headMeta });
     expect(strip(served).data.toString('utf-8')).toBe(applyServeMarks(c!.html, { headMeta: c!.headMeta }).toString('utf-8'));
+  });
+});
+
+/**
+ * The owner's analytics tags (layer B) and the behaviour script (layer D) are added by the REAL
+ * snippet functions on the serve path, so the round trip goes through them: a change to either
+ * snippet's opening tag turns this red before a served copy can carry one owner's ids into another's app.
+ */
+describe('stripServedMarks: the owner\'s analytics tags and the behaviour script', () => {
+  const src = '<!doctype html><html><head><title>Shop</title></head><body><button id="buy">Buy</button></body></html>';
+  const config = {
+    baseUrl: 'https://aimeat.io', analyticsTagsEnabled: true,
+    cookieConsentEnabled: true, cookieConsentCategories: ['necessary'],
+  } as unknown as AimeatConfig;
+  const settings = { enabled: true, clarityProjectId: 'k7x2m9qp1a', ga4MeasurementId: 'G-ABC123XYZ9', updatedAt: '' };
+
+  it('strips both, the cookie banner the tags bring included, back to the author\'s bytes', () => {
+    const snippet = behaviourSnippet(config.baseUrl, 'alice@node-1', 'shop.html') + ownerTagsSnippet(config, settings);
+    const served = ownerTagsIntoHtml(src, snippet);
+    expect(served).toContain('data-aimeat-tags');
+    expect(served).toContain('cookieconsent.umd.js');
+    const out = strip(served);
+    expect(out.data.toString('utf-8')).toBe(src);
+    expect(out.removed.map((r) => r.mark)).toEqual(['owner-tags', 'behaviour']);
+  });
+
+  it('strips the tags alone when the node shows no banner, and keeps an app\'s own cookieconsent', () => {
+    const own = src.replace('</head>', '<script src="/my/cookieconsent.umd.js"></script></head>');
+    const served = ownerTagsIntoHtml(own, ownerTagsSnippet({ ...config, cookieConsentEnabled: false } as AimeatConfig, settings));
+    expect(strip(served).data.toString('utf-8')).toBe(own);
   });
 });
 
