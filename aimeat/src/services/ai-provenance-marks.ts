@@ -44,6 +44,8 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.9.1 — 2026-10-09 — The JSON-LD escapes every non-ASCII character, so a localized fallback model
+ *     name or a reviewer's name keeps the served app document ASCII.
  *   v1.9.0 — 2026-10-08 — The disclosure is decided when the record is SERVED, against the item's
  *     visibility as served and the record's medium (servedDisclosure). The loaders take an optional
  *     `surface`; without its visibility they ask the live visibility predicate, so an item made
@@ -344,8 +346,11 @@ function jsonLd(p: ServedProvenance, reviewedBy?: string, locale: Locale = 'en')
   const iptc = toIptc(p.record);
   if (iptc) doc.digitalSourceType = iptc;
   if (p.record.sources?.length) doc.isBasedOn = p.record.sources.map((s) => s.url);
-  // `<` escaped so the JSON can never close its own <script> element.
-  return JSON.stringify(doc).replace(/</g, '\\u003c');
+  // `<` escaped so the JSON can never close its own <script> element. Every non-ASCII character is
+  // escaped too (the same JSON value): the served app document stays ASCII whatever its own charset
+  // says, and a localized fallback name ("tekoälymalli") or a reviewer's name would otherwise put a
+  // UTF-8 byte into it (test/unit/app-badge-encoding.test.ts).
+  return JSON.stringify(doc).replace(/[<\u0080-￿]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
 }
 
 /**
