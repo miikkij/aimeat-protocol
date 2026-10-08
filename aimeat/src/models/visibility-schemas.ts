@@ -20,6 +20,7 @@
  * @structure caps · keys · VisibilityDay · VisibilityMonthRecord · VisibilitySettings · emptyVisibilityDay
  * @usage import { visibilityMonthKey, type VisibilityMonthRecord } from '../models/visibility-schemas.js';
  * @version-history
+ *   v1.1.0 — 2026-10-08 — VisibilitySettings carries the owner's Clarity and GA4 ids (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
  */
 /** Where a person came from. A closed list, so every record ever written reads the same way.
@@ -123,9 +124,17 @@ export interface VisibilityMonthRecord {
   updatedAt: string;
 }
 
-/** The owner's switch. Absent means on: counting is the default, and the owner may turn it off. */
+/**
+ * The owner's settings. Absent means on: counting is the default, and the owner may turn it off.
+ * The two ids are the analytics the owner already uses (layer B), added by the place to its pages;
+ * null when not set.
+ */
 export interface VisibilitySettings {
   enabled: boolean;
+  /** A Microsoft Clarity project id. */
+  clarityProjectId: string | null;
+  /** A Google Analytics 4 measurement id (`G-…`). */
+  ga4MeasurementId: string | null;
   updatedAt: string;
 }
 

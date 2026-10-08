@@ -4,6 +4,7 @@
   count is decided, and what each number is worth. Named by `spec` inside every month record, so an
   agent or another system can read and honour the shape without our code.
 @version-history
+  v1.1.0 — 2026-10-08 — The settings record and the owner's own analytics tags (layer B).
   v1.0.0 — 2026-10-08 — Initial, with layer A (channels, AI fetches, discovery files, purchases).
 -->
 
@@ -92,6 +93,17 @@ Thirteen months are kept, so a month can be read against the same month a year e
 are deleted when a new month's record is created. The owner can switch counting off (what was counted
 stays); deleting the account deletes the records with everything else. Counts are merged into the
 record every ten seconds; a node stopped without warning loses what it had not merged.
+
+## The settings record
+
+`signals.visibility.settings`: `{ enabled, clarityProjectId, ga4MeasurementId, updatedAt }`. Absent
+means counting is on and no tag is added. The two ids are the owner's own analytics (layer B): the
+place adds the tag to every app, the portfolio and the company page, and the data goes to the
+owner's own account. With the node's cookie banner on, the tag waits for the visitor to accept the
+`analytics` category and passes the choice on (Clarity `consentv2`, GA4 consent mode, advertising
+always denied); without the banner it loads at once and the report's `tags.warning` says EU
+visitors need consent. A browser that sends Global Privacy Control gets no tag. Each id is checked
+against its shape before it is stored and again before it is written into a page.
 
 ## Reading it
 

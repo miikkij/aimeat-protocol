@@ -10,7 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
- *   v1.18.0 — 2026-10-08 — The app download counts the visit for AI visibility (services/visibility/).
+ *   v1.18.0 — 2026-10-08 — The app download counts the visit for AI visibility (services/visibility/),
+ *     and a runnable HTML app carries its owner's own analytics tags (layer B).
  *   v1.17.0 — 2026-10-06 — SECURITY: on a per-app origin GET /v1/apps/:owner/:filename runs only that
  *     origin's own app. A draft preview through it is refused there (the draft origin serves it at
  *     `/`), and a runnable request for another app, or on a draft origin, is redirected to the app's
@@ -109,6 +110,7 @@ import { countPageView } from '../../services/signals/page-views.js';
 import { geoFromHeaders } from '../../utils/geo-headers.js';
 import { countVisit } from '../../services/visibility/visibility-counter.js';
 import { visitSignals } from '../../utils/visit-signals.js';
+import { ownerTagsFor, withOwnerTags } from '../../services/visibility/analytics-tags.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import {
@@ -692,6 +694,8 @@ export function registerReadRoutes(
                 servedAt: new Date().toISOString(),
             });
         }
+        // The owner's own Clarity or GA4, waiting for consent when the banner is on (layer B).
+        if (runnable && isHtml) body = withOwnerTags(body, await ownerTagsFor(storage, config, app.ownerGaii));
         // Last, so it is in front of everything the passes above added as well as the app's own lines.
         if (answer === 'sandboxed' && isHtml) body = withFrameShim(body);
         res.setHeader('Content-Length', body.length.toString());

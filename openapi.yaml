@@ -67349,8 +67349,8 @@ paths:
     get:
       operationId: readVisibilitySettings
       tags: [Signals]
-      summary: Whether AI visibility counting is on for the caller's place
-      description: '`enabled` is the owner''s switch (absent means on); `node_enabled` is the operator''s (AIMEAT_AI_VISIBILITY). Requires scope signals:read.'
+      summary: The caller's visibility settings
+      description: '`enabled` is the owner''s switch (absent means on); `node_enabled` is the operator''s (AIMEAT_AI_VISIBILITY). `clarity_project_id` and `ga4_measurement_id` are the owner''s own analytics tags; `tags_active`, `consent_banner` and `tags_warning` say whether they load and whether they wait for consent. Requires scope signals:read.'
       security: [{ BearerAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
@@ -67359,8 +67359,8 @@ paths:
     put:
       operationId: setVisibilitySettings
       tags: [Signals]
-      summary: Switch AI visibility counting off or on
-      description: 'Off stops new counting and keeps what was counted. The MCP tool aimeat_visibility_settings_set does the same. Requires scope signals:write.'
+      summary: Change the caller's visibility settings
+      description: 'Only the fields given change. `enabled` switches AI visibility counting off or on; off keeps what was counted. `clarity_project_id` and `ga4_measurement_id` add the owner''s own Microsoft Clarity or Google Analytics 4 to every page and app of the place (null removes one). With the node''s cookie banner on, a tag loads only after the visitor accepts analytics and the choice is passed on (Clarity consentv2, GA4 consent mode); without it the answer carries `tags_warning`. A browser sending Global Privacy Control gets no tag. The MCP tool aimeat_visibility_settings_set does the same. Requires scope signals:write.'
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
@@ -67369,9 +67369,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [enabled]
               properties:
                 enabled: { type: boolean }
+                clarity_project_id: { type: string, nullable: true, pattern: '^[a-z0-9]{6,20}$', description: 'Clarity: Settings > Overview > Project ID. null removes it.' }
+                ga4_measurement_id: { type: string, nullable: true, pattern: '^G-[A-Z0-9]{4,20}$', description: 'The Measurement ID of a GA4 web data stream. null removes it.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

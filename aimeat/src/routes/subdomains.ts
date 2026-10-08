@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.25.0 — 2026-10-08 — The owner's own analytics tags (services/visibility/analytics-tags.ts) on the
+ *     app, the portfolio and the company page. servePortfolio moved to serve-portfolio.ts unchanged.
  *   v1.24.0 — 2026-10-08 — serveApp, the portfolio and the company page count the visit for AI
  *     visibility (services/visibility/), on by default; the signal stream stays opt-in. The router
  *     also runs countApexDocs, which counts the node's own discovery files and serves nothing.
@@ -137,6 +139,8 @@ import type { SignalGeoInput } from '../models/signal-schemas.js';
 import { countVisit } from '../services/visibility/visibility-counter.js';
 import { visitSignals, type VisitSignals } from '../utils/visit-signals.js';
 import { countApexDocs } from './visibility.js';
+import { servePortfolio } from './serve-portfolio.js';
+import { ownerTagsFor, withOwnerTags, ownerTagsIntoHtml } from '../services/visibility/analytics-tags.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
@@ -466,6 +470,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
         servedAt: new Date().toISOString(),
       });
     }
+    // The owner's own Clarity or GA4, waiting for consent when the banner is on (layer B).
+    buf = withOwnerTags(buf, await ownerTagsFor(storage, protect.config, app.ownerGaii));
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;
@@ -527,35 +533,6 @@ async function serveDraftPreview(
   res.send(draft.data);
 }
 
-/** Insert an HTML snippet into a document head (fallbacks: after <body>, else prepend). */
-function injectHeadSnippet(html: string, snippet: string): string {
-  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, snippet + '</head>');
-  if (/<body[^>]*>/i.test(html)) return html.replace(/<body[^>]*>/i, (m) => m + snippet);
-  return snippet + html;
-}
-
-/**
- * Write a standalone portfolio document on the portfolio origin. Injects the
- * standalone bridge (aimeat-auth SDK + portfolio-standalone.js + a memory:read
- * scopes meta) so the SAME portfolio HTML that runs inside the apex viewer's
- * iframe gets working auth/members bridging here too. The optional aimeat badge
- * follows the per-portfolio `showBadge` flag (default ON).
- */
-function servePortfolio(res: Response, html: string, portfolioConfig: Record<string, unknown>, csp: string, config: AimeatConfig): void {
-  const bridge =
-    '<meta name="aimeat-scopes" content="memory:read">'
-    + '<script src="/v1/libs/aimeat-auth.js"></script>'
-    + '<script src="/v1/libs/portfolio-standalone.js"></script>';
-  let buf: Buffer = Buffer.from(injectHeadSnippet(html, bridge), 'utf-8');
-  if (portfolioConfig.showBadge !== false && servedBadgeOn(config)) buf = applyServeMarks(buf, { badge: true });
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Content-Security-Policy', csp);
-  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Content-Length', buf.length.toString());
-  res.send(buf);
-}
-
 /**
  * Serves mapped subdomains at their root. Mounted BEFORE bootstrapRouter so a
  * subdomain request never reaches the apex GET / handler; requests without a
@@ -597,7 +574,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
       countVisit(storage, config, { ownerGaii: `${sub}@${config.nodeId}`, target: 'portfolio', ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
-      servePortfolio(res, resolved.html, resolved.portfolioConfig, csp, config);
+      servePortfolio(res, ownerTagsIntoHtml(resolved.html, await ownerTagsFor(storage, config, `${sub}@${config.nodeId}`)), resolved.portfolioConfig.showBadge !== false && servedBadgeOn(config), csp);
       return;
     }
 
@@ -630,7 +607,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         const html = await readCompanyPortfolioHtml(storage, company);
         if (!html) return companyNotFound();
         countVisit(storage, config, { ownerGaii: company.ownerGhii, target: `company:${sub}`, ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
-        servePortfolio(res, html, {}, csp, config);
+        servePortfolio(res, ownerTagsIntoHtml(html, await ownerTagsFor(storage, config, company.ownerGhii)), servedBadgeOn(config), csp);
         return;
       }
       // 'none' answers exactly like an unmapped address: reserving a name and publishing a

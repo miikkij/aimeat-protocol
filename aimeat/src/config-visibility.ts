@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-10-08 — analyticsTagsEnabled (layer B).
  *   v1.0.0 — 2026-10-08 — Initial: aiVisibilityEnabled (layer A).
  */
 
@@ -23,10 +24,16 @@ export interface VisibilityConfig {
    * default: the record holds counts only (models/visibility-schemas.ts).
    */
   aiVisibilityEnabled: boolean;
+  /**
+   * Layer B: an owner may add their own Microsoft Clarity or Google Analytics 4 to the pages and
+   * apps of their place. On by default; the tags wait for consent when the cookie banner is on.
+   */
+  analyticsTagsEnabled: boolean;
 }
 
 export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): VisibilityConfig {
   return {
     aiVisibilityEnabled: env.AIMEAT_AI_VISIBILITY !== 'false',
+    analyticsTagsEnabled: env.AIMEAT_ANALYTICS_TAGS !== 'false',
   };
 }

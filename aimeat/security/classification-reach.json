@@ -1946,10 +1946,16 @@
     },
     "src/services/visibility/visibility-counter.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 1,
         "listMemoryMeta": 1
       },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the owner's visibility switch and the month count records under the reserved signals.visibility. prefix, which only this counter writes. No content."
+      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the month count records under the reserved signals.visibility. prefix, which only this counter writes. No content."
+    },
+    "src/services/visibility/visibility-settings.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer B), the node's own read: the owner's visibility settings record (signals.visibility.settings, reserved prefix): the counting switch and the analytics tag ids. No content."
     },
     "src/services/visibility/visibility-report.ts": {
       "reads": {
