@@ -6,6 +6,8 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.12.1 — 2026-10-10 — An INSTALL_FAILED answer keeps its sentence past the 500 filter, with
+ *     key-shaped text taken out (secrets audit 2026-10-09, d4).
  *   v1.12.0 — 2026-10-04 — The body takes `grant_apps` and the 201 answer carries `app_grants`: the
  *     owner's grant recorded for each app the install approved (package-install-requests.ts).
  *   v1.11.0 — 2026-10-02 — A package that carries an install bundle installs as a set for the caller's
@@ -52,6 +54,8 @@ import type { Scheduler } from '../../services/scheduler.js';
 import { actCallerOf } from './install-requests.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { bundleInstallOf, installSetForOwner } from '../../services/install-bundle-owner.js';
+import { keepErrorMessage } from '../../middleware/internal-error-text.js';
+import { redactCredentialText } from '../../utils/redact-credentials.js';
 
 export function registerInstallRoutes(
   router: Router,
@@ -106,7 +110,12 @@ export function registerInstallRoutes(
     );
 
     if (!out.ok) {
-      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      // INSTALL_FAILED is a sentence the install wrote for the installer: which component was refused
+      // and whether the rollback was complete. It is kept past the 500 filter
+      // (middleware/internal-error-text.ts), with any key-shaped text a component's own error carried
+      // taken out (secrets audit 2026-10-09, d4).
+      const envelope = error(config.nodeId, out.code, out.code === 'INSTALL_FAILED' ? redactCredentialText(out.message) : out.message);
+      res.status(out.status).json(out.code === 'INSTALL_FAILED' ? keepErrorMessage(envelope) : envelope);
       return;
     }
 

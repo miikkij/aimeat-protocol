@@ -19,6 +19,7 @@
  *   NOT_SECRET is the explicit list of secret-named rows that are public on purpose (a public key, a
  *   key id), each with its reason. A row goes there only with that reason written down.
  * @version-history
+ *   v1.0.1 — 2026-10-10 — AIMEAT_WS_QUERY_TOKEN joins NOT_SECRET: a switch named after what it switches.
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S2).
  */
 import { describe, it, expect } from 'vitest';
@@ -27,8 +28,10 @@ import { isSecretField } from '../../src/services/config-sealing.js';
 
 const SECRET_LAST_WORDS = new Set(['SECRET', 'PASSWORD', 'PASSPHRASE', 'PASS', 'CREDENTIAL', 'CREDENTIALS', 'TOKEN', 'KEY']);
 
-/** Secret-named rows that are public on purpose, with the reason. Empty today. */
-const NOT_SECRET: Readonly<Record<string, string>> = {};
+/** Secret-named rows that are public on purpose, with the reason. */
+const NOT_SECRET: Readonly<Record<string, string>> = {
+  AIMEAT_WS_QUERY_TOKEN: 'a true/false switch for whether a socket upgrade still accepts ?token=, not a token (auth/ws-upgrade.ts)',
+};
 
 function secretNamed(envVar: string): boolean {
   const words = envVar.toUpperCase().split('_').filter(Boolean);
