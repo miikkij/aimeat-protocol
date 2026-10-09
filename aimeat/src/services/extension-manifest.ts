@@ -5,6 +5,11 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-09 — `network: { host_fields: { FIELD: required|optional } }`: config fields
+ *                         whose value the installer gives as one more host, stored as
+ *                         `config.__networkHostFields` (services/extension-network-hosts.ts, where
+ *                         hostRefusal() moved). A host field with no value in the manifest is stored
+ *                         as '' (not set), never as its descriptor.
  *   v1.10.0 — 2026-10-08 — `workspace.rows`: append to and read the row spaces that name the
  *                         extension, on a schedule or a workflow step too (aimeat-soc ingest).
  *                         `network: { hosts }`: the only hostnames ctx.fetch may reach, stored as
@@ -53,6 +58,7 @@ import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValue
 import { MONEY_CURRENCIES } from '../commerce/money.js';
 import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import { CAPABILITY_DECLARATION_KEY, NETWORK_HOSTS_KEY, parseCapabilityDeclaration } from './extension-capability-declaration.js';
+import { NETWORK_HOST_FIELDS_KEY, hostRefusal, parseNetworkDeclaration } from './extension-network-hosts.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
   AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
@@ -200,34 +206,7 @@ function validateManifestShape(
 const FORBIDDEN_AUTH_HEADERS = ['host', 'cookie', 'content-length', 'transfer-encoding', 'connection', 'set-cookie'];
 /** An HTTP header name (RFC 9110 token). */
 const HEADER_NAME_TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,100}$/;
-/** One hostname label: letters, digits and inner hyphens, 1 to 63 characters. */
-const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const PRICE_FIELDS = { in_per_mtok: 'inPerMtok', out_per_mtok: 'outPerMtok', per_image: 'perImage', per_second: 'perSecond' } as const;
-
-/**
- * Why a declared host is not a bare hostname, or null when it is. The provider key is added to a
- * request only when the hostname matches one of these EXACTLY, so each refused form is one where an
- * exact match would mean something other than what the author wrote.
- */
-function hostRefusal(host: string): string | null {
-  if (host.includes('://')) return 'a host is a bare hostname without a scheme: write api.example.com, not https://api.example.com';
-  if (host.includes('/')) return 'a host is a bare hostname without a path: the key is added to every path on that host';
-  if (host.includes('*')) return 'wildcards are not accepted: the key is added only to a host named exactly, so every host must be listed';
-  if (host.includes('[') || host.includes(':')) {
-    return 'a host is a bare hostname without a port and never an IPv6 address: ctx.fetch compares the hostname only';
-  }
-  if (host.length > 253) return 'a hostname is at most 253 characters';
-  const labels = host.split('.');
-  // A top-level label is never all digits, so this refuses every IPv4 literal and its decimal,
-  // octal and hex spellings that DNS resolvers also accept.
-  if (/^[0-9]+$/.test(labels[labels.length - 1] ?? '') || /^0x[0-9a-f]+$/.test(labels[labels.length - 1] ?? '')) {
-    return 'an IP address is not accepted: name the service by its hostname, which is what the owner reads before adding the provider';
-  }
-  if (!labels.every(l => HOST_LABEL.test(l))) {
-    return 'a hostname has only lowercase letters, digits, hyphens and dots between non-empty labels';
-  }
-  return null;
-}
 
 /**
  * Validate `provides:` and build the AI provider declaration it carries (System 2 plan V6). Returns
@@ -600,26 +579,6 @@ export function buildExtensionRecordFromManifest(
   const capabilityDecl = parseCapabilityDeclaration(manifest.capabilities);
   if (!capabilityDecl.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: capabilityDecl.message };
 
-  // `network: { hosts: [...] }`: the only hostnames ctx.fetch may reach, on every redirect hop too
-  // (utils/url-validator.ts allowHosts). Bare hostnames, compared exactly, as provides.ai_provider.
-  let networkHosts: string[] | undefined;
-  if (manifest.network !== undefined) {
-    const n = manifest.network;
-    const hostsRaw = n && typeof n === 'object' && !Array.isArray(n) ? (n as Record<string, unknown>).hosts : undefined;
-    const extra = n && typeof n === 'object' && !Array.isArray(n) ? Object.keys(n).filter(k => k !== 'hosts') : [];
-    if (!Array.isArray(hostsRaw) || hostsRaw.length === 0 || hostsRaw.some(h => typeof h !== 'string') || extra.length) {
-      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'network must be a map with a non-empty hosts list and nothing else, e.g. network: { hosts: [api.example.com] }' };
-    }
-    for (const h of hostsRaw as string[]) {
-      const why = hostRefusal(h.toLowerCase());
-      if (why) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `network.hosts "${h}": ${why}` };
-    }
-    if (capabilityDecl.list && !capabilityDecl.list.includes('network')) {
-      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'network.hosts names hosts, and capabilities does not include network. Add network to capabilities, or remove network.hosts.' };
-    }
-    networkHosts = [...new Set((hostsRaw as string[]).map(h => h.toLowerCase()))].sort();
-  }
-
   for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
     const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
     if (sizeKb > config.extensionMaxCodeSizeKb) {
@@ -660,6 +619,13 @@ export function buildExtensionRecordFromManifest(
     }
   }
   const manifestSecretKeys = computeManifestSecretKeys(manifestConfig);
+
+  // `network: { hosts, host_fields }`: the only hostnames ctx.fetch may reach, on every redirect hop
+  // too (utils/url-validator.ts allowHosts). `hosts` are bare hostnames, compared exactly;
+  // `host_fields` names config fields whose value the installer gives (extension-network-hosts.ts).
+  const network = parseNetworkDeclaration(manifest.network, capabilityDecl.list, manifestConfig, manifestSecretKeys);
+  if (!network.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: network.message };
+  const hostFieldNames = new Set((network.hostFields ?? []).map(f => f.field));
   const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
   const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
   const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
@@ -729,8 +695,11 @@ export function buildExtensionRecordFromManifest(
               .filter(([k, v]) => !(manifestSecretKeys.includes(k) && !('default' in (v as Record<string, unknown>))))
               .map(([k, v]) => {
                 if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                  return [k, (v as Record<string, unknown>).default];
+                  const d = (v as Record<string, unknown>).default;
+                  return [k, hostFieldNames.has(k) && typeof d === 'string' ? d.trim().toLowerCase() : d];
                 }
+                // A host field the manifest gives no value is not set: '', which reaches nothing.
+                if (hostFieldNames.has(k)) return [k, typeof v === 'string' ? v.trim().toLowerCase() : ''];
                 return [k, v];
               }),
           )
@@ -739,7 +708,8 @@ export function buildExtensionRecordFromManifest(
       ...(workspaceDecl ? { [WORKSPACE_DECLARATION_KEY]: workspaceDecl } : {}),
       ...(aiProviderDecl ? { [AI_PROVIDER_DECLARATION_KEY]: aiProviderDecl } : {}),
       ...(capabilityDecl.list ? { [CAPABILITY_DECLARATION_KEY]: capabilityDecl.list } : {}),
-      ...(networkHosts ? { [NETWORK_HOSTS_KEY]: networkHosts } : {}),
+      ...(network.hosts ? { [NETWORK_HOSTS_KEY]: network.hosts } : {}),
+      ...(network.hostFields ? { [NETWORK_HOST_FIELDS_KEY]: network.hostFields } : {}),
       // Record which config fields are `type: 'secret'` so the route can encrypt their values
       // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
       // lost by the flatten above). See services/extension-secrets.ts.

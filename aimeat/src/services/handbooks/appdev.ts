@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-09 — aimeat_extension_config_set in the extension tools.
  *   2026-10-08 — aimeat_visibility_behaviour, _behaviour_fix and _behaviour_set: what people do on the owner's apps.
  *   2026-10-08 — aimeat_visibility_report: how people and AIs find the owner's apps.
  *   2026-10-04 — The design spec is shown on the app's own page in the App Catalog.
@@ -142,7 +143,8 @@ where its workspace was made with \`AIMEAT.data.appWorkspace(contract)\`.
 \`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with
 manifest.yaml at root + scripts/) · \`aimeat_extension_invoke\` · \`aimeat_extension_get\` ·
 \`aimeat_extension_list\` · \`aimeat_extension_activate\` · \`aimeat_extension_deactivate\` ·
-\`aimeat_extension_delete\`.
+\`aimeat_extension_delete\` · \`aimeat_extension_config_set\` (change an installed extension's config
+in place, e.g. a host field from \`network.host_fields\` when the owner's server moved).
 
 **Cortex (browser-side IIFE: rich UI over ext data + user data).** \`aimeat_cortex_install\` (ZIP with
 manifest.yaml + libs/) · \`aimeat_cortex_activate\` · \`aimeat_cortex_deactivate\` ·

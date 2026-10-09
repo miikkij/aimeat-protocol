@@ -19,16 +19,21 @@
  *   approval then shows more and the sandbox allows what was shown; what the text does not name at
  *   all (a computed property, a decoded string) is refused.
  * @structure CAPABILITY_DECLARATION_KEY · EXTENSION_CAPABILITY_NAMES · ExtensionCapabilitySet ·
- *   parseCapabilityDeclaration(raw) · inferCapabilities(code) · capabilitiesOfRecord(record) ·
- *   capabilityNotDeclared(name)
+ *   parseCapabilityDeclaration(raw) · inferCapabilities(code) · declaredHostsOf(config) ·
+ *   capabilitiesOfRecord(record) · capabilityNotDeclared(name)
  * @usage
  *   const caps = capabilitiesOfRecord(ext);
  *   buildExtensionCtx({ ..., capabilities: caps });
  * @version-history
+ *   v1.2.0 — 2026-10-09 — `hosts` is the declared list plus the current value of each `host_fields`
+ *     field (services/extension-network-hosts.ts), so one bundle reaches each buyer's own host. A
+ *     manifest with host fields and no value set yet has `hosts: []`, which reaches nothing.
  *   v1.1.0 — 2026-10-08 — `hosts` (manifest `network: { hosts }`, stored as `__networkHosts`): the only
  *     hostnames ctx.fetch reaches, checked on every redirect hop by safeFetch's allowHosts.
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, PKG-3, plan S8).
  */
+
+import { hostFieldsOf, parseHostFieldValue } from './extension-network-hosts.js';
 
 /** Where the manifest's declaration is stored on the record's config. __-prefixed, so `config:` cannot set it. */
 export const CAPABILITY_DECLARATION_KEY = '__capabilities';
@@ -47,11 +52,28 @@ export const NETWORK_HOSTS_KEY = '__networkHosts';
 export type ExtensionCapabilitySet = Record<ExtensionCapabilityName, boolean> & { declared: boolean; hosts?: string[] };
 
 /** The manifest's `network.hosts` on an installed record, or undefined when it named none. */
-function networkHostsOf(config: Record<string, unknown> | undefined): string[] | undefined {
+export function declaredHostsOf(config: Record<string, unknown> | undefined): string[] | undefined {
   const raw = config?.[NETWORK_HOSTS_KEY];
   if (!Array.isArray(raw)) return undefined;
   const hosts = raw.filter((h): h is string => typeof h === 'string' && !!h).map(h => h.toLowerCase());
   return hosts.length ? hosts : undefined;
+}
+
+/**
+ * The hosts ctx.fetch may reach on this install: the declared list plus the host part of each host
+ * field's current value. Undefined when the manifest named neither (any public address). A stored
+ * value that does not read as a host adds nothing; the config writers refuse one before it is stored.
+ */
+function networkHostsOf(config: Record<string, unknown> | undefined): string[] | undefined {
+  const declared = declaredHostsOf(config);
+  const fields = hostFieldsOf(config);
+  if (!fields.length) return declared;
+  const hosts = new Set(declared ?? []);
+  for (const { field } of fields) {
+    const parsed = parseHostFieldValue(config?.[field]);
+    if (parsed.ok && parsed.host) hosts.add(parsed.host);
+  }
+  return [...hosts].sort();
 }
 
 /** The broad word each capability is inferred from. Matching more than the call is the safe side. */

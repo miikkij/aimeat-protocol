@@ -21,6 +21,8 @@
  *   const plan = planPackageConfig(pkg.components, plannedComponents, input.config, { config, owner });
  *   if (!plan.ok) return plan;
  * @version-history
+ *   v1.1.0 — 2026-10-09 — An extension's host fields (manifest `network.host_fields`) are planned and
+ *     shown (`host_fields`), and an answer to one must be a single host, refused before anything registers.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 2).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -29,6 +31,7 @@ import { parseAppConfigSchema, checkAppConfigValues, configMissing, type AppConf
 import { buildExtensionRecordFromManifest } from '../../extension-manifest.js';
 import { getExtSecretKeys, prepareSecretConfigForWrite } from '../../extension-secrets.js';
 import { getEncryptionKey } from '../../encryption.js';
+import { hostFieldsOf, parseHostFieldValue, type NetworkHostField } from '../../extension-network-hosts.js';
 
 /** Config keys the extension builder keeps beside the declared fields; never a caller's to set. */
 const EXTENSION_RESERVED_KEY = /^__|^\$/;
@@ -37,7 +40,7 @@ export type ConfigPlanEntry =
     | { componentId: string; type: 'app'; registeredAs: string; schema: AppConfigSchema; values: AppConfigValues;
         missing: Array<{ field: string; description?: string }> }
     | { componentId: string; type: 'extension'; registeredAs: string; fields: string[]; secretFields: string[];
-        values: Record<string, unknown>; unsetSecrets: string[] };
+        hostFields: NetworkHostField[]; values: Record<string, unknown>; unsetSecrets: string[] };
 
 export type PackageConfigPlan =
     | { ok: true; entries: ConfigPlanEntry[]; missingCount: number }
@@ -45,7 +48,7 @@ export type PackageConfigPlan =
 
 const refuse = (status: number, code: string, message: string): PackageConfigPlan => ({ ok: false, status, code, message });
 
-function extensionFields(content: string, config: AimeatConfig, owner: string): { fields: string[]; secretFields: string[] } | null {
+function extensionFields(content: string, config: AimeatConfig, owner: string): { fields: string[]; secretFields: string[]; hostFields: NetworkHostField[] } | null {
     let parsed: { manifest?: string; scripts?: Record<string, string> };
     try { parsed = JSON.parse(content); }
     // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
@@ -54,7 +57,7 @@ function extensionFields(content: string, config: AimeatConfig, owner: string): 
     if (!built.ok) return null;
     const secretFields = getExtSecretKeys(built.record);
     const plain = Object.keys(built.record.config ?? {}).filter(k => !EXTENSION_RESERVED_KEY.test(k));
-    return { fields: [...new Set([...plain, ...secretFields])], secretFields };
+    return { fields: [...new Set([...plain, ...secretFields])], secretFields, hostFields: hostFieldsOf(built.record.config) };
 }
 
 /**
@@ -120,6 +123,17 @@ export function planPackageConfig(
                 problems.push(`${comp.id}: the extension does not declare ${foreign.join(', ')}${decl.fields.length ? ` (it declares ${decl.fields.join(', ')})` : ' (it declares no config)'}`);
                 continue;
             }
+            // A host field's answer joins this install's fetch allowlist, so it is one hostname and
+            // nothing else, checked here before anything registers (extension-network-hosts.ts).
+            const hostProblems: string[] = [];
+            const normalized = { ...vals };
+            for (const { field } of decl.hostFields) {
+                if (vals[field] === undefined) continue;
+                const parsed = parseHostFieldValue(vals[field]);
+                if (parsed.ok) normalized[field] = parsed.value;
+                else hostProblems.push(`${comp.id}.${field} is a host field: ${parsed.message}`);
+            }
+            if (hostProblems.length) { problems.push(...hostProblems); continue; }
             const secretsGiven = decl.secretFields.filter(k => vals[k] !== undefined && vals[k] !== '');
             if (secretsGiven.length && !getEncryptionKey(deps.config)) {
                 return refuse(503, 'ENCRYPTION_NOT_CONFIGURED',
@@ -127,7 +141,7 @@ export function planPackageConfig(
             }
             entries.push({
                 componentId: comp.id, type: 'extension', registeredAs, fields: decl.fields, secretFields: decl.secretFields,
-                values: vals, unsetSecrets: decl.secretFields.filter(k => vals[k] === undefined || vals[k] === ''),
+                hostFields: decl.hostFields, values: normalized, unsetSecrets: decl.secretFields.filter(k => vals[k] === undefined || vals[k] === ''),
             });
             continue;
         }
@@ -172,5 +186,6 @@ export function configPreview(plan: { entries: ConfigPlanEntry[] }): Array<Recor
     return plan.entries.map(e => e.type === 'app'
         ? { component_id: e.componentId, type: 'app', registered_as: e.registeredAs, schema: e.schema, given: Object.keys(e.values), missing: e.missing }
         : { component_id: e.componentId, type: 'extension', registered_as: e.registeredAs, fields: e.fields, secret_fields: e.secretFields,
+            ...(e.hostFields.length ? { host_fields: e.hostFields } : {}),
             given: Object.keys(e.values), unset_secrets: e.unsetSecrets });
 }

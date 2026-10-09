@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-09 -- aimeat_extension_config_set sends PATCH /v1/extensions/:name/config.
  *   v1.10.1 -- 2026-10-06 -- aimeat_appdev_overview takes sections as the list the catalog publishes
  *     and sends the route its comma-separated string; aimeat_appdev_pitfall_list reads
  *     GET /v1/appdev/pitfalls/index and aimeat_app_template_propose posts to
@@ -420,6 +421,17 @@ export const appTools: ConnectCliToolDefinition[] = [
         description: 'Deactivate an extension.',
         input: { name: { type: 'string', required: true, description: 'Extension name.' } },
         handler: ({ client }, input) => client.post(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}/deactivate`),
+    },
+    {
+        name: 'aimeat_extension_config_set',
+        description: 'Change config values of an installed extension in place.',
+        input: {
+            name: { type: 'string', required: true, description: 'Extension name.' },
+            config: { type: 'object', required: true, description: 'The fields to change: { "<field>": value }.' },
+        },
+        handler: ({ client }, input) => client.patch(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}/config`, {
+            config: optionalRecord(input, 'config'),
+        }),
     },
     {
         name: 'aimeat_extension_delete',

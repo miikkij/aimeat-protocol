@@ -20,6 +20,10 @@
  *     - a redirect from a listed host to an unlisted one is refused on the hop;
  *     - a manifest naming a URL instead of a hostname, or hosts without network in capabilities,
  *       is refused at install.
+ *   Host fields, manifest network.host_fields, PATCH /v1/extensions/:name/config:
+ *     - unset, the extension reaches nothing and the refusal says the field is not set;
+ *     - another owner setting it → 404; a URL in place of a host → 400, nothing changed;
+ *     - set, ctx.fetch reaches that host and no other; changed, the list moves, same version.
  *   A workflow's extension step, input_from:
  *     - propose → a person approves → act: the act step receives the earlier step's result and the
  *       person's answer as input, and appends the action as a row.
@@ -29,6 +33,7 @@
  *   `network:` is ignored, so the unlisted host is reached. Each assertion of the new behaviour is
  *   marked `// HOLE:`.
  * @version-history
+ *   v1.1.0 — 2026-10-09 — Host fields (wish-a-package-s-extension-hosts-settable-per-install-the-soc-s-w).
  *   v1.0.0 — 2026-10-08 — Initial (aimeat-soc core).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-rows
@@ -349,10 +354,58 @@ await test('Workflow: input_from is a read, so an agent with workflow:write and 
     assert(/memory:read/.test(JSON.stringify(put.body)), `names the permission: ${JSON.stringify(put.body?.error)}`);
 });
 
+// ─── Host fields: a host the installer sets, changed by the owner without a reinstall ───
+const EXT_H = `exrowsh${STAMP}`;
+const setHost = (token: string, value: string) => json(`/v1/extensions/${EXT_H}/config`, {
+    method: 'PATCH', headers: auth(token), body: JSON.stringify({ config: { FAR_HOST: value } }) });
+
+await test('Host field: installed with no value, the extension reaches nothing and says the field is not set', async () => {
+    const inst = await json('/v1/extensions', { method: 'POST', headers: auth(A.token), body: JSON.stringify({
+        manifest: manifestFor(EXT_H, FETCH_SCRIPTS, { capabilities: ['network'], network: { host_fields: { FAR_HOST: 'optional' } },
+            config: { FAR_HOST: { description: 'The far side' } } }), scripts: FETCH_SCRIPTS }) });
+    // HOLE: 400 before this change: network had to be a non-empty hosts list and nothing else.
+    assert(inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    const act = await json(`/v1/extensions/${EXT_H}/activate`, { method: 'POST', headers: auth(A.token) });
+    assert(act.status === 200, `activate ${act.status}`);
+    const r = await invoke(EXT_H, 'fetch_listed', A.token);
+    assert(r.status !== 200 && /has not set its host field/.test(JSON.stringify(r.body)), `expected the not-set refusal, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Host field: another owner cannot set it, and a URL in place of a host is refused', async () => {
+    const other = await setHost(X.token, 'localhost');
+    assert(other.status === 404, `other owner: expected 404, got ${other.status}`);
+    const url = await setHost(A.token, 'https://localhost');
+    assert(url.status === 400 && /FAR_HOST is a host field/.test(JSON.stringify(url.body)), `url: ${url.status} ${JSON.stringify(url.body?.error)}`);
+    const still = await invoke(EXT_H, 'fetch_listed', A.token);
+    assert(still.status !== 200, `nothing changed, got ${still.status}`);
+});
+
+await test('Host field: the owner sets it, and ctx.fetch reaches that host and no other', async () => {
+    const set = await setHost(A.token, 'LocalHost');
+    // HOLE: 404 before this change; the route did not exist.
+    assert(set.status === 200, `set ${set.status}: ${JSON.stringify(set.body?.error)}`);
+    assert(JSON.stringify(set.body.data.network_hosts) === '["localhost"]', `hosts: ${JSON.stringify(set.body.data)}`);
+    const ok = await invoke(EXT_H, 'fetch_listed', A.token);
+    assert(ok.status === 200 && ok.body.data.text === 'far-ok', `listed ${ok.status}: ${JSON.stringify(ok.body?.error ?? ok.body.data)}`);
+    const no = await invoke(EXT_H, 'fetch_unlisted', A.token);
+    assert(no.status !== 200 && /not one of the hosts this extension declared/.test(JSON.stringify(no.body)), `unlisted ${no.status}`);
+});
+
+await test('Host field: changing it moves the allowlist with no new version', async () => {
+    const set = await setHost(A.token, '127.0.0.1');
+    assert(set.status === 200, `set ${set.status}: ${JSON.stringify(set.body?.error)}`);
+    const now = await invoke(EXT_H, 'fetch_unlisted', A.token);
+    assert(now.status === 200, `127.0.0.1 now ${now.status}: ${JSON.stringify(now.body?.error)}`);
+    const before = await invoke(EXT_H, 'fetch_listed', A.token);
+    assert(before.status !== 200, `localhost is no longer listed, got ${before.status}`);
+    const got = await json(`/v1/extensions/${EXT_H}`, { headers: auth(A.token) });
+    assert(got.body.data?.version === '1.0.0' || got.body.data?.extension?.version === '1.0.0', `version: ${JSON.stringify(got.body.data?.version ?? got.body.data?.extension?.version)}`);
+});
+
 // ─── Cleanup ───
 await test('Cleanup: schedule, extensions, rows', async () => {
     if (scheduleId) await json(`/v1/schedules/${scheduleId}`, { method: 'DELETE', headers: auth(A.token) });
-    for (const [name, who] of [[EXT, A], [EXT_X, X], [EXT_NR, A]] as const) {
+    for (const [name, who] of [[EXT, A], [EXT_X, X], [EXT_NR, A], [EXT_H, A]] as const) {
         await json(`/v1/extensions/${name}`, { method: 'DELETE', headers: auth(who.token) });
     }
     await json(`/v1/organisms/${orgId}/workspace/rows/alert?ws=${WS}&before=2100-01-01T00:00:00Z`, { method: 'DELETE', headers: auth(A.token) });

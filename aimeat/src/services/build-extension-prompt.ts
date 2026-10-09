@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.10 — 2026-10-09 — ADDITIVE: `network.host_fields`, a host the installer gives per install.
  *   v1.5.9 — 2026-10-09 — ADDITIVE: ctx.workspace.archiveRecords in the ctx table.
  *   v1.5.8 — 2026-10-08 — ADDITIVE: ai.speak may answer sampleRate, channels and sampleFormat, which the
  *     node reports in the speech answer's `audio` block (aiprov plan, A4).
@@ -231,6 +232,11 @@ function sandboxSection(): string {
     '`capabilities`) limits `ctx.fetch` to those exact hostnames, and a redirect to any other host is',
     'refused with `Fetch blocked:`. The installer sees the list when they approve the package, so an',
     'extension that names its hosts asks for less trust than one that may reach the whole internet.',
+    'When the host differs per install (a customer\'s own server), declare a config field for it and',
+    'name it in `network: { host_fields: { SERVER_HOST: required } }` (or `optional`). The package asks',
+    'the installer for it before install, its value (one hostname or IPv4 address, optional `:port`)',
+    'joins that install\'s list, the approval says "and the host you set in SERVER_HOST", and the owner',
+    'changes it later with `aimeat_extension_config_set`, no new version. One bundle serves every buyer.',
     '',
     '**A batch goes in one call, never one record per call.** A run has at most 500 API calls and 5',
     'seconds, and `write` + `publish` cost two calls per record, so 500 records that way cannot finish.',
