@@ -7621,6 +7621,8 @@
   "notifpage.group.appsSub": "membresías y eventos de aplicaciones",
   "notifpage.group.accountSub": "presupuesto, cuotas, buzón, cumplimiento",
   "notifpage.group.otherSub": "todo lo demás, incluido lo que te envías a ti",
+  "notiftext.docsign_request.title": "{from} te pide que firmes: {title}",
+  "notiftext.docsign_request.body": "Documento {document}. Abre la solicitud de firma o pide a tu IA que te la muestre.",
   "notiftext.workflow_finished.title": "El flujo \"{name}\" terminó",
   "notiftext.workflow_finished.body": "Cada paso produjo · unos {minutes} min · {steps}",
   "notiftext.workflow_failed.title": "El flujo \"{name}\" se quedó corto",

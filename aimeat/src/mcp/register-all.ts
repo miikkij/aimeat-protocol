@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-09 — registerDocsignTools: aimeat_docsign_validate, _lookup, _request_create, _requests,
+ *     _request_get, _sign and _cancel.
  *   2026-10-08 — registerAgentMessageTools receives the session's scopes: declaring how a message was
  *     made needs provenance:write there too (aiprov D5).
  *   2026-10-08 — registerVisibilityTools: aimeat_visibility_report and aimeat_visibility_settings_set.
@@ -147,6 +149,7 @@ import { registerToolLoader } from './tool-loader.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
 import { registerRefineryTools } from './refinery.js';
+import { registerDocsignTools } from './docsign.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
@@ -197,6 +200,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
     registerRefineryTools(mcp, storage, config, agentGaii, scopes, caller);
+    registerDocsignTools(mcp, storage, config, caller);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes, caller);

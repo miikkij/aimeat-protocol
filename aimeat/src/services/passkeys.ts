@@ -36,9 +36,13 @@
  *   - twoStepArmed: does this account ask for two factors (the password door's own test)
  *   - beginRegistration / finishRegistration: add a device to an account that is already signed in
  *   - beginLogin / finishLogin: sign in with a device, by username or discoverable
+ *   - beginSigning / finishSigning / passkeyOriginAllowed: sign a document statement with a device
  *   - PasskeyCeremony: what a caller gets back, and the refusal shape both doors render
  * @usage const r = await beginLogin(config, storage, 'alice');
  * @version-history
+ *   v1.4.0 — 2026-10-09 — beginSigning / finishSigning: a device signs a document statement (the
+ *     challenge is its hash), user verification required, from the node or one of its app origins
+ *     (passkeyOriginAllowed). Used by services/docsign/.
  *   v1.3.0 — 2026-10-09 — A device registered before the account it names was created is refused: it
  *     belongs to an earlier holder of a released name (secrets audit 2026-10-09, finding 1.2).
  *   v1.2.0 — 2026-09-24 — An account that armed two-step sign-in requires user verification: its
@@ -398,6 +402,113 @@ export async function finishLogin(
     ok: true,
     data: { passkey: { ...stored, counter: verification.authenticationInfo.newCounter, lastUsedAt: usedAt }, ghiiRecord },
   };
+}
+
+// ── Signing a statement with a device (document signing, services/docsign/) ──
+
+/** An origin a ceremony may come from: the node's own and the configured extras, and, when the node serves apps on their own origin, any app on it. */
+export function passkeyOriginAllowed(config: AimeatConfig, origin: string): boolean {
+  if (expectedOrigins(config).includes(origin)) return true;
+  if (!config.appOriginEnabled || !config.appHost) return false;
+  try {
+    const u = new URL(origin);
+    return u.protocol === 'https:' && u.hostname.endsWith(`.${config.appHost}`) && !u.port;
+  } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- an origin that is not a URL is not an origin this node serves; false refuses it
+    return false;
+  }
+}
+
+export interface BeginSigningData {
+  ceremony_id: string;
+  options: Awaited<ReturnType<typeof generateAuthenticationOptions>>;
+}
+
+/**
+ * Options for a SIGNATURE rather than a sign-in: the challenge is the hash of what is being signed
+ * (the caller computes it), the device list is this account's, and user verification is required,
+ * because a signature is an act of the person and a key touched by whoever holds the device is not.
+ */
+export async function beginSigning(
+  config: AimeatConfig, storage: Storage, owner: string, challenge: Uint8Array<ArrayBuffer>,
+): Promise<PasskeyResult<BeginSigningData>> {
+  const off = disabled(config); if (off) return off;
+  const keys = await storage.listPasskeysByOwner(owner);
+  if (!keys.length) {
+    return { ok: false, status: 409, code: 'NO_PASSKEY', message: 'You have no passkey on this account. Add one under Account security, then sign.' };
+  }
+  const options = await generateAuthenticationOptions({
+    rpID: config.passkeyRpId,
+    allowCredentials: keys.map(p => ({ id: p.id, transports: p.transports as never })),
+    userVerification: 'required',
+    challenge,
+  });
+  try {
+    return { ok: true, data: { ceremony_id: remember(options.challenge, owner), options } };
+  } catch {
+    return { ok: false, status: 503, code: 'PASSKEY_BUSY', message: 'Too many ceremonies in flight right now. Try again in a moment.' };
+  }
+}
+
+export interface FinishSigningData {
+  passkey: PasskeyRecord;
+  /** The origin the browser reported, from clientDataJSON: where the person pressed the button. */
+  origin: string;
+}
+
+/**
+ * Check a device's answer to a signing ceremony. Refuses an answer from another account's device,
+ * from an origin this node does not serve, or without user verification. The counter is stored as
+ * at sign-in.
+ */
+export async function finishSigning(
+  config: AimeatConfig, storage: Storage,
+  args: { ceremonyId: string; owner: string; response: { id?: string; response?: { clientDataJSON?: string } } & Record<string, unknown> },
+): Promise<PasskeyResult<FinishSigningData>> {
+  const off = disabled(config); if (off) return off;
+  const ceremony = take(args.ceremonyId);
+  if (!ceremony || ceremony.owner !== args.owner) {
+    return { ok: false, status: 400, code: 'PASSKEY_CHALLENGE_EXPIRED', message: 'That took too long, or it was started for another account. Start again.' };
+  }
+  const credentialId = typeof args.response?.id === 'string' ? args.response.id : '';
+  const stored = credentialId ? await storage.getPasskey(credentialId) : null;
+  if (!stored || stored.owner !== args.owner) {
+    return { ok: false, status: 401, code: 'PASSKEY_UNKNOWN', message: 'That device is not registered to your account.' };
+  }
+  let origin = '';
+  try {
+    origin = String(JSON.parse(Buffer.from(String(args.response.response?.clientDataJSON ?? ''), 'base64url').toString('utf8')).origin ?? '');
+  // eslint-disable-next-line aimeat/no-silent-catch -- unreadable client data leaves the origin empty, which the next line refuses as PASSKEY_INVALID
+  } catch { /* refused below */ }
+  if (!passkeyOriginAllowed(config, origin)) {
+    return { ok: false, status: 401, code: 'PASSKEY_INVALID', message: 'That answer came from a page this node does not serve.' };
+  }
+  let verification;
+  try {
+    verification = await verifyAuthenticationResponse({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      response: args.response as any,
+      expectedChallenge: ceremony.challenge,
+      expectedOrigin: origin,
+      expectedRPID: config.passkeyRpId,
+      credential: {
+        id: stored.id,
+        publicKey: new Uint8Array(Buffer.from(stored.publicKey, 'base64url')),
+        counter: stored.counter,
+        transports: stored.transports as never,
+      },
+      requireUserVerification: false,
+    });
+  } catch (err) {
+    return { ok: false, status: 401, code: 'PASSKEY_INVALID', message: `That device's answer did not check out: ${String((err as Error).message ?? err)}` };
+  }
+  if (!verification.verified) return { ok: false, status: 401, code: 'PASSKEY_INVALID', message: 'That device\'s answer did not check out.' };
+  if (!verification.authenticationInfo.userVerified) {
+    return userNotVerified(401, 'A signature needs your PIN, fingerprint or face on the device. Use a device that asks for one.');
+  }
+  const usedAt = new Date().toISOString();
+  await storage.touchPasskey(stored.id, verification.authenticationInfo.newCounter, usedAt);
+  return { ok: true, data: { passkey: { ...stored, counter: verification.authenticationInfo.newCounter, lastUsedAt: usedAt }, origin } };
 }
 
 /** TEST SEAM: forget every pending ceremony. Never called by the server. */

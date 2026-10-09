@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-09 -- e2e-docsign.ts joins the list: document signing and signature validation.
  *   2026-10-09 -- e2e-extension-fetch-gunzip.ts joins the list (not the guard tier yet): ctx.fetch with
  *     gunzip under a manifest's limits.fetch_max_mb (wish-tv-opas).
  *   2026-10-09 -- e2e-secret-canaries.ts joins the list (not the guard tier yet): a stored credential
@@ -321,6 +322,7 @@ const ALL_SUITES = [
     'test/e2e-account-security-gate.ts',
     'test/e2e-totp-lifecycle.ts',
     'test/e2e-passkeys.ts',
+    'test/e2e-docsign.ts',
     'test/e2e-auth-tarpit.ts',
     'test/e2e-oauth-login.ts',
     'test/e2e-session-refresh.ts',

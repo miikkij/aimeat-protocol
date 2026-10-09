@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.26.0 -- 2026-10-09 -- Signed documents: aimeat_docsign_validate, _lookup, _request_create and _sign.
  *   v1.25.0 -- 2026-10-04 -- aimeat_task_decline: a request the agent should not take is declined with
  *     the reason, not failed.
  *   v1.24.0 -- 2026-10-02 -- An AI that is off: tell the owner `fix` and give them `settingsUrl`;
@@ -213,6 +214,17 @@ message, and files it as clear, unclear, unusable or skipped · \`aimeat_refiner
 Every message costs the owner's decision and model allowance, so run one batch and report what it
 filed before running more. It never sends. It reads only a mailbox YOU connected; for a nightly run,
 \`aimeat_schedule_create { kind: "refinery", input: { prefix } }\`. Skill: aimeat-refinery.
+
+**Signed documents — check and sign.** When a person asks whether a signed PDF, a contract or an
+official document is genuine, upload it with \`aimeat_storage_upload\` and call
+\`aimeat_docsign_validate { storage_key }\`: each signature comes back valid, invalid or
+indeterminate, with a one-line \`summary\`, the signer, the time and what proves it, the EU trusted
+list entry and the eIDAS level (\`qualified\` is a qualified electronic signature or seal). Say
+indeterminate as "could not be confirmed", never as forged. \`aimeat_docsign_lookup { sha256 }\` says
+who signed a document with AIMEAT on this node. To have people sign,
+\`aimeat_docsign_request_create { storage_key, title, parties }\` (your owner, or you acting for them,
+must be a party); each person signs with their passkey in the signing app, from the \`sign_link\`.
+\`aimeat_docsign_sign\` signs as YOU, the agent, and never in your owner's name.
 
 **Which AI models are allowed.** Your owner may limit the models their calls use: \`aimeat_ai_policy_set\`
 with no policy reads the policy and the node's recommended models. A call naming a model the rules
