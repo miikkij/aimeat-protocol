@@ -436,7 +436,10 @@ export async function beginSigning(
   config: AimeatConfig, storage: Storage, owner: string, challenge: Uint8Array<ArrayBuffer>,
 ): Promise<PasskeyResult<BeginSigningData>> {
   const off = disabled(config); if (off) return off;
-  const keys = await storage.listPasskeysByOwner(owner);
+  const holder = await storage.getOwner(owner);
+  const since = holder?.createdAt ? Date.parse(holder.createdAt) : 0;
+  // Only this holder's devices: one registered before the account existed is an earlier holder's.
+  const keys = (await storage.listPasskeysByOwner(owner)).filter(p => Date.parse(p.createdAt) >= since);
   if (!keys.length) {
     return { ok: false, status: 409, code: 'NO_PASSKEY', message: 'You have no passkey on this account. Add one under Account security, then sign.' };
   }
@@ -476,6 +479,13 @@ export async function finishSigning(
   const credentialId = typeof args.response?.id === 'string' ? args.response.id : '';
   const stored = credentialId ? await storage.getPasskey(credentialId) : null;
   if (!stored || stored.owner !== args.owner) {
+    return { ok: false, status: 401, code: 'PASSKEY_UNKNOWN', message: 'That device is not registered to your account.' };
+  }
+  // A device registered before this account existed belongs to an earlier holder of the name, the
+  // same refusal finishLogin makes (secrets audit 2026-10-09, 1.2): it must not sign in the new
+  // holder's name either.
+  const holder = await storage.getOwner(stored.owner);
+  if (holder?.createdAt && Date.parse(stored.createdAt) < Date.parse(holder.createdAt)) {
     return { ok: false, status: 401, code: 'PASSKEY_UNKNOWN', message: 'That device is not registered to your account.' };
   }
   let origin = '';
