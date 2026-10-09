@@ -60,6 +60,19 @@ re-serialises on the way out — a knowledge-package manifest, for instance — 
 the hashed bytes from the response, so `by-hash` will not find it and you must use the record id from
 the `Link` header instead. This is a real limit, not a bug you should keep retrying.
 
+### Files: a clip, a picture, a document you store
+
+A stored file carries the record of its bytes. When the node made the bytes (`POST /v1/ai/speak`,
+`POST /v1/ai/image`), the file it stores names the record it minted while it watched them, so a
+picture stored public or a clip made public in place
+(`PATCH /v1/storage/{key}/visibility`, folder paths included) is served from `/v1/pub` with the
+`AI-Disclosure` and `Link` headers, and its record resolves for anyone by id and by the SHA-256 of
+the file. When you store the bytes yourself, pass the record's id as `ai_provenance_id` (or declare
+with `ai_provenance`) on `POST /v1/storage`, a presigned or a chunked upload, or
+`aimeat_storage_upload`. The record must describe these exact bytes: an id whose content hash names
+other bytes is refused with `PROVENANCE_HASH_MISMATCH`. An agent's upload that says nothing is
+stamped by the node, as every other agent write is.
+
 ### The visible label
 
 Where a person reads it, they see the official **EU AI Office icon** plus plain-language text in
