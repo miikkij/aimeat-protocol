@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Auth, OAuth, device/eco authorization, consent, and identity-verification record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-10-09 — VerificationNonceRecord type `login_second_factor`: the ticket an emailed
+ *     sign-in link leaves when the account has two-step sign-in (routes/ghii/login-link-second-factor.ts).
  *   v1.1.0 — 2026-09-26 — AppGrantRecord.ownerAddedScopes: the words the owner added to a grant by
  *     hand, which the narrowing to the app's declaration keeps.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
@@ -263,8 +265,10 @@ export interface TrustedIssuerRecord {
 export interface VerificationNonceRecord {
   id: string;
   owner: string;
-  /** `mcp_connect` is a remote MCP server's OAuth round; `connect` is an outbound ACCOUNT's. */
-  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'saml_login' | 'connect' | 'mcp_connect';
+  /** `mcp_connect` is a remote MCP server's OAuth round; `connect` is an outbound ACCOUNT's.
+   *  `login_second_factor` is a spent sign-in link waiting for the account's TOTP code. */
+  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'saml_login' | 'connect' | 'mcp_connect'
+    | 'login_second_factor';
   state: string;
   /** OIDC nonce for the login types; the PKCE code_verifier for `connect`. */
   nonce: string;

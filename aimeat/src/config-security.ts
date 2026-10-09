@@ -16,6 +16,12 @@
  *   interface AimeatConfig extends SecurityDoorConfig { … }
  *   return { ...securityDoorDefaults(), … };
  * @version-history
+ *   v1.2.0 — 2026-10-09 — ownerKeyLogin (AIMEAT_OWNER_KEY_LOGIN, default true, deprecated, removed in
+ *     4.0.0): the legacy owner-key sign-in can be switched off now (secrets audit 2026-10-09, S2).
+ *   v1.1.0 — 2026-10-09 — adminSetupOpenAfterFirstOperator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR,
+ *     default false): POST /v1/admin/setup/register stays open after the first operator, for test
+ *     nodes only (secrets audit 2026-10-09, 1.4). Here because config.ts and config-types.ts are at
+ *     799 lines.
  *   v1.0.0 — 2026-08-17 — Initial: the refusal log and the credential-door tarpit.
  */
 
@@ -43,6 +49,24 @@ export interface SecurityDoorConfig {
   loginTarpitWindowMs: number;
   /** How many requests may be asleep in the tarpit at once before it sheds instead of holding. */
   loginTarpitMaxConcurrent: number;
+
+  /**
+   * Whether POST /v1/admin/setup/register still creates an operator once the node has one. Off: the
+   * route answers 410 SETUP_CLOSED after the first operator, and an operator adds another through
+   * the Owners page (POST /v1/admin/roles/grant). On only for a test node whose suites register
+   * several operators with the admin password; never on a public node.
+   * AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR, default false.
+   */
+  adminSetupOpenAfterFirstOperator: boolean;
+
+  /**
+   * Whether POST /v1/auth/token still signs an owner in with the account's Ed25519 signing key (the
+   * legacy owner-key sign-in RFC v4.0 deprecates). DEPRECATED: default on in 3.x, because the auth
+   * SDK's password-less registration and existing scripts use it; removed in 4.0.0. Even when on, an
+   * account with two-step sign-in armed is refused on this route, and the key is replaced when the
+   * password is reset. AIMEAT_OWNER_KEY_LOGIN, default true.
+   */
+  ownerKeyLogin: boolean;
 }
 
 /**
@@ -69,5 +93,7 @@ export function securityDoorDefaults(): SecurityDoorConfig {
     loginTarpitBlockAfter: parseInt(process.env.AIMEAT_LOGIN_TARPIT_BLOCK_AFTER ?? '12', 10),
     loginTarpitWindowMs: parseInt(process.env.AIMEAT_LOGIN_TARPIT_WINDOW_MS ?? '900000', 10),
     loginTarpitMaxConcurrent: parseInt(process.env.AIMEAT_LOGIN_TARPIT_MAX_CONCURRENT ?? '50', 10),
+    adminSetupOpenAfterFirstOperator: process.env.AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR === 'true',
+    ownerKeyLogin: process.env.AIMEAT_OWNER_KEY_LOGIN !== 'false',
   };
 }

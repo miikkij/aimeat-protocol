@@ -7,6 +7,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-09 — Secret config is decrypted for the field it is bound to (SecretBinding,
+ *     services/extension-secrets.ts; secrets audit 2026-10-09, 1.1).
  *   v1.13.0 — 2026-10-05 — Both handlers pass the extension's capabilities to buildExtensionCtx
  *     (secaudit 2026-10, PKG-3).
  *   v1.12.0 — 2026-09-29 — Both handlers give ctx.files the caller's roles and scopes, so a file read
@@ -211,8 +213,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           isAppOwner,
         },
         // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
-        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
-        instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config)) },
+        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
+        instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config), { extension: ext.name, instance: instanceId }) },
         logPrefix: `[ext:${ext.name}:${instanceId}]`,
         wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name, trackingScope: instanceId }),
         files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, callerRoles: req.auth!.roles, callerScopes: req.auth!.scopes ?? [], extName: ext.name }),
@@ -395,7 +397,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           isAppOwner,
         },
         // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
-        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
+        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
         logPrefix: `[ext:${ext.name}]`,
         wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name }),
         files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, callerRoles: req.auth!.roles, callerScopes: req.auth!.scopes ?? [], extName: ext.name }),

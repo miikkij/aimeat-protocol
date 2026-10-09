@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.14.0 — 2026-10-09 — device-auth-cleanup: expired device authorizations are deleted on a clock
+ *     (secrets audit 2026-10-09, finding 1.3).
  *   v1.13.0 — 2026-10-08 — behaviour-fixer: the weekly fixing agent of on-page behaviour (layer D).
  *   v1.12.0 — 2026-10-08 — ucp-upkeep: the UCP order webhooks that wait for another try.
  *   v1.11.0 — 2026-09-30 — classification-audit-prune is its own handler, registered on every node.
@@ -153,6 +155,13 @@ export function registerCoreHandlers(
   if (config.eudiwEnabled || config.ftnEnabled) {
     scheduler.registerCoreHandler('nonce-cleanup', () => runNonceCleanupJob(storage));
   }
+  // Expired device authorizations, whatever their status. An approved row holds the new agent's
+  // private key and token until it is deleted; this runs on a clock so a row nobody polls again does
+  // not wait for the next device-authorize call (secrets audit 2026-10-09, finding 1.3).
+  scheduler.registerCoreHandler('device-auth-cleanup', async () => {
+    const n = await storage.cleanupExpiredDeviceAuth();
+    if (n > 0) logger.info(`[device-auth-cleanup] removed ${n} expired device authorization(s)`);
+  });
   // Agent task stall detection + agent connectivity checks
   scheduler.registerCoreHandler('task-stall-detection', async () => {
     const { detectStalledTasks, detectAgentStallConditions } = await import('./task-stall-detector.js');

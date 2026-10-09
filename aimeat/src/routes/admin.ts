@@ -11,6 +11,11 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.11.0 — 2026-10-09 — POST /v1/admin/setup/register answers 410 SETUP_CLOSED, before any write,
+ *     once an owner holds the operator role, unless AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR is on
+ *     (test nodes). A successful register deletes the boot's admin-setup-secret file. The admin
+ *     password used to create an operator for the life of the process, also on a node that had
+ *     operators (secrets audit 2026-10-09, 1.4).
  *   v1.10.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2). adminNodeUpdateRouter takes storage.
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.0 — 2026-09-30 — Mounts adminNodeUpdateRouter: GET /v1/admin/node-update, the npm version check.
@@ -64,6 +69,8 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { ADMIN_LOGIN_HTML, ADMIN_SETUP_HTML } from './admin/setup-html.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorCaller } from '../services/operator-override.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
+import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../services/admin-setup-secret.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -167,6 +174,20 @@ export function adminRouter(
             return;
         }
 
+        // The admin password creates the FIRST operator and nothing after it. Until 2026-10-09 this
+        // route created an operator for anyone holding the password for the life of the process,
+        // and a node without AIMEAT_ADMIN_PASSWORD wrote its generated password to stderr, so
+        // reading the server log was enough to become an operator (secrets audit 2026-10-09, 1.4).
+        // Refused before any write. The setting keeps the old behaviour for test nodes, whose
+        // suites register several operators with the password.
+        if (!config.adminSetupOpenAfterFirstOperator && (await storage.listOwners()).some(isOperatorAccount)) {
+            res.status(410).json(error(config.nodeId, 'SETUP_CLOSED',
+                'This node already has an operator, so setup registration is closed. '
+                + 'The new person creates an ordinary account (POST /v1/ghii), and an operator grants it the operator role '
+                + 'on the admin Owners page (/v1/admin?tab=owners, Grant operator) or with POST /v1/admin/roles/grant.'));
+            return;
+        }
+
         const { name, display_name, password } = req.body ?? {};
         if (!name || typeof name !== 'string') {
             res.status(400).json({ ok: false, error: 'name is required' });
@@ -245,6 +266,13 @@ export function adminRouter(
             } catch { /* GHII record may already exist */ }
         } else {
             hasPassword = !!existingGhii.passwordHash;
+        }
+
+        // The node has an owner now, so the boot's secret file has done its job (services/admin-setup-secret.ts).
+        try {
+            removeAdminSetupSecretFile(adminSetupSecretDir(config));
+        } catch (err) {
+            logger.warn('setup/register: the admin-setup-secret file could not be deleted', { error: String(err) });
         }
 
         res.json({ ok: true, owner: { name: owner.name, roles: owner.roles }, private_key: keyPair.privateKey, public_key: keyPair.publicKey, has_password: hasPassword });

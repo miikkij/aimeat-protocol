@@ -353,10 +353,10 @@
      "slug": "g-2-two-step-sign-in-totp",
      "cells": [
       "<strong>Two-step sign-in (TOTP)</strong>",
-      "QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it.",
-      "<code>/v1/ghii/totp/*</code>, <code>aimeat_admin_totp_reset</code>"
+      "QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. Once it is on, every way in asks for the code: an emailed sign-in link opens a code step before you are signed in, and the account's signing key no longer signs in on its own. A password reset or change also replaces that signing key.",
+      "<code>/v1/ghii/totp/*</code>, <code>/v1/ghii/magic-link/second-factor</code>, <code>aimeat_admin_totp_reset</code>"
      ],
-     "plain": "Two-step sign-in (TOTP) QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. /v1/ghii/totp/*, aimeat_admin_totp_reset"
+     "plain": "Two-step sign-in (TOTP) QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. Once it is on, every way in asks for the code: an emailed sign-in link opens a code step before you are signed in, and the account's signing key no longer signs in on its own. A password reset or change also replaces that signing key. /v1/ghii/totp/*, /v1/ghii/magic-link/second-factor, aimeat_admin_totp_reset"
     },
     {
      "slug": "g-2-sign-in-with-google-microsoft-entra-id-or-casdoor",
@@ -2268,10 +2268,10 @@
      "slug": "g-11-realtime-library",
      "cells": [
       "<strong>Realtime library</strong>",
-      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node.",
-      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>/v1/realtime/rooms</code>"
+      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none.",
+      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>/v1/realtime/rooms</code>, <code>/v1/realtime/ice-servers</code>, <code>AIMEAT_TURN_SECRET</code>"
      ],
-     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. /lib/realtime.js, syncDoc, SharedClock, /v1/realtime/rooms"
+     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. /lib/realtime.js, syncDoc, SharedClock, /v1/realtime/rooms, /v1/realtime/ice-servers, AIMEAT_TURN_SECRET"
     }
    ]
   },

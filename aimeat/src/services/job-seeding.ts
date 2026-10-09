@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.12.0 — 2026-10-09 — Seed core:device-auth-cleanup (every 5 minutes).
  *   v1.11.0 — 2026-10-08 — Seed core:behaviour-fixer (weekly, Monday 06:17): the on-page behaviour fixing agent.
  *   v1.10.0 — 2026-10-08 — Seed core:ucp-upkeep (every 5 minutes): UCP order webhooks tried again.
  *   v1.9.0 — 2026-10-02 — Seed core:package-peer-cleanup (daily, 05:29): unused packages-only peers removed.
@@ -100,6 +101,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   if (config.eudiwEnabled || config.ftnEnabled) {
     jobs.push({ id: 'core:nonce-cleanup', name: 'Verification Nonce Cleanup', coreHandler: 'nonce-cleanup', cron: '*/5 * * * *' });
   }
+
+  // Expired device authorizations and the agent credentials an approved one holds -- every 5 minutes
+  jobs.push({ id: 'core:device-auth-cleanup', name: 'Device Authorization Cleanup', coreHandler: 'device-auth-cleanup', cron: '*/5 * * * *' });
 
   // Agent task stall detection (Phase 1) -- runs every 5 minutes
   jobs.push({ id: 'core:task-stall-detection', name: 'Task Stall Detection', coreHandler: 'task-stall-detection', cron: '*/5 * * * *' });

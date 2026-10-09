@@ -18,9 +18,19 @@
  *   record from a generic editor would overwrite the key with `{ configured: true }`. The generic
  *   memory write doors refuse these two keys for every principal; the owner changes them through
  *   /v1/openrouter/settings and /v1/commerce/payout/stripe, and an agent through the commerce tools.
- * @structure SECRET_RECORD_KEYS · isSecretRecordKey · shownMemoryValue · secretRecordWriteRefusal
+ *
+ *   A WORKSPACE SHARE RECORD (`organism.<id>.w.<ws>.meta.share`) is an ordinary record that carries
+ *   one secret field: the scrypt hash of the share password. The share routes read it from storage
+ *   and never show it (routes/organisms/shared.ts), but the generic doors returned it to the creator's
+ *   agents and to any app holding memory:read. They now show `has_password` in its place. The record
+ *   stays writable through the generic doors: a write without the hash leaves a password share that
+ *   no password opens, which is closed, not open.
+ * @structure SECRET_RECORD_KEYS · isSecretRecordKey · isWorkspaceShareKey · shownMemoryValue ·
+ *   secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.4.0 — 2026-10-09 — The workspace share record's `passwordHash` is shown as `has_password`
+ *     (secrets audit 2026-10-09, finding 1.7).
  *   v1.3.0 — 2026-09-28 — System 2's provider keys: `ai.apikey.provider.<id>` and
  *     `ai.apikey.agent.<agent>.<id>`, matched by the `ai.apikey.` prefix.
  *   v1.2.0 — 2026-09-23 — The key of an owner's own decision provider (`decide.apikey.provider.<id>`).
@@ -60,8 +70,20 @@ export function isSecretRecordKey(key: unknown): boolean {
   return typeof key === 'string' && (SECRET_RECORD_KEYS.has(key) || AGENT_KEY_PREFIXES.some(p => key.startsWith(p)));
 }
 
+/** A workspace's public-share record (routes/organisms/workspace-ops.ts writes it). */
+const WORKSPACE_SHARE_KEY_RE = /^organism\.[^.]+\.w\.[^.]+\.meta\.share$/;
+
+export function isWorkspaceShareKey(key: unknown): boolean {
+  return typeof key === 'string' && WORKSPACE_SHARE_KEY_RE.test(key);
+}
+
 /** The value a generic door may show. Every other key passes through untouched. */
 export function shownMemoryValue(key: string, value: unknown): unknown {
+  if (isWorkspaceShareKey(key) && value && typeof value === 'object' && !Array.isArray(value)
+    && 'passwordHash' in (value as Record<string, unknown>)) {
+    const { passwordHash, ...rest } = value as Record<string, unknown>;
+    return { ...rest, has_password: typeof passwordHash === 'string' && passwordHash.length > 0 };
+  }
   if (!isSecretRecordKey(key) || value === null || value === undefined) return value;
   if (key !== PSP_RECORD_KEY) return { configured: true };
   if (typeof value !== 'object' || Array.isArray(value)) return { configured: true };

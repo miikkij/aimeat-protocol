@@ -17,6 +17,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-account-security-gate
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The owner signs back in with the changed password: the password change
+ *     replaces the signing key, and the old key is asserted refused (secrets audit 2026-10-09, S2).
  *   v1.1.0 — 2026-09-12 — Phase 1b: the read side, on the one door of this family that could not
  *     take a gate. GET /v1/ghii/me is how any principal learns who it acts for, so it stays open to
  *     everything carrying the person's name and splits its response instead. The four assertions
@@ -363,11 +365,16 @@ async function main() {
     // is listed and they are what dropping it would lose. e2e-profile-tabs carries the same repair
     // for the same door, and the comment beside it records the day this was first learned.
     await test('the owner signs back in after signing themselves out everywhere', async () => {
+        // With the password, not the signing key: the table's "set the password" row changed the
+        // password to TakenOver9876 on the owner's own pass, and a password change replaces the
+        // signing key since 2026-10-09 (secrets audit 2026-10-09, S2).
         const ts = new Date().toISOString();
-        const again = await json('/v1/auth/token', {
+        const byKey = await json('/v1/auth/token', {
             method: 'POST',
             body: JSON.stringify({ owner: ownerA, timestamp: ts, signature: await signMsg(ownerAKey, ownerA + NODE_ID + ts) }),
         });
+        assert(byKey.body.ok !== true, 'the signing key from before the password change must no longer sign in');
+        const again = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: ownerA, password: 'TakenOver9876' }) });
         assert(again.body.ok === true, `owner re-auth: ${JSON.stringify(again.body.error)}`);
         ownerAToken = again.body.data.token as string;
     });

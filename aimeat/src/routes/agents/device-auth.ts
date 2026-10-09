@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.3 — 2026-10-09 — A device-token poll on an expired row clears its credentials and deletes
+ *     it, approved rows included (secrets audit 2026-10-09, 1.3).
  *   v1.11.2 — 2026-10-05 — The approving owner token must be the owner in person (isOwnerInPerson;
  *     secaudit 2026-10, C4).
  *   v1.11.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
@@ -546,11 +548,13 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
-    // Check expiry
+    // Check expiry. An expired row is removed here rather than left for the next sweep: an approved
+    // one still holds the agent's private key and JWT in plain text. The credentials are cleared by
+    // device_code first, then the sweep deletes this row and every other expired one. A later poll
+    // with the same device_code gets invalid_grant (unknown device code).
     if (new Date(request.expiresAt) <= new Date()) {
-      if (request.status === 'pending') {
-        await storage.updateDeviceAuth(device_code, { status: 'expired' });
-      }
+      await storage.updateDeviceAuth(device_code, { status: 'expired', agentCredentials: undefined });
+      await storage.cleanupExpiredDeviceAuth();
       res.status(400).json({ error: 'expired_token', error_description: 'This authorization request has expired.' });
       return;
     }
@@ -595,11 +599,12 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
         // credentials forever — forcing a whole new authorize + owner approval round. So the
         // first retrieval does NOT clear the credentials; it shortens the request's expiry to
         // a short grace window instead. A re-poll with the same device_code inside the window
-        // returns the same credentials; after it, the expiry check above ends the flow and
-        // cleanupExpiredDeviceAuth wipes the record. Security note: this narrows credential
-        // lifetime (they previously sat in storage until the original 30 min expiry when
-        // unpolled) and only the device_code holder — who could have polled first anyway —
-        // can re-read within the window.
+        // returns the same credentials. After it, the row is deleted, private key included, by
+        // whichever comes first: a poll with this device_code (the expiry check above deletes it)
+        // or cleanupExpiredDeviceAuth, which removes every expired row whatever its status. That
+        // sweep runs on each POST /v1/agents/device-authorize, not on a timer. An approved row
+        // nobody polls goes the same way at its original expiry (DEVICE_AUTH_EXPIRY_MS). Only the
+        // device_code holder, who could have polled first anyway, can re-read within the window.
         const RETRIEVAL_GRACE_MS = 120_000;
         const creds = request.agentCredentials;
         const remainingMs = new Date(request.expiresAt).getTime() - Date.now();

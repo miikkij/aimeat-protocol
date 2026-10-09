@@ -12,6 +12,8 @@
  *   - extension and cortex-extension/lib-file CRUD
  *
  * @version-history
+ *   v1.4.0 — 2026-10-09 — deleteVerificationNonce answers whether this call removed the row, so a
+ *     single-use nonce has one consumer under concurrent requests.
  *   v1.3.0 — 2026-09-09 — Generic escrow holds (create/get/list/release/refund), getTrustedIssuer,
  *     getTrustedIssuerByUrl, deleteTrustedIssuer and listRealtimeRooms deleted: no caller.
  *   v1.2.0 — 2026-08-17 — `lean` option on listExtensions (no scriptContent) and
@@ -63,7 +65,8 @@ export interface NodeRepository {
   listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]>;
   createVerificationNonce(record: VerificationNonceRecord): Promise<VerificationNonceRecord>;
   getVerificationNonce(state: string): Promise<VerificationNonceRecord | null>;
-  deleteVerificationNonce(state: string): Promise<void>;
+  /** True when this call removed the row: the one caller that gets true has consumed the nonce. */
+  deleteVerificationNonce(state: string): Promise<boolean>;
   cleanExpiredNonces(): Promise<number>;
   createRealtimeRoom(room: RealtimeRoomRecord): Promise<RealtimeRoomRecord>;
   getRealtimeRoom(id: string): Promise<RealtimeRoomRecord | null>;

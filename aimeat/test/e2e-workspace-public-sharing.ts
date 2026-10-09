@@ -6,6 +6,8 @@
  *   PUBLISHED docs the share meta marks public are served, that drafts never leak, that per-doc
  *   overrides win over the space flag, and that the share write is creator/admin-gated.
  * @version-history
+ *   v1.3.0 — 2026-10-09 — 14b: the generic memory routes show has_password, never the share
+ *     password's hash (secrets audit 2026-10-09, finding 1.7).
  *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit (e2e-workspace-public-sharing:103): the
  *     share write has TWO gates — active membership, then creator/admin — and only a NON-MEMBER was
  *     ever refused, so the second one was covered by nothing. This organism is join_policy 'open', so
@@ -219,6 +221,23 @@ await test('14. set access password + password; response/GET carry has_password,
     assert(get.body.data.share.access === 'password' && get.body.data.share.has_password === true, 'GET reflects access + has_password');
     const dumped = JSON.stringify(put.body) + JSON.stringify(get.body);
     assert(!dumped.includes('passwordHash') && !dumped.includes('v2:'), 'the scrypt hash must never appear in any response');
+});
+
+await test('14b. the generic memory routes show has_password, never the hash, of the share record', async () => {
+    // HOLE (secrets audit 2026-10-09, finding 1.7): the share record is an ordinary memory record, and
+    // GET /v1/memory/:key, the list and the search returned its scrypt hash to the creator and to
+    // every agent or app reading the creator's memory.
+    const key = `${root()}.meta.share`;
+    const one = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: AH() });
+    assert(one.status === 200, `read ${one.status}`);
+    assert(one.body.data.value.has_password === true, `has_password shown: ${JSON.stringify(one.body.data.value)}`);
+    const list = await json(`/v1/memory?prefix=${encodeURIComponent(`organism.${orgId}.`)}&limit=500`, { headers: AH() });
+    const search = await json('/v1/memory/search?q=share', { headers: AH() });
+    for (const [door, body] of [['read', one.body], ['list', list.body], ['search', search.body]] as const) {
+        const text = JSON.stringify(body);
+        assert(!text.includes('passwordHash'), `${door} carries the passwordHash field`);
+        assert(!/\$scrypt|v2:[0-9a-f]{16,}/.test(text), `${door} carries the hash value: ${text.slice(0, 200)}`);
+    }
 });
 
 await test('15. password mode: anonymous public reads → 401 SHARE_PASSWORD_REQUIRED (list, single, md)', async () => {

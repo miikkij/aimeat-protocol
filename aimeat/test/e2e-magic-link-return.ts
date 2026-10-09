@@ -16,7 +16,10 @@
  *   foreign address, asked for or written into the link afterwards, lands on the front page, signed
  *   in, because the token was good and only the address was not. A refused token still goes to the
  *   front page with `auth_error`, whatever address it carries. The session a link opens is the
- *   mailed account's, and the operator's endpoint refuses it with 403.
+ *   mailed account's, and the operator's endpoint refuses it with 403. On an account with two-step
+ *   sign-in the link opens no session: it redirects to `/?auth_step=second_factor` with a ticket
+ *   cookie, and POST /v1/ghii/magic-link/second-factor opens the session once, with the right code.
+ *   POST /v1/ghii/login/attach-email asks such an account for its code too.
  *
  *   It runs its own node, with email on (a real SMTP sink) and app origins on, because the shared
  *   E2E server has neither. SQLite whichever backend the runner started with: what is under test is
@@ -24,6 +27,8 @@
  *   it (default 40454, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-return
  * @version-history
+ *   v1.1.0 — 2026-10-09 — Two-step sign-in: the link, the code step and attach-email (secaudit
+ *     2026-10-09, S1).
  *   v1.0.0 — 2026-09-29 — Initial (the emailed link returns to the place it was asked from).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -32,6 +37,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { TOTP, Secret } from 'otpauth';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeSmtp, type FakeSmtp } from './helpers/fake-smtp.js';
@@ -86,6 +92,30 @@ async function ownerToken(owner: string, privB64: string): Promise<string> {
     });
     assert(r.status === 200, `owner token ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
     return r.body.data.token as string;
+}
+
+/** The code an authenticator app shows now (or `offset` periods later) for this secret. */
+function totpCode(secret: string, offset = 0): string {
+    return new TOTP({ secret: Secret.fromBase32(secret), algorithm: 'SHA1', digits: 6, period: 30 })
+        .generate({ timestamp: Date.now() + offset * 30_000 });
+}
+
+/** A six-digit code outside the window the server accepts around now. */
+function wrongCode(secret: string): string {
+    const near = new Set([-2, -1, 0, 1, 2].map(o => totpCode(secret, o)));
+    for (let n = 0; ; n++) { const c = String(n).padStart(6, '0'); if (!near.has(c)) return c; }
+}
+
+/** Arm two-step sign-in on the account the token is for, and return its base32 secret. */
+async function armTotp(token: string): Promise<string> {
+    const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: '{}' });
+    assert(setup.status === 200, `totp setup ${setup.status}: ${JSON.stringify(setup.body).slice(0, 300)}`);
+    const secret = setup.body.data.totp_secret as string;
+    const verify = await json('/v1/ghii/totp/verify', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ code: totpCode(secret) }),
+    });
+    assert(verify.status === 200, `totp verify ${verify.status}: ${JSON.stringify(verify.body).slice(0, 300)}`);
+    return secret;
 }
 
 // ─── The node ─────────────────────────────────────────────────────────────────
@@ -325,6 +355,75 @@ async function run() {
         assert(again.status === 302 && again.location === `${BASE}/?auth_error=INVALID_TOKEN`,
             `expected the front page with INVALID_TOKEN, got ${again.status} ${again.location}`);
         assert(!again.session, 'a refused link must not open a session');
+    });
+
+    // ── Two-step sign-in (secaudit 2026-10-09, S1) ──
+    //
+    // Until 2026-10-09 the link opened a full session on an account with TOTP armed, without the code
+    // the password sign-in asks for. Now it leaves a ticket and the code finishes it.
+
+    const totpName = `mrtotp${stamp}`;
+    const totpEmail = `${totpName}@aimeat.test`;
+    let totpSecret = '';
+
+    await test('setup: a second person verifies the address and arms two-step sign-in', async () => {
+        const reg = await json('/v1/ghii/register-web', {
+            method: 'POST', body: JSON.stringify({ username: totpName, display_name: 'Totp User', email: totpEmail }),
+        });
+        assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body).slice(0, 300)}`);
+        const mail = await smtp!.waitForMail(totpEmail, /\b\d{6}\b/);
+        const code = /\b(\d{6})\b/.exec(mail.text)![1];
+        const verify = await json('/v1/ghii/verify-email', {
+            method: 'POST', body: JSON.stringify({ verification_id: reg.body.data.verification_id, code }),
+        });
+        assert(verify.status === 200, `verify-email ${verify.status}`);
+        totpSecret = await armTotp(await ownerToken(totpName, reg.body.data.private_key));
+    });
+
+    await test('a link for an account with TOTP armed opens no session; it asks for the code', async () => {
+        const link = await askLink(totpEmail, '/v1/profile');
+        const r = await fetch(link, { redirect: 'manual', headers: asClient() });
+        const cookies = r.headers.getSetCookie();
+        assert(r.status === 302 && r.headers.get('location') === `${BASE}/?auth_step=second_factor`,
+            `expected the front page's code step, got ${r.status} ${r.headers.get('location')}`);
+        assert(!cookies.some(c => c.startsWith('aimeat_rt=') && !/^aimeat_rt=;/.test(c)), 'the link alone must not set the refresh cookie');
+        const ticket = cookies.find(c => c.startsWith('aimeat_link_2fa='))?.split(';')[0] ?? '';
+        assert(ticket.length > 'aimeat_link_2fa='.length, `the link must leave a ticket cookie: ${cookies.join(' | ')}`);
+
+        // Signed out: the refresh endpoint has nothing to refresh, whatever the browser sends.
+        const refresh = await json('/v1/auth/refresh', { method: 'POST', headers: { Cookie: ticket, 'X-AIMEAT-Refresh': '1' } });
+        assert(refresh.status !== 200, `the session endpoint must stay signed out, got ${refresh.status}`);
+
+        const url = '/v1/ghii/magic-link/second-factor';
+        const wrong = await json(url, { method: 'POST', headers: { Cookie: ticket }, body: JSON.stringify({ totp_code: wrongCode(totpSecret) }) });
+        assert(wrong.status === 401 && wrong.body.error?.code === 'INVALID_TOTP', `a wrong code: ${wrong.status} ${wrong.body.error?.code}`);
+
+        const res = await fetch(`${BASE}${url}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: ticket, ...asClient() },
+            body: JSON.stringify({ totp_code: totpCode(totpSecret) }),
+        });
+        const body = await res.json() as any;
+        assert(res.status === 200, `the right code: ${res.status} ${JSON.stringify(body).slice(0, 300)}`);
+        assert(body.data.redirect === `${BASE}/v1/profile`, `the return address comes back from the server: ${body.data.redirect}`);
+        assert(res.headers.getSetCookie().some(c => c.startsWith('aimeat_rt=') && !/^aimeat_rt=;/.test(c)), 'the right code sets the refresh cookie');
+
+        const again = await json(url, { method: 'POST', headers: { Cookie: ticket }, body: JSON.stringify({ totp_code: totpCode(totpSecret, 1) }) });
+        assert(again.status === 401 && again.body.error?.code === 'SECOND_FACTOR_EXPIRED', `the same ticket twice: ${again.status} ${again.body.error?.code}`);
+    });
+
+    await test('attach-email on an account with TOTP armed asks for the code', async () => {
+        // An account below verification level 1 with a password, armed through its owner key: the
+        // only route to TOTP for such an account, and the one the attach-email check is for.
+        const name = `mrattach${stamp}`;
+        const password = 'AttachEmailTotp1234';
+        const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: name, password }) });
+        if (reg.status === 400 && reg.body.error?.code === 'EMAIL_REQUIRED') { console.log('    (this node requires an email to register; skipped)'); return; }
+        assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body).slice(0, 300)}`);
+        await armTotp(await ownerToken(name, reg.body.data.private_key));
+        const r = await json('/v1/ghii/login/attach-email', {
+            method: 'POST', body: JSON.stringify({ username: name, password, email: `${name}@aimeat.test` }),
+        });
+        assert(r.status === 401 && r.body.error?.code === 'TOTP_REQUIRED', `expected 401 TOTP_REQUIRED, got ${r.status} ${r.body.error?.code}`);
     });
 
     await stopAll();

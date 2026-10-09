@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.24.0 — 2026-10-09 — turnDefaults(): the TURN settings, with turnSecret and turnTtlSeconds (config-turn.ts).
  *   v1.23.0 — 2026-10-08 — visibilityDefaults(): one switch per visibility layer (config-visibility.ts).
  *   v1.22.0 — 2026-10-06 — SHIPPED_DEFAULT_AGENT_SCOPES carries organism:read (secaudit 2026-10 last
  *     items, D4).
@@ -84,6 +85,7 @@ import { aiJobDefaults } from './config-ai-jobs.js';
 import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
 import { visibilityDefaults } from './config-visibility.js';
+import { turnDefaults } from './config-turn.js';
 import { dataAccessDefaults } from './config-data-access.js';
 import { updateCheckDefaults } from './config-update-check.js';
 import { themesDefaults } from './config-themes.js';
@@ -581,9 +583,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     realtimeMaxMessageSizeBytes: parseInt(process.env.AIMEAT_REALTIME_MAX_MESSAGE_SIZE ?? '16384', 10),
     realtimeRateLimitPerSecond: parseInt(process.env.AIMEAT_REALTIME_RATE_LIMIT ?? '50', 10),
     stunServers: (process.env.AIMEAT_STUN_SERVERS ?? 'stun:stun.l.google.com:19302').split(',').map(s => s.trim()).filter(Boolean),
-    turnServer: process.env.AIMEAT_TURN_SERVER ?? null,
-    turnUsername: process.env.AIMEAT_TURN_USERNAME ?? null,
-    turnCredential: process.env.AIMEAT_TURN_CREDENTIAL ?? null,
+    ...turnDefaults(),
     echatAnonymous: process.env.AIMEAT_ECHAT_ANONYMOUS === 'true',
     siteEnabled: process.env.AIMEAT_SITE_ENABLED !== 'false',
     siteMaxTemplateSizeKb: parseInt(process.env.AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB ?? '512', 10),

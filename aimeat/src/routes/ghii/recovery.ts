@@ -6,6 +6,8 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-09 — A password reset and a password change replace the owner's signing key, so
+ *     the deprecated owner-key sign-in does not outlive them (secrets audit 2026-10-09, S2).
  *   v1.5.0 — 2026-10-05 — The password change checks the current password with checkPassword
  *     (services/password-check.ts), so the account's lock and attempt count apply (secaudit 2026-10, C1).
  *   v1.4.0 — 2026-10-01 — POST /v1/ghii/email/confirm applies the open app roster invitations of the
@@ -44,6 +46,17 @@ import { passwordResetEmail } from '../../services/email-template-reset.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
+import { generateKeyPair } from '../../auth/keypair.js';
+
+/**
+ * Replace the owner's Ed25519 signing key and hand the new private half to nobody. The key signs in
+ * at POST /v1/auth/token (deprecated owner-key sign-in); a password reset or change has to end that
+ * too. A person who still wants the key asks for a fresh one at sign-in (request_owner_key).
+ */
+async function replaceOwnerSigningKey(storage: Storage, ownerName: string): Promise<void> {
+    const { publicKey } = await generateKeyPair();
+    await storage.updateOwner(ownerName, { publicKey });
+}
 
 export function registerRecoveryRoutes(
     router: Router,
@@ -335,6 +348,10 @@ export function registerRecoveryRoutes(
         const newHash = await hashPassword(newPassword);
         const ghii = `${username}@${config.nodeId}`;
         await storage.updateGHII(ghii, { passwordHash: newHash });
+        // A reset is what a person does when someone else may have had the account: the signing key
+        // that also signs in (deprecated owner-key sign-in) is replaced with it, or whoever took the
+        // key keeps the account through the reset (secrets audit 2026-10-09, S2).
+        await replaceOwnerSigningKey(storage, username);
 
         // Mark verification as used
         await storage.updateEmailVerification(record.id, {
@@ -402,6 +419,8 @@ export function registerRecoveryRoutes(
 
         const newHash = await hashPassword(new_password);
         await storage.updateGHII(ghii, { passwordHash: newHash });
+        // Same as the reset above: a changed password retires the signing key that also signs in.
+        await replaceOwnerSigningKey(storage, ownerName);
 
         res.json(success(config.nodeId, {
             ok: true,

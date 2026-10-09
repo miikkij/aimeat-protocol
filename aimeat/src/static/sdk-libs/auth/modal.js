@@ -13,6 +13,7 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.14.0 — 2026-10-09 — opts.secondFactorLink opens the dialog on the code view in link mode (secaudit 2026-10-09, S1).
  *   v1.13.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.13.0 — 2026-10-05 — A sign-up reaches the code step every time. The late dictionary load no
  *     longer redraws the dialog while a step is open or a button is working (the redraw threw a
@@ -70,7 +71,7 @@
  *     a display name to sign in, never mentioned email until a create attempt had already failed, and
  *     turned a mistyped username into a second empty account.
  */
-import { auth, api } from './session.js';
+import { auth, api, restoreSessionFromCookie } from './session.js';
 import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANGS } from './i18n.js';
 import { writeLang } from '../_core/lang.js';
@@ -454,8 +455,11 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       i: i,
       showView: showView,
       submit: function (user, pass, secondFactor) { return auth.loginWithPassword(user, pass, secondFactor); },
+      restoreSession: restoreSessionFromCookie,
       onSuccess: finishLogin,
     });
+    // An emailed link on a two-step account opens the dialog on the code view, once (modal-totp.js).
+    if (opts.secondFactorLink) { opts.secondFactorLink = false; totpStep.openLinkStep(); }
 
     // Credentials captured from the last correct-password attempt that hit the email gate.
     var pendingEmailLogin = null;

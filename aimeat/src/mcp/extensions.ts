@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   v2.9.1 — 2026-10-09 — aimeat_extension_invoke decrypts secret config for the field it is bound to
+ *     (SecretBinding; secrets audit 2026-10-09, 1.1).
  *   v2.9.0 — 2026-10-09 — aimeat_extension_config_set (services/extension-config-set.ts).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -319,10 +321,10 @@ export function registerExtensionsTools(
                 // MCP tool as through the HTTP route, or the word means two things.
                 caller: runAs,
                 // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
-                extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
+                extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
                 instance: instance_id ? {
                     id: instance_id,
-                    config: decryptSecretFields((await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config)),
+                    config: decryptSecretFields((await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config), { extension: ext.name, instance: instance_id }),
                 } : undefined,
                 logPrefix: `[ext:${ext.name}${instance_id ? ':' + instance_id : ''}]`,
                 // Same ctx.files the REST door builds: reads are authorized as the caller, writes

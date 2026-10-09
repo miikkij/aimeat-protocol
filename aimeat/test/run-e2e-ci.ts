@@ -9,6 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-09 -- e2e-secret-canaries.ts joins the list (not the guard tier yet): a stored credential
+ *     searched for in every listed read route (secrets audit 2026-10-09).
+ *   2026-10-09 -- e2e-admin-setup-closed.ts joins the list (not the guard tier): setup/register answers
+ *     410 once an operator exists, on a node started with the shipped setting (secrets audit 2026-10-09, 1.4).
  *   2026-10-09 -- e2e-app-ai-use.ts joins the list: the "Use with your AI" mark and its guide page.
  *   2026-10-09 -- e2e-workspace-read-scale.ts joins the list: the workspace read timed at production size.
  *   2026-10-08 -- e2e-storage-file-provenance.ts joins the list: a stored file carries its AI-provenance record.
@@ -298,6 +302,12 @@ const ALL_SUITES = [
     // knowledge admin. e2e-admin-features keeps the refusals and reads.
     'test/e2e-admin-doors.ts',
     'test/e2e-admin-doors-2.ts',
+    // The admin password creates the first operator only (secrets audit 2026-10-09, 1.4). Runs with
+    // AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=false (ADMIN_SETUP_CLOSED_SUITES).
+    'test/e2e-admin-setup-closed.ts',
+    // Secret canaries: a stored credential searched for in every listed read route, as the owner and
+    // as an agent (secrets audit 2026-10-09).
+    'test/e2e-secret-canaries.ts',
     // The operator's memory doors — the listing, the cross-owner content search, one record, and
     // the bin. This surface had no test at all until 2026-09-12, and it is the one an operator
     // deletes anybody's data through.

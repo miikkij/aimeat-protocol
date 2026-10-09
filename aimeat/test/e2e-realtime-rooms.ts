@@ -21,11 +21,13 @@
  *   9 the idle reaper.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-realtime-rooms
  * @version-history
+ *   v1.1.0 — 2026-10-09 — ice-servers: the TURN credential is derived from AIMEAT_TURN_SECRET, expires
+ *     within the TTL, matches an HMAC computed here, and the secret appears in no response.
  *   v1.0.0 — 2026-09-08 — Initial. First suite in the repo to open a realtime socket.
  */
 import { WebSocket } from 'ws';
 import * as ed from '@noble/ed25519';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
@@ -312,6 +314,44 @@ await test('GET /v1/realtime/ice-servers — served to a credential, refused wit
     assert(Array.isArray(body.data.ice_servers) && body.data.ice_servers.length > 0, 'has ice_servers');
     const anon = await json('/v1/realtime/ice-servers');
     assert(anon.status === 401, `unauthenticated ice-servers must be 401, got ${anon.status}`);
+});
+
+// The runner pins AIMEAT_TURN_SERVER and AIMEAT_TURN_SECRET (test/run-e2e-server.ts pinnedEnv).
+const TURN_SECRET = process.env.AIMEAT_TURN_SECRET ?? 'e2e-turn-secret-canary';
+const TURN_TTL = Number(process.env.AIMEAT_TURN_TTL_SECONDS ?? 3600);
+
+await test('GET /v1/realtime/ice-servers — TURN credential derived from the shared secret, expiring, secret never sent', async () => {
+    const res = await fetch(`${BASE}/v1/realtime/ice-servers`, { headers: authA() });
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('cache-control') ?? '').includes('no-store'), `cache-control: ${res.headers.get('cache-control')}`);
+    const raw = await res.text();
+    assert(!raw.includes(TURN_SECRET), 'the response body must never contain the TURN shared secret');
+    const body = JSON.parse(raw);
+    const turn = body.data.ice_servers.find((s: any) => [s.urls].flat().some((u: string) => u.startsWith('turn:')));
+    assert(!!turn, `an owner must get a TURN entry: ${raw}`);
+    const [expiryStr, opaqueId] = String(turn.username).split(':');
+    const expiry = Number(expiryStr);
+    const now = Math.floor(Date.now() / 1000);
+    assert(Number.isInteger(expiry) && expiry > now, `expiry must be in the future: ${turn.username}`);
+    assert(expiry <= now + TURN_TTL + 60, `expiry must be within the TTL: ${expiry - now}s ahead, TTL ${TURN_TTL}`);
+    assert(/^[0-9a-f]{16}$/.test(opaqueId ?? ''), `opaque id must be a short hash: ${opaqueId}`);
+    assert(!String(turn.username).includes(ownerA.name), 'the TURN username must not carry the account name');
+    const expected = createHmac('sha1', TURN_SECRET).update(String(turn.username)).digest('base64');
+    assert(turn.credential === expected, `credential must be base64(HMAC-SHA1(secret, username)): ${turn.credential} vs ${expected}`);
+    // A second principal gets a different username, so one leaked credential names one caller.
+    const b = await json('/v1/realtime/ice-servers', { headers: authB() });
+    const turnB = b.body.data.ice_servers.find((s: any) => [s.urls].flat().some((u: string) => u.startsWith('turn:')));
+    assert(!!turnB && String(turnB.username).split(':')[1] !== opaqueId, 'owner B must get its own opaque id');
+});
+
+await test('GET /v1/realtime/ice-servers — no TURN entry and no secret for a caller without a credential', async () => {
+    // This suite's node runs anonymous mode on, and requireAuth() refuses the anonymous identity it
+    // injects: the call answers 401 with no ICE list, so no TURN entry and no trace of the secret.
+    const res = await fetch(`${BASE}/v1/realtime/ice-servers`);
+    const raw = await res.text();
+    assert(res.status === 401, `anonymous ice-servers must be 401, got ${res.status}: ${raw}`);
+    assert(!raw.includes(TURN_SECRET), 'an anonymous response must never contain the TURN shared secret');
+    assert(!raw.includes('turn:'), `an anonymous response must carry no TURN entry: ${raw}`);
 });
 
 await test('GET /v1/realtime/stats — operator only', async () => {

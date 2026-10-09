@@ -5,6 +5,8 @@
  * @description Extension instance REST routes — create, list, get, update (PATCH), delete, and
  *   public per-instance translations. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-09 — Instance secrets are encrypted bound to their extension, instance and field
+ *     (SecretBinding; secrets audit 2026-10-09, 1.1).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  *   v1.1.0 — 2026-08-10 — Instance config is stripped of client-supplied ciphertext before the
  *                         merge with stored secrets.
@@ -81,7 +83,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       // those, and encryptSecretFields would store an outside one verbatim and later decrypt it
       // with the node key straight into the sandbox.
       const { config: cleanInstanceConfig } = stripClientEncryptedValues(instanceConfig ?? {});
-      const encInstConfig = encryptSecretFields(cleanInstanceConfig ?? {}, instSecretKeys, getEncryptionKey(config));
+      const encInstConfig = encryptSecretFields(cleanInstanceConfig ?? {}, instSecretKeys, getEncryptionKey(config), { extension: name, instance: id });
       if (encInstConfig === null) {
         res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
           'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to store secret instance config.'));
@@ -232,7 +234,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
         // are the stored ones this carries forward.
         const { config: cleanNewConfig } = stripClientEncryptedValues(newConfig);
         const merged = preserveMaskedSecrets(cleanNewConfig ?? {}, instance.config, instSecretKeys);
-        const encInstConfig = encryptSecretFields(merged, instSecretKeys, getEncryptionKey(config));
+        const encInstConfig = encryptSecretFields(merged, instSecretKeys, getEncryptionKey(config), { extension: ext.name, instance: instance.id });
         if (encInstConfig === null) {
           res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
             'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to store secret instance config.'));

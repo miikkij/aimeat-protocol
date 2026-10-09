@@ -10,6 +10,9 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.21.0 — 2026-10-09 — A protected app's code is waived for a caller who could set it (the owner in
+ *     person, or the owner's principal holding app:write), not for every token in the owner's name
+ *     (secrets audit 2026-10-09, finding 1.5).
  *   v1.20.0 — 2026-10-09 — The inline serve carries the "Use with your AI" mark when the app has public app tools or skills.
  *   v1.19.0 — 2026-10-08 — A runnable HTML app carries the on-page behaviour script unless its owner switched it off (layer D).
  *   v1.18.0 — 2026-10-08 — The app download counts the visit for AI visibility (services/visibility/),
@@ -116,6 +119,7 @@ import { visitSignals } from '../../utils/visit-signals.js';
 import { ownerTagsFor, withOwnerTags } from '../../services/visibility/analytics-tags.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
+import { callerOf } from '../../middleware/caller.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
@@ -510,10 +514,14 @@ export function registerReadRoutes(
             // authenticated owner request (the catalog's Details/version/fork fetches carry a
             // Bearer) used to 403 here silently, dead-ending the owner on their own app
             // (UX-remake v3, P6, measured).
+            // The owner's exemption belongs to a caller who could set the code (app:write, or the
+            // owner in person): a token that merely acts in the owner's name, such as another
+            // person's app the owner signed into, read protected apps here (secrets audit 2026-10-09, 1.5).
             let codeExempt = false;
             if (req.auth) {
                 const { owner: viewerOwner } = await canonicalOwner(req);
-                codeExempt = viewerOwner === app.ownerName || await operatorReads();
+                codeExempt = (viewerOwner === app.ownerName && !req.auth.anonymous && callerOf(req, config.nodeId, storage).has('app:write'))
+                    || await operatorReads();
             }
             if (!codeExempt) {
                 // A browser NAVIGATION gets a human page with a code field instead of raw JSON

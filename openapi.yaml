@@ -7825,7 +7825,10 @@ paths:
 
         With `owner`, an owner logs in with an older Ed25519 key, signing
         `owner + node id + timestamp`. That form is the legacy owner-key login (RFC Core §9);
-        password login at `POST /v1/ghii/login` is the one to use.
+        password login at `POST /v1/ghii/login` is the one to use. DEPRECATED, removed in 4.0.0:
+        a node with `AIMEAT_OWNER_KEY_LOGIN=false` answers `410 OWNER_KEY_LOGIN_OFF`. An account
+        with two-step sign-in armed is always refused here with `401 SECOND_FACTOR_REQUIRED`, and
+        a password reset or change replaces the key.
       tags: [Auth]
       security:
         - SignatureAuth: []
@@ -7875,6 +7878,8 @@ paths:
                             $ref: '#/components/schemas/GAII'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '410':
+          description: The owner-key login is switched off on this node (OWNER_KEY_LOGIN_OFF).
         '429':
           $ref: '#/components/responses/RateLimited'
 
@@ -34896,6 +34901,11 @@ paths:
         The caller then confirms the code via `POST /v1/ghii/verify-email` (which sets verificationLevel
         to 1) and re-runs `POST /v1/ghii/login` to obtain a normal session. No auth required; the password
         is the authorization. Rate limited to 3 requests / 10 minutes.
+
+        An account with two-step sign-in (TOTP) armed also gives its second factor, as on
+        `POST /v1/ghii/login`: without `totp_code` or `backup_code` it is refused with 401
+        `TOTP_REQUIRED`, a wrong code with `INVALID_TOTP`, and repeated wrong codes pause the account
+        (`TOTP_LOCKED`, 429).
       tags: [GHII-Web]
       requestBody:
         required: true
@@ -34913,6 +34923,12 @@ paths:
                 email:
                   type: string
                   format: email
+                totp_code:
+                  type: string
+                  description: The six-digit code from the authenticator app, for an account with TOTP armed.
+                backup_code:
+                  type: string
+                  description: One unused backup code instead of totp_code. It is spent.
       responses:
         '200':
           description: Verification code sent
@@ -35023,6 +35039,14 @@ paths:
         `redirect` it carries, and a refusal does not spend the token. For a
         program that wants an agent token instead,
         GET /v1/ghii/magic-link/verify takes the same token.
+
+        An account with two-step sign-in (TOTP) armed gets no session from
+        the link alone. The link is spent, a five-minute ticket is set as
+        the httpOnly cookie `aimeat_link_2fa` (SameSite=Lax, path
+        /v1/ghii/magic-link), and the redirect goes to the front page with
+        `auth_step=second_factor`, where the sign-in dialog asks for the
+        code and sends it to POST /v1/ghii/magic-link/second-factor. The
+        return address stays on the server, in the ticket.
       tags: [GHII-Web]
       parameters:
         - name: token
@@ -35040,13 +35064,81 @@ paths:
           description: The place the link returns to, as POST /v1/ghii/magic-link accepted it
       responses:
         '302':
-          description: Redirect to `redirect` or the front page on success, with the refresh cookie set; to the front page with `auth_error` on refusal
+          description: Redirect to `redirect` or the front page on success, with the refresh cookie set; to the front page with `auth_step=second_factor` and the ticket cookie for an account with TOTP armed; to the front page with `auth_error` on refusal
           headers:
             Location:
               schema:
                 type: string
         '429':
           $ref: '#/components/responses/RateLimited'
+
+  /v1/ghii/magic-link/second-factor:
+    post:
+      operationId: ghiiMagicLinkSecondFactor
+      summary: Finish an emailed sign-in link with the TOTP code
+      description: |
+        The second step of an emailed sign-in link on an account with
+        two-step sign-in armed. GET /v1/ghii/magic-link/open spent the link
+        and set the ticket cookie `aimeat_link_2fa`; this endpoint reads it
+        and checks the code the same way POST /v1/ghii/login does: the TOTP
+        lock, replay protection, and backup codes, which are spent when
+        used. A refusal keeps the ticket for another try; five wrong codes,
+        or the account's TOTP lock, end it. The right code ends the ticket
+        (single use), sets the httpOnly refresh cookie as the open route
+        does for an account without TOTP, and answers the address to go
+        to. The ticket lasts five minutes. Send the request with the
+        browser's cookies (`credentials: 'include'`).
+      tags: [GHII-Web]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                totp_code:
+                  type: string
+                  description: The six-digit code from the authenticator app.
+                backup_code:
+                  type: string
+                  description: One unused backup code instead of totp_code. It is spent.
+      responses:
+        '200':
+          description: Signed in; the refresh cookie is set
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          redirect:
+                            type: string
+                            description: The place the link returns to, or the node's front page.
+        '401':
+          description: |
+            `SECOND_FACTOR_EXPIRED` (no ticket, expired, already used, or ended
+            by wrong codes: ask for a new sign-in link), `TOTP_REQUIRED` (no code
+            sent), `INVALID_TOTP` or `TOTP_REPLAY` (the ticket stays)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: The account has been deactivated (`ACCOUNT_DISABLED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '429':
+          description: Too many requests, or the account's TOTP lock (`TOTP_LOCKED`), which ends the ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/ghii/magic-link/verify:
     get:
@@ -59900,6 +59992,15 @@ paths:
       description: |
         Returns the ICE (STUN/TURN) server configuration for WebRTC, falling back
         to a public STUN server if none is configured. Requires `config.realtimeEnabled` (503 otherwise).
+
+        When the node has `AIMEAT_TURN_SECRET` set (the coturn `static-auth-secret`), the TURN entry
+        carries a credential that expires, made for this caller as the TURN REST API draft defines:
+        `username` is `<expiry unix seconds>:<opaque id>` and `credential` is
+        base64(HMAC-SHA1(secret, username)). The expiry is now plus `AIMEAT_TURN_TTL_SECONDS`
+        (default 3600); ask again before it passes. The opaque id is a keyed hash, never the
+        caller's account name, and the secret itself is never returned. Without the secret, the
+        deprecated static `AIMEAT_TURN_USERNAME` / `AIMEAT_TURN_CREDENTIAL` pair is returned.
+        A visitor from another node gets no TURN entry, only STUN. The response is `Cache-Control: no-store`.
       security:
         - BearerAuth: []
       responses:
@@ -59925,8 +60026,12 @@ paths:
                                     - type: string
                                     - type: array
                                       items: { type: string }
-                                username: { type: string }
-                                credential: { type: string }
+                                username:
+                                  type: string
+                                  description: TURN only. With a shared secret, `<expiry unix seconds>:<opaque id>`.
+                                credential:
+                                  type: string
+                                  description: TURN only. With a shared secret, base64(HMAC-SHA1(secret, username)); valid until the expiry in `username`.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
@@ -67131,6 +67236,11 @@ paths:
         Admin-password-protected (session cookie/header or `X-Admin-Password`). Creates an owner
         with `owner`+`operator` roles, its GHII profile (with welcome-bonus morsels), and returns a
         freshly generated Ed25519 keypair. Rate limited.
+
+        Creates the node's FIRST operator only: once any owner holds the operator role it answers
+        410 `SETUP_CLOSED` before any write, and an operator adds another with
+        `POST /v1/admin/roles/grant`. `AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=true` keeps it
+        open, for test nodes only.
       requestBody:
         required: true
         content:
@@ -67188,6 +67298,10 @@ paths:
                 properties:
                   ok: { type: boolean }
                   error: { type: string }
+        '410':
+          description: |
+            SETUP_CLOSED: the node already has an operator, so the admin password creates no more.
+            The message names POST /v1/admin/roles/grant and the admin Owners page. Nothing was written.
   /v1/admin/setup/token:
     post:
       operationId: adminSetupToken

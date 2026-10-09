@@ -7,6 +7,10 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.8.0 -- 2026-10-09 -- AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR pinned 'true'; the suites in
+ *            ADMIN_SETUP_CLOSED_SUITES get 'false', the shipped setting (secrets audit 2026-10-09, 1.4).
+ *   v1.7.0 -- 2026-10-09 -- AIMEAT_TURN_SERVER and AIMEAT_TURN_SECRET pinned, so the ice-servers
+ *            route's derived TURN credential is provable.
  *   v1.6.1 -- 2026-09-30 -- e2e-agent-refusals joins ANONYMOUS_OFF_SUITES (three green runs alone on
  *            each backend with the setting off).
  *   v1.6.0 -- 2026-09-26 -- ANONYMOUS_OFF_SUITES: the credential suites get a node started with
@@ -199,8 +203,26 @@ export function anonymousModeFor(suite?: string): string {
 }
 
 /**
+ * The suites whose node starts with AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=false, the setting
+ * a shipped node runs: /v1/admin/setup/register answers 410 SETUP_CLOSED once an operator exists.
+ * Every other suite gets it on (the runner's default below), because 39 suites register several
+ * operators per run with the admin password.
+ */
+export const ADMIN_SETUP_CLOSED_SUITES: readonly string[] = [
+    'e2e-secret-canaries',
+    'e2e-admin-setup-closed',
+];
+
+/** AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR for a suite's node: 'false' for a listed suite, else the default. */
+export function adminSetupOpenFor(suite?: string): string {
+    if (suite && ADMIN_SETUP_CLOSED_SUITES.includes(suite)) return 'false';
+    return process.env.AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR ?? 'true';
+}
+
+/**
  * Everything the runner decides for the node under test. `suite` is the suite's file name without
- * `.ts`; it selects the anonymous-mode setting, and nothing else depends on it.
+ * `.ts`; it selects the anonymous-mode setting and the admin setup setting, and nothing else
+ * depends on it.
  */
 export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, string> {
     return {
@@ -279,6 +301,11 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         AIMEAT_CONNECT_FAKE_BASE_URL: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:40388',
         // The fake provider lives on loopback, which safeFetch refuses by default and must.
         AIMEAT_ALLOW_PRIVATE_EGRESS: process.env.AIMEAT_ALLOW_PRIVATE_EGRESS ?? 'true',
+        // A TURN server and its shared secret, so e2e-realtime-rooms can prove that
+        // /v1/realtime/ice-servers hands out an expiring credential derived from the secret and
+        // never the secret itself. Nothing listens on the port: no suite opens a TURN connection.
+        AIMEAT_TURN_SERVER: process.env.AIMEAT_TURN_SERVER ?? 'turn:127.0.0.1:3478',
+        AIMEAT_TURN_SECRET: process.env.AIMEAT_TURN_SECRET ?? 'e2e-turn-secret-canary',
         // Off for the credential suites (ANONYMOUS_OFF_SUITES above), on for the rest.
         AIMEAT_ANONYMOUS: anonymousModeFor(suite),
         AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',
@@ -294,6 +321,10 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         // reuse-detection (prev-token-after-grace) without a 60s wait.
         AIMEAT_REFRESH_GRACE_MS: process.env.AIMEAT_REFRESH_GRACE_MS ?? '1500',
         AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
+        // A shipped node closes /v1/admin/setup/register once it has an operator. 39 suites
+        // register several operators per run with the admin password, so the runner keeps the
+        // route open; ADMIN_SETUP_CLOSED_SUITES (above) get the shipped setting.
+        AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR: adminSetupOpenFor(suite),
         // A fixed 32-byte (hex) encryption key so features that encrypt at rest work in
         // e2e (extension secrets, TOTP, and the app copy-protection watermark + decode).
         AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',

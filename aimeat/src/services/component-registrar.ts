@@ -15,6 +15,9 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.14.0 — 2026-10-09 — An extension component's config always goes through mergeExtensionConfig,
+ *     bound to its stored name: with no config values it was stored as built, a manifest secret
+ *     default in plain text (secrets audit 2026-10-09, finding 1.1).
  *   v1.13.0 — 2026-10-02 — An app component's tool list (meta.app.tools, no prices) is written for the installed app.
  *   v1.12.0 — 2026-10-02 — A memory component refuses a key the owner already has (KEY_EXISTS) unless
  *     this component or an install of the same package wrote it, and tags what it writes with the
@@ -350,10 +353,10 @@ export async function registerComponent(
         if (odps) return { success: false, componentId, registeredAs, error: `${odps.code}: ${odps.message}` };
 
         if (input.dryRun) break;
-        // Given config and, on an update, the owner's previous config; secrets encrypted (package-config.ts).
-        const extConfig = (input.configValues || input.previousConfig)
-          ? mergeExtensionConfig(built.record.config ?? {}, input.configValues, input.previousConfig, config)
-          : built.record.config;
+        // Given config and, on an update, the owner's previous config; secrets encrypted and bound to
+        // the stored name (package-config.ts). Always through the merge: without config values the
+        // built record went to storage as it was, a manifest's secret default in the clear.
+        const extConfig = mergeExtensionConfig(registeredAs, built.record.config ?? {}, input.configValues, input.previousConfig, config);
         if (extConfig === null) {
           return { success: false, componentId, registeredAs, error: 'ENCRYPTION_NOT_CONFIGURED: a secret config value needs AIMEAT_ENCRYPTION_KEY on this node' };
         }

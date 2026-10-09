@@ -6,6 +6,10 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-10-09 — The access code of a protected app goes to a caller who could set it: the
+ *     owner in person, or a principal of the owner holding app:write. It went to every token acting in
+ *     the owner's name, an agent with no scopes and another person's app the owner signed into among
+ *     them (secrets audit 2026-10-09, finding 1.5).
  *   v1.14.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.13.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.12.1 — 2026-09-26 — The app owner in the moderate and delete doors comes from localAccountName
@@ -60,6 +64,7 @@ import { appSeoState } from '../../services/app-seo.js';
 import { stripLegalContent } from '../../services/app-legal.js';
 import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { callerOf } from '../../middleware/caller.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -143,6 +148,9 @@ export function registerCatalogueAdminRoutes(
         const downloadsByApp = await storage.getAppDownloadsForApps(refs);
         const forksByApp = await storage.countAppForksForApps(refs);
         const filesByOwner = await storage.listStorageFilesForOwners([...new Set(apps.map(a => a.ownerGaii))]);
+        // Whether this caller may read the access codes of the viewer's own protected apps: whoever
+        // could set one (publishing with access_code asks app:write).
+        const mayReadCodes = !!req.auth && !req.auth.anonymous && callerOf(req, config.nodeId, storage).has('app:write');
         // Which of the VIEWER's own apps have a pending staging draft — one query, owner-only.
         // Others' apps never expose draft state (a draft is owner-private).
         const viewerDraftFilenames = viewerGhii
@@ -200,11 +208,12 @@ export function registerCatalogueAdminRoutes(
                 size: app.size,
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
-                // The code itself goes ONLY to the app's own owner (isOwn), so the owner's
-                // surfaces (catalog Open/Details, profile Launch) can append ?code= instead of
-                // dead-ending the owner on their own protected app. The owner already holds
-                // the same power via Edit Access Code; everyone else keeps the boolean only.
-                ...(isOwn && app.accessCode ? { access_code: app.accessCode } : {}),
+                // The code itself goes ONLY to a caller who could set it (mayReadCodes: the owner in
+                // person, or the owner's principal holding app:write), so the owner's surfaces
+                // (catalog Open/Details, profile Launch) can append ?code= instead of dead-ending
+                // the owner on their own protected app. Everyone else, the owner's other agents and
+                // apps included, keeps the boolean only.
+                ...(isOwn && mayReadCodes && app.accessCode ? { access_code: app.accessCode } : {}),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
                 has_draft: buildingOnly ? !!sharedDrafts.get(app.ownerGaii)?.has(app.filename)

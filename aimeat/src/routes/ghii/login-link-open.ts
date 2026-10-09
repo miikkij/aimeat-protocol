@@ -13,7 +13,14 @@
  *   Before 2026-09-29 the emailed link pointed at GET /v1/ghii/magic-link/verify, which answers JSON
  *   with an agent token and private keys: correct for a program, and raw JSON for a person clicking
  *   the link in their mail. That endpoint is unchanged; only the emailed address moved here.
+ *
+ *   TWO-STEP SIGN-IN. On an account with TOTP armed the link opens no session: it leaves a
+ *   five-minute ticket and sends the browser to the front page's code view, and
+ *   POST /v1/ghii/magic-link/second-factor opens the session when the code is right
+ *   (login-link-second-factor.ts).
  * @version-history
+ *   v1.3.0 — 2026-10-09 — An account with two-step sign-in gets no session from the link alone: a
+ *     ticket and the code view instead (secaudit 2026-10-09, S1).
  *   v1.2.0 — 2026-10-05 — The return address is checked after the redeem, against the account it
  *     signed in: an app address must be the account's own app or one it holds a grant for (secaudit
  *     2026-10, WEB-3).
@@ -27,6 +34,7 @@ import type { Storage } from '../../storage/interface.js';
 import { AccountDisabledError } from '../../auth/jwt.js';
 import { establishForGhii } from '../../services/external-login.js';
 import { loginReturnTarget, redeemLoginLink } from '../../services/login-link.js';
+import { startLinkSecondFactor, registerLoginLinkSecondFactorRoute } from './login-link-second-factor.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 
@@ -44,6 +52,13 @@ export function registerLoginLinkOpenRoute(router: Router, config: AimeatConfig,
             const result = await redeemLoginLink(storage, config, token);
             if (!result.ok) { fail(result.code); return; }
             const back = await loginReturnTarget(storage, config, req.query.redirect, result.ghii.ownerName);
+            // The same test checkSecondFactor() makes (services/password-check.ts): an account with
+            // TOTP armed is asked for its code here as it is on the password sign-in. The link is
+            // spent either way; the ticket carries the sign-in to the code (secaudit 2026-10-09, S1).
+            if (result.ghii.totpEnabled && result.ghii.totpSecret) {
+                await startLinkSecondFactor(storage, config, req, res, result.ghii, back);
+                return;
+            }
             await establishForGhii(storage, config, req, res, result.ghii);
             res.redirect(back ?? `${config.baseUrl}/`);
         } catch (err) {
@@ -52,4 +67,8 @@ export function registerLoginLinkOpenRoute(router: Router, config: AimeatConfig,
             fail('LOGIN_LINK_FAILED');
         }
     });
+
+    // POST /v1/ghii/magic-link/second-factor: the code that finishes a link on a TOTP account.
+    // Registered here, beside the route that starts it.
+    registerLoginLinkSecondFactorRoute(router, config, storage);
 }

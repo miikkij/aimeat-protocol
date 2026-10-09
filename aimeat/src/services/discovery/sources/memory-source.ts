@@ -16,6 +16,10 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.8.0 — 2026-10-09 — An entry is built from the value the generic memory doors show
+ *     (shownMemoryValue): the description was built from the raw record, so the whole ciphertext of
+ *     the owner's AI keys reached the owner and every agent or app with memory:read (secrets audit
+ *     2026-10-09, finding 1.1).
  *   v0.7.0 — 2026-09-30 — The public scope leaves out an organism's public record whose label keeps it
  *     inside the organism, for a caller who is not a member (TARGET-082 review, item 1).
  *   v0.6.0 — 2026-09-29 — Every hit passes the caller's classification reader (ctx.reader, TARGET-082).
@@ -52,6 +56,7 @@ import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 import { readWorkspaceManifest } from '../../workspace-meta.js';
+import { shownMemoryValue } from '../../secret-records.js';
 import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';
 import type { DiscoveryPlace } from '../types.js';
 
@@ -312,7 +317,9 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
     toEntry(raw: RawHit, _ctx: DiscoveryContext): DiscoveryEntry {
       const h = raw.record as MemHit;
       const { type, segment } = classifyMemoryKey(h.key, { tags: h.tags, contentType: h.contentType });
-      const value = parsed(h.value);
+      // The title and the description quote the value, so they are built from what the generic
+      // memory routes show of it: a credential record reads as { configured: true }.
+      const value = shownMemoryValue(h.key, parsed(h.value));
       const description = clip(plain(bestDescription(value) || flattenText(value)), 240);
       return {
         type,

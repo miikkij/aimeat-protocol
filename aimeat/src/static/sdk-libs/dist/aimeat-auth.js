@@ -1308,9 +1308,96 @@
     ".aimeat-why-num{font:400 12px/1.45 " + mono + ";color:" + accent + "}"
   ].join("");
 
+  // src/static/sdk-libs/auth/http.js
+  async function api(path, opts = {}) {
+    const url = NODE_URL + path;
+    const headers = { "Content-Type": "application/json", ...opts.headers };
+    const resp = await fetch(url, { ...opts, headers });
+    const data = await resp.json();
+    if (!data.ok) {
+      const err = (
+        /** @type {Error & { code?: string, details?: unknown }} */
+        new Error(data.error?.message || "API error")
+      );
+      err.code = data.error?.code;
+      err.details = data.error?.details;
+      throw err;
+    }
+    return data;
+  }
+  async function authApi(path, jwt, opts = {}) {
+    return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
+  }
+  function sessionHeaders(given, jwt, body) {
+    const headers = new Headers(given || void 0);
+    if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + jwt);
+    if (!headers.has("Content-Type") && (body == null || typeof body === "string")) {
+      headers.set("Content-Type", "application/json");
+    }
+    return headers;
+  }
+
+  // src/static/sdk-libs/auth/auth-error.js
+  function takeParam(name) {
+    var url;
+    try {
+      url = new URL(location.href);
+    } catch {
+      return null;
+    }
+    var value = url.searchParams.get(name);
+    if (!value) return null;
+    url.searchParams.delete(name);
+    try {
+      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+    } catch {
+    }
+    return value;
+  }
+  function readAuthError() {
+    var code = takeParam("auth_error");
+    if (!code) return null;
+    return /^[A-Z0-9_]{1,64}$/.test(code) ? code : "UNKNOWN";
+  }
+  function readAuthStep() {
+    var step = takeParam("auth_step");
+    return step === "second_factor" ? step : null;
+  }
+  function authErrorText(i, code) {
+    i = i || {};
+    if (code === "INVALID_TOKEN") return i.authErrorUsedLink || "This sign-in link has already been used or is not valid. Ask for a new one below, or sign in another way.";
+    if (code === "EXPIRED") return i.authErrorExpired || "This sign-in link has expired. Ask for a new one below.";
+    if (code === "ACCOUNT_DISABLED") return i.authErrorDisabled || "This account has been deactivated. Contact the administrator of this service.";
+    if (code === "SECOND_FACTOR_EXPIRED") return i.authErrorSecondFactorExpired || "This sign-in has expired. Ask for a new sign-in link and open it.";
+    return i.authErrorGeneric || "Sign-in did not go through. Try again, or choose another way to sign in.";
+  }
+  function showAuthErrorIn(i, code) {
+    var el = document.getElementById("aimeat-error");
+    if (!el) return;
+    el.textContent = authErrorText(i, code);
+    el.style.display = "block";
+  }
+
   // src/static/sdk-libs/auth/modal-totp.js
   function onlyDigits(value) {
     return String(value || "").replace(/\D/g, "").slice(0, 6);
+  }
+  async function submitLinkCode(secondFactor, restoreSession) {
+    var body = secondFactor.totpCode ? { totp_code: secondFactor.totpCode } : { backup_code: secondFactor.backupCode };
+    var data = await api("/v1/ghii/magic-link/second-factor", { method: "POST", credentials: "include", body: JSON.stringify(body) });
+    var session = await restoreSession();
+    return { session, redirect: data.data && data.data.redirect || "" };
+  }
+  function goTo(redirect) {
+    var target;
+    try {
+      target = new URL(redirect, location.href);
+    } catch {
+      return;
+    }
+    if (target.protocol !== "https:" && target.protocol !== "http:") return;
+    if (target.href === location.href) return;
+    location.assign(target.href);
   }
   function totpViewHtml(i, field) {
     return '<div id="aimeat-totp-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.totpTitle || "One more step") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.totpDesc || "Your account asks for a code. Open your authenticator app and enter the six digits it shows.") + "</p>" + field(
@@ -1340,6 +1427,7 @@
     );
     var backBtn = document.getElementById("aimeat-totp-back");
     if (!codeEl || !backupEl || !errEl || !goBtn || !backBtn) return { openTotpStep: function() {
+    }, openLinkStep: function() {
     } };
     function fail(message) {
       errEl.textContent = message;
@@ -1388,16 +1476,21 @@
       var label = i.totpSubmit || "Sign in";
       goBtn.textContent = i.working || "Working...";
       goBtn.disabled = true;
+      var secondFactor = code ? { totpCode: code } : { backupCode: backup };
       try {
-        var session = await ctx.submit(
-          pending.username,
-          pending.password,
-          code ? { totpCode: code } : { backupCode: backup }
-        );
+        if (pending.link) {
+          var done = await submitLinkCode(secondFactor, ctx.restoreSession);
+          forget();
+          ctx.onSuccess(done.session);
+          if (done.redirect) goTo(done.redirect);
+          return;
+        }
+        var session = await ctx.submit(pending.username, pending.password, secondFactor);
         forget();
         ctx.onSuccess(session);
       } catch (e) {
-        if (e.code === "TOTP_LOCKED") fail(e.message);
+        if (e.code === "SECOND_FACTOR_EXPIRED") fail(authErrorText(i, e.code));
+        else if (e.code === "TOTP_LOCKED") fail(e.message);
         else if (e.code === "TOTP_REPLAY") fail(i.errTotpReplay || "That code was already used. Wait for your app to show the next one.");
         else if (e.code === "INVALID_TOTP") fail(i.errTotpWrong || "That code does not match. Check the app and try again.");
         else fail(e.message);
@@ -1406,19 +1499,26 @@
         goBtn.disabled = false;
       }
     });
+    function open(next) {
+      pending = next;
+      codeEl.value = "";
+      backupEl.value = "";
+      errEl.style.display = "none";
+      goBtn.textContent = i.totpSubmit || "Sign in";
+      goBtn.disabled = false;
+      ctx.showView("totp");
+      setTimeout(function() {
+        codeEl.focus();
+      }, 50);
+    }
     return {
       /** The password was right and the server asked for the second factor. */
       openTotpStep: function(username, password) {
-        pending = { username, password };
-        codeEl.value = "";
-        backupEl.value = "";
-        errEl.style.display = "none";
-        goBtn.textContent = i.totpSubmit || "Sign in";
-        goBtn.disabled = false;
-        ctx.showView("totp");
-        setTimeout(function() {
-          codeEl.focus();
-        }, 50);
+        open({ username, password });
+      },
+      /** An emailed sign-in link was spent and its ticket waits for the code (`?auth_step=second_factor`). */
+      openLinkStep: function() {
+        open({ link: true });
       }
     };
   }
@@ -1509,35 +1609,6 @@
       msgEl.textContent = i.usernameSent || "If an account with that email exists, your username was sent.";
       msgEl.style.display = "block";
     });
-  }
-
-  // src/static/sdk-libs/auth/http.js
-  async function api(path, opts = {}) {
-    const url = NODE_URL + path;
-    const headers = { "Content-Type": "application/json", ...opts.headers };
-    const resp = await fetch(url, { ...opts, headers });
-    const data = await resp.json();
-    if (!data.ok) {
-      const err = (
-        /** @type {Error & { code?: string, details?: unknown }} */
-        new Error(data.error?.message || "API error")
-      );
-      err.code = data.error?.code;
-      err.details = data.error?.details;
-      throw err;
-    }
-    return data;
-  }
-  async function authApi(path, jwt, opts = {}) {
-    return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
-  }
-  function sessionHeaders(given, jwt, body) {
-    const headers = new Headers(given || void 0);
-    if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + jwt);
-    if (!headers.has("Content-Type") && (body == null || typeof body === "string")) {
-      headers.set("Content-Type", "application/json");
-    }
-    return headers;
   }
 
   // src/static/sdk-libs/auth/passkey.js
@@ -1855,37 +1926,6 @@
     });
   }
 
-  // src/static/sdk-libs/auth/auth-error.js
-  function readAuthError() {
-    var url;
-    try {
-      url = new URL(location.href);
-    } catch {
-      return null;
-    }
-    var code = url.searchParams.get("auth_error");
-    if (!code) return null;
-    url.searchParams.delete("auth_error");
-    try {
-      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
-    } catch {
-    }
-    return /^[A-Z0-9_]{1,64}$/.test(code) ? code : "UNKNOWN";
-  }
-  function authErrorText(i, code) {
-    i = i || {};
-    if (code === "INVALID_TOKEN") return i.authErrorUsedLink || "This sign-in link has already been used or is not valid. Ask for a new one below, or sign in another way.";
-    if (code === "EXPIRED") return i.authErrorExpired || "This sign-in link has expired. Ask for a new one below.";
-    if (code === "ACCOUNT_DISABLED") return i.authErrorDisabled || "This account has been deactivated. Contact the administrator of this service.";
-    return i.authErrorGeneric || "Sign-in did not go through. Try again, or choose another way to sign in.";
-  }
-  function showAuthErrorIn(i, code) {
-    var el = document.getElementById("aimeat-error");
-    if (!el) return;
-    el.textContent = authErrorText(i, code);
-    el.style.display = "block";
-  }
-
   // src/static/sdk-libs/auth/modal.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -2134,8 +2174,13 @@
         submit: function(user, pass, secondFactor) {
           return auth.loginWithPassword(user, pass, secondFactor);
         },
+        restoreSession: restoreSessionFromCookie,
         onSuccess: finishLogin
       });
+      if (opts.secondFactorLink) {
+        opts.secondFactorLink = false;
+        totpStep.openLinkStep();
+      }
       var pendingEmailLogin = null;
       function openEmailCompletion(user, pass, hasEmail, mode, displayName, prefillEmail) {
         pendingEmailLogin = { username: user, password: pass, mode: mode || "attach", displayName: displayName || user };
@@ -3511,6 +3556,12 @@
     var code = readAuthError();
     if (code) showLoginModal({ authError: code }, function() {
     });
+    if (readAuthStep() === "second_factor") {
+      loadModalI18n(currentModalLang()).then(function(i18n) {
+        showLoginModal({ i18n: i18n || {}, secondFactorLink: true }, function() {
+        });
+      });
+    }
   }
   if (typeof document !== "undefined" && document.addEventListener) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", maybeShowAuthError);
@@ -3552,5 +3603,5 @@
     });
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-10-01-001";
+  ns.version = "2026-10-09-001";
 })();
