@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-10-09 -- definitions/docsign.ts: aimeat_docsign_validate, _lookup, _request_create,
+ *     _requests, _request_get, _sign and _cancel (document signing and signature validation).
  *   v1.x -- 2026-10-08 -- definitions/visibility.ts: aimeat_visibility_report and aimeat_visibility_settings_set.
  *   v1.x -- 2026-10-05 -- CatalogTool: the entries with their literal types, for zodShapeFor()
  *     (secaudit 2026-10, M3).
@@ -80,6 +82,7 @@ import { connectionTools } from './definitions/connections.js';
 import { refineryTools } from './definitions/refinery.js';
 import { mcpProxyTools } from './definitions/mcp-proxy.js';
 import { visibilityTools } from './definitions/visibility.js';
+import { docsignTools } from './definitions/docsign.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -115,6 +118,7 @@ const CATALOG = [
     ...refineryTools,
     ...mcpProxyTools,
     ...visibilityTools,
+    ...docsignTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

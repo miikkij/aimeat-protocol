@@ -8746,6 +8746,8 @@
   "notifpage.group.appsSub": "sovellusten jäsenyydet ja tapahtumat",
   "notifpage.group.accountSub": "budjetti, kiintiöt, postilaatikko, vaatimustenmukaisuus",
   "notifpage.group.otherSub": "kaikki muu, myös se, minkä lähetät itsellesi",
+  "notiftext.docsign_request.title": "{from} pyytää sinua allekirjoittamaan: {title}",
+  "notiftext.docsign_request.body": "Dokumentti {document}. Avaa allekirjoituspyyntö, tai pyydä tekoälyäsi näyttämään se.",
   "notiftext.workflow_finished.title": "Työnkulku \"{name}\" valmistui",
   "notiftext.workflow_finished.body": "Jokainen askel tuotti · noin {minutes} min · {steps}",
   "notiftext.workflow_failed.title": "Työnkulku \"{name}\" jäi kesken",

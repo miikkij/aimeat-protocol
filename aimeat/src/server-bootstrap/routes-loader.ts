@@ -477,7 +477,7 @@ export async function mountRoutes(
   app.use(contactsRouter(config, storage));       // Contacts (address book) — generic identity picker source
   app.use(openItemsRouter(config, storage));      // Open items — what the owner is going to do here
   app.use(settingsProactiveRouter(config, storage));  // Whether this account's AIs offer what else is here
-  app.use(attestationsRouter(config, storage));   // Dual-signed attestations (TINKI) — co-signed deeds
+  app.use(attestationsRouter(config, storage));   // Attestations (TINKI) and document signing (/v1/docsign, mounted inside)
   app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));
   app.use(agentCrewRouter(config, storage));     // Crew tab — a JSON crew definition, validated by the agent's own runtime

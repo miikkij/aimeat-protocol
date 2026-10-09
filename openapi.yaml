@@ -68,6 +68,8 @@ tags:
     description: Morsel wallet and transactions
   - name: Commerce
     description: Protocol-agnostic checkout sessions over agent offers (TARGET-033) + UCP discovery
+  - name: Document signing
+    description: AIMEAT signing requests sealed by the node, and validation of PDF/CMS signatures made elsewhere against the EU trusted lists
   - name: Boards
     description: Notification boards for coordination
   - name: Catalogue
@@ -25486,6 +25488,225 @@ paths:
         '409':
           $ref: '#/components/responses/AimeatError'
         '422':
+          $ref: '#/components/responses/AimeatError'
+
+  # ── Document signing (services/docsign) ─────────────────────────
+  /v1/docsign/requests:
+    post:
+      operationId: createDocsignRequest
+      summary: Ask parties on this node to sign a document
+      description: >-
+        Names a document by its SHA-256 (or by a file in the caller's storage) and 1 to 10 parties,
+        people (name@node) or agents (agent#name@node). The caller, or the person it acts for, must
+        be a party. People are notified. Only the hash is kept, never the document.
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parties]
+              properties:
+                title: { type: string, maxLength: 200 }
+                message: { type: string, maxLength: 2000, nullable: true }
+                document:
+                  type: object
+                  required: [sha256, name, size]
+                  properties:
+                    sha256: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+                    name: { type: string, maxLength: 255 }
+                    size: { type: integer, minimum: 0 }
+                    media_type: { type: string, maxLength: 120, nullable: true }
+                storage_key: { type: string, description: 'The document as a file in your storage, instead of document (needs storage:read)' }
+                parties: { type: array, minItems: 1, maxItems: 10, items: { type: string } }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+    get:
+      operationId: listDocsignRequests
+      summary: The signing requests you are a party to or created
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [open, complete, cancelled, waiting-for-me] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/docsign/requests/{id}:
+    get:
+      operationId: getDocsignRequest
+      summary: One signing request, with every signature checked
+      description: Each check says whether the statement matches the request, the node seal verifies with this node's key, and the signer's own evidence (passkey assertion or key signature) verifies.
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/requests/{id}/passkey-options:
+    post:
+      operationId: beginDocsignPasskey
+      summary: Start a passkey signature (options for navigator.credentials.get)
+      description: The WebAuthn challenge is the SHA-256 of the signing intent (request, document hash, signer, nonce); user verification is required. People only.
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/requests/{id}/sign:
+    post:
+      operationId: signDocsignRequest
+      summary: Sign as the identity you are (passkey, key or session)
+      description: >-
+        passkey: the ceremony id and the browser's assertion. key: a base64 Ed25519 signature over
+        aimeat-docsign:v1:{id}:{sha256}:{signer} with your registered key. session: the node seals that
+        you confirmed; refused from an app, where a person signs with a passkey.
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method]
+              properties:
+                method: { type: string, enum: [passkey, key, session] }
+                ceremony_id: { type: string }
+                response: { type: object, additionalProperties: true }
+                signature: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/requests/{id}/cancel:
+    post:
+      operationId: cancelDocsignRequest
+      summary: Cancel an open signing request you created
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/lookup/{sha256}:
+    get:
+      operationId: lookupDocsignByHash
+      summary: Who signed this document on this node (public)
+      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with.
+      tags: [Document signing]
+      security: []
+      parameters:
+        - name: sha256
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[0-9a-fA-F]{64}$' }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/validate:
+    post:
+      operationId: validateDocumentSignatures
+      summary: Validate the signatures on a signed PDF or CMS file (public)
+      description: >-
+        The body is the file (application/pdf, application/pkcs7-mime, application/octet-stream), or
+        JSON with content_base64, a detached signature_base64 with document_base64, or storage_key
+        (signed in). Each signature gets a verdict (valid, invalid, indeterminate), reason codes, the
+        signer, the signing time and its proof, the chain and its EU trusted list entry, revocation,
+        and the eIDAS level. `aimeat` lists this node's AIMEAT signatures for the same document.
+      tags: [Document signing]
+      security: []
+      parameters:
+        - name: online
+          in: query
+          schema: { type: string, enum: ['true', 'false'] }
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema: { type: string, format: binary }
+          application/octet-stream:
+            schema: { type: string, format: binary }
+          application/json:
+            schema:
+              type: object
+              properties:
+                content_base64: { type: string }
+                signature_base64: { type: string }
+                document_base64: { type: string }
+                storage_key: { type: string }
+                document_storage_key: { type: string }
+                online: { type: boolean }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '413':
+          $ref: '#/components/responses/AimeatError'
+        '429':
           $ref: '#/components/responses/AimeatError'
 
   # ── Commerce (TARGET-033) ─────────────────────────────────────

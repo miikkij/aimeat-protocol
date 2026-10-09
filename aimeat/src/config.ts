@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.25.0 — 2026-10-09 — docsignDefaults() (config-docsign.ts); the AI-label posture moved to config-ai-label.ts unchanged.
  *   v1.24.0 — 2026-10-09 — turnDefaults(): the TURN settings, with turnSecret and turnTtlSeconds (config-turn.ts).
  *   v1.23.0 — 2026-10-08 — visibilityDefaults(): one switch per visibility layer (config-visibility.ts).
  *   v1.22.0 — 2026-10-06 — SHIPPED_DEFAULT_AGENT_SCOPES carries organism:read (secaudit 2026-10 last
@@ -86,6 +87,8 @@ import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
 import { visibilityDefaults } from './config-visibility.js';
 import { turnDefaults } from './config-turn.js';
+import { aiLabelPublicFromEnv } from './config-ai-label.js';
+import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
 import { updateCheckDefaults } from './config-update-check.js';
 import { themesDefaults } from './config-themes.js';
@@ -240,16 +243,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   // SERVED publicly, never what is stored. Rationale in config-types.ts + .env.example.
   const aiProvenance = process.env.AIMEAT_AI_PROVENANCE !== 'false';
   const aiProvenanceDetail: 'full' | 'minimal' = process.env.AIMEAT_AI_PROVENANCE_DETAIL === 'minimal' ? 'minimal' : 'full';
-  // Visible-label posture. `off` is REFUSED on a public node rather than obeyed: this knob decides
-  // whether a person is told, and the one combination that must be unreachable by accident is
-  // "reachable from the internet, labels hidden". An unknown value falls back to the strict default
-  // rather than to the permissive one. securityPostureWarnings() reports the coercion at startup.
-  const requestedLabelPublic = process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase();
-  const aiLabelPublic: 'strict' | 'light' | 'off' =
-    requestedLabelPublic === 'off' && securityProfile === 'public' ? 'strict'
-      : (['strict', 'light', 'off'].includes(requestedLabelPublic ?? '')
-        ? (requestedLabelPublic as 'strict' | 'light' | 'off')
-        : 'strict');
+  // Visible-label posture: `off` is refused on a public node (config-ai-label.ts has the reasons).
+  const aiLabelPublic = aiLabelPublicFromEnv(securityProfile);
 
   const config: AimeatConfig = {
     port,
@@ -351,6 +346,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     ...aiJobDefaults(),
     ...decideDefaults(),
     ...visibilityDefaults(),
+    ...docsignDefaults(),
     ...themesDefaults(),
     maxActionsPerAgent: parseInt(process.env.AIMEAT_MAX_ACTIONS_PER_AGENT ?? '20', 10),
     minTrustForPaidActions: parseInt(process.env.AIMEAT_MIN_TRUST_PAID_ACTIONS ?? '10', 10),

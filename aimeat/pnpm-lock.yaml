@@ -85,6 +85,21 @@ importers:
       '@openrouter/ai-sdk-provider':
         specifier: 3.1.0
         version: 3.1.0(ai@7.0.127(zod@4.6.5))(zod@4.6.5)
+      '@peculiar/asn1-cms':
+        specifier: ^2.10.0
+        version: 2.10.0
+      '@peculiar/asn1-ocsp':
+        specifier: ^2.10.0
+        version: 2.10.0
+      '@peculiar/asn1-schema':
+        specifier: ^2.10.0
+        version: 2.10.0
+      '@peculiar/asn1-tsp':
+        specifier: ^2.10.0
+        version: 2.10.0
+      '@peculiar/asn1-x509':
+        specifier: ^2.10.0
+        version: 2.10.0
       '@prometheus-io/client':
         specifier: ^0.16.1
         version: 0.16.1
@@ -109,6 +124,9 @@ importers:
       archiver:
         specifier: ^8.0.0
         version: 8.0.0
+      asn1js:
+        specifier: ^3.0.10
+        version: 3.0.10
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
@@ -893,6 +911,10 @@ packages:
     resolution: {integrity: sha512-GFd3iOjFrWX+QWH2R2dO5QSJyyRGv9CIBKtRlGlPNCvb2RvmCbBDexe91MJgV76c69d998Xsa+CvuQ98seoiPg==}
     engines: {node: '>=14'}
 
+  '@peculiar/asn1-ocsp@2.10.0':
+    resolution: {integrity: sha512-2V8HyRaCg/eWz6/kE3itbOlPmmUhfdldMCV5ALd2uhGTupdDCwDdYCtFrgpuJpyJRIYroQdCPCGcuXORCH8PwA==}
+    engines: {node: '>=14'}
+
   '@peculiar/asn1-pfx@2.10.0':
     resolution: {integrity: sha512-1y3QK9ZH1IPleAMmRoJlPS10eGkAWnULETW8zDFNUK1ffqpG7zmDY+kYBMYQgwlcQZ2iitLm2z2EBP0xzRXpaA==}
     engines: {node: '>=14'}
@@ -911,6 +933,10 @@ packages:
 
   '@peculiar/asn1-schema@2.10.0':
     resolution: {integrity: sha512-GhokD41lV4gQrrLYm3wCkHfBOnJrnhDMgt4XeMW8gzfE1UdJqIuSwsE+ggf82XBjUXRJylcm+KIGQFa4utIVLw==}
+    engines: {node: '>=14'}
+
+  '@peculiar/asn1-tsp@2.10.0':
+    resolution: {integrity: sha512-gMVQWcthWBn2H+JnPNv/FYqzEWZc0igLGTGCrXPIcgNSsWdKb2fVbWiEit7dnDB7biAYkXBgg6+AafddznI2Aw==}
     engines: {node: '>=14'}
 
   '@peculiar/asn1-x509-attr@2.10.0':
@@ -4348,6 +4374,13 @@ snapshots:
       asn1js: 3.0.10
       tslib: 2.8.1
 
+  '@peculiar/asn1-ocsp@2.10.0':
+    dependencies:
+      '@peculiar/asn1-schema': 2.10.0
+      '@peculiar/asn1-x509': 2.10.0
+      asn1js: 3.0.10
+      tslib: 2.8.1
+
   '@peculiar/asn1-pfx@2.10.0':
     dependencies:
       '@peculiar/asn1-cms': 2.10.0
@@ -4385,6 +4418,14 @@ snapshots:
   '@peculiar/asn1-schema@2.10.0':
     dependencies:
       '@peculiar/utils': 2.0.3
+      asn1js: 3.0.10
+      tslib: 2.8.1
+
+  '@peculiar/asn1-tsp@2.10.0':
+    dependencies:
+      '@peculiar/asn1-cms': 2.10.0
+      '@peculiar/asn1-schema': 2.10.0
+      '@peculiar/asn1-x509': 2.10.0
       asn1js: 3.0.10
       tslib: 2.8.1
 

@@ -29,6 +29,7 @@
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.3.2 -- 2026-10-09 -- The `docsign` section (document signing and signature checks) sits under identity.
  *   v3.3.1 -- 2026-10-08 -- The `visibility` section (AI visibility switches) sits under integrations.
  *   v3.3.0 -- 2026-10-02 -- The question mark that explains a setting: a SettingLine gets `help` ('config.' + path) when the locale has explain.config.<path> (hasExplain), so far the fourteen config.* terms, ai.model_default_embed among them (components/HelpTip.js).
  *   v3.2.0 -- 2026-09-30 -- `?q=` in the address opens the page with that search, so a link names one
@@ -103,7 +104,7 @@ const SOURCE_BADGE = {
 const DOMAINS = [
   { id: 'ai', groups: ['ai', 'decide', 'agent', 'tasks', 'mcp', 'cortex', 'calibrator'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'economy', 'portfolio'] },
-  { id: 'identity', groups: ['auth', 'totp', 'eudiw', 'consent', 'classification', 'security', 'moderation'] },
+  { id: 'identity', groups: ['auth', 'totp', 'eudiw', 'docsign', 'consent', 'classification', 'security', 'moderation'] },
   { id: 'node', groups: ['node', 'storage', 'database_url', 'sqlite_path', 'admin_password', 'setup', 'consul', 'stats', 'metrics'] },
   { id: 'limits', groups: ['quotas', 'rate_limits', 'extensions', 'realtime'] },
   { id: 'federation', groups: ['federation', 'sync', 'personal_nodes', 'genesis', 'tunnel', 'msm'] },

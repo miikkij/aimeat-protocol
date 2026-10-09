@@ -11,6 +11,7 @@
  *   - GET  /v1/attestations/:id       public read + server-side signature verification
  *   - POST /v1/attestations/:id/sign  add the caller's signature (completes when all have signed)
  * @version-history
+ *   v1.1.0 — 2026-10-09 — Mounts docsignRouter (routes/docsign.ts): document signing and validation.
  *   v1.0.0 — 2026-08-06 — Initial attestation routes (TINKI phase 1)
  */
 import { Router } from 'express';
@@ -23,6 +24,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { createAttestation, getAttestation, signAttestation, verifyAttestation } from '../services/attestation.js';
 import { CommerceError } from '../commerce/errors.js';
+import { docsignRouter } from './docsign.js';
 
 const CreateSchema = z.object({
   payload: z.unknown(),
@@ -84,6 +86,10 @@ export function attestationsRouter(config: AimeatConfig, storage: Storage): Rout
       res.json(success(config.nodeId, { attestation }));
     } catch (err) { sendError(res, config, err); }
   });
+
+  // Document signing and signature validation (routes/docsign.ts) are the same family of signed
+  // records and are mounted with it, which keeps server-bootstrap/routes-loader.ts at its line ceiling.
+  router.use(docsignRouter(config, storage));
 
   return router;
 }

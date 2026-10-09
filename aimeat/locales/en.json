@@ -8747,6 +8747,8 @@
   "notifpage.group.appsSub": "app memberships and app events",
   "notifpage.group.accountSub": "budget, quota, mailbox, compliance",
   "notifpage.group.otherSub": "everything else, including what you send yourself",
+  "notiftext.docsign_request.title": "{from} asks you to sign: {title}",
+  "notiftext.docsign_request.body": "Document {document}. Open the signing request, or ask your AI to show it to you.",
   "notiftext.workflow_finished.title": "Workflow \"{name}\" finished",
   "notiftext.workflow_finished.body": "Every step produced · about {minutes} min · {steps}",
   "notiftext.workflow_failed.title": "Workflow \"{name}\" stopped short",

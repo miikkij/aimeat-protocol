@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.27.0 — 2026-10-09 — The document signing rows (config-schema-docsign.ts), beside identity verification.
  *   v1.26.0 — 2026-10-09 — security.owner_key_login (AIMEAT_OWNER_KEY_LOGIN), immutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, S2).
  *   v1.25.0 — 2026-10-09 — security.admin_setup_open_after_first_operator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR), immutable, default off: test nodes only (secrets audit 2026-10-09, 1.4).
  *   v1.24.0 — 2026-10-09 — realtime.turn_secret (a secret row) and realtime.turn_ttl_seconds; the static TURN pair is marked deprecated.
@@ -93,6 +94,7 @@ import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
 import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
 import { VISIBILITY_CONFIG_FIELDS } from './config-schema-visibility.js';
+import { DOCSIGN_CONFIG_FIELDS } from './config-schema-docsign.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
@@ -361,6 +363,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── EUDIW / Identity (Phase 3.3, mutable) ──
   { key: 'eudiwEnabled', dotPath: 'eudiw.enabled', envVar: 'AIMEAT_EUDIW_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'EUDIW identity verification enabled' },
   { key: 'ftnEnabled', dotPath: 'eudiw.ftn_enabled', envVar: 'AIMEAT_FTN_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Finnish Trust Network enabled' },
+  ...DOCSIGN_CONFIG_FIELDS,
 
   // ── Cross-Federation (Phase 3.4, mutable) ──
   { key: 'crossFederationEnabled', dotPath: 'cross_federation.enabled', envVar: 'AIMEAT_CROSS_FEDERATION_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Cross-federation peering enabled' },

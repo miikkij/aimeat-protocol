@@ -102,7 +102,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 483 npm packages that travel inside the `aimeat` package. Build and test
+The 485 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -156,11 +156,13 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@peculiar/asn1-cms](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/cms#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-csr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/csr#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-ecc](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ecc#readme) | 2.10.0 | MIT |
+| [@peculiar/asn1-ocsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ocsp#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-pfx](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pfx#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-pkcs8](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs8#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-pkcs9](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs9#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-rsa](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/rsa#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-schema](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/schema#readme) | 2.10.0 | MIT |
+| [@peculiar/asn1-tsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/tsp#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-x509-attr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-attr#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-x509-post-quantum](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-post-quantum#readme) | 2.10.0 | MIT |
 | [@peculiar/asn1-x509](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509#readme) | 2.10.0 | MIT |
@@ -1767,12 +1769,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/asn1-cms 2.10.0, @peculiar/asn1-csr 2.10.0, @peculiar/asn1-ecc 2.10.0, @peculiar/asn1-pfx 2.10.0, @peculiar/asn1-pkcs8 2.10.0, @peculiar/asn1-rsa 2.10.0, @peculiar/asn1-schema 2.10.0, @peculiar/asn1-x509-attr 2.10.0, @peculiar/asn1-x509 2.10.0
+### @peculiar/asn1-cms 2.10.0, @peculiar/asn1-csr 2.10.0, @peculiar/asn1-ecc 2.10.0, @peculiar/asn1-ocsp 2.10.0, @peculiar/asn1-pfx 2.10.0, @peculiar/asn1-pkcs8 2.10.0, @peculiar/asn1-rsa 2.10.0, @peculiar/asn1-schema 2.10.0, @peculiar/asn1-x509-attr 2.10.0, @peculiar/asn1-x509 2.10.0
 
 ```text
 MIT License
 
 Copyright (c) 2020 
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### @peculiar/asn1-tsp 2.10.0
+
+```text
+MIT License
+
+Copyright (c) 2021 Peculiar Ventures, LLC
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

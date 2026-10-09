@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.17.0 — 2026-10-09 — DocsignConfig mixed in (config-docsign.ts); ExtensionHooks and HookName
+ *     moved to config-types-hooks.ts unchanged and re-exported here.
  *   v1.16.0 — 2026-10-09 — TurnConfig mixed in (config-turn.ts): the TURN fields moved there unchanged, plus turnSecret and turnTtlSeconds.
  *   v1.15.0 — 2026-10-08 — VisibilityConfig mixed in (config-visibility.ts): one switch per
  *     visibility layer.
@@ -50,21 +52,8 @@
 import type { SecurityDoorConfig } from './config-security.js';
 import type { SealedConfig } from './services/config-sealing.js';
 
-export interface ExtensionHooks {
-  pre_owner_registration: string[];
-  post_owner_registration: string[];
-  pre_agent_registration: string[];
-  post_agent_registration: string[];
-  owner_recovery: string[];
-  agent_rekey: string[];
-  pre_work_request: string[];
-  post_work_delivery: string[];
-  post_settlement: string[];
-  pre_board_post: string[];
-  pre_federation_peer: string[];
-}
-
-export type HookName = keyof ExtensionHooks;
+import type { ExtensionHooks } from './config-types-hooks.js';
+export type { ExtensionHooks, HookName } from './config-types-hooks.js';
 
 export interface RateLimitTier {
   windowMs: number;
@@ -172,8 +161,9 @@ import type { AppAuditConfig } from './config-app-audit.js';
 import type { AgentAccessConfig } from './config-types-agent-access.js';
 import type { VisibilityConfig } from './config-visibility.js';
 import type { TurnConfig } from './config-turn.js';
+import type { DocsignConfig } from './config-docsign.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig {
   port: number;
   baseUrl: string;
   /**
