@@ -21,6 +21,9 @@
  *   script throws a TypeError and the route answers 500 EXTENSION_ERROR. Each assertion that asserts
  *   the new capability is marked `// HOLE:`.
  * @version-history
+ *   v1.1.0 — 2026-10-09 — ctx.workspace.archiveRecords: the creator's agent with organism:write
+ *     archives 10 in one call and they leave the workspace read until restored; a member in person is
+ *     refused ACCESS_DENIED and the creator's agent without organism:write SCOPE_DENIED.
  *   v1.0.0 — 2026-10-06 — Initial (wish bulk-records-for-ai).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-workspace-batch
@@ -98,6 +101,11 @@ const SCRIPTS = {
         for (var i = 0; i < input.n; i++) ids.push('c' + i);
         return ctx.workspace.deleteRecords(input.org, input.ws, '${NS}', ids);
     }`,
+    archive_some: `export default async function(ctx, input){
+        var ids = [];
+        for (var i = 0; i < input.k; i++) ids.push('c' + i);
+        return ctx.workspace.archiveRecords(input.org, input.ws, '${NS}', ids);
+    }`,
 };
 
 // NO limits block: the node's defaults apply (AIMEAT_EXT_MAX_API_CALLS 500, AIMEAT_EXT_TIMEOUT_MS 5000).
@@ -115,6 +123,8 @@ const B_AGENT = 'importer';
 let bAgentToken = '';      // memory:write + memory:purge + organism:read
 let bNoPurgeToken = '';    // memory:write + organism:read
 let cAgentToken = '';      // memory:write + organism:read, but C holds no grant
+let aArchiveToken = '';    // A (the creator): organism:read + organism:write
+let aNoWriteToken = '';    // A: organism:read only
 let orgId = '';
 const WS = 'wscrm';
 const root = () => `organism.${orgId}.w.${WS}`;
@@ -134,6 +144,8 @@ await test('Setup: three owners and their agents', async () => {
     bAgentToken = await mintAgentToken(B, B_AGENT, ['memory:read', 'memory:write', 'memory:purge', 'organism:read']);
     bNoPurgeToken = await mintAgentToken(B, 'nopurge', ['memory:read', 'memory:write', 'organism:read']);
     cAgentToken = await mintAgentToken(C, 'outsider', ['memory:read', 'memory:write', 'organism:read']);
+    aArchiveToken = await mintAgentToken(A, 'keeper', ['memory:read', 'organism:read', 'organism:write']);
+    aNoWriteToken = await mintAgentToken(A, 'reader', ['memory:read', 'organism:read']);
 });
 
 await test('Setup: A\'s organism, a workspace with a locked contact schema, B contributor, C plain member', async () => {
@@ -218,6 +230,39 @@ await test('Refused: deleteRecords from an agent without memory:purge (SCOPE_DEN
 await test('Refused: publishRecords from the agent of a member without a contributor grant (CONSENT_REQUIRED)', async () => {
     const r = await invoke('import_records', cAgentToken, { n: 3 });
     assert(r.status === 403 && r.body?.error?.code === 'CONSENT_REQUIRED', `no grant ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+/** How many contacts the creator's workspace read shows: archived records leave it. */
+async function readCount(): Promise<number> {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(A.token) });
+    assert(r.status === 200, `workspace read ${r.status}`);
+    return (r.body.data.objects.contact as unknown[]).length;
+}
+
+await test('Refused: archiveRecords from a member in person who is not creator or admin (ACCESS_DENIED)', async () => {
+    // B in person: an owner session passes the scope test, so the refusal is the role's.
+    const r = await invoke('archive_some', B.token, { k: 3 });
+    // HOLE: 500 EXTENSION_ERROR (archiveRecords is not a function) before this change.
+    assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED', `member archive ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(await readCount() === N, 'a refused archive hid records');
+});
+
+await test('Refused: archiveRecords from the creator\'s agent without organism:write (SCOPE_DENIED)', async () => {
+    const r = await invoke('archive_some', aNoWriteToken, { k: 3 });
+    assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `no organism:write ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('archiveRecords: the creator\'s agent archives 10 in one call; they leave the read and come back on restore', async () => {
+    const r = await invoke('archive_some', aArchiveToken, { k: 10 });
+    // HOLE: 500 EXTENSION_ERROR before this change.
+    assert(r.status === 200, `archive ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.body.data.archived.length === 10 && r.body.data.rows >= 10, `archive answer: ${JSON.stringify(r.body.data)}`);
+    assert(await readCount() === N - 10, 'archived records still in the workspace read');
+    for (let i = 0; i < 10; i++) {
+        const u = await json(`/v1/organisms/${orgId}/unarchive`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ level: 'record', ws: WS, key: `${root()}.${NS}.c${i}` }) });
+        assert(u.status === 200, `unarchive c${i} ${u.status}: ${JSON.stringify(u.body?.error)}`);
+    }
+    assert(await readCount() === N, 'restored records are back in the read');
 });
 
 await test('Undo: one deleteRecords removes the same 500', async () => {
