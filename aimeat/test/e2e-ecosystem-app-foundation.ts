@@ -7,6 +7,9 @@
  *   poll-before-approval). Also unit-asserts the gaii.ts GEAI/GAII discrimination. Additive: the
  *   agent path is unaffected (regression covered by e2e-agent-onboarding).
  * @version-history
+ *   v1.5.0 — 2026-10-09 — The app pins a real Ed25519 key, and a refresh needs a fresh signature by
+ *     it: no proof and a foreign key are refused, the pinned key's proof renews the credential with
+ *     its `auth_time` and the date of the next approval (secrets audit 2026-10-09, S-2).
  *   v1.4.0 — 2026-08-17 — E2E quality, ecosystem-app-foundation :195 and :203. Every approval in the file
  *     echoed the hello, so the suite was equally true of a node that grants whatever the app asked for
  *     and ignores the owner entirely — which is the opposite of what the consent screen promises.
@@ -33,6 +36,7 @@ import {
   parseGAII, isValidGAII, isGEAI, parseGEAI, isValidGEAI, buildGEAI,
   parseGaiiLoose, isSameOwner, resolveIdentity,
 } from '../src/utils/gaii.js';
+import { generateKeyPair, sign as signWith } from '../src/auth/keypair.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -104,7 +108,10 @@ let ownerToken = '';
 let geai = '';
 let geaiToken = '';
 const APP = 'zendesk';
-const APP_PUBKEY = Buffer.from('eco-app-verification-key-placeholder').toString('base64');
+// The app's own Ed25519 keypair. The public half is pinned at hello; the private half signs the
+// proof a refresh needs (secrets audit 2026-10-09, S-2).
+const APP_KEYS = await generateKeyPair();
+const APP_PUBKEY = APP_KEYS.publicKey;
 const MEM_KEY = 'service.zendesk.refined';
 
 console.log('\n=== AIMEAT Ecosystem-App Foundation E2E Test ===\n');
@@ -407,6 +414,39 @@ await test('A GEAI refresh cannot turn it into the owner', async () => {
   } else {
     assert(r.status === 401 || r.status === 403, `unexpected refresh status ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
   }
+});
+
+// S-2 (secrets audit 2026-10-09). The app's key is pinned at hello, and nothing ever checked it: a
+// refresh took only the bearer, so a stolen ninety-day token renewed itself for ever. A refresh now
+// needs a fresh signature by the pinned key over `<geai><timestamp>`, the agent renewal's message.
+const refreshEco = (body: Record<string, unknown>) => json('/v1/auth/refresh', {
+  method: 'POST', headers: { Authorization: `Bearer ${geaiToken}` }, body: JSON.stringify(body),
+});
+
+await test('A GEAI refresh without proof of its pinned key is refused', async () => {
+  const r = await refreshEco({});
+  assert(r.status === 401, `a bearer alone renewed the GEAI credential: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+  assert(r.body.error?.code === 'ECO_KEY_PROOF_REQUIRED', `code: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('A GEAI refresh signed by another key is refused', async () => {
+  const other = await generateKeyPair();
+  const timestamp = new Date().toISOString();
+  const r = await refreshEco({ timestamp, signature: await signWith(other.privateKey, geai + timestamp) });
+  assert(r.status === 401, `a foreign key renewed the GEAI credential: ${r.status}`);
+  assert(r.body.error?.code === 'ECO_KEY_PROOF_INVALID', `code: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('A GEAI refresh signed by the pinned key is renewed, as an ecosystem principal, inside its approval', async () => {
+  const timestamp = new Date().toISOString();
+  const r = await refreshEco({ timestamp, signature: await signWith(APP_KEYS.privateKey, geai + timestamp) });
+  assert(r.status === 200, `the pinned key's proof was refused: ${r.status} ${JSON.stringify(r.body.error)}`);
+  const claims = JSON.parse(Buffer.from(String(r.body.data.token).split('.')[1], 'base64url').toString());
+  assert(JSON.stringify(claims.roles) === '["ecosystem"]', `roles: ${JSON.stringify(claims.roles)}`);
+  assert(typeof claims.auth_time === 'number', `the renewed token carries when the owner approved: ${JSON.stringify(claims)}`);
+  assert(typeof r.body.data.reapprove_by === 'string', `the answer says when the owner must approve again: ${JSON.stringify(r.body.data)}`);
+  const use = await json('/v1/memory', { headers: { Authorization: `Bearer ${r.body.data.token}` } });
+  assert(use.status === 200, `the renewed token works: ${use.status}`);
 });
 
 await test('GEAI denied a scope it was not granted (memory:delete) → 403', async () => {

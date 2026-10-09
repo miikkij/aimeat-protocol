@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 -- 2026-10-09 -- The share unlock mints a token bound to the current password's version, so
+ *     a password change ends it (secrets audit 2026-10-09, S-6).
  *   v1.14.0 -- 2026-10-08 -- The share reads (public documents, document, records) and the member read
  *     of records serve each item's `ai_provenance` block; the single public document also sends the
  *     AI-Disclosure and Link headers (both formats) and `meta.provenance`. A shared page carried no
@@ -55,7 +57,7 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import { hashPassword, verifyPassword } from '../../services/password.js';
-import { generateShareToken, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
+import { generateShareToken, shareTokenVersionOf, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, workspaceMetaReader, readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
 import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace-provision.js';
 import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
@@ -603,7 +605,8 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       const usable = !!share && share.access === 'password' && !!share.passwordHash;
       const ok = await verifyPassword(password, usable ? share!.passwordHash! : SHARE_UNLOCK_DUMMY_HASH);
       if (!usable || !ok) { res.status(401).json(error(config.nodeId, 'INVALID_PASSWORD', 'Invalid password')); return; }
-      const shareToken = await generateShareToken({ org: id, ws });
+      // Bound to this password: a change ends the token (secrets audit 2026-10-09, S-6).
+      const shareToken = await generateShareToken({ org: id, ws, pwv: shareTokenVersionOf(share!.passwordHash!) });
       res.json(success(config.nodeId, {
         organism_id: id, ws, share_token: shareToken, expires_in: SHARE_TOKEN_TTL_SECONDS,
       }, [{ description: 'Read the shared documents (send the token as X-Share-Token)', method: 'GET', url: `/v1/organisms/${id}/workspace/public/documents?ws=${ws}` }]));

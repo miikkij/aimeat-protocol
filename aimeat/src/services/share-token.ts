@@ -17,10 +17,14 @@
  * @usage
  *   import { generateShareToken, verifyShareToken } from '../services/share-token.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-09 -- The token carries `pwv`, the version of the password it was unlocked with
+ *     (shareTokenVersionOf), and the gate compares it with the current one, so a password change ends
+ *     every token minted under the old password (secrets audit 2026-10-09, S-6).
  *   v1.0.0 -- 2026-07-10 -- TARGET-025: password-protected workspace shares (SESSIO 008)
  */
 
 import { SignJWT, jwtVerify } from 'jose';
+import { createHmac } from 'node:crypto';
 
 let _privateKey: CryptoKey | null = null;
 let _publicKey: CryptoKey | null = null;
@@ -35,6 +39,22 @@ export interface ShareTokenPayload {
     org: string;
     /** Workspace id the share belongs to. */
     ws: string;
+    /**
+     * The version of the share password the token was unlocked with: shareTokenVersionOf() of the
+     * stored hash. A new password has a new salt and so a new hash, so changing it ends every token
+     * minted under the old one. A token without it (minted before 2026-10-09) opens nothing.
+     */
+    pwv: string;
+}
+
+/**
+ * The password version a share token carries: the first 16 hex characters of an HMAC-SHA256 of the
+ * stored scrypt hash, keyed with a fixed label. It names one password without saying anything about
+ * it: the hash carries a random salt, so equal passwords set twice give two versions, and the token
+ * holder learns nothing they could test a guess against.
+ */
+export function shareTokenVersionOf(passwordHash: string): string {
+    return createHmac('sha256', 'aimeat-share-token-pwv').update(passwordHash).digest('hex').slice(0, 16);
 }
 
 export type ShareTokenErrorCode = 'TOKEN_EXPIRED' | 'TOKEN_INVALID';
@@ -57,6 +77,7 @@ export async function generateShareToken(payload: ShareTokenPayload, ttlSeconds:
         typ: 'share',
         org: payload.org,
         ws: payload.ws,
+        pwv: payload.pwv,
     })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setIssuedAt()
@@ -82,6 +103,11 @@ export async function verifyShareToken(token: string): Promise<ShareTokenPayload
     if (payload.typ !== 'share' || typeof payload.org !== 'string' || typeof payload.ws !== 'string') {
         throw new ShareTokenError('TOKEN_INVALID', 'Token is not a share token');
     }
+    // A token minted before the password version existed names no password, so it opens nothing:
+    // its holder unlocks again, at most once, instead of keeping a token a password change cannot end.
+    if (typeof payload.pwv !== 'string' || !payload.pwv) {
+        throw new ShareTokenError('TOKEN_INVALID', 'This share token predates the current password check. Unlock again.');
+    }
 
-    return { org: payload.org, ws: payload.ws };
+    return { org: payload.org, ws: payload.ws, pwv: payload.pwv };
 }

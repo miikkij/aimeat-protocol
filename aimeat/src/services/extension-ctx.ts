@@ -29,6 +29,9 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.14.0 — 2026-10-09 — ctx.fetch removes from the response every value the node put into the
+ *     request (vault secrets, the shared map, the owner's provider key) before the script sees it, and
+ *     a first use records its principal (secrets audit 2026-10-09, item 10).
  *   v1.13.0 — 2026-10-09 — ctx.fetch takes `gunzip: true` (the answer is inflated before it is
  *     decoded, under the same ceiling) and reads under the extension's own ceiling when its manifest
  *     declared `limits.fetch_max_mb` (capabilities.fetchMaxBytes); RESPONSE_TOO_LARGE names the
@@ -113,6 +116,7 @@ import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { readBodyCapped, inflateCapped, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
 import { parseGAII, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
+import { scrubFormsOf, scrubResponse } from './extension-fetch-scrub.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { presentMemories, presentMemory, classificationWarningOf } from './classification/present-memory.js';
@@ -472,10 +476,10 @@ async function resolveOutboundSecrets(
     deps: ExtensionCtxDeps,
     headers: Record<string, string> | undefined,
     url: string,
-): Promise<{ values: Record<string, string> | undefined; sensitive: string[] }> {
+): Promise<{ values: Record<string, string> | undefined; sensitive: string[]; inserted: string[] }> {
     const named = secretPlaceholderNames(headers);
     // The common case: no placeholder, no database read, nothing changed.
-    if (!named.length) return { values: headers, sensitive: [] };
+    if (!named.length) return { values: headers, sensitive: [], inserted: [] };
 
     // THE ADDRESS FIRST (919ef5f56d69). Resolving binds a vault secret's first use to this host, and
     // safeFetch checks the address only after that, so an address it refuses (the cloud metadata
@@ -496,6 +500,7 @@ async function resolveOutboundSecrets(
         // The vault belongs to the HUMAN, whichever of their principals is calling: the owner at a
         // screen, their agent, their granted app. ownerGhiiOf collapses all three to one coordinate.
         ownerGhii: ownerGhiiOf(deps.caller.gaii),
+        principal: deps.caller.gaii,
         extConfig: deps.extConfig,
         extName,
         headers,
@@ -511,7 +516,8 @@ async function resolveOutboundSecrets(
     const sensitive = Object.entries(headers ?? {})
         .filter(([, v]) => typeof v === 'string' && named.some(n => v.includes(`{{secret:${n}}}`)))
         .map(([k]) => k);
-    return { values: resolved.headers, sensitive };
+    // What the node put into this request, for scrubbing the answer: each value and each whole header.
+    return { values: resolved.headers, sensitive, inserted: [...resolved.values, ...sensitive.map(k => resolved.headers[k] ?? '')] };
 }
 
 /**
@@ -729,7 +735,10 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 { gunzip: opts?.gunzip === true, maxBytes: deps.capabilities.fetchMaxBytes });
             const headers: Record<string, string> = {};
             resp.headers.forEach((v, k) => { headers[k] = v; });
-            return { status: resp.status, ok: resp.ok, text, headers };
+            // GUARD (2026-10-09): what the node inserted does not come back. A host that echoes the
+            // request would hand the script the secret or key it never held (extension-fetch-scrub.ts).
+            const forms = scrubFormsOf([...outbound.inserted, ...(inject ? [inject.value, inject.value.replace(/^Bearer\s+/i, '')] : [])]);
+            return { status: resp.status, ok: resp.ok, ...scrubResponse(text, headers, forms) };
         },
 
         caller: deps.caller,

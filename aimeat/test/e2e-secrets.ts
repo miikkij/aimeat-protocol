@@ -33,6 +33,10 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-living-hooks and e2e-connections use to put a real counterparty on the machine.
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The owner may set a secret's host when storing it (a bad host is refused,
+ *     another host is refused from the first call on), the list names the principal and extension of
+ *     a first use, and the operator's shared map is bound to the host of its first use (secrets audit
+ *     2026-10-09, item 10).
  *   v1.1.0 — 2026-09-16 — A vault secret is bound to the first host it is sent to: another host is
  *     refused with SECRET_HOST, the list shows the binding, and storing the value again clears it.
  *   v1.0.0 — 2026-09-06 — Initial.
@@ -149,12 +153,12 @@ async function hook(action: 'send' | 'read', token: string, input: unknown) {
 }
 
 /** Let this owner's living-hooks call the receiver. Their own list, in their own memory. */
-async function allowReceiver(token: string) {
+async function allowReceiver(token: string, hosts: string[] = [RECEIVER_HOST]) {
     const r = await json('/v1/memory', {
         method: 'POST', headers: auth(token),
         body: JSON.stringify({
             key: 'living-hooks.settings',
-            value: { allow_hosts: [RECEIVER_HOST] },
+            value: { allow_hosts: hosts },
             // 'public' because the extension reads it with getPublic, which is the only visibility
             // that leaves a namespace. Same as e2e-living-hooks.
             visibility: 'public',
@@ -525,6 +529,22 @@ await test("and a second owner, holding no vault entry, still gets the operator'
         `owner B got: ${String(deliveries[0]?.headers['x-api-key'])}`);
 });
 
+// Secrets audit 2026-10-09, item 10: the operator's shared map had no host binding at all, so any
+// address the script named received the shared credential. It is bound to the host of its first use
+// now, as a vault secret is. SHARED_NAME was first used with the receiver above.
+await test("the shared map is bound to the host of its first use, as a vault secret is", async () => {
+    await allowReceiver(owner.token, [RECEIVER_HOST, 'localhost']);
+    deliveries.length = 0;
+    const r = await hook('send', owner.token, {
+        url: `http://localhost:${RECEIVER_PORT}/steal`, headers: { 'X-Api-Key': `{{secret:${SHARED_NAME}}}` }, body: { a: 9 },
+    });
+    await allowReceiver(owner.token);
+    assert(r.error !== null && String(r.error.message).includes('SECRET_HOST'),
+        `the shared value went to a second host: ${JSON.stringify(r.data)}`);
+    assert(deliveries.length === 0, 'the refused call reached the receiver');
+    assert(!JSON.stringify(r.envelope).includes(SHARED_VALUE), 'the refusal carries the shared value');
+});
+
 // ── Phase 6: what the sandbox is actually handed ──────────────────────────────────────────────
 console.log('\n-- What the script itself can see --');
 
@@ -674,6 +694,56 @@ await test('storing the value again clears the binding, and the next use binds a
     const out = back.body.data?.result ?? back.body.data;
     assert(typeof out.failed === 'string' && out.failed.includes('SECRET_HOST'), `the old host still works: ${JSON.stringify(out)}`);
     assert(deliveries.length === 0, 'the refused call reached the receiver');
+});
+
+// Secrets audit 2026-10-09, item 10: a first use binds the host, and nothing said WHO made it. Any of
+// the owner's agents or apps could be first. The list now says which principal and which extension.
+await test('the list says who made the first use that bound a secret, and through which extension', async () => {
+    const r = await json('/v1/secrets', { headers: auth(owner.token) });
+    const row = (r.body.data?.secrets ?? []).find((s: any) => s.name === SECRET_NAME);
+    assert(row?.hostBinding?.how === 'first-use', `hostBinding: ${JSON.stringify(row)}`);
+    assert(row.hostBinding.by === owner.ghii, `the first use names its principal: ${JSON.stringify(row.hostBinding)}`);
+    assert(row.hostBinding.extension === 'secret-probe', `the first use names its extension: ${JSON.stringify(row.hostBinding)}`);
+    assert(typeof row.hostBinding.at === 'string', `the first use names its time: ${JSON.stringify(row.hostBinding)}`);
+});
+
+const HOSTED = 'HOSTED_KEY';
+const HOSTED_VALUE = 'zz-hosted-value-zz';
+await test('a host that is not a host is refused, and nothing is stored', async () => {
+    for (const host of ['http://127.0.0.1/path', 'a b', '127.0.0.1/x', '']) {
+        const r = await json(`/v1/secrets/${HOSTED}`, {
+            method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ value: HOSTED_VALUE, host }),
+        });
+        assert(r.status === 400 && r.body.error?.code === 'INVALID_SECRET_HOST', `host ${JSON.stringify(host)}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    const list = await json('/v1/secrets', { headers: auth(owner.token) });
+    assert(!(list.body.data.secrets as any[]).some(s => s.name === HOSTED), 'a refused store left a row');
+});
+
+await test('a secret stored with a host goes only there, from its first call on', async () => {
+    const host = `${RECEIVER_HOST}:${RECEIVER_PORT}`;
+    const put = await json(`/v1/secrets/${HOSTED}`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ value: HOSTED_VALUE, host }),
+    });
+    assert(put.status === 200, `store with a host ${put.status}: ${JSON.stringify(put.body.error)}`);
+    assert(JSON.stringify(put.body.data.hosts) === JSON.stringify([host]), `hosts: ${JSON.stringify(put.body.data)}`);
+    assert(put.body.data.hostBinding?.how === 'set' && put.body.data.hostBinding.by === owner.ghii, `hostBinding: ${JSON.stringify(put.body.data.hostBinding)}`);
+    deliveries.length = 0;
+    const away = await json('/v1/ext/secret-probe/probe', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ url: `${OTHER_HOST}/first`, headers: { Authorization: `Bearer {{secret:${HOSTED}}}` } }),
+    });
+    const outAway = away.body.data?.result ?? away.body.data;
+    assert(typeof outAway.failed === 'string' && outAway.failed.includes('SECRET_HOST'), `the first call to another host was not refused: ${JSON.stringify(outAway)}`);
+    assert(deliveries.length === 0, 'the refused call reached a receiver');
+    const home = await json('/v1/ext/secret-probe/probe', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ url: `${RECEIVER}/probe`, headers: { Authorization: `Bearer {{secret:${HOSTED}}}` } }),
+    });
+    const outHome = home.body.data?.result ?? home.body.data;
+    assert(outHome.failed === null, `the set host was refused: ${outHome.failed}`);
+    assert(deliveries[0]?.headers.authorization === `Bearer ${HOSTED_VALUE}`, `the receiver got: ${String(deliveries[0]?.headers.authorization)}`);
+    await json(`/v1/secrets/${HOSTED}`, { method: 'DELETE', headers: auth(owner.token) });
 });
 
 await stopReceiver();

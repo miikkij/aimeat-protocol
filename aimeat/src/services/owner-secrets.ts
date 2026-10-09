@@ -36,6 +36,11 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The owner may set a secret's host when storing it (putOwnerSecret `host`,
+ *     normalizeSecretHost). A first use records who made it and through which extension (`hostBinding`,
+ *     on the list). The extension's shared secret map is bound to the host of its first use as well,
+ *     under a binding row per value (sharedBindingName). resolveSecretForHeaders answers the values
+ *     it inserted, so ctx.fetch can scrub them from the response (secrets audit 2026-10-09, item 10).
  *   v1.1.1 — 2026-09-24 — resolveSecretForHeaders binds a first use to its host only once every
  *     name has resolved (7d6c102099f3). It bound inside the per-name loop, so a call that a later
  *     name refused left the secret bound to a host that received nothing, and the owner's real host
@@ -48,7 +53,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { SecretRecord } from '../storage/types/secrets.js';
+import type { SecretBinding, SecretRecord } from '../storage/types/secrets.js';
+import { createHmac } from 'node:crypto';
 import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
 import { logger } from '../utils/logger.js';
 
@@ -78,8 +84,11 @@ export interface SecretSummary {
   updatedAt: string;
   /** Extension names that resolved this secret within the last 30 days, most recent first. */
   usedBy: string[];
-  /** The hosts this secret may be sent to. Empty until its first use binds one. */
+  /** The hosts this secret may be sent to. Empty until its first use binds one, or the host it was stored with. */
   hosts: string[];
+  /** Who bound it and how: `set` when stored with a host, `first-use` naming the principal and the
+   *  extension whose call bound it. Null while unbound. */
+  hostBinding: SecretBinding | null;
 }
 
 /** A refusal the caller turns into an HTTP status or a tool error, with the words already written. */
@@ -109,7 +118,21 @@ export function toSummary(record: SecretRecord, now = Date.now()): SecretSummary
     updatedAt: record.updatedAt,
     usedBy: recentUsers(record, now),
     hosts: record.hosts ?? [],
+    hostBinding: record.hostBinding ?? null,
   };
+}
+
+/**
+ * The host a secret may be stored with: `host` or `host:port`, nothing else (no scheme, path,
+ * userinfo, query or space), in the form ctx.fetch compares with (URL's `host`, lowercase). Null when
+ * it is not one.
+ */
+export function normalizeSecretHost(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const h = raw.trim().toLowerCase();
+  if (!h || /[\s/@?#\\]/.test(h) || !URL.canParse(`https://${h}`)) return null;
+  const host = new URL(`https://${h}`).host;
+  return host || null;
 }
 
 /** Every secret this owner holds — names and times, never a value. */
@@ -132,6 +155,11 @@ export async function putOwnerSecret(
   ownerGhii: string,
   name: unknown,
   value: unknown,
+  /**
+   * `host`: where the secret may go, set now rather than by its first use (`host` or `host:port`).
+   * Absent or null: unbound until its first use. `by`: the principal storing it, recorded with a host.
+   */
+  opts: { host?: unknown; by?: string } = {},
 ): Promise<{ ok: true; data: SecretSummary } | SecretRefusal> {
   if (typeof name !== 'string' || !SECRET_NAME_RE.test(name)) {
     return {
@@ -154,6 +182,17 @@ export async function putOwnerSecret(
         + 'passwords, not documents: nothing here can read a value back to tell you what it became.',
     };
   }
+  // The owner may name the host now. Without it the first use chooses, and the first use is made by
+  // whichever of the owner's agents or apps calls first (secrets audit 2026-10-09, item 10).
+  const host = opts.host === undefined || opts.host === null ? null : normalizeSecretHost(opts.host);
+  if (opts.host !== undefined && opts.host !== null && !host) {
+    return {
+      ok: false, status: 400, code: 'INVALID_SECRET_HOST',
+      message: 'host is the address a secret may be sent to, written as a host name or host:port, for example '
+        + 'api.example.com or api.example.com:8443: no https://, no path. Leave it out to bind the secret to the '
+        + 'host of its first use. Nothing was stored.',
+    };
+  }
   // REFUSE BEFORE YOU WRITE. Resolve the key first: a node with none must answer, not store.
   const key = getEncryptionKey(config);
   if (!key) {
@@ -172,7 +211,8 @@ export async function putOwnerSecret(
     setAt: now,
     updatedAt: now,
     usedBy: {},
-    hosts: [],
+    hosts: host ? [host] : [],
+    hostBinding: host ? { how: 'set', by: opts.by ?? ownerGhii, at: now } : null,
   });
   return { ok: true, data: toSummary(stored) };
 }
@@ -313,12 +353,20 @@ export function secretUnknownMessage(headerName: string, secretName: string): st
  * the extension config is not a vault row and has nothing to stamp. The stamp is fire-and-forget on
  * purpose: a slow write must not delay somebody's outbound call, and a failed one costs a line on a
  * list rather than a credential.
+ *
+ * A first use is bound with WHO made it (`principal`) and through which extension, so the owner can
+ * see on the list whether the host was one they chose. The extension's shared map is bound to the
+ * host of its first use too (sharedBindingName), as a vault secret is. The answer carries the values
+ * it put into the headers, so ctx.fetch can remove them from whatever the far end sends back
+ * (services/extension-fetch-scrub.ts; secrets audit 2026-10-09, item 10).
  */
 export async function resolveSecretForHeaders(deps: {
   storage: Storage;
   config: AimeatConfig;
   /** The owner GHII behind whichever principal is calling. */
   ownerGhii: string;
+  /** The principal making the call (an agent's GAII, the owner's GHII): recorded with a first use. */
+  principal?: string;
   /** The extension's manifest config, secrets already decrypted by the road that built the context. */
   extConfig: Record<string, unknown> | undefined;
   /** Which extension is asking, for the usedBy stamp. */
@@ -326,10 +374,10 @@ export async function resolveSecretForHeaders(deps: {
   headers: Record<string, string> | undefined;
   /** Where the call is going. A vault secret is sent only to the host it is bound to. */
   url: string;
-}): Promise<{ ok: true; headers: Record<string, string> } | SecretResolutionRefusal> {
+}): Promise<{ ok: true; headers: Record<string, string>; values: string[] } | SecretResolutionRefusal> {
   const { storage, config, ownerGhii, extConfig, extName, headers, url } = deps;
   const names = secretPlaceholderNames(headers);
-  if (!names.length) return { ok: true, headers: headers ?? {} };
+  if (!names.length) return { ok: true, headers: headers ?? {}, values: [] };
 
   const key = getEncryptionKey(config);
   const fallback = extensionConfigSecrets(extConfig);
@@ -339,6 +387,9 @@ export async function resolveSecretForHeaders(deps: {
   // every name has resolved: a binding is a write, and a call refused by a later name would leave
   // the secret bound to a host that received nothing, refusing the owner's real host from then on.
   const toBind: string[] = [];
+  // The same for the shared map's values: the binding row each would be bound under.
+  const toBindShared: Array<{ name: string; row: string }> = [];
+  const sharedOwner = sharedBindingOwner(extName);
   // An address that does not parse binds nothing and sends nothing.
   const host = URL.canParse(url) ? new URL(url).host.toLowerCase() : '';
 
@@ -373,7 +424,18 @@ export async function resolveSecretForHeaders(deps: {
       }
     }
     const alt = fallback[name];
-    if (typeof alt === 'string' && alt !== '') resolved.set(name, alt);
+    if (typeof alt === 'string' && alt !== '') {
+      // The shared map had no host binding at all: any address the script named received the
+      // operator's credential. Bound to the host of its first use now, under a row that names the
+      // value by an HMAC, so the operator storing a new value starts a new binding.
+      const row = sharedBindingName(name, alt, key, config.nodeId);
+      const bound = (await storage.getSecret(sharedOwner, row))?.hosts ?? [];
+      if (!host || (bound.length && !bound.includes(host))) {
+        return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
+      }
+      if (!bound.length) toBindShared.push({ name, row });
+      resolved.set(name, alt);
+    }
   }
 
   const substituted = resolveHeaderSecrets(headers, name => resolved.get(name));
@@ -387,8 +449,23 @@ export async function resolveSecretForHeaders(deps: {
   // THE CALL IS ACCEPTED: every name resolved, every bound secret goes where it is bound. Only now
   // is a first use bound to this host. The store answers the hosts the secret ended up bound to, so
   // a concurrent first use that bound it elsewhere a moment ago is still refused here.
+  const firstUse: SecretBinding = {
+    how: 'first-use', by: deps.principal ?? ownerGhii, extension: extName, at: new Date().toISOString(),
+  };
   for (const name of toBind) {
-    const bound = await storage.bindSecretHost(ownerGhii, name, host);
+    const bound = await storage.bindSecretHost(ownerGhii, name, host, firstUse);
+    if (!bound.includes(host)) {
+      return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
+    }
+  }
+  for (const { name, row } of toBindShared) {
+    // One statement creates the row already bound; a row another call created first is bound by the
+    // conditional update, and the answer says where it ended up.
+    const created = await storage.createSecretIfAbsent({
+      ownerGaii: sharedOwner, name: row, ciphertext: '', setAt: firstUse.at, updatedAt: firstUse.at,
+      usedBy: {}, hosts: [host], hostBinding: firstUse,
+    });
+    const bound = created ? [host] : await storage.bindSecretHost(sharedOwner, row, host, firstUse);
     if (!bound.includes(host)) {
       return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
     }
@@ -403,5 +480,24 @@ export async function resolveSecretForHeaders(deps: {
       });
     }
   }
-  return { ok: true, headers: substituted.headers };
+  return { ok: true, headers: substituted.headers, values: [...resolved.values()] };
+}
+
+/**
+ * Where the binding rows of an extension's shared secret map live in the Secret table: under the
+ * extension's own namespace, which is never an owner's GHII, so no owner's list, export or erasure
+ * reads them. A binding row holds no value (its ciphertext is empty), only the hosts and who bound.
+ */
+export function sharedBindingOwner(extName: string): string {
+  return `ext:${extName}`;
+}
+
+/**
+ * The row one shared value is bound under: its name and an HMAC of the value under the node key
+ * (the node id when the node has none), so a new value is a new row, unbound until its first use,
+ * and the row says nothing about the value to whoever reads the table.
+ */
+export function sharedBindingName(name: string, value: string, key: Buffer | null, nodeId: string): string {
+  const mac = createHmac('sha256', key ?? Buffer.from(nodeId, 'utf8')).update(`shared-secret:${name}:${value}`).digest('hex');
+  return `${name}#${mac.slice(0, 24)}`;
 }

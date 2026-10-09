@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-09 — aimeat_secret_set takes an optional `host`; aimeat_secret_list names the host binding
+ *     and who made it (secrets audit 2026-10-09, item 10).
  *   2026-10-08 — aimeat_skill_publish takes ai_provenance and ai_provenance_id: SKILL.md is prose a
  *     reader loads and a skill can be public, so how it was written is recorded (aiprov E12).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -214,7 +216,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_secret_list',
-        description: "The named keys and passwords in your owner's vault: for each one its name, when it was first stored, when its value last changed, and which extensions have used it in the last 30 days. NEVER a value — nothing on this node reads one back, including this tool and including the owner. Use it to see what is already stored before asking a person for a key again, and to see what would break before removing one. Needs secrets:manage, which no wildcard carries — the owner ticks it per agent.",
+        description: "The named keys and passwords in your owner's vault: for each one its name, when it was first stored, when its value last changed, which extensions have used it in the last 30 days, the host it may be sent to, and who bound it there (`hostBinding`: set with the secret, or the principal and extension of its first use). NEVER a value — nothing on this node reads one back, including this tool and including the owner. Use it to see what is already stored before asking a person for a key again, and to see what would break before removing one. Needs secrets:manage, which no wildcard carries — the owner ticks it per agent.",
         caller: 'agent',
         visibility: agentEverywhere,
         // set is idempotent (the same name and value twice leaves the same row) and NOT destructive,
@@ -244,6 +246,7 @@ export const capabilitiesGroupsSkillsTools = [
         input: {
             name: { type: 'string', required: true, description: 'What to call it: letters, digits, underscore and hyphen, 1 to 64 characters. This is the name written into a header as {{secret:NAME}}, so it is case-exact.' },
             value: { type: 'string', required: true, description: 'The key or password itself, up to 4 kB. It is encrypted at rest and never returned by anything.' },
+            host: { type: 'string', description: 'Optional. The one host this secret may be sent to, as a host name or host:port (api.example.com, api.example.com:8443), no https:// and no path. Set it when you know where the key belongs: then no extension can send it anywhere else, even on its first call. Left out, the first call that uses the secret binds it to that call\'s host, and the list shows who made that call.' },
         },
     },
     {

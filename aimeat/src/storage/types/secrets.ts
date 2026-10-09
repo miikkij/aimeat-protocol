@@ -28,6 +28,9 @@
  *
  * @structure SecretRecord · SecretUseStamps · SecretRepository
  * @version-history
+ *   v1.2.0 — 2026-10-09 — `hostBinding` (who bound a secret to its host, and how); setSecret writes
+ *     the hosts and hostBinding it is given; createSecretIfAbsent, for the binding rows of an extension's
+ *     shared secret map (services/owner-secrets.ts; secrets audit 2026-10-09, item 10).
  *   v1.1.0 — 2026-09-16 — `hosts` and bindSecretHost: a secret is bound to the host of its first
  *     use. An extension's script chose where a person's secret went.
  *   v1.0.0 — 2026-09-06 — Initial. The owner's secrets vault.
@@ -60,6 +63,22 @@ export interface SecretRecord {
    * send their credential to its author.
    */
   hosts: string[];
+  /**
+   * Who bound the secret to its host, and how: the owner (or an agent with secrets:manage) setting
+   * the host when storing it (`set`), or the principal and extension whose call was its first use
+   * (`first-use`). Null until bound; cleared with the hosts when the value is stored again.
+   */
+  hostBinding?: SecretBinding | null;
+}
+
+/** Who bound a secret to its host (SecretRecord.hostBinding). */
+export interface SecretBinding {
+  how: 'set' | 'first-use';
+  /** The principal: a GHII for a person, a GAII for an agent, the owner GHII for an app grant. */
+  by: string;
+  /** The extension whose call made the first use. Absent for `set`. */
+  extension?: string;
+  at: string;
 }
 
 export interface SecretRepository {
@@ -69,9 +88,16 @@ export interface SecretRepository {
   getSecret(ownerGaii: string, name: string): Promise<SecretRecord | null>;
   /**
    * Insert or replace. `setAt` on the record is used only when the name is new; an existing row
-   * keeps the `setAt` it had, so "since when do I hold this" survives a rotation.
+   * keeps the `setAt` it had, so "since when do I hold this" survives a rotation. `hosts` and
+   * `hostBinding` are written as the record gives them (empty and null when it gives none): a new value
+   * is the owner's own act, so it resets where the old one was allowed to go unless it says.
    */
   setSecret(record: SecretRecord): Promise<SecretRecord>;
+  /**
+   * Insert the row only when this owner holds no secret of that name, in one statement, and say
+   * whether this call inserted it. Two callers racing to create one row: exactly one is told true.
+   */
+  createSecretIfAbsent(record: SecretRecord): Promise<boolean>;
   /** Remove one. False when this owner has no secret of that name. */
   deleteSecret(ownerGaii: string, name: string): Promise<boolean>;
   /**
@@ -81,11 +107,12 @@ export interface SecretRepository {
    */
   noteSecretUse(ownerGaii: string, name: string, extName: string, at: string): Promise<void>;
   /**
-   * Bind a secret to `host` if it is bound to nothing yet, and answer the hosts it is bound to
-   * afterwards (empty when the row is gone). The write is conditional on the stored list being
-   * empty, so two first uses racing to different hosts bind one of them, not both.
+   * Bind a secret to `host` if it is bound to nothing yet, recording `binding` with it, and answer
+   * the hosts it is bound to afterwards (empty when the row is gone). The write is conditional on
+   * the stored list being empty, so two first uses racing to different hosts bind one of them, not
+   * both.
    */
-  bindSecretHost(ownerGaii: string, name: string, host: string): Promise<string[]>;
+  bindSecretHost(ownerGaii: string, name: string, host: string, binding?: SecretBinding): Promise<string[]>;
   /** Every secret this owner holds, gone. Called by the owner-deletion cascade. */
   deleteSecretsByOwner(ownerGaii: string): Promise<number>;
 }

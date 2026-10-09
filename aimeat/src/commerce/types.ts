@@ -12,6 +12,8 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   v1.5.0 — 2026-10-09 — FulfillOutcome.sellerResult: what the seller's order copy carries in place of
+ *     a result that belongs to the buyer alone (secrets audit 2026-10-09, S-3).
  *   v1.4.0 — 2026-10-08 — CheckoutSessionRecord.guest: a buyer with no account (an AI shopping
  *     platform), for agent orders from Stripe's Agentic Commerce Suite and UCP platform checkouts.
  *   v1.3.0 — 2026-10-08 — CheckoutAttribution: the channel a checkout came from, carried on the
@@ -91,6 +93,12 @@ export interface FulfillArgs {
 export interface FulfillOutcome {
   taskId?: string;
   result?: unknown;
+  /**
+   * What the SELLER's copy of the order carries in place of `result`, when the result holds something
+   * that belongs to the buyer alone (an ext-call's one-time pay token). Absent: the seller's copy
+   * carries `result` as the buyer's does.
+   */
+  sellerResult?: unknown;
 }
 
 /** One line of a checkout session, resolved against the live offer at creation/update time. */

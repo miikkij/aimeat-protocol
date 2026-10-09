@@ -6,14 +6,17 @@
  *   `usedBy` is a JSON object in one column; everything else is a scalar. Mirrors the Postgres
  *   methods table for table, including the rule that replacing a secret keeps its `setAt` and its
  *   `usedBy`: a rotation is not a new secret and does not forget who was using the old one.
- * @structure secretMethods — listSecrets · getSecret · setSecret · deleteSecret · noteSecretUse ·
- *   deleteSecretsByOwner
+ * @structure secretMethods — listSecrets · getSecret · setSecret · createSecretIfAbsent ·
+ *   bindSecretHost · deleteSecret · noteSecretUse · deleteSecretsByOwner
  * @version-history
+ *   v1.2.0 — 2026-10-09 — hostBinding column; setSecret writes the hosts and hostBinding it is given;
+ *     bindSecretHost records the binding; createSecretIfAbsent (INSERT OR IGNORE). Mirrors Postgres
+ *     0099 (secrets audit 2026-10-09, item 10).
  *   v1.1.0 — 2026-09-16 — hosts column and bindSecretHost; setSecret clears the hosts.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 import type Database from 'better-sqlite3';
-import type { SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
+import type { SecretBinding, SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
 
 /**
  * Only `db` is used here, so the `this` type names that field rather than the whole storage class.
@@ -50,6 +53,18 @@ function parseHosts(raw: unknown): string[] {
   return Array.isArray(parsed) ? parsed.filter((h): h is string => typeof h === 'string') : [];
 }
 
+/** Who bound the secret, or null. Informational, so a malformed column reads as unknown. */
+function parseBinding(raw: unknown): SecretBinding | null {
+  if (typeof raw !== 'string' || !raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as SecretBinding : null;
+  } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the binding record is informational; the hosts column decides.
+    return null;
+  }
+}
+
 function toRecord(row: Record<string, unknown>): SecretRecord {
   return {
     ownerGaii: row.ownerGaii as string,
@@ -59,8 +74,11 @@ function toRecord(row: Record<string, unknown>): SecretRecord {
     updatedAt: row.updatedAt as string,
     usedBy: parseUsedBy(row.usedBy),
     hosts: parseHosts(row.hosts),
+    hostBinding: parseBinding(row.hostBinding),
   };
 }
+
+const bindingText = (b: SecretBinding | null | undefined): string | null => (b ? JSON.stringify(b) : null);
 
 export const secretMethods = {
   async listSecrets(this: Db, ownerGaii: string): Promise<SecretRecord[]> {
@@ -83,25 +101,36 @@ export const secretMethods = {
       ...record,
       setAt: prior?.setAt ?? record.setAt,
       usedBy: prior?.usedBy ?? record.usedBy ?? {},
-      // A new value is the owner's own act, so it clears where the old one was allowed to go.
-      hosts: [],
+      // A new value is the owner's own act, so it resets where the old one was allowed to go: to
+      // the host it names, or to none until its first use.
+      hosts: record.hosts ?? [],
+      hostBinding: record.hostBinding ?? null,
     };
+    const hosts = JSON.stringify(stored.hosts);
     if (prior) {
-      this.db.prepare('UPDATE secrets SET ciphertext = ?, updatedAt = ?, hosts = \'[]\' WHERE ownerGaii = ? AND name = ?')
-        .run(stored.ciphertext, stored.updatedAt, stored.ownerGaii, stored.name);
+      this.db.prepare('UPDATE secrets SET ciphertext = ?, updatedAt = ?, hosts = ?, hostBinding = ? WHERE ownerGaii = ? AND name = ?')
+        .run(stored.ciphertext, stored.updatedAt, hosts, bindingText(stored.hostBinding), stored.ownerGaii, stored.name);
     } else {
       this.db.prepare(
-        'INSERT INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts) VALUES (?, ?, ?, ?, ?, ?, \'[]\')',
+        'INSERT INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts, hostBinding) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       ).run(stored.ownerGaii, stored.name, stored.ciphertext, stored.setAt, stored.updatedAt,
-        JSON.stringify(stored.usedBy ?? {}));
+        JSON.stringify(stored.usedBy ?? {}), hosts, bindingText(stored.hostBinding));
     }
     return stored;
   },
 
-  async bindSecretHost(this: Db, ownerGaii: string, name: string, host: string): Promise<string[]> {
+  async createSecretIfAbsent(this: Db, record: SecretRecord): Promise<boolean> {
+    const r = this.db.prepare(
+      'INSERT OR IGNORE INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts, hostBinding) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(record.ownerGaii, record.name, record.ciphertext, record.setAt, record.updatedAt,
+      JSON.stringify(record.usedBy ?? {}), JSON.stringify(record.hosts ?? []), bindingText(record.hostBinding));
+    return Number(r.changes ?? 0) > 0;
+  },
+
+  async bindSecretHost(this: Db, ownerGaii: string, name: string, host: string, binding?: SecretBinding): Promise<string[]> {
     // Conditional on the list being empty, so a second first use cannot add a second host.
-    this.db.prepare('UPDATE secrets SET hosts = ? WHERE ownerGaii = ? AND name = ? AND hosts = \'[]\'')
-      .run(JSON.stringify([host]), ownerGaii, name);
+    this.db.prepare('UPDATE secrets SET hosts = ?, hostBinding = ? WHERE ownerGaii = ? AND name = ? AND hosts = \'[]\'')
+      .run(JSON.stringify([host]), bindingText(binding), ownerGaii, name);
     const row = this.db.prepare('SELECT hosts FROM secrets WHERE ownerGaii = ? AND name = ?')
       .get(ownerGaii, name) as Record<string, unknown> | undefined;
     return row ? parseHosts(row.hosts) : [];

@@ -14,6 +14,8 @@
  *   const { token } = await mintExtPayToken(storage, { buyerOwner, ext, action, currency, amount });
  *   const r = await consumeExtPayToken(storage, token, { buyerOwner, ext, action });
  * @version-history
+ *   v1.1.0 — 2026-10-09 — consumeExtPayToken compares buyer, extension and action before it deletes,
+ *     so a refused presentation leaves the buyer's token spendable (secrets audit 2026-10-09, S-3).
  *   v1.0.0 — 2026-07-17 — Initial (Phase 3 — money-channel one-time token, D1/D3)
  */
 import { randomUUID } from 'node:crypto';
@@ -52,9 +54,11 @@ export async function mintExtPayToken(storage: Storage, grant: ExtPayGrant): Pro
 }
 
 /**
- * Verify + CONSUME a token. Single-use: the record is deleted first and the delete result is the
- * atomicity gate — a concurrent replay that loses the delete race is rejected. Also checks expiry
- * and that the token was minted for exactly this buyer + ext + action.
+ * Verify + CONSUME a token. The binding is checked FIRST: a token presented by anybody but its buyer,
+ * or for another extension or action, is refused and left exactly as it was, so whoever holds the
+ * string cannot burn the call the buyer paid for (secrets audit 2026-10-09, S-3). Only a matching
+ * token is deleted, and the delete result is the single-use gate: a concurrent replay that loses the
+ * delete race is refused. An expired token is deleted on sight, since nobody can spend it any more.
  */
 export async function consumeExtPayToken(
   storage: Storage,
@@ -64,15 +68,16 @@ export async function consumeExtPayToken(
   if (!token) return { ok: false, reason: 'missing' };
   const rec = await storage.getMemory(NS, token);
   if (!rec) return { ok: false, reason: 'invalid_or_used' };
-  // Single-use gate: whoever deletes it wins; a racing replay gets deleted=false.
-  const deleted = await storage.deleteMemory(NS, token);
-  if (!deleted) return { ok: false, reason: 'replayed' };
   const g = rec.value as ExtPayGrant & { expiresAt: string };
   if (!g || typeof g.expiresAt !== 'string' || new Date(g.expiresAt).getTime() < Date.now()) {
+    await storage.deleteMemory(NS, token);
     return { ok: false, reason: 'expired' };
   }
   if (g.buyerOwner !== expect.buyerOwner || g.ext !== expect.ext || g.action !== expect.action) {
     return { ok: false, reason: 'mismatch' };
   }
+  // Single-use gate: whoever deletes it wins; a racing replay gets deleted=false.
+  const deleted = await storage.deleteMemory(NS, token);
+  if (!deleted) return { ok: false, reason: 'replayed' };
   return { ok: true };
 }

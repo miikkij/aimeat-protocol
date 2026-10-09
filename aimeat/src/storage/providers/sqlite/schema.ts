@@ -12,6 +12,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-09 — The extension_instances and secrets column block moves to schema-columns-extensions.ts
+ *     unchanged (max-file-lines), and gains secrets.hostBinding (migration 0099).
  *   2026-10-08 — work.aiProvenanceId and agent_v2_tasks.aiProvenanceId (migration 0098).
  *   2026-10-08 — storage_files.aiProvenanceId and its index (migration 0096).
  *   2026-10-04 — The scheduler's column block moves to schema-columns-scheduler.ts unchanged
@@ -76,6 +78,7 @@ import { applySchemaTables4 } from './schema-tables-4.js';
 import { splitPushSubscriptionsPerDevice, relaxPushLastUsedAt, relaxInvitationsOrganismId } from './schema-rebuilds.js';
 import { moveActionsAndWorkToFullIdentity } from './schema-identity-backfill.js';
 import { applySchedulerColumns } from './schema-columns-scheduler.js';
+import { applyExtensionColumns } from './schema-columns-extensions.js';
 
 export function initializeSchema(db: Database.Database): void {
   // CREATE TABLE/INDEX DDL, applied in numeric order (same order as the original single
@@ -687,16 +690,9 @@ export function initializeSchema(db: Database.Database): void {
   // whatever the owner had picked. Review item 5.3, 2026-09-06.
   safeAddColumn('notification_preferences', 'locale', 'TEXT');
 
-  // An extension instance's per-locale overrides and the agent that created it. The
-  // deserializer has read both since they were added to the record; the table had neither
-  // column and the INSERT and UPDATE wrote neither, while updateExtensionInstance returned
-  // `{...existing, ...updates}` -- so a PUT answered 200 with the translations echoed back and
-  // the next GET served nothing. Review item 5.4, 2026-09-06.
-  safeAddColumn('extension_instances', 'createdByAgent', 'TEXT');
-  safeAddColumn('extension_instances', 'translations', 'TEXT');
-
-  // The hosts a vault secret may be sent to, bound at its first use. Mirrors Postgres 0078.
-  safeAddColumn('secrets', 'hosts', "TEXT NOT NULL DEFAULT '[]'");
+  // extension_instances.createdByAgent/.translations, and the vault's hosts and hostBinding columns
+  // (Postgres 0078 and 0099), in schema-columns-extensions.ts.
+  applyExtensionColumns(safeAddColumn);
 
   // Decision rules: which rule ran, at which version, what its bands made of the answers, and whose
   // key paid. Columns rather than document fields, because the quality view counts by them. The

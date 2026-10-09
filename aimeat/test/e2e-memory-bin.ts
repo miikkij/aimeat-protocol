@@ -204,5 +204,34 @@ await test('12. Without memory:delete the door is shut, and says so', async () =
   assert(d.status === 403, `expected 403 without memory:delete, got ${d.status} ${JSON.stringify(d.body)}`);
 });
 
+console.log('\nA credential record is not removed or put back through the bin');
+// Secrets audit 2026-10-09, item 10. `openrouter.apikey` holds the owner's AI key. The generic write
+// doors refuse it and name the record's own route; the generic delete and restore did not, so any
+// principal holding memory:delete could remove the owner's key, and memory:write could put an old,
+// replaced key back from the bin.
+await test('13. The generic delete refuses a credential record and names its own route', async () => {
+  const put = await json('/v1/openrouter/settings', {
+    method: 'PUT', headers: auth(tokA), body: JSON.stringify({ apiKey: 'sk-bin-probe-key-0001' }),
+  });
+  assert(put.status === 200, `the owner stores a key: ${put.status} ${JSON.stringify(put.body?.error)}`);
+  const d = await json('/v1/memory/openrouter.apikey', { method: 'DELETE', headers: auth(tokA) });
+  assert(d.status === 403, `expected 403 for a credential record, got ${d.status} ${JSON.stringify(d.body)}`);
+  assert(d.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${d.body.error?.code}`);
+  assert(String(d.body.error?.message).includes('DELETE /v1/openrouter/settings'), `the refusal names the route: ${d.body.error?.message}`);
+  const still = await json('/v1/openrouter/settings', { headers: auth(tokA) });
+  assert(still.body.data?.hasApiKey === true, `the key is still stored: ${JSON.stringify(still.body.data)}`);
+});
+
+await test('14. The generic restore refuses a credential record the owner removed through its own route', async () => {
+  const del = await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth(tokA) });
+  assert(del.status === 200, `the owner removes the key on its own route: ${del.status} ${JSON.stringify(del.body?.error)}`);
+  const r = await json('/v1/memory/openrouter.apikey/restore', { method: 'POST', headers: auth(tokA) });
+  assert(r.status === 403, `expected 403 for a credential record, got ${r.status} ${JSON.stringify(r.body)}`);
+  assert(r.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${r.body.error?.code}`);
+  assert(String(r.body.error?.message).includes('PUT /v1/openrouter/settings'), `the refusal names the route: ${r.body.error?.message}`);
+  const after = await json('/v1/openrouter/settings', { headers: auth(tokA) });
+  assert(after.body.data?.hasApiKey === false, `the removed key came back: ${JSON.stringify(after.body.data)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 process.exit(failed > 0 ? 1 : 0);

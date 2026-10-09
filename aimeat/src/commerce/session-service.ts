@@ -15,6 +15,8 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.10.0 — 2026-10-09 — The seller's order copy carries each line's sellerResult where a fulfilment
+ *     gives one, so an ext-call's one-time pay token stays with the buyer (secrets audit 2026-10-09, S-3).
  *   v2.9.0 — 2026-10-08 — A session carries its attribution (where the checkout came from), and a
  *     completed one is counted for the seller under it (services/visibility/, AI visibility layer A).
  *   v2.8.0 — 2026-10-05 — An agent's amount is reserved against its daily limit in one compare-and-swap
@@ -561,6 +563,9 @@ async function completeSessionInner(
   //    (app-tool: synchronous capability invoke whose result rides on the session).
   const taskIds: string[] = [];
   const results: Array<{ sku: string; result: unknown }> = [];
+  // The seller's copy of the same results: a line whose result belongs to the buyer alone (an
+  // ext-call's one-time pay token) gives the seller its sellerResult instead.
+  const sellerResults: Array<{ sku: string; result: unknown }> = [];
   // Per-line, because one session can carry several priced lines with different sellers.
   const lineDesignations: DynamicDesignation[][] = [];
   try {
@@ -576,7 +581,9 @@ async function completeSessionInner(
           // the buyer's receipt never carries the seller's commercial arrangement.
           const shared = takeDesignations(outcome.result);
           lineDesignations[i] = shared.designations;
-          results.push({ sku: `${item.kind}:${item.agent}:${item.offerId}`, result: shared.result });
+          const sku = `${item.kind}:${item.agent}:${item.offerId}`;
+          results.push({ sku, result: shared.result });
+          sellerResults.push({ sku, result: outcome.sellerResult !== undefined ? outcome.sellerResult : shared.result });
         }
       } else {
         taskIds.push(await createFulfillmentTask(storage, session, item));
@@ -631,8 +638,12 @@ async function completeSessionInner(
     updatedAt: new Date().toISOString(),
   };
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);
-  // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data).
-  await putRecord(storage, session.sellerGhii, orderKey(session.id), completed);
+  // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data). It
+  // carries the seller's view of each result, never a buyer's one-time token (secrets audit
+  // 2026-10-09, S-3).
+  await putRecord(storage, session.sellerGhii, orderKey(session.id), {
+    ...completed, fulfillment: { taskIds, ...(sellerResults.length ? { results: sellerResults } : {}) },
+  });
   // Counted for the seller under the channel it came from. Without an attribution (the buyer opted
   // out, or the door gave nothing to go on) it counts as `none`: in the totals, under no channel.
   recordPurchase(storage, config, {

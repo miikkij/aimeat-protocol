@@ -16,6 +16,8 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.6.0 — 2026-10-09 — The ext-call fulfilment gives the seller's order `{ call_paid, expiresAt }` in
+ *     place of the buyer's one-time pay token (secrets audit 2026-10-09, S-3).
  *   v1.5.1 — 2026-10-07 — An app tool is bought in money at any price it declares (toolMoneyPrices),
  *     so a tool sold only in `pricesMoney`, or in a second currency there, can be bought.
  *   v1.5.0 — 2026-10-01 — The app-tool and ext-call resolvers refuse a buyer the app's members-only
@@ -322,7 +324,11 @@ export function extCallSellableResolver(): SellableResolver {
           const { token, expiresAt } = await mintExtPayToken(ctx.storage, {
             buyerOwner: session.buyerOwner, ext: extName, action: actionId, currency, amount: unitPrice,
           });
-          return { result: { pay_token: token, expiresAt, retry: `POST /v1/ext/${extName}/${actionId} with header 'x-aimeat-pay-token: ${token}'` } };
+          return {
+            result: { pay_token: token, expiresAt, retry: `POST /v1/ext/${extName}/${actionId} with header 'x-aimeat-pay-token: ${token}'` },
+            // The token is the buyer's to spend; the seller's order says one was issued, never which.
+            sellerResult: { call_paid: true, expiresAt },
+          };
         },
       };
     },

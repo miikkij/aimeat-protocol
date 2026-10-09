@@ -6,6 +6,7 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.13.0 — 2026-10-09 — secrets.hostBinding: who bound a vault secret to its host. Mirrors Postgres 0099.
  *   v1.12.0 — 2026-09-29 — classification_audit table: the classification audit log (TARGET-082 V4).
  *     Mirrors Postgres 0091.
  *   v1.11.0 — 2026-09-29 — content_labels table: classification labels (TARGET-082). Mirrors Postgres 0090.
@@ -632,6 +633,7 @@ export function applySchemaTables4(db: Database.Database): void {
       updatedAt  TEXT NOT NULL,
       usedBy     TEXT NOT NULL DEFAULT '{}',
       hosts      TEXT NOT NULL DEFAULT '[]',
+      hostBinding TEXT,
       PRIMARY KEY (ownerGaii, name)
     );
     CREATE INDEX IF NOT EXISTS idx_secrets_owner ON secrets(ownerGaii);

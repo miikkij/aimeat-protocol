@@ -12,6 +12,9 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.10.0 — 2026-10-09 — Single use is durable: verifyUploadToken takes the storage and files the
+ *     spend in the revoked-token table until the token's expiry, so a used token is refused after a
+ *     restart and on every process over the same database (secrets audit 2026-10-09, S-7).
  *   v1.9.0 — 2026-10-08 — PRESIGNED_META_KEYS.storage carries `ai_provenance` and `ai_provenance_id`.
  *   v1.8.0 — 2026-10-03 — utype 'font': a theme face's file for the font manager (services/themes/fonts.ts).
  *   v1.7.0 — 2026-09-13 — PRESIGNED_META_KEYS.app carries `cortex_agents`, validated at the mint and
@@ -43,14 +46,25 @@
 
 import { SignJWT, jwtVerify } from 'jose';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
+import type { Storage } from '../storage/interface.js';
 
 // ── Key management (initialized from jwt.ts node keys) ──
 
 let _privateKey: CryptoKey | null = null;
 let _publicKey: CryptoKey | null = null;
 
-// Single-use tracking: token hash -> expiry timestamp
-const usedTokens = new Map<string, number>();
+/**
+ * Single use is a row, not a Map. The spent set lived in this process until 2026-10-09, so after a
+ * restart, or on a second process over the same database, a used token uploaded again for the rest
+ * of its sixty minutes (secrets audit 2026-10-09, S-7). A spend is now filed in the revoked-token
+ * table (storage.revokeTokenIfAbsent, one conditional insert, so of two requests carrying one token
+ * exactly one spends it), kept until the token's own expiry, and swept by that table's cleanup.
+ * The prefix keeps an upload spend apart from the other hashes the table holds.
+ */
+const SPENT_PREFIX = 'upload-token-spent:';
+
+/** The storage half single use needs: the revoked-token table's conditional insert. */
+export type UploadSpendStore = Pick<Storage, 'revokeTokenIfAbsent'>;
 
 /**
  * Short handle -> the signed token it stands for, with the same expiry.
@@ -65,9 +79,9 @@ const usedTokens = new Map<string, number>();
  * A handle has no words to paraphrase and is short enough that a copy error is visible. The JWT
  * stays the authority; it just stops being the address.
  *
- * In memory on purpose, next to usedTokens: this path is already restart-sensitive (the
- * single-use record has always lived here), and a lost handle behaves exactly like an expired
- * one — ask for a fresh URL.
+ * In memory on purpose: a lost handle (a restart, another process) behaves exactly like an expired
+ * one — ask for a fresh URL. It can only ever fail closed. The single-use record is NOT here; it is
+ * a row (SPENT_PREFIX above), because a raw JWT replayed on another process must fail closed too.
  */
 const handles = new Map<string, { token: string; exp: number }>();
 
@@ -83,9 +97,6 @@ export function initUploadTokenKeys(privateKey: CryptoKey, publicKey: CryptoKey)
     if (_cleanupInterval) clearInterval(_cleanupInterval);
     _cleanupInterval = setInterval(() => {
         const now = Math.floor(Date.now() / 1000);
-        for (const [hash, exp] of usedTokens) {
-            if (exp < now) usedTokens.delete(hash);
-        }
         for (const [handle, entry] of handles) {
             if (entry.exp < now) handles.delete(handle);
         }
@@ -231,11 +242,22 @@ async function signUploadToken(payload: UploadTokenPayload, ttlSeconds: number):
 
 // ── Token verification ──
 
-function hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
+/**
+ * What a spend is filed under: the token's own id (`jti`, on every upload token minted since
+ * 2026-07-05), else the part its signature covers. Never the whole string, because an Ed25519
+ * signature has several spellings that all verify (auth/jwt.ts tokenIdOf says why).
+ */
+function spendHashOf(token: string, jti: unknown): string {
+    const id = typeof jti === 'string' && jti ? `jti:${jti}` : `signed:${token.slice(0, token.lastIndexOf('.'))}`;
+    return createHash('sha256').update(`${SPENT_PREFIX}${id}`).digest('hex');
 }
 
-export async function verifyUploadToken(tokenOrHandle: string): Promise<VerifiedUploadToken> {
+/**
+ * Verify an upload token or the handle that stands for it, and SPEND it. The signature, the expiry and
+ * the type are checked first, so a token that does not verify spends nothing; then the spend is filed
+ * in `store`, and a token already spent there, by this process or any other, is refused TOKEN_USED.
+ */
+export async function verifyUploadToken(tokenOrHandle: string, store: UploadSpendStore): Promise<VerifiedUploadToken> {
     if (!_publicKey) throw new Error('Upload token keys not initialized');
 
     // An address resolves to the credential it stands for; anything else is treated as the
@@ -248,12 +270,6 @@ export async function verifyUploadToken(tokenOrHandle: string): Promise<Verified
                 'This upload URL is no longer valid (expired, already used, or the node restarted). Request a fresh one rather than editing this address.');
         }
         token = entry.token;
-    }
-
-    // Single-use check
-    const hash = hashToken(token);
-    if (usedTokens.has(hash)) {
-        throw new UploadTokenError('TOKEN_USED', 'Upload token has already been used (single-use)');
     }
 
     let payload;
@@ -275,8 +291,10 @@ export async function verifyUploadToken(tokenOrHandle: string): Promise<Verified
         throw new UploadTokenError('TOKEN_INVALID', 'Token is not an upload token');
     }
 
-    // Mark as used (store until token expiry for dedup)
-    usedTokens.set(hash, payload.exp as number);
+    // Spend it, durably and once: kept until the token's own expiry, when it could not be used anyway.
+    if (!(await store.revokeTokenIfAbsent(spendHashOf(token, payload.jti), payload.exp as number))) {
+        throw new UploadTokenError('TOKEN_USED', 'Upload token has already been used (single-use)');
+    }
 
     return {
         sub: payload.sub as string,

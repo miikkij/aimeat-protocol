@@ -19,6 +19,7 @@
  *   services/owner-secrets.js — the module is not there. Every assertion below is new behaviour.
  * @usage pnpm test -- owner-secrets
  * @version-history
+ *   v1.3.0 — 2026-10-09 — The summary carries `hostBinding` (who bound the secret to its host).
  *   v1.2.0 — 2026-09-24 — The host binding is made only once the call is accepted: not when a later
  *     name refuses it (7d6c102099f3), not before ctx.fetch has checked the address (919ef5f56d69).
  *     Against an in-memory store; both failed on the old code first.
@@ -119,8 +120,10 @@ describe('the summary — what a caller may know', () => {
         const s = toSummary(record({}), now);
         expect(JSON.stringify(s)).not.toContain(record({}).ciphertext);
         // `hosts` names where the value may go, which the owner needs to see; it carries no value.
-        expect(Object.keys(s).sort()).toEqual(['hosts', 'name', 'setAt', 'updatedAt', 'usedBy']);
+        // `hostBinding` names who bound it there (secrets audit 2026-10-09, item 10); no value either.
+        expect(Object.keys(s).sort()).toEqual(['hostBinding', 'hosts', 'name', 'setAt', 'updatedAt', 'usedBy']);
         expect(s.hosts).toEqual(['api.example.com']);
+        expect(s.hostBinding).toBeNull();
     });
 
     it('reports the extensions that used it inside the window, most recent first', () => {
