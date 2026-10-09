@@ -19,6 +19,8 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.6.0 — 2026-10-09 — Phase 2d: the owner lists their agents' connections (no credential) and
+ *     revokes one in person; the agent itself, another owner and the owner's own connection are refused.
  *   v1.5.0 — 2026-10-09 — Phases 2b and 2c (secrets audit 2026-10-09, chapter 2): the callback seals
  *     only for the browser that started the round, an agent's round waits for the owner to confirm it
  *     in their own browser, the stored verifier is sealed, and a deleted agent's connection goes with
@@ -397,6 +399,59 @@ async function main(): Promise<void> {
       const conns = list.data.data.connections as any[];
       assert(conns.length === 1 && conns[0].accountLabel === 'Test account agentbox', `agent's connections: ${JSON.stringify(conns)}`);
       agentConnId = conns[0].id;
+    });
+
+    console.log('\nPhase 2d — The owner sees and revokes the accounts their agents connected');
+    // Secrets audit 2026-10-09, chapter 2 (F2): an agent's connections were invisible to its owner
+    // and could not be revoked by them. Each test below failed before the two routes existed.
+    await test('the owner lists their agents\' connections, with no credential, and nobody else does', async () => {
+      assert(!!agentConnId, 'precondition: the agent connected nothing in the test above');
+      const mine = await api('/v1/connections/agents', { method: 'GET', bearer: jwtA });
+      assert(mine.status === 200, `owner list: ${mine.status} ${mine.data?.error?.message}`);
+      const rows = mine.data.data.connections as any[];
+      const row = rows.find(c => c.id === agentConnId);
+      assert(!!row && row.agent === agentName && row.provider === 'fake' && row.accountLabel === 'Test account agentbox',
+        `the agent's connection is not listed as it should be: ${JSON.stringify(rows)}`);
+      assert(row.principal.startsWith(`${agentName}#${userA}@`), `the row does not name the agent's identity: ${row.principal}`);
+      const blob = JSON.stringify(mine.data);
+      assert(!/\bat-[0-9a-f]{8}/.test(blob) && !/\brt-[0-9a-f]{8}/.test(blob) && !blob.includes('credential') && !blob.includes('scopes'),
+        'the list carries a credential, a token or provider scopes');
+      // The owner's own connections are on the ordinary list, not on this one.
+      assert(rows.every(c => c.principal !== `${userA}@${row.principal.split('@')[1]}`), 'the owner\'s own connection is on the agents\' list');
+
+      const overview = await api('/v1/access/overview', { method: 'GET', bearer: jwtA });
+      const fromPage = (overview.data?.data?.connections?.agent_connections ?? []) as any[];
+      assert(fromPage.some(c => c.id === agentConnId), `the Access page's overview does not carry it: ${JSON.stringify(overview.data?.data?.connections)}`);
+
+      const asB = await api('/v1/connections/agents', { method: 'GET', bearer: jwtB });
+      assert(asB.status === 200 && !(asB.data.data.connections as any[]).some(c => c.id === agentConnId), 'another owner sees it');
+      const asAgent = await api('/v1/connections/agents', { method: 'GET', bearer: agentToken });
+      assert(asAgent.status === 403, `the agent read its owner's view: ${asAgent.status}`);
+    });
+    await test('only the owner in person revokes an agent\'s connection; the agent itself and other owners cannot', async () => {
+      // A second account for the agent, so the one above stays for the deletion test below.
+      const start = await api('/v1/connections/start', { bearer: agentToken, body: { provider: 'fake' } });
+      const ok = await api(`/v1/oauth-rounds/${encodeURIComponent(start.data.data.state)}/approve`, { bearer: jwtA, browser: true });
+      assert((await callback(start.data.data.state, 'code-agentbox2', ok.cookie)).status === 302, 'second agent connection');
+      const second = ((await api('/v1/connections', { method: 'GET', bearer: agentToken })).data.data.connections as any[])
+        .find(c => c.accountLabel === 'Test account agentbox2');
+      assert(!!second, 'precondition: the second agent connection exists');
+
+      const byAgent = await api(`/v1/connections/agents/${second.id}`, { method: 'DELETE', bearer: agentToken });
+      assert(byAgent.status === 403, `the agent used the owner's revoke: ${byAgent.status}`);
+      const byB = await api(`/v1/connections/agents/${second.id}`, { method: 'DELETE', bearer: jwtB });
+      const missing = await api('/v1/connections/agents/00000000-0000-0000-0000-000000000000', { method: 'DELETE', bearer: jwtB });
+      assert(byB.status === 404 && missing.status === 404, `another owner: ${byB.status} / ${missing.status}`);
+      assert(JSON.stringify(byB.data.error) === JSON.stringify(missing.data.error), 'not-yours and absent answer differently');
+      // The owner's OWN connection is not an agent's: this route does not take it.
+      const own = await api(`/v1/connections/agents/${connA}`, { method: 'DELETE', bearer: jwtA });
+      assert(own.status === 404, `the agents' route revoked the owner's own connection: ${own.status}`);
+
+      const byOwner = await api(`/v1/connections/agents/${second.id}`, { method: 'DELETE', bearer: jwtA });
+      assert(byOwner.status === 200 && byOwner.data.data.revoked === true, `owner revoke: ${byOwner.status} ${byOwner.data?.error?.message}`);
+      const left = (await api('/v1/connections', { method: 'GET', bearer: agentToken })).data.data.connections as any[];
+      assert(!left.some(c => c.id === second.id), 'the agent still holds the revoked connection');
+      assert(left.some(c => c.id === agentConnId), 'the revoke took another connection with it');
     });
     await test('a deleted agent\'s connection is gone, and a new agent with the same name sees none', async () => {
       // Not vacuous: the agent must hold a connection before it is deleted.

@@ -20,6 +20,8 @@
  *   summarizeSessions(sessions, ownerName, currentSessionId, now) — pure, unit-tested
  * @usage const access = await createAccessTabService(storage, config).overview(owner, `${owner}@${nodeId}`, req.auth.sessionId);
  * @version-history
+ *   v2.1.0 — 2026-10-09 — connections.agent_connections: the accounts the owner's agents connected,
+ *     in the public projection with the agent's name (secrets audit 2026-10-09, F2).
  *   v2.0.0 — 2026-09-05 — sign_in, connections and base_package (design canvas "AIMEAT Pääsy-sivu",
  *     direction A). Sessions arrive grouped and valid-only: the security overview handed the page
  *     3 290 rows of which 2 848 had expired, 815 kB for a question whose answer is "374 on four
@@ -32,7 +34,7 @@ import type { SessionRecord } from '../../storage/repositories/session.repositor
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { GRANDFATHERED_SCOPES } from '../scope-vocabulary-migration.js';
 import { buildOutboundProviders, listProviderMeta, type OutboundProvider } from '../connections/providers.js';
-import { listOwnConnections, toPublicClient } from '../connections/access.js';
+import { listOwnConnections, listAgentsConnections, toPublicClient } from '../connections/access.js';
 
 // Each older section's payload mirrors its source endpoint's response `.data` exactly.
 export interface AccessOverview {
@@ -61,6 +63,8 @@ export interface SignInOverview {
 export interface ConnectionsOverview {
   enabled: boolean;
   connections: Array<Record<string, unknown>>;
+  /** The accounts the owner's agents connected, each naming its agent (secrets audit 2026-10-09, F2). */
+  agent_connections: Array<Record<string, unknown>>;
   providers: Array<Record<string, unknown>>;
   clients: Array<Record<string, unknown>>;
 }
@@ -252,20 +256,22 @@ export class AccessTabService {
       // ── accounts elsewhere: the owner's own connections, the services on offer, the own apps ──
       let connections: ConnectionsOverview;
       if (this.config.connectionsEnabled) {
-        const [list, clientRows] = await Promise.all([
+        const [list, clientRows, agentList] = await Promise.all([
           listOwnConnections(this.storage, ownerGhii),
           this.storage.listPrincipalProviderClients(ownerGhii),
+          listAgentsConnections(this.storage, ownerName),
         ]);
         const clients = await Promise.all(clientRows.map(async r =>
           toPublicClient(r, await this.storage.countConnectionsByProviderClient(r.id))));
         connections = {
           enabled: true,
           connections: list as unknown as Array<Record<string, unknown>>,
+          agent_connections: agentList as unknown as Array<Record<string, unknown>>,
           providers: listProviderMeta(this.providers) as unknown as Array<Record<string, unknown>>,
           clients: clients as unknown as Array<Record<string, unknown>>,
         };
       } else {
-        connections = { enabled: false, connections: [], providers: [], clients: [] };
+        connections = { enabled: false, connections: [], agent_connections: [], providers: [], clients: [] };
       }
 
       return {
