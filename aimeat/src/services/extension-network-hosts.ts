@@ -20,11 +20,13 @@
  *
  *   A leaf module: the manifest builder, the capability reader and the config writers import it.
  * @structure NETWORK_HOST_FIELDS_KEY · NetworkHostField · hostRefusal() · parseHostFieldValue() ·
- *   parseNetworkDeclaration() · hostFieldsOf()
+ *   parseNetworkDeclaration() · carryHostFieldValues() · hostFieldsOf()
  * @usage
  *   const net = parseNetworkDeclaration(manifest.network, capabilityList, manifestConfig, secretKeys);
  *   const v = parseHostFieldValue('wazuh.example.com:9200');   // { ok, value, host: 'wazuh.example.com' }
  * @version-history
+ *   v1.1.0 — 2026-10-09 — carryHostFieldValues(): an in-place extension update keeps the owner's host
+ *     (found on aimeat.io by cc-jouni-soc-sale: an upload upsert reset WAZUH_HOST to '').
  *   v1.0.0 — 2026-10-09 — Initial: `host_fields`, and hostRefusal() moved here from extension-manifest.ts.
  */
 
@@ -171,6 +173,23 @@ export function parseNetworkDeclaration(
     return { ok: false, message: 'network names hosts, and capabilities does not include network. Add network to capabilities, or remove network.' };
   }
   return { ok: true, ...(hosts ? { hosts } : {}), ...(hostFields ? { hostFields } : {}) };
+}
+
+/**
+ * A new build of an installed extension, with each host field set to the host the install already
+ * holds. A host is the owner's answer for THIS install, so an in-place update (a redeploy, an upload,
+ * an operator's reinstall) keeps it, as a package update does through mergeExtensionConfig. A field
+ * the install has no valid host for keeps the new build's value. Returns a new object.
+ */
+export function carryHostFieldValues(
+  next: Record<string, unknown> | undefined, previous: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const out = { ...(next ?? {}) };
+  for (const { field } of hostFieldsOf(out)) {
+    const held = parseHostFieldValue(previous?.[field]);
+    if (held.ok && held.host) out[field] = held.value;
+  }
+  return out;
 }
 
 /** The host fields an installed record declares, or [] when its manifest named none. */

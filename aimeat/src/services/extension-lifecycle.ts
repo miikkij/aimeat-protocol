@@ -39,6 +39,7 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.6.0 — 2026-10-09 — An in-place update keeps the owner's host field values (carryHostFieldValues).
  *   v1.5.0 — 2026-09-28 — writeExtensionRecord refuses other code for an extension a managed package
  *     install owns, 409 MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts); a config-only change passes.
  *   v1.4.0 — 2026-09-24 — writeExtensionRecord refuses a redeploy that brings other code under a
@@ -68,6 +69,7 @@ import { stableStringify } from '../utils/stable-json.js';
 import { logger } from '../utils/logger.js';
 import { snapshotExtensionVersion, forgetVersions, keptVersionRefusal, extensionCodeOf } from './component-versions.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
+import { carryHostFieldValues } from './extension-network-hosts.js';
 
 export interface ExtensionLifecycleDeps {
     storage: Storage;
@@ -172,6 +174,10 @@ export async function writeExtensionRecord(
         }, config);
         return { ok: true, record: created, action: 'installed', reinitialized: false };
     }
+
+    // A host field (manifest network.host_fields) is the owner's answer for this install: the new
+    // build takes the host the install holds, before the no-op comparison below sees it.
+    record.config = carryHostFieldValues(record.config, existing.config);
 
     // Identical derived bytes are a safe no-op, and a no-op must not re-run the extension's
     // @activate work or re-register its schedules.
