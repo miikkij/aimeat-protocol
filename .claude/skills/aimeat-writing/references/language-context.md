@@ -204,6 +204,8 @@ everywhere at once, and say so in the Changes section.
 | the strongest EU signature level | a qualified certificate on a qualified signature device; equal to a handwritten signature in EU law (eIDAS article 25). The word the Finnish and Spanish texts of eIDAS use | qualified electronic signature (a company's: qualified electronic seal) | hyväksytty sähköinen allekirjoitus (sinetti: hyväksytty sähköinen leima) | firma electrónica cualificada (sello electrónico cualificado) |
 | the node's own signature on a signing event | made with the node's key, which /.well-known/aimeat publishes, so it can be checked without this AIMEAT | the node's seal | noden sinetti | sello del nodo |
 | the EU list of approved signature providers | each member state's list of trust service providers, gathered by the Commission | EU trusted list | EU:n luotettujen palveluntarjoajien luettelo | lista de confianza de la UE |
+| the identity app every EU country gives its people | the person's own phone app under eIDAS 2; it proves who they are and makes a qualified electronic signature through its own trust service. Finland's is the Suomi.fi wallet (DVV, 2027); today the EU reference wallet, whose signatures are tests | EU Digital Identity Wallet (short: EU wallet) | EU:n digitaalisen identiteetin lompakko (lyhyesti: EU-lompakko) | Cartera Europea de Identidad Digital (en corto: cartera de la UE) |
+| a signature with no legal effect | made with test certificates, such as the EU reference wallet's; a check reports it as a test and never as qualified | test signature | testiallekirjoitus | firma de prueba |
 
 ## Never translated, in any language
 
@@ -312,6 +314,7 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-10-10**: the EU Digital Identity Wallet and the test signature, for signing a PDF in the wallet. The long names are the ones DVV and the Spanish eIDAS texts use; *EU-lompakko* and *cartera de la UE* are the short forms for a button.
 - **2026-10-09**: document signing: AIMEAT signature, signing request, signature check, its three results, the qualified signature and seal, the node's seal and the EU trusted list. The qualified terms are the ones the Finnish and Spanish texts of eIDAS (EU 910/2014) use; *leima* for a seal is the Finnish eIDAS word, not *sinetti*, which here names only the node's own seal.
 - **2026-10-09**: Visibility (*Näkyvyys*, *Visibilidad*), a click that changed nothing, repeated clicks and the corrected draft, for the Visibility page and the weekly helper of AI visibility. *Klikkaus* is the word the Finnish pages already use. The first Finnish lines written for this work said *applikaatio*; they say *sovellus* now, as the app row above says.
 - **2026-10-05**: a page the server opens (*palvelimen avaama sivu*, *página que abre el servidor*), for the Config setting that lists which private servers such a page may reach (security.screenshot_egress). Screenshot stays *kuvakaappaus*, as the app pages already say.

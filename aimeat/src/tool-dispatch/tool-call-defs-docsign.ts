@@ -6,6 +6,7 @@
  *   and the connector MCP: thin REST proxies over /v1/docsign/*, so the node decides everything.
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and _wallet_status (wish-allekirjoitus-eudi-lompakolla).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { requiredString, optionalString, optionalBoolean, optionalRecord, requiredArray, query } from './tool-call-helpers.js';
@@ -76,5 +77,17 @@ export const docsignCliTools: ConnectCliToolDefinition[] = [
         // → POST /v1/docsign/requests/:id/cancel
         name: 'aimeat_docsign_cancel',
         handler: ({ client }, input) => client.post(`/v1/docsign/requests/${id(input)}/cancel`, {}),
+    },
+    {
+        // → POST /v1/docsign/requests/:id/wallet (JSON: the PDF named by a stored file)
+        name: 'aimeat_docsign_wallet_start',
+        handler: ({ client }, input) => client.post(`/v1/docsign/requests/${id(input)}/wallet`, {
+            storage_key: requiredString(input, 'storage_key'),
+        }),
+    },
+    {
+        // → GET /v1/docsign/requests/:id/wallet/:session
+        name: 'aimeat_docsign_wallet_status',
+        handler: ({ client }, input) => client.get(`/v1/docsign/requests/${id(input)}/wallet/${encodeURIComponent(requiredString(input, 'session_id'))}`),
     },
 ];

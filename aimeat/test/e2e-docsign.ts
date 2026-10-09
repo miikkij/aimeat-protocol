@@ -16,21 +16,31 @@
  *     - a creator who is not a party, a party who does not exist, a party on another node
  *     - a party who did not create the request cancelling it
  *     - a changed PDF byte (DIGEST_MISMATCH) and a page added after signing
+ *     - wallet signing: a stranger starting it, a PDF that is not the request's document, a file
+ *       that is not a PDF, a response with the wrong state, a returned PDF that does not start with
+ *       the bytes sent (a different document signed), and the original PDF after a wallet signature
+ *       already made a newer one
  *
  *   The PDFs are test/fixtures/docsign/*.pdf, made by make-fixtures.ts with a test CA of our own.
  *   Validation runs with online=false, so the suite never reaches the EU lists or an OCSP responder.
+ *   For wallet signing the suite plays the wallet: it checks the request object's signature and
+ *   host name as a wallet does, downloads the PDF and appends a PAdES signature (pdf-sign.ts).
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=docsign
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — Signing with an EU Digital Identity Wallet, the suite playing the wallet
+ *     (wish-allekirjoitus-eudi-lompakolla).
  */
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compactVerify, decodeProtectedHeader } from 'jose';
 import { SoftAuthenticator } from './helpers/soft-authenticator.js';
+import { plainPdf, appendSignature, makeCert, name, newRsa } from './fixtures/docsign/pdf-sign.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -77,10 +87,10 @@ async function registerOwner(username: string): Promise<{ token: string; private
     return { token: tok.body.data.token as string, privateKey: priv };
 }
 
-async function agentOf(owner: string, ownerTok: string, name: string): Promise<{ token: string; gaii: string; privateKey: string }> {
+async function agentOf(owner: string, ownerTok: string, name: string, scopes = ['memory:read', 'memory:write']): Promise<{ token: string; gaii: string; privateKey: string }> {
     const created = await json('/v1/agents', {
         method: 'POST', headers: auth(ownerTok),
-        body: JSON.stringify({ name, owner, display_name: name, capabilities: [], scopes: ['memory:read', 'memory:write'] }),
+        body: JSON.stringify({ name, owner, display_name: name, capabilities: [], scopes }),
     });
     assert(created.status === 201, `create agent ${name}: ${created.status} ${JSON.stringify(created.body)}`);
     const gaii = created.body.data.agent.gaii as string;
@@ -303,6 +313,131 @@ async function main() {
         const ownerId = JSON.parse(toolText(forOwner)).request?.id as string;
         const asOwner = await mcpCall(agent.token, 'aimeat_docsign_sign', { id: ownerId, method: 'session' });
         assert(toolText(asOwner).startsWith('NOT_A_PARTY'), `as owner: ${toolText(asOwner).slice(0, 120)}`);
+    });
+
+    // ── an EU Digital Identity Wallet signs (this suite plays the wallet) ──
+
+    const walletPdf = plainPdf(`Kauppakirja ${stamp}`);
+    const walletSha = createHash('sha256').update(walletPdf).digest('hex');
+    const walletSigner = (() => {
+        const ca = newRsa(), key = newRsa();
+        const caName = name('Wallet Test QTSP CA', 'AIMEAT Test');
+        const caCert = makeCert({ subject: caName, issuer: caName, publicKey: ca.publicKey, signer: ca.privateKey, ca: true, serial: 9 });
+        const cert = makeCert({ subject: name(names.alice, 'AIMEAT Test'), issuer: caName, publicKey: key.publicKey, signer: ca.privateKey, ca: false, serial: 10 });
+        return { cert, key: key.privateKey, chain: [caCert] };
+    })();
+    let walletRequestId = '';
+
+    /** What the wallet does with a link: fetch and check the request object, then download the PDF. */
+    async function walletOpens(link: string): Promise<{ claims: any; pdf: Buffer }> {
+        const u = new URL(link);
+        assert(u.protocol === 'eudi-rqes:', `scheme ${u.protocol}`);
+        const clientId = u.searchParams.get('client_id')!;
+        const jwsRes = await fetch(u.searchParams.get('request_uri')!);
+        assert(jwsRes.status === 200 && (jwsRes.headers.get('content-type') ?? '').includes('oauth-authz-req+jwt'), `request object: ${jwsRes.status}`);
+        const jws = await jwsRes.text();
+        const header = decodeProtectedHeader(jws) as any;
+        const leaf = new X509Certificate(Buffer.from(header.x5c[0], 'base64'));
+        assert((leaf.subjectAltName ?? '').includes(`DNS:${clientId}`), `the certificate names ${clientId}: ${leaf.subjectAltName}`);
+        const { payload } = await compactVerify(jws, leaf.publicKey);
+        const claims = JSON.parse(Buffer.from(payload).toString());
+        assert(claims.client_id === clientId && claims.client_id_scheme === 'x509_san_dns' && claims.response_mode === 'direct_post', `claims ${JSON.stringify(claims).slice(0, 200)}`);
+        assert(new URL(claims.response_uri).hostname === clientId && claims.signatureQualifier === 'eu_eidas_qes', 'response_uri on the same host, QES asked for');
+        const docRes = await fetch(claims.documentLocations[0].uri);
+        const pdf = Buffer.from(await docRes.arrayBuffer());
+        assert(createHash('sha256').update(pdf).digest('base64') === claims.documentDigests[0].hash, 'the downloaded PDF has the digest the request names');
+        return { claims, pdf };
+    }
+    const walletPosts = (claims: any, form: Record<string, string>) =>
+        fetch(claims.response_uri, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form).toString() });
+
+    await test('wallet signing is ready on this node, and a request names the PDF to sign', async () => {
+        const st = await json('/v1/docsign/wallet');
+        assert(st.status === 200 && st.body.data.ready === true && st.body.data.client_id === new URL(BASE).hostname, `status: ${JSON.stringify(st.body.data ?? st.body.error)}`);
+        const r = await post('/v1/docsign/requests', alice.token, {
+            title: 'Kauppakirja', document: { sha256: walletSha, name: 'kauppakirja.pdf', size: walletPdf.length, media_type: 'application/pdf' },
+            parties: [ghii(names.alice), ghii(names.bob)],
+        });
+        assert(r.status === 201, `create: ${r.status}`);
+        walletRequestId = r.body.data.request.id;
+    });
+
+    await test('a wallet signature starts only for a party, with the very PDF the request names', async () => {
+        const startRaw = (tok: string, body: Buffer) => fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/wallet`, { method: 'POST', headers: { ...auth(tok), 'Content-Type': 'application/pdf' }, body });
+        const stranger = await startRaw(carol.token, walletPdf);
+        assert(stranger.status === 404, `carol: ${stranger.status}`);
+        const other = await startRaw(alice.token, plainPdf('another document'));
+        assert(other.status === 409 && (await other.json() as any).error?.code === 'DOCUMENT_MISMATCH', `another PDF: ${other.status}`);
+        const text = await post('/v1/docsign/requests', alice.token, { title: 'Teksti', document: { sha256: sha, name: 'v.txt', size: doc.length }, parties: [ghii(names.alice)] });
+        const notPdf = await fetch(`${BASE}/v1/docsign/requests/${text.body.data.request.id}/wallet`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/octet-stream' }, body: doc });
+        assert(notPdf.status === 415, `not a PDF: ${notPdf.status}`);
+    });
+
+    await test('the wallet cancels: the session ends as failed, nothing is signed', async () => {
+        const started = await fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/wallet`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: walletPdf });
+        const s = (await started.json() as any).data;
+        const { claims } = await walletOpens(s.wallet_link);
+        const wrongState = await walletPosts(claims, { state: 'not-it', error: 'user_cancelled' });
+        assert(wrongState.status === 400, `wrong state: ${wrongState.status}`);
+        const cancelled = await walletPosts(claims, { state: claims.state, error: 'user_cancelled' });
+        assert(cancelled.status === 200, `cancel: ${cancelled.status}`);
+        const st = await json(`/v1/docsign/requests/${walletRequestId}/wallet/${s.session_id}`, { headers: auth(alice.token) });
+        assert(st.body.data.status === 'failed' && st.body.data.error.code === 'user_cancelled', `status: ${JSON.stringify(st.body.data)}`);
+        const again = await fetch(claims.documentLocations[0].uri);
+        assert(again.status === 404, `the document is gone with the session: ${again.status}`);
+    });
+
+    await test('a PDF that is not the one sent is refused: the given bytes must come first', async () => {
+        const started = await fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/wallet`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: walletPdf });
+        const s = (await started.json() as any).data;
+        const { claims } = await walletOpens(s.wallet_link);
+        const forged = appendSignature(plainPdf(`Kauppakirja ${stamp} 1 000 000 e`), walletSigner.cert, walletSigner.key, walletSigner.chain);
+        const r = await walletPosts(claims, { state: claims.state, documentWithSignature: JSON.stringify([forged.toString('base64')]) });
+        assert(r.status === 422, `forged: ${r.status}`);
+        const st = await json(`/v1/docsign/requests/${walletRequestId}/wallet/${s.session_id}`, { headers: auth(alice.token) });
+        assert(st.body.data.status === 'failed' && st.body.data.error.code === 'DOCUMENT_CHANGED', `status: ${JSON.stringify(st.body.data)}`);
+    });
+
+    let signedPdf = Buffer.alloc(0);
+    await test('alice signs in her wallet: the node checks the PDF, stores it in her files and seals the signature', async () => {
+        const started = await fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/wallet`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: walletPdf });
+        assert(started.status === 201, `start: ${started.status}`);
+        const s = (await started.json() as any).data;
+        const { claims, pdf } = await walletOpens(s.wallet_link);
+        signedPdf = appendSignature(pdf, walletSigner.cert, walletSigner.key, walletSigner.chain);
+        const r = await walletPosts(claims, { state: claims.state, documentWithSignature: JSON.stringify([signedPdf.toString('base64')]) });
+        const body = await r.json() as any;
+        assert(r.status === 200 && String(body.redirect_uri).includes(walletRequestId), `response: ${r.status} ${JSON.stringify(body)}`);
+        const st = await json(`/v1/docsign/requests/${walletRequestId}/wallet/${s.session_id}`, { headers: auth(alice.token) });
+        assert(st.body.data.status === 'signed', `status: ${st.body.data.status}`);
+        const got = await json(`/v1/docsign/requests/${walletRequestId}`, { headers: auth(alice.token) });
+        const sig = got.body.data.request.signatures[ghii(names.alice)];
+        assert(sig?.statement.method === 'eudi-wallet' && sig.wallet.signed.sha256 === createHash('sha256').update(signedPdf).digest('hex'), `signature: ${JSON.stringify(sig?.statement)}`);
+        assert(sig.wallet.validation.verdict !== 'invalid' && sig.wallet.nameMatches === true, `validation ${JSON.stringify(sig.wallet.validation)} name ${sig.wallet.nameMatches}`);
+        const check = got.body.data.checks.find((c: any) => c.signer === ghii(names.alice));
+        assert(check.valid === true && check.consistent === true, `check: ${JSON.stringify(check)}`);
+        const file = await fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/signed-document`, { headers: auth(bob.token) });
+        assert(file.status === 200 && Buffer.from(await file.arrayBuffer()).equals(signedPdf), `bob reads the signed PDF: ${file.status}`);
+        const look = await json(`/v1/docsign/lookup/${createHash('sha256').update(signedPdf).digest('hex')}`);
+        assert(look.body.data.requests.some((q: any) => q.id === walletRequestId), 'the signed PDF\'s own hash finds the request');
+    });
+
+    await test('bob signs the signed PDF with his wallet, never the original; an agent starts it for its owner over MCP', async () => {
+        const original = await fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/wallet`, { method: 'POST', headers: { ...auth(bob.token), 'Content-Type': 'application/pdf' }, body: walletPdf });
+        assert(original.status === 409, `the original after a wallet signature: ${original.status}`);
+        const bobAgent = await agentOf(names.bob, bob.token, `dsbobbot${stamp}`, ['memory:read', 'memory:write', 'storage:read', 'storage:write']);
+        const up = await json('/v1/storage', { method: 'POST', headers: auth(bobAgent.token), body: JSON.stringify({ key: 'kauppakirja-signed.pdf', data: signedPdf.toString('base64'), mime_type: 'application/pdf', visibility: 'private' }) });
+        assert(up.status === 201 || up.status === 200, `upload: ${up.status} ${JSON.stringify(up.body.error)}`);
+        const started = JSON.parse(toolText(await mcpCall(bobAgent.token, 'aimeat_docsign_wallet_start', { id: walletRequestId, storage_key: 'kauppakirja-signed.pdf' })));
+        assert(started.signer === ghii(names.bob) && String(started.wallet_link).startsWith('eudi-rqes://'), `tool: ${JSON.stringify(started).slice(0, 200)}`);
+        const { claims, pdf } = await walletOpens(started.wallet_link);
+        const twice = appendSignature(pdf, walletSigner.cert, walletSigner.key, walletSigner.chain);
+        const r = await walletPosts(claims, { state: claims.state, documentWithSignature: twice.toString('base64') });
+        assert(r.status === 200, `bob's response: ${r.status}`);
+        const status = JSON.parse(toolText(await mcpCall(bobAgent.token, 'aimeat_docsign_wallet_status', { id: walletRequestId, session_id: started.session_id })));
+        assert(status.status === 'signed', `status tool: ${JSON.stringify(status)}`);
+        const got = await json(`/v1/docsign/requests/${walletRequestId}`, { headers: auth(alice.token) });
+        assert(got.body.data.request.state === 'complete' && got.body.data.request.walletDocument.sha256 === createHash('sha256').update(twice).digest('hex'), `complete: ${got.body.data.request.state}`);
     });
 
     // ── cancelling ──

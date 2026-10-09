@@ -28,12 +28,14 @@
  * @usage const report = await validatePdf(config, pdfBuffer);
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — A chain that ends at an EU reference wallet test CA: trust source
+ *     eudi-test-anchor, reason TEST_TRUST_ANCHOR, level unknown (wish-allekirjoitus-eudi-lompakolla).
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import { extractPdfSignatures, PdfExtractError, type PdfSignatureField } from './pdf-extract.js';
 import { verifyCms, verifyTimestampToken, type CmsCheck, type TimestampCheck } from './cms-verify.js';
-import { buildChain, type BuiltChain } from './chain.js';
+import { buildChain, isEudiTestRoot, type BuiltChain } from './chain.js';
 import { findIssuingService, qualifiersFor, type TrustMatch } from './trust-list.js';
 import { checkRevocation, type RevocationResult } from './revocation.js';
 import { readCert, holderLabel, type CertInfo } from './x509-info.js';
@@ -67,6 +69,7 @@ export const REASONS = {
   NOT_WHOLE_FILE: 'Later signatures or validation data were added after this signature, which is normal.',
   ONLINE_CHECKS_OFF: 'This node does not reach the network for validation, so trust and revocation were not checked.',
   MULTIPLE_SIGNERS: 'The signature data holds more than one signer; only the first was checked.',
+  TEST_TRUST_ANCHOR: 'The certificate comes from a test authority of the EU reference wallet. The signature is a test and has no legal effect.',
 } as const;
 export type Reason = keyof typeof REASONS;
 
@@ -100,7 +103,7 @@ export interface SignatureReport {
   coverage: { wholeFile: boolean; laterSignatures: number; validationDataAdded: boolean; otherContentAdded: boolean; addedObjectTypes: string[] } | null;
   trust: {
     trusted: boolean;
-    source: 'eu-trusted-list' | 'operator-anchor' | null;
+    source: 'eu-trusted-list' | 'operator-anchor' | 'eudi-test-anchor' | null;
     service: { territory: string; provider: string; name: string; type: string; statusAtSigning: string | null; qualifiers: string[] } | null;
     chain: { subject: string; issuer: string; sha256: string }[];
     territoriesChecked: string[];
@@ -155,7 +158,8 @@ function summarize(r: SignatureReport): string {
   const what = r.kind === 'document-timestamp' ? 'Document timestamp' : `Signature by ${who}${when}`;
   const level = r.level === 'qualified' ? (r.purpose === 'eseal' ? ' (qualified electronic seal)' : ' (qualified electronic signature)')
     : r.level === 'advanced-qc' ? ' (advanced, qualified certificate)' : '';
-  const first = r.reasons.find((x) => x !== 'NOT_WHOLE_FILE' && x !== 'REVOKED_AFTER_SIGNING');
+  const first = r.reasons.find((x) => x !== 'NOT_WHOLE_FILE' && x !== 'REVOKED_AFTER_SIGNING' && x !== 'TEST_TRUST_ANCHOR');
+  if (r.verdict === 'valid' && r.trust.source === 'eudi-test-anchor') return `${what}: valid as a test. ${REASONS.TEST_TRUST_ANCHOR}`;
   if (r.verdict === 'valid') return `${what}${level}: valid.`;
   return `${what}: ${r.verdict}. ${first ? REASONS[first] : ''}`.trim();
 }
@@ -240,6 +244,8 @@ async function assess(
   }
   const trustedByList = !!match?.positiveAt;
   const trustedByOperator = !!chain?.operatorAnchor;
+  const testAnchor = !trustedByList && !!chain?.operatorAnchor && isEudiTestRoot(chain.operatorAnchor.sha256);
+  if (testAnchor) reasons.push('TEST_TRUST_ANCHOR');
   if (signer && !online) doubt('ONLINE_CHECKS_OFF');
   else if (signer && !trustedByList && !trustedByOperator) {
     if (match && !match.positiveAt) doubt('SERVICE_NOT_GRANTED_AT_SIGNING');
@@ -289,7 +295,7 @@ async function assess(
     purpose ??= qualifiers.includes('QCForESeal') ? 'eseal' : qualifiers.includes('QCForESig') ? 'esign' : null;
     if (!purpose && match.periodAt?.additionalInfo.some((a) => a.endsWith('ForeSeals'))) purpose = 'eseal';
     if (!purpose && match.periodAt?.additionalInfo.some((a) => a.endsWith('ForeSignatures'))) purpose = 'esign';
-  } else if (signer && (trustedByList || trustedByOperator)) {
+  } else if (signer && (trustedByList || trustedByOperator) && !testAnchor) {
     level = 'advanced';
   }
   if (verdict === 'invalid') level = 'unknown';
@@ -323,7 +329,7 @@ async function assess(
     } : null,
     trust: {
       trusted: trustedByList || trustedByOperator,
-      source: trustedByList ? 'eu-trusted-list' : trustedByOperator ? 'operator-anchor' : null,
+      source: trustedByList ? 'eu-trusted-list' : testAnchor ? 'eudi-test-anchor' : trustedByOperator ? 'operator-anchor' : null,
       service: match ? {
         territory: match.service.territory, provider: match.service.tspName, name: match.service.serviceName,
         type: match.service.type, statusAtSigning: match.periodAt?.statusName ?? null, qualifiers,

@@ -8,6 +8,8 @@
  *   definitions.ts.
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and aimeat_docsign_wallet_status: signing with
+ *     an EU Digital Identity Wallet (wish-allekirjoitus-eudi-lompakolla).
  */
 
 import { z } from 'zod';
@@ -109,6 +111,32 @@ export const docsignTools = [
         surfaces: ['agent'],
         input: {
             id: { type: 'string', required: true, description: 'The request id (ds-…).', zod: z.string().max(60) },
+        },
+    },
+    {
+        name: 'aimeat_docsign_wallet_start',
+        description: "Start a signature with an EU Digital Identity Wallet for the person you act for, on a signing request they are a party to. The wallet makes the signature itself (PAdES, through its own trust service provider) after the person confirms on their phone; you only prepare it. Pass the PDF as storage_key: the request's own document, or, once someone has signed with a wallet, the signed PDF (the request's `walletDocument`). Returns `wallet_link`: give it to the person to open on the phone that holds the wallet, or show it as a QR code the wallet scans. It works for 15 minutes; follow it with aimeat_docsign_wallet_status. Today this is the EU reference wallet (Android) with test certificates: the result is a test signature with no legal effect, and the answer says so. Check aimeat_docsign_request_get afterwards: the signature has method `eudi-wallet`, and the signed PDF is in the person's files.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Start a Wallet Signature', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        scope: 'memory:write',
+        surfaces: ['agent'],
+        input: {
+            id: { type: 'string', required: true, description: 'The request id (ds-…).', zod: z.string().max(60) },
+            storage_key: { type: 'string', required: true, description: 'The PDF in your storage (aimeat_storage_upload): the document the request names, or its latest wallet-signed version.', zod: z.string().max(1024) },
+        },
+    },
+    {
+        name: 'aimeat_docsign_wallet_status',
+        description: "How a wallet signature you started stands: waiting (the link has not been opened), fetched (the wallet has the document), signed, failed (with the reason, such as the person cancelling), or expired.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Wallet Signature Status', readOnlyHint: true, openWorldHint: false },
+        scope: 'memory:read',
+        surfaces: ['agent'],
+        input: {
+            id: { type: 'string', required: true, description: 'The request id (ds-…).', zod: z.string().max(60) },
+            session_id: { type: 'string', required: true, description: 'The session_id aimeat_docsign_wallet_start returned.', zod: z.string().max(64) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

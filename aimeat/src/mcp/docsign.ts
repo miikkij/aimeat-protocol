@@ -16,6 +16,9 @@
  * @usage registerDocsignTools(mcp, storage, config, caller);
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and _wallet_status (services/docsign/eudi.ts):
+ *     the AI prepares a wallet signature for the person, who confirms it in their own wallet
+ *     (wish-allekirjoitus-eudi-lompakolla).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
@@ -31,7 +34,8 @@ import {
 } from '../services/docsign/records.js';
 import { validateDocument } from '../services/docsign/validate-input.js';
 import { ValidationInputError } from '../services/docsign/validate.js';
-import { documentFromStorage } from '../services/docsign/files.js';
+import { documentFromStorage, readOwnFile } from '../services/docsign/files.js';
+import { startWalletSignature, walletSessionStatus } from '../services/docsign/eudi.js';
 
 export function registerDocsignTools(
   mcp: McpServer,
@@ -129,6 +133,32 @@ export function registerDocsignTools(
       const disabled = off(); if (disabled) return disabled;
       try {
         return ok({ request: await cancelRequest(ctx, caller(), String(id)) });
+      } catch (err) { return fail(err); }
+    });
+
+  mcp.tool('aimeat_docsign_wallet_start', descriptionFor('aimeat_docsign_wallet_start'), zodShapeFor('aimeat_docsign_wallet_start'),
+    annotationsFor('aimeat_docsign_wallet_start'),
+    async ({ id, storage_key }) => {
+      const disabled = off(); if (disabled) return disabled;
+      try {
+        const c = caller();
+        const file = await readOwnFile(ctx, c, String(storage_key));
+        const started = await startWalletSignature(ctx, c, String(id), { bytes: file.data, name: file.name });
+        // The QR image is for a page; in a chat it is kilobytes of base64 nobody reads.
+        return ok({
+          session_id: started.session_id, wallet_link: started.wallet_link, request_uri: started.request_uri,
+          expires_at: started.expires_at, signer: started.signer, test_roots_trusted: config.docsignEudiTestRoots,
+          next: 'Give the person wallet_link to open on the phone with the wallet (or as a QR code the wallet scans). Then check aimeat_docsign_wallet_status.',
+        });
+      } catch (err) { return fail(err); }
+    });
+
+  mcp.tool('aimeat_docsign_wallet_status', descriptionFor('aimeat_docsign_wallet_status'), zodShapeFor('aimeat_docsign_wallet_status'),
+    annotationsFor('aimeat_docsign_wallet_status'),
+    async ({ id, session_id }) => {
+      const disabled = off(); if (disabled) return disabled;
+      try {
+        return ok(walletSessionStatus(caller(), String(id), String(session_id)));
       } catch (err) { return fail(err); }
     });
 }

@@ -9,6 +9,7 @@
  * @usage import { DOCSIGN_CONFIG_FIELDS } from './config-schema-docsign.js';
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — The three wallet signing rows (wish-allekirjoitus-eudi-lompakolla).
  */
 import type { DocsignConfig } from '../config-docsign.js';
 import type { ConfigFieldShape } from './config-field-def.js';
@@ -23,4 +24,7 @@ export const DOCSIGN_CONFIG_FIELDS: ConfigFieldShape<keyof DocsignConfig>[] = [
   { key: 'docsignTrustAnchorsPath', dotPath: 'docsign.trust_anchors', envVar: 'AIMEAT_DOCSIGN_TRUST_ANCHORS', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 1024, immutable: true, description: 'A file of extra root certificates to trust (PEM), for a company CA or a scheme outside the EU. Empty trusts only the EU lists' },
   { key: 'docsignMaxMb', dotPath: 'docsign.max_mb', envVar: 'AIMEAT_DOCSIGN_MAX_MB', type: 'number', validate: v => typeof v === 'number' && v >= 1 && v <= 100, immutable: false, description: 'The largest file a signature check reads, in megabytes (1 to 100)' },
   { key: 'docsignAppUrl', dotPath: 'docsign.app_url', envVar: 'AIMEAT_DOCSIGN_APP_URL', type: 'string', validate: v => typeof v === 'string' && ((v as string) === '' || /^https?:\/\/[^\s]+$/i.test(v as string)), immutable: false, description: 'The address of the signing app. A person asked to sign gets a notification that opens it on the request. Empty: the notification names the request without a link' },
+  { key: 'docsignEudiEnabled', dotPath: 'docsign.eudi_enabled', envVar: 'AIMEAT_DOCSIGN_EUDI_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'A person can sign a PDF with an EU Digital Identity Wallet: the wallet makes the signature, and this node seals that it was given. Needs the relying-party access certificate (docsign.eudi_rp_credential). Off by default' },
+  { key: 'docsignEudiRpCredentialPath', dotPath: 'docsign.eudi_rp_credential', envVar: 'AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 1024, immutable: true, description: 'A PEM file with this node\'s wallet access certificate: the EC private key, the certificate naming this node\'s host name, and its CA. A registrar issues it (for the EU reference wallet, registry.serviceproviders.eudiw.dev). Empty: wallet signing is not ready' },
+  { key: 'docsignEudiTestRoots', dotPath: 'docsign.eudi_test_roots', envVar: 'AIMEAT_DOCSIGN_EUDI_TEST_ROOTS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Trust the test certificate authorities of the EU reference wallet when checking a signature. A signature that chains to one is reported as a test with no legal effect, never as qualified. Turn off once national wallets are in use' },
 ];

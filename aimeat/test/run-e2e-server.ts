@@ -7,6 +7,9 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.9.0 -- 2026-10-10 -- Wallet signing on (AIMEAT_DOCSIGN_EUDI_ENABLED) with the test-only access
+ *            certificate test/fixtures/docsign/eudi-rp-test.txt, and signature checks offline
+ *            (AIMEAT_DOCSIGN_ONLINE_CHECKS false), so e2e-docsign can play the wallet.
  *   v1.8.0 -- 2026-10-09 -- AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR pinned 'true'; the suites in
  *            ADMIN_SETUP_CLOSED_SUITES get 'false', the shipped setting (secrets audit 2026-10-09, 1.4).
  *   v1.7.0 -- 2026-10-09 -- AIMEAT_TURN_SERVER and AIMEAT_TURN_SECRET pinned, so the ice-servers
@@ -306,6 +309,11 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         // never the secret itself. Nothing listens on the port: no suite opens a TURN connection.
         AIMEAT_TURN_SERVER: process.env.AIMEAT_TURN_SERVER ?? 'turn:127.0.0.1:3478',
         AIMEAT_TURN_SECRET: process.env.AIMEAT_TURN_SECRET ?? 'e2e-turn-secret-canary',
+        // Wallet signing with a test-only access certificate naming localhost, so e2e-docsign can
+        // play the wallet; signature checks never leave the machine (no EU list, no OCSP).
+        AIMEAT_DOCSIGN_EUDI_ENABLED: 'true',
+        AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL: resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'docsign', 'eudi-rp-test.txt'),
+        AIMEAT_DOCSIGN_ONLINE_CHECKS: 'false',
         // Off for the credential suites (ANONYMOUS_OFF_SUITES above), on for the rest.
         AIMEAT_ANONYMOUS: anonymousModeFor(suite),
         AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',

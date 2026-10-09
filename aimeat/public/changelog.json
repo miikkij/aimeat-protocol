@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-10",
+      "kind": "feature",
+      "title": {
+        "en": "Sign a PDF with your EU Digital Identity Wallet (test phase)",
+        "fi": "Allekirjoita PDF EU-lompakolla (testivaihe)"
+      },
+      "body": {
+        "en": "A party to a signing request can now sign a PDF in their EU Digital Identity Wallet instead of with a passkey. You open a link on the phone that holds the wallet, or scan a QR code with it. The wallet shows the document, you confirm, and the wallet makes the signature through its own trust service, so no contract with a signature provider is needed. The signed PDF is stored in your files, and every party can download it. When someone else signs after you, they sign the same file. Your AI can start the signature for you and follow it. For now this works with the EU's reference wallet on Android, whose certificates are test certificates: the signature is a test and has no legal effect. Finland's own wallet is expected in 2027, and it will give a qualified electronic signature.",
+        "fi": "Allekirjoituspyynnön osapuoli voi nyt allekirjoittaa PDF:n EU:n digitaalisen identiteetin lompakolla pääsyavaimen sijaan. Avaat linkin puhelimessa, jossa lompakko on, tai skannaat QR-koodin lompakolla. Lompakko näyttää dokumentin, sinä vahvistat, ja lompakko tekee allekirjoituksen oman luottamuspalvelunsa kautta. Siksi sopimusta allekirjoituspalvelun kanssa ei tarvita. Allekirjoitettu PDF tallentuu tiedostoihisi, ja jokainen osapuoli voi ladata sen. Kun joku muu allekirjoittaa sinun jälkeesi, hän allekirjoittaa saman tiedoston. Tekoälysi voi aloittaa allekirjoituksen puolestasi ja seurata sitä. Toistaiseksi tämä toimii EU:n mallilompakolla Android-puhelimessa. Sen varmenteet ovat testivarmenteita, joten allekirjoitus on testi, eikä sillä ole oikeusvaikutusta. Suomen oma lompakko on tulossa vuonna 2027, ja se antaa hyväksytyn sähköisen allekirjoituksen."
+      }
+    },
+    {
       "date": "2026-10-09",
       "kind": "feature",
       "title": {
