@@ -550,8 +550,9 @@ Before driving any app, check for them.
    \`GET /v1/apps/{owner}/{filename}/skills\`) — the skills that teach this app.
 2. If any exist, load each with \`aimeat_skill_get\` and APPLY it — a description saying
    "use whenever operating X" is required reading, not optional.
-3. Nothing bound? Proceed with the app's own docs, and consider authoring a skill once you
-   have learned the app (below) so the next agent starts smarter.
+3. Nothing bound? Proceed with the app's own docs. When the app is your owner's own, consider
+   authoring a skill once you have learned it (below) so the next agent starts smarter.
+   \`GET /v1/apps/{owner}/{filename}/skills\` needs no sign-in, and lists public skills only.
 
 ## Authoring app expertise
 Put the binding in the SKILL.md frontmatter so it travels with the skill:
@@ -565,6 +566,9 @@ Put the binding in the SKILL.md frontmatter so it travels with the skill:
 
 Publish with \`aimeat_skill_publish\`. Owners can also attach/detach an existing skill from
 the profile Apps tab. The app catalog shows bound skills on the app's detail page.
+A skill under your owner's name binds only to an app of that same owner: the node refuses a
+binding to another account's app (422 BAD_FIELD), because the app's public pages list a bound
+skill as that app's own guide.
 
 ## Principles
 - One skill per app, focused on OPERATING it (workflow, data keys, quirks) — not a copy of

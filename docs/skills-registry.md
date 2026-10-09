@@ -91,12 +91,17 @@ metadata:
 
 Publish it like any skill (`POST /v1/skills`, `aimeat_skill_publish`, or the profile Skills
 tab). The node validates the format (`app:{owner}/{filename}`, 422 otherwise) and mirrors it
-to `manifest.binding` for cheap filtering.
+to `manifest.binding` for cheap filtering. A user-scope skill binds only to an app of its own
+publisher: a binding to another account's app is refused with 422 `BAD_FIELD`, and the app
+listings leave out any user skill whose owner does not own the app (since 2026-10-09; the app's
+public pages present a bound skill as that app's own guide). A node-scope skill is the
+operator's and may name any app on the node; a workspace skill's binding is not checked,
+because no app listing reads workspace skills.
 
 **Owner shortcut:** in the profile **Apps tab**, every "My Apps" card shows its bound skills
 with an **Attach skill / detach** picker — attaching rewrites the chosen skill's frontmatter
 binding and republishes it (version bumps). The public **app catalog detail view** shows an
-app's bound skills to everyone (visitors see public-bound ones).
+app's bound skills to everyone (visitors see public-bound ones; the route needs no sign-in).
 
 **How consumers fetch them:**
 

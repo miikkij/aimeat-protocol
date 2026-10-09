@@ -1157,6 +1157,92 @@ metadata:
     assert(status === 422, `status ${status}: ${JSON.stringify(body)}`);
 });
 
+// 2026-10-09: the app's llms.txt, AGENTS.md and agent-discovery block advertise this route as
+// public discovery, and it answered 401 to a caller who was not signed in. Asserts the hole closed.
+await test('46c. App skills route answers a signed-out caller with the public bound skills only', async () => {
+    const privateBound = `---
+name: app-helper-private
+description: The owner's own notes on the demo app. Use when the owner works inside the demo app.
+metadata:
+  binding: app:${ownerName}/demo.html
+---
+
+# Private notes
+`;
+    const pub = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: privateBound, visibility: 'owner' }),
+    });
+    assert(pub.status === 201, `private publish ${pub.status}`);
+
+    const { status, body } = await json(`/v1/apps/${ownerName}/demo.html/skills`);
+    assert(status === 200, `signed-out status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    const names = body.data.skills.map((s: any) => s.name);
+    assert(names.includes('app-helper'), `public bound skill missing: ${names}`);
+    assert(!names.includes('app-helper-private'), `owner-only skill leaked to a signed-out caller: ${names}`);
+});
+
+// 2026-10-09: the binding was checked for shape only, so any account could put its own public text
+// under another account's app. Asserts the refusal at publish.
+await test('46d. A skill bound to another account\'s app is refused (422 BAD_FIELD)', async () => {
+    const foreign = `---
+name: foreign-helper
+description: A guide someone else wrote for the demo app. Use when working inside the demo app.
+metadata:
+  binding: app:${ownerName}/demo.html
+---
+
+# Not the owner's guide
+`;
+    const { status, body } = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ skill_md: foreign, visibility: 'public' }),
+    });
+    assert(status === 422 && body.error?.details?.code === 'BAD_FIELD', `status ${status}: ${JSON.stringify(body).slice(0, 300)}`);
+    assert(/another account/.test(body.error?.message ?? ''), `message: ${body.error?.message}`);
+
+    const own = foreign.replace('foreign-helper', 'own-helper').replace(`app:${ownerName}/demo.html`, `app:${otherOwnerName}/demo.html`);
+    const ok = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ skill_md: own }),
+    });
+    assert(ok.status === 201, `binding to the publisher's own app: ${ok.status} ${JSON.stringify(ok.body).slice(0, 200)}`);
+});
+
+// A memory write can still store a skill manifest under any key of the caller's own, so the listing
+// is the guard that holds for every write path, and for any record stored before the refusal.
+await test('46e. A planted manifest bound to another account\'s app is not listed as that app\'s skill', async () => {
+    const now = new Date().toISOString();
+    const planted = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({
+            key: 'skills.planted-helper.manifest',
+            visibility: 'public',
+            tags: ['skill', 'scope:user'],
+            value: {
+                type: 'skill', name: 'planted-helper', description: 'Planted.', version: '1.0.0',
+                files: [], publishedBy: otherOwnerName, createdAt: now, updatedAt: now,
+                binding: `app:${ownerName}/demo.html`,
+            },
+        }),
+    });
+    assert(planted.status === 200 || planted.status === 201, `plant ${planted.status}: ${JSON.stringify(planted.body).slice(0, 200)}`);
+
+    for (const headers of [{}, { Authorization: `Bearer ${ownerToken}` }, { Authorization: `Bearer ${otherOwnerToken}` }]) {
+        const { status, body } = await json(`/v1/apps/${ownerName}/demo.html/skills`, { headers });
+        const names = body.data?.skills?.map((s: any) => s.name) ?? [];
+        assert(status === 200 && !names.includes('planted-helper'), `planted skill listed (${status}): ${names}`);
+    }
+    const viaFilter = await json(`/v1/skills?binding=${encodeURIComponent(`app:${ownerName}/demo.html`)}`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(!viaFilter.body.data.skills.some((s: any) => s.name === 'planted-helper'), 'planted skill in the binding filter');
+});
+
 await test('46b. Skill ZIP download is upload-ready ({name}/SKILL.md layout, pin supported)', async () => {
     const res = await rawFetch(`/v1/skills/pinned-skill/zip`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
