@@ -411,8 +411,11 @@ export function passkeyOriginAllowed(config: AimeatConfig, origin: string): bool
   if (expectedOrigins(config).includes(origin)) return true;
   if (!config.appOriginEnabled || !config.appHost) return false;
   try {
+    // An app origin is the node's own scheme and port under the app host: https and no port on a
+    // public node, http and the dev port on a local one.
     const u = new URL(origin);
-    return u.protocol === 'https:' && u.hostname.endsWith(`.${config.appHost}`) && !u.port;
+    const base = new URL(config.baseUrl);
+    return u.protocol === base.protocol && u.port === base.port && u.hostname.endsWith(`.${config.appHost}`);
   } catch {
     // eslint-disable-next-line aimeat/no-silent-catch -- an origin that is not a URL is not an origin this node serves; false refuses it
     return false;
