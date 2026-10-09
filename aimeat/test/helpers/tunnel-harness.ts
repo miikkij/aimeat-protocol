@@ -12,6 +12,9 @@
  *   const d = await t.waitForDeliver(1000);
  *   await t.close();
  * @version-history
+ *   v1.1.0 — 2026-10-09 — The upgrade carries the agent's bearer in the Authorization header, as the
+ *     connector does, instead of ?token= (deprecated; secrets audit 2026-10-09, d3); connect() takes
+ *     an optional single-use `ticket`; a refused upgrade rejects with its status and refusal code.
  *   v1.0.0 — 2026-06-10 — Phase 1 harness (forward request/response, welcome,
  *     heartbeat, buffered inbound frames, reconnect).
  */
@@ -76,20 +79,32 @@ export class TunnelClient {
   /** When set, every inbound `invoke` is auto-answered with this function's `{ok, result}`. */
   private autoInvokeReply?: (f: TunnelFrame) => { ok: boolean; result: unknown };
 
+  private ticket: string | null = null;
+
   private constructor(
     private readonly httpBase: string,
     private readonly token: string,
   ) {}
 
-  static async connect(httpBase: string, token: string): Promise<TunnelClient> {
+  /**
+   * Open the tunnel with the agent's bearer in the Authorization header, as the connector does
+   * (src/cli/connect/tunnel-client.ts). With `opts.ticket`, the upgrade carries `?ticket=` from
+   * POST /v1/ws/ticket and no header. A refused upgrade rejects with "HTTP <status> <X-AIMEAT-Error>".
+   */
+  static async connect(httpBase: string, token: string, opts: { ticket?: string } = {}): Promise<TunnelClient> {
     const c = new TunnelClient(httpBase, token);
+    c.ticket = opts.ticket ?? null;
     await c.open();
     return c;
   }
 
   private open(): Promise<void> {
-    const url = `${wsBase(this.httpBase)}/v1/connect/tunnel?token=${encodeURIComponent(this.token)}`;
-    this.ws = new WebSocket(url);
+    const root = `${wsBase(this.httpBase)}/v1/connect/tunnel`;
+    const ticket = this.ticket;
+    this.ticket = null;
+    this.ws = ticket
+      ? new WebSocket(`${root}?ticket=${encodeURIComponent(ticket)}`)
+      : new WebSocket(root, { headers: { Authorization: `Bearer ${this.token}` } });
     return new Promise((resolve, reject) => {
       const onWelcome = (f: TunnelFrame) => { this.welcome = f; resolve(); };
       let welcomed = false;
@@ -131,6 +146,11 @@ export class TunnelClient {
             break;
           default: break;
         }
+      });
+      this.ws.on('unexpected-response', (req, res) => {
+        const code = String(res.headers['x-aimeat-error'] ?? '');
+        if (!welcomed) reject(new Error(`HTTP ${res.statusCode}${code ? ` ${code}` : ''}`));
+        req.destroy();
       });
       this.ws.on('error', (err) => { if (!welcomed) reject(err); });
       this.ws.on('close', () => { if (!welcomed) reject(new Error('closed before welcome')); });

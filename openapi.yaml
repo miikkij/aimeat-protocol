@@ -6791,9 +6791,13 @@ paths:
         polls, and a machine serving 200 agents holds one connection rather than
         200.
 
-        Authenticate by passing the agent JWT (roles must include `agent`) as
-        `?token=<jwt>` or an `Authorization: Bearer <jwt>` header at upgrade.
-        Non-agent or invalid tokens are rejected (`401`/`403`) before the upgrade.
+        Authenticate with the agent JWT (roles must include `agent` or
+        `ecosystem`) in an `Authorization: Bearer <jwt>` header at upgrade, or
+        with `?ticket=` from `POST /v1/ws/ticket` (`socket: connect-tunnel`)
+        where a header cannot be set. `?token=<jwt>` is deprecated (reverse
+        proxies log URLs): accepted while `AIMEAT_WS_QUERY_TOKEN` is on, removed
+        in 4.0.0. Non-agent or invalid credentials are rejected (`401`/`403`)
+        before the upgrade; a refusal names its code in `X-AIMEAT-Error`.
         The verified identity is pinned to the socket and reused as the bearer for
         every forwarded request, so existing scope enforcement applies unchanged.
 
@@ -6846,12 +6850,19 @@ paths:
         stop the agent.
       tags: [Connector Tunnel]
       parameters:
-        - name: token
+        - name: ticket
           in: query
           required: false
           schema:
             type: string
-          description: Agent JWT (alternative to the Authorization header) used at WS upgrade.
+          description: Single-use ticket from POST /v1/ws/ticket (socket connect-tunnel), in place of the Authorization header.
+        - name: token
+          in: query
+          required: false
+          deprecated: true
+          schema:
+            type: string
+          description: Deprecated, removed in 4.0.0. Agent JWT in the URL; refused when AIMEAT_WS_QUERY_TOKEN is off. Use the Authorization header or a ticket.
       responses:
         '101':
           description: Switching Protocols — WebSocket tunnel established.
@@ -60510,7 +60521,9 @@ paths:
       summary: Connect a federation relay between rooms
       description: |
         Connects a federation relay linking a local room to a remote room on another node.
-        Operator role required. Requires `config.realtimeEnabled` (503 otherwise).
+        Operator role required. Requires `config.realtimeEnabled` (503 otherwise). `token` is a
+        credential the REMOTE node issued; the relay sends it to that node in an
+        `Authorization: Bearer` header on the WebSocket upgrade, never in the URL.
       security:
         - BearerAuth: []
       requestBody:
@@ -65735,6 +65748,61 @@ paths:
                         properties:
                           ticket: { type: string }
                           expires: { type: integer, description: Seconds until the ticket expires. }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/ws/ticket:
+    post:
+      operationId: createSocketTicket
+      tags: [Realtime]
+      summary: Exchange a session token for a single-use WebSocket ticket
+      description: |
+        Issue a short-lived (60 s), single-use ticket for ONE WebSocket endpoint, bound to the caller's
+        principal. A browser WebSocket cannot send an Authorization header, so the client puts the
+        ticket in the upgrade URL as `?ticket=` instead of its session token: a URL is written to
+        reverse-proxy access logs, and a ticket found there is already spent or expired.
+
+        `socket` names the endpoint: `realtime` (`/v1/realtime/ws`), `personal-tunnel`
+        (`/v1/personal/tunnel`) or `connect-tunnel` (`/v1/connect/tunnel`). The upgrade re-verifies the
+        token the ticket was minted with and then applies that endpoint's own rules, so a ticket opens
+        exactly what the token would have opened. A ticket for one endpoint is refused on another
+        (`401`, `X-AIMEAT-Error: TICKET_WRONG_SOCKET`); a used or expired ticket is refused
+        (`401`, `X-AIMEAT-Error: INVALID_TICKET`).
+
+        `?token=<jwt>` on these upgrades is deprecated: accepted while `AIMEAT_WS_QUERY_TOKEN` is on
+        (the default in 3.x), refused with `X-AIMEAT-Error: WS_QUERY_TOKEN_DISABLED` when it is off,
+        and removed in 4.0.0. Each accepted use is counted in `ws_query_token` on `GET /v1/stats`.
+        The ticket is minted from a session JWT; an access token (`aimeat_pat_…`) is refused here.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [socket]
+              properties:
+                socket:
+                  type: string
+                  enum: [realtime, personal-tunnel, connect-tunnel]
+      responses:
+        '200':
+          description: Socket ticket
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ticket: { type: string }
+                          socket: { type: string, enum: [realtime, personal-tunnel, connect-tunnel] }
+                          expires: { type: integer, description: Seconds until the ticket expires. }
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /v1/events:

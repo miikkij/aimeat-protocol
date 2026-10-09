@@ -2295,10 +2295,10 @@
      "slug": "g-11-realtime-library",
      "cells": [
       "<strong>Realtime library</strong>",
-      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none.",
-      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>/v1/realtime/rooms</code>, <code>/v1/realtime/ice-servers</code>, <code>AIMEAT_TURN_SECRET</code>"
+      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log.",
+      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>/v1/realtime/rooms</code>, <code>/v1/realtime/ice-servers</code>, <code>/v1/ws/ticket</code>, <code>AIMEAT_TURN_SECRET</code>, <code>AIMEAT_WS_QUERY_TOKEN</code>"
      ],
-     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. /lib/realtime.js, syncDoc, SharedClock, /v1/realtime/rooms, /v1/realtime/ice-servers, AIMEAT_TURN_SECRET"
+     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log. /lib/realtime.js, syncDoc, SharedClock, /v1/realtime/rooms, /v1/realtime/ice-servers, /v1/ws/ticket, AIMEAT_TURN_SECRET, AIMEAT_WS_QUERY_TOKEN"
     }
    ]
   },

@@ -7,6 +7,9 @@
 // (exactly one active connection after N calls + replacement on reconnect),
 // malformed-frame rejection, heartbeat, reconnect, and upgrade auth (non-agent
 // / invalid tokens rejected).
+// 2026-10-09: Phase 1b, the single-use socket ticket (POST /v1/ws/ticket): it opens the
+// tunnel once as the agent that minted it, with that agent's scopes, and a realtime or
+// owner ticket does not open it (secrets audit 2026-10-09, d3).
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -105,15 +108,65 @@ await test('1. Connect → welcome handshake with protocol version + heartbeat h
 });
 
 await test('2. Upgrade rejects an owner (non-agent) token', async () => {
-  let errored = false;
-  try { await TunnelClient.connect(BASE, ownerToken); } catch { errored = true; }
-  assert(errored, 'owner token must be rejected at upgrade (403)');
+  let refusal = 'opened';
+  try { await TunnelClient.connect(BASE, ownerToken); } catch (err: any) { refusal = err.message; }
+  assert(refusal.startsWith('HTTP 403'), `owner token must be rejected at upgrade with 403: "${refusal}"`);
 });
 
 await test('3. Upgrade rejects an invalid token', async () => {
-  let errored = false;
-  try { await TunnelClient.connect(BASE, 'not-a-jwt'); } catch { errored = true; }
-  assert(errored, 'invalid token must be rejected at upgrade (401)');
+  let refusal = 'opened';
+  try { await TunnelClient.connect(BASE, 'not-a-jwt'); } catch (err: any) { refusal = err.message; }
+  assert(refusal === 'HTTP 401 INVALID_TOKEN', `invalid token must be rejected at upgrade with 401: "${refusal}"`);
+});
+
+// ─── Phase 1b: The socket ticket (secrets audit 2026-10-09, d3) ───
+console.log('\nPhase 1b — Socket tickets');
+
+async function mintTicket(token: string, socket = 'connect-tunnel'): Promise<string> {
+  const { status, body } = await json('/v1/ws/ticket', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ socket }),
+  });
+  assert(status === 200 && typeof body.data?.ticket === 'string', `ticket mint ${status}: ${JSON.stringify(body)}`);
+  return body.data.ticket;
+}
+async function refusal(open: () => Promise<TunnelClient>): Promise<string> {
+  try { const t = await open(); await t.close(); return 'opened'; } catch (err: any) { return err.message; }
+}
+
+await test('3a. A ticket opens the tunnel as the agent that minted it, and only once', async () => {
+  const ticket = await mintTicket(fullAgentToken);
+  const t = await TunnelClient.connect(BASE, fullAgentToken, { ticket });
+  assert(t.welcome !== null, 'received welcome over a ticket');
+  // The pinned identity is the minting agent's, scopes included: a full-scope write goes through.
+  const w = await t.request('POST', '/v1/memory', { body: { key: `tunnel.ticket.${Date.now()}`, value: { via: 'ticket' } } });
+  // A new key is created: 201.
+  assert(w.status === 201, `write over a ticket-opened tunnel: ${w.status} ${JSON.stringify(w.body)}`);
+  assert(String(w.body.data?.owner_gaii).startsWith('fullbot#'), `the write must land as the minting agent: ${w.body.data?.owner_gaii}`);
+  await t.close();
+  const replay = await refusal(() => TunnelClient.connect(BASE, fullAgentToken, { ticket }));
+  assert(replay === 'HTTP 401 INVALID_TICKET', `a spent ticket must be refused: "${replay}"`);
+});
+
+await test('3b. A ticket carries its own agent\'s scopes, not another agent\'s', async () => {
+  // Minted by the read-only agent: the tunnel acts as that agent, so the write is refused exactly as
+  // its direct call would be, even though the harness was handed the full agent's token as well.
+  const ticket = await mintTicket(liteAgentToken);
+  const t = await TunnelClient.connect(BASE, fullAgentToken, { ticket });
+  const w = await t.request('POST', '/v1/memory', { body: { key: 'denied.ticket', value: { x: 1 } } });
+  assert(w.status === 403 && w.body.error?.code === 'SCOPE_DENIED', `the lite agent's ticket wrote: ${w.status} ${JSON.stringify(w.body)}`);
+  await t.close();
+});
+
+await test('3c. A realtime ticket does not open the connect tunnel (401 TICKET_WRONG_SOCKET)', async () => {
+  const ticket = await mintTicket(fullAgentToken, 'realtime');
+  const r = await refusal(() => TunnelClient.connect(BASE, fullAgentToken, { ticket }));
+  assert(r === 'HTTP 401 TICKET_WRONG_SOCKET', `a realtime ticket on the connect tunnel: "${r}"`);
+});
+
+await test('3d. An owner\'s ticket is refused here as the owner\'s token is (403)', async () => {
+  const ticket = await mintTicket(ownerToken);
+  const r = await refusal(() => TunnelClient.connect(BASE, ownerToken, { ticket }));
+  assert(r.startsWith('HTTP 403'), `an owner ticket must be refused with 403: "${r}"`);
 });
 
 // ─── Phase 2: Forward dispatch + parity ───

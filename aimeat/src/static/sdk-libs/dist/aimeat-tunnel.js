@@ -101,11 +101,38 @@
       }
     }
   };
+  function socketTicket(jwt) {
+    return fetch(NODE_URL + "/v1/ws/ticket", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + jwt, "Content-Type": "application/json" },
+      body: JSON.stringify({ socket: "personal-tunnel" })
+    }).then(function(res) {
+      return res.json().catch(function() {
+        return null;
+      }).then(function(json) {
+        if (!res.ok || !json || !json.ok) {
+          throw new Error(json && json.error && json.error.message || "Socket ticket refused (HTTP " + res.status + ")");
+        }
+        return json.data.ticket;
+      });
+    });
+  }
   TunnelClient.prototype.connect = function() {
     if (this._closed) return;
     this._setStatus("connecting");
     var session = getSession2();
-    var wsUrl = NODE_URL.replace(/^http/, "ws") + "/v1/personal/tunnel?token=" + encodeURIComponent(session.jwt);
+    var self2 = this;
+    socketTicket(session.jwt).then(function(ticket) {
+      if (self2._closed) return;
+      self2._open(NODE_URL.replace(/^http/, "ws") + "/v1/personal/tunnel?ticket=" + encodeURIComponent(ticket));
+    }, function(e) {
+      if (self2._closed) return;
+      self2._setStatus("offline");
+      if (self2._opts.onError) self2._opts.onError(e);
+      self2._scheduleReconnect();
+    });
+  };
+  TunnelClient.prototype._open = function(wsUrl) {
     var self2 = this;
     try {
       this._ws = new WebSocket(wsUrl);

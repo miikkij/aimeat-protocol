@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-09 — The three upgrade code paths read their credential through
+ *     authenticateUpgrade (auth/ws-upgrade.ts): the Authorization header, a single-use ?ticket= from
+ *     POST /v1/ws/ticket, or the deprecated ?token= while AIMEAT_WS_QUERY_TOKEN is on (secrets audit
+ *     2026-10-09, d3). A refusal names its code in X-AIMEAT-Error. A realtime upgrade with a credential
+ *     that fails is refused; only an upgrade with no credential falls back to anonymous mode.
  *   v1.8.0 — 2026-10-09 — The generated admin secret is no longer written to stderr. While the node
  *     has no owner it goes to a 0600 file, admin-setup-secret in the data directory, and the log
  *     names only the file; once the node has an owner a file left from an earlier boot is deleted
@@ -228,8 +233,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // WebSocket upgrade handling for personal node tunnels + realtime P2P + connector forward tunnel
   if (tunnelManager || realtimeManager || connectTunnelManager) {
     const { WebSocketServer } = await import('ws');
-    const { verifyJWT } = await import('./auth/jwt.js');
-    const { isAnonymousMode, credentialRevoked, isOwnerPrincipal } = await import('./auth/middleware.js');
+    const { authenticateUpgrade, refuseUpgrade } = await import('./auth/ws-upgrade.js');
+    const { isAnonymousMode, isOwnerPrincipal } = await import('./auth/middleware.js');
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
@@ -252,31 +257,12 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
 
       // ── Personal tunnel upgrade ──
       if (url.pathname === '/v1/personal/tunnel' && tunnelManager && tunnelWss) {
-        const authHeader = request.headers.authorization;
-        const tokenParam = url.searchParams.get('token');
-        const token = authHeader?.startsWith('Bearer ')
-          ? authHeader.slice(7)
-          : tokenParam;
-
-        if (!token) {
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
-        }
-
         try {
-          const payload = await verifyJWT(token);
-          if (!payload || !payload.sub) {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-          }
-
-          if (await credentialRevoked(token, payload)) {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-          }
+          // Header, single-use ticket, or the deprecated ?token= (auth/ws-upgrade.ts).
+          const auth = await authenticateUpgrade(request, url, 'personal-tunnel', config.wsQueryToken);
+          if (auth.outcome === 'refused') { refuseUpgrade(socket, auth.status, auth.code, auth.message); return; }
+          if (auth.outcome === 'none') { refuseUpgrade(socket, 401, 'AUTH_REQUIRED', 'Authentication required'); return; }
+          const { payload } = auth;
 
           // The tunnel is the account holder's own, as POST /v1/personal/anchor is (requireRole
           // owner). The owner NAME alone is on every token of the account: its agents, its app
@@ -313,29 +299,13 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       // middleware can't run on the raw upgrade, so verify manually like the
       // personal tunnel above.
       if (url.pathname === CONNECT_TUNNEL_PATH && connectTunnelManager && connectWss) {
-        const authHeader = request.headers.authorization;
-        const token = authHeader?.startsWith('Bearer ')
-          ? authHeader.slice(7)
-          : url.searchParams.get('token');
-
-        if (!token) {
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
-        }
-
         try {
-          const payload = await verifyJWT(token);
-          if (!payload || !payload.sub) {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-          }
-          if (await credentialRevoked(token, payload)) {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-          }
+          // Header, single-use ticket, or the deprecated ?token= (auth/ws-upgrade.ts). A ticket
+          // resolves to the token it was minted with, which is reused as the forward bearer.
+          const auth = await authenticateUpgrade(request, url, 'connect-tunnel', config.wsQueryToken);
+          if (auth.outcome === 'refused') { refuseUpgrade(socket, auth.status, auth.code, auth.message); return; }
+          if (auth.outcome === 'none') { refuseUpgrade(socket, 401, 'AUTH_REQUIRED', 'Authentication required'); return; }
+          const { payload, token } = auth;
           // Only scoped external principals (agent OR ecosystem app) may hold a forward tunnel.
           // Owner/operator sessions bypass scopes and are not the connector's transport. The
           // tunnel manager keys by identity.sub, so a GEAI tunnel needs no further change.
@@ -421,43 +391,14 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           return;
         }
 
-        // Authenticate: JWT from ?token= or Authorization header
-        const authHeader = request.headers.authorization;
-        const tokenParam = url.searchParams.get('token');
-        const token = authHeader?.startsWith('Bearer ')
-          ? authHeader.slice(7)
-          : tokenParam;
-
-        if (!token) {
-          // Allow anonymous mode without token for realtime WS
-          if (isAnonymousMode()) {
-            const room = realtimeManager.getRoom(roomId);
-            if (!room) {
-              socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
-              socket.destroy();
-              return;
-            }
-            realtimeWss.handleUpgrade(request, socket, head, (ws) => {
-              realtimeManager.handleUpgrade(ws, roomId, nick);
-            });
-            return;
-          }
-          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-          socket.destroy();
-          return;
-        }
-
         try {
-          const payload = await verifyJWT(token);
-          if (!payload || !payload.sub) {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-          }
-
-          if (await credentialRevoked(token, payload)) {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
+          // Authenticate: Authorization header, single-use ticket, or the deprecated ?token=
+          // (auth/ws-upgrade.ts). A credential that fails is refused; only NO credential falls back
+          // to anonymous mode.
+          const auth = await authenticateUpgrade(request, url, 'realtime', config.wsQueryToken);
+          if (auth.outcome === 'refused') { refuseUpgrade(socket, auth.status, auth.code, auth.message); return; }
+          if (auth.outcome === 'none' && !isAnonymousMode()) {
+            refuseUpgrade(socket, 401, 'AUTH_REQUIRED', 'Authentication required');
             return;
           }
 

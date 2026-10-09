@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.28.0 — 2026-10-09 — security.ws_query_token (AIMEAT_WS_QUERY_TOKEN), mutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, d3).
  *   v1.27.0 — 2026-10-09 — The document signing rows (config-schema-docsign.ts), beside identity verification.
  *   v1.26.0 — 2026-10-09 — security.owner_key_login (AIMEAT_OWNER_KEY_LOGIN), immutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, S2).
  *   v1.25.0 — 2026-10-09 — security.admin_setup_open_after_first_operator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR), immutable, default off: test nodes only (secrets audit 2026-10-09, 1.4).
@@ -531,6 +532,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // about what kind of node this is, so it takes a restart and never a live write.
   // Immutable for the same reason: which sign-in methods a node accepts is decided at start.
   { key: 'ownerKeyLogin', dotPath: 'security.owner_key_login', envVar: 'AIMEAT_OWNER_KEY_LOGIN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Deprecated, removed in 4.0.0. When on (the default in 3.x), an owner can sign in at POST /v1/auth/token with the signing key the account was given at registration. An account with two-step sign-in is refused there either way, and a password reset replaces the key. Turn it off when nobody signs in that way.' },
+  { key: 'wsQueryToken', dotPath: 'security.ws_query_token', envVar: 'AIMEAT_WS_QUERY_TOKEN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Deprecated, removed in 4.0.0. When on (the default in 3.x), a realtime room, personal node tunnel or connector tunnel connection may carry its session token in the URL (?token=), which reverse proxies write to their access logs. Current clients use a single-use ticket (POST /v1/ws/ticket). GET /v1/stats counts the uses (ws_query_token); turn it off when that stays at zero.' },
   { key: 'adminSetupOpenAfterFirstOperator', dotPath: 'security.admin_setup_open_after_first_operator', envVar: 'AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test servers only; keep it off on a public server. When on, the admin password can still create operators through /v1/admin/setup/register after the first operator exists. When off (the default), that route refuses with 410 once an operator exists, and an operator adds another on the Owners page.' },
 
   // ── Email (mutable, additional) ──

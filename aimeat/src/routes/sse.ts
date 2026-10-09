@@ -2,15 +2,21 @@
  * @file sse.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Server-Sent Events transport for live UI updates. Exposes
- *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket)
- *   and GET /v1/events?ticket=... (the event stream). Forwards event-bus
+ * @description Server-Sent Events transport for live UI updates, and the single-use connection
+ *   tickets for every connection that cannot send an Authorization header. Exposes
+ *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket),
+ *   POST /v1/ws/ticket (the same for one WebSocket endpoint, spent at the upgrade in
+ *   auth/ws-upgrade.ts) and GET /v1/events?ticket=... (the event stream). Forwards event-bus
  *   changes to connected clients as a `data:` SSE message, COALESCED to at most
  *   one signal per second per client (the browser ignores the payload and just
  *   debounces a re-fetch, so a per-write firehose was wasted bandwidth).
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   v1.6.0 -- 2026-10-09 -- POST /v1/ws/ticket: a 60-second single-use ticket for one WebSocket
+ *     endpoint (realtime, personal-tunnel, connect-tunnel), so a client stops putting its session
+ *     token in the upgrade URL (secrets audit 2026-10-09, d3). The SSE ticket map moved to
+ *     services/single-use-tickets.ts, which both tickets now use; the SSE behaviour is unchanged.
  *   v1.5.2 -- 2026-09-26 -- The change listener runs as this node (runAsNode, utils/gaii.ts). A
  *     listener runs as whoever emitted the event, and in a process that serves more than one node
  *     that can be another node; now the stream matches the owner for the node that opened it. One
@@ -38,10 +44,12 @@
  *     browser; the client only debounces a re-fetch, so collapse the burst.
  */
 import { Router } from 'express';
-import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
+import { verifyJWT } from '../auth/jwt.js';
+import { isSocketKind, mintSocketTicket, SOCKET_KINDS, SOCKET_TICKET_TTL_SECONDS } from '../auth/ws-upgrade.js';
+import { createSingleUseTicketStore } from '../services/single-use-tickets.js';
 import { success, error } from '../middleware/envelope.js';
 import { onChangeEvent, offChangeEvent } from '../services/event-bus.js';
 import type { ChangeEvent } from '../services/event-bus.js';
@@ -51,7 +59,6 @@ import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-dom
 
 interface Ticket {
   sub: string;
-  expires: number;
   /** Resolved presence identity (GHII for owner sessions) — marked online while the stream is open. */
   presenceGhii: string;
   /**
@@ -67,31 +74,45 @@ interface Ticket {
   presenceEligible: boolean;
 }
 
-const tickets = new Map<string, Ticket>();
-
-// Periodic cleanup of expired tickets (every 60s)
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, t] of tickets) {
-    if (t.expires < now) tickets.delete(id);
-  }
-}, 60_000);
+const tickets = createSingleUseTicketStore<Ticket>();
 
 export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
 
   // Ticket endpoint — exchange JWT for a single-use SSE connection ticket
   router.post('/v1/events/ticket', requireAuth(), (req, res) => {
-    const ticket = randomBytes(32).toString('hex');
     const owner = isOwnerPrincipal(req.auth!);
-    tickets.set(ticket, {
+    const ticket = tickets.mint({
       sub: req.auth!.sub,
-      expires: Date.now() + 30_000,
       presenceGhii: resolveIdentity(req.auth!, config.nodeId),
       allow: owner ? null : allowedDomains(req.auth!.scopes),
       presenceEligible: owner,
-    });
+    }, 30_000);
     res.json(success(config.nodeId, { ticket, expires: 30 }));
+  });
+
+  // The same exchange for a WebSocket: a browser WebSocket cannot send an Authorization header, and
+  // the session token in the upgrade URL ended up in reverse-proxy access logs (secrets audit
+  // 2026-10-09, d3). The ticket names one socket kind; the upgrade (auth/ws-upgrade.ts) re-verifies
+  // the token it was minted with and applies that endpoint's own rules, so it opens exactly what the
+  // token would have opened. Minted from a session JWT only: the upgrade has never taken an access
+  // token (aimeat_pat_…), and a ticket must not widen what opens a socket.
+  router.post('/v1/ws/ticket', requireAuth(), async (req, res) => {
+    const socket = (req.body as { socket?: unknown } | undefined)?.socket;
+    if (!isSocketKind(socket)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `socket must be one of: ${SOCKET_KINDS.join(', ')}`));
+      return;
+    }
+    const header = req.headers.authorization;
+    const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : '';
+    const verified = token ? await verifyJWT(token) : null;
+    if (!verified || verified.sub !== req.auth!.sub) {
+      res.status(401).json(error(config.nodeId, 'JWT_REQUIRED', 'Ask for this ticket while signed in, with your sign-in token in the Authorization header. An access token cannot open a live connection.'));
+      return;
+    }
+    const ticket = mintSocketTicket(socket, token, verified.sub);
+    res.set('Cache-Control', 'no-store');
+    res.json(success(config.nodeId, { ticket, socket, expires: SOCKET_TICKET_TTL_SECONDS }));
   });
 
   // SSE stream — validates ticket, streams change events
@@ -102,15 +123,12 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
       return;
     }
 
-    const t = tickets.get(ticketId);
-    if (!t || t.expires < Date.now()) {
-      tickets.delete(ticketId);
+    // Consumed on this read (single-use), whether or not it is still valid.
+    const t = tickets.take(ticketId);
+    if (!t) {
       res.status(401).json(error(config.nodeId, 'INVALID_TICKET', 'Ticket is invalid or expired'));
       return;
     }
-
-    // Consume the ticket (single-use)
-    tickets.delete(ticketId);
 
     // Presence: an open PORTAL stream means this owner is reachable. An app-grant stream
     // resolves to the same GHII but must NOT speak for the human: otherwise any app they
