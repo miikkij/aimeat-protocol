@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-09 -- e2e-workspace-read-scale.ts joins the list: the workspace read timed at production size.
  *   2026-10-08 -- e2e-storage-file-provenance.ts joins the list: a stored file carries its AI-provenance record.
  *   2026-10-08 -- e2e-ai-provenance-rest-declare.ts joins the list: the REST message, board and task
  *     routes take an ai_provenance declaration (aiprov D5).
@@ -533,6 +534,9 @@ const ALL_SUITES = [
     // AI provenance on the content surfaces (aiprov workstream E, 2026-10-08): memory, workspace
     // shares, the Design Book, knowledge, skills, site passages and comments.
     'test/e2e-ai-provenance-content.ts',
+    // The workspace read at production size (2026-10-09): 800 agent-written records and 2000 app
+    // rows, timed. A per-record cost passes every functional suite and only shows at this size.
+    'test/e2e-workspace-read-scale.ts',
     // The remote MCP proxy: attach against a real upstream MCP server this suite starts
     // itself, the tool cache, calling, the cross-owner 404 and the scope split. Here and
     // not only in the unit suites because those run on SQLite alone, and this is what

@@ -17,6 +17,8 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.5.1 — 2026-10-09 — The legal-page clause of PUBLICLY_LINKED is an uncorrelated IN, evaluated
+ *     once per statement instead of once per id. Mirrors the Postgres provider.
  *   v1.4.0 — 2026-10-08 — PUBLICLY_LINKED covers a public stored file (storage_files.aiProvenanceId):
  *     a speech clip or picture made public in place answered 404 at its own record.
  *   v1.4.0 — 2026-10-08 — PUBLICLY_LINKED covers an app's legal pages: a record named in
@@ -81,10 +83,16 @@ const PUBLICLY_LINKED = `(
   OR EXISTS (SELECT 1 FROM apps a WHERE a.aiProvenanceId = p.id
              AND a.parked = 0 AND a.operatorHidden = 0 AND a.accessCode IS NULL)
   /* app legal pages (aiprov D3): manifest.legal.<kind>.aiProvenanceId, public while the app is not
-     operator-hidden; served without the access code and while parked (pre-contract information). */
-  OR EXISTS (SELECT 1 FROM apps a, json_each(CASE WHEN json_valid(a.manifest) THEN a.manifest ELSE '{}' END, '$.legal') lg
-             WHERE a.operatorHidden = 0 AND instr(a.manifest, p.id) > 0
-             AND json_extract(lg.value, '$.aiProvenanceId') = p.id)
+     operator-hidden; served without the access code and while parked (pre-contract information).
+     UNCORRELATED on purpose: SQLite evaluates the list once per statement and probes it per row.
+     Correlated, it searched every app row's manifest once per id (the Postgres twin took 9 s for a
+     771-record workspace read on aimeat.io, 2026-10-09). Only an OBJECT entry is read: json_extract
+     on a plain-string entry (a restored backup can carry one) throws "malformed JSON" and would fail
+     the whole statement, which the old instr() prefilter happened to avoid. */
+  OR p.id IN (SELECT CASE WHEN lg.type = 'object' THEN json_extract(lg.value, '$.aiProvenanceId') END
+             FROM apps a, json_each(CASE WHEN json_valid(a.manifest) THEN a.manifest ELSE '{}' END, '$.legal') lg
+             WHERE a.operatorHidden = 0
+               AND (CASE WHEN lg.type = 'object' THEN json_extract(lg.value, '$.aiProvenanceId') END) IS NOT NULL)
   /* end app legal pages */
   OR EXISTS (SELECT 1 FROM board_posts bp JOIN boards b ON b.id = bp.boardId
              WHERE bp.aiProvenanceId = p.id AND b.visibility = 'public')

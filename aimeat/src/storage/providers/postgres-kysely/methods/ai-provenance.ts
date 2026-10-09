@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.5.1 — 2026-10-09 — The legal-page clause of publiclyLinked is an uncorrelated IN, evaluated once
+ *     per statement. The correlated EXISTS scanned every App manifest once per id: 800 ids against
+ *     2000 App rows took 3.2 s locally, and the claims workspace read 9 s on aimeat.io.
  *   v1.4.0 — 2026-10-08 — publiclyLinked covers a public stored file ("StorageFile"."aiProvenanceId",
  *     migrations/0096_storage_file_provenance.sql).
  *   v1.4.0 — 2026-10-08 — publiclyLinked covers an app's legal pages: a record named in
@@ -78,10 +81,17 @@ const publiclyLinked = (idColumn: string) => sql<boolean>`(
   OR EXISTS (SELECT 1 FROM "App" a WHERE a."aiProvenanceId" = ${sql.raw(idColumn)}
              AND a."parked" = false AND a."operatorHidden" = false AND a."accessCode" IS NULL)
   /* app legal pages (aiprov D3): manifest.legal.<kind>.aiProvenanceId, public while the app is not
-     operator-hidden; served without the access code and while parked (pre-contract information). */
-  OR EXISTS (SELECT 1 FROM "App" a, jsonb_each(CASE WHEN jsonb_typeof(a."manifest"->'legal') = 'object'
-                                                    THEN a."manifest"->'legal' ELSE '{}'::jsonb END) lg
-             WHERE a."operatorHidden" = false AND lg.value->>'aiProvenanceId' = ${sql.raw(idColumn)})
+     operator-hidden; served without the access code and while parked (pre-contract information).
+     UNCORRELATED on purpose, and an ARRAY(): the subquery does not name the outer id, so it is an
+     InitPlan that runs once per statement and its cost is counted once. Correlated, it walked every
+     App row (one per version) and its manifest once per id, and a workspace read of 771 records
+     took 9 s on aimeat.io (2026-10-09). As IN (SELECT ...) it ran once too, but jsonb_each's
+     100-rows-per-app estimate pushed the plan past jit_above_cost and JIT compilation took 190 ms of
+     a 220 ms statement. */
+  OR ${sql.raw(idColumn)} = ANY(ARRAY(SELECT lg.value->>'aiProvenanceId'
+             FROM "App" a, jsonb_each(CASE WHEN jsonb_typeof(a."manifest"->'legal') = 'object'
+                                           THEN a."manifest"->'legal' ELSE '{}'::jsonb END) lg
+             WHERE a."operatorHidden" = false AND lg.value->>'aiProvenanceId' IS NOT NULL))
   /* end app legal pages */
   OR EXISTS (SELECT 1 FROM "BoardPost" bp JOIN "Board" b ON b."boardId" = bp."boardId"
              WHERE bp."aiProvenanceId" = ${sql.raw(idColumn)} AND b."visibility" = 'public')
