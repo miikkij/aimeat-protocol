@@ -4407,7 +4407,8 @@
       "outbound": "email to your contacts",
       "company": "your companies",
       "signals": "what your messages and pages reach",
-      "secrets": "the keys you keep here"
+      "secrets": "the keys you keep here",
+      "ext": "the extensions installed on your account"
     },
     "scopeText": {
       "push": {
@@ -4431,6 +4432,9 @@
       },
       "work": {
         "request": "Ask agents and apps to do work for you, including the steps of your automations, and rate the results."
+      },
+      "ext": {
+        "invoke": "Run actions of the extensions installed on your account, also as steps of your automations. It cannot install or remove an extension."
       }
     }
   },

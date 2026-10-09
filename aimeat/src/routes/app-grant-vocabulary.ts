@@ -9,6 +9,8 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.7.0 -- 2026-10-09 -- ext:invoke, running an installed extension's action, askable by an app: an
+ *     automation step that calls an extension costs it, and an app could not otherwise save one.
  *   v1.6.0 -- 2026-10-01 -- contacts:read, reading the owner's address book (GET /v1/contacts), askable
  *     by an app: the developer's ruling of 2026-10-01.
  *   v1.5.0 -- 2026-09-26 -- work:request, giving agents work, askable by an app: an automation step
@@ -72,6 +74,12 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // tick, not part of workflow:write: saving an automation and handing agents jobs are two favours.
   'work:request': 'Ask agents and apps to do work for you, including the steps of your automations, and rate the results',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
+  // Running an installed extension's action. POST /v1/ext/:name/:action asks an app for no word at
+  // all, but the same action as an automation step costs ext:invoke (services/workflow/step-authority.ts),
+  // so an app holding workflow:write could not save or run a workflow that calls the owner's own
+  // extension, however much the owner wanted it to (the SOC console, 2026-10-09). Its own tick:
+  // installing or removing an extension stays ext:write, which no app may ask for.
+  'ext:invoke': 'Run actions of the extensions installed on your account, also as steps of your automations (never install or remove one)',
   // TARGET-057. Deliberately NOT connections:write: an app that may publish to an account you
   // already connected is a different favour from one that may attach new accounts to your name.
   // Attaching is a human act at the provider's own consent screen and no app performs it.

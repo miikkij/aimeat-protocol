@@ -3349,7 +3349,8 @@
       "outbound": "correo a tus contactos",
       "company": "tus empresas",
       "signals": "el alcance de tus mensajes y páginas",
-      "secrets": "las claves que guardas aquí"
+      "secrets": "las claves que guardas aquí",
+      "ext": "las extensiones instaladas en tu cuenta"
     },
     "scopeText": {
       "push": {
@@ -3373,6 +3374,9 @@
       },
       "work": {
         "request": "Pedirles a agentes y aplicaciones que hagan trabajos por ti, por ejemplo como pasos de tus automatizaciones, y valorar los resultados."
+      },
+      "ext": {
+        "invoke": "Ejecutar acciones de las extensiones instaladas en tu cuenta, también como pasos de tus automatizaciones. No puede instalar ni quitar extensiones."
       }
     }
   },
