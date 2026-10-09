@@ -13,6 +13,9 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Backup — 2026-10-09 — GET /v1/admin/backup writes owners and agents through an allowlist and
+ *     leaves credential memory records out, and says what it omitted; the webhook secret was in the
+ *     file (secrets audit 2026-10-09, finding 1.9).
  *   Join form — 2026-10-05 — The join form's three requests to the URL the operator typed go through
  *     safeFetch, which checks every redirect hop, and read their answers under a ceiling; they were
  *     bare fetch() calls that followed redirects after one check (secaudit 2026-10, C6).
@@ -54,6 +57,7 @@ import { deriveTierFlags } from '../services/federation-tiers.js';
 import { performKeyExchange } from '../services/federation-helpers.js';
 import { logger } from '../utils/logger.js';
 import { ROOMS } from '../services/home-rooms.js';
+import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED } from '../services/admin-backup-projection.js';
 
 const POLL_INTERVAL_MS = 10_000;
 const MAX_POLL_DURATION_MS = 30 * 60_000;
@@ -371,20 +375,24 @@ export function adminMonitoringRouter(
         // Collect all memories and transactions per agent
         const agentData: Record<string, { memories: unknown[]; transactions: unknown[] }> = {};
         for (const a of agents) {
-            const memories = await storage.listMemory(a.gaii);
+            const memories = backupMemories(await storage.listMemory(a.gaii));
             const transactions = await storage.getTransactions(a.gaii, 100_000);
             agentData[a.gaii] = { memories, transactions };
         }
 
+        // Owner and agent rows go through an allowlist (services/admin-backup-projection.ts): the
+        // whole-row spread put every agent's plaintext webhook secret in the file (secrets audit
+        // 2026-10-09, 1.9). `omitted` says what a restore has to set again.
         res.json(success(config.nodeId, {
-            version: '1.2',
+            version: '1.3',
             exported_at: new Date().toISOString(),
             node_id: config.nodeId,
-            owners,
-            agents,
+            owners: owners.map(backupOwner),
+            agents: agents.map(backupAgent),
             actions,
             boards,
             agent_data: agentData,
+            omitted: BACKUP_OMITTED,
         }));
     });
 

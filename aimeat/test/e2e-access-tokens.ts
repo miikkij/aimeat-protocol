@@ -9,6 +9,8 @@
  *   cookie + access overview.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-access-tokens
  * @version-history
+ *   v1.2.0 — 2026-10-09 — Phase 1c: a replayed PAT mint (same Idempotency-Key) is answered 409 and
+ *            never carries the token again (secrets audit 2026-10-09, finding 1.8).
  *   v1.1.0 — 2026-07-29 — Add the owner-only minting/list/revoke denials for a scoped agent session,
  *            cross-owner PAT revocation, and the create route's bad-input codes (batch 01, holes 1+5).
  */
@@ -118,6 +120,30 @@ async function main() {
     assert(read.status === 200, `direct PAT read should work, got ${read.status}`);
     const write = await api('/v1/memory', { bearer: scopedToken, body: { key: 'y', value: { a: 2 }, visibility: 'private' } });
     assert(write.status === 403, `direct PAT write should be denied (scope enforced), got ${write.status}`);
+  });
+
+  // Secrets audit 2026-10-09, finding 1.8: the idempotency cache kept the whole response for 24
+  // hours, so the same Idempotency-Key handed the raw token out a second time.
+  console.log('\nPhase 1c — a replayed mint does not hand the token out again');
+  await test('a replay with the same Idempotency-Key answers 409 and carries no token', async () => {
+    const mint = () => fetch(`${BASE}/v1/access/tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwtB}`, 'Idempotency-Key': key },
+      body: JSON.stringify({ label: 'replayed', scopes: ['memory:read'] }),
+    });
+    const key = crypto.randomUUID();
+    const first = await mint();
+    const firstBody = await first.json() as any;
+    assert(first.status === 201 && typeof firstBody.data?.token === 'string', `mint: ${first.status}`);
+    const replay = await mint();
+    const replayText = await replay.text();
+    assert(!replayText.includes(firstBody.data.token), `the replay carried the token again: ${replay.status}`);
+    assert(replay.status === 409 && JSON.parse(replayText).error?.code === 'IDEMPOTENCY_RESULT_UNAVAILABLE',
+      `a replay is answered like a lost response: ${replay.status} ${replayText.slice(0, 200)}`);
+    // The mint ran once: one token with this label.
+    const list = await api('/v1/access/tokens', { method: 'GET', bearer: jwtB });
+    const rows = (list.data?.data?.tokens ?? []).filter((t: any) => t.label === 'replayed');
+    assert(rows.length === 1, `one token was minted, found ${rows.length}`);
   });
 
   console.log('\nPhase 2 — Full owner token');

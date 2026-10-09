@@ -7,6 +7,9 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-10-09 — A failed action's own message and the timeout answer pass the 500 text
+ *     filter (middleware/internal-error-text.ts) through keepErrorMessage; the script's message is
+ *     redacted of credential-shaped text (secrets audit 2026-10-09, d4).
  *   v1.14.0 — 2026-10-09 — Secret config is decrypted for the field it is bound to (SecretBinding,
  *     services/extension-secrets.ts; secrets audit 2026-10-09, 1.1).
  *   v1.13.0 — 2026-10-05 — Both handlers pass the extension's capabilities to buildExtensionCtx
@@ -54,6 +57,8 @@ const aimeatHashRef: (s: string) => string =
 import { makeExtensionFiles } from '../../services/extension-files.js';
 import { makeExtensionDataPackage } from '../../services/datapackage/ext-capability.js';
 import { logger } from '../../utils/logger.js';
+import { redactCredentialText } from '../../utils/redact-credentials.js';
+import { keepErrorMessage } from '../../middleware/internal-error-text.js';
 import { getMember, accountOf } from '../../services/app-members.js';
 import { resolveIdentity, callerPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
 
@@ -293,14 +298,16 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
           `Action "${actionId}" refused: ${wsRefusal.message}`));
       } else if (isSandboxTimeout(message)) {
-        res.status(500).json(error(config.nodeId, 'EXTENSION_TIMEOUT',
-          `Action "${actionId}" timed out`));
+        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_TIMEOUT',
+          `Action "${actionId}" timed out`)));
       } else if (message.includes('API call limit exceeded')) {
         res.status(500).json(error(config.nodeId, 'API_LIMIT_EXCEEDED',
           `Action "${actionId}" exceeded API call limit`));
       } else {
-        res.status(500).json(error(config.nodeId, 'EXTENSION_ERROR',
-          `Action "${actionId}" failed: ${message}`));
+        // The script's own error is the extension author's answer to the caller (a quality gate
+        // naming the row), so it passes the 500 text filter; credential-shaped text is redacted.
+        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_ERROR',
+          `Action "${actionId}" failed: ${redactCredentialText(message)}`)));
       }
     }
   });
@@ -476,14 +483,16 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
           `Action "${actionId}" refused: ${wsRefusal.message}`));
       } else if (isSandboxTimeout(message)) {
-        res.status(500).json(error(config.nodeId, 'EXTENSION_TIMEOUT',
-          `Action "${actionId}" timed out`));
+        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_TIMEOUT',
+          `Action "${actionId}" timed out`)));
       } else if (message.includes('API call limit exceeded')) {
         res.status(500).json(error(config.nodeId, 'API_LIMIT_EXCEEDED',
           `Action "${actionId}" exceeded API call limit`));
       } else {
-        res.status(500).json(error(config.nodeId, 'EXTENSION_ERROR',
-          `Action "${actionId}" failed: ${message}`));
+        // The script's own error is the extension author's answer to the caller (a quality gate
+        // naming the row), so it passes the 500 text filter; credential-shaped text is redacted.
+        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_ERROR',
+          `Action "${actionId}" failed: ${redactCredentialText(message)}`)));
       }
     }
   });

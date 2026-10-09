@@ -31,6 +31,8 @@
  * @usage
  *   void reportSystemFault({ storage, config }, { code, route, method, requestId });
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The forwarded caller message is redacted of credential-shaped text; for a
+ *     500 it is already the sentence that replaced the exception text (secrets audit 2026-10-09, d4).
  *   v1.1.0 — 2026-09-24 — The report is the node's own message, so it does not count against the
  *     operator account's message limit (services/message-send-limit.ts).
  *   v1.0.0 — 2026-08-16 — Initial, from the review of what 2107 user-visible messages actually say.
@@ -38,6 +40,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { redactCredentialText } from '../utils/redact-credentials.js';
 import { findOperatorGhii } from './operators.js';
 import { sendDirectMessage } from './message-send.js';
 
@@ -108,7 +111,9 @@ export async function reportSystemFault(
         const body = [
             `The node answered **${input.code}** on \`${input.method} ${input.route}\`.`,
             '',
-            input.shown ? `The caller was shown: "${input.shown}"` : '',
+            // What the caller saw: for a 500 that is the sentence middleware/internal-error-text.ts put
+            // in place of the exception text. Redacted again, for a code answered on another status.
+            input.shown ? `The caller was shown: "${redactCredentialText(input.shown)}"` : '',
             input.requestId ? `Request id: \`${input.requestId}\`` : '',
             '',
             'Reported by the node itself. Nobody was asked to write this, and no user content is in it.',

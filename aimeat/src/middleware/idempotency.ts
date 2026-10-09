@@ -11,6 +11,9 @@
  *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
  *
  * @version-history
+ *   v1.4.0 -- 2026-10-09 -- A response marked Cache-Control: no-store, or one carrying a credential
+ *     field, is not kept: a replay is answered IDEMPOTENCY_RESULT_UNAVAILABLE and never hands a
+ *     one-time secret out again (secrets audit 2026-10-09, finding 1.8).
  *   v1.3.0 -- 2026-10-08 -- The /ucp/2026-08-25/ paths are left to their own idempotency, which is
  *     durable, per platform and seller, and refuses a reused key with another body (UCP 2026-08-25).
  *   v1.2.0 -- 2026-09-16 -- Reserve before next(), retain interrupted/non-JSON work, expire on
@@ -24,6 +27,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { Request, Response, NextFunction } from 'express';
+import { carriesCredentialField } from '../utils/redact-credentials.js';
 
 interface CachedResponse {
     state: 'pending' | 'complete' | 'unavailable';
@@ -64,6 +68,21 @@ setInterval(() => {
 function cacheKeyFor(req: Request, idempotencyKey: string): string {
     const principal = req.auth?.sub ?? 'anon';
     return `${principal}|${req.method}|${req.originalUrl}|${idempotencyKey}`;
+}
+
+/**
+ * A response that must not be kept for a replay: one the route marked `Cache-Control: no-store`
+ * (every key and token mint already does), or one that carries a credential field (scim_token,
+ * private_key, access_token, secret, backup_codes) whether or not its route remembered the header.
+ *
+ * Until 2026-10-09 the whole body was kept for 24 hours, so a replay with the same key handed the
+ * one-time secret out again: the SCIM token, a PAT, an agent's key, the TOTP secret and backup codes
+ * (secrets audit 2026-10-09, finding 1.8). The SPA sends an Idempotency-Key on every POST.
+ */
+function mustNotKeep(res: Response, body: unknown): boolean {
+    const header = typeof res.getHeader === 'function' ? res.getHeader('Cache-Control') : undefined;
+    if (typeof header === 'string' && /\bno-store\b/i.test(header)) return true;
+    return carriesCredentialField(body);
 }
 
 export function idempotency() {
@@ -153,6 +172,9 @@ export function idempotency() {
             if (cache.get(cacheKey) === entry) {
                 // A 401 means the credential was refused, so a refresh may try the same key.
                 if (res.statusCode === 401) cache.delete(cacheKey);
+                // A one-time secret is never kept: the reservation stays, without the body, and a
+                // replay is answered IDEMPOTENCY_RESULT_UNAVAILABLE like a lost response.
+                else if (mustNotKeep(res, body)) entry.state = 'unavailable';
                 else Object.assign(entry, { state: 'complete', status: res.statusCode, body, storedAt: Date.now() });
             }
             return originalJson(body);

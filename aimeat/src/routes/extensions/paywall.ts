@@ -13,6 +13,8 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.9.1 — 2026-10-09 — The SETTLEMENT_FAILED sentence ("you were not charged") passes the 500 text
+ *     filter through keepErrorMessage (middleware/internal-error-text.ts; secrets audit d4).
  *   v1.9.0 — 2026-10-01 — The members-only question is services/members-only.ts, asked by every route
  *     that charges before it charges, and asked here again on a call settled upstream: the internal
  *     pass used to return before step 1.5, so a non-member who paid through the checkout or an
@@ -50,6 +52,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
+import { keepErrorMessage } from '../../middleware/internal-error-text.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
@@ -495,7 +498,7 @@ export async function enforcePaywall(args: {
       // Never keep a debit we couldn't pay out — refund the caller and fail loudly.
       await storage.creditBalance(callerGaii, payMorsels);
       logger.error(`[paywall] credit to owner failed; refunded caller`, { ext: ext.name, action: action.id, ownerGhii });
-      res.status(500).json(error(config.nodeId, 'SETTLEMENT_FAILED', 'Payment could not be settled to the seller; you were not charged'));
+      res.status(500).json(keepErrorMessage(error(config.nodeId, 'SETTLEMENT_FAILED', 'Payment could not be settled to the seller; you were not charged')));
       return { ok: false };
     }
     const track = `ext:${ext.name}:${action.id}:pay`;

@@ -12,6 +12,8 @@
  *   binding adds exactly a membership.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scim-users
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A replayed SCIM token mint (same Idempotency-Key) is answered 409
+ *     IDEMPOTENCY_RESULT_UNAVAILABLE and never carries the token again (secrets audit 2026-10-09, 1.8).
  *   v1.1.0 — 2026-09-04 — Clears the SSO flags before its first assertion. It builds connections
  *     through the management routes, which an inherited `sso.connections_locked` refuses — and a
  *     refusal there fails every test after it without naming what caused it.
@@ -117,6 +119,23 @@ async function run() {
             method: 'POST', headers: bearer(op.ownerToken), body: JSON.stringify({ xml: buildIdpMetadataXml() }),
         });
         assert(meta.status === 200, `idp-metadata ${meta.status}`);
+    });
+
+    // Secrets audit 2026-10-09, finding 1.8: the idempotency cache kept the whole response for 24
+    // hours, so the same Idempotency-Key handed the one-time SCIM token out a second time.
+    await test('a replayed SCIM token mint does not hand the token out again', async () => {
+        const key = crypto.randomUUID();
+        const headers = { ...bearer(op.ownerToken), 'Idempotency-Key': key };
+        const first = await json(`/v1/admin/sso/connections/${OTHER}/scim-token`, { method: 'POST', headers });
+        assert(first.status === 201 && typeof first.body.data.scim_token === 'string', `mint: ${first.status}`);
+        otherToken = first.body.data.scim_token;
+        const replay = await json(`/v1/admin/sso/connections/${OTHER}/scim-token`, { method: 'POST', headers });
+        assert(!JSON.stringify(replay.body).includes(otherToken), `the replay carried the token again: ${replay.status}`);
+        assert(replay.status === 409 && replay.body.error?.code === 'IDEMPOTENCY_RESULT_UNAVAILABLE',
+            `a replay is answered like a lost response: ${replay.status} ${JSON.stringify(replay.body?.error)}`);
+        // Nothing ran twice: the token from the first answer is still the one that works.
+        const works = await scim(otherToken, 'GET', '/Users', undefined, OTHER);
+        assert(works.status === 200, `the first token still works: ${works.status}`);
     });
 
     // ── The doors refuse the wrong credential in every direction ──

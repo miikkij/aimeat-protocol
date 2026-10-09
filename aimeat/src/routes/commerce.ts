@@ -16,6 +16,8 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.8.1 — 2026-10-09 — A typed commerce or payment error keeps its sentence through the 500 text
+ *     filter (keepErrorMessage); an untyped one answers with the filter's sentence (secrets audit d4, d5).
  *   v1.8.0 — 2026-10-08 — A checkout may carry `attribution` (the page's Referer and utm_source); the
  *     session keeps the channel it names, never the values. An agent's checkout is attributed to the
  *     agent (services/visibility/attribution.ts).
@@ -44,6 +46,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { keepErrorMessage } from '../middleware/internal-error-text.js';
 import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { pageAttribution, agentAttribution } from '../services/visibility/attribution.js';
 import { visitSignals } from '../utils/visit-signals.js';
@@ -103,10 +106,13 @@ function sendCommerceError(res: Response, config: AimeatConfig, err: unknown, ex
   if (err instanceof CommerceError || err instanceof PaymentError) {
     // 402 carries the `accepts` block: the AIMEAT-native schemes plus the real x402 `exact` scheme
     // (extraAccepts) when the session is a money one and the seller has a USDC address.
-    res.status(err.statusCode).json({
+    // A typed commerce or payment error carries a sentence written for the buyer (the Stripe text is
+    // already replaced in commerce/stripe-handler.ts), so it passes the 500 text filter. An untyped
+    // error below does not: its message is the exception's, and the filter answers for it.
+    res.status(err.statusCode).json(keepErrorMessage({
       ...error(config.nodeId, err.code, err.message),
       ...(err.statusCode === 402 ? paymentChallenge(config, extraAccepts) : {}),
-    });
+    }));
     return;
   }
   const e = err as { message?: string };
