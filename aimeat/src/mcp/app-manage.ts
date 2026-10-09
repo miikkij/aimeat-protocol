@@ -172,7 +172,7 @@ export function registerAppManageTool(
                 return answer({ filename, state: out.state, ...(out.note ? { note: out.note } : {}), seo: out.seo });
             }
             case 'marks': {
-                const out = await ownerAppMarks(storage, config, { callerGaii, filename, marks: pick(args, ['badge', 'install']) });
+                const out = await ownerAppMarks(storage, config, { callerGaii, filename, marks: pick(args, ['badge', 'install', 'aiUse']) });
                 if ('error' in out) return plainRefusal(out.error);
                 return answer({ filename, ...(out.note ? { note: out.note } : {}), marks: out.state.marks, reviewer: out.state.authorship?.name ?? null });
             }

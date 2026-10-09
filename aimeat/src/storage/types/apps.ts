@@ -57,6 +57,8 @@ export interface AppMarks {
   badge?: boolean;
   /** The browser "Install this app" chip on the app's own origin. */
   install?: boolean;
+  /** The "Use with your AI" mark, served when the app has public app tools or bound skills. */
+  aiUse?: boolean;
 }
 
 /** A natural person's declaration that they reviewed this app and answer for it. */

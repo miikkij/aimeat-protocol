@@ -210,6 +210,7 @@
   <link rel="stylesheet" href="/css/views/wallet-poster.css">
   <link rel="stylesheet" href="/css/views/aimeat-os.css">
   <link rel="stylesheet" href="/css/views/portfolio.css">
+  <link rel="stylesheet" href="/css/views/use-with-ai.css">
   <link rel="stylesheet" href="/css/views/members.css">
   <link rel="stylesheet" href="/css/components/link-preview.css">
   <link rel="stylesheet" href="/css/views/glossary.css">
@@ -1152,6 +1153,10 @@
       // Portfolio public view: /v1/portfolio/<username>
       if (pathname.startsWith('/v1/portfolio/') && pathname !== '/v1/portfolio/') {
         return () => import('/views/portfolio.js' + B);
+      }
+      // One app's "Use with your AI" guide: /v1/use-with-ai/<owner>/<file>
+      if (/^\/v1\/use-with-ai\/[^/]+\/[^/]+\/?$/.test(pathname)) {
+        return () => import('/views/use-with-ai.js' + B);
       }
       return ROUTES[pathname] || ROUTES['/v1/portal'];
     }

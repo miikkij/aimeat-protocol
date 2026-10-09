@@ -89,6 +89,12 @@ corrected app from those findings and writes it as the DRAFT; it never publishes
 owner's own draft alone. It spends the owner's AI credit, so ask first. \`aimeat_visibility_behaviour_set\`
 switches the script off per app, or the weekly fixing agent on.
 
+**What a visitor's AI can use on the app.** When the app has public app tools (\`aimeat_app_tools_publish\`)
+or a public skill bound to it, the served app carries a round "Use with your AI" mark that links to
+\`/v1/use-with-ai/{owner}/{filename}\`: the tools, each skill's text, and how a person's own AI, an agent or
+a program uses them. Write the tool descriptions and the skill for that reader. The owner takes the
+mark off with \`aimeat_app_manage\` action \`marks\`, \`aiUse: false\`.
+
 **Component packages are a different thing** and have their own tools: \`aimeat_package_list\` ·
 \`aimeat_package_get\` · \`aimeat_package_compose\` · \`aimeat_package_status_set\` ·
 \`aimeat_package_install\`, addressed by \`group_id\` (authoring a package by hand and pruning its

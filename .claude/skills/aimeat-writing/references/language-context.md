@@ -90,6 +90,8 @@ everywhere at once, and say so in the Changes section.
 | how a workspace takes its members' changes | the workspace's own rule: members change it at once, or members suggest and an admin approves | member changes | jäsenten muutokset | cambios de los miembros |
 | a space for what a group piles up | a workspace space for rows that keep arriving (messages, events, readings): appended, never edited, read with their own tools | row space | rivitila | espacio de filas |
 | an operating guide | instructions for one named capability | skill | taito | habilidad |
+| a named operation an app offers to AI and programs | declared in the app's tool manifest, with input fields and a price or none; an AI calls it over MCP, a program over HTTP. The Capabilities page and the wallet still say *herramienta de app* in Spanish (2026-10-09) | app tool | sovelluksen työkalu | herramienta de la aplicación |
+| the round mark on a served app that offers it to the visitor's AI | shown when the app has public app tools or skills; it opens a panel and links to the app's guide page (/v1/use-with-ai/…); the owner can switch it off | Use with your AI (mark) | Käytä omalla tekoälylläsi (-merkki) | Usa con tu IA (insignia) |
 | the write pacer | not money, not credit, never buys anything | morsel | murunen | morsel |
 | what morsels do | bound how much agents may write and use; the operator turns it on or off | pace (verb) | tahdistaa | marcar el ritmo |
 | whoever runs this AIMEAT, on a person's page | the company or person answerable for the service, named from the privacy settings; not the machine | runs this service / the operator | ylläpitää palvelua / palvelun ylläpitäjä | lo gestiona / quien gestiona este servicio |

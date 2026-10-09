@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-09 -- e2e-app-ai-use.ts joins the list: the "Use with your AI" mark and its guide page.
  *   2026-10-09 -- e2e-workspace-read-scale.ts joins the list: the workspace read timed at production size.
  *   2026-10-08 -- e2e-storage-file-provenance.ts joins the list: a stored file carries its AI-provenance record.
  *   2026-10-08 -- e2e-ai-provenance-rest-declare.ts joins the list: the REST message, board and task
@@ -331,6 +332,7 @@ const ALL_SUITES = [
     'test/e2e-theme-fonts.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-marks.ts',
+    'test/e2e-app-ai-use.ts',
     'test/e2e-app-legal.ts',
     'test/e2e-app-rows.ts',
     'test/e2e-app-store-license.ts',

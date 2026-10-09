@@ -19,6 +19,7 @@
  * @structure meta · MarksSection({ d })
  * @usage const mod = await import('./sections/marks.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A third switch, the "Use with your AI" mark (marks.aiUse), drawn as the other two.
  *   v1.1.0 — 2026-09-27 — Parity with the old page (sections-c): the switches as .mk-row (List tone
  *     switches), the part headings as its h4, the reviewer's form as .mk-author-form (Enter no longer
  *     declares: the old field had no key), the aside, the law's paragraph with its ink link, the
@@ -61,7 +62,10 @@ function loadPolicy() {
 function fromRow(app) {
   const m = (app && app.manifest) || {};
   return {
-    marks: { badge: !(m.marks && m.marks.badge === false), install: !(m.marks && m.marks.install === false) },
+    marks: {
+      badge: !(m.marks && m.marks.badge === false), install: !(m.marks && m.marks.install === false),
+      aiUse: !(m.marks && m.marks.aiUse === false),
+    },
     authorship: m.authorship || null,
     log: m.authorshipLog || [],
     posture: app.ai_posture || null,
@@ -90,7 +94,7 @@ export default function MarksSection({ d }) {
       const a = await patchApp(d.filename, body);
       setData((cur) => ({
         ...cur,
-        marks: a.marks ? { badge: a.marks.badge !== false, install: a.marks.install !== false } : cur.marks,
+        marks: a.marks ? { badge: a.marks.badge !== false, install: a.marks.install !== false, aiUse: a.marks.aiUse !== false } : cur.marks,
         authorship: 'authorship' in a ? (a.authorship || null) : cur.authorship,
         log: a.authorshipLog || cur.log,
       }));
@@ -126,7 +130,7 @@ export default function MarksSection({ d }) {
   // readout (.mk-sees) and the log (.mk-log). Enter in the name field sends nothing, as there.
   return html`
     <${Note} kind="hint" chapter>${x('marks.intro')}<//>
-    <${List} tone="switches" cols="name-meaning-doors">${sw('badge')}${sw('install')}<//>
+    <${List} tone="switches" cols="name-meaning-doors">${sw('badge')}${sw('install')}${sw('aiUse')}<//>
 
     <${SubHeading} level=${4} part="apart">${x('marks.authorTitle')}<//>
     ${data.authorship

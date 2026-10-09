@@ -1988,6 +1988,15 @@
      "plain": "App tools Declare named operations with input and output schemas in an app's tool manifest. MCP clients, HTTP WebMCP clients and other apps can call bound capabilities. Checkout can also fulfil an unbound tool as a task assigned to the app's agent. An agent lists its own owner's free callable tools beside the priced catalog in one read. aimeat_app_tools_publish, aimeat_app_tools_get, aimeat_app_tool_invoke, /v1/apps/:owner/:filename/webmcp, /v1/commerce/tools?include=own"
     },
     {
+     "slug": "g-10-use-with-your-ai",
+     "cells": [
+      "<strong>Use with your AI</strong>",
+      "A visitor of your app learns that their own AI can use it. When the app has public app tools or skills bound to it, the served app carries a round mark beside the AI label; it opens a panel that counts them and links to the app's guide page. The page lists the tools (free or priced) and the skills with their text, and shows three ways in: an AI that connects over MCP (an account here and one approval), a ready text for a chat AI that cannot connect (it learns the app and guides the person; no account needed), and plain HTTP calls with a token. A public skill's text reads without sign-in. You switch the mark off in Marks and authorship. Limits: no mark on an app behind an access code, a price or an operator hide; a skill counts only when its owner owns the app.",
+      "<code>/v1/use-with-ai/:owner/:filename</code>, <code>/v1/apps/:owner/:filename/webmcp</code>, <code>/v1/skills/:name</code>, <code>aimeat_app_manage</code> action <code>marks</code> (<code>aiUse</code>), App Catalog &gt; Marks and authorship"
+     ],
+     "plain": "Use with your AI A visitor of your app learns that their own AI can use it. When the app has public app tools or skills bound to it, the served app carries a round mark beside the AI label; it opens a panel that counts them and links to the app's guide page. The page lists the tools (free or priced) and the skills with their text, and shows three ways in: an AI that connects over MCP (an account here and one approval), a ready text for a chat AI that cannot connect (it learns the app and guides the person; no account needed), and plain HTTP calls with a token. A public skill's text reads without sign-in. You switch the mark off in Marks and authorship. Limits: no mark on an app behind an access code, a price or an operator hide; a skill counts only when its owner owns the app. /v1/use-with-ai/:owner/:filename, /v1/apps/:owner/:filename/webmcp, /v1/skills/:name, aimeat_app_manage action marks (aiUse), App Catalog > Marks and authorship"
+    },
+    {
      "slug": "g-10-selling-app-tools",
      "cells": [
       "<strong>Selling app tools</strong>",
@@ -3871,6 +3880,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 387
+  "rows": 388
  }
 }

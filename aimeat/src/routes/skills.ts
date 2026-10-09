@@ -19,6 +19,8 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.7.0 -- 2026-10-09 -- GET /v1/skills/:name and its /zip answer a caller who is not signed in, with
+ *     public skills only (Jouni's decision of 2026-10-09: a public skill is readable without sign-in).
  *   v1.6.0 -- 2026-10-09 -- GET /v1/apps/:owner/:filename/skills answers a caller who is not signed in
  *     (public skills only), as the app's agent surfaces already advertised; it answered 401 before.
  *   v1.5.0 -- 2026-10-08 -- POST /v1/skills takes `ai_provenance` and `ai_provenance_id`, records how
@@ -209,8 +211,11 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  /* ── GET /v1/skills/:name — resolve one skill. Query: scope (user|node), owner, manifest_only ── */
-  router.get('/v1/skills/:name', requireAuth(), async (req, res) => {
+  /* ── GET /v1/skills/:name — resolve one skill. Query: scope (user|node), owner, manifest_only.
+   *    Open without sign-in: accessorOf gives such a caller no owner, so the scope read gate lets
+   *    only a public skill through. An app's guide page (/v1/use-with-ai/…) shows a public bound
+   *    skill's text to anyone, as its owner chose by making it public. ── */
+  router.get('/v1/skills/:name', async (req, res) => {
     try {
       const name = req.params.name as string;
       const accessor = await accessorOf(req);
@@ -254,8 +259,9 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── GET /v1/skills/:name/zip — download a skill as a ZIP (dir layout: {name}/SKILL.md …).
    *    The ZIP is upload-ready for claude.ai's skill upload and for manual installs into
    *    ~/.claude/skills. Same addressing as the resolve route; the :name segment may carry
-   *    an @semver pin ({name}@1.0.2 → the retained snapshot). ── */
-  router.get('/v1/skills/:name/zip', requireAuth(), async (req, res) => {
+   *    an @semver pin ({name}@1.0.2 → the retained snapshot). Open without sign-in for a public
+   *    skill, by the same read gate as the resolve route. ── */
+  router.get('/v1/skills/:name/zip', async (req, res) => {
     try {
       const nameParam = req.params.name as string;
       const accessor = await accessorOf(req);

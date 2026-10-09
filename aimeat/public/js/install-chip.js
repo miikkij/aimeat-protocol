@@ -14,6 +14,7 @@
  *   prompt on click
  * @usage <script src="/js/install-chip.js" defer></script> (injected at serve time)
  * @version-history
+ *   v1.2.0 — 2026-10-09 — Placed after the "Use with your AI" mark too (--aimeat-mark-aiuse-w).
  *   v1.1.0 — 2026-09-29 — The third mark on the one row (developer decision 2026-09-29): placed
  *     after the AI label and the attribution bolt by the widths they declare (--aimeat-mark-ai-w,
  *     --aimeat-mark-badge-w), 34px high like them, on the same opaque surface. It was a separate
@@ -56,9 +57,9 @@
   function buildPill() {
     var wrap = document.createElement('div');
     wrap.id = 'aimeat-install-chip';
-    // The third place on the row: after the AI label and the bolt when they are there, in their
-    // place when they are not (the fallbacks are 0).
-    var left = 'calc(12px + var(--aimeat-mark-ai-w, 0px) + var(--aimeat-mark-badge-w, 0px))';
+    // The last place on the row: after the AI label, the bolt and the "Use with your AI" mark when
+    // they are there, in their place when they are not (the fallbacks are 0).
+    var left = 'calc(12px + var(--aimeat-mark-ai-w, 0px) + var(--aimeat-mark-badge-w, 0px) + var(--aimeat-mark-aiuse-w, 0px))';
     wrap.style.cssText = 'position:fixed!important;left:' + left + '!important;right:auto!important;'
       + 'bottom:12px!important;top:auto!important;z-index:2147483646!important;display:flex!important;'
       + 'align-items:center!important;height:34px!important;box-sizing:border-box!important;'
