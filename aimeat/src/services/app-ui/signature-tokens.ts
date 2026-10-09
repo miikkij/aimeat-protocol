@@ -11,6 +11,7 @@
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.6.0 — 2026-10-09 — SERVED_FONT_FAMILIES takes IBM Plex Sans and IBM Plex Mono (aimeat-fonts.css v1.4.0).
  *   v1.5.0 — 2026-10-03 — servedFontFamilies(): the base list and the faces the operator added to the
  *     running node (the font manager); unservedFirstFamily() reads it, so the bench accepts an added face.
  *   v1.4.0 — 2026-10-03 — SERVED_FONT_FAMILIES takes Press Start 2P and Selawik (aimeat-fonts.css v1.3.0).
@@ -36,6 +37,7 @@ export const SERVED_FONT_FAMILIES: readonly string[] = [
   'Instrument Serif', 'Instrument Sans', 'Schibsted Grotesk', 'Bricolage Grotesque', 'Syne', 'Unbounded', 'Gloock',
   'Mona Sans', 'Hubot Sans', 'Geist Mono', 'Martian Mono',
   'Press Start 2P', 'Selawik',
+  'IBM Plex Sans', 'IBM Plex Mono',
 ];
 
 /** Faces a browser has without a download, and the generic keywords. Lower case. */

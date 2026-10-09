@@ -15,9 +15,13 @@
  *   `archived` on its entry in the `organism.{id}.meta.workspaces` registry; a record-table/space and a
  *   single record have no separate marker — their archived state is the flag on their rows, counted via
  *   countArchivedByKeyPrefix. The write guard (isKeyArchived) enforces read-only.
- * @structure ARCHIVE ROOT format; archiveTarget/unarchiveTarget; isKeyArchived; setRegistryWorkspaceArchived
+ * @structure ARCHIVE ROOT format; archiveTarget/unarchiveTarget; isKeyArchived; setRegistryWorkspaceArchived;
+ *   archiveRoleOf (the creator-or-admin rule); archiveRecordsBatchOp (many records of one space)
  * @usage import { archiveTarget, unarchiveTarget, isKeyArchived } from '../services/archive.js';
  * @version-history
+ *   v1.1.0 — 2026-10-09 — archiveRoleOf, which the archive route now asks, and archiveRecordsBatchOp,
+ *     which ctx.workspace.archiveRecords runs: an extension keeps a space bounded by archiving what
+ *     has stopped mattering (Lifecycle Central's closed claims, 771 of them, made every read 9 s).
  *   v1.0.0 — 2026-06-26 — Initial: record/space/workspace/organism archive + cascade + smart restore + guard.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
@@ -160,4 +164,64 @@ export async function isKeyArchived(storage: Storage, key: string, ownerGaii?: s
     if (rec?.archived) return { archived: true, level: 'record', root: rec.archivedRoot };
   }
   return { archived: false };
+}
+
+/** Who is asking to archive: the resolved principal and the bare account name it acts for. */
+export interface ArchiveCaller { principal: string; ownerName: string }
+
+/**
+ * The caller's role in the organism, as the archive rule reads it: a principal listed among the
+ * organism's own agents is a member; anyone else has the role their owner's active membership holds.
+ * POST /v1/organisms/:id/archive and ctx.workspace.archiveRecords both ask this, so the creator-or-
+ * admin rule is decided in one place.
+ */
+export async function archiveRoleOf(storage: Storage, organism: { id: string; agentGaiis: string[] }, who: ArchiveCaller): Promise<string | null> {
+  if (who.principal && organism.agentGaiis.includes(who.principal)) return 'member';
+  if (!who.ownerName) return null;
+  const m = await storage.getMembership(organism.id, who.ownerName);
+  return m && m.status === 'active' ? m.role : null;
+}
+
+/** The most records one archiveRecordsBatchOp call takes. */
+export const ARCHIVE_BATCH_MAX = 500;
+const SEGMENT = /^[A-Za-z0-9_-]+$/;
+const NAMESPACE = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
+
+export type ArchiveBatchResult =
+  | { ok: true; data: { archived: string[]; rows: number } }
+  | { ok: false; status: number; code: string; message: string };
+
+/**
+ * ARCHIVE MANY RECORDS of one workspace space in one call: each id is archived at the record level
+ * (its whole family, `.latest`, `.draft` and `.version.N`), exactly as POST /v1/organisms/:id/archive
+ * with level 'record' archives one. The caller must be the organism's creator or an admin
+ * (archiveRoleOf). Archiving is undoable (unarchiveTarget), which is why it needs no purge word.
+ * Answers the ids that had rows to archive and the number of rows flagged.
+ */
+export async function archiveRecordsBatchOp(
+  storage: Storage, who: ArchiveCaller,
+  args: { organismId: string; ws: string; namespace: string; ids: string[] },
+): Promise<ArchiveBatchResult> {
+  const { organismId, ws, namespace, ids } = args;
+  if (!SEGMENT.test(String(ws || ''))) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'ws must be a workspace id' };
+  if (!NAMESPACE.test(String(namespace || ''))) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'namespace must be a dotted space namespace such as shared.claim' };
+  if (!Array.isArray(ids) || ids.length === 0) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'ids must be a non-empty array of instance ids' };
+  if (ids.length > ARCHIVE_BATCH_MAX) return { ok: false, status: 400, code: 'INVALID_INPUT', message: `at most ${ARCHIVE_BATCH_MAX} ids per call` };
+  const bad = ids.find(id => !SEGMENT.test(String(id)));
+  if (bad !== undefined) return { ok: false, status: 400, code: 'INVALID_INPUT', message: `not an instance id: ${String(bad).slice(0, 80)}` };
+  const organism = await storage.getOrganism(organismId);
+  if (!organism) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Organism not found' };
+  const role = await archiveRoleOf(storage, organism, who);
+  if (role !== 'creator' && role !== 'admin') {
+    return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the creator or an admin can archive organism content' };
+  }
+  const archived: string[] = [];
+  let rows = 0;
+  for (const id of [...new Set(ids.map(String))]) {
+    const key = `organism.${organismId}.w.${ws}.${namespace}.${id}`;
+    const r = await archiveTarget(storage, { level: 'record', orgId: organismId, ws, key }, who.principal);
+    if (r.count > 0) archived.push(id);
+    rows += r.count;
+  }
+  return { ok: true, data: { archived, rows } };
 }

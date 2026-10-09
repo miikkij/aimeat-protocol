@@ -13,6 +13,8 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.7.0 — 2026-10-09 — `ctx.workspace.archiveRecords`: archive many records of one space in one
+ *     call, under the archive route's creator-or-admin rule (services/archive.ts).
  *   v1.6.0 — 2026-10-08 — `ctx.workspace.appendRows` and `readRows`: a row space that names the
  *     extension, also on a schedule or a workflow step (services/extension-workspace.ts).
  *   v1.5.0 — 2026-10-06 — `ctx.workspace.publishRecords` and `deleteRecords`: a batch of records in
@@ -213,6 +215,12 @@ export interface ExtensionCtx {
         publishRecords(organismId: string, ws: string, namespace: string, records: Array<{ id: string; value: unknown; visibility?: string }>, opts?: { expectedVersions?: Record<string, number | null>; createOnly?: boolean; dryRun?: boolean }): Promise<unknown>;
         /** Remove up to 2000 records the caller owns in ONE call: `{ deleted: [{ id, keys }], failed: [{ id, reason }], rows_removed }`. */
         deleteRecords(organismId: string, ws: string, namespace: string, ids: string[]): Promise<unknown>;
+        /**
+         * Archive up to 500 records of one space in ONE call: `{ archived: [ids], rows }`. An archived
+         * record leaves every read and stays restorable. The caller must be the organism's creator or
+         * an admin, and a token needs organism:write, as on POST /v1/organisms/:id/archive.
+         */
+        archiveRecords(organismId: string, ws: string, namespace: string, ids: string[]): Promise<unknown>;
         /**
          * Append up to 500 rows `[{ body, rowId?, occurredAt? }]` to a ROW space that names this
          * extension as `installer/name` (`objectTypes[].extensions`); manifest `workspace.rows`. A repeated `rowId`

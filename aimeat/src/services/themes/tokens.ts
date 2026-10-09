@@ -19,6 +19,7 @@
  * @structure ThemeTokenKind · THEME_TOKENS · CORE_TOKENS · THEME_FACES · FACE_SLOTS · faceStack
  * @usage import { THEME_TOKENS, THEME_FACES } from './tokens.js';
  * @version-history
+ *   v1.4.0 — 2026-10-09 — IBM Plex Sans and IBM Plex Mono, vendored for the SOC console (aimeat-fonts.css v1.4.0).
  *   v1.3.0 — 2026-10-03 — Two more faces, Press Start 2P and Selawik, vendored for the C64 and AZURE themes.
  *   v1.2.0 — 2026-10-02 — Eleven more faces (Instrument Serif and Sans, Schibsted Grotesk, Bricolage
  *     Grotesque, Syne, Unbounded, Gloock, Mona Sans, Hubot Sans, Geist Mono, Martian Mono), vendored
@@ -114,6 +115,9 @@ export const THEME_FACES: Readonly<Record<string, string>> = {
     // Vendored on 2026-10-03 for the C64 and AZURE themes.
     'Press Start 2P': "'Press Start 2P', 'VT323', 'JetBrains Mono', monospace",
     'Selawik': "'Selawik', 'Segoe UI', system-ui, -apple-system, sans-serif",
+    // Vendored on 2026-10-09 for the SOC console's accepted design.
+    'IBM Plex Sans': "'IBM Plex Sans', 'Inter', system-ui, sans-serif",
+    'IBM Plex Mono': "'IBM Plex Mono', 'JetBrains Mono', 'SF Mono', monospace",
 };
 
 /** The three faces a theme may choose, and the token each one sets. */

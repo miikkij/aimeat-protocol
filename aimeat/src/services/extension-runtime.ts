@@ -8,6 +8,7 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.14.0 — 2026-10-09 — `ctx.workspace.archiveRecords`, one host call (services/extension-workspace.ts).
  *   v2.13.0 — 2026-10-08 — `ctx.workspace.appendRows` and `readRows`, one host call each
  *     (services/extension-workspace.ts).
  *   v2.12.0 — 2026-10-06 — `ctx.workspace.publishRecords` and `deleteRecords`, one host call each
@@ -122,6 +123,7 @@ const GUEST_CALL_NAMES: Record<string, string> = {
     __ws_index: 'ctx.workspace.index', __ws_get: 'ctx.workspace.get', __ws_write: 'ctx.workspace.write',
     __ws_writeDoc: 'ctx.workspace.writeDoc', __ws_publish: 'ctx.workspace.publish',
     __ws_publishRecords: 'ctx.workspace.publishRecords', __ws_deleteRecords: 'ctx.workspace.deleteRecords',
+    __ws_archiveRecords: 'ctx.workspace.archiveRecords',
     __ws_appendRows: 'ctx.workspace.appendRows', __ws_readRows: 'ctx.workspace.readRows',
     __wallet_consume: 'ctx.wallet.consume', __wallet_balance: 'ctx.wallet.getBalance',
     __ext_buy: 'ctx.buy', __ai_start: 'ctx.ai.start',
@@ -297,6 +299,7 @@ const __aimeatCtx = (() => {
             // A batch is ONE host call: one count against maxApiCalls, whatever the record count.
             publishRecords: async (org, ws, ns, records, opts) => __call(__ws_publishRecords, [org, ws, ns, JSON.stringify(records ?? []), JSON.stringify(opts || {})]),
             deleteRecords:  async (org, ws, ns, ids)           => __call(__ws_deleteRecords,  [org, ws, ns, JSON.stringify(ids ?? [])]),
+            archiveRecords: async (org, ws, ns, ids)           => __call(__ws_archiveRecords, [org, ws, ns, JSON.stringify(ids ?? [])]),
             // A row space that names this extension; also on a schedule or a workflow step.
             appendRows: async (org, ws, space, rows)  => __call(__ws_appendRows, [org, ws, space, JSON.stringify(rows ?? [])]),
             readRows:   async (org, ws, space, opts)  => __call(__ws_readRows,   [org, ws, space, JSON.stringify(opts || {})]),
@@ -596,6 +599,9 @@ async function runInSandbox(
             counter, limits.maxApiCalls, inflight);
         registerAsyncHostFn(vm, '__ws_deleteRecords',
             wsCap ? async (org, ws, ns, idsJson) => wsCap.deleteRecords(org, ws, ns, JSON.parse(idsJson || '[]') as string[]) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ws_archiveRecords',
+            wsCap ? async (org, ws, ns, idsJson) => wsCap.archiveRecords(org, ws, ns, JSON.parse(idsJson || '[]') as string[]) : null,
             counter, limits.maxApiCalls, inflight);
         registerAsyncHostFn(vm, '__ws_appendRows',
             wsCap ? async (org, ws, space, rowsJson) => wsCap.appendRows(org, ws, space,
