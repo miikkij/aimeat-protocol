@@ -22,6 +22,8 @@
  *   submitInvoice() / refreshDeliveryStatus() glue used by the finance routes
  * @usage const op = getFinvoiceOperator(config); if (op) await submitInvoice(...)
  * @version-history
+ *   v1.1.0 — 2026-10-09 — The operator gateway's error and ack bodies go to the log, redacted, and the
+ *     invoice sender gets a plain sentence (secrets audit d5).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 3.
  */
 import { randomUUID } from 'node:crypto';
@@ -29,6 +31,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { InvoiceRecord, InvoiceDeliveryStatus } from '../../models/finance-schemas.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import { logger } from '../../utils/logger.js';
+import { redactKeyShaped } from '../../utils/redact-credentials.js';
 import { FinanceError } from './errors.js';
 import { buildFinvoiceXml } from './finvoice.js';
 
@@ -75,8 +79,12 @@ function restOperator(config: AimeatConfig): FinvoiceOperator {
         signal: AbortSignal.timeout(20_000),
       });
       const text = await res.text();
+      // The operator's body goes to the log only: the gateway is called with the NODE's key, and a
+      // gateway that echoes the request would hand that key to every owner who sends an invoice.
       if (!res.ok) {
-        throw new FinanceError('OPERATOR_REJECTED', res.status >= 500 ? 502 : 422, `Operator answered ${res.status}: ${text.slice(0, 300)}`);
+        logger.warn(`[finvoice] operator answered ${res.status}`, { reason: redactKeyShaped(text.slice(0, 300)) });
+        throw new FinanceError('OPERATOR_REJECTED', res.status >= 500 ? 502 : 422,
+          `The e-invoice operator refused the invoice (HTTP ${res.status}). The node operator can see the reason in the node log.`);
       }
       let messageId: string | undefined;
       try {
@@ -84,7 +92,11 @@ function restOperator(config: AimeatConfig): FinvoiceOperator {
         messageId = ack.id ?? ack.message_id;
         // eslint-disable-next-line aimeat/no-silent-catch -- a non-JSON ack is handled by the missing-id error below; the raw body is already in that error's context
       } catch { /* non-JSON ack */ }
-      if (!messageId) throw new FinanceError('OPERATOR_PROTOCOL', 502, `Operator ack did not carry a message id: ${text.slice(0, 200)}`);
+      if (!messageId) {
+        logger.warn('[finvoice] operator ack carried no message id', { ack: redactKeyShaped(text.slice(0, 200)) });
+        throw new FinanceError('OPERATOR_PROTOCOL', 502,
+          'The e-invoice operator accepted the invoice but did not say how to follow it. The node operator can see its answer in the node log.');
+      }
       return { messageId };
     },
     async status(messageId: string): Promise<InvoiceDeliveryStatus> {

@@ -4,6 +4,8 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A public route's 500 answer carries a sentence and the request id, never the
+ *     exception text (secrets audit 2026-10-09, 07-side-channels d4).
  *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit, two findings. Phase 3b: every replication
  *     and sync in the file carried a VALID signature, and the two existing refusals are stopped
  *     earlier by the not-an-active-peer check, so the signature block itself had never answered
@@ -1042,6 +1044,30 @@ await test('28. the outbound genesis read needs memory:read, and an agent withou
         body: JSON.stringify({ key: `${GEN_PREFIX}.open`, target_scope: 'genesis' }),
     });
     assert(allowed.status !== 403, `owner was refused: ${allowed.status} ${JSON.stringify(allowed.body)}`);
+});
+
+// ─── A public route's 500 carries no internal text (secrets audit 2026-10-09, d4) ───
+// Until 2026-10-09 the public federation routes answered a failure with String(err), so a caller
+// read the node's own exception text (a TypeError, a SQL error with the database's words). A
+// repeated `keyword` parameter reaches matchesKeyword as an array, which throws on every backend.
+console.log('\nPublic 500 answers');
+
+await test('A public 500 says what happened in a sentence, and the exception text stays in the log', async () => {
+    const tmpl = await fetch(`${BASE}/v1/csm/templates/hobby-directory`);
+    assert(tmpl.status === 200, `template fetch ${tmpl.status}`);
+    const yaml = (await tmpl.text()).replace('"Harrastehakemisto"', JSON.stringify(`Fed500 Directory ${Date.now()}`));
+    const reg = await json('/v1/csm', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ yaml, federate: true }),
+    });
+    assert(reg.status === 201, `csm: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+
+    const broken = await json('/v1/federation/cross-catalogue?source=local&keyword=a&keyword=b');
+    assert(broken.status === 500, `the repeated parameter still breaks the route: ${broken.status} ${JSON.stringify(broken.body)}`);
+    assert(broken.body.error?.code === 'INTERNAL_ERROR', `the code is kept: ${JSON.stringify(broken.body.error)}`);
+    const message = String(broken.body.error?.message ?? '');
+    assert(!/TypeError|toLowerCase|is not a function|at \w+ \(/.test(message), `no exception text reaches the caller: ${message}`);
+    assert(message.includes(String(broken.body.request_id)), `the sentence names the request id the log carries: ${message}`);
 });
 
 // ─── Cleanup ───

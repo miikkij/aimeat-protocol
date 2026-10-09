@@ -1,5 +1,13 @@
-// E2E Tests for Agent Webhook CRUD
-// Run: cd aimeat && pnpm exec tsx test/e2e-agent-webhook.ts
+/**
+ * @file test/e2e-agent-webhook.ts
+ * @description E2E tests for agent webhook CRUD, its delivery log, and the operator backup's
+ *   handling of the webhook secret.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-webhook
+ * @version-history
+ *   v1.1.0 — 2026-10-09 — 3b: the operator's admin backup carries no webhook secret or URL (secrets
+ *     audit 2026-10-09, finding 1.9).
+ *   v1.0.0 — pre-dates the header standard.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -166,6 +174,20 @@ await test('3. PUT webhook with custom secret', async () => {
     assert(body.data.url === WEBHOOK_URL, `url: ${body.data.url}`);
     assert(body.data.secret === customSecret, `secret: ${body.data.secret}`);
     assert(body.data.enabled === true, `enabled: ${body.data.enabled}`);
+});
+
+// Secrets audit 2026-10-09, finding 1.9: GET /v1/admin/backup spread whole agent rows, so every
+// agent's plaintext webhook signing secret was in the file. The owner here is the first owner on a
+// cleared database, so it is the operator.
+await test('3b. The admin backup lists the agent and leaves its webhook secret and URL out', async () => {
+    const { status, body } = await json('/v1/admin/backup', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `backup ${status}: ${JSON.stringify(body?.error)}`);
+    const text = JSON.stringify(body);
+    assert(!text.includes('my-custom-secret-that-is-long-enough-for-validation'), 'the webhook secret is in the backup');
+    const row = (body.data.agents as any[]).find(a => a.gaii === agentGaii);
+    assert(!!row && row.name === agentName && typeof row.publicKey === 'string', `the agent is listed: ${JSON.stringify(row)}`);
+    assert(!('webhookSecret' in row) && !('webhookUrl' in row), `no webhook credential fields: ${Object.keys(row).join(',')}`);
+    assert(Array.isArray(body.data.omitted) && body.data.omitted.length > 0, `the backup says what it left out: ${JSON.stringify(body.data.omitted)}`);
 });
 
 // ─── Phase 4: Validation ───

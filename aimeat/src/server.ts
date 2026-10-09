@@ -13,6 +13,9 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   v1.8.0 — 2026-10-09 — hideInternalErrorText() after systemFaultReporter(): a 500 answer whose code
+ *     means the node failed carries a sentence and the request id, and the exception text goes to the
+ *     log (secrets audit 2026-10-09, d4).
  *   v1.7.0 — 2026-10-08 — The /ucp/ paths keep the raw request body (req.rawBody) beside the parsed
  *     one, for the Content-Digest of a signed UCP request (routes/ucp-checkout.ts).
  *   v1.6.0 — 2026-10-04 — appOriginSignIn() after CORS: the sign-in and registration routes refuse a
@@ -62,6 +65,7 @@ import { setupGuards } from './server-bootstrap/middleware-guards.js';
 import { relayGate } from './middleware/relay-gate.js';
 import { mountRoutes } from './server-bootstrap/routes-loader.js';
 import { systemFaultReporter } from './middleware/system-fault.js';
+import { hideInternalErrorText } from './middleware/internal-error-text.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
 
 export interface ServerResult {
@@ -272,6 +276,9 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // the ENVELOPE rather than the status code: a 500 carrying a caller-error code is not a fault, and
   // a fault answered with a 200 still is one. services/system-fault-report.ts decides what counts.
   app.use(systemFaultReporter(config, storage));
+  // Mounted AFTER the fault reporter, so its res.json wrapper runs first: the exception text of a
+  // 500 goes to the log, and both the caller and the fault report get the sentence instead.
+  app.use(hideInternalErrorText());
 
   // ── Service Initialization ──
   const services = await initializeServices(config, storage);

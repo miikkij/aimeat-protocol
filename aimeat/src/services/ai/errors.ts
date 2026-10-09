@@ -20,6 +20,8 @@
  *   providerReasonFromText · providerReason · retryAfterHeader · providerStatusError · providerFailureOf ·
  *   nodeFailureOf
  * @version-history
+ *   v1.4.0 -- 2026-10-09 -- redactKeyShaped moved to utils/redact-credentials.ts and re-exported here,
+ *     so the node logger applies the same rules without importing a service (secrets audit d1).
  *   v1.3.0 -- 2026-10-08 -- providerStatusError, providerFailureOf, providerReason(FromText) and
  *     CONTENT_REFUSAL (moved from route-run.ts): one status table and one reason policy for every AI
  *     path. A permanent 4xx is 422 PROVIDER_REJECTED with details.provider_status and
@@ -34,6 +36,7 @@
  */
 import { logger } from '../../utils/logger.js';
 import { readBodyPrefix } from '../../utils/read-capped.js';
+import { redactKeyShaped } from '../../utils/redact-credentials.js';
 
 /**
  * The status every AI route answers when the PROVIDER refuses the key that pays (code INVALID_API_KEY):
@@ -72,16 +75,10 @@ const PROVIDER_REASON_READ_BYTES = 4096;
 
 /**
  * Replace anything shaped like a credential with `[redacted]`. A provider's error body can echo the
- * request, a header or the key it refused, and the reason is shown to the caller and logged.
+ * request, a header or the key it refused, and the reason is shown to the caller and logged. The
+ * rules live in utils/redact-credentials.ts since 2026-10-09, shared with the node logger.
  */
-export function redactKeyShaped(text: string): string {
-  return text
-    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
-    .replace(/\b(api[_-]?key|access[_-]?token|token|secret|password|authorization)(["']?\s*[:=]\s*["']?)[^\s"',}]+/gi, '$1$2[redacted]')
-    .replace(/\b(?:sk|pk|rk|ak|xai|gsk)-[A-Za-z0-9_-]{8,}/g, '[redacted]')
-    .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, '[redacted]')
-    .replace(/[A-Za-z0-9_-]{32,}/g, '[redacted]');
-}
+export { redactKeyShaped };
 
 /** JSON.parse that answers undefined for text that is not JSON, which a provider's error body often is not. */
 function parseOrUndefined(text: string): unknown {

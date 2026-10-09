@@ -25,6 +25,8 @@
  *   registerLoginLinkSecondFactorRoute(router, config, storage)
  * @usage registerLoginLinkSecondFactorRoute(router, config, storage);
  * @version-history
+ *   v1.0.2 — 2026-10-09 — The LOGIN_LINK_FAILED sentence passes the 500 text filter through
+ *     keepErrorMessage (middleware/internal-error-text.ts; secrets audit d4).
  *   v1.0.1 — 2026-10-09 — The ticket is consumed by the request whose delete removed it; a second
  *     request racing with the same ticket is refused.
  *   v1.0.0 — 2026-10-09 — Initial (secaudit 2026-10-09, S1).
@@ -37,6 +39,7 @@ import { AccountDisabledError } from '../../auth/jwt.js';
 import { establishForGhii } from '../../services/external-login.js';
 import { checkSecondFactor } from '../../services/password-check.js';
 import { success, error } from '../../middleware/envelope.js';
+import { keepErrorMessage } from '../../middleware/internal-error-text.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 
@@ -182,7 +185,7 @@ export function registerLoginLinkSecondFactorRoute(router: Router, config: Aimea
                 return;
             }
             logger.error('login link second factor failed', { error: String(err) });
-            res.status(500).json(error(config.nodeId, 'LOGIN_LINK_FAILED', 'Sign-in did not go through. Ask for a new sign-in link.'));
+            res.status(500).json(keepErrorMessage(error(config.nodeId, 'LOGIN_LINK_FAILED', 'Sign-in did not go through. Ask for a new sign-in link.')));
             return;
         }
         res.json(success(config.nodeId, { redirect: payload.back ?? `${config.baseUrl}/` }));

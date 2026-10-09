@@ -20,6 +20,8 @@
  * @structure STRIPE_HANDLER_ID · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   v1.5.0 — 2026-10-09 — Stripe's error text goes to the log, redacted, and the buyer gets a plain
+ *     sentence; only a card_error, which Stripe writes for the cardholder, passes (secrets audit d5).
  *   v1.4.0 — 2026-10-08 — collect charges a shared payment token (spt_…) as payment_method_data
  *     under Stripe-Version 2026-09-30.preview, for the UCP guest checkout. Not run against Stripe
  *     itself here: a test-mode SPT needs a seller's Stripe account with agentic commerce on.
@@ -40,6 +42,7 @@ import { PaymentError } from './payment-handlers.js';
 import { bookPayable } from './payable-book.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
+import { redactKeyShaped } from '../utils/redact-credentials.js';
 import { MONEY_CURRENCIES, microsToStripeMinor } from './money.js';
 
 type EncryptionConfig = { encryptionKey: string | null; totpSecretEncryptionKey: string | null };
@@ -63,6 +66,13 @@ function sellerKey(config: EncryptionConfig, seller: { psp?: unknown } | undefin
   return key;
 }
 
+/** What the buyer reads when Stripe refuses for a reason on the seller's side or Stripe's own. */
+const STRIPE_SELLER_SIDE = 'The card payment could not be made, because the seller\'s payment setup did not accept it. Try again later, or ask the seller.';
+/** What the buyer reads when Stripe refuses this request and the reason is not one written for the buyer. */
+const STRIPE_REFUSED = 'The card payment provider refused this payment. Check the card details, or try another card.';
+/** What the buyer reads when Stripe's answer could not be read. */
+const STRIPE_UNREADABLE = 'The card payment provider gave an answer the node could not read. Try again shortly.';
+
 /**
  * One raw Stripe REST call through safeFetch (Rule 10: all non-constant outbound HTTP). Params are
  * form-encoded, bracket notation included. Stripe's own 4xx becomes a 422 the buyer can act on; an
@@ -83,19 +93,25 @@ async function stripeApi(
   // Read the body as TEXT first: Stripe answers JSON, but a proxy or an outage answers HTML, and
   // swallowing that into an empty object would report "Stripe failed" with no reason at all.
   const raw = await res.text();
-  let body: { error?: { message?: string } } | null = null;
+  let body: { error?: { message?: string; type?: string; code?: string } } | null = null;
   try {
-    body = JSON.parse(raw) as { error?: { message?: string } };
+    body = JSON.parse(raw) as { error?: { message?: string; type?: string; code?: string } };
   } catch (parseErr) {
-    if (res.ok) {
-      throw new PaymentError('PSP_ERROR', 502,
-        `Stripe ${path} returned a non-JSON body (${res.status}): ${raw.slice(0, 200)}`);
-    }
-    logger.error(`[stripe] non-JSON error body from ${path} (${res.status}): ${raw.slice(0, 200)} — ${String(parseErr)}`);
+    logger.error(`[stripe] non-JSON body from ${path} (${res.status}): ${redactKeyShaped(raw.slice(0, 200))} — ${String(parseErr)}`);
+    if (res.ok) throw new PaymentError('PSP_ERROR', 502, STRIPE_UNREADABLE);
   }
   if (!res.ok) {
     const status = res.status === 401 ? 502 : (res.status >= 400 && res.status < 500 ? 422 : 502);
-    throw new PaymentError('PSP_ERROR', status, body?.error?.message ?? `Stripe ${path} failed (${res.status})`);
+    const err = body?.error;
+    // Stripe's text for anything but a card refusal describes the SELLER's account and key
+    // ("Invalid API Key provided: sk_live_****abcd"), and the buyer is the one reading this
+    // answer. It goes to the log; the buyer gets a sentence. A card_error is the one kind Stripe
+    // writes for the cardholder ("Your card was declined."), so it passes, redacted.
+    logger.warn(`[stripe] ${path} answered ${res.status}`, { type: err?.type, code: err?.code, reason: redactKeyShaped(err?.message ?? '') });
+    if (err?.type === 'card_error' && err.message) {
+      throw new PaymentError('PSP_ERROR', status, redactKeyShaped(err.message));
+    }
+    throw new PaymentError('PSP_ERROR', status, status === 502 ? STRIPE_SELLER_SIDE : STRIPE_REFUSED);
   }
   return body as unknown as Record<string, unknown>;
 }

@@ -109,6 +109,61 @@ it('never evicts a pending request when all 10,000 slots are occupied', async ()
     expect(next).toHaveBeenCalledTimes(10_000);
 });
 
+// Secrets audit 2026-10-09, finding 1.8: the cache kept the whole body for 24 hours, so a replay
+// with the same key handed a one-time secret (SCIM token, PAT, agent key, TOTP secret, backup codes)
+// out a second time. A replay of such a request is answered the way a lost response is answered.
+const ONE_TIME_BODIES: Array<[string, unknown]> = [
+    ['a SCIM token', { ok: true, data: { scim_token: 'aimeat_scim_CANARYxyz', note: 'shown once' } }],
+    ['a personal access token', { ok: true, data: { token: 'aimeat_pat_CANARYxyz', id: 'pat-1' } }],
+    ['an agent private key', { ok: true, data: { agent: { gaii: 'a#o@n' }, private_key: 'CANARYkey' } }],
+    ['a TOTP secret and backup codes', { ok: true, data: { secret: 'CANARYBASE32', backup_codes: ['c1', 'c2'] } }],
+    ['an OAuth token pair', { ok: true, access_token: 'CANARYjwt', refresh_token: 'CANARYrefresh' }],
+    ['a webhook secret', { ok: true, data: { url: 'https://x.example', secret: 'CANARYwebhook' } }],
+];
+for (const [label, body] of ONE_TIME_BODIES) {
+    it(`a replay never hands out ${label} again`, async () => {
+        const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+        const req = request(), first = response(), next = vi.fn();
+        middleware(req, first, next);
+        first.status(201).json(body);
+        const replay = response();
+        middleware(req, replay, next);
+        expect(next).toHaveBeenCalledTimes(1); // the mint did not run twice
+        expect(JSON.stringify(replay.body)).not.toContain('CANARY');
+        expect(replay.statusCode).toBe(409);
+        expect(replay.body).toMatchObject({ ok: false, error: { code: 'IDEMPOTENCY_RESULT_UNAVAILABLE' } });
+    });
+}
+
+it('a response marked Cache-Control: no-store is not kept for a replay', async () => {
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const req = request(), first = response(), next = vi.fn();
+    const headers: Record<string, string> = {};
+    Object.assign(first, {
+        set(k: string, v: string) { headers[k.toLowerCase()] = v; return first; },
+        getHeader(k: string) { return headers[k.toLowerCase()]; },
+    });
+    middleware(req, first, next);
+    (first as unknown as { set: (k: string, v: string) => void }).set('Cache-Control', 'no-store');
+    first.json({ ok: true, data: { opaque: 'CANARYvalue' } });
+    const replay = response();
+    middleware(req, replay, next);
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(replay.body)).not.toContain('CANARY');
+    expect(replay.body).toMatchObject({ ok: false, error: { code: 'IDEMPOTENCY_RESULT_UNAVAILABLE' } });
+});
+
+it('an ordinary response is still replayed, flags and counts included', async () => {
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const req = request(), first = response(), next = vi.fn();
+    middleware(req, first, next);
+    first.status(201).json({ ok: true, data: { key: 'notes.a', version: 2, has_password: true, max_tokens: 10 } });
+    const replay = response();
+    middleware(req, replay, next);
+    expect(replay.statusCode).toBe(201);
+    expect(replay.body).toEqual(first.body);
+});
+
 it('a real HTTP disconnect and concurrent duplicate still execute a slow write only once', async () => {
     vi.useRealTimers();
     const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();

@@ -13,11 +13,14 @@
  *   - logger: the configured Winston logger (console transport, AIMEAT_LOG_LEVEL or LOG_LEVEL)
  *
  * @version-history
+ *   v1.2.0 — 2026-10-09 — Credential masking is case-insensitive, recursive (bounded, cycle-safe) and
+ *     scrubs key-shaped text in every string, through utils/redact-credentials.ts (secrets audit d1).
  *   v1.1.0 — 2026-09-08 — AIMEAT_LOG_LEVEL is honoured, LOG_LEVEL kept as the fallback.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import winston from 'winston';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { redactCredentialField } from './redact-credentials.js';
 
 export interface RequestContext {
   requestId?: string;
@@ -36,14 +39,21 @@ const contextFormat = winston.format((info) => {
   return info;
 });
 
-/** SECURITY: Mask sensitive fields in log output to prevent credential leaks. */
-const SENSITIVE_FIELDS = ['token', 'password', 'private_key', 'privateKey', 'secret', 'authorization', 'cookie', 'encryptionKey'];
+/** Top-level fields winston itself sets; nothing a caller passes lands in them. */
+const LOGGER_FIELDS = new Set(['level', 'timestamp', 'node_id', 'requestId', 'gaii']);
 
+/**
+ * SECURITY: mask credentials in every log entry. A field whose name is a credential's (any case,
+ * any depth, `Authorization`, `headers.authorization`, `client_secret`) is masked, and every string
+ * (the message, an `error: String(err)`, a stack) has key-shaped text replaced. The rules are
+ * utils/redact-credentials.ts, the same ones the AI provider errors use. Until 2026-10-09 eight
+ * exact lowercase names were masked at the top level only (secrets audit, 07-side-channels d1).
+ * Nested objects are copied, so an object the caller still holds keeps its values.
+ */
 const maskSensitive = winston.format((info) => {
-  for (const field of SENSITIVE_FIELDS) {
-    if (info[field] !== undefined) {
-      info[field] = '***REDACTED***';
-    }
+  for (const key of Object.keys(info)) {
+    if (LOGGER_FIELDS.has(key)) continue;
+    info[key] = redactCredentialField(key, info[key]);
   }
   return info;
 });

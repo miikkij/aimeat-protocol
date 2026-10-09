@@ -28635,7 +28635,18 @@ paths:
     get:
       operationId: getBackup
       summary: Export all data
-      description: Full data backup as JSON. Operator only.
+      description: |
+        Data backup as JSON: owners, agents, actions, boards, and each agent's memory and
+        transactions. Operator only.
+
+        The backup carries no credential. Owner and agent rows are written from a list of allowed
+        fields, so a field the list does not name stays out. Left out (since 2026-10-09):
+        passwords, private keys and tokens; each agent's webhook URL and signing secret (a webhook
+        URL can carry its credential in the path); each agent's signed card (`cardJws`), which is
+        issued again at enrolment; and memory records that hold a credential (AI provider keys,
+        payment provider settings, decide keys) or a workspace share password. `data.omitted`
+        lists the same in the response, so a restore knows what to set again. `data.version` is
+        `1.3`.
       tags: [Admin]
       security:
         - BearerAuth: []
