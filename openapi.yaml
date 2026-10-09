@@ -66552,7 +66552,7 @@ paths:
       operationId: installAdminExtension
       tags: [Admin]
       summary: Install a bundled extension
-      description: Operator only. One-click installs a bundled extension by name from disk, and keeps its version, so `name@version` answers with the code installed here.
+      description: Operator only. One-click installs a bundled extension by name from disk, and keeps its version, so `name@version` answers with the code installed here. The manifest is read by the same builder as POST /v1/extensions (capabilities, network hosts and host fields, secret fields, validation); a manifest it refuses answers 400 with its own code, and one whose name differs from its folder 400 NAME_MISMATCH. The extension is switched on at once; `schedules_not_registered` says when its scheduled jobs could not be registered.
       security:
         - BearerAuth: []
       parameters:
@@ -66581,6 +66581,8 @@ paths:
                               description: { type: string }
                               status: { type: string }
                               actionsCount: { type: integer }
+                          schedules_not_registered: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -66596,7 +66598,11 @@ paths:
         deploys is kept, so `name@version` answers with that code. A version is kept once: other
         code under a version already kept is refused with 409 VERSION_EXISTS before anything is
         written, and the change needs a new version in extension.yaml. The same code again is no
-        conflict.
+        conflict. The manifest is read and stored as on PUT /v1/extensions/{name}: the same builder
+        (capabilities, network hosts and host fields, secret fields; 400 for a manifest it refuses,
+        400 NAME_MISMATCH when the manifest names another extension than its folder), and an update
+        keeps the installed copy's status, stored secrets and host field values. A fresh install is
+        switched on.
       security:
         - BearerAuth: []
       parameters:
@@ -66625,6 +66631,8 @@ paths:
                               status: { type: string }
                               actionsCount: { type: integer }
                           reinstalled: { type: boolean }
+                          schedules_not_registered: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
