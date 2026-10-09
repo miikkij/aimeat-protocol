@@ -4406,7 +4406,8 @@
       "outbound": "sähköposti yhteystiedoillesi",
       "company": "yrityksesi",
       "signals": "viestiesi ja sivujesi tavoittavuus",
-      "secrets": "täällä pitämäsi avaimet"
+      "secrets": "täällä pitämäsi avaimet",
+      "ext": "tilillesi asennetut laajennukset"
     },
     "scopeText": {
       "push": {
@@ -4430,6 +4431,9 @@
       },
       "work": {
         "request": "Pyytää agentteja ja sovelluksia tekemään töitä puolestasi, esimerkiksi automaatioidesi askeleina, ja arvioi tulokset."
+      },
+      "ext": {
+        "invoke": "Ajaa tilillesi asennettujen laajennusten toimintoja, myös automaatioidesi askeleina. Se ei voi asentaa eikä poistaa laajennuksia."
       }
     }
   },

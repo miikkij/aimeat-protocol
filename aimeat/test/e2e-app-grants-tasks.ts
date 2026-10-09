@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants-tasks
  * @version-history
+ *   v1.2.0 — 2026-10-09 — ext:invoke is an app word: an app granted it with workflow:write saves and
+ *     runs a workflow with an extension step, and without it the save is refused naming the word.
  *   v1.1.0 — 2026-09-26 — work:request is an app word: an app granted it with workflow:write saves a
  *     workflow with an agent step, and without it the save is refused naming the word.
  *   v1.0.0 — 2026-07-07 — Initial (TARGET-006 AGENCY: task and workflow app-grant scopes).
@@ -194,6 +196,47 @@ async function main() {
         const giver = await grantApp(['workflow:read', 'workflow:write', 'work:request', 'memory:read']);
         const saved = await json('/v1/workflows/agency-flow', { method: 'PUT', headers: { Authorization: `Bearer ${giver}` }, body: JSON.stringify(flow) });
         assert(saved.status === 200 && saved.body.data.savedBy?.kind === 'app', `with work:request: ${saved.status} ${JSON.stringify(saved.body.error ?? saved.body.data?.savedBy)}`);
+    });
+
+    console.log('\nPhase 3c: ext:invoke — the app runs the owner\'s extension through a workflow step');
+    await test('an app granted workflow:write and ext:invoke saves and runs a workflow with an extension step', async () => {
+        // The owner's own extension, one action that answers without reaching anything.
+        const ext = `grantext${Date.now() % 100000}`;
+        const scripts = { ping: 'export default async function (ctx, input) { return { pong: true, at: input.at || null }; }' };
+        // The manifest is YAML text, and JSON is YAML.
+        const manifest = JSON.stringify({ metadata: { name: ext, version: '1.0.0', description: 'app grant ext e2e', author: 'e2e' },
+            actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'ping' }] });
+        const inst = await json('/v1/extensions', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ manifest, scripts }) });
+        assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body?.error)}`);
+        const act = await json(`/v1/extensions/${ext}/activate`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(act.status === 200, `activate: ${act.status}`);
+        const flow = {
+            title: 'Extension flow', description: 'the app runs the owner\'s extension', trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+            steps: [{ id: 'ping', description: 'Ping', required_to_function: 'none',
+                action: { kind: 'extension', extension: ext, action: 'ping', input: { at: 'e2e' }, result_to_key: 'grantext.pong' },
+                success_signal: { kind: 'deterministic', key: 'grantext.pong', op: 'exists' } }],
+        };
+        // HOLE: before this change ext:invoke was not an app word, so no owner could grant it and an
+        // app could not save this workflow at all (authorize answered 400 for the word).
+        const without = await grantApp(['workflow:read', 'workflow:write', 'memory:read']);
+        const refused = await json('/v1/workflows/ext-flow', { method: 'PUT', headers: { Authorization: `Bearer ${without}` }, body: JSON.stringify(flow) });
+        assert(refused.status === 403 && /ext:invoke/.test(refused.body?.error?.message ?? ''), `without ext:invoke: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+        const runner = await grantApp(['workflow:read', 'workflow:write', 'memory:read', 'ext:invoke']);
+        const saved = await json('/v1/workflows/ext-flow', { method: 'PUT', headers: { Authorization: `Bearer ${runner}` }, body: JSON.stringify(flow) });
+        assert(saved.status === 200 && saved.body.data.savedBy?.kind === 'app', `save with ext:invoke: ${saved.status} ${JSON.stringify(saved.body.error ?? saved.body.data?.savedBy)}`);
+        const started = await json('/v1/workflows/ext-flow/run', { method: 'POST', headers: { Authorization: `Bearer ${runner}` }, body: JSON.stringify({ mode: 'full' }) });
+        const runId = started.body?.data?.run?.runId ?? started.body?.data?.runId;
+        assert(started.status === 200 && !!runId, `run: ${started.status} ${JSON.stringify(started.body?.error ?? started.body?.data)}`);
+        let run: any = null;
+        for (let i = 0; i < 60; i++) {
+            const r = await json(`/v1/workflows/ext-flow/runs/${runId}`, { headers: { Authorization: `Bearer ${runner}` } });
+            run = r.body?.data?.run ?? r.body?.data;
+            if (run && !['running', 'waiting-step'].includes(run.status)) break;
+            await new Promise(res => setTimeout(res, 250));
+        }
+        assert(run?.status === 'done', `run status: ${run?.status} ${JSON.stringify(run?.steps ?? run)}`);
+        const pong = await json('/v1/memory/grantext.pong', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(pong.status === 200 && JSON.stringify(pong.body.data.value).includes('pong'), `result: ${pong.status} ${JSON.stringify(pong.body.data?.value)}`);
     });
 
     console.log('\nPhase 4: least-privilege — no scope, no access');
