@@ -91,7 +91,7 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [Preact](https://preactjs.com) | 10.29.8 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
 | [htm](https://github.com/developit/htm) | 3.1.1 | Apache-2.0 | Copyright (c) Jason Miller and the htm contributors | served by the node | notice only |
 | [minidenticons](https://github.com/laurentpayot/minidenticons) | 4.2.1 | MIT | Copyright (c) 2021 Laurent Payot | served by the node | notice only |
-| [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
+| [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
 | [KaTeX](https://katex.org) | 0.18.5 | MIT | Copyright (c) 2013-2020 Khan Academy and other contributors | served by the node | notice only |
 | [AIMEAT (this project's own served libraries)](https://github.com/miikkij/aimeat-protocol) | see each file's @version-history header | MIT | Copyright (c) 2026 Jouni Miikki | served by the node | notice only |
 | [models.dev (model data)](https://models.dev) | 2026-09-28 | MIT | Copyright (c) 2025 models.dev | served by the node | notice only |
@@ -6620,7 +6620,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik see fonts/LICENSE.md
+### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono see fonts/LICENSE.md
 
 ```text
 Copyright (c) <dates>, <Copyright Holder> (<URL|email>),
@@ -12991,7 +12991,7 @@ its NOTICE file:
   (c) Copyright [2014-2015] Hewlett-Packard Development Company, L.P
 ```
 
-### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik see fonts/LICENSE.md
+### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono see fonts/LICENSE.md
 
 ```text
 # Vendored font licenses
@@ -13025,6 +13025,8 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | Mona Sans | v2.0.27 (variable wdth 75–125, opsz, wght 200–900; one file, latin and latin-ext whole) | `mona-sans-var.woff2` | © 2022 The Mona Sans Project Authors (https://github.com/github/mona-sans), Reserved Font Name "Mona" | https://github.com/github/mona-sans/releases/tag/v2.0.27 |
 | Hubot Sans | v1.0.1 (variable slnt, wdth 75–125, wght 200–900; one file, latin and latin-ext whole) | `hubot-sans-var.woff2` | © 2022 GitHub (https://github.com/github/hubot-sans), Reserved Font Name "Hubot Sans" | https://github.com/github/hubot-sans/releases/tag/v1.0.1 |
 | Press Start 2P | v16 (400, the only cut) | `press-start-2p-400-latin.woff2`, `press-start-2p-400-latin-ext.woff2` | © 2012 The Press Start 2P Project Authors (cody@zone38.net), Reserved Font Name "Press Start 2P" | https://fonts.google.com/specimen/Press+Start+2P |
+| IBM Plex Sans | v23 on Google Fonts (variable wdth 85–100, wght 100–700) | `ibm-plex-sans-var-latin.woff2`, `ibm-plex-sans-var-latin-ext.woff2` | © 2017 IBM Corp. (https://github.com/IBM/plex), Reserved Font Name "Plex" | https://fonts.google.com/specimen/IBM+Plex+Sans |
+| IBM Plex Mono | v20 on Google Fonts (static 400 and 500) | `ibm-plex-mono-400-latin.woff2`, `ibm-plex-mono-400-latin-ext.woff2`, `ibm-plex-mono-500-latin.woff2`, `ibm-plex-mono-500-latin-ext.woff2` | © 2017 IBM Corp. (https://github.com/IBM/plex), Reserved Font Name "Plex" | https://fonts.google.com/specimen/IBM+Plex+Mono |
 | Selawik | 1.01 (static 300, 350, 400, 600, 700; one file per cut, each whole) | `selawik-300.woff2`, `selawik-350.woff2`, `selawik-400.woff2`, `selawik-600.woff2`, `selawik-700.woff2` | © 2015 Microsoft Corporation (www.microsoft.com), Reserved Font Name Selawik; Selawik is a trademark of Microsoft Corporation | https://github.com/microsoft/Selawik/releases/tag/1.01 |
 
 Baloo 2 + Bangers vendored 2026-07-19 for the self-hosted `fonts` capability pack
