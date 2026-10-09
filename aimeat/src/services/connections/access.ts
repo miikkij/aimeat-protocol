@@ -17,9 +17,12 @@
  *   leaves: provider, account label and status — enough for an app to name a connection and tell a
  *   person which account it is — while the credential and the provider's own scope vocabulary never
  *   appear in it.
- * @structure listOwnConnections · requireOwnConnection · toPublicConnection · toPublicClient
+ * @structure listOwnConnections · requireOwnConnection · listAgentsConnections ·
+ *   requireAgentsConnection · toPublicConnection · toPublicClient
  * @usage const conn = await requireOwnConnection(storage, principal, id);
  * @version-history
+ *   v1.2.0 — 2026-10-09 — listAgentsConnections and requireAgentsConnection: the owner in person sees
+ *     and revokes the accounts their agents connected (secrets audit 2026-10-09, F2).
  *   v1.1.0 — 2026-09-05 — toPublicClient moved here from routes/connections.ts by pure extraction,
  *     because the Access page's composite read shows the same rows and must not shape them twice.
  *   v1.0.0 — 2026-08-26 — Extracted from routes/connections.ts when the MCP surface was added, so
@@ -52,6 +55,44 @@ export async function listOwnConnections(
 ): Promise<PublicConnection[]> {
   const rows = await storage.listConnections({ principal });
   return rows.map(toPublicConnection);
+}
+
+/** An account one of the owner's agents connected, as the owner sees it: the public shape plus whose. */
+export interface PublicAgentConnection extends PublicConnection {
+  /** The agent's name, as the owner knows it. */
+  agent: string;
+  /** The agent's identity, which the connection is stored under. */
+  principal: string;
+}
+
+/**
+ * The accounts the owner's agents connected, each under its own GAII. Only the owner in person asks
+ * this (routes/connections-agents.ts): an agent's mailbox is its own to every other caller, and its
+ * owner is the one person who must be able to see it and take it away (secrets audit 2026-10-09, F2).
+ */
+export async function listAgentsConnections(
+  storage: Storage, ownerName: string,
+): Promise<PublicAgentConnection[]> {
+  const out: PublicAgentConnection[] = [];
+  for (const agent of await storage.getAgentsByOwner(ownerName)) {
+    for (const c of await storage.listConnections({ principal: agent.gaii })) {
+      out.push({ ...toPublicConnection(c), agent: agent.name, principal: agent.gaii });
+    }
+  }
+  return out;
+}
+
+/**
+ * The connection, if one of this owner's agents holds it. Null when it is not, when it is the
+ * owner's own, and when there is none, alike: the owner revokes their own on the ordinary route.
+ */
+export async function requireAgentsConnection(
+  storage: Storage, ownerName: string, connectionId: string,
+): Promise<ConnectionRecord | null> {
+  const conn = await storage.getConnection(connectionId);
+  if (!conn) return null;
+  const agents = await storage.getAgentsByOwner(ownerName);
+  return agents.some(a => a.gaii === conn.principal) ? conn : null;
 }
 
 /**

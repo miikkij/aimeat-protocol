@@ -71,6 +71,12 @@ true: the owner opens it signed in, confirms (`POST /v1/oauth-rounds/{state}/app
 the provider from there. A callback from any other browser is refused with 403 and connects nothing,
 so an address handed to somebody else cannot put their account under the starter.
 
+**An agent's accounts are its own, and its owner sees them.** An agent connects under its own
+identity, so only that agent can use the account. The owner in person lists every account their
+agents connected with `GET /v1/connections/agents` (Access page, "Accounts your agents connected")
+and takes one away with `DELETE /v1/connections/agents/{id}`; an agent, an app and another owner are
+refused. Deleting an agent deletes its connections and its own app registrations with it.
+
 PKCE throughout, with the `state` nonce held server-side rather than round-tripped. The provider
 redirects to `GET /v1/connections/callback`, the node exchanges the code, seals the credential with
 AES-256-GCM and asks the provider who the account belongs to, so the connection has a name and a

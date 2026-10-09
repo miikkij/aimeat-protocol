@@ -7959,8 +7959,9 @@ paths:
         issued token outlives a narrowing), `sign_in` (password set, organisation-managed or not,
         two-step state, passkeys, and the OPEN sessions grouped: the person's by device with the
         caller's own marked current, the agents' by agent, and how many expired rows the store still
-        keeps) and `connections` (the accounts connected at other services, the providers on offer,
-        the person's own app registrations). No secret leaves. Readable by the owner, or by a
+        keeps) and `connections` (the accounts connected at other services, the accounts the
+        person's agents connected as `agent_connections`, the providers on offer, the person's own
+        app registrations). No secret leaves. Readable by the owner, or by a
         principal carrying `account:security`, the scope no wildcard carries.
       tags: [Auth]
       security:
@@ -58209,6 +58210,102 @@ paths:
           description: >
             Connected accounts were made with this app. The message says how many. Disconnect them
             first.
+  /v1/connections/agents:
+    get:
+      operationId: listAgentsConnections
+      summary: The accounts the owner's agents connected
+      description: >
+        Owner in person only. An agent connects an outside account under its own identity, so the
+        ordinary list never shows it to the owner. Each row is the public projection (provider,
+        mode, account label, status) plus the agent's name and identity: no credential, no provider
+        scopes. Any agent, app grant or visitor is refused with 403.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The agents' connections
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          connections:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                provider:
+                                  type: string
+                                mode:
+                                  type: string
+                                  enum: [personal, shared]
+                                accountLabel:
+                                  type: string
+                                status:
+                                  type: string
+                                agent:
+                                  type: string
+                                  description: The agent's name.
+                                principal:
+                                  type: string
+                                  description: The agent's identity, which the connection is stored under.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not the owner in person.
+        '503':
+          description: Outbound connections are not enabled on this node.
+  /v1/connections/agents/{id}:
+    delete:
+      operationId: revokeAgentsConnection
+      summary: Revoke an account one of the owner's agents connected
+      description: >
+        Owner in person only. Tells the provider first where it offers a way to be told, then removes
+        the credential locally regardless; told_provider reports which happened. A connection that
+        is not one of this owner's agents' (another owner's, the owner's own, or none) answers one
+        404. The agent itself is refused with 403.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          revoked:
+                            type: boolean
+                          told_provider:
+                            type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not the owner in person.
+        '404':
+          description: No such connection of this owner's agents.
+        '503':
+          description: Connections are off, or the node has no encryption key.
   /v1/connections/attempts:
     get:
       operationId: listPublishHistory

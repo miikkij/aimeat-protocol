@@ -15,6 +15,9 @@
  * @structure ConnectionsSection — GET /v1/connections + /providers + /clients, connect via a
  *   pop-up, revoke · OwnApp — one service's own-app credentials.
  * @version-history
+ *   v1.8.0 — 2026-10-09 — "Accounts your agents connected": the owner sees each account an agent
+ *     connected, named by its agent, and disconnects it (GET and DELETE /v1/connections/agents;
+ *     secrets audit 2026-10-09, F2).
  *   v1.7.2 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.7.1 — 2026-09-26 — An account's name turns coral under the pointer again, as main's
@@ -51,7 +54,7 @@ import { Action, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { TextField } from '/components/TextField.js';
-import { Row as Line, Stack, Split } from '/components/Layout.js';
+import { Row as Line, Stack, Split, Space } from '/components/Layout.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -70,6 +73,8 @@ const NOTES = {
  */
 export function ConnectionsSection({ showToast, inRow }) {
   const [connections, setConnections] = useState([]);
+  /** The accounts the owner's agents connected, each naming its agent (GET /v1/connections/agents). */
+  const [agentConnections, setAgentConnections] = useState([]);
   const [providers, setProviders] = useState([]);
   const [instances, setInstances] = useState({});
   // Supplied credentials, per provider per field. Held only until the POST; nothing here is
@@ -99,6 +104,15 @@ export function ConnectionsSection({ showToast, inRow }) {
       setProviders(provs?.data?.providers || []);
       setOwnClients(mine?.data?.clients || []);
       setUnavailable(false);
+      // Read on its own: it answers only the owner in person, and a refusal there must not hide
+      // the owner's own accounts above.
+      try {
+        const agents = await apiGet('/v1/connections/agents');
+        setAgentConnections(agents?.data?.connections || []);
+      } catch (err) {
+        swallowed('connections-agents-load', err);
+        setAgentConnections([]);
+      }
     } catch (err) {
       // A node with the capability switched off answers 503. Saying so beats an empty list that
       // reads as "you have no accounts".
@@ -298,6 +312,28 @@ export function ConnectionsSection({ showToast, inRow }) {
     });
   }, [confirm, load, showToast]);
 
+  /** Take an account away from one of the owner's agents: DELETE /v1/connections/agents/:id. */
+  const revokeAgent = useCallback((conn) => {
+    const message = (t('profile.access.cxAgentConfirm') || 'Disconnect {account} from the agent {agent}? The agent can no longer use it.')
+      .replace('{account}', conn.accountLabel).replace('{agent}', conn.agent);
+    confirm(message, async () => {
+      try {
+        const res = await apiDelete('/v1/connections/agents/' + encodeURIComponent(conn.id));
+        showToast(res?.data?.told_provider
+          ? (t('profile.access.cxRevokedTold') || 'Disconnected, and the service was told.')
+          : (t('profile.access.cxRevokedLocal') || 'Disconnected here. The service could not be reached, so check it there too.'));
+        await load();
+      } catch (err) {
+        swallowed('connections-agent-revoke', err);
+        showToast(t('profile.access.cxRevokeFailed') || 'Could not disconnect that account');
+      }
+    }, {
+      title: t('profile.access.cxDisconnect') || 'Disconnect',
+      confirmLabel: t('profile.access.cxDisconnect') || 'Disconnect',
+      danger: true,
+    });
+  }, [confirm, load, showToast]);
+
   if (unavailable) return null;
 
   /* One service per block, and the eye has to tell where one ends: from the second block on, a
@@ -323,6 +359,20 @@ export function ConnectionsSection({ showToast, inRow }) {
               <${Action} small row onClick=${() => connect({ id: c.provider })}>${t('profile.access.cxReconnect') || 'Reconnect'}<//>
             `}
             <${Action} small row tone="danger" onClick=${() => revoke(c)}>${t('profile.access.cxDisconnect') || 'Disconnect'}<//>
+          <//>
+        <//>
+      `)}
+    <//>
+
+    <${Space} above="section">
+      <${SubHeading} level=${4} desc=${t('profile.access.cxAgentsIntro')}>${t('profile.access.cxAgentsTitle') || 'Accounts your agents connected'}<//>
+    <//>
+    <${List} cols="name-state" keepCols empty=${t('profile.access.cxAgentsEmpty') || 'Your agents have not connected any accounts.'}>
+      ${agentConnections.map(c => html`
+        <${Row} key=${c.id} hover>
+          <${Name} meta=${(t('profile.access.cxAgentMeta') || '{provider} · agent {agent}').replace('{provider}', c.provider ?? '').replace('{agent}', c.agent ?? '')}>${c.accountLabel}<//>
+          <${Doors}>
+            <${Action} small row tone="danger" onClick=${() => revokeAgent(c)}>${t('profile.access.cxDisconnect') || 'Disconnect'}<//>
           <//>
         <//>
       `)}
