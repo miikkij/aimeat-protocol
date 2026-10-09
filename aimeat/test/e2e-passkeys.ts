@@ -26,6 +26,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=passkeys
  * @version-history
+ *   v1.3.0 — 2026-10-09 — An erased account's devices do not sign in the next holder of the released
+ *     name (secrets audit 2026-10-09, finding 1.2).
  *   v1.2.0 — 2026-09-24 — Two-step sign-in armed: a device that does not check the person is
  *     refused at sign-in and when it is added, and one that does still works (audit A3-2).
  *   v1.1.0 — 2026-09-14 — A sign-in refused because the account is deactivated leaves no "last
@@ -543,6 +545,39 @@ async function main() {
         const r = await passkeyLogin(pinKey, carol);
         assert(r.status === 200, `a device that checks the person signs in: ${r.status} ${JSON.stringify(r.body.error)}`);
         assert(r.body.data.owner?.name === carol, `the session is Carol's, got ${r.body.data.owner?.name}`);
+    });
+
+    await test('an erased account takes its devices with it: the next holder of the name is not signed in by them', async () => {
+        // HOLE (secrets audit 2026-10-09, finding 1.2): erasure left the Passkey rows, the name is
+        // released for reuse, and the sign-in checked only that an account with that name existed.
+        if (!enabled) return;
+        const dave = `pkdave${Date.now() % 100000}`;
+        const daveDevice = new SoftAuthenticator(ORIGIN, RP_ID);
+        const first = await registerOwner(dave);
+        const opts = await registerOptions(first);
+        assert(opts.status === 200, `options: ${opts.status}`);
+        const added = await json('/v1/ghii/passkeys/register/verify', {
+            method: 'POST', headers: auth(first),
+            body: JSON.stringify({ ceremony_id: opts.body.data.ceremony_id, response: daveDevice.register(opts.body.data.options) }),
+        });
+        assert(added.status === 201, `the first holder adds a device: ${added.status} ${JSON.stringify(added.body.error)}`);
+        const before = await passkeyLogin(daveDevice, dave);
+        assert(before.status === 200, `the device signs the first holder in: ${before.status}`);
+
+        const erased = await json(`/v1/owners/${dave}`, { method: 'DELETE', headers: auth(first) });
+        assert(erased.status === 200, `erase: ${erased.status} ${JSON.stringify(erased.body.error)}`);
+        const second = await registerOwner(dave);
+        assert(typeof second === 'string' && second.length > 0, 'somebody else registers the released name');
+
+        for (const asName of [dave, undefined]) {
+            const r = await passkeyLogin(daveDevice, asName);
+            assert(r.status === 401 || r.status === 400, `the old device must not sign in (${asName ?? 'discoverable'}): ${r.status} ${JSON.stringify(r.body?.data?.owner)}`);
+            assert(r.body?.data?.owner?.name !== dave, 'no session for the new holder');
+        }
+        const listed = await json('/v1/ghii/passkeys', { headers: auth(second) });
+        assert(listed.status === 200 && !JSON.stringify(listed.body.data).includes(daveDevice.id),
+            `the new holder lists no device of the old one: ${JSON.stringify(listed.body.data).slice(0, 200)}`);
+        await json(`/v1/owners/${dave}`, { method: 'DELETE', headers: auth(second) });
     });
 
     await test('the accounts are erased (cleanup)', async () => {

@@ -9,6 +9,7 @@
  * @structure passkeyMethods — createPasskey · getPasskey · listPasskeysByOwner · touchPasskey ·
  *   renamePasskey · deletePasskey
  * @version-history
+ *   v1.1.0 — 2026-10-09 — deletePasskeysByOwner (account erasure).
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import type { Kysely } from 'kysely';
@@ -92,5 +93,10 @@ export const passkeyMethods = {
     const r = await this.db.deleteFrom('Passkey')
       .where('id', '=', id).where('owner', '=', owner).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
+  },
+
+  async deletePasskeysByOwner(this: Db, owner: string): Promise<number> {
+    const r = await this.db.deleteFrom('Passkey').where('owner', '=', owner).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
 };

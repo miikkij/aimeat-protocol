@@ -26,6 +26,8 @@
  *   `E2E_MAGIC_LINK_PORT` moves it (default 40289, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-refusal
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The program endpoint answers no owner key and leaves the registered one in
+ *     force (secrets audit 2026-10-09, S2).
  *   v1.1.0 — 2026-09-29 — The emailed link is GET /v1/ghii/magic-link/open, the browser endpoint; it
  *     is refused for a deactivated account before it spends the token, and the API endpoint's
  *     refusal is still asked with the same token.
@@ -350,7 +352,8 @@ async function run() {
 
     // Secaudit 2026-10, AUTH-3: the spend was a read and a write, so two clicks at once both signed in,
     // and a link stayed good after the person moved their account to another address.
-    // The JSON endpoint answers a new owner key (it re-keys the owner); the next case signs in with it.
+    // The JSON endpoint no longer re-keys the owner or answers an owner key (secrets audit 2026-10-09,
+    // S2): the key the account registered with stays the one that signs in, and the next case uses it.
     let ownerKeyNow = '';
     await test('a link is spent once when it is opened four times at the same moment', async () => {
         inbox.length = 0;
@@ -360,7 +363,13 @@ async function run() {
         const all = await Promise.all([1, 2, 3, 4].map(() => json(`/v1/ghii/magic-link/verify?token=${token}`)));
         const won = all.filter(b => b.status === 200);
         assert(won.length === 1, `exactly one open may sign in, got ${won.length}: ${all.map(b => b.status).join(', ')}`);
-        ownerKeyNow = won[0]!.body.data.owner_private_key;
+        // HOLE (secrets audit 2026-10-09, S2): the answer carried a fresh owner private key, which
+        // signs in as the owner and operator past two-step sign-in. A link proves a mailbox only.
+        assert(won[0]!.body.data.owner_private_key === undefined, 'the program endpoint must not hand out an owner key');
+        assert(!JSON.stringify(won[0]!.body).includes(victimPrivKey), 'nor the registered one');
+        const still = await ownerToken(victimName, victimPrivKey);
+        assert(still.status === 200, `the registered owner key still signs in after the link: ${still.status}`);
+        ownerKeyNow = victimPrivKey;
     });
 
     await test('a link mailed before the person changed their address no longer signs in', async () => {

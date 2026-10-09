@@ -129,7 +129,9 @@ Using in-memory (data will not persist across restarts) storage
 
 If it is the third, `aimeat/.env` was not picked up or `AIMEAT_STORAGE` is unset. Fix it and restart
 **before the user registers an account or creates anything**, or that work is lost on the next restart. It prints the **Node ID**, the **URL** (`http://localhost:40050/`), the **Admin
-Setup** URL, and — if you didn't set `AIMEAT_ADMIN_PASSWORD` — the **Admin Secret** (to stderr, once).
+Setup** URL, and — if you didn't set `AIMEAT_ADMIN_PASSWORD` and the node has no owner yet — the path
+of the file `admin-setup-secret` that holds the **Admin Secret** (beside the SQLite database, or in
+`./data`; readable by the server's user only). The secret creates the first operator only.
 **Surface the admin secret to the user; never write it into the repo.** Sanity-check the node:
 
 > Open `http://localhost:40050/` and fetch `http://localhost:40050/llms.txt` — if it returns the protocol

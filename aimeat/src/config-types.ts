@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.16.0 — 2026-10-09 — TurnConfig mixed in (config-turn.ts): the TURN fields moved there unchanged, plus turnSecret and turnTtlSeconds.
  *   v1.15.0 — 2026-10-08 — VisibilityConfig mixed in (config-visibility.ts): one switch per
  *     visibility layer.
  *   v1.14.0 — 2026-10-04 — The agent, MCP-session and ecosystem scope settings moved unchanged to
@@ -170,8 +171,9 @@ import type { UpdateCheckConfig } from './config-update-check.js';
 import type { AppAuditConfig } from './config-app-audit.js';
 import type { AgentAccessConfig } from './config-types-agent-access.js';
 import type { VisibilityConfig } from './config-visibility.js';
+import type { TurnConfig } from './config-turn.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig {
   port: number;
   baseUrl: string;
   /**
@@ -666,9 +668,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   realtimeMaxMessageSizeBytes: number;
   realtimeRateLimitPerSecond: number;
   stunServers: string[];
-  turnServer: string | null;
-  turnUsername: string | null;
-  turnCredential: string | null;
+  // TURN relay settings: TurnConfig (config-turn.ts), mixed in above.
 
   // Encrypted Chat (extension)
   echatAnonymous: boolean;

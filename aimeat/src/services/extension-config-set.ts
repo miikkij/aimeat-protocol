@@ -22,6 +22,7 @@
  *   const out = await setExtensionConfig({ storage, config }, ext, { WAZUH_HOST: 'wazuh.example.com' });
  *   if (!out.ok) return refuse(out.status, out.code, out.message);
  * @version-history
+ *   v1.0.1 — 2026-10-09 — Secrets are encrypted bound to the extension's name (SecretBinding).
  *   v1.0.0 — 2026-10-09 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -84,7 +85,7 @@ export async function setExtensionConfig(
     }
     if (problems.length) return refuse(400, 'INVALID_INPUT', `${problems.join('. ')}. Nothing was changed.`);
 
-    const prepared = prepareSecretConfigForWrite({ ...(ext.config ?? {}), ...next }, ext.config, getEncryptionKey(deps.config));
+    const prepared = prepareSecretConfigForWrite({ ...(ext.config ?? {}), ...next }, ext.config, getEncryptionKey(deps.config), { extension: ext.name });
     if (prepared === null) {
         return refuse(503, 'ENCRYPTION_NOT_CONFIGURED', 'This node has no encryption key, so a secret field cannot be stored. The operator sets AIMEAT_ENCRYPTION_KEY.');
     }

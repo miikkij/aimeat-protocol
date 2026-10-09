@@ -24,6 +24,8 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.25.2 — 2026-10-09 — A ZIP-installed extension's secrets are encrypted bound to its name
+ *     (SecretBinding; secrets audit 2026-10-09, 1.1).
  *   v1.25.1 — 2026-10-09 — An extension upload over an installed copy keeps its host field values and
  *     its stored secrets (prepareSecretConfigForWrite, the function the other install paths use).
  *   v1.25.0 — 2026-10-08 — The storage handler and declaredFromMeta moved to routes/upload-storage.ts
@@ -456,8 +458,9 @@ async function handleExtensionUpload(
     // in plaintext.
     // prepareSecretConfigForWrite, as writeExtensionRecord uses: a secret the new manifest declares
     // without a value keeps the installed copy's stored one. encryptSecretFields alone dropped it, so
-    // an upload over an installed copy erased the owner's API key (found 2026-10-09).
-    const encConfig = prepareSecretConfigForWrite(record.config, existing?.config, getEncryptionKey(config));
+    // an upload over an installed copy erased the owner's API key (found 2026-10-09). Bound to the
+    // extension's name (SecretBinding; secrets audit 2026-10-09, 1.1).
+    const encConfig = prepareSecretConfigForWrite(record.config, existing?.config, getEncryptionKey(config), { extension: record.name });
     if (encConfig === null) {
         res.status(503).json({
             success: false, error: 'ENCRYPTION_NOT_CONFIGURED',

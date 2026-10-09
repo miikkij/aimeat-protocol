@@ -6,6 +6,9 @@
  *   Backs the agent-connect flow: agent requests a device+user code, owner approves, agent polls. The
  *   minted credentials live in the jsonb `agentCredentials`. Translated 1:1 from the Prisma provider.
  * @version-history
+ *   v1.2.0 — 2026-10-09 — cleanupExpiredDeviceAuth deletes every expired row, not only pending ones,
+ *     so an approved row's plaintext agentCredentials leave storage; updateDeviceAuth writes
+ *     expiresAt, so the retrieval grace window is stored (secrets audit 2026-10-09, 1.3).
  *   v1.0.0 — 2026-07-15 — Phase 5: device-auth on Postgres+Kysely.
  *   v1.1.0 — 2026-08-29 — `requestedScopes` (migration 0056): what the agent asked for, carried
  *     apart from `scopes`, which is what the approval granted.
@@ -56,6 +59,9 @@ export const deviceAuthMethods = {
     if (updates.status !== undefined) data.status = updates.status;
     if (updates.scopes !== undefined) data.scopes = updates.scopes;
     if (updates.requestedScopes !== undefined) data.requestedScopes = updates.requestedScopes;
+    // expiresAt is written so the device-token route's retrieval grace window (120 s after the
+    // first credential poll) reaches storage; see the twin in sqlite/methods/device-auth.ts.
+    if (updates.expiresAt !== undefined) data.expiresAt = new Date(updates.expiresAt);
     if (updates.lastPolledAt !== undefined) data.lastPolledAt = updates.lastPolledAt ? new Date(updates.lastPolledAt) : null;
     if (updates.pollInterval !== undefined) data.pollInterval = updates.pollInterval;
     if (updates.approvedBy !== undefined) data.approvedBy = updates.approvedBy;
@@ -74,7 +80,9 @@ export const deviceAuthMethods = {
     return rows.map(toRecord);
   },
   async cleanupExpiredDeviceAuth(this: PostgresKyselyStorage): Promise<number> {
-    const r = await this.db.deleteFrom('DeviceAuth').where('status', '=', 'pending').where('expiresAt', '<=', new Date()).executeTakeFirst();
+    // Every expired row goes, whatever its status: an approved row holds the agent's private key and
+    // JWT in plain text (agentCredentials). Reasoning in the twin, sqlite/methods/device-auth.ts.
+    const r = await this.db.deleteFrom('DeviceAuth').where('expiresAt', '<=', new Date()).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
   },
   async deleteDeviceAuthByOwner(this: PostgresKyselyStorage, ownerName: string): Promise<number> {

@@ -8,6 +8,7 @@
  * @structure nodeInfraMethods
  * @usage Object.assign(SqliteStorage.prototype, nodeInfraMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-09 — deleteVerificationNonce returns whether it removed the row.
  *   v1.0.0 — 2026-10-05 — 18 methods (createPushSubscription, markPushSubscriptionDelivered,
  *     getPushSubscription, …) moved here from community.ts; addSiteChangeLog, listSiteChangeLog moved here
  *     from extensions-notify.ts so the file mirrors postgres-kysely/methods/node-infra.ts (secaudit 2026-10,
@@ -150,8 +151,9 @@ export const nodeInfraMethods = {
     };
   },
 
-  async deleteVerificationNonce(this: SqliteStorage, state: string): Promise<void> {
-    this.db.prepare('DELETE FROM verification_nonces WHERE state = ?').run(state);
+  async deleteVerificationNonce(this: SqliteStorage, state: string): Promise<boolean> {
+    const r = this.db.prepare('DELETE FROM verification_nonces WHERE state = ?').run(state);
+    return Number(r.changes ?? 0) > 0;
   },
 
   async cleanExpiredNonces(this: SqliteStorage): Promise<number> {

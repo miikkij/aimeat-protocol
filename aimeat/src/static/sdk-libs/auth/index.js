@@ -10,6 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.7.0 — 2026-10-09 — `?auth_step=second_factor` opens the sign-in dialog on its code view: an
+ *     emailed link on an account with two-step sign-in (secaudit 2026-10-09, S1); the bundle version moves.
  *   v1.6.1 — 2026-10-01 — <html lang> names the stored language at load (aimeatRestoreLang), beside
  *     the mode and palette restores; the bundle version moves.
  *   v1.6.0 — 2026-09-29 — A refused sign-in (?auth_error=) opens the sign-in dialog with the reason
@@ -40,8 +42,9 @@
  */
 import { auth, refreshOnFocus } from './session.js';
 import { maybeShowGoogleSignup } from './signup.js';
-import { readAuthError } from './auth-error.js';
+import { readAuthError, readAuthStep } from './auth-error.js';
 import { showLoginModal } from './modal.js';
+import { currentModalLang, loadModalI18n } from './i18n.js';
 import { attach } from '../_core/namespace.js';
 import { readLocales, aimeatReadLang, aimeatApplyLang, aimeatRestoreLang } from './locale.js';
 import { paletteRegistry, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
@@ -58,6 +61,14 @@ if (typeof document !== 'undefined' && document.addEventListener) {
 function maybeShowAuthError() {
   var code = readAuthError();
   if (code) showLoginModal({ authError: code }, function () {});
+  // An emailed sign-in link on an account with two-step sign-in (?auth_step=second_factor): the
+  // dialog opens on its code view. The dictionary is loaded first, because the dialog does not
+  // redraw in a new language while a step is open (modal.js busyOrAway).
+  if (readAuthStep() === 'second_factor') {
+    loadModalI18n(currentModalLang()).then(function (i18n) {
+      showLoginModal({ i18n: i18n || {}, secondFactorLink: true }, function () {});
+    });
+  }
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', maybeShowAuthError);
@@ -97,4 +108,4 @@ if (typeof document !== 'undefined' && document.readyState === 'loading' && docu
 }
 
 const ns = attach('auth', auth);
-ns.version = '2026-10-01-001';
+ns.version = '2026-10-09-001';

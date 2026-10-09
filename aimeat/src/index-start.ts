@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-09 — The generated admin secret is no longer written to stderr. While the node
+ *     has no owner it goes to a 0600 file, admin-setup-secret in the data directory, and the log
+ *     names only the file; once the node has an owner a file left from an earlier boot is deleted
+ *     (services/admin-setup-secret.ts; secrets audit 2026-10-09, 1.4).
+ *   v1.7.0 — 2026-10-09 — One boot warning when the deprecated static TURN pair is set: it names
+ *     AIMEAT_TURN_SECRET as the replacement (services/turn-credentials.ts).
  *   v1.6.1 — 2026-10-05 — The anonymous chat connection limit counts with services/rate-buckets.ts
  *     in place of a hand copy that never pruned its map (secaudit 2026-10, C5).
  *   v1.6.0 — 2026-10-02 — The connect tunnel upgrade reads X-AIMEAT-Run-Modes, the run modes the
@@ -34,6 +40,8 @@ import { securityPostureWarnings } from './config.js';
 import type { AimeatConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
+import { turnDeprecationWarning } from './services/turn-credentials.js';
+import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
 
 /**
  * Start an AIMEAT node. Runs the post-upgrade asset self-heal, launches the HTTP
@@ -74,11 +82,27 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   }
 
   // Start the server
-  // Auto-generate admin password if not set
-  if (!config.adminPassword) {
-    config.adminPassword = randomBytes(16).toString('base64url');
-  }
+  // Auto-generate admin password if not set. It lives in memory for this process, and reaches a
+  // person only through the 0600 file written below, never through a log.
+  const generatedAdminSecret = config.adminPassword ? null : randomBytes(16).toString('base64url');
+  if (generatedAdminSecret) config.adminPassword = generatedAdminSecret;
   const { app, tunnelManager, connectTunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
+
+  // The generated secret opens POST /v1/admin/setup/register, so it goes to a file only this
+  // user can read, and only while the node has no owner (the `anonymous` system owner of
+  // anonymous mode is nobody's and does not count). With an owner, or with a secret the operator
+  // set, a file left from an earlier boot is deleted. Secrets audit 2026-10-09, 1.4.
+  try {
+    const hasOwner = (await storage.listOwners()).some(o => o.name !== 'anonymous');
+    const written = syncAdminSetupSecretFile({ dir: adminSetupSecretDir(config), secret: generatedAdminSecret, hasOwner });
+    if (written.action === 'written') {
+      logger.info(`   Admin setup secret: written to ${written.path} (readable by this user only). Use it at ${config.baseUrl}/v1/admin/setup to create the first operator.`);
+    } else if (written.action === 'removed') {
+      logger.info(`   Admin setup secret file removed (${written.path}): the node has an owner, or an admin password is configured.`);
+    }
+  } catch (err) {
+    logger.warn(`Admin setup secret could not be written to a file: ${err instanceof Error ? err.message : String(err)}. Set AIMEAT_ADMIN_PASSWORD to choose the secret yourself.`);
+  }
   const server = app.listen(config.port, (listenError?: Error) => {
     // Express 5 calls this for the server's 'error' event too, not only for 'listening'. Without
     // this check a node whose port was taken printed "AIMEAT node started", ran its schedulers and
@@ -131,9 +155,6 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup`);
-    if (!process.env.AIMEAT_ADMIN_PASSWORD) {
-      process.stderr.write(`   Admin Secret: ${config.adminPassword}\n`);
-    }
     logger.info(`──────────────────────────────────────────────────────────`);
 
     // Security warnings
@@ -147,6 +168,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
         logger.warn('SECURITY: Dev mode is ON with non-local configuration. Dev mode allows account wipe on duplicate registration.');
       }
     }
+    const turnWarning = turnDeprecationWarning(config);
+    if (turnWarning) logger.warn(`SECURITY: ${turnWarning}`);
     if (process.platform === 'win32' && !process.env.AIMEAT_KEY_PASSPHRASE) {
       logger.warn('SECURITY: Node key is stored unencrypted. Windows does not enforce Unix file permissions. Set AIMEAT_KEY_PASSPHRASE to encrypt.');
     }

@@ -9,6 +9,8 @@
 //
 // Run via the CI runner: cd aimeat && pnpm exec node --env-file=.env.test.sqlite \
 //   --import tsx test/run-e2e-ci.ts --test=extension-secrets
+//
+// 2026-10-09 — the stored form is the bound ciphertext v2:iv:tag:ct (secrets audit 2026-10-09, 1.1).
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -158,7 +160,9 @@ await test('ciphertext at rest (SQLite raw-read) — stored as {encrypted}, not 
     assert(row!.config.indexOf(SECRET) === -1, 'raw stored config must NOT contain plaintext secret');
     const parsed = JSON.parse(row!.config);
     assert(parsed.apiKey && typeof parsed.apiKey.encrypted === 'string', 'apiKey stored as {encrypted}');
-    assert(parsed.apiKey.encrypted.split(':').length === 3, 'ciphertext is iv:tag:ct (AES-256-GCM)');
+    // Bound to its extension, instance and field since 2026-10-09: v2:iv:tag:ct (services/encryption.ts
+    // encryptBound; secrets audit 2026-10-09, finding 1.1).
+    assert(/^v2:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(parsed.apiKey.encrypted), 'ciphertext is the bound form v2:iv:tag:ct (AES-256-GCM)');
   } finally { db.close(); }
 });
 

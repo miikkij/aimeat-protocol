@@ -39,6 +39,10 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.7.0 — 2026-10-09 — Secrets are prepared and compared bound to the extension's name
+ *     (SecretBinding; secrets audit 2026-10-09, 1.1). uninstallExtension needs only storage (and the
+ *     scheduler when there is one), so account erasure can call it; with no scheduler the stored
+ *     schedule rows still go.
  *   v1.6.0 — 2026-10-09 — An in-place update keeps the owner's host field values (carryHostFieldValues).
  *   v1.5.0 — 2026-09-28 — writeExtensionRecord refuses other code for an extension a managed package
  *     install owns, 409 MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts); a config-only change passes.
@@ -110,7 +114,7 @@ function recordSignature(r: ExtensionRecord, encKey: Buffer | null): string {
     return stableStringify({
         version: r.version, description: r.description, author: r.author,
         requiredApis: r.requiredApis, actions: r.actions,
-        config: decryptSecretFields(r.config, getExtSecretKeys(r), encKey),
+        config: decryptSecretFields(r.config, getExtSecretKeys(r), encKey, { extension: r.name }),
         limits: r.limits, federation: r.federation, instances: r.instances ?? null,
     });
 }
@@ -151,7 +155,7 @@ export async function writeExtensionRecord(
         const overQuota = await extensionInstallRefusal({ storage, config }, ctx.ownerName, ctx.isOperator);
         if (overQuota) return { ok: false, ...overQuota };
 
-        const prepared = prepareSecretConfigForWrite(record.config, undefined, encKey);
+        const prepared = prepareSecretConfigForWrite(record.config, undefined, encKey, { extension: name });
         if (prepared === null) return encryptionRefusal();
         record.config = prepared;
 
@@ -201,7 +205,7 @@ export async function writeExtensionRecord(
 
     // Carry forward the encrypted secrets this manifest omitted, then encrypt the plaintext ones. A
     // manifest that declares a secret field without repeating its value must not wipe what is stored.
-    const prepared = prepareSecretConfigForWrite(record.config, existing.config, encKey);
+    const prepared = prepareSecretConfigForWrite(record.config, existing.config, encKey, { extension: name });
     if (prepared === null) return encryptionRefusal();
     record.config = prepared;
 
@@ -288,7 +292,7 @@ export async function deactivateExtension(
  * resolves, and a namespace left behind is data nobody can reach and nobody can list.
  */
 export async function uninstallExtension(
-    deps: ExtensionLifecycleDeps,
+    deps: Pick<ExtensionLifecycleDeps, 'storage' | 'scheduler'> & Partial<ExtensionLifecycleDeps>,
     name: string,
 ): Promise<boolean> {
     const { storage } = deps;
@@ -323,13 +327,16 @@ export async function uninstallExtension(
     return deleted;
 }
 
-/** Drop every scheduled job registered for this extension, from the scheduler and from storage. */
-async function removeExtensionSchedules(deps: ExtensionLifecycleDeps, name: string): Promise<void> {
+/**
+ * Drop every scheduled job registered for this extension, from the scheduler and from storage. With
+ * no scheduler wired (account erasure) the stored rows still go, so the next boot does not load jobs
+ * for an extension that no longer exists.
+ */
+async function removeExtensionSchedules(deps: Pick<ExtensionLifecycleDeps, 'storage' | 'scheduler'>, name: string): Promise<void> {
     const { storage, scheduler } = deps;
-    if (!scheduler) return;
     const jobs = await storage.listScheduledJobs({ extensionName: name });
     for (const job of jobs) {
-        scheduler.removeJob(job.id);
+        scheduler?.removeJob(job.id);
         await storage.deleteScheduledJob(job.id);
     }
     if (jobs.length > 0) {

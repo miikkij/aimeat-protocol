@@ -12,6 +12,9 @@
  *   - additional room listing/lookup routes over realtimeManager
  *
  * @version-history
+ *   v1.3.0 — 2026-10-09 — GET /v1/realtime/ice-servers hands an expiring TURN credential derived per
+ *     caller from AIMEAT_TURN_SECRET (services/turn-credentials.ts) instead of the static pair, gives
+ *     a visitor from another node no TURN entry, and answers Cache-Control: no-store.
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-12 — GET /v1/admin/realtime answers 200 with `enabled: false` when realtime is
  *     switched off, instead of refusing with 503 (the admin page could not tell "off" from "quiet"),
@@ -28,6 +31,8 @@ import { emitChange } from '../services/event-bus.js';
 import type { RealtimeManager } from '../services/realtime-manager.js';
 import type { PeerInfo } from '../services/federation.js';
 import { operatorOverride } from '../services/operator-override.js';
+import { turnEntryFor, type IceServer } from '../services/turn-credentials.js';
+import { callerOf } from '../middleware/caller.js';
 
 export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeManager: RealtimeManager, peers?: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -185,32 +190,33 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
   });
 
   // GET /v1/realtime/ice-servers — return ICE server configuration for WebRTC
-  router.get('/v1/realtime/ice-servers', requireAuth(), requireScope('social:read'), (_req, res) => {
+  router.get('/v1/realtime/ice-servers', requireAuth(), requireScope('social:read'), (req, res) => {
     if (!config.realtimeEnabled) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Realtime is disabled on this node'));
       return;
     }
 
-    const iceServers: Array<{ urls: string | string[]; username?: string; credential?: string }> = [];
+    const iceServers: IceServer[] = [];
 
     // STUN servers
     if (config.stunServers.length > 0) {
       iceServers.push({ urls: config.stunServers });
     }
 
-    // TURN server
-    if (config.turnServer) {
-      iceServers.push({
-        urls: config.turnServer,
-        username: config.turnUsername ?? undefined,
-        credential: config.turnCredential ?? undefined,
-      });
-    }
+    // TURN server: an expiring credential derived per caller from AIMEAT_TURN_SECRET, or the
+    // deprecated static pair. requireAuth() already refuses the anonymous identity; the null caller
+    // keeps the TURN entry out if this route is ever mounted without it. A visitor gets none either.
+    const caller = req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null;
+    const turn = turnEntryFor(config, caller, Date.now());
+    if (turn) iceServers.push(turn);
 
     // Fallback to Google public STUN if nothing configured
     if (iceServers.length === 0) {
       iceServers.push({ urls: 'stun:stun.l.google.com:19302' });
     }
+
+    // The response can carry a credential: no shared cache may keep it.
+    res.set('Cache-Control', 'no-store');
 
     res.json(success(config.nodeId, { ice_servers: iceServers }, [
       { description: 'List rooms', method: 'GET', url: '/v1/realtime/rooms' },

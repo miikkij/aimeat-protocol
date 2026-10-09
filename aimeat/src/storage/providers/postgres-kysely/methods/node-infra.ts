@@ -11,6 +11,7 @@
  *   - nodeInfraMethods: push-subscription upsert+CRUD, trusted-issuer create/list, nonce CRUD + expiry
  *     sweep, realtime-room create/get/update/delete, site-change-log append + cursor-paginated list
  * @version-history
+ *   v1.3.0 — 2026-10-09 — deleteVerificationNonce returns whether it removed the row.
  *   v1.2.0 — 2026-09-09 — getTrustedIssuer, getTrustedIssuerByUrl, deleteTrustedIssuer and
  *     listRealtimeRooms deleted: no caller.
  *   v1.1.0 — 2026-08-11 — Push subscriptions key on (ownerName, endpoint), so an owner's second
@@ -136,8 +137,9 @@ export const nodeInfraMethods = {
     const r = await this.db.selectFrom('VerificationNonce').selectAll().where('state', '=', state).executeTakeFirst();
     return r ? toVerificationNonce(r) : null;
   },
-  async deleteVerificationNonce(this: PostgresKyselyStorage, state: string): Promise<void> {
-    await this.db.deleteFrom('VerificationNonce').where('state', '=', state).execute();
+  async deleteVerificationNonce(this: PostgresKyselyStorage, state: string): Promise<boolean> {
+    const r = await this.db.deleteFrom('VerificationNonce').where('state', '=', state).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0) > 0;
   },
   async cleanExpiredNonces(this: PostgresKyselyStorage): Promise<number> {
     const r = await this.db.deleteFrom('VerificationNonce').where('expiresAt', '<', new Date()).executeTakeFirst();

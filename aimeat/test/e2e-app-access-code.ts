@@ -14,6 +14,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-access-code
  * @version-history
+ *   v1.2.0 — 2026-10-09 — Phase 4: an agent of the owner without app:write gets neither the code nor
+ *     the protected bytes; with app:write it still gets the code (secrets audit 2026-10-09, 1.5).
  *   v1.1.0 — 2026-09-26 — The unlock page types the code hidden, its eye runs under the response's
  *     CSP nonce, and its Finnish says "sovellus". Failed on the code before the change.
  *   v1.0.0 — 2026-08-07 — Initial.
@@ -180,6 +182,42 @@ await test('Another user and an anonymous caller NEVER see the code value', asyn
             assert(seen.protected === true, 'boolean flag stays visible');
         }
     }
+});
+
+/** Device-auth (RFC 8628): an agent token for owner A carrying exactly `scopes`. */
+async function agentTokenOfA(agentName: string, scopes: string[]): Promise<string> {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: ownerA }) });
+    assert(da.status === 200, `device-authorize ${da.status}`);
+    const ok = await json('/v1/agents/verify', {
+        method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: tokenA }),
+    });
+    assert(ok.status === 200, `approve ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+    const poll = await json('/v1/agents/device-token', {
+        method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(poll.status === 200 && typeof poll.body?.token === 'string', `device-token ${poll.status}`);
+    return poll.body.token as string;
+}
+
+console.log('\nPhase 4: a token in the owner\'s name is not the owner (secrets audit 2026-10-09, finding 1.5)');
+
+await test('An agent of the owner WITHOUT app:write sees neither the code nor the protected bytes', async () => {
+    // HOLE: the listing and the app read decided "own" from any token naming the owner, so an agent
+    // with no app scope, an ecosystem app or another person's app the owner signed into got the code.
+    const reader = await agentTokenOfA(`accreader${Date.now() % 100000}`, ['memory:read']);
+    const { body } = await json('/v1/apps?limit=200', auth(reader));
+    const text = JSON.stringify(body);
+    assert(!text.includes(CODE), 'the code value reached an agent that cannot set it');
+    const res = await fetch(`${BASE}${appPath}`, { headers: { Authorization: `Bearer ${reader}` } });
+    const page = await res.text();
+    assert(res.status === 403 && !page.includes('secret content'), `protected bytes reached the agent: ${res.status}`);
+});
+
+await test('An agent of the owner WITH app:write still sees the code, because it could set one', async () => {
+    const writer = await agentTokenOfA(`accwriter${Date.now() % 100000}`, ['app:write']);
+    const { body } = await json('/v1/apps?limit=200', auth(writer));
+    const mine = (body.data?.apps ?? []).find((a: any) => a.owner === ownerA && a.filename === FILENAME);
+    assert(!!mine && mine.access_code === CODE, `app:write keeps the code: ${JSON.stringify(mine?.access_code)}`);
 });
 
 console.log(`\n=== App Access-Code: ${passed} passed, ${failed} failed ===\n`);

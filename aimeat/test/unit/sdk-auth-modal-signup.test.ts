@@ -26,6 +26,8 @@ const h = vi.hoisted(() => ({
 vi.mock('../../src/static/sdk-libs/auth/session.js', () => ({
   api: (...a: any[]) => h.api(...a),
   auth: new Proxy({}, { get: (_t, k) => h.auth[k] }),
+  // The sign-in link's code step restores the session from the cookie (modal.js, 2026-10-09).
+  restoreSessionFromCookie: async () => null,
 }));
 vi.mock('../../src/static/sdk-libs/auth/i18n.js', () => ({
   MODAL_LANG_KEY: 'aimeat-lang',

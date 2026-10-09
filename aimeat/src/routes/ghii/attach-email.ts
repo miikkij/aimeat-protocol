@@ -10,6 +10,8 @@
  * @structure registerAttachEmailRoute(router, config, storage, emailService).
  * @usage registerAttachEmailRoute(router, config, storage, emailService);
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The second factor after the password: an account with TOTP armed gives its
+ *     code here as it does on the sign-in route (secaudit 2026-10-09, S1).
  *   v1.1.0 — 2026-10-05 — The password and its lock are services/password-check.ts, the check every
  *     route that takes a password calls; this file held a hand copy of the sign-in route's lock
  *     (secaudit 2026-10, C1).
@@ -21,7 +23,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import { success, error } from '../../middleware/envelope.js';
 import { createHash } from 'node:crypto';
-import { checkPassword } from '../../services/password-check.js';
+import { checkPassword, checkSecondFactor } from '../../services/password-check.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
@@ -75,6 +77,18 @@ export function registerAttachEmailRoute(
         const pw = await checkPassword(storage, config, ghiiRecord, password);
         if (!pw.ok) {
             res.status(pw.status).json(error(config.nodeId, pw.code, pw.message));
+            return;
+        }
+
+        // The second factor, as on the sign-in route: the email this call attaches becomes the
+        // account's sign-in link and recovery address, so a password alone must not set it on an
+        // account with TOTP armed (secaudit 2026-10-09, S1). The SDK's attach-email form has no code
+        // field: an account below verification level 1 is refused a session by the email gate, so it
+        // normally cannot reach the TOTP setup. One that armed TOTP before the gate was turned on
+        // gets TOTP_REQUIRED here, and sends totp_code or backup_code with the same body.
+        const second = await checkSecondFactor(storage, config, ghiiRecord, req.body ?? {});
+        if (!second.ok) {
+            res.status(second.status).json(error(config.nodeId, second.code, second.message));
             return;
         }
 

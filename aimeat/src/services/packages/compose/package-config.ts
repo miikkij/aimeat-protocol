@@ -21,6 +21,9 @@
  *   const plan = planPackageConfig(pkg.components, plannedComponents, input.config, { config, owner });
  *   if (!plan.ok) return plan;
  * @version-history
+ *   v1.2.0 — 2026-10-09 — mergeExtensionConfig takes the stored extension name: given values that
+ *     carry an encrypted wrapper are dropped (stripClientEncryptedValues), and secrets are encrypted
+ *     bound to that extension (secrets audit 2026-10-09, finding 1.1).
  *   v1.1.0 — 2026-10-09 — An extension's host fields (manifest `network.host_fields`) are planned and
  *     shown (`host_fields`), and an answer to one must be a single host, refused before anything registers.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 2).
@@ -29,7 +32,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { PackageComponent, InstalledComponent } from '../../../storage/interface.js';
 import { parseAppConfigSchema, checkAppConfigValues, configMissing, type AppConfigSchema, type AppConfigValues } from '../../app-config.js';
 import { buildExtensionRecordFromManifest } from '../../extension-manifest.js';
-import { getExtSecretKeys, prepareSecretConfigForWrite } from '../../extension-secrets.js';
+import { getExtSecretKeys, prepareSecretConfigForWrite, stripClientEncryptedValues } from '../../extension-secrets.js';
 import { getEncryptionKey } from '../../encryption.js';
 import { hostFieldsOf, parseHostFieldValue, type NetworkHostField } from '../../extension-network-hosts.js';
 
@@ -172,13 +175,16 @@ export function missingConfigMessage(plan: { entries: ConfigPlanEntry[] }): stri
  * secret must be stored and the node has no encryption key.
  */
 export function mergeExtensionConfig(
+    extensionName: string,
     built: Record<string, unknown>, given: Record<string, unknown> | undefined,
     previous: Record<string, unknown> | undefined, nodeConfig: AimeatConfig,
 ): Record<string, unknown> | null {
     const carried = Object.fromEntries(Object.entries(previous ?? {})
         .filter(([k]) => !EXTENSION_RESERVED_KEY.test(k) && k in built));
-    const merged = { ...built, ...carried, ...(given ?? {}) };
-    return prepareSecretConfigForWrite(merged, previous, getEncryptionKey(nodeConfig));
+    // What the installer typed is a value, never a ciphertext: only this node mints those.
+    const { config: cleanGiven } = stripClientEncryptedValues(given);
+    const merged = { ...built, ...carried, ...(cleanGiven ?? {}) };
+    return prepareSecretConfigForWrite(merged, previous, getEncryptionKey(nodeConfig), { extension: extensionName });
 }
 
 /** The plan as a dry run and an install answer show it: what each part asks for, never a secret. */

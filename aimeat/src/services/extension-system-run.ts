@@ -33,6 +33,8 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.5.1 — 2026-10-09 — Secret config is decrypted for the field it is bound to (SecretBinding;
+ *     secrets audit 2026-10-09, 1.1).
  *   v1.5.0 — 2026-10-08 — ctx.workspace with the two row calls only, when the manifest declares
  *     workspace.rows (services/extension-workspace.ts, buildUnattendedExtensionWorkspace).
  *   v1.4.0 — 2026-10-05 — The run passes the extension's capabilities to buildExtensionCtx (secaudit
@@ -156,7 +158,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         instanceCtx = {
             id: instanceId,
             config: inst
-                ? decryptSecretFields(inst.config, getInstanceSecretKeys(ext), encKey)
+                ? decryptSecretFields(inst.config, getInstanceSecretKeys(ext), encKey, { extension: ext.name, instance: instanceId })
                 : (args.input ?? {}),
         };
     }
@@ -175,7 +177,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         // session here, so there is no list of words anybody granted. A script deciding what an
         // unattended run may do reads the 'operator' role, which says exactly that.
         caller: { gaii: callerGaii, owner: ownerName, roles: ['operator'], scopes: [] },
-        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey),
+        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey, { extension: ext.name }),
         instance: instanceCtx,
         logPrefix: `[ext:${ext.name}:${logLabel}]`,
         // No wallet: see the file header. Of ctx.workspace, only the two row calls: the record and

@@ -7,6 +7,7 @@
  * @structure passkeyMethods — createPasskey · getPasskey · listPasskeysByOwner · touchPasskey ·
  *   renamePasskey · deletePasskey
  * @version-history
+ *   v1.1.0 — 2026-10-09 — deletePasskeysByOwner (account erasure).
  *   v1.0.0 — 2026-09-04 — Initial.
  */
 import type Database from 'better-sqlite3';
@@ -84,5 +85,10 @@ export const passkeyMethods = {
   async deletePasskey(this: Db, id: string, owner: string): Promise<boolean> {
     const r = this.db.prepare('DELETE FROM passkeys WHERE id = ? AND owner = ?').run(id, owner);
     return Number(r.changes ?? 0) > 0;
+  },
+
+  async deletePasskeysByOwner(this: Db, owner: string): Promise<number> {
+    const r = this.db.prepare('DELETE FROM passkeys WHERE owner = ?').run(owner);
+    return Number(r.changes ?? 0);
   },
 };

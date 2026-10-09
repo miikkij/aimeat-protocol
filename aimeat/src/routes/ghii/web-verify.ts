@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-09 — GET /v1/ghii/magic-link/verify no longer re-keys the owner and no longer
+ *     returns owner_private_key: that key signs in as the owner and operator, past two-step sign-in,
+ *     which a clicked link must not grant (secrets audit 2026-10-09, S2).
  *   v1.12.0 — 2026-10-05 — GET /v1/ghii/magic-link/verify checks and spends the link with
  *     redeemLoginLink, the emailed link's own check, instead of a copy of it (secaudit 2026-10, AUTH-3).
  *   v1.11.0 — 2026-10-01 — POST /v1/ghii/verify-email applies the open app roster invitations of the
@@ -505,9 +508,11 @@ export function registerWebVerifyRoutes(
             loginCount: (redeemed.ghii.loginCount ?? 0) + 1,
         });
 
-        // Re-key owner
-        const ownerKeyPair = await generateKeyPair();
-        await storage.updateOwner(record.ownerName, { publicKey: ownerKeyPair.publicKey });
+        // The owner's signing key is NOT re-keyed here and not returned. A clicked link proves a
+        // mailbox; the owner key signs in as the account's owner (and its operator) at
+        // POST /v1/auth/token, which is exactly what H-2 below refuses to hand over, and it skipped
+        // the account's two-step sign-in (secrets audit 2026-10-09, S2). The program gets the agent
+        // credential below; a person signs in through GET /v1/ghii/magic-link/open.
 
         // Find or create a default agent
         const agents = await storage.getAgentsByOwner(record.ownerName);
@@ -561,7 +566,6 @@ export function registerWebVerifyRoutes(
             ghii,
             token: jwtToken,
             expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
-            owner_private_key: ownerKeyPair.privateKey,
             agent: { gaii: agent.gaii },
             agent_private_key: agentPrivKey,
         }, [

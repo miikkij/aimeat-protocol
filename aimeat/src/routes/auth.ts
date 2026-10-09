@@ -10,6 +10,10 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.10.0 -- 2026-10-09 -- The owner-key sign-in on POST /v1/auth/token refuses an account with
+ *     two-step sign-in armed (SECOND_FACTOR_REQUIRED), answers 410 OWNER_KEY_LOGIN_OFF when the node
+ *     set AIMEAT_OWNER_KEY_LOGIN=false (deprecated, removed in 4.0.0), and counts each use in
+ *     auth_owner_key_login_total (secrets audit 2026-10-09, S2).
  *   v1.9.0 -- 2026-09-29 -- The JWT minted from a PAT-backed refresh cookie carries the `via: 'pat'`
  *     claim, and the Bearer refresh keeps it on a session that had it, so classification reads such a
  *     session as an AI (TARGET-082 V4). Roles and scopes are unchanged.
@@ -80,6 +84,7 @@ import { parseGAII, isExternalPrincipal, isForeignPrincipal, localAccountName } 
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
+import { getStats } from '../services/stats.js';
 
 // In-memory challenge store
 const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
@@ -276,8 +281,15 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Owner auth (owner name provided instead of gaii)
+    // Owner auth (owner name provided instead of gaii). DEPRECATED (RFC v4.0), removed in 4.0.0, and
+    // off on a node that set AIMEAT_OWNER_KEY_LOGIN=false.
     if (ownerName) {
+      if (!config.ownerKeyLogin) {
+        res.status(410).json(error(config.nodeId, 'OWNER_KEY_LOGIN_OFF',
+          'This service no longer signs you in with your account key. Sign in with your password instead.',
+          undefined, { sign_in: 'POST /v1/ghii/login' }));
+        return;
+      }
       const ownerRecord = await storage.getOwner(ownerName);
       if (!ownerRecord) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${ownerName}`));
@@ -302,6 +314,21 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
         return;
       }
+
+      // TWO FACTORS WHERE THE OWNER ASKED FOR TWO. The key is one factor and this route has no code
+      // step, so an account with two-step sign-in armed does not sign in here at all: before
+      // 2026-10-09 the key opened an owner and operator session past the account's own second
+      // factor (secrets audit 2026-10-09, S2). Asked after the signature, as the deactivated refusal
+      // above is, so the answer says nothing about an account to someone without its key.
+      const ownerGhiiRecord = await storage.getGHII(`${ownerName}@${config.nodeId}`);
+      if (ownerGhiiRecord?.totpEnabled && ownerGhiiRecord.totpSecret) {
+        res.status(401).json(error(config.nodeId, 'SECOND_FACTOR_REQUIRED',
+          'This account uses two-step sign-in, so the account key alone does not sign you in. Sign in with your password and the code from your app.',
+          undefined, { sign_in: 'POST /v1/ghii/login' }));
+        return;
+      }
+      // How many sign-ins still use the deprecated key: the number that says when it can go.
+      getStats()?.increment('auth_owner_key_login_total');
 
       const roles = [...ownerRecord.roles];
 

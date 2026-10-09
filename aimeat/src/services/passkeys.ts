@@ -39,6 +39,8 @@
  *   - PasskeyCeremony: what a caller gets back, and the refusal shape both doors render
  * @usage const r = await beginLogin(config, storage, 'alice');
  * @version-history
+ *   v1.3.0 — 2026-10-09 — A device registered before the account it names was created is refused: it
+ *     belongs to an earlier holder of a released name (secrets audit 2026-10-09, finding 1.2).
  *   v1.2.0 — 2026-09-24 — An account that armed two-step sign-in requires user verification: its
  *     sign-in and registration options ask for it, and finishLogin and finishRegistration refuse an
  *     answer without it (PASSKEY_USER_NOT_VERIFIED). A key with no PIN had entered such an account
@@ -372,6 +374,12 @@ export async function finishLogin(
     return { ok: false, status: 401, code: 'PASSKEY_UNKNOWN', message: 'That device is not registered here. Sign in with your password, then add it under Account security.' };
   }
   const owner = await storage.getOwner(stored.owner);
+  // A device registered before this account existed belongs to an earlier holder of the name: an
+  // erased name is released for reuse, and the name alone is what this row and the account share.
+  // Erasure deletes the rows; this refuses one that survived it (secrets audit 2026-10-09, 1.2).
+  if (owner?.createdAt && Date.parse(stored.createdAt) < Date.parse(owner.createdAt)) {
+    return { ok: false, status: 401, code: 'PASSKEY_UNKNOWN', message: 'That device is not registered here. Sign in with your password, then add it under Account security.' };
+  }
   if (owner?.disabledAt) {
     return { ok: false, status: 403, code: 'ACCOUNT_DISABLED', message: 'This account has been deactivated' };
   }

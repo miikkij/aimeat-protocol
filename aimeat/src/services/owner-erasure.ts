@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.9.0 — 2026-10-09 — Two steps: the account's passkeys, and the extensions the person or their
+ *     agents installed. Both survived erasure and passed to the next holder of the released name
+ *     (secrets audit 2026-10-09, finding 1.2).
  *   v1.8.0 — 2026-10-05 — The classification audit rows still waiting are written before the cascade,
  *     so the rows where the person read someone else's content take the erasure's pseudonym there
  *     (secaudit 2026-10, STO-1).
@@ -59,6 +62,7 @@ import { purgeClassificationAudit, flushClassificationAudit } from './classifica
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app-member-erasure.js';
 import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
+import { uninstallExtension } from './extension-lifecycle.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -216,6 +220,25 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const c = await revokeEntitlementsOfAccount(storage, name, nodeId);
       const n = c.asConsumer + c.asProvider;
       return n ? `entitlements:${n}` : null;
+    }, deletionLog);
+
+    // Passkeys. The row is found by credential id and names the account by its bare name, which is
+    // released for reuse, so a surviving row signed the previous holder's device in to the next
+    // holder's account (secrets audit 2026-10-09, finding 1.2).
+    await step('passkeys', async () => {
+      const n = await storage.deletePasskeysByOwner(name);
+      return n ? `passkeys:${n}` : null;
+    }, deletionLog);
+
+    // Extensions this person or their agents installed. The installer is who may upload new code to
+    // an extension, and its stored secrets are carried across an update, so a surviving row made the
+    // next holder of the name the installer of the previous person's extension, keys included.
+    // uninstallExtension takes the extension's memory, its instances' memory and its schedules too.
+    await step('extensions', async () => {
+      const installers = new Set([ghii, name, ...agents.map(a => a.gaii)]);
+      const mine = (await storage.listExtensions({ lean: true })).filter(e => installers.has(e.installedBy));
+      for (const e of mine) await uninstallExtension({ storage }, e.name);
+      return mine.length ? `extensions:${mine.length}` : null;
     }, deletionLog);
 
     await step('ext_instances', async () => {

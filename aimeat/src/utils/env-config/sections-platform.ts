@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Realtime, load-balancer, extensions, generator, app-origin, cortex, portfolio, agent-scope, moderation, setup, consul, metrics config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-09 — AIMEAT_TURN_SECRET and AIMEAT_TURN_TTL_SECONDS; the static TURN pair is marked deprecated.
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
 
@@ -65,14 +66,27 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
           defaultVal: '(none)',
         },
         {
+          envVar: 'AIMEAT_TURN_SECRET',
+          description: 'TURN shared secret (coturn static-auth-secret); clients receive an expiring credential derived from it',
+          value: config.turnSecret ? '****' : '(not set)',
+          defaultVal: '(none)',
+          secret: true,
+        },
+        {
+          envVar: 'AIMEAT_TURN_TTL_SECONDS',
+          description: 'Lifetime of a derived TURN credential in seconds',
+          value: String(config.turnTtlSeconds),
+          defaultVal: '3600',
+        },
+        {
           envVar: 'AIMEAT_TURN_USERNAME',
-          description: 'TURN server username',
+          description: 'TURN server username (deprecated: use AIMEAT_TURN_SECRET)',
           value: config.turnUsername ?? '(not set)',
           defaultVal: '(none)',
         },
         {
           envVar: 'AIMEAT_TURN_CREDENTIAL',
-          description: 'TURN server credential',
+          description: 'TURN server credential (deprecated: use AIMEAT_TURN_SECRET)',
           value: config.turnCredential ? '****' : '(not set)',
           defaultVal: '(none)',
           secret: true,

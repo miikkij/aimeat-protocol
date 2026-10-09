@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-09 — An `input_from` value is the value the generic memory routes show
+ *     (shownMemoryValue), so a credential record reaches extension code as { configured: true } even
+ *     where the save-time check could not see the finished key (secrets audit 2026-10-09, 1.1).
  *   v1.10.0 — 2026-10-08 — An extension step's `input_from` fills input fields from the owner's
  *     memory at dispatch, through the classification reader (aimeat-soc).
  *   v1.9.0 — 2026-09-29 — The export-out step and the datapackage step pass their source record
@@ -84,6 +87,7 @@ import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
 import { systemReader } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
+import { shownMemoryValue } from '../secret-records.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -305,7 +309,7 @@ export function dispatchExtensionStep(
       const key = (run.keyPrefix ?? '') + template(keyTmpl, run.vars);
       const rec = await deps.storage.getMemory(ownerGhii, key);
       const shown = rec ? await systemReader(deps, ownerGhii).show([rec], r => memoryTarget(r.ownerGaii, r.key)) : [];
-      base[param] = shown.length ? (shown[0]!.value ?? null) : null;
+      base[param] = shown.length ? (shownMemoryValue(key, shown[0]!.value) ?? null) : null;
     }
     const out = action.paging
       ? await runPaged(action.paging, base, (input, page) => runOnce(input, `wf:${workflowId}:${stepId}:p${page}`))

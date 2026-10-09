@@ -58,6 +58,10 @@
  *   v1.16.0 — 2026-09-29 — listRuns (opts.reader) and getRun (reader) take the caller's
  *     classification reader: an observed value copied from a record the caller may not see is
  *     withheld (value null, `withheld` says why), and a warning label rides on the leaf (TARGET-082 V4).
+ *   v1.17.0 — 2026-10-09 — reservedStepKeys reads an extension step's `input_from` keys too. They are
+ *     read from the owner's memory and handed to extension code, which can send them out, so
+ *     `input_from: { k: 'openrouter.apikey' }` gave the sandbox the key's ciphertext (secrets audit
+ *     2026-10-09, finding 1.1).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
@@ -265,6 +269,7 @@ export function reservedStepKeys(
       check(step.id, a.result_to_key, true);
     } else if (a?.kind === 'extension') {
       check(step.id, a.result_to_key, true);
+      for (const k of Object.values(a.input_from ?? {})) check(step.id, k, true);
     } else if (a?.kind === 'datapackage') {
       check(step.id, a.from_key, true);
     } else if (a?.kind === 'export-out') {

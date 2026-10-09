@@ -18,6 +18,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-device-token-grace
  * @version-history
+ *   v1.1.0 — 2026-10-09 — The first poll's 120 s grace expiry is asserted to reach storage
+ *     (secrets audit 2026-10-09, 1.3).
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 
@@ -180,6 +182,19 @@ await test('First poll returns flat OAuth-style credentials', async () => {
 
 // ── Phase 2: the grace window ──
 console.log('\nPhase 2: retrieval grace');
+
+// THE GRACE WINDOW IS STORED. The first poll shortens the row's expiry to 120 s, and until
+// 2026-10-09 both providers' updateDeviceAuth dropped `expiresAt`, so the private key stayed
+// readable for the whole two-hour request window (secrets audit 2026-10-09, 1.3). /verify/info
+// reports the stored expiry as `expires_in` and does not count as a poll, so the RFC 8628 rate
+// limit the next test measures is untouched. The window itself (120 s) is not waited out here:
+// the deletion after it is covered by test/unit/device-auth-cleanup.test.ts.
+await test('After the first poll the request expires within the 120 s grace window', async () => {
+    const r = await json(`/v1/agents/verify/info/${userCode}`);
+    assert(r.status === 200 && r.body.ok === true, `verify/info ${r.status}: ${JSON.stringify(r.body)}`);
+    const expiresIn = r.body.data.expires_in as number;
+    assert(expiresIn > 0 && expiresIn <= 120, `expires_in after the first poll must be <= 120 s, got ${expiresIn}`);
+});
 
 await test('Immediate re-poll is slow_down (RFC 8628 rate limit still applies)', async () => {
     const r = await pollToken(deviceCode);

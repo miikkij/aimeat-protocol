@@ -8,6 +8,9 @@
  * @structure deviceAuthMethods
  * @usage Object.assign(SqliteStorage.prototype, deviceAuthMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-09 — cleanupExpiredDeviceAuth deletes every expired row, not only pending ones,
+ *     so an approved row's plaintext agentCredentials leave storage; updateDeviceAuth writes
+ *     expiresAt, so the retrieval grace window is stored (secrets audit 2026-10-09, 1.3).
  *   v1.0.0 — 2026-10-05 — 9 methods (createDeviceAuth, getDeviceAuthByDeviceCode, getDeviceAuthByUserCode, …)
  *     moved here from federation-oauth.ts so the file mirrors postgres-kysely/methods/device-auth.ts
  *     (secaudit 2026-10, M8).
@@ -53,6 +56,10 @@ export const deviceAuthMethods = {
     if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
     if (updates.scopes !== undefined) { fields.push('scopes = ?'); values.push(JSON.stringify(updates.scopes)); }
     if (updates.requestedScopes !== undefined) { fields.push('requestedScopes = ?'); values.push(JSON.stringify(updates.requestedScopes)); }
+    // expiresAt is written so the device-token route's retrieval grace window (120 s after the
+    // first credential poll) reaches storage. Without it the shortened expiry was dropped here and
+    // the credentials stayed readable for the whole original window.
+    if (updates.expiresAt !== undefined) { fields.push('expiresAt = ?'); values.push(updates.expiresAt); }
     if (updates.lastPolledAt !== undefined) { fields.push('lastPolledAt = ?'); values.push(updates.lastPolledAt); }
     if (updates.pollInterval !== undefined) { fields.push('pollInterval = ?'); values.push(updates.pollInterval); }
     if (updates.approvedBy !== undefined) { fields.push('approvedBy = ?'); values.push(updates.approvedBy); }
@@ -77,8 +84,12 @@ export const deviceAuthMethods = {
   },
 
   async cleanupExpiredDeviceAuth(this: SqliteStorage): Promise<number> {
+    // Every expired row goes, whatever its status. An approved row holds the agent's private key
+    // and JWT in plain text (agentCredentials), and a filter on status = 'pending' kept those rows
+    // for ever. Nothing reads an expired row: the poll and /verify both refuse on expiresAt first,
+    // and the scope request an approval recorded lives in its own record (agent-refusals).
     const result = this.db.prepare(
-      `DELETE FROM device_auth WHERE status = 'pending' AND expiresAt <= ?`
+      `DELETE FROM device_auth WHERE expiresAt <= ?`
     ).run(new Date().toISOString());
     return result.changes;
   },

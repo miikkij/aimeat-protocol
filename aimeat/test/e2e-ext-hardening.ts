@@ -26,6 +26,8 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   v1.3.0 — 2026-10-09 — 3b: an encrypted value inside a secret field's descriptor default is not
+ *     stored (secrets audit 2026-10-09, finding 1.1).
  *   v1.2.0 — 2026-09-16 — 3a: install, update, activate and deactivate answer with secret config
  *     masked. They returned the ciphertext and the __secretKeys marker.
  *   v1.1.0 — 2026-08-11 — Add the two H-17 mechanisms: the capability an app-tool binds must belong
@@ -269,6 +271,22 @@ async function run() {
     const cfg = await storedConfig(name, ownerA.token);
     assert(cfg.stolen === undefined,
       `a client-supplied ciphertext was stored as ${JSON.stringify(cfg.stolen)} — the node would decrypt it into the sandbox`);
+    assert(cfg.greeting === 'hi', 'the installer\'s own config keys must survive untouched');
+  });
+
+  // ── 3b. A submitted ciphertext one level down, in a descriptor's default ───────────────────
+  await test('a manifest cannot submit an encrypted value as a secret field\'s default either', async () => {
+    // HOLE (secrets audit 2026-10-09, finding 1.1): the strip looked at the field's own value, and a
+    // descriptor `{ type: 'secret', default: { encrypted } }` is an object without `encrypted`, so it
+    // passed, the flatten stored the default, and the node opened it into the sandbox.
+    const name = `hardenc2${Date.now()}`;
+    const res = await install(ownerA.token, name, {
+      stolen: { type: 'secret', default: { encrypted: 'aaaaaaaaaaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:cccccccccccc' } },
+      greeting: { default: 'hi' },
+    });
+    assert(res.status === 201, `install ${res.status}: ${JSON.stringify(res.body?.error)}`);
+    const cfg = await storedConfig(name, ownerA.token);
+    assert(cfg.stolen === undefined, `a ciphertext in a descriptor default was stored as ${JSON.stringify(cfg.stolen)}`);
     assert(cfg.greeting === 'hi', 'the installer\'s own config keys must survive untouched');
   });
 

@@ -12,6 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.26.0 — 2026-10-09 — security.owner_key_login (AIMEAT_OWNER_KEY_LOGIN), immutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, S2).
+ *   v1.25.0 — 2026-10-09 — security.admin_setup_open_after_first_operator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR), immutable, default off: test nodes only (secrets audit 2026-10-09, 1.4).
+ *   v1.24.0 — 2026-10-09 — realtime.turn_secret (a secret row) and realtime.turn_ttl_seconds; the static TURN pair is marked deprecated.
  *   v1.23.0 — 2026-10-08 — The visibility rows (config-schema-visibility.ts), beside the visitor geography.
  *   v1.22.0 — 2026-10-06 — The site-link rows moved to config-schema-site-links.ts unchanged (max-file-lines),
  *     where site.store_status and the store notes joined them.
@@ -521,6 +524,11 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'loginTarpitBlockAfter', dotPath: 'security.login_tarpit_block_after', envVar: 'AIMEAT_LOGIN_TARPIT_BLOCK_AFTER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Refusals after which the door answers 429 without holding the connection', range: '1-1000' },
   { key: 'loginTarpitWindowMs', dotPath: 'security.login_tarpit_window_ms', envVar: 'AIMEAT_LOGIN_TARPIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60_000 && (v as number) <= 86_400_000, immutable: false, description: 'How long a penalty takes to decay if nothing else arrives', range: '60000-86400000' },
   { key: 'loginTarpitMaxConcurrent', dotPath: 'security.login_tarpit_max_concurrent', envVar: 'AIMEAT_LOGIN_TARPIT_MAX_CONCURRENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10_000, immutable: false, description: 'Requests that may be delayed at once before the door sheds instead of holding', range: '1-10000' },
+  // Immutable: the setup register route reads it on every request, but turning it on is a decision
+  // about what kind of node this is, so it takes a restart and never a live write.
+  // Immutable for the same reason: which sign-in methods a node accepts is decided at start.
+  { key: 'ownerKeyLogin', dotPath: 'security.owner_key_login', envVar: 'AIMEAT_OWNER_KEY_LOGIN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Deprecated, removed in 4.0.0. When on (the default in 3.x), an owner can sign in at POST /v1/auth/token with the signing key the account was given at registration. An account with two-step sign-in is refused there either way, and a password reset replaces the key. Turn it off when nobody signs in that way.' },
+  { key: 'adminSetupOpenAfterFirstOperator', dotPath: 'security.admin_setup_open_after_first_operator', envVar: 'AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test servers only; keep it off on a public server. When on, the admin password can still create operators through /v1/admin/setup/register after the first operator exists. When off (the default), that route refuses with 410 once an operator exists, and an operator adds another on the Owners page.' },
 
   // ── Email (mutable, additional) ──
   { key: 'emailRateLimitMin', dotPath: 'email.rate_limit_min', envVar: 'AIMEAT_EMAIL_RATE_LIMIT_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Email rate limit cooldown in minutes', range: '1-1440' },
@@ -589,8 +597,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'realtimeRateLimitPerSecond', dotPath: 'realtime.rate_limit_per_second', envVar: 'AIMEAT_REALTIME_RATE_LIMIT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'P2P messages per second rate limit', range: '1-1000' },
   { key: 'stunServers', dotPath: 'realtime.stun_servers', envVar: 'AIMEAT_STUN_SERVERS', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'STUN servers for P2P (comma-separated)' },
   { key: 'turnServer', dotPath: 'realtime.turn_server', envVar: 'AIMEAT_TURN_SERVER', type: 'string', validate: () => true, immutable: false, description: 'TURN server URL for P2P relay' },
-  { key: 'turnUsername', dotPath: 'realtime.turn_username', envVar: 'AIMEAT_TURN_USERNAME', type: 'string', validate: () => true, immutable: false, description: 'TURN server username', adminDisplay: 'configured' },
-  { key: 'turnCredential', dotPath: 'realtime.turn_credential', envVar: 'AIMEAT_TURN_CREDENTIAL', type: 'string', validate: () => true, immutable: false, description: 'TURN server credential', adminDisplay: 'configured' },
+  { key: 'turnUsername', dotPath: 'realtime.turn_username', envVar: 'AIMEAT_TURN_USERNAME', type: 'string', validate: () => true, immutable: false, description: 'TURN server username (deprecated: set the TURN shared secret instead; served only while that is empty)', adminDisplay: 'configured' },
+  { key: 'turnCredential', dotPath: 'realtime.turn_credential', envVar: 'AIMEAT_TURN_CREDENTIAL', type: 'string', validate: () => true, immutable: false, description: 'TURN server credential (deprecated: set the TURN shared secret instead; served only while that is empty)', adminDisplay: 'configured' },
+  { key: 'turnSecret', dotPath: 'realtime.turn_secret', envVar: 'AIMEAT_TURN_SECRET', type: 'string', validate: v => v === null || typeof v === 'string', immutable: false, description: 'TURN shared secret (secret): the coturn static-auth-secret. It never leaves the node; each client receives a credential derived from it that expires', adminDisplay: 'configured' },
+  { key: 'turnTtlSeconds', dotPath: 'realtime.turn_ttl_seconds', envVar: 'AIMEAT_TURN_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 86400, immutable: false, description: 'How long a TURN credential handed to a client stays valid, in seconds', range: '60-86400' },
 
   // ── Site / Portal (mutable) ──
   { key: 'siteEnabled', dotPath: 'site.enabled', envVar: 'AIMEAT_SITE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable site portal' },

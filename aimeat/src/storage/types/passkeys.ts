@@ -21,6 +21,8 @@
  *
  * @structure PasskeyRecord · PasskeyRepository
  * @version-history
+ *   v1.1.0 — 2026-10-09 — deletePasskeysByOwner, for account erasure: a released name re-registered
+ *     by someone else accepted the previous holder's device (secrets audit 2026-10-09, finding 1.2).
  *   v1.0.0 — 2026-09-04 — Initial. Passkeys as a sign-in method of their own.
  */
 
@@ -63,4 +65,6 @@ export interface PasskeyRepository {
   renamePasskey(id: string, owner: string, label: string): Promise<boolean>;
   /** Take a device away. Scoped to the owner, so an id alone is not enough. */
   deletePasskey(id: string, owner: string): Promise<boolean>;
+  /** Every device of one account, when the account is erased. Returns how many went. */
+  deletePasskeysByOwner(owner: string): Promise<number>;
 }
