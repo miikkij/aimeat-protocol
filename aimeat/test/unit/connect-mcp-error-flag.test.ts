@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-10-09 — PROBE_SETUP entry for aimeat_docsign_lookup (a 64-hex SHA-256).
  *   2026-10-06 — PROBE_SETUP entries for seven tools that run their dispatch definition on the
  *     connector now (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — PROBE_SETUP conversation ids for aimeat_dm_thread, aimeat_dm_thread_as_owner and
@@ -75,6 +76,8 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_dm_thread: { conversation_id: 'conv-probe-0001' },
   aimeat_dm_thread_as_owner: { conversation_id: 'conv-probe-0001' },
   aimeat_dm_archive_as_owner: { conversation_ids: ['conv-probe-0001'] },
+  // A document's SHA-256 is 64 hex characters on the catalog schema; the generic 'probe' is not one.
+  aimeat_docsign_lookup: { sha256: 'a'.repeat(64) },
   aimeat_datamap_get: { app: 'someone/thing.html' },
   aimeat_datamap_set: { app: 'someone/thing.html', data_map: { spec: 'aimeat.datamap/1' } },
   aimeat_skill_get: { name: 'probe' },
