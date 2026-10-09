@@ -14563,6 +14563,24 @@
     "authCodeLabel": "Valtuutuskoodi:",
     "authCodeHint": "Liitä tämä koodi takaisin sovellukseen, joka pyysi pääsyä."
   },
+  "oauthRound": {
+    "badge": "Kirjautuminen",
+    "titleAccount": "Liitetäänkö tili palvelusta {provider}?",
+    "titleServer": "Kirjaudutaanko MCP-palvelimelle {server}?",
+    "leadAccountAgent": "Agenttisi {agent} pyysi liittämään tilin palvelusta {provider}. Kun jatkat, kirjaudut palveluun {provider}. Sen jälkeen agentti voi käyttää tiliä, jonka valitset siellä.",
+    "leadAccountSelf": "Aloitit tilin liittämisen palvelusta {provider}. Kun jatkat, kirjaudut palveluun {provider}. Tili, jonka valitset siellä, liitetään AIMEAT-tiliisi.",
+    "leadServerAgent": "Agenttisi {agent} pyysi kirjautumista MCP-palvelimelle {server}. Kun jatkat, kirjaudut sille palvelimelle. Sen jälkeen jokainen kutsu sen kautta käyttää tiliä, jonka valitset siellä.",
+    "leadServerSelf": "Aloitit kirjautumisen MCP-palvelimelle {server}. Kun jatkat, kirjaudut sille palvelimelle. Sen jälkeen jokainen kutsu sen kautta käyttää tiliä, jonka valitset siellä.",
+    "warn": "Jatka vain, jos pyysit tätä itse. Kirjautuminen toimii vain tässä selaimessa, joten kukaan muu ei voi viedä sitä loppuun.",
+    "continue": "Jatka",
+    "cancel": "Peruuta",
+    "signInTitle": "Kirjaudu ensin sisään",
+    "signInLead": "Tämä kirjautuminen odottaa sen tilin omistajaa, joka sen aloitti. Kirjaudu sisään sillä tilillä, niin näet, mitä se liittää.",
+    "signIn": "Kirjaudu sisään",
+    "goneTitle": "Tätä kirjautumista ei voi jatkaa",
+    "gone": "Se on vanhentunut, se on jo käytetty, tai se kuuluu toiselle tilille. Pyydä uusi.",
+    "failed": "Jatkaminen ei onnistunut. Yritä uudelleen."
+  },
   "agentConsentPage": {
     "title": "Agentin hyväksyminen",
     "loginRequired": "Kirjaudu sisään hyväksyäksesi tai hylätäksesi pyynnön.",

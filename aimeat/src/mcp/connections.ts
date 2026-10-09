@@ -23,6 +23,9 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.5.0 — 2026-10-09 — aimeat_connection_start hands back the node's confirmation page, where the
+ *     owner confirms the round in their own browser, never the provider's address (secrets audit
+ *     2026-10-09, chapter 2).
  *   2026-10-08 — aimeat_mail_send takes ai_provenance_id beside ai_disclosure and answers with the
  *     record the message carries (aiprov D9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -133,12 +136,16 @@ export function registerConnectionTools(
             });
             if (!result.ok) return fail(`${result.code}: ${result.reason}`);
             return ok({
-                authorize_url: result.authorizeUrl,
+                // The node's confirmation page, never the provider's address: a session here is not
+                // the owner's browser, so the round waits until the owner signs in on that page and
+                // confirms it (secrets audit 2026-10-09, chapter 2). Whoever approved the provider's
+                // address without that step would connect THEIR account to this principal.
+                authorize_url: result.approvalUrl,
+                owner_confirms: true,
                 // Said plainly because it is the part an agent gets wrong: this cannot be completed
                 // by fetching the URL. A PERSON opens it, sees exactly what is being asked for, and
-                // approves it at the provider. The connection appears in aimeat_connection_list
-                // afterwards.
-                next: 'Give this address to the person and ask them to open it. They approve it at the provider; nothing here can approve it for them. When they have, the connection shows up in aimeat_connection_list.',
+                // approves it. The connection appears in aimeat_connection_list afterwards.
+                next: 'Give this address to your owner and ask them to open it. They sign in to this node, confirm, and approve it at the provider; nothing here can approve it for them. When they have, the connection shows up in aimeat_connection_list.',
             });
         });
 

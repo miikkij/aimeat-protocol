@@ -6,6 +6,7 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-09 — aimeat_connection_start says the address is the node's confirmation page (secrets audit 2026-10-09).
  *   2026-10-08 — aimeat_mail_send takes ai_provenance_id (aiprov D9).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
@@ -56,7 +57,7 @@ export const connectionTools = [
     },
     {
         name: 'aimeat_connection_start',
-        description: "Begin connecting an outside account. Returns an address for a PERSON to open: they see exactly what is being asked for and approve it at the provider, and nothing here can approve it for them — fetching the address yourself does nothing. Hand it over, say in one sentence what it is for and what it will and will not be able to do, and wait; the connection then appears in aimeat_connection_list. Worth saying to them, because it is the question they are actually asking: a read connection cannot send, delete or change anything, because those permissions are never requested.",
+        description: "Begin connecting an outside account. Returns an address for a PERSON to open: they see exactly what is being asked for and approve it at the provider, and nothing here can approve it for them — fetching the address yourself does nothing. Hand it over, say in one sentence what it is for and what it will and will not be able to do, and wait; the connection then appears in aimeat_connection_list. Worth saying to them, because it is the question they are actually asking: a read connection cannot send, delete or change anything, because those permissions are never requested. The address is this node's own confirmation page: the owner opens it signed in to this node, confirms, and goes on to the provider from there, so an approval given in anybody else's browser connects nothing.",
         caller: 'agent',
         visibility: agentEverywhere,
         // It creates a pending authorization, so it is not read-only; it is idempotent in the sense

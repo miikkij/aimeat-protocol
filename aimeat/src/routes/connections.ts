@@ -14,8 +14,9 @@
  *   otherwise the difference between the two answers enumerates other people's connections.
  *
  *   THE CALLBACK IS THE ONE UNAUTHENTICATED ROUTE, and it must be: the provider redirects a browser
- *   to it. Its gate is the single-use `state`, which is bound to the principal who started the round
- *   and consumed before the code is exchanged.
+ *   to it. Its gates are the single-use `state`, which names whose connection it will be and is
+ *   consumed before the code is exchanged, and the round's browser binding, which names the one
+ *   browser that may finish it (routes/connections-callback.ts).
  * @structure connectionsRouter(config, storage):
  *   GET    /v1/connections/providers            -- discovery (enabled providers + capabilities)
  *   POST   /v1/connections/start                -- begin an authorization
@@ -28,6 +29,11 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.8.0 — 2026-10-09 — POST /start binds the round to the owner's browser when the owner starts it
+ *     from a page of this node (an httpOnly SameSite=Lax cookie on the callback path); any other
+ *     caller gets the node's confirmation page as authorize_url, with owner_confirms: true. The
+ *     callback moved to routes/connections-callback.ts and refuses a browser the round was not bound
+ *     to (secrets audit 2026-10-09, chapter 2).
  *   v1.7.2 — 2026-10-05 — The file's workspace binding goes to fileTarget, so a workspace file leaves under its organism's classification (secaudit 2026-10, DATA-4).
  *     explainReadThrough moved to routes/connections-read-through.ts unchanged (max-file-lines).
  *   v1.7.1 — 2026-09-29 — The delegated publish's CLASSIFIED refusal is refuseClassified(): a plain sentence and the way forward, the key and label in details.
@@ -67,7 +73,10 @@ import { logger } from '../utils/logger.js';
 import { buildOutboundProviders, listProviderMeta, findProvider } from '../services/connections/providers.js';
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
 import { listOwnConnections, requireOwnConnection, toPublicConnection, toPublicClient } from '../services/connections/access.js';
-import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
+import { startAuthorization, type ConnectContext } from '../services/connections/oauth.js';
+import { answerConnectCallback, connectCallbackPath } from './connections-callback.js';
+import { browserCanBind, issueRoundBinding } from '../middleware/oauth-round-cookie.js';
+import { callerOf } from '../middleware/caller.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { readResource } from '../services/connections/read.js';
 import { answerStoredAttachment } from './connections-attachment.js';
@@ -78,7 +87,6 @@ import { readMetrics, toStoredSample } from '../services/connections/metrics.js'
 import { runOwnPublish } from '../services/connections/publish-run.js';
 import { readerFor } from '../services/classification/reader.js';
 import { fileTarget } from '../services/classification/labels.js';
-import { safeRedirectPath } from '../utils/same-origin-path.js';
 import type { ConnectionMode, ModerationMode } from '../models/connection-schemas.js';
 
 // The projection and the two access sentences live in services/connections/access.ts, so the MCP
@@ -380,12 +388,17 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       return;
     }
     const mode: ConnectionMode = req.body?.mode === 'shared' ? 'shared' : 'personal';
+    // The owner on a page of this node binds the round to this browser now. Anyone else (an agent,
+    // a CLI) gets the node's confirmation page, where the owner confirms in their own browser
+    // (middleware/oauth-round-cookie.ts; secrets audit 2026-10-09, chapter 2).
+    const inBrowser = browserCanBind(req, callerOf(req, config.nodeId, storage).inPerson);
     const result = await startAuthorization(c, {
       principal: resolve(req),
       provider,
       instance: str(req.body?.instance) || undefined,
       mode,
       returnUrl: str(req.body?.return_url),
+      ...(inBrowser ? { bindBrowser: (state: string, ttl: number) => issueRoundBinding(req, res, state, connectCallbackPath(config), ttl) } : {}),
     });
     if (!result.ok) {
       // The reason travels with the refusal. "Disabled" alone leaves an operator nothing to act on.
@@ -393,7 +406,11 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
         .json(error(config.nodeId, result.code, result.reason));
       return;
     }
-    res.json(success(config.nodeId, { authorize_url: result.authorizeUrl, state: result.state }));
+    res.json(success(config.nodeId, {
+      authorize_url: inBrowser ? result.authorizeUrl : result.approvalUrl,
+      state: result.state,
+      owner_confirms: !inBrowser,
+    }));
   });
 
   // ── POST /v1/connections/attach ──
@@ -433,48 +450,12 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
 
   // ── GET /v1/connections/callback ──
   // Unauthenticated BY NECESSITY: the provider redirects a browser here and that browser may carry
-  // no session. The gate is the single-use state, bound to the principal who started the round.
-  router.get('/v1/connections/callback', async (req: Request, res: Response) => {
-    if (!config.connectionsEnabled) {
-      res.status(503).send('Outbound connections are not enabled on this node.');
-      return;
-    }
-    const key = requireEncryptionKey(config);
-    if (!key) {
-      res.status(503).send('This node has no encryption key configured.');
-      return;
-    }
-    const state = str(req.query.state);
-    const code = str(req.query.code);
-    const providerError = str(req.query.error);
-
-    if (providerError) {
-      // The user pressed cancel, or the provider refused. Not our failure, and not an error page:
-      // the state still needs consuming so a stale row does not sit until it expires.
-      await storage.deleteVerificationNonce(state).catch((err: unknown) => {
-        logger.warn('connections: could not clear the state after a provider-side refusal', { error: String(err) });
-      });
-      // text/plain, not the default text/html of res.send(string): providerError is unauthenticated
-      // query input, and an HTML response would execute `?error=<img onerror=…>` on this node's own
-      // origin (CodeQL js/reflected-xss, AI-triage 2026-08-23).
-      res.status(400).type('txt').send(`The provider did not complete the connection: ${providerError}`);
-      return;
-    }
-    if (!state || !code) {
-      res.status(400).send('This connection callback is missing its state or code.');
-      return;
-    }
-
-    const result = await completeAuthorization({ config, storage, providers, key }, { state, code });
-    if (!result.ok) {
-      res.status(400).send(`Could not finish connecting: ${result.reason}`);
-      return;
-    }
-    // Back to wherever the flow started, when the starter said where that was. Same-origin only, as
-    // safeRedirectPath reads it: an address from the request that a browser resolves to another
-    // site would make this an open redirect, so it lands on the access page instead.
-    res.redirect(safeRedirectPath(result.returnUrl, '/profile#access'));
-  });
+  // no session. Its gates are the single-use state and the round's browser binding; see
+  // routes/connections-callback.ts.
+  const answerCallback = answerConnectCallback(config, storage, providers);
+  router.get('/v1/connections/callback', (req: Request, res: Response) => answerCallback(req, res, {
+    state: str(req.query.state), code: str(req.query.code), providerError: str(req.query.error),
+  }));
 
   // ── DELETE /v1/connections/:id ──
   router.delete('/v1/connections/:id', requireAuth(), requireScope('connections:write'), async (req: Request, res: Response) => {

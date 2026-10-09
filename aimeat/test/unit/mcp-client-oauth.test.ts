@@ -15,6 +15,9 @@
  *   round that "works" against a server which never checks the verifier proves nothing about the
  *   half that never travels.
  * @version-history
+ *   v1.1.0 — 2026-10-09 — Rounds are bound to a browser: the finish takes the binding, a missing or
+ *     foreign one is NOT_THIS_BROWSER with nothing sealed, an unbound round waits for the owner, and
+ *     the stored round holds no plaintext verifier or client_secret (secrets audit 2026-10-09).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy, the OAuth credential path.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -25,9 +28,14 @@ import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import { startMcpOAuth, finishMcpOAuth } from '../../src/services/mcp-client/oauth.js';
 import { openMcpCredential } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
+import { bindingHash } from '../../src/services/oauth-round-secrets.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
+
+/** The cookie value the owner's browser holds, and the start hook that binds a round to it. */
+const BINDING = 'the-owners-browser';
+const bindBrowser = (): string => bindingHash(BINDING);
 
 const PORT = 40688;
 const KEY = 'c'.repeat(64);
@@ -170,7 +178,10 @@ describe('the OAuth round, against a real authorization server', () => {
     const round = await storage.getVerificationNonce(started.state);
     expect(round?.type).toBe('mcp_connect');
     expect(round?.owner).toBe('alice@test-node-001');
-    expect(round?.nonce).toBeTruthy();
+    // Sealed to this round: the verifier and the registration's client_secret are not stored in
+    // plain text (secrets audit 2026-10-09, chapter 2).
+    expect(round?.nonce).toMatch(/^v2:/);
+    expect(JSON.stringify(round)).not.toContain('secret-xyz');
   });
 
   it('finishes the round, proves the verifier and seals the token', async () => {
@@ -179,12 +190,12 @@ describe('the OAuth round, against a real authorization server', () => {
     await storage.createMcpServer(row);
 
     const started = await startMcpOAuth({
-      storage, config, server: row, ownerGhii: 'alice@test-node-001', returnUrl: '/spa.html#access',
+      storage, config, server: row, ownerGhii: 'alice@test-node-001', returnUrl: '/spa.html#access', bindBrowser,
     });
     if (!started.ok) throw new Error('start failed');
     seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
 
-    const done = await finishMcpOAuth({ storage, config, state: started.state, code: 'the-code' });
+    const done = await finishMcpOAuth({ storage, config, state: started.state, code: 'the-code', binding: BINDING });
     expect(done.ok).toBe(true);
     if (!done.ok) return;
 
@@ -213,15 +224,15 @@ describe('the OAuth round, against a real authorization server', () => {
     await storage.createMcpServer(row);
 
     const started = await startMcpOAuth({
-      storage, config, server: row, ownerGhii: 'alice@test-node-001',
+      storage, config, server: row, ownerGhii: 'alice@test-node-001', bindBrowser,
     });
     if (!started.ok) throw new Error('start failed');
     seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
 
-    const first = await finishMcpOAuth({ storage, config, state: started.state, code: 'c' });
+    const first = await finishMcpOAuth({ storage, config, state: started.state, code: 'c', binding: BINDING });
     expect(first.ok).toBe(true);
 
-    const replay = await finishMcpOAuth({ storage, config, state: started.state, code: 'c' });
+    const replay = await finishMcpOAuth({ storage, config, state: started.state, code: 'c', binding: BINDING });
     expect(replay.ok).toBe(false);
     if (replay.ok) return;
     expect(replay.code).toBe('BAD_STATE');
@@ -229,7 +240,7 @@ describe('the OAuth round, against a real authorization server', () => {
 
   it('refuses a state that was never issued', async () => {
     const storage = new SqliteStorage(':memory:');
-    const r = await finishMcpOAuth({ storage, config, state: 'invented', code: 'c' });
+    const r = await finishMcpOAuth({ storage, config, state: 'invented', code: 'c', binding: BINDING });
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.code).toBe('BAD_STATE');
@@ -243,15 +254,47 @@ describe('the OAuth round, against a real authorization server', () => {
     // The round is started for somebody who does not own this server. The nonce carries THEM, and
     // the callback compares it with the row: a replayed state cannot cross accounts.
     const started = await startMcpOAuth({
-      storage, config, server: row, ownerGhii: 'mallory@test-node-001',
+      storage, config, server: row, ownerGhii: 'mallory@test-node-001', bindBrowser,
     });
     if (!started.ok) throw new Error('start failed');
     seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
 
-    const r = await finishMcpOAuth({ storage, config, state: started.state, code: 'c' });
+    const r = await finishMcpOAuth({ storage, config, state: started.state, code: 'c', binding: BINDING });
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.code).toBe('NO_SERVER');
+  });
+
+  it('refuses a callback from a browser the round was not bound to, and seals nothing', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow();
+    await storage.createMcpServer(row);
+    const started = await startMcpOAuth({ storage, config, server: row, ownerGhii: 'alice@test-node-001', bindBrowser });
+    if (!started.ok) throw new Error('start failed');
+    seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
+
+    for (const binding of ['', 'somebody-elses-cookie']) {
+      const fresh = binding ? started : await startMcpOAuth({ storage, config, server: row, ownerGhii: 'alice@test-node-001', bindBrowser });
+      if (!fresh.ok) throw new Error('start failed');
+      const r = await finishMcpOAuth({ storage, config, state: fresh.state, code: 'c', binding });
+      expect(r.ok).toBe(false);
+      if (r.ok) return;
+      expect(r.code).toBe('NOT_THIS_BROWSER');
+    }
+    expect((await storage.getMcpServer(row.id))?.credential).toBeNull();
+  });
+
+  it('a round started outside a browser has no binding until the owner confirms it', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow();
+    await storage.createMcpServer(row);
+    const started = await startMcpOAuth({ storage, config, server: row, ownerGhii: 'alice@test-node-001', startedBy: 'bot#alice@test-node-001' });
+    if (!started.ok) throw new Error('start failed');
+    expect(started.approvalUrl).toBe(`http://127.0.0.1:40689/v1/oauth-round?state=${encodeURIComponent(started.state)}`);
+    const r = await finishMcpOAuth({ storage, config, state: started.state, code: 'c', binding: BINDING });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.code).toBe('NOT_THIS_BROWSER');
   });
 
   it('answers a node with no encryption key by naming the env var, before any round starts', async () => {

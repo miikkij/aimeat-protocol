@@ -19,6 +19,10 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.5.0 — 2026-10-09 — Phases 2b and 2c (secrets audit 2026-10-09, chapter 2): the callback seals
+ *     only for the browser that started the round, an agent's round waits for the owner to confirm it
+ *     in their own browser, the stored verifier is sealed, and a deleted agent's connection goes with
+ *     it so a new agent of the same name sees none. Every round here starts as a browser does.
  *   v1.4.1 — 2026-09-25 — The read-through arm follows A5-1: an app holding only connections:use is
  *     refused with the word it needs named, and one holding connections:read-through reads.
  *   v1.4.0 — 2026-09-24 — The callback sends the browser to a path of this node only: `//host` and
@@ -48,7 +52,9 @@
  */
 
 import { randomBytes, createHash } from 'node:crypto';
+import * as ed from '@noble/ed25519';
 import { startFakeProvider, type FakeProvider } from './helpers/fake-oauth-provider.js';
+import { BROWSER_START, roundCookie, roundCookieLine, readRoundRow } from './helpers/oauth-round.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const FAKE_PORT = Number(new URL(process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:40388').port);
@@ -62,9 +68,13 @@ async function test(name: string, fn: () => Promise<void>): Promise<void> {
 }
 function assert(cond: boolean, msg: string): void { if (!cond) throw new Error(msg); }
 
-interface Call { status: number; data: any }
-async function api(path: string, opts: { method?: string; body?: any; bearer?: string; redirect?: RequestRedirect } = {}): Promise<Call> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+interface Call { status: number; data: any; cookie: string; cookieLine: string }
+/**
+ * `browser: true` sends what a browser sends on a fetch from the node's own page, so a start is bound
+ * to "this browser" and answers with the round cookie (`cookie`), which the callback then needs.
+ */
+async function api(path: string, opts: { method?: string; body?: any; bearer?: string; redirect?: RequestRedirect; browser?: boolean } = {}): Promise<Call> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.browser ? BROWSER_START : {}) };
   if (opts.bearer) headers.Authorization = 'Bearer ' + opts.bearer;
   const res = await fetch(`${BASE}${path}`, {
     method: opts.method ?? 'POST', headers,
@@ -73,7 +83,14 @@ async function api(path: string, opts: { method?: string; body?: any; bearer?: s
   });
   let data: any = null;
   try { data = await res.json(); } catch { /* redirect or plain text */ }
-  return { status: res.status, data };
+  return { status: res.status, data, cookie: roundCookie(res), cookieLine: roundCookieLine(res) };
+}
+
+/** The provider's redirect back to the node, as the browser that holds `cookie` makes it. */
+function callback(state: string, code: string, cookie = ''): Promise<Response> {
+  return fetch(`${BASE}/v1/connections/callback?state=${encodeURIComponent(state)}&code=${code}`, {
+    redirect: 'manual', headers: cookie ? { Cookie: cookie } : {},
+  });
 }
 
 async function registerAndLogin(username: string, password: string): Promise<string> {
@@ -84,12 +101,37 @@ async function registerAndLogin(username: string, password: string): Promise<str
   return login.data.data.token;
 }
 
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+
+/**
+ * An agent of `owner` that may connect, list and read through its own accounts, and a token for it.
+ * Made through POST /v1/agents, so the same name made again is the same GAII, as device
+ * authorization makes it.
+ */
+async function agentFor(ownerBearer: string, owner: string, name: string): Promise<string> {
+  const made = await api('/v1/agents', {
+    bearer: ownerBearer, body: { name, owner, capabilities: ['memory'], model: 'test' },
+  });
+  assert(made.status === 201, `agent ${name}: ${made.status} ${made.data?.error?.message}`);
+  const scoped = await api(`/v1/agents/${name}/scopes`, {
+    method: 'PATCH', bearer: ownerBearer,
+    body: { scopes: ['connections:read', 'connections:write', 'connections:read-through'] },
+  });
+  assert(scoped.status === 200, `agent scopes: ${scoped.status} ${scoped.data?.error?.message}`);
+  const gaii = made.data.data.agent.gaii as string;
+  const timestamp = new Date().toISOString();
+  const sig = await ed.signAsync(new TextEncoder().encode(gaii + timestamp), Buffer.from(made.data.data.private_key, 'base64'));
+  const tok = await api('/v1/auth/token', { body: { gaii, timestamp, signature: Buffer.from(sig).toString('base64') } });
+  assert(tok.status === 200, `agent token: ${tok.status} ${tok.data?.error?.message}`);
+  return tok.data.data.token as string;
+}
+
 /** Drive one full round and return the connection the node created. */
 async function connect(bearer: string, subject: string, mode: 'personal' | 'shared' = 'personal'): Promise<any> {
-  const start = await api('/v1/connections/start', { bearer, body: { provider: 'fake', mode, return_url: '/profile#access' } });
+  const start = await api('/v1/connections/start', { bearer, browser: true, body: { provider: 'fake', mode, return_url: '/profile#access' } });
   assert(start.status === 200 && start.data?.ok, `start failed: ${start.status} ${start.data?.error?.message}`);
   const state = start.data.data.state as string;
-  const res = await fetch(`${BASE}/v1/connections/callback?state=${encodeURIComponent(state)}&code=code-${subject}`, { redirect: 'manual' });
+  const res = await callback(state, `code-${subject}`, start.cookie);
   assert(res.status === 302, `callback did not redirect: ${res.status} ${await res.text()}`);
   const list = await api('/v1/connections', { method: 'GET', bearer });
   return { state, connections: list.data.data.connections as any[] };
@@ -237,12 +279,12 @@ async function main(): Promise<void> {
       assert(connections.length === 2, `expected 2, got ${connections.length}`);
     });
     await test('a replayed callback creates nothing', async () => {
-      const start = await api('/v1/connections/start', { bearer: jwtA, body: { provider: 'fake' } });
+      const start = await api('/v1/connections/start', { bearer: jwtA, browser: true, body: { provider: 'fake' } });
       const state = start.data.data.state as string;
-      const first = await fetch(`${BASE}/v1/connections/callback?state=${state}&code=code-gamma`, { redirect: 'manual' });
+      const first = await callback(state, 'code-gamma', start.cookie);
       assert(first.status === 302, `first callback: ${first.status}`);
       const before = (await api('/v1/connections', { method: 'GET', bearer: jwtA })).data.data.connections.length;
-      const replay = await fetch(`${BASE}/v1/connections/callback?state=${state}&code=code-gamma`, { redirect: 'manual' });
+      const replay = await callback(state, 'code-gamma', start.cookie);
       assert(replay.status === 400, `a replayed state was accepted: ${replay.status}`);
       const after = (await api('/v1/connections', { method: 'GET', bearer: jwtA })).data.data.connections.length;
       assert(before === after, `replay created a connection: ${before} → ${after}`);
@@ -254,10 +296,9 @@ async function main(): Promise<void> {
     await test('the callback sends the browser to a path of this node, and nowhere else', async () => {
       /** One round naming `returnUrl`; the Location the callback answers with. Re-authorises alpha. */
       const land = async (returnUrl: string): Promise<string | null> => {
-        const start = await api('/v1/connections/start', { bearer: jwtA, body: { provider: 'fake', return_url: returnUrl } });
+        const start = await api('/v1/connections/start', { bearer: jwtA, browser: true, body: { provider: 'fake', return_url: returnUrl } });
         assert(start.status === 200 && start.data?.ok, `start: ${start.status} ${start.data?.error?.message}`);
-        const res = await fetch(`${BASE}/v1/connections/callback?state=${
-          encodeURIComponent(start.data.data.state as string)}&code=code-alpha`, { redirect: 'manual' });
+        const res = await callback(start.data.data.state as string, 'code-alpha', start.cookie);
         assert(res.status === 302, `callback: ${res.status}`);
         return res.headers.get('location');
       };
@@ -269,6 +310,106 @@ async function main(): Promise<void> {
         const location = await land(offSite);
         assert(location === '/profile#access', `${offSite} sent the browser to ${location}`);
       }
+    });
+
+    console.log('\nPhase 2b — The callback seals only for the browser that started the round');
+    // Secrets audit 2026-10-09, chapter 2: the callback took the state alone, so whoever approved an
+    // authorize URL somebody else had started connected THEIR mailbox to that somebody. Each test
+    // below failed against the code before the binding existed.
+    await test('the owner\'s browser start answers with an httpOnly, SameSite=Lax cookie scoped to the callback', async () => {
+      const start = await api('/v1/connections/start', { bearer: jwtA, browser: true, body: { provider: 'fake' } });
+      assert(start.status === 200, `start: ${start.status}`);
+      const line = start.cookieLine;
+      assert(!!line, 'the start set no round cookie');
+      assert(/HttpOnly/i.test(line), `not httpOnly: ${line}`);
+      assert(/SameSite=Lax/i.test(line), `not SameSite=Lax: ${line}`);
+      assert(/Path=\/v1\/connections\/callback/i.test(line), `not scoped to the callback: ${line}`);
+      assert(new URL(start.data.data.authorize_url).origin !== new URL(BASE).origin,
+        'a browser start should go straight to the provider');
+    });
+    await test('a callback from a browser that did not start the round is refused and connects nothing', async () => {
+      const before = (await api('/v1/connections', { method: 'GET', bearer: jwtA })).data.data.connections.length;
+      const start = await api('/v1/connections/start', { bearer: jwtA, browser: true, body: { provider: 'fake' } });
+      const state = start.data.data.state as string;
+      // Somebody else's browser: the state and a code, and not the starter's cookie.
+      const stranger = await callback(state, 'code-stranger');
+      const strangerBody = await stranger.text();
+      assert(stranger.status === 403, `a stranger's callback was accepted: ${stranger.status} ${strangerBody}`);
+      // A cookie of the right name with a value of somebody's own choosing binds nothing either.
+      const second = await api('/v1/connections/start', { bearer: jwtA, browser: true, body: { provider: 'fake' } });
+      const forged = await callback(second.data.data.state, 'code-stranger', second.cookie.replace(/=.*$/, '=not-the-binding'));
+      assert(forged.status === 403, `a forged cookie was accepted: ${forged.status}`);
+      const after = (await api('/v1/connections', { method: 'GET', bearer: jwtA })).data.data.connections;
+      assert(after.length === before, `the stranger's account was connected: ${before} → ${after.length}`);
+      assert(!after.some((c: any) => c.accountLabel === 'Test account stranger'), 'the stranger\'s mailbox is on the list');
+      // The refusal consumed the round: the starter's own cookie no longer finishes it either.
+      const late = await callback(state, 'code-stranger', start.cookie);
+      assert(late.status === 400, `the refused round could still be finished: ${late.status}`);
+    });
+    await test('the stored round holds the PKCE verifier sealed, never in plain text', async () => {
+      const start = await api('/v1/connections/start', { bearer: jwtA, browser: true, body: { provider: 'fake' } });
+      const row = await readRoundRow(start.data.data.state as string);
+      assert(row !== null, 'the stored round could not be read from the server database');
+      assert(/^v2:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(String(row.nonce)), `the verifier is stored in plain text: ${String(row.nonce).slice(0, 12)}…`);
+    });
+
+    console.log('\nPhase 2c — An agent asks, and the owner confirms in their own browser');
+    let agentName = '';
+    let agentToken = '';
+    let agentConnId = '';
+    await test('an agent\'s start returns the node\'s confirmation page, and its callback alone connects nothing', async () => {
+      agentName = `cxagent${stamp % 100000}`;
+      agentToken = await agentFor(jwtA, userA, agentName);
+      const start = await api('/v1/connections/start', { bearer: agentToken, body: { provider: 'fake' } });
+      assert(start.status === 200, `agent start: ${start.status} ${start.data?.error?.message}`);
+      const url = new URL(start.data.data.authorize_url as string);
+      assert(url.origin === new URL(BASE).origin && url.pathname === '/v1/oauth-round',
+        `the agent was handed the provider's own address: ${url.origin}${url.pathname}`);
+      assert(start.data.data.owner_confirms === true, 'the answer does not say the owner confirms');
+      assert(!start.cookie, 'an agent start set a browser cookie');
+      // Whoever approves at the provider without the owner's confirmation connects nothing.
+      const cb = await callback(start.data.data.state, 'code-thirdparty');
+      assert(cb.status === 403, `an unconfirmed agent round was finished: ${cb.status}`);
+      const list = await api('/v1/connections', { method: 'GET', bearer: agentToken });
+      assert(list.data.data.connections.length === 0, 'the third party\'s mailbox became the agent\'s');
+    });
+    await test('only the owner in person can see and confirm the agent\'s round', async () => {
+      const start = await api('/v1/connections/start', { bearer: agentToken, body: { provider: 'fake' } });
+      const state = start.data.data.state as string;
+      const asB = await api(`/v1/oauth-rounds/${encodeURIComponent(state)}`, { method: 'GET', bearer: jwtB });
+      assert(asB.status === 404, `another owner read the round: ${asB.status}`);
+      const asAgent = await api(`/v1/oauth-rounds/${encodeURIComponent(state)}/approve`, { bearer: agentToken, browser: true });
+      assert(asAgent.status === 403, `the agent confirmed its own round: ${asAgent.status}`);
+      const bApprove = await api(`/v1/oauth-rounds/${encodeURIComponent(state)}/approve`, { bearer: jwtB, browser: true });
+      assert(bApprove.status === 404, `another owner confirmed the round: ${bApprove.status}`);
+      const shown = await api(`/v1/oauth-rounds/${encodeURIComponent(state)}`, { method: 'GET', bearer: jwtA });
+      assert(shown.status === 200, `the owner could not read the round: ${shown.status}`);
+      assert(String(shown.data.data.round.for).startsWith(`${agentName}#${userA}@`),
+        `the round does not name the agent: ${JSON.stringify(shown.data.data.round)}`);
+      assert(shown.data.data.round.provider === 'fake', `provider: ${shown.data.data.round.provider}`);
+      const ok = await api(`/v1/oauth-rounds/${encodeURIComponent(state)}/approve`, { bearer: jwtA, browser: true });
+      assert(ok.status === 200, `the owner could not confirm: ${ok.status} ${ok.data?.error?.message}`);
+      assert(!!ok.cookie, 'confirming set no round cookie');
+      assert(new URL(ok.data.data.authorize_url).origin !== new URL(BASE).origin, 'confirming did not hand over the provider address');
+      const cb = await callback(state, 'code-agentbox', ok.cookie);
+      assert(cb.status === 302, `the confirmed round did not finish: ${cb.status} ${await cb.text()}`);
+      const list = await api('/v1/connections', { method: 'GET', bearer: agentToken });
+      const conns = list.data.data.connections as any[];
+      assert(conns.length === 1 && conns[0].accountLabel === 'Test account agentbox', `agent's connections: ${JSON.stringify(conns)}`);
+      agentConnId = conns[0].id;
+    });
+    await test('a deleted agent\'s connection is gone, and a new agent with the same name sees none', async () => {
+      // Not vacuous: the agent must hold a connection before it is deleted.
+      assert(!!agentConnId, 'precondition: the agent connected nothing in the test above');
+      const del =await api(`/v1/agents/${agentName}`, { method: 'DELETE', bearer: jwtA });
+      assert(del.status === 200, `delete agent: ${del.status} ${del.data?.error?.message}`);
+      const again = await agentFor(jwtA, userA, agentName);
+      const list = await api('/v1/connections', { method: 'GET', bearer: again });
+      assert(list.status === 200, `list: ${list.status}`);
+      assert(list.data.data.connections.length === 0, `the new agent inherited ${list.data.data.connections.length} connection(s)`);
+      const read = await api(`/v1/connections/${agentConnId}/read/messages`, { bearer: again, body: {} });
+      assert(read.status === 404, `the old connection answered the new agent: ${read.status}`);
+      await api(`/v1/agents/${agentName}`, { method: 'DELETE', bearer: jwtA });
     });
 
     console.log('\nPhase 3 — The credential never leaves');
@@ -925,7 +1066,7 @@ async function main(): Promise<void> {
     await test("the principal's OWN client is used, not the node's", async () => {
       // Read off the authorize URL, which is where a wrong client would actually reach the provider.
       const start = await api('/v1/connections/start', {
-        bearer: jwtA, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
+        bearer: jwtA, browser: true, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
       });
       assert(start.status === 200, `start: ${start.status} ${start.data?.error?.message}`);
       const url = new URL(start.data.data.authorize_url as string);
@@ -937,7 +1078,7 @@ async function main(): Promise<void> {
       const list = await api('/v1/connections/clients', { method: 'GET', bearer: jwtB });
       assert(list.status === 200 && (list.data.data.clients as any[]).length === 0, "B can see A's client");
       const start = await api('/v1/connections/start', {
-        bearer: jwtB, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
+        bearer: jwtB, browser: true, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
       });
       assert(start.status === 200, `B start: ${start.status}`);
       const url = new URL(start.data.data.authorize_url as string);
@@ -946,12 +1087,9 @@ async function main(): Promise<void> {
 
     await test('a connection made with an own app remembers which app made it', async () => {
       const start = await api('/v1/connections/start', {
-        bearer: jwtA, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
+        bearer: jwtA, browser: true, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
       });
-      const cb = await fetch(
-        `${BASE}/v1/connections/callback?state=${encodeURIComponent(start.data.data.state)}&code=code-ownapp`,
-        { redirect: 'manual' },
-      );
+      const cb = await callback(start.data.data.state, 'code-ownapp', start.cookie);
       assert(cb.status === 302, `callback: ${cb.status}`);
       const clients = await api('/v1/connections/clients', { method: 'GET', bearer: jwtA });
       assert((clients.data.data.clients as any[])[0].connectionCount >= 1,

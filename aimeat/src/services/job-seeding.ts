@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.13.0 — 2026-10-09 — Seed core:nonce-cleanup on every node, not only with FTN or EUDIW on
+ *     (secrets audit 2026-10-09, chapter 2).
  *   v1.12.0 — 2026-10-09 — Seed core:device-auth-cleanup (every 5 minutes).
  *   v1.11.0 — 2026-10-08 — Seed core:behaviour-fixer (weekly, Monday 06:17): the on-page behaviour fixing agent.
  *   v1.10.0 — 2026-10-08 — Seed core:ucp-upkeep (every 5 minutes): UCP order webhooks tried again.
@@ -98,9 +100,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
 
   jobs.push({ id: 'core:capability-aggregation', name: 'Capability Aggregation', coreHandler: 'capability-aggregation', cron: '*/5 * * * *' });
 
-  if (config.eudiwEnabled || config.ftnEnabled) {
-    jobs.push({ id: 'core:nonce-cleanup', name: 'Verification Nonce Cleanup', coreHandler: 'nonce-cleanup', cron: '*/5 * * * *' });
-  }
+  // Every node, not only with FTN or EUDIW on: every outside sign-in round lives in that table.
+  jobs.push({ id: 'core:nonce-cleanup', name: 'Verification Nonce Cleanup', coreHandler: 'nonce-cleanup', cron: '*/5 * * * *' });
 
   // Expired device authorizations and the agent credentials an approved one holds -- every 5 minutes
   jobs.push({ id: 'core:device-auth-cleanup', name: 'Device Authorization Cleanup', coreHandler: 'device-auth-cleanup', cron: '*/5 * * * *' });

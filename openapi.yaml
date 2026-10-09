@@ -57642,9 +57642,12 @@ paths:
       description: >
         Needs mcp:manage. Returns an address for a PERSON to open: consent happens at the far side,
         never here, and fetching the address from a script accomplishes nothing. The PKCE verifier
-        stays on this node and never travels, and the single-use state is bound to the owner who
-        started the round, which is the CSRF gate. An empty authorize_url means the far side needed
-        nobody to sign in.
+        stays on this node, sealed, and never travels. The round is bound to one browser: when the
+        owner starts it from a page of this node (Sec-Fetch-Site same-origin), the answer sets an
+        httpOnly SameSite=Lax cookie on the callback path and authorize_url is the far side's
+        address; for any other caller authorize_url is the node's page /v1/oauth-round?state=…,
+        owner_confirms is true, and the owner confirms there (POST /v1/oauth-rounds/{state}/approve).
+        An empty authorize_url means the far side needed nobody to sign in.
       tags: [MCP Servers]
       security:
         - BearerAuth: []
@@ -57681,9 +57684,10 @@ paths:
       summary: The far side's redirect after a person approves
       description: >
         THE ONE UNAUTHENTICATED ROUTE in this group, and it has to be: the far side redirects a
-        browser here and that browser carries no bearer of ours. Its gate is the single-use state,
-        which is bound to the owner who started the round and consumed before the code is exchanged,
-        so a replayed callback finds nothing whether or not the first one succeeded.
+        browser here and that browser carries no bearer of ours. Its gates are the single-use state,
+        consumed before the code is exchanged so a replayed callback finds nothing, and the round's
+        browser binding: a browser without the round's cookie is refused with 403 and nothing is
+        sealed.
       tags: [MCP Servers]
       parameters:
         - name: state
@@ -57703,6 +57707,8 @@ paths:
           description: Connected, when there was nowhere to send them back to.
         '400':
           description: The link was already used, or it expired.
+        '403':
+          description: NOT_THIS_BROWSER. The round was not started or confirmed in this browser; nothing was saved.
         '502':
           description: The far side refused the sign-in.
   /v1/mcp-servers/{id}/tools:
@@ -57828,8 +57834,12 @@ paths:
       summary: Begin connecting an account
       description: >
         Returns the URL to send the user's browser to. Consent happens at the PROVIDER, never here.
-        The state is single-use and bound to the calling principal; the PKCE verifier stays on the
-        node and never travels.
+        The state is single-use and names the calling principal; the PKCE verifier stays on the node,
+        sealed, and never travels. The round is bound to one browser: when the owner starts it from a
+        page of this node (Sec-Fetch-Site same-origin), the answer sets an httpOnly SameSite=Lax
+        cookie on the callback path and authorize_url is the provider's address. For any other
+        caller (an agent, a CLI) authorize_url is the node's page /v1/oauth-round?state=…,
+        owner_confirms is true, and the owner confirms there (POST /v1/oauth-rounds/{state}/approve).
       tags: [Connections]
       security:
         - BearerAuth: []
@@ -57877,6 +57887,9 @@ paths:
                             type: string
                           state:
                             type: string
+                          owner_confirms:
+                            type: boolean
+                            description: True when authorize_url is the node's confirmation page rather than the provider's.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -58484,9 +58497,10 @@ paths:
       summary: Provider redirect target
       description: >
         Unauthenticated by necessity - the provider redirects a browser here and that browser may
-        carry no session. Its gate is the single-use state, which is bound to the principal who
-        started the round and consumed BEFORE the code is exchanged, so a replayed callback finds
-        nothing rather than racing the original.
+        carry no session. Its gates are the single-use state, consumed BEFORE the code is exchanged
+        so a replayed callback finds nothing rather than racing the original, and the round's
+        browser binding: a browser without the round's cookie is refused with 403 and nothing is
+        connected.
       tags: [Connections]
       parameters:
         - in: query
@@ -58507,6 +58521,115 @@ paths:
           description: Connected; redirected back to where the flow started.
         '400':
           description: The authorization could not be completed, with the reason.
+        '403':
+          description: The round was not started or confirmed in this browser; nothing was connected.
+  /v1/oauth-rounds/{state}:
+    get:
+      operationId: getOauthRound
+      summary: A sign-in round waiting for the owner's confirmation
+      description: >
+        Owner in person only. A round an agent or a CLI started (POST /v1/connections/start,
+        POST /v1/mcp-servers/{id}/authorize, aimeat_connection_start, aimeat_mcp_authorize) waits
+        until the owner confirms it in their own browser. This says what it connects and to whom.
+        A round of another account answers 404 like a missing one.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: state
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The round
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          round:
+                            type: object
+                            properties:
+                              kind:
+                                type: string
+                                enum: [account, mcp_server]
+                              for:
+                                type: string
+                                description: The identity the account or the sign-in will belong to.
+                              started_by:
+                                type: string
+                              provider:
+                                type: string
+                                nullable: true
+                              provider_label:
+                                type: string
+                                nullable: true
+                              server:
+                                type: object
+                                nullable: true
+                                properties:
+                                  id:
+                                    type: string
+                                  slug:
+                                    type: string
+                                  title:
+                                    type: string
+                              expires_at:
+                                type: string
+                                format: date-time
+        '401':
+          description: Not signed in.
+        '403':
+          description: Not the owner in person.
+        '404':
+          description: No round of this account under that state, or it expired.
+  /v1/oauth-rounds/{state}/approve:
+    post:
+      operationId: approveOauthRound
+      summary: Confirm a waiting sign-in round in this browser
+      description: >
+        Owner in person only. Binds the round to this browser with an httpOnly SameSite=Lax cookie on
+        the callback path, and answers with the provider's address to send this browser to. The
+        callback then finishes the round only for this browser.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: state
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The provider's address
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          authorize_url:
+                            type: string
+        '401':
+          description: Not signed in.
+        '403':
+          description: Not the owner in person.
+        '404':
+          description: No round of this account under that state, or it expired.
+        '409':
+          description: The round was used meanwhile.
   /v1/connections/{id}:
     delete:
       operationId: revokeConnection

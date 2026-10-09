@@ -63,6 +63,14 @@ The answer is an address for a **person** to open. They see at the provider exac
 asked for and approve it there. Nothing on this node can approve it for them, and fetching the
 address without handing it over does nothing.
 
+**The callback finishes only in the browser that the round belongs to** (since 2026-10-09). When the
+owner starts the round on a page of this node, the answer sets an httpOnly cookie on the callback
+path and `authorize_url` is the provider's address. When anybody else starts it (an agent, a CLI, an
+MCP tool), `authorize_url` is the node's own page `/v1/oauth-round?state=…` and `owner_confirms` is
+true: the owner opens it signed in, confirms (`POST /v1/oauth-rounds/{state}/approve`), and goes on to
+the provider from there. A callback from any other browser is refused with 403 and connects nothing,
+so an address handed to somebody else cannot put their account under the starter.
+
 PKCE throughout, with the `state` nonce held server-side rather than round-tripped. The provider
 redirects to `GET /v1/connections/callback`, the node exchanges the code, seals the credential with
 AES-256-GCM and asks the provider who the account belongs to, so the connection has a name and a

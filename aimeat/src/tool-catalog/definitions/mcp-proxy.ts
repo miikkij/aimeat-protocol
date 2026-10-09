@@ -12,6 +12,7 @@
  *   problem. Flattening a chosen server into the list with its real schemas is a later phase, opted
  *   into per server.
  * @version-history
+ *   2026-10-09 — aimeat_mcp_authorize says the address is the node's confirmation page (secrets audit 2026-10-09).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
@@ -93,7 +94,7 @@ export const mcpProxyTools = [
     },
     {
         name: 'aimeat_mcp_authorize',
-        description: "Begin signing in to an attached MCP server that uses OAuth. Returns an address for a PERSON to open: they see exactly what is being asked for and approve it at the far side, and nothing here can approve it for them \u2014 fetching the address yourself does nothing. Hand it over, say in one sentence what it is for, and wait; the server then reports its tools and starts working. Use this for a server attached with auth 'oauth'; a server that takes a plain token needs no round at all. Needs the mcp:manage permission.",
+        description: "Begin signing in to an attached MCP server that uses OAuth. Returns an address for a PERSON to open: they see exactly what is being asked for and approve it at the far side, and nothing here can approve it for them \u2014 fetching the address yourself does nothing. Hand it over, say in one sentence what it is for, and wait; the server then reports its tools and starts working. Use this for a server attached with auth 'oauth'; a server that takes a plain token needs no round at all. The address is this node's own confirmation page: the owner opens it signed in to this node, confirms, and goes on to the far side from there, so a sign-in in anybody else's browser saves nothing. Needs the mcp:manage permission.",
         caller: 'agent',
         visibility: agentEverywhere,
         // Destructive, and the credential goes with it. Everything acting for this person loses those

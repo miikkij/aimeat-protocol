@@ -31,6 +31,9 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.12.0 — 2026-10-09 — A sign-in callback from a browser that did not start the round seals
+ *     nothing; an agent's sign-in waits for the owner's confirmation; the stored round and the server
+ *     row hold no plaintext secret (secrets audit 2026-10-09, chapter 2).
  *   v1.11.0 — 2026-10-08 — The upstream answers 404 to an unknown session, as the MCP transport
  *     says, and a call after it drops every session (a restart) still answers 200 on a new session.
  *   v1.10.0 — 2026-10-08 — Phase 4c: a read_only grant admits `echo` (the server marks it
@@ -63,6 +66,7 @@ import http from 'node:http';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { BROWSER_START, roundCookie, readRoundRow, readRawRow } from './helpers/oauth-round.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -101,6 +105,27 @@ async function json(path: string, opts: RequestInit = {}) {
   const ct = res.headers.get('content-type') ?? '';
   const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
   return { status: res.status, body };
+}
+
+/**
+ * Start a sign-in as the owner's browser does: a same-origin fetch, whose answer carries the cookie
+ * that binds the round to this browser. The callback seals only for that cookie (secrets audit
+ * 2026-10-09, chapter 2).
+ */
+async function browserAuthorize(server: string, returnUrl: string): Promise<{ status: number; body: any; cookie: string }> {
+  const res = await fetch(`${BASE}/v1/mcp-servers/${server}/authorize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...BROWSER_START, Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify(returnUrl ? { return_url: returnUrl } : {}),
+  });
+  return { status: res.status, body: await res.json(), cookie: roundCookie(res) };
+}
+
+/** The stored server row, read behind the node's back, so a sealed credential can be told from none. */
+async function storedServer(id: string): Promise<any> {
+  const row = await readRawRow('mcp_servers', 'McpServer', id);
+  assert(!!row, `the server row ${id} could not be read from the database`);
+  return row;
 }
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -555,14 +580,12 @@ await test('a finished sign-in sends the browser back to a path of this node, an
 
   /** One whole round: start it naming `returnUrl`, then come back the way the far side sends a browser. */
   const land = async (returnUrl: string): Promise<{ status: number; location: string | null }> => {
-    const started = await json('/v1/mcp-servers/oauthround/authorize', {
-      method: 'POST', headers: ownerAuth(), body: JSON.stringify({ return_url: returnUrl }),
-    });
+    const started = await browserAuthorize('oauthround', returnUrl);
     assert(started.status === 200 && started.body.data.needs_person === true,
       `authorize: ${started.status}: ${JSON.stringify(started.body)}`);
     // `manual`: following an off-site Location from a test would be the very bounce under test.
     const res = await fetch(`${BASE}/v1/mcp-servers/callback?state=${
-      encodeURIComponent(started.body.data.state)}&code=e2e-code`, { redirect: 'manual' });
+      encodeURIComponent(started.body.data.state)}&code=e2e-code`, { redirect: 'manual', headers: { Cookie: started.cookie } });
     await res.arrayBuffer();
     return { status: res.status, location: res.headers.get('location') };
   };
@@ -582,6 +605,93 @@ await test('a finished sign-in sends the browser back to a path of this node, an
   }
 
   const removed = await json('/v1/mcp-servers/oauthround', { method: 'DELETE', headers: ownerAuth() });
+  assert(removed.status === 200, `clean up: ${removed.status}`);
+});
+
+// Secrets audit 2026-10-09, chapter 2: the callback checked only that the server's owner was the
+// round's owner, which is always true, so whoever saw a pending authorize URL could plant their own
+// upstream account on the owner's server. Both tests below failed against the code before the binding.
+await test('a sign-in callback from a browser that did not start it is refused and seals nothing', async () => {
+  const attached = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'boundround', url: `${OAUTH_BASE}/mcp`, auth: 'oauth' }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}: ${JSON.stringify(attached.body)}`);
+  const id = attached.body.data.server.id as string;
+  const started = await browserAuthorize('boundround', '');
+  assert(started.status === 200, `authorize: ${started.status}`);
+
+  // Somebody else's browser: the state and a code, and not the owner's cookie.
+  const stranger = await fetch(`${BASE}/v1/mcp-servers/callback?state=${
+    encodeURIComponent(started.body.data.state)}&code=e2e-code`, { redirect: 'manual' });
+  const said = await stranger.text();
+  const after = await storedServer(id);
+  assert(after && !after.credential, `a credential was sealed for a stranger's sign-in (callback ${stranger.status})`);
+  assert(stranger.status === 403, `a stranger's callback was accepted: ${stranger.status} ${said.slice(0, 200)}`);
+  assert(after.status === 'needs_reauth', `the server changed state: ${after.status}`);
+  assert(!!started.cookie, 'the owner\'s browser start set no round cookie');
+
+  // The stored round: the PKCE verifier and the registration's client_secret are sealed.
+  const pending = await browserAuthorize('boundround', '');
+  const row = await readRoundRow(pending.body.data.state);
+  assert(row !== null, 'the stored round could not be read from the server database');
+  assert(/^v2:/.test(String(row!.nonce)), `the PKCE verifier is stored in plain text: ${String(row!.nonce).slice(0, 8)}…`);
+  assert(!JSON.stringify(row).includes('e2e-secret'), 'the registration client_secret is stored in plain text');
+
+  // The owner's own browser finishes a fresh round, and the row then holds no plaintext secret.
+  const mine = await browserAuthorize('boundround', '');
+  const ok = await fetch(`${BASE}/v1/mcp-servers/callback?state=${
+    encodeURIComponent(mine.body.data.state)}&code=e2e-code`, { redirect: 'manual', headers: { Cookie: mine.cookie } });
+  assert(ok.status === 200, `the owner's own sign-in did not finish: ${ok.status} ${(await ok.text()).slice(0, 200)}`);
+  const done = await storedServer(id);
+  assert(!!done?.credential, 'the owner\'s sign-in sealed nothing');
+  const raw = JSON.stringify(done);
+  assert(!raw.includes('e2e-oauth-token') && !raw.includes('e2e-secret'), 'the server row holds a plaintext secret');
+
+  const removed = await json('/v1/mcp-servers/boundround', { method: 'DELETE', headers: ownerAuth() });
+  assert(removed.status === 200, `clean up: ${removed.status}`);
+});
+
+await test('an agent\'s sign-in waits for the owner to confirm it in their own browser', async () => {
+  const attached = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'agentround', url: `${OAUTH_BASE}/mcp`, auth: 'oauth' }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}`);
+  const manager = await agentWithScopes({ name: ownerName, token: ownerToken }, 'mcpsignin', ['mcp:read', 'mcp:manage']);
+  const started = await json('/v1/mcp-servers/agentround/authorize', {
+    method: 'POST', headers: { Authorization: `Bearer ${manager.token}` }, body: JSON.stringify({}),
+  });
+  assert(started.status === 200, `agent authorize: ${started.status}: ${JSON.stringify(started.body)}`);
+  const url = new URL(started.body.data.authorize_url);
+  assert(url.origin === new URL(BASE).origin && url.pathname === '/v1/oauth-round',
+    `the agent was handed the far side's address: ${url.origin}${url.pathname}`);
+  const state = started.body.data.state as string;
+  const early = await fetch(`${BASE}/v1/mcp-servers/callback?state=${encodeURIComponent(state)}&code=e2e-code`, { redirect: 'manual' });
+  assert(early.status === 403, `an unconfirmed round was finished: ${early.status}`);
+
+  const fresh = await json('/v1/mcp-servers/agentround/authorize', {
+    method: 'POST', headers: { Authorization: `Bearer ${manager.token}` }, body: JSON.stringify({}),
+  });
+  const s2 = fresh.body.data.state as string;
+  const shown = await json(`/v1/oauth-rounds/${encodeURIComponent(s2)}`, { headers: ownerAuth() });
+  assert(shown.status === 200 && shown.body.data.round.kind === 'mcp_server', `round: ${shown.status} ${JSON.stringify(shown.body)}`);
+  const approved = await fetch(`${BASE}/v1/oauth-rounds/${encodeURIComponent(s2)}/approve`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...BROWSER_START, ...ownerAuth() }, body: '{}',
+  });
+  const cookie = roundCookie(approved);
+  const approvedBody = await approved.json() as any;
+  assert(approved.status === 200 && !!cookie, `approve: ${approved.status} ${JSON.stringify(approvedBody)}`);
+  const ok = await fetch(`${BASE}/v1/mcp-servers/callback?state=${encodeURIComponent(s2)}&code=e2e-code`, { redirect: 'manual', headers: { Cookie: cookie } });
+  // The agent named no page to come back to, so the owner's browser lands on the one that says so.
+  assert(ok.status === 302 && ok.headers.get('location') === '/connection-done.html',
+    `the confirmed sign-in did not finish: ${ok.status} → ${ok.headers.get('location')}`);
+  // The far side here has no tools to list, so the status says unreachable; the sealed credential
+  // is what proves the sign-in landed.
+  const signedIn = await storedServer(attached.body.data.server.id);
+  assert(!!signedIn.credential && !JSON.stringify(signedIn).includes('e2e-oauth-token'), 'the confirmed sign-in sealed no credential');
+
+  const removed = await json('/v1/mcp-servers/agentround', { method: 'DELETE', headers: ownerAuth() });
   assert(removed.status === 200, `clean up: ${removed.status}`);
 });
 

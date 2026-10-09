@@ -12799,6 +12799,24 @@
     "authCodeLabel": "Código de autorización:",
     "authCodeHint": "Pega este código de vuelta en la aplicación que pidió el acceso."
   },
+  "oauthRound": {
+    "badge": "Inicio de sesión",
+    "titleAccount": "¿Conectar una cuenta de {provider}?",
+    "titleServer": "¿Iniciar sesión en el servidor MCP {server}?",
+    "leadAccountAgent": "Tu agente {agent} ha pedido conectar una cuenta de {provider}. Si continúas, inicias sesión en {provider} y el agente podrá usar la cuenta que elijas allí.",
+    "leadAccountSelf": "Has empezado a conectar una cuenta de {provider}. Si continúas, inicias sesión en {provider} y la cuenta que elijas allí quedará conectada a tu cuenta de AIMEAT.",
+    "leadServerAgent": "Tu agente {agent} ha pedido iniciar sesión en el servidor MCP {server}. Si continúas, inicias sesión en ese servidor y cada llamada a través de él usará la cuenta que elijas allí.",
+    "leadServerSelf": "Has empezado a iniciar sesión en el servidor MCP {server}. Si continúas, inicias sesión en ese servidor y cada llamada a través de él usará la cuenta que elijas allí.",
+    "warn": "Continúa solo si lo has pedido tú. El inicio de sesión solo funciona en este navegador, así que nadie más puede completarlo.",
+    "continue": "Continuar",
+    "cancel": "Cancelar",
+    "signInTitle": "Inicia sesión primero",
+    "signInLead": "Este inicio de sesión espera a la persona dueña de la cuenta que lo empezó. Inicia sesión con esa cuenta para ver qué conecta.",
+    "signIn": "Iniciar sesión",
+    "goneTitle": "Este inicio de sesión no puede continuar",
+    "gone": "Ha caducado, ya se ha usado o pertenece a otra cuenta. Pide uno nuevo.",
+    "failed": "No se ha podido continuar. Inténtalo de nuevo."
+  },
   "agentConsentPage": {
     "title": "Autorización del agente",
     "loginRequired": "Inicia sesión para aprobar o denegar esta solicitud.",

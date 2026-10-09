@@ -19,6 +19,9 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   v1.9.0 — 2026-10-09 — A parked server's stored lastError and the log line carry the error through
+ *     describeUpstreamError: the host and the status, never the endpoint or the upstream's body
+ *     (secrets audit 2026-10-09, chapter 2).
  *   v1.8.0 — 2026-10-08 — A call answered 404 for its session (a restarted server) drops the pooled
  *     client and is made once more on a new session, as the MCP transport asks of a client. It was
  *     answered 502 and the server parked, so an agent's first call after any upstream restart failed.
@@ -57,6 +60,7 @@ import { resolveMcpAccess, applyLockedInput } from './grants.js';
 import { recordUsageCall } from '../usage/usage-buffer.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { describeUpstreamError } from './upstream-error.js';
 
 /**
  * How long a single tool call may take.
@@ -399,8 +403,11 @@ async function parkAndDescribe(
       message: `"${server.slug}" answered with more than ${MCP_RESPONSE_MAX_BYTES / 1024 / 1024} MB at once, which is more than this node reads of one answer.`,
     };
   }
+  // What is stored and logged from here on: no endpoint, no upstream body (upstream-error.ts). An
+  // upstream that echoes the request's headers would otherwise put the Bearer in the log.
+  const told = describeUpstreamError(err);
   if (isUnauthorized(err)) {
-    await storage.setMcpServerStatus(server.id, 'needs_reauth', raw);
+    await storage.setMcpServerStatus(server.id, 'needs_reauth', told);
     await mcpClientPool.invalidate(server.id);
     return {
       code: 'UPSTREAM_UNAUTHORIZED',
@@ -411,11 +418,12 @@ async function parkAndDescribe(
         : `"${server.slug}" answered, and it needs a token or a sign-in first.`,
     };
   }
-  await storage.setMcpServerStatus(server.id, 'unreachable', raw);
+  await storage.setMcpServerStatus(server.id, 'unreachable', told);
   await mcpClientPool.invalidate(server.id);
-  // The reason is logged rather than returned verbatim: an upstream error string can carry the
-  // endpoint, and the endpoint is the one thing this whole design keeps away from callers.
-  logger.warn('mcp-client: a remote server could not be reached', { server: server.slug, error: raw });
+  // The reason is logged rather than returned: an upstream error string can carry the endpoint,
+  // and the endpoint is the one thing this whole design keeps away from callers. Logged as the host
+  // and the status only, for the same reason.
+  logger.warn('mcp-client: a remote server could not be reached', { server: server.slug, error: told });
   return { code: 'UNREACHABLE', message: `"${server.slug}" could not be reached.` };
 }
 

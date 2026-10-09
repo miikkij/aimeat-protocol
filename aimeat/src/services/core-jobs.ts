@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.15.0 — 2026-10-09 — nonce-cleanup is registered on every node, not only with FTN or EUDIW on:
+ *     an abandoned connection or MCP sign-in round is swept too (secrets audit 2026-10-09, chapter 2).
  *   v1.14.0 — 2026-10-09 — device-auth-cleanup: expired device authorizations are deleted on a clock
  *     (secrets audit 2026-10-09, finding 1.3).
  *   v1.13.0 — 2026-10-08 — behaviour-fixer: the weekly fixing agent of on-page behaviour (layer D).
@@ -152,9 +154,10 @@ export function registerCoreHandlers(
   import('./capability-aggregator.js')
     .then(m => m.runCapabilityAggregation(config, storage))
     .catch(err => logger.error('Startup capability aggregation failed', { error: String(err) }));
-  if (config.eudiwEnabled || config.ftnEnabled) {
-    scheduler.registerCoreHandler('nonce-cleanup', () => runNonceCleanupJob(storage));
-  }
+  // Every node: connection and MCP sign-in rounds, social and SSO sign-ins and the two-step sign-in
+  // ticket write the same table, and an abandoned round must not stay for ever. It ran only with FTN
+  // or EUDIW on until 2026-10-09 (secrets audit 2026-10-09, chapter 2).
+  scheduler.registerCoreHandler('nonce-cleanup', () => runNonceCleanupJob(storage));
   // Expired device authorizations, whatever their status. An approved row holds the new agent's
   // private key and token until it is deleted; this runs on a clock so a row nobody polls again does
   // not wait for the next device-authorize call (secrets audit 2026-10-09, finding 1.3).

@@ -17,8 +17,15 @@
  *   server could otherwise point our metadata lookup at something internal.
  *
  *   THE PKCE VERIFIER NEVER TRAVELS. It is written against the single-use `state` in a verification
- *   nonce, exactly as the outbound-connections round does it, and the nonce is bound to the owner —
- *   which is the CSRF gate: a code redeemed by anyone else lands on a nonce that is not theirs.
+ *   nonce, exactly as the outbound-connections round does it, sealed to that round with the node key
+ *   together with a dynamic registration's client_secret (services/oauth-round-secrets.ts).
+ *
+ *   THE STATE NAMES WHOSE SERVER, THE BINDING NAMES WHICH BROWSER. The owner on the nonce is always
+ *   the server's owner, so comparing the two refused nothing: whoever saw a pending authorize address
+ *   could sign in with THEIR upstream account and plant it on the owner's server. The round now
+ *   stores the hash of a cookie given to the one browser that may finish it, the owner's, at the
+ *   start or when they confirm a round an agent started; the callback refuses without it, before the
+ *   code is exchanged (secrets audit 2026-10-09, chapter 2).
  *
  *   THE CLIENT REGISTRATION IS SEALED WITH THE TOKENS, not stored beside them. A refresh needs the
  *   same client that minted the token, and putting it in the credential means one sealed document
@@ -26,6 +33,10 @@
  * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   v1.1.0 — 2026-10-09 — A round is bound to one browser (bindBrowser at the start, the binding checked in
+ *     finishMcpOAuth before the exchange, NOT_THIS_BROWSER otherwise); the verifier and the client
+ *     registration are sealed in the stored round; the three log lines carry the error through
+ *     describeUpstreamError, never an endpoint or an upstream body (secrets audit 2026-10-09).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy, the OAuth credential path.
  */
 import { randomUUID, randomBytes } from 'node:crypto';
@@ -40,6 +51,8 @@ import { sealMcpCredential, openMcpCredential, requireEncryptionKey } from './cr
 import { guardedFetch } from './transport.js';
 import { mcpClientPool } from './pool.js';
 import { logger } from '../../utils/logger.js';
+import { bindingMatches, roundApprovalUrl, sealRoundSecret, openRoundSecret } from '../oauth-round-secrets.js';
+import { describeUpstreamError } from './upstream-error.js';
 
 /** How long a person has to finish the round in their browser before the state is dead. */
 const STATE_TTL_MS = 15 * 60_000;
@@ -49,11 +62,24 @@ const b64url = (b: Buffer): string => b.toString('base64url');
 /** What the callback needs and the redirect URL must not carry. Stored against the state. */
 interface RoundPayload {
   serverId: string;
-  /** The registration the SDK made, or the one it found. A refresh must use the same client. */
-  clientInformation?: OAuthClientInformation;
+  /**
+   * The registration the SDK made, or the one it found, as JSON sealed to this round
+   * (sealRoundSecret): it may carry a client_secret. A refresh must use the same client.
+   */
+  clientSealed?: string;
   /** Where the person came from, so they land back on their own settings page. */
   returnUrl: string;
+  /** SHA-256 of the cookie that binds the round to one browser. Absent until the owner confirms. */
+  bind?: string;
+  /** The far side's authorize address, kept so the confirmation step can hand it to the owner. */
+  authorizeUrl?: string;
+  /** Who started the round: the owner in person, or an agent acting for them. */
+  startedBy?: string;
 }
+
+/** The contexts a waiting round's two secrets are sealed to. */
+const verifierContext = (state: string): string => `mcp-oauth-round:${state}:verifier`;
+const clientContext = (state: string): string => `mcp-oauth-round:${state}:client`;
 
 export const mcpCallbackUrl = (config: AimeatConfig): string =>
   `${config.baseUrl}/v1/mcp-servers/callback`;
@@ -140,7 +166,8 @@ class McpOAuthProvider implements OAuthClientProvider {
 }
 
 export type OAuthStart =
-  | { ok: true; authorizeUrl: string; state: string }
+  /** `authorizeUrl` is the far side's ('' when nobody had to sign in); `approvalUrl` the node's page. */
+  | { ok: true; authorizeUrl: string; approvalUrl: string; state: string }
   | { ok: false; code: 'NO_ENCRYPTION_KEY' | 'NO_OAUTH' | 'UNREACHABLE'; message: string };
 
 /**
@@ -155,10 +182,19 @@ export async function startMcpOAuth(input: {
   server: McpServerRecord;
   ownerGhii: string;
   returnUrl?: string;
+  /** The principal starting the round, shown to the owner on the confirmation page. */
+  startedBy?: string;
+  /**
+   * Makes the binding for this browser and returns its hash, when the owner starts the round from a
+   * page of this node (middleware/oauth-round-cookie.ts). Absent for an agent or a CLI, whose round
+   * then waits for the owner to confirm it on the node's page.
+   */
+  bindBrowser?: (state: string, ttlMs: number) => string;
 }): Promise<OAuthStart> {
   const { storage, config, server, ownerGhii } = input;
 
-  if (!requireEncryptionKey(config)) {
+  const key = requireEncryptionKey(config);
+  if (!key) {
     return {
       ok: false,
       code: 'NO_ENCRYPTION_KEY',
@@ -182,7 +218,7 @@ export async function startMcpOAuth(input: {
       // The far side needed nothing from a person — a pre-registered client with a grant already in
       // place. Seal what came back and say the round is done.
       await sealAndStore(storage, config, server, provider);
-      return { ok: true, authorizeUrl: '', state };
+      return { ok: true, authorizeUrl: '', approvalUrl: '', state };
     }
     if (!provider.captured.authorizationUrl) {
       return {
@@ -196,7 +232,7 @@ export async function startMcpOAuth(input: {
     // The reason is logged rather than returned: a discovery error can carry the endpoint, and the
     // endpoint is the one thing this design keeps away from callers.
     logger.warn('mcp-client: the OAuth round could not be started', {
-      server: server.slug, error: err instanceof Error ? err.message : String(err),
+      server: server.slug, error: describeUpstreamError(err),
     });
     return {
       ok: false,
@@ -205,33 +241,41 @@ export async function startMcpOAuth(input: {
     };
   }
 
+  // The owner on the nonce says whose server the credential lands on; the binding says which browser
+  // may finish the round. Without the second, whoever saw this address could sign in with their own
+  // upstream account and plant it here (secrets audit 2026-10-09, chapter 2).
+  const bind = input.bindBrowser?.(state, STATE_TTL_MS);
+  const client = provider.captured.clientInformation;
   const payload: RoundPayload = {
     serverId: server.id,
-    ...(provider.captured.clientInformation ? { clientInformation: provider.captured.clientInformation } : {}),
+    ...(client ? { clientSealed: sealRoundSecret(JSON.stringify(client), key, clientContext(state)) } : {}),
     returnUrl: input.returnUrl ?? '',
+    authorizeUrl: provider.captured.authorizationUrl,
+    ...(input.startedBy ? { startedBy: input.startedBy } : {}),
+    ...(bind ? { bind } : {}),
   };
 
   await storage.createVerificationNonce({
     id: randomUUID(),
-    // Binding the round to the owner is the CSRF gate: a code redeemed by anyone else lands on a
-    // nonce whose owner is not them, and the callback refuses.
     owner: ownerGhii,
     type: 'mcp_connect',
     state,
-    // The PKCE verifier stays HERE. It is the half of the exchange that never travels.
-    nonce: provider.captured.codeVerifier ?? '',
+    // The PKCE verifier stays HERE, sealed to this round. It is the half of the exchange that never travels.
+    nonce: sealRoundSecret(provider.captured.codeVerifier ?? '', key, verifierContext(state)),
     redirectUri: input.returnUrl ?? '',
     payload: JSON.stringify(payload),
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + STATE_TTL_MS).toISOString(),
   });
 
-  return { ok: true, authorizeUrl: provider.captured.authorizationUrl, state };
+  return {
+    ok: true, authorizeUrl: provider.captured.authorizationUrl, approvalUrl: roundApprovalUrl(config, state), state,
+  };
 }
 
 export type OAuthFinish =
   | { ok: true; server: McpServerRecord; returnUrl: string }
-  | { ok: false; code: 'BAD_STATE' | 'NO_SERVER' | 'EXCHANGE_FAILED'; message: string };
+  | { ok: false; code: 'BAD_STATE' | 'NO_SERVER' | 'EXCHANGE_FAILED' | 'NOT_THIS_BROWSER'; message: string };
 
 /**
  * Complete the round: consume the state, exchange the code, seal what came back.
@@ -244,26 +288,49 @@ export async function finishMcpOAuth(input: {
   config: AimeatConfig;
   state: string;
   code: string;
+  /** The round cookie the callback request carried ('' when it carried none). */
+  binding: string;
 }): Promise<OAuthFinish> {
   const { storage, config } = input;
+  const used = {
+    ok: false as const,
+    code: 'BAD_STATE' as const,
+    message: 'That sign-in link has already been used, or it expired. Start again from the server.',
+  };
 
   const round = await storage.getVerificationNonce(input.state);
-  if (!round || round.type !== 'mcp_connect') {
-    return {
-      ok: false,
-      code: 'BAD_STATE',
-      message: 'That sign-in link has already been used, or it expired. Start again from the server.',
-    };
-  }
-  await storage.deleteVerificationNonce(input.state);
+  if (!round || round.type !== 'mcp_connect') return used;
+  // Only the caller whose delete removed the row goes on: two callbacks with one state finish once.
+  if (!(await storage.deleteVerificationNonce(input.state))) return used;
   if (new Date(round.expiresAt).getTime() < Date.now()) {
     return { ok: false, code: 'BAD_STATE', message: 'That sign-in link expired. Start again.' };
   }
 
-  const payload = JSON.parse(round.payload ?? '{}') as RoundPayload;
+  let payload: RoundPayload;
+  try {
+    payload = JSON.parse(round.payload ?? '{}') as RoundPayload;
+  } catch {
+    logger.warn('mcp-client: a sign-in round has an unreadable payload and was refused');
+    return used;
+  }
+  // The browser that signed in at the far side must be the one the round was bound to: the owner's,
+  // at the start or after they confirmed an agent's round. Checked before the code is exchanged, so
+  // nothing is sealed for anybody else (secrets audit 2026-10-09, chapter 2).
+  if (!bindingMatches(input.binding, payload.bind)) {
+    return {
+      ok: false,
+      code: 'NOT_THIS_BROWSER',
+      message: 'This sign-in was not started in this browser, so nothing was saved. Start it again from your own account.',
+    };
+  }
+  const key = requireEncryptionKey(config);
+  const verifier = key ? openRoundSecret(round.nonce, key, verifierContext(input.state)) : null;
+  const clientJson = key && payload.clientSealed ? openRoundSecret(payload.clientSealed, key, clientContext(input.state)) : null;
+  if (verifier === null || (payload.clientSealed && clientJson === null)) return used;
+  const clientInformation = clientJson ? JSON.parse(clientJson) as OAuthClientInformation : undefined;
+
   const server = await storage.getMcpServer(payload.serverId);
-  // The owner on the nonce is the fence: a round started for one account cannot land on another's
-  // server even if somebody replays the exact state.
+  // A round started for one account cannot land on another's server even if the server row moved.
   if (!server || server.ownerGhii !== round.owner) {
     return { ok: false, code: 'NO_SERVER', message: 'That server is no longer attached.' };
   }
@@ -275,8 +342,8 @@ export async function finishMcpOAuth(input: {
 
   const provider = new McpOAuthProvider(config, {
     state: input.state,
-    codeVerifier: round.nonce,
-    ...(payload.clientInformation ? { clientInformation: payload.clientInformation } : {}),
+    codeVerifier: verifier,
+    ...(clientInformation ? { clientInformation } : {}),
   });
 
   try {
@@ -285,7 +352,7 @@ export async function finishMcpOAuth(input: {
     });
   } catch (err) {
     logger.warn('mcp-client: the OAuth exchange failed', {
-      server: server.slug, error: err instanceof Error ? err.message : String(err),
+      server: server.slug, error: describeUpstreamError(err),
     });
     return {
       ok: false,
@@ -396,7 +463,7 @@ export async function refreshMcpOAuth(
     // A network failure is NOT a dead grant. Parking the server here would tell the owner to
     // reconnect an account that is perfectly fine, because the far side was briefly down.
     logger.warn('mcp-client: a token could not be renewed', {
-      server: server.slug, error: err instanceof Error ? err.message : String(err),
+      server: server.slug, error: describeUpstreamError(err),
     });
     return server;
   } finally {

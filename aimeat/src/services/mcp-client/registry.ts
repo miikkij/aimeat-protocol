@@ -28,6 +28,7 @@
  *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   v1.6.0 — 2026-10-09 — The three attach doors store the row through sealServerRowSecrets: a stdio env and transport headers are sealed at rest (secrets audit 2026-10-09).
  *   v1.5.0 — 2026-09-26 — A group's server compares whole identities on every road: attaching one takes
  *     the caller's owner GHII instead of a name, and organismAdmits and requireManageableServer ask the
  *     one onRoll(), so a visitor from another node named like a member, admin or owner is none of
@@ -56,6 +57,7 @@ import {
   type McpAvailability,
 } from '../../models/mcp-server-schemas.js';
 import { sealMcpCredential, requireEncryptionKey } from './credential.js';
+import { sealServerRowSecrets } from './transport-secrets.js';
 import { listRemoteTools, type RemoteCallRefusal } from './invoke.js';
 import { selfAddressRefusal } from './hops.js';
 import { mcpClientPool } from './pool.js';
@@ -248,7 +250,7 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     updatedAt: now,
   };
 
-  await storage.createMcpServer(row);
+  await storage.createMcpServer(sealServerRowSecrets(row, config));
 
   // A server awaiting sign-in cannot answer a tool list yet, and probing it would report the
   // address as wrong when it is right. The round fills the cache when it completes.
@@ -430,7 +432,7 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
     updatedAt: now,
   };
 
-  await storage.createMcpServer(row);
+  await storage.createMcpServer(sealServerRowSecrets(row, config));
   if (input.deferCredential) {
     return { ok: true, server: toPublicMcpServer(row), tools: [] };
   }
@@ -638,7 +640,7 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
     updatedAt: now,
   };
 
-  await storage.createMcpServer(row);
+  await storage.createMcpServer(sealServerRowSecrets(row, config));
   if (input.deferCredential) return { ok: true, server: toPublicMcpServer(row), tools: [] };
 
   const probed = await listRemoteTools(storage, config, row);

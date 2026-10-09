@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-09 — /v1/oauth-round joins the SPA routes: the owner confirms a sign-in round an agent
+ *     started (secrets audit 2026-10-09, chapter 2).
  *   v1.0.0 — 2026-03-03 — Initial portal with SSR removal
  *   v1.1.0 — 2026-03-04 — Static HTML URL routing, SPA shell serving
  *   v1.2.0 — 2026-03-14 — Prompt fallback to factory seeds when storage not yet seeded
@@ -584,6 +586,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/start',
     '/v1/app-grant',   // H-2 app-grant consent page (SPA)
     '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
+    '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
   ];
 
   // The short address of the whole feature list, the one the front page and the footer hand out.
