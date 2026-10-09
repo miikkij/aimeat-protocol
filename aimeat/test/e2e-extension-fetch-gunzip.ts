@@ -11,6 +11,8 @@
  *     - a gzip bomb (48 MB of zeros, under 50 kB on the wire) fails with RESPONSE_TOO_LARGE naming
  *       8 MB, once inflated;
  *     - a plain answer under `gunzip: true` is read as it is;
+ *     - signed out, the action is refused (401); another owner's re-install under the same name
+ *       is refused and the ceiling stays where the installer set it;
  *     - `fetch_max_mb: -1` is refused at install (400) naming the field, and 999 is clamped to 32 MB.
  *   FIRST FAIL: against the tree before this change the 8 MB manifest installs with the limit
  *   dropped, so the guide fails with 4 MB on both extensions, and the gzip bytes are read as text.
@@ -149,6 +151,20 @@ await test('Without the flag the gzip bytes are not inflated', async () => {
     const r = await invoke(EXT_WIDE, { file: 'guide.xml.gz', gunzip: false });
     assert(r.status === 200, `pull ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(r.body.data.head !== '<?xml' && r.body.data.programmes === 0, `raw: ${JSON.stringify(r.body.data)}`);
+});
+
+// An installed extension is a node capability any signed-in principal may call, so the fences here
+// are the credential and the record: nobody calls it signed out, and another owner cannot move its
+// ceiling by re-installing under the same name.
+await test('Signed out, the action is refused; another owner cannot re-install it and move its ceiling', async () => {
+    const anon = await json(`/v1/ext/${EXT_WIDE}/pull`, { method: 'POST', body: JSON.stringify({ port: FAR_PORT, file: 'guide.xml.gz' }) });
+    assert(anon.status === 401, `signed out: expected 401, got ${anon.status}: ${JSON.stringify(anon.body?.error)}`);
+    const X = await setupOwner('x');
+    const take = await json('/v1/extensions', { method: 'POST', headers: auth(X.token), body: JSON.stringify({ manifest: manifestFor(EXT_WIDE, { limits: { fetch_max_mb: 32 } }), scripts: SCRIPTS, update: true }) });
+    assert(take.status >= 400, `other owner update: expected a refusal, got ${take.status}`);
+    const rec = await json(`/v1/extensions/${EXT_WIDE}`, { headers: auth(A.token) });
+    const limits = rec.body.data?.extension?.limits ?? rec.body.data?.limits;
+    assert(limits?.fetchMaxBytes === 8 * MB, `ceiling after the other owner's attempt: ${JSON.stringify(limits)}`);
 });
 
 await test('Install: fetch_max_mb -1 is refused naming the field; 999 is clamped to 32 MB', async () => {

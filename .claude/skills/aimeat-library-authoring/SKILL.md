@@ -72,7 +72,10 @@ guest receives is missing from that table, so change the table in the same commi
   list from a broad word match on the scripts (`fetch`, `ai`, `email`, `buy`), so a computed name
   gets nothing. The bridge's `__*` globals are deleted before the author's code runs (since 2026-10-05).
   A top-level `network: { hosts: [api.example.com] }` limits `ctx.fetch` to those exact hostnames, a
-  redirect elsewhere included, and the approval lists them (since 2026-10-08). A host that differs
+  redirect elsewhere included, and the approval lists them (since 2026-10-08). `ctx.fetch` reads at
+  most 4 MB of one answer unless the manifest raises it with `limits: { fetch_max_mb }` (clamped to
+  32 MB, stored on the record as `limits.fetchMaxBytes`), and `ctx.fetch(url, { gunzip: true })`
+  inflates a gzipped answer under the same ceiling (since 2026-10-09). A host that differs
   per install (a customer's own server) is a config field named in
   `network: { host_fields: { SERVER_HOST: required } }` (or `optional`): the package's config-needs
   asks it, its value (one hostname or IPv4, optional `:port`) joins that install's list, and the owner

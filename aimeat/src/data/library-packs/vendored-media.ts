@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-10-09 — Initial: hls.js 1.7.3 vendored under /lib/hls@1/ for published apps
  *     that play a live stream in the browser (wish-tv-opas-ilmaisstreameille-ja-oma-tv-kalenteri).
  */
-import type { LibraryPack } from '../library-packs.js';
+import type { LibraryPack } from './types.js';
 
 export const MEDIA_PACKS: LibraryPack[] = [
   {
