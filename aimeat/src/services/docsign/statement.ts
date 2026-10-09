@@ -28,6 +28,7 @@
  * @usage const challenge = intentChallenge(intent);
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — Method eudi-wallet (wish-allekirjoitus-eudi-lompakolla).
  */
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '../attestation.js';
@@ -35,7 +36,12 @@ import { sign, verify } from '../../auth/keypair.js';
 
 export { canonicalJson };
 
-export type SignMethod = 'passkey' | 'key' | 'session';
+/**
+ * `eudi-wallet`: the person signed the PDF in an EU Digital Identity Wallet, which returned it with
+ * a PAdES signature of its own (services/docsign/eudi.ts). The evidence names the signed file, the
+ * certificate and the validation result; the signed file itself is the stronger proof.
+ */
+export type SignMethod = 'passkey' | 'key' | 'session' | 'eudi-wallet';
 
 /** What a passkey ceremony signs: its hash is the WebAuthn challenge. */
 export interface SignIntent {

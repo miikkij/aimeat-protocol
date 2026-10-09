@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.27.0 -- 2026-10-10 -- Signed documents: a person signs a PDF in an EU Digital Identity Wallet
+ *            (aimeat_docsign_wallet_start, _wallet_status).
  *   v1.26.0 -- 2026-10-09 -- Signed documents: aimeat_docsign_validate, _lookup, _request_create and _sign.
  *   v1.25.0 -- 2026-10-04 -- aimeat_task_decline: a request the agent should not take is declined with
  *     the reason, not failed.
@@ -224,7 +226,10 @@ indeterminate as "could not be confirmed", never as forged. \`aimeat_docsign_loo
 who signed a document with AIMEAT on this node. To have people sign,
 \`aimeat_docsign_request_create { storage_key, title, parties }\` (your owner, or you acting for them,
 must be a party); each person signs with their passkey in the signing app, from the \`sign_link\`.
-\`aimeat_docsign_sign\` signs as YOU, the agent, and never in your owner's name.
+\`aimeat_docsign_sign\` signs as YOU, the agent, and never in your owner's name. For a PDF, a person
+can also sign in their EU Digital Identity Wallet: \`aimeat_docsign_wallet_start { id, storage_key }\`
+gives a \`wallet_link\` they open on the phone with the wallet; follow it with
+\`aimeat_docsign_wallet_status\`. Today that is the EU reference wallet, and its signature is a test.
 
 **Which AI models are allowed.** Your owner may limit the models their calls use: \`aimeat_ai_policy_set\`
 with no policy reads the policy and the node's recommended models. A call naming a model the rules

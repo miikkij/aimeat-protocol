@@ -25648,6 +25648,182 @@ paths:
         '409':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/docsign/wallet:
+    get:
+      operationId: getDocsignWalletStatus
+      summary: Whether signing with an EU Digital Identity Wallet is ready on this node (public)
+      description: Whether wallet signing is on and its access certificate is usable, the host name a wallet sees (client_id), the protocol, and whether the EU reference wallet's test CAs are trusted.
+      tags: [Document signing]
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/docsign/requests/{id}/wallet:
+    post:
+      operationId: startDocsignWalletSignature
+      summary: Start a signature with an EU Digital Identity Wallet
+      description: |
+        The body is the PDF itself (application/pdf, optional ?name=), or JSON with content_base64 or
+        storage_key. It must be the request's document, or once a wallet has signed, the newest signed
+        PDF. Returns wallet_link (eudi-rqes://…) for the person to open on the phone with the wallet,
+        or to show as a QR code. A person signs for themselves; an agent or app acting for a person
+        starts it for that person. Valid for 15 minutes.
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/pdf:
+            schema: { type: string, format: binary }
+          application/json:
+            schema:
+              type: object
+              properties:
+                content_base64: { type: string }
+                storage_key: { type: string }
+                name: { type: string }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+        '415':
+          $ref: '#/components/responses/AimeatError'
+        '503':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/requests/{id}/wallet/{session}:
+    get:
+      operationId: getDocsignWalletSession
+      summary: How a started wallet signature stands
+      description: waiting, fetched, signed, failed (with the reason) or expired.
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: session
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/requests/{id}/signed-document:
+    get:
+      operationId: getDocsignSignedDocument
+      summary: The newest wallet-signed PDF of a request, for a party
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The signed PDF. X-Content-SHA256 carries its hash.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/AimeatError'
+        '410':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/wallet/{session}/request:
+    get:
+      operationId: getDocsignWalletRequestObject
+      summary: The signed request object a wallet fetches (public, by session)
+      description: A JWS (oauth-authz-req+jwt) signed with this node's access certificate, client_id_scheme x509_san_dns, naming the document's digest, where to download it and where to post the signed PDF.
+      tags: [Document signing]
+      security: []
+      parameters:
+        - name: session
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The request object.
+          content:
+            application/oauth-authz-req+jwt:
+              schema: { type: string }
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/wallet/{session}/document/{token}:
+    get:
+      operationId: getDocsignWalletDocument
+      summary: The PDF a wallet downloads to sign (public, by session and token)
+      tags: [Document signing]
+      security: []
+      parameters:
+        - name: session
+          in: path
+          required: true
+          schema: { type: string }
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The PDF.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/wallet/{session}/response:
+    post:
+      operationId: postDocsignWalletResponse
+      summary: Where a wallet posts the signed PDF or an error (public, by session and state)
+      description: A form with state and documentWithSignature (a JSON array of base64 PDFs), or state and error. The PDF must begin with the bytes that were sent, and its new signature must check out; it is then stored in the signer's files and sealed into the request. Answers redirect_uri.
+      tags: [Document signing]
+      security: []
+      parameters:
+        - name: session
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                state: { type: string }
+                documentWithSignature: { type: string }
+                error: { type: string }
+      responses:
+        '200':
+          description: Accepted; the wallet opens redirect_uri.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_uri: { type: string }
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/docsign/lookup/{sha256}:
     get:
       operationId: lookupDocsignByHash

@@ -17,6 +17,8 @@
  *     one, for the Content-Digest of a signed UCP request (routes/ucp-checkout.ts).
  *   v1.6.0 — 2026-10-04 — appOriginSignIn() after CORS: the sign-in and registration routes refuse a
  *     request from an app (middleware/app-origin-sign-in.ts).
+ *   v1.6.0 — 2026-10-10 — The global form parser skips a wallet's signing response
+ *     (/v1/docsign/wallet/:id/response), which carries a signed PDF and is parsed by its route.
  *   v1.5.0 — 2026-10-01 — apexPageRedirect() after robotsHeader(): the node's content pages asked
  *     for on an app or portfolio host answer 301 to the apex instead of a copy.
  *   v1.4.0 — 2026-09-30 — robotsHeader() is mounted here, ahead of the static files, instead of in
@@ -182,7 +184,9 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     express.json({ limit, ...(keepRaw ? { verify: keepRaw as never } : {}) })(req, res, next);
   });
   app.use((req, res, next) => {
-    if (req.path.startsWith('/v1/upload/')) return next();
+    // A wallet posts the signed PDF as a form, larger than 1 MB; routes/docsign-wallet.ts parses
+    // that one path at the signing size limit.
+    if (req.path.startsWith('/v1/upload/') || /^\/v1\/docsign\/wallet\/[^/]+\/response$/.test(req.path)) return next();
     express.urlencoded({ extended: false, limit: '1mb' })(req, res, next);
   });
   app.use(express.text({ limit: '1mb', type: ['text/yaml', 'application/x-yaml'] }));

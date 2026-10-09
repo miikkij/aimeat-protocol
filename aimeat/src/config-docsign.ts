@@ -13,6 +13,8 @@
  * @usage const config = { ...docsignDefaults(), ... };
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — Signing with an EU Digital Identity Wallet: docsignEudiEnabled,
+ *     docsignEudiRpCredentialPath, docsignEudiTestRoots (wish-allekirjoitus-eudi-lompakolla).
  */
 
 /** Declared here, not picked from AimeatConfig, so this file imports nothing. */
@@ -38,6 +40,23 @@ export interface DocsignConfig {
    * `?request=<id>`). Empty: the notification names the request and carries no link.
    */
   docsignAppUrl: string;
+  /**
+   * A person may sign a PDF with an EU Digital Identity Wallet (services/docsign/eudi.ts). Off by
+   * default: it needs the relying-party access certificate below, which a registrar issues.
+   */
+  docsignEudiEnabled: boolean;
+  /**
+   * A PEM file holding this node's wallet relying-party access certificate: the EC private key,
+   * then the certificate whose subjectAltName names this node's host name, then its CA. Read at
+   * start. Empty: wallet signing is not ready.
+   */
+  docsignEudiRpCredentialPath: string;
+  /**
+   * Trust the test certification authorities of the EU reference wallet when checking a signature
+   * (src/data/eudi-test-roots.ts). On by default while national wallets are not out; a signature
+   * that chains to one is reported as a test with no legal effect, never as qualified.
+   */
+  docsignEudiTestRoots: boolean;
 }
 
 /** The largest file a validation reads, in bytes. */
@@ -56,5 +75,8 @@ export function docsignDefaults(): DocsignConfig {
     docsignTrustAnchorsPath: (process.env.AIMEAT_DOCSIGN_TRUST_ANCHORS ?? '').trim(),
     docsignMaxMb: Number.isFinite(mb) && mb > 0 ? Math.min(mb, 100) : 25,
     docsignAppUrl: (process.env.AIMEAT_DOCSIGN_APP_URL ?? '').trim().replace(/\/+$/, ''),
+    docsignEudiEnabled: process.env.AIMEAT_DOCSIGN_EUDI_ENABLED === 'true',
+    docsignEudiRpCredentialPath: (process.env.AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL ?? '').trim(),
+    docsignEudiTestRoots: process.env.AIMEAT_DOCSIGN_EUDI_TEST_ROOTS !== 'false',
   };
 }

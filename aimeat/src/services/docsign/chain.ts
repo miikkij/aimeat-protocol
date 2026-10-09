@@ -15,6 +15,8 @@
  * @usage const chain = await buildChain(config, signerDer, poolDers);
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — The EU reference wallet's test CAs are anchors too while
+ *     docsign.eudi_test_roots is on; isEudiTestRoot() tells the report so (wish-allekirjoitus-eudi-lompakolla).
  */
 import { readFileSync } from 'node:fs';
 import { X509Certificate } from 'node:crypto';
@@ -24,6 +26,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { readCert, safeVerify, type CertInfo } from './x509-info.js';
+import { EUDI_TEST_ROOTS_B64 } from '../../data/eudi-test-roots.js';
 
 const MAX_DEPTH = 8;
 const MAX_FETCHES = 3;
@@ -78,6 +81,25 @@ export function operatorAnchors(config: AimeatConfig): CertInfo[] {
   return certs;
 }
 
+let testRoots: CertInfo[] | null = null;
+
+/** The EU reference wallet's test CAs (data/eudi-test-roots.ts), parsed once. */
+function eudiTestRoots(): CertInfo[] {
+  testRoots ??= EUDI_TEST_ROOTS_B64.map((b64) => readCert(Buffer.from(b64, 'base64')));
+  return testRoots;
+}
+
+/** A certificate is one of the EU reference wallet's test CAs: a signature under it has no legal effect. */
+export function isEudiTestRoot(sha256: string): boolean {
+  return eudiTestRoots().some((c) => c.sha256 === sha256);
+}
+
+/** Every anchor a chain may stop at: the operator's, and the wallet test CAs while they are trusted. */
+function trustAnchors(config: AimeatConfig): CertInfo[] {
+  const own = operatorAnchors(config);
+  return config.docsignEudiTestRoots ? [...own, ...eudiTestRoots()] : own;
+}
+
 /** A caIssuers response is a DER certificate, a PEM one, or a PKCS#7 "certs-only" bundle. */
 function certsFromCaIssuers(buf: Buffer): Buffer[] {
   const text = buf.toString('latin1');
@@ -100,7 +122,7 @@ function certsFromCaIssuers(buf: Buffer): Buffer[] {
 }
 
 export async function buildChain(config: AimeatConfig, signer: Buffer, pool: Buffer[], online = true): Promise<BuiltChain> {
-  const anchors = operatorAnchors(config);
+  const anchors = trustAnchors(config);
   const candidates: CertInfo[] = [];
   const seen = new Set<string>();
   const add = (der: Buffer) => {

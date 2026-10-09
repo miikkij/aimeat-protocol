@@ -1156,9 +1156,11 @@
     },
     "src/services/docsign/records.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 2,
+        "getStorageFile": 1,
+        "getStorageFileMeta": 1
       },
-      "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given."
+      "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given. Reviewed 2026-10-10 (wish-allekirjoitus-eudi-lompakolla): signedDocument() reads the wallet-signed PDF a signer stored for this request, for a party who may read the request; the metadata goes through readerFor(...).show() first, as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file."
     },
     "src/services/db/agent-data-access-overview-db-service.ts": {
       "reads": {

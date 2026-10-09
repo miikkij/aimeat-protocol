@@ -19,9 +19,12 @@
  *   - POST /v1/docsign/requests/:id/cancel            cancel an open request (its creator)
  *   - GET  /v1/docsign/lookup/:sha256                 public: who signed this document on this node
  *   - POST /v1/docsign/validate                       public: validate a signed PDF or CMS file
+ *   - the wallet signing endpoints                    routes/docsign-wallet.ts, mounted here
  * @usage router.use(docsignRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — Mounts docsignWalletRouter: signing with an EU Digital Identity Wallet
+ *     (wish-allekirjoitus-eudi-lompakolla).
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -39,6 +42,7 @@ import { validateDocument } from '../services/docsign/validate-input.js';
 import { ValidationInputError } from '../services/docsign/validate.js';
 import { documentFromStorage } from '../services/docsign/files.js';
 import { docsignMaxBytes } from '../config-docsign.js';
+import { docsignWalletRouter } from './docsign-wallet.js';
 
 const CreateSchema = z.object({
   title: z.string().max(200).optional().default(''),
@@ -182,6 +186,8 @@ export function docsignRouter(config: AimeatConfig, storage: Storage): Router {
       ]));
     } catch (err) { fail(res, err); }
   });
+
+  router.use(docsignWalletRouter(config, storage));
 
   return router;
 }

@@ -17,6 +17,8 @@
  *   - Sign: only as yourself, and only as a listed party. A person signs with a passkey from an app
  *     or with their session on the node's own pages; an app can never use the session method,
  *     because a press inside an app is not proof the person pressed it. An agent signs as itself.
+ *     A person may also sign in an EU Digital Identity Wallet; an agent or app acting for them may
+ *     start that, because the act itself happens in the person's own wallet.
  *   - Look up by hash: anyone. It shows the signatures given, never who has yet to sign.
  *
  *   STORAGE. Records sit in the reserved `sys:docsign` namespace, which no principal-writable path
@@ -25,10 +27,13 @@
  *   parties signing at once: a node is one process, so an in-process lock is the whole answer.
  * @structure DocSignRecord · DocSignature · DocsignError · createRequest · getRequest ·
  *   listRequests · lookupByHash · beginPasskeySignature · signRequest · cancelRequest ·
- *   verifyRecordSignatures · publicView
+ *   verifyRecordSignatures · publicView · walletSigner · recordWalletSignature · signedDocument
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — Wallet signatures: the sealing step is shared (sealInto), a request keeps
+ *     the newest wallet-signed PDF's place and hash, and any party reads that PDF
+ *     (wish-allekirjoitus-eudi-lompakolla).
  */
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
@@ -38,6 +43,8 @@ import type { CallerContext } from '../caller-context.js';
 import { verify as verifyEd25519 } from '../../auth/keypair.js';
 import { beginSigning, finishSigning } from '../passkeys.js';
 import { notify } from '../notify.js';
+import { readerFor } from '../classification/reader.js';
+import { fileTarget } from '../classification/labels.js';
 import { logger } from '../../utils/logger.js';
 import {
   canonicalJson, intentChallenge, keyMessage, evidenceHash, sealStatement, verifySeal, sha256Hex,
@@ -66,11 +73,27 @@ export interface PasskeyEvidence {
 
 export interface KeyEvidence { publicKey: string; signature: string; message: string }
 
+/** What an EU Digital Identity Wallet signature left behind (services/docsign/eudi.ts). */
+export interface WalletEvidence {
+  protocol: 'eudi-rqes-document-retrieval/1';
+  clientId: string;
+  signatureQualifier: string;
+  /** The PDF the wallet was given: the request's document, or the latest signed version of it. */
+  input: { sha256: string; size: number };
+  /** The PDF the wallet returned, stored in the signer's own files. */
+  signed: { sha256: string; size: number; owner: string; key: string };
+  certificate: { subject: string; issuer: string | null; serialNumber: string | null; sha256: string | null };
+  validation: { verdict: string; level: string; reasons: string[]; trustSource: string | null; test: boolean };
+  /** The certificate's holder name matches the signer's display name on this node; null when it cannot be told. */
+  nameMatches: boolean | null;
+}
+
 export interface DocSignature {
   statement: SealedStatement;
   seal: Seal;
   passkey?: PasskeyEvidence;
   key?: KeyEvidence;
+  wallet?: WalletEvidence;
 }
 
 export interface DocSignRecord {
@@ -86,6 +109,11 @@ export interface DocSignRecord {
   createdAt: string;
   completedAt: string | null;
   cancelledAt: string | null;
+  /**
+   * The newest PDF a wallet returned for this request. A later wallet signer signs this one, so
+   * every wallet signature lands in one file. Absent until the first wallet signature.
+   */
+  walletDocument?: { sha256: string; size: number; owner: string; key: string; name: string };
 }
 
 export class DocsignError extends Error {
@@ -282,11 +310,15 @@ export async function cancelRequest(ctx: DocsignCtx, caller: CallerContext, id: 
 const pendingIntents = new Map<string, { intent: SignIntent; expires: number }>();
 
 function partyCheck(rec: DocSignRecord, caller: CallerContext): void {
+  partyCheckFor(rec, caller.principal);
+}
+
+function partyCheckFor(rec: DocSignRecord, signer: string): void {
   if (rec.state !== 'open') throw new DocsignError('NOT_OPEN', 409, `The request is ${rec.state}; nothing can be signed.`);
-  if (!rec.parties.some((p) => p.identity === caller.principal)) {
-    throw new DocsignError('NOT_A_PARTY', 403, `You sign as ${caller.principal}, which is not a party to this request. A person signs for themselves; an agent signs as itself.`);
+  if (!rec.parties.some((p) => p.identity === signer)) {
+    throw new DocsignError('NOT_A_PARTY', 403, `You sign as ${signer}, which is not a party to this request. A person signs for themselves; an agent signs as itself.`);
   }
-  if (rec.signatures[caller.principal]) throw new DocsignError('ALREADY_SIGNED', 409, 'You have already signed this request.');
+  if (rec.signatures[signer]) throw new DocsignError('ALREADY_SIGNED', 409, 'You have already signed this request.');
 }
 
 /** Start a passkey signature: the options for navigator.credentials.get(), bound to this document and signer. */
@@ -353,26 +385,89 @@ export async function signRequest(ctx: DocsignCtx, caller: CallerContext, id: st
       throw new DocsignError('INVALID_INPUT', 400, 'method is passkey, key or session.');
     }
 
-    const nodeKey = await ctx.storage.getNodeKey();
-    if (!nodeKey) throw new DocsignError('NODE_KEY_MISSING', 503, 'This node has no signing key yet.');
-    const evidence = passkey ?? key ?? null;
-    const statement: SealedStatement = {
-      type: 'aimeat-docsign/v1', node: ctx.config.nodeId, request: rec.id, title: rec.title,
-      document: { sha256: rec.document.sha256, name: rec.document.name, size: rec.document.size },
-      signer: caller.principal, signerName: rec.parties.find((p) => p.identity === caller.principal)?.name ?? null,
-      signedAt: new Date().toISOString(), method: input.method,
-      assurance: await assuranceOf(ctx.storage, caller, userVerified),
-      evidence: evidenceHash(evidence),
-    };
-    const seal = await sealStatement(statement, nodeKey);
-    rec.signatures[caller.principal] = { statement, seal, ...(passkey ? { passkey } : {}), ...(key ? { key } : {}) };
-    if (rec.parties.every((p) => rec.signatures[p.identity])) {
-      rec.state = 'complete';
-      rec.completedAt = statement.signedAt;
-    }
-    await writeJson(ctx.storage, reqKey(rec.id), rec, ['docsign']);
-    return rec;
+    return sealInto(ctx, rec, caller.principal, input.method, { passkey, key }, await assuranceOf(ctx.storage, caller, userVerified));
   });
+}
+
+/** Seal one signer's statement into the request and store it. The caller holds the request's lock. */
+async function sealInto(
+  ctx: DocsignCtx, rec: DocSignRecord, signer: string, method: SignMethod,
+  ev: { passkey?: PasskeyEvidence; key?: KeyEvidence; wallet?: WalletEvidence }, assurance: Assurance,
+): Promise<DocSignRecord> {
+  const nodeKey = await ctx.storage.getNodeKey();
+  if (!nodeKey) throw new DocsignError('NODE_KEY_MISSING', 503, 'This node has no signing key yet.');
+  const statement: SealedStatement = {
+    type: 'aimeat-docsign/v1', node: ctx.config.nodeId, request: rec.id, title: rec.title,
+    document: { sha256: rec.document.sha256, name: rec.document.name, size: rec.document.size },
+    signer, signerName: rec.parties.find((p) => p.identity === signer)?.name ?? null,
+    signedAt: new Date().toISOString(), method, assurance,
+    evidence: evidenceHash(ev.passkey ?? ev.key ?? ev.wallet ?? null),
+  };
+  const seal = await sealStatement(statement, nodeKey);
+  rec.signatures[signer] = {
+    statement, seal, ...(ev.passkey ? { passkey: ev.passkey } : {}), ...(ev.key ? { key: ev.key } : {}), ...(ev.wallet ? { wallet: ev.wallet } : {}),
+  };
+  if (rec.parties.every((p) => rec.signatures[p.identity])) {
+    rec.state = 'complete';
+    rec.completedAt = statement.signedAt;
+  }
+  await writeJson(ctx.storage, reqKey(rec.id), rec, ['docsign']);
+  return rec;
+}
+
+// ── wallet signatures (services/docsign/eudi.ts holds the protocol) ──
+
+/**
+ * Who signs when `caller` starts a wallet signature on request `id`, and which PDF the wallet must
+ * be given. A wallet belongs to a person: a person signs as themselves, and an agent or an app
+ * acting for a person starts it for that person, who then confirms in their own wallet.
+ */
+export async function walletSigner(ctx: DocsignCtx, caller: CallerContext, id: string): Promise<{ rec: DocSignRecord; signer: string; expectedSha256: string }> {
+  refuseVisitor(caller);
+  const rec = await getRequest(ctx, caller, id);
+  const signer = caller.kind === 'agent' || caller.kind === 'ecosystem' || caller.kind === 'app' ? caller.ownerGhii : caller.principal;
+  if (signer.includes('#')) throw new DocsignError('METHOD_NOT_ALLOWED', 400, 'A wallet belongs to a person; an agent signs with its key or its session.');
+  partyCheckFor(rec, signer);
+  return { rec, signer, expectedSha256: rec.walletDocument?.sha256 ?? rec.document.sha256 };
+}
+
+/**
+ * Seal a wallet signature, once the wallet's PDF has been checked and stored. Refused when the
+ * request moved on meanwhile: it closed, this signer signed some other way, or another wallet
+ * signature changed which PDF is the latest.
+ */
+export async function recordWalletSignature(
+  ctx: DocsignCtx, id: string, signer: string, inputSha256: string, wallet: WalletEvidence, name: string,
+): Promise<DocSignRecord> {
+  return withLock(id, async () => {
+    const rec = await load(ctx, id);
+    partyCheckFor(rec, signer);
+    if ((rec.walletDocument?.sha256 ?? rec.document.sha256) !== inputSha256) {
+      throw new DocsignError('CONFLICT', 409, 'Someone else signed this request with a wallet meanwhile. Start again with the latest signed PDF.');
+    }
+    const ghii = await ctx.storage.getGHII(signer);
+    const assurance: Assurance = { verificationLevel: ghii?.verificationLevel ?? 0, userVerified: true, principalKind: 'person' };
+    rec.walletDocument = { sha256: wallet.signed.sha256, size: wallet.signed.size, owner: wallet.signed.owner, key: wallet.signed.key, name };
+    await addToIndex(ctx.storage, hashKey(wallet.signed.sha256), rec.id);
+    return sealInto(ctx, rec, signer, 'eudi-wallet', { wallet }, assurance);
+  });
+}
+
+/** The newest wallet-signed PDF of a request, for any party who may read the request. */
+export async function signedDocument(ctx: DocsignCtx, caller: CallerContext, id: string): Promise<{ data: Buffer; name: string; sha256: string }> {
+  const rec = await getRequest(ctx, caller, id);
+  const doc = rec.walletDocument;
+  if (!doc) throw new DocsignError('NOT_FOUND', 404, 'Nobody has signed this request with a wallet yet, so there is no signed PDF.');
+  // The signer stored it in their own files for this request; reading it here is the request's own
+  // purpose, shared with the parties who agreed to sign the same document. A classification label
+  // the signer put on the file still decides, through the same reader GET /v1/storage/{key} uses.
+  const meta = await ctx.storage.getStorageFileMeta(doc.owner, doc.key);
+  const [shown] = meta ? await readerFor(ctx, caller.auth).show([meta], () => fileTarget(doc.owner, doc.key, meta.workspaceRef)) : [];
+  const file = shown ? await ctx.storage.getStorageFile(doc.owner, doc.key) : null;
+  if (!file || documentHash(file.data) !== doc.sha256) {
+    throw new DocsignError('GONE', 410, 'The signed PDF is no longer in the signer\'s files. Ask them for a copy; its hash still finds this request.');
+  }
+  return { data: file.data, name: doc.name, sha256: doc.sha256 };
 }
 
 async function registeredKey(storage: Storage, identity: string): Promise<string | null> {
@@ -405,7 +500,7 @@ export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord
   for (const [signer, sig] of Object.entries(rec.signatures)) {
     const st = sig.statement;
     const consistent = st.request === rec.id && st.document.sha256 === rec.document.sha256 && st.signer === signer
-      && st.evidence === evidenceHash(sig.passkey ?? sig.key ?? null);
+      && st.evidence === evidenceHash(sig.passkey ?? sig.key ?? sig.wallet ?? null);
     const sealValid = await verifySeal(st, sig.seal);
     const sealByThisNode = !!nodeKey && sig.seal.publicKey === nodeKey.publicKey;
     let evidenceValid: boolean | null = null;
