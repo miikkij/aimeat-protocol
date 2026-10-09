@@ -32,6 +32,9 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.4.0 — 2026-10-09 — The token is stored as its SHA-256 (the row id), never as itself; a row
+ *     written before, keyed by the raw token, is still redeemed for one release (findLoginLinkRow)
+ *     (secrets audit 2026-10-09, auth S3).
  *   v1.3.1 — 2026-10-06 — A link never lands on an app's draft origin (secaudit 2026-10 follow-up, A2).
  *   v1.3.0 — 2026-10-05 — redeemLoginLink() also refuses a link whose account turned the link off or
  *     changed the address it was mailed to (the seven-day welcome link included), and spends it with
@@ -57,6 +60,24 @@ export const LOGIN_LINK_TTL_MS = 15 * 60 * 1000;
 export const WELCOME_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const emailHashOf = (email: string): string => createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+const tokenHashOf = (token: string): string => createHash('sha256').update(token).digest('hex');
+
+/**
+ * The stored row a link's token names, and the id it is stored under. A row issued since 2026-10-09
+ * is keyed by the token's hash. One issued before is keyed by the raw token, with its hash in
+ * `code`; it is still found for one release, because a welcome link lasts seven days.
+ * DEPRECATED: the raw-id branch below is removed in 3.27.0 (rows issued by 3.25.x have expired by then).
+ */
+async function findLoginLinkRow(storage: Storage, token: string) {
+    const hashed = tokenHashOf(token);
+    const row = await storage.getEmailVerification(hashed);
+    if (row) return { id: hashed, record: row };
+    // The raw form: the row's own `code` must be this token's hash, so the hash of a token (which is
+    // what a reader of the table now holds) sent as a token finds nothing here.
+    const legacy = await storage.getEmailVerification(token);
+    if (legacy && legacy.id === token && legacy.code === hashed) return { id: token, record: legacy };
+    return null;
+}
 
 // A backslash or a control character anywhere: a browser reads `\` as `/` and drops a tab or a line
 // break, so such an address is not the one it appears to be (utils/same-origin-path.ts).
@@ -113,11 +134,14 @@ export async function issueLoginLink(
 ): Promise<string> {
     const token = randomBytes(32).toString('hex');
     const now = new Date().toISOString();
+    // The row is keyed by the token's SHA-256, never by the token: a reader of the table or of a
+    // backup would otherwise hold a live sign-in for everyone with a link outstanding (secrets
+    // audit 2026-10-09, auth S3). The token itself is only in the mail.
     await storage.createEmailVerification({
-        id: token,
+        id: tokenHashOf(token),
         ownerName: ghii.ownerName,
         emailHash: emailHashOf(email),
-        code: createHash('sha256').update(token).digest('hex'),
+        code: tokenHashOf(token),
         purpose: 'login',
         status: 'pending',
         attempts: 0,
@@ -186,10 +210,12 @@ export type RedeemResult =
  * included. The spend is one conditional update, so two concurrent clicks cannot both sign in.
  */
 export async function redeemLoginLink(storage: Storage, config: AimeatConfig, token: string): Promise<RedeemResult> {
-    const record = token ? await storage.getEmailVerification(token) : null;
-    if (!record || record.status !== 'pending' || record.purpose !== 'login') return { ok: false, code: 'INVALID_TOKEN' };
+    const found = token ? await findLoginLinkRow(storage, token) : null;
+    const record = found?.record ?? null;
+    if (!found || !record || record.status !== 'pending' || record.purpose !== 'login') return { ok: false, code: 'INVALID_TOKEN' };
+    const rowId = found.id;
     if (new Date(record.expiresAt).getTime() < Date.now()) {
-        await storage.updateEmailVerification(token, { status: 'expired' });
+        await storage.updateEmailVerification(rowId, { status: 'expired' });
         return { ok: false, code: 'EXPIRED' };
     }
     const owner = await storage.getOwner(record.ownerName);
@@ -199,7 +225,7 @@ export async function redeemLoginLink(storage: Storage, config: AimeatConfig, to
     if (!ghii.magicLinkEnabled || !ghii.notificationEmail || emailHashOf(ghii.notificationEmail) !== record.emailHash) {
         return { ok: false, code: 'INVALID_TOKEN' };
     }
-    if (!(await storage.spendEmailVerification(token, new Date().toISOString()))) return { ok: false, code: 'INVALID_TOKEN' };
+    if (!(await storage.spendEmailVerification(rowId, new Date().toISOString()))) return { ok: false, code: 'INVALID_TOKEN' };
     // Clicking the link proves the mailbox, as it always has.
     if ((ghii.verificationLevel ?? 0) < 1) await storage.updateGHII(ghii.ghii, { verificationLevel: 1 });
     return { ok: true, ghii };

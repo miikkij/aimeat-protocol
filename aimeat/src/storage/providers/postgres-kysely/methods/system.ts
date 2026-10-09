@@ -7,6 +7,8 @@
  *   boot (config-init) and the stats flusher. Translated 1:1 from the Prisma implementations against the
  *   same tables (SystemSetting keyed `config:*` / `maintenance`, NodeKey, StatsCounter, StatsDailyHistory).
  * @version-history
+ *   v1.2.0 — 2026-10-09 — setNodeKey seals the private key and getNodeKey opens it
+ *     (storage/node-key-at-rest.ts), the same as sqlite (secrets audit 2026-10-09, S4a).
  *   v1.1.0 — 2026-09-09 — getConfigValue deleted: no caller (readers take getAllConfigValues).
  *   v1.0.0 — 2026-07-15 — Phase 5: startup/system domain on Postgres+Kysely.
  */
@@ -14,6 +16,7 @@ import { sql } from 'kysely';
 import type { MaintenanceState, StorageStatsSnapshot } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
+import { sealNodePrivateKey, openNodePrivateKey, isSealedNodeKey } from '../../../node-key-at-rest.js';
 
 export const systemMethods = {
   // ── Config persistence (SystemSetting, key `config:<dotPath>`) ──
@@ -49,15 +52,18 @@ export const systemMethods = {
   },
 
   // ── Node keypair (single-row NodeKey) ──
-  async setNodeKey(this: PostgresKyselyStorage, publicKey: string, privateKey: string): Promise<void> {
+  // The private key is sealed on write and opened on read (storage/node-key-at-rest.ts), so every
+  // caller keeps receiving the plain key; `sealed` says which form the row is in.
+  async setNodeKey(this: PostgresKyselyStorage, publicKey: string, plainPrivateKey: string): Promise<void> {
+    const privateKey = sealNodePrivateKey(plainPrivateKey, publicKey);
     const existing = await this.db.selectFrom('NodeKey').select('id').executeTakeFirst();
     if (existing) await this.db.updateTable('NodeKey').set({ publicKey, privateKey }).where('id', '=', existing.id).execute();
     else await this.db.insertInto('NodeKey').values({ publicKey, privateKey }).execute();
   },
 
-  async getNodeKey(this: PostgresKyselyStorage): Promise<{ publicKey: string; privateKey: string } | null> {
+  async getNodeKey(this: PostgresKyselyStorage): Promise<{ publicKey: string; privateKey: string; sealed: boolean } | null> {
     const r = await this.db.selectFrom('NodeKey').selectAll().executeTakeFirst();
-    return r ? { publicKey: r.publicKey, privateKey: r.privateKey } : null;
+    return r ? { publicKey: r.publicKey, privateKey: openNodePrivateKey(r.privateKey, r.publicKey), sealed: isSealedNodeKey(r.privateKey) } : null;
   },
 
   // ── Stats counters + daily history ──

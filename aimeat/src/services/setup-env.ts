@@ -1,0 +1,105 @@
+/**
+ * @file src/services/setup-env.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The node settings the first-run setup route (POST /v1/setup/init) takes, checked, and
+ *   the .env file it writes from them.
+ *
+ *   WHY. The route wrote nodeId, nodeType, genesisUrl and locale into .env as they came, from a caller
+ *   who is not signed in on a node that has no owner yet. A line break in any of them added a
+ *   variable to the file the node reads at its next start (secrets audit 2026-10-09, node
+ *   configuration S1). Each setting is now held to what the node actually takes, and a value with a
+ *   double quote, a carriage return, a line feed or a NUL is refused, before the route creates
+ *   anything (invariant 14). The file is written through utils/env-file.ts envLine, the one writer
+ *   of a .env line, and at mode 0600 (utils/private-file.ts).
+ * @structure SetupNodeSettings · NODE_TYPES · parseSetupNodeSettings · buildSetupEnv
+ * @usage
+ *   const parsed = parseSetupNodeSettings(req.body);
+ *   if (!parsed.ok) return refuse(parsed.problem);
+ *   writePrivateFile(envPath, buildSetupEnv(parsed.settings, config, now));
+ * @version-history
+ *   v1.0.0 — 2026-10-09 — Initial: the checks and the writer moved out of routes/setup.ts (S1).
+ */
+import type { AimeatConfig } from '../config.js';
+import { envLine, envValueProblem } from '../utils/env-file.js';
+
+/** The node types the node starts as (config.ts refuses to boot on any other: the NodeType type). */
+export const NODE_TYPES: readonly string[] = ['full', 'relay', 'mirror', 'personal'];
+/** A node id as federation reads one (services/mcp-client/hops.ts NODE_ID_RE). */
+const NODE_ID_RE = /^[a-z0-9][a-z0-9._-]{0,99}$/i;
+/** A BCP 47 language tag: a language, then up to three subtags. */
+const LOCALE_RE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8}){0,3}$/;
+
+export interface SetupNodeSettings {
+  nodeId?: string;
+  nodeType?: string;
+  genesisUrl?: string;
+  locale?: string;
+  port?: number;
+}
+
+const given = (v: unknown): boolean => v !== undefined && v !== null && v !== '';
+
+/**
+ * The node settings of a setup request, or the first thing wrong with them. A setting left out
+ * (absent, null or an empty string) is not set; one that is given must be a value the node takes.
+ * `port` is kept as before: a whole number from 1 to 65535 is used, anything else is ignored.
+ */
+export function parseSetupNodeSettings(body: unknown): { ok: true; settings: SetupNodeSettings } | { ok: false; problem: string } {
+  const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+  const settings: SetupNodeSettings = {};
+  const text = (field: string): string | { problem: string } => {
+    const v = b[field];
+    if (typeof v !== 'string') return { problem: `${field} must be a string.` };
+    const problem = envValueProblem(v);
+    return problem ? { problem: `${field} cannot be used: ${problem}.` } : v;
+  };
+
+  if (given(b.nodeId)) {
+    const v = text('nodeId');
+    if (typeof v !== 'string') return { ok: false, problem: v.problem };
+    if (!NODE_ID_RE.test(v)) return { ok: false, problem: 'nodeId: letters, digits, dots, dashes and underscores, starting with a letter or a digit, up to 100 characters.' };
+    settings.nodeId = v;
+  }
+  if (given(b.nodeType)) {
+    const v = text('nodeType');
+    if (typeof v !== 'string') return { ok: false, problem: v.problem };
+    if (!NODE_TYPES.includes(v)) return { ok: false, problem: `nodeType: one of ${NODE_TYPES.join(', ')}.` };
+    settings.nodeType = v;
+  }
+  if (given(b.genesisUrl)) {
+    const v = text('genesisUrl');
+    if (typeof v !== 'string') return { ok: false, problem: v.problem };
+    // Checked on the string as sent: URL parsing drops a tab or a line break before it looks.
+    // eslint-disable-next-line no-control-regex
+    const u = !/[\x00-\x20\x7f]/.test(v) && URL.canParse(v) ? new URL(v) : null;
+    if (!u || (u.protocol !== 'https:' && u.protocol !== 'http:') || u.username || u.password) {
+      return { ok: false, problem: 'genesisUrl: the full http(s) address of the genesis node, with no credentials and no spaces in it.' };
+    }
+    settings.genesisUrl = v;
+  }
+  if (given(b.locale)) {
+    const v = text('locale');
+    if (typeof v !== 'string') return { ok: false, problem: v.problem };
+    if (!LOCALE_RE.test(v)) return { ok: false, problem: 'locale: a language tag such as en, fi or es.' };
+    settings.locale = v;
+  }
+  if (typeof b.port === 'number' && Number.isInteger(b.port) && b.port >= 1 && b.port <= 65535) settings.port = b.port;
+  return { ok: true, settings };
+}
+
+/** The .env the setup route writes: the node's identity, port and type, and the optional two. */
+export function buildSetupEnv(s: SetupNodeSettings, config: Pick<AimeatConfig, 'nodeId' | 'port' | 'nodeType'>, createdAt: string): string {
+  const lines: string[] = [
+    '# AIMEAT Node Configuration (generated by setup wizard)',
+    `# Created: ${createdAt}`,
+    '',
+    envLine('AIMEAT_NODE_ID', s.nodeId ?? config.nodeId),
+    envLine('AIMEAT_PORT', s.port ?? config.port),
+    envLine('AIMEAT_NODE_TYPE', s.nodeType ?? config.nodeType),
+  ];
+  if (s.genesisUrl) lines.push(envLine('AIMEAT_GENESIS_URL', s.genesisUrl));
+  if (s.locale) lines.push(envLine('AIMEAT_LOCALE', s.locale));
+  lines.push('');
+  return lines.join('\n') + '\n';
+}

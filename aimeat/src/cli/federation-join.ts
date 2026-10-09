@@ -14,12 +14,17 @@
  *   - load/save/clearPendingJoin: resumable pending-request state on disk
  *
  * @version-history
+ *   v1.3.0 — 2026-10-09 — .env lines go through utils/env-file.ts envLine and the file is left at
+ *     mode 0600 (utils/private-file.ts), also when it existed; it holds the second private key
+ *     (secrets audit 2026-10-09, S4d).
  *   v1.2.0 — 2026-10-06 — The introduction names the node it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.1.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import { existsSync, readFileSync, writeFileSync, appendFileSync, unlinkSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { envLine } from '../utils/env-file.js';
+import { writePrivateFile, appendPrivateFile } from '../utils/private-file.js';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
@@ -116,16 +121,14 @@ async function ensureKeypair(t: TFunction): Promise<{ publicKey: string; private
   const lines = [
     '',
     '# ── Node Keypair ─────────────────────────────────────────────────',
-    `AIMEAT_PUBLIC_KEY="${keys.publicKey}"`,
-    `AIMEAT_PRIVATE_KEY="${keys.privateKey}"`,
+    envLine('AIMEAT_PUBLIC_KEY', keys.publicKey),
+    envLine('AIMEAT_PRIVATE_KEY', keys.privateKey),
     '',
   ];
 
-  if (existsSync(envFile)) {
-    appendFileSync(envFile, lines.join('\n'));
-  } else {
-    writeFileSync(envFile, lines.join('\n'));
-  }
+  // The file now holds a private key: 0600 whether it was created here or existed (secrets audit
+  // 2026-10-09, S4d).
+  appendPrivateFile(envFile, lines.join('\n'));
 
   // Set in current process
   process.env.AIMEAT_PUBLIC_KEY = keys.publicKey;
@@ -138,16 +141,19 @@ async function ensureKeypair(t: TFunction): Promise<{ publicKey: string; private
 /** Update or append an env var in the .env file. */
 function setEnvVar(key: string, value: string): void {
   const envFile = findEnvFile();
+  // envLine refuses a quote or a line break in the value, which would start another variable.
+  const line = envLine(key, value);
   if (existsSync(envFile)) {
     const content = readFileSync(envFile, 'utf-8');
     const regex = new RegExp(`^${key}=.*$`, 'm');
     if (regex.test(content)) {
-      writeFileSync(envFile, content.replace(regex, `${key}="${value}"`));
+      // A function replacer, so a `$&` or `$1` in the value is written as it is.
+      writePrivateFile(envFile, content.replace(regex, () => line));
     } else {
-      appendFileSync(envFile, `${key}="${value}"\n`);
+      appendPrivateFile(envFile, `${line}\n`);
     }
   } else {
-    writeFileSync(envFile, `${key}="${value}"\n`);
+    writePrivateFile(envFile, `${line}\n`);
   }
 }
 

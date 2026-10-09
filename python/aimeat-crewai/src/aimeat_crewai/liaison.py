@@ -692,7 +692,7 @@ def _resolve_skill_path(agent_name: str | None) -> Path | None:
         return None
 
     # Same precedence the connector uses: AIMEAT_HOME env var wins, else
-    # <cwd>/.aimeat. Single source of truth in paths.aimeat_home().
+    # ~/.aimeat. Single source of truth in paths.aimeat_home().
     candidate = aimeat_home() / agent_name
     skill_md = candidate / "SKILL.md"
     return candidate if skill_md.is_file() else None

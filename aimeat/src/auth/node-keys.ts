@@ -13,6 +13,12 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.3.0 — 2026-10-09 — The database copy of the private key is stored encrypted when the node has
+ *     AIMEAT_KEY_PASSPHRASE or AIMEAT_ENCRYPTION_KEY (storage/node-key-at-rest.ts); it was plain text
+ *     and read before the protected file (secrets audit 2026-10-09, S4a). A plain row is sealed at boot
+ *     on positive evidence (it must read back as the same keypair). A sealed row that does not open is
+ *     answered from the key file with the same public key, or the node refuses to start; it never
+ *     generates a new identity over it.
  *   v1.2.0 — 2026-09-03 — THE KEY BELONGS TO THE NODE, NOT THE MACHINE. The path had no node in it
  *     and no way to configure it, so every node process on one host loaded the same keypair: two
  *     nodes started side by side published an IDENTICAL federation public key, and a signature from
@@ -48,6 +54,9 @@ import { initDownloadTokenKeys } from '../services/download-token.js';
 import { initShareTokenKeys } from '../services/share-token.js';
 import { initDraftTokenKeys } from '../services/draft-token.js';
 import { logger } from '../utils/logger.js';
+import {
+  configureNodeKeySecrets, nodeKeySecretsAvailable, NodeKeyLockedError, type NodeKeySecrets,
+} from '../storage/node-key-at-rest.js';
 
 // ── P3-8: Node Key Encryption Helpers ────────────────────────────────
 
@@ -262,11 +271,78 @@ function persistNodeKey(kp: { publicKey: string; privateKey: string }, keyPath: 
 }
 
 /**
+ * The database copy, opened. When it is sealed and this process cannot open it (the secret it was
+ * sealed with is not set, or changed), the key FILE with the same public key is the identity: it is
+ * used, and the database copy is written again with the secrets this process has. Without such a
+ * file the node refuses to start and names the secret. It never answers null for a row that exists,
+ * because the caller's answer to null is a new identity (secrets audit 2026-10-09, S4a).
+ */
+async function readStoredNodeKey(config: AimeatConfig, storage: Storage): Promise<{ publicKey: string; privateKey: string; sealed?: boolean } | null> {
+  try {
+    return await storage.getNodeKey();
+  } catch (err) {
+    if (!(err instanceof NodeKeyLockedError)) throw err;
+    const candidates = [getNodeKeyPath(config), getLegacyNodeKeyPath()]
+      .filter((p, i, all) => all.indexOf(p) === i && existsSync(p))
+      .filter(p => { const claim = readKeyFileClaim(p); return !claim || claim === config.nodeId; });
+    for (const path of candidates) {
+      const fromFile = loadPersistedNodeKey(path);
+      if (!fromFile || fromFile.publicKey !== err.publicKey) continue;
+      logger.error(`${err.message} The key file holds the same identity, so this node uses it and writes the database copy again with the secrets it has now.`,
+        { path, nodeId: config.nodeId });
+      await storage.setNodeKey(fromFile.publicKey, fromFile.privateKey);
+      return fromFile;
+    }
+    logger.error(`${err.message} Refusing to start: no key file on this machine holds the same identity, and starting with a NEW `
+      + 'identity would break every issued token and every peer that pinned this node. Set the variable back to the value it had.',
+      { nodeId: config.nodeId, publicKey: err.publicKey, keyFilesRead: candidates });
+    process.exit(1);
+  }
+}
+
+/**
+ * A database copy stored in plain text is sealed when this process has a secret for it, on positive
+ * evidence: the row is the keypair this boot just read, and the sealed row must read back as the same
+ * keypair. If it does not, the plain row is written back and the boot carries on with the key it
+ * holds. Never throws.
+ */
+async function sealStoredNodeKeyIfPlain(storage: Storage, nodeKey: { publicKey: string; privateKey: string; sealed?: boolean }, secrets: NodeKeySecrets): Promise<void> {
+  if (nodeKey.sealed !== false || !nodeKeySecretsAvailable(secrets)) return;
+  try {
+    await storage.setNodeKey(nodeKey.publicKey, nodeKey.privateKey);
+    const back = await storage.getNodeKey();
+    if (back?.publicKey === nodeKey.publicKey && back.privateKey === nodeKey.privateKey && back.sealed === true) {
+      logger.info('The node key in the database is now stored encrypted; the identity is unchanged.');
+      return;
+    }
+    throw new Error('the encrypted row did not read back as the same keypair');
+  } catch (err) {
+    logger.error('Could not store the node key encrypted; the plain copy is written back and the identity is unchanged.', { error: String(err) });
+    configureNodeKeySecrets({});
+    try {
+      await storage.setNodeKey(nodeKey.publicKey, nodeKey.privateKey);
+    } catch (restoreErr) {
+      logger.error('Writing the plain node key back failed too. The key file still holds this identity.', { error: String(restoreErr) });
+    } finally {
+      configureNodeKeySecrets(secrets);
+    }
+  }
+}
+
+/**
  * Initialize node keys: load from storage, fall back to persisted file, or generate new.
  */
 export async function initializeNode(config: AimeatConfig, storage: Storage): Promise<void> {
   try {
-    let nodeKey = await storage.getNodeKey();
+    // The secrets the database copy is sealed with: the passphrase the key file uses, and the data
+    // key. Set before the first read, so the providers open the row with them.
+    const secrets: NodeKeySecrets = {
+      passphrase: process.env.AIMEAT_KEY_PASSPHRASE || null,
+      dataKeyHex: config.encryptionKey ?? process.env.AIMEAT_ENCRYPTION_KEY ?? null,
+    };
+    configureNodeKeySecrets(secrets);
+    let nodeKey = await readStoredNodeKey(config, storage);
+    if (nodeKey) await sealStoredNodeKeyIfPlain(storage, nodeKey, secrets);
     if (!nodeKey) {
       const keyPath = getNodeKeyPath(config);
       const legacyPath = getLegacyNodeKeyPath();

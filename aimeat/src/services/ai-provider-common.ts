@@ -12,15 +12,19 @@
  *   function is the way it is moved with it; System 1's behaviour does not change, and e2e-ai-decide
  *   proves it.
  * @structure
- *   isObj · isLoopbackHost · PROVIDER_ID_RE · PROVIDER_ID_PROBLEM · providerIdOf · egressOriginsOf
+ *   isObj · isLoopbackHost · PROVIDER_ID_RE · PROVIDER_ID_PROBLEM · providerIdOf ·
+ *   PROVIDER_KEY_ENV_PREFIX · PROVIDER_KEY_ENV_RULE · isProviderKeyEnvName · egressOriginsOf
  * @usage
  *   const id = providerIdOf(req.params.id);
  *   const origins = egressOriginsOf(config.decideProviderEgress, 'decide', 'AIMEAT_DECIDE_PROVIDER_EGRESS');
  * @version-history
+ *   v1.1.0 — 2026-10-09 — isProviderKeyEnvName: an operator's provider may name only a provider key
+ *     variable as its key, on both systems (secrets audit 2026-10-09, S1).
  *   v1.0.0 — 2026-09-28 — Initial: moved from services/decide/providers.ts, unchanged.
  */
 import { logger } from '../utils/logger.js';
 import { isLinkLocalHost } from '../utils/url-validator.js';
+import { keyEnvProblem } from './crew-llm-guard.js';
 
 export const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -39,6 +43,33 @@ export const PROVIDER_ID_PROBLEM = "id: lower-case letters, digits and '-', 2 to
 export function providerIdOf(raw: unknown): string | null {
   const id = typeof raw === 'string' ? raw.trim() : '';
   return PROVIDER_ID_RE.test(id) ? id : null;
+}
+
+/**
+ * WHICH VARIABLE AN OPERATOR'S PROVIDER MAY SEND AS ITS KEY. A provider record with
+ * `auth: { type: 'env', env: NAME }` sends the value of NAME as the bearer to the provider's address.
+ * The name used to be any upper-case word, so a record could name DATABASE_URL or
+ * AIMEAT_ENCRYPTION_KEY and send it anywhere; the first-run setup route could write such a record
+ * into .env (secrets audit 2026-10-09, node configuration S1). An ALLOW-LIST, as for a crew's key
+ * (services/crew-llm-guard.ts, Jouni 2026-10-02): a deny-list of today's secrets misses the next one.
+ *
+ * A key variable is one of three things: a name under the node's own prefix AIMEAT_AI_KEY_ (the
+ * documented place for an operator's provider key), a vendor-style name ending in _API_KEY that does
+ * not start with AIMEAT_ (the crew rule, keyEnvProblem), or one of the decision-model keys the
+ * built-in providers already name (services/decide/providers.ts BUILTIN_PROVIDERS).
+ */
+export const PROVIDER_KEY_ENV_PREFIX = 'AIMEAT_AI_KEY_';
+const PROVIDER_KEY_ENV_NAMES: readonly string[] = ['AIMEAT_DECIDE_LAYA_KEY', 'AIMEAT_DECIDE_VON_KEY', 'AIMEAT_DECIDE_JEFF_KEY'];
+const ENV_NAME_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
+export const PROVIDER_KEY_ENV_RULE = `auth.env names a provider key variable: ${PROVIDER_KEY_ENV_PREFIX}<NAME>, `
+  + `a name ending in _API_KEY that does not start with AIMEAT_ (for example ANTHROPIC_API_KEY), or one of ${PROVIDER_KEY_ENV_NAMES.join(', ')}. `
+  + 'A variable of the node itself, such as DATABASE_URL or AIMEAT_ENCRYPTION_KEY, is never a provider key.';
+
+/** True when an operator's provider may send the value of `name` as its key. */
+export function isProviderKeyEnvName(name: unknown): name is string {
+  if (typeof name !== 'string' || !ENV_NAME_RE.test(name)) return false;
+  if (name.startsWith(PROVIDER_KEY_ENV_PREFIX) && name.length > PROVIDER_KEY_ENV_PREFIX.length) return true;
+  return PROVIDER_KEY_ENV_NAMES.includes(name) || keyEnvProblem(name) === null;
 }
 
 /**

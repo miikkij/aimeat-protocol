@@ -40,6 +40,8 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   v1.5.0 — 2026-10-09 — An operator's `env` auth names only a provider key variable
+ *     (ai-provider-common.ts isProviderKeyEnvName); any upper-case name was taken (secrets audit 2026-10-09, S1).
  *   v1.4.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.4.0 — 2026-09-28 — The id rule, isObj, the loopback test and the egress list parser moved to
  *     services/ai-provider-common.ts (a pure move, System 2 plan V3), so System 2's provider records
@@ -73,6 +75,7 @@ import { logger } from '../../utils/logger.js';
 import { isValidAgentName } from '../../utils/gaii.js';
 import {
   isObj, isLoopbackHost as LOOPBACK, PROVIDER_ID_RE, PROVIDER_ID_PROBLEM as ID_PROBLEM, providerIdOf, egressOriginsOf,
+  isProviderKeyEnvName, PROVIDER_KEY_ENV_RULE,
 } from '../ai-provider-common.js';
 import { DecideError } from './errors.js';
 import { estimateTokens, type JevQuestion, type LimitViolation } from './limits.js';
@@ -129,7 +132,6 @@ export interface DecisionProvider {
 }
 
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
-const ENV_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 export const PROVIDER_PREFIX = 'decide.providers.';
 /** The owner's own provider key. Under `decide.apikey.` so the credential list matches it by prefix. */
 export const PROVIDER_KEY_PREFIX = 'decide.apikey.provider.';
@@ -271,7 +273,9 @@ export function parseProvider(
   let auth: ProviderAuth = { type: 'none' };
   if (a.type === 'none' || a.type === undefined) auth = { type: 'none' };
   else if (a.type === 'key') auth = { type: 'key' };
-  else if (a.type === 'env' && opts.allowEnv && typeof a.env === 'string' && ENV_RE.test(a.env)) auth = { type: 'env', env: a.env };
+  else if (a.type === 'env' && opts.allowEnv && isProviderKeyEnvName(a.env)) auth = { type: 'env', env: a.env };
+  // Never a variable of the node itself (secrets audit 2026-10-09, S1): ai-provider-common.ts.
+  else if (a.type === 'env' && opts.allowEnv) problems.push(PROVIDER_KEY_ENV_RULE);
   else problems.push(opts.allowEnv
     ? "auth: { type: 'none' }, { type: 'key' } or { type: 'env', env: 'VARIABLE_NAME' }."
     : "auth: { type: 'none' } or { type: 'key' } with the key sent as api_key.");

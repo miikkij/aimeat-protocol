@@ -8,6 +8,8 @@
  *   Presets, helpers, generators, and per-section wizard steps live in
  *   ./init-wizard/*; this file orchestrates them.
  * @version-history
+ *   v1.28.0 — 2026-10-09 — The config file and its backup are written at mode 0600 through
+ *     utils/private-file.ts, also when the file already existed (secrets audit 2026-10-09, S4d).
  *   v1.27.0 — 2026-09-28 — `--install-set <file>` (and `--install-set-secrets <file>`): the file is
  *     checked as an install set and its path written as AIMEAT_INSTALL_SET, which the node applies at
  *     start-up (services/install-set-startup.ts).
@@ -25,7 +27,8 @@
  *   text, derives apps.<host>, sets AIMEAT_APP_HOST/AIMEAT_APP_ORIGIN_ENABLED.
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { writePrivateFile } from '../utils/private-file.js';
 import { randomBytes } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -289,7 +292,9 @@ export async function runInitWizard(config: AimeatConfig, opts: InitWizardOption
     // Backup existing file before any modification
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupName = `${fileName}.backup.${timestamp}`;
-    writeFileSync(backupName, readFileSync(fileName, 'utf-8'));
+    // Every file written here holds the node's secrets (data key, key passphrase, DB address), so
+    // each is left at 0600, the backup included (secrets audit 2026-10-09, S4d).
+    writePrivateFile(backupName, readFileSync(fileName, 'utf-8'));
     p.log.info(t('init.backupCreated', { file: backupName }));
 
     if (action === 'merge' && outputFormat === 'env') {
@@ -309,7 +314,7 @@ export async function runInitWizard(config: AimeatConfig, opts: InitWizardOption
       }
 
       const merged = existing.trimEnd() + '\n\n' + newLines.join('\n');
-      writeFileSync(fileName, merged);
+      writePrivateFile(fileName, merged);
     } else if (action === 'merge' && outputFormat === 'ini') {
       const existing = ini.parse(readFileSync(fileName, 'utf-8'));
       const newCfg = ini.parse(content);
@@ -321,17 +326,17 @@ export async function runInitWizard(config: AimeatConfig, opts: InitWizardOption
           existing[section] = values;
         }
       }
-      writeFileSync(fileName, '; AIMEAT Node Configuration (INI format)\n; Merged by aimeat init\n\n' + ini.stringify(existing));
+      writePrivateFile(fileName, '; AIMEAT Node Configuration (INI format)\n; Merged by aimeat init\n\n' + ini.stringify(existing));
     } else if (action === 'merge' && outputFormat === 'json') {
       const existing = JSON.parse(readFileSync(fileName, 'utf-8'));
       const newCfg = JSON.parse(content);
       const merged = { ...existing, ...newCfg };
-      writeFileSync(fileName, JSON.stringify(merged, null, 2) + '\n');
+      writePrivateFile(fileName, JSON.stringify(merged, null, 2) + '\n');
     } else {
-      writeFileSync(fileName, content);
+      writePrivateFile(fileName, content);
     }
   } else {
-    writeFileSync(fileName, content);
+    writePrivateFile(fileName, content);
   }
 
   p.log.success(t('init.written', { file: fileName }));

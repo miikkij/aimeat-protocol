@@ -12,6 +12,8 @@
  *   - extension and cortex-extension/lib-file CRUD
  *
  * @version-history
+ *   v1.5.0 — 2026-10-09 — getNodeKey reports `sealed` and throws when a sealed row does not open
+ *     (secrets audit 2026-10-09, S4a).
  *   v1.4.0 — 2026-10-09 — deleteVerificationNonce answers whether this call removed the row, so a
  *     single-use nonce has one consumer under concurrent requests.
  *   v1.3.0 — 2026-09-09 — Generic escrow holds (create/get/list/release/refund), getTrustedIssuer,
@@ -34,8 +36,14 @@ import type {
 } from '../interface.js';
 
 export interface NodeRepository {
+  /** Stores the private key sealed when the node has a secret for it (storage/node-key-at-rest.ts). */
   setNodeKey(publicKey: string, privateKey: string): Promise<void>;
-  getNodeKey(): Promise<{ publicKey: string; privateKey: string } | null>;
+  /**
+   * The keypair with the private key opened. `sealed` says whether the row is stored encrypted. Throws
+   * NodeKeyLockedError when the row is sealed and this process cannot open it; never answers null for
+   * a row that exists, because the answer to null is a new identity.
+   */
+  getNodeKey(): Promise<{ publicKey: string; privateKey: string; sealed?: boolean } | null>;
   getMaintenanceMode(): Promise<MaintenanceState>;
   setMaintenanceMode(state: MaintenanceState): Promise<MaintenanceState>;
   /**

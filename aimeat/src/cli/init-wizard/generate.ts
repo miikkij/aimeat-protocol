@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description .env / .json / .ini config-file generators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-10-09 — A string value is written through utils/env-file.ts envLine, which refuses a
+ *     quote or a line break instead of letting it start another variable (secrets audit 2026-10-09).
  *   v1.2.0 — 2026-09-28 — The "Install Set" .env section (AIMEAT_INSTALL_SET, AIMEAT_INSTALL_SET_SECRETS),
  *     written when `aimeat init --install-set` names a file.
  *   v1.1.0 — 2026-08-21 — Add the "Security (encryption at rest)" .env section for the two
@@ -14,6 +16,7 @@
 
 import ini from 'ini';
 import { ENV_TO_DOT_PATH } from '../../services/config-schema.js';
+import { envLine } from '../../utils/env-file.js';
 
 // ── .env generation ─────────────────────────────────────────────────
 
@@ -229,7 +232,9 @@ export function generateEnvContent(settings: Record<string, string>): string {
       if (v.key in settings) {
         const val = settings[v.key];
         const isNumOrBool = /^(\d+(\.\d+)?|true|false)$/.test(val);
-        lines.push(`${v.key}=${isNumOrBool ? val : `"${val}"`}`);
+        // A string goes through the one .env line writer, which refuses a quote or a line break
+        // rather than letting it end the value (utils/env-file.ts).
+        lines.push(isNumOrBool ? `${v.key}=${val}` : envLine(v.key, val));
       } else {
         lines.push(`# ${v.key}=`);
       }

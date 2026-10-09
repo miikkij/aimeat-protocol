@@ -5,6 +5,8 @@
  * @description The pure half of the decision providers (services/decide/providers.ts): what a
  *   provider record may say, what it cannot carry, and when a provider on this machine is reachable.
  * @version-history
+ *   v1.4.0 — 2026-10-09 — An operator's provider names only a provider key variable as its key
+ *     (secrets audit 2026-10-09, S1); the operator records use AIMEAT_AI_KEY_<NAME>.
  *   v1.3.0 — 2026-09-24 — The built-in laya and von send AIMEAT_DECIDE_LAYA_KEY and _VON_KEY as a
  *     bearer when set and nothing when unset; jeff's and an operator's variable stay required; with
  *     laya or von as the default the model stays available without a TypeSafe key.
@@ -65,7 +67,13 @@ describe('parseProvider', () => {
   });
 
   it('lets the operator name a variable, and names only known adapters', () => {
-    expect(parseProvider(local({ auth: { type: 'env', env: 'MY_KEY' } }), 'node', { allowEnv: true }).provider?.auth).toEqual({ type: 'env', env: 'MY_KEY' });
+    expect(parseProvider(local({ auth: { type: 'env', env: 'AIMEAT_AI_KEY_MINE' } }), 'node', { allowEnv: true }).provider?.auth).toEqual({ type: 'env', env: 'AIMEAT_AI_KEY_MINE' });
+    // Never a variable of the node itself (secrets audit 2026-10-09, S1).
+    for (const env of ['DATABASE_URL', 'AIMEAT_ENCRYPTION_KEY', 'AIMEAT_KEY_PASSPHRASE', 'MY_KEY']) {
+      const r = parseProvider(local({ auth: { type: 'env', env } }), 'node', { allowEnv: true });
+      expect(r.provider, env).toBeNull();
+      expect(r.problems.join(' '), env).toMatch(/AIMEAT_AI_KEY_/);
+    }
     expect(parseProvider(local({ adapter: 'laya' }), 'owner', { allowEnv: false }).provider?.adapter).toBe('laya');
     expect(parseProvider(local({ adapter: 'mystery' }), 'owner', { allowEnv: false }).provider).toBeNull();
   });
@@ -184,8 +192,8 @@ describe('the built-in local providers send the key the operator set, and none w
     const jeff = { ...BUILTIN_PROVIDERS.jeff, source: 'builtin' } as DecisionProvider;
     delete process.env.AIMEAT_DECIDE_JEFF_KEY;
     expect(() => envKeyOf(jeff)).toThrow(/AIMEAT_DECIDE_JEFF_KEY/);
-    const op = parseProvider(local({ auth: { type: 'env', env: 'MY_MODEL_KEY' } }), 'node', { allowEnv: true }).provider as DecisionProvider;
-    expect(() => envKeyOf(op, {})).toThrow(/MY_MODEL_KEY/);
+    const op = parseProvider(local({ auth: { type: 'env', env: 'AIMEAT_AI_KEY_MY_MODEL' } }), 'node', { allowEnv: true }).provider as DecisionProvider;
+    expect(() => envKeyOf(op, {})).toThrow(/AIMEAT_AI_KEY_MY_MODEL/);
     process.env.AIMEAT_DECIDE_JEFF_KEY = 'jeff-key';
     expect(await sentAuth(jeff)).toBe('Bearer jeff-key');
   });

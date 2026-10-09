@@ -45,6 +45,10 @@
  *     many slashes and another character (CodeQL js/polynomial-redos, alert 1673).
  *   v1.2.0 — 2026-09-28 — A text, vision or files capability carries `params`, the provider's default
  *     fine-tuning, which the call and the app's role override (AI roles).
+ *   v1.4.0 — 2026-10-09 — An operator's `env` auth names only a provider key variable
+ *     (ai-provider-common.ts isProviderKeyEnvName): AIMEAT_AI_KEY_<NAME>, a vendor-style _API_KEY
+ *     name, or a decision-model key. Any upper-case name was taken, DATABASE_URL included (secrets
+ *     audit 2026-10-09, S1).
  *   v1.3.0 — 2026-10-08 — A speech capability may state the PCM its server sends (sampleRate,
  *     channels, sampleFormat), which the speech answer's `audio` block reports (aiprov plan, A4).
  */
@@ -54,6 +58,7 @@ import { logger } from '../../utils/logger.js';
 import { stripTrailingSlashes } from '../../utils/url-validator.js';
 import {
   isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM, egressOriginsOf,
+  isProviderKeyEnvName, PROVIDER_KEY_ENV_RULE, PROVIDER_KEY_ENV_PREFIX,
 } from '../ai-provider-common.js';
 import {
   FIXED_BASE_URLS, FIXED_PROVIDER_TYPES, isFixedType,
@@ -220,7 +225,6 @@ export const NODE_OPENROUTER_ID = 'node-openrouter';
 export const MAX_OWNER_PROVIDERS = 20;
 
 const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}$/;
-const ENV_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 const LOCAL_STATEMENT = 'The prompt goes to a model on this machine and does not leave it.';
 
 /** The local servers an operator may switch on, at the ports they listen on by default. */
@@ -413,11 +417,15 @@ export function parseAiProvider(
   // With no auth named, a self-hosted address needs none; an extension provider holds the owner's key.
   if (a.type === 'none' || (a.type === undefined && type && !isFixedType(type) && type !== 'extension')) auth = { type: 'none' };
   else if ((a.type === 'key' || a.type === undefined) && source === 'owner') auth = { type: 'key' };
-  else if (a.type === 'env' && opts.allowEnv && typeof a.env === 'string' && ENV_RE.test(a.env)) {
+  else if (a.type === 'env' && opts.allowEnv && isProviderKeyEnvName(a.env)) {
     auth = { type: 'env', env: a.env, ...(a.optional === true ? { optional: true } : {}) };
+  } else if (a.type === 'env' && opts.allowEnv) {
+    // A name outside the allow-list is refused, so no record can send a variable of the node
+    // itself (DATABASE_URL, the data key) to its address (secrets audit 2026-10-09, S1).
+    problems.push(PROVIDER_KEY_ENV_RULE);
   } else {
     problems.push(opts.allowEnv
-      ? "auth: { type: 'none' } or { type: 'env', env: 'VARIABLE_NAME' }; an operator's provider never holds a key in the record."
+      ? `auth: { type: 'none' } or { type: 'env', env: '${PROVIDER_KEY_ENV_PREFIX}NAME' }; an operator's provider never holds a key in the record.`
       : "auth: { type: 'key' } (the key is set separately, on the web page) or { type: 'none' }.");
   }
   if (type && isFixedType(type) && auth.type === 'none') problems.push(`auth: a ${type} provider needs a key.`);

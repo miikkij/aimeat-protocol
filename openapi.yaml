@@ -35018,6 +35018,15 @@ paths:
                         properties:
                           code:
                             example: TOTP_ALREADY_ENABLED
+        '503':
+          description: |
+            FEATURE_DISABLED when TOTP is off on this node, or ENCRYPTION_NOT_CONFIGURED when the node
+            has neither AIMEAT_ENCRYPTION_KEY nor AIMEAT_TOTP_ENCRYPTION_KEY: the secret is never
+            stored in plain text, so nothing is stored and no secret is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/ghii/totp/verify:
     post:
@@ -36442,8 +36451,12 @@ paths:
       summary: First-run node initialization
       description: |
         Performs initial node setup: creates the first owner (who becomes the operator),
-        a GHII profile, a default agent, and optionally writes a .env file.
+        a GHII profile, a default agent, and optionally writes a .env file (mode 0600).
         This endpoint can only be called once — it rejects requests if any owners already exist.
+        The node settings (nodeId, nodeType, genesisUrl, locale) are checked before anything is
+        created: a value with a double quote, a carriage return, a line feed or a NUL, a node id
+        outside the node-id grammar, an unknown node type, a genesis URL that is not http(s) or
+        carries credentials, or a locale that is not a language tag answers 400 INVALID_INPUT.
       tags: [Setup]
       security: []
       requestBody:
@@ -36459,6 +36472,7 @@ paths:
                   description: Preferred language (e.g. "en", "fi")
                 nodeId:
                   type: string
+                  pattern: '^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$'
                   description: Override node ID (defaults to current config)
                 nodeType:
                   type: string
@@ -64846,9 +64860,25 @@ paths:
       operationId: postAdminConsulExport
       tags: [Federation, Admin]
       summary: Push mutable config to Consul KV
-      description: Operator-only (requireRole('operator')). Serializes the node's mutable config and writes each value to Consul KV.
+      description: |
+        Operator-only (requireRole('operator')). Serializes the node's mutable config and writes each
+        value to Consul KV. A path the node's host sealed is left out. A secret setting (the node's AI
+        keys, the TURN values: every row the Config page shows only as configured) is left out unless
+        the body says include_secrets: true, because anyone who can read the KV store could read it
+        there.
       security:
         - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                include_secrets:
+                  type: boolean
+                  default: false
+                  description: Also write the secret settings to Consul KV.
       responses:
         '200':
           description: Export result
@@ -64864,6 +64894,8 @@ paths:
                         properties:
                           exported: { type: integer }
                           total: { type: integer }
+                          sealed_skipped: { type: integer, description: Sealed paths left out (present when not zero). }
+                          secrets_skipped: { type: integer, description: Secret settings left out because include_secrets was not true (present when not zero). }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

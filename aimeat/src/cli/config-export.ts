@@ -8,9 +8,13 @@
  * @structure
  *   - runConfigExport: dispatches on format (env/ini/json/consul)
  *   - exportToEnv/exportToIni/exportToJson: render config to the respective text format
- *   - exportToConsul: pushes mutable (non-immutable) config values into Consul KV
+ *   - exportToConsul: pushes mutable (non-immutable) config values into Consul KV, secret rows only
+ *     with --include-secrets (services/consul-export.ts)
  *
  * @version-history
+ *   v1.1.0 — 2026-10-09 — The Consul export uses services/consul-export.ts, the route's plan: sealed
+ *     paths and secret rows stay out, the secrets only with --include-secrets (secrets audit
+ *     2026-10-09, S3). The env, ini and json formats are unchanged: they are the host's own backup.
  *   (2026-08-28) Reads a row's value through readConfigField, so the site-link rows
  *     (siteLinks.<name>) export like every other row.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -25,12 +29,15 @@ import ini from 'ini';
 import { CONFIG_FIELDS, serializeConfigValue, readConfigField } from '../services/config-schema.js';
 import type { AimeatConfig } from '../config.js';
 import { createConsulConfigService } from '../services/consul-config.js';
+import { planConsulExport } from '../services/consul-export.js';
 
 type ExportFormat = 'env' | 'ini' | 'json' | 'consul';
 
-export async function runConfigExport(config: AimeatConfig, format: ExportFormat): Promise<void> {
+export async function runConfigExport(
+  config: AimeatConfig, format: ExportFormat, opts: { includeSecrets?: boolean } = {},
+): Promise<void> {
   if (format === 'consul') {
-    return exportToConsul(config);
+    return exportToConsul(config, opts.includeSecrets === true);
   }
 
   const output = format === 'env'
@@ -98,26 +105,28 @@ function exportToJson(config: AimeatConfig): string {
   return JSON.stringify(result, null, 2) + '\n';
 }
 
-async function exportToConsul(config: AimeatConfig): Promise<void> {
+async function exportToConsul(config: AimeatConfig, includeSecrets: boolean): Promise<void> {
   const consulService = createConsulConfigService(config);
   if (!consulService) {
     console.error('Error: Consul is not enabled. Set AIMEAT_CONSUL_ENABLED=true and AIMEAT_CONSUL_URL.');
     process.exit(1);
   }
 
+  // The same plan the operator's POST /v1/admin/consul/export writes: sealed paths out, and the
+  // secret rows out unless --include-secrets was given (secrets audit 2026-10-09, S3).
+  const plan = planConsulExport(config, { includeSecrets });
   let exported = 0;
-  for (const field of CONFIG_FIELDS) {
-    if (field.immutable) continue;
-    const value = readConfigField(config, field);
-    if (value !== undefined && value !== null) {
-      try {
-        await consulService.set(field.dotPath, serializeConfigValue(value));
-        exported++;
-      } catch (err) {
-        console.warn(`  Warning: Failed to export ${field.dotPath}: ${(err as Error).message}`);
-      }
+  for (const { path, value } of plan.entries) {
+    try {
+      await consulService.set(path, value);
+      exported++;
+    } catch (err) {
+      console.warn(`  Warning: Failed to export ${path}: ${(err as Error).message}`);
     }
   }
 
   console.log(`Exported ${exported} mutable config values to Consul KV`);
+  if (plan.secretsSkipped > 0) {
+    console.log(`Left out ${plan.secretsSkipped} secret value(s) (AI keys, TURN). Run again with --include-secrets to write them to Consul KV as well.`);
+  }
 }

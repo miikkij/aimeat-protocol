@@ -11,6 +11,8 @@
  * @structure ConfigChange · ConfigApplyResult · applyConfigChanges(deps, changes)
  * @usage const r = await applyConfigChanges({ config, storage, provenance }, [{ path, value }]);
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A secret row is stored encrypted with the node key (config-at-rest.ts); it
+ *     went into SystemSetting in plain text (secrets audit 2026-10-09, S4b).
  *   v1.1.0 — 2026-10-02 — The four settings in RANGE_ENFORCED are refused outside their stated
  *     `range` (withinStatedRange), with the range named in the reason. The rows' checks enforced the
  *     minimum only, so a value above the maximum the Config tab shows was stored and applied.
@@ -21,6 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import type { ConfigProvenance } from './config-provenance.js';
 import { MUTABLE_CONFIG_MAP, serializeConfigValue, readConfigField, writeConfigField } from './config-schema.js';
 import { isSecretField } from './config-sealing.js';
+import { sealSettingForStorage } from './config-at-rest-rows.js';
 import { withinStatedRange, RANGE_ENFORCED } from './config-schema-validators.js';
 import { logger } from '../utils/logger.js';
 
@@ -65,7 +68,8 @@ export async function applyConfigChanges(
         // vanish on the next boot, which is the worst of the three possible outcomes because
         // nobody investigates a success.
         try {
-            await storage.setConfigValue(path, serializeConfigValue(value));
+            // A secret row is stored encrypted (services/config-at-rest.ts; secrets audit 2026-10-09, S4b).
+            await storage.setConfigValue(path, sealSettingForStorage(path, serializeConfigValue(value), config));
         } catch (e) {
             logger.error('admin-config: a change could not be persisted, so it was not applied', { path, error: String(e) });
             errors.push({

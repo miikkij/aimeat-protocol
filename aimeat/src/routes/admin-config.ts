@@ -18,6 +18,9 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.8.0 -- 2026-10-09 -- POST /v1/admin/consul/export leaves the secret rows out unless the body
+ *     says include_secrets: true, and answers secrets_skipped (services/consul-export.ts, shared with
+ *     the CLI); the Consul import stores a secret row encrypted (secrets audit 2026-10-09, S3, S4b).
  *   v1.7.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.6.0 -- 2026-09-29 -- PUT and the classification switch (classification.mode): an AI
  *     credential (a personal access token) is refused a change that turns classification off or
@@ -49,7 +52,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue, readConfigField } from '../services/config-schema.js';
+import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, readConfigField } from '../services/config-schema.js';
+import { planConsulExport } from '../services/consul-export.js';
+import { sealSettingForStorage } from '../services/config-at-rest-rows.js';
 import { applyConfigChanges, type ConfigChange } from '../services/config-apply.js';
 import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
@@ -286,28 +291,28 @@ export function adminConfigRouter(
     });
 
     // POST /v1/admin/consul/export — push current mutable config to Consul KV
-    router.post('/v1/admin/consul/export', requireAuth(), requireOperator(storage), async (_req, res) => {
+    router.post('/v1/admin/consul/export', requireAuth(), requireOperator(storage), async (req, res) => {
         if (!consulService) {
             res.status(400).json(error(config.nodeId, 'CONSUL_DISABLED', 'Consul is not enabled'));
             return;
         }
 
+        // A sealed value is left out (it looks editable in KV and is discarded on import), and so
+        // is a secret row unless the operator sends include_secrets: true (secrets audit
+        // 2026-10-09, S3): services/consul-export.ts, the same plan the CLI uses.
+        const plan = planConsulExport(config, { includeSecrets: req.body?.include_secrets === true });
         let exported = 0;
-        let sealedSkipped = 0;
-        for (const [dotPath, field] of Object.entries(MUTABLE_CONFIG_MAP)) {
-            // A sealed value pushed into the KV store looks editable there, gets edited, and is
-            // then discarded on the next import without anyone being told. Leave it out.
-            if (isSealed(config, dotPath)) { sealedSkipped++; continue; }
+        for (const { path, value } of plan.entries) {
             try {
-                const value = readConfigField(config, field);
-                await consulService.set(dotPath, serializeConfigValue(value));
+                await consulService.set(path, value);
                 exported++;
             } catch (err) { logger.warn('value: skip individual failures', { error: String(err) }); }
         }
 
         res.json(success(config.nodeId, {
-            exported, total: Object.keys(MUTABLE_CONFIG_MAP).length,
-            ...(sealedSkipped > 0 ? { sealed_skipped: sealedSkipped } : {}),
+            exported, total: plan.total,
+            ...(plan.sealedSkipped > 0 ? { sealed_skipped: plan.sealedSkipped } : {}),
+            ...(plan.secretsSkipped > 0 ? { secrets_skipped: plan.secretsSkipped } : {}),
         }));
         emitChange('config');
     });
@@ -327,7 +332,8 @@ export function adminConfigRouter(
         // Persist to DB if available
         if (storage.supportsConfigPersistence()) {
             for (const dotPath of applied) {
-                await storage.setConfigValue(dotPath, values[dotPath]);
+                // A secret row is stored encrypted, as PUT stores it (services/config-at-rest.ts).
+                await storage.setConfigValue(dotPath, sealSettingForStorage(dotPath, values[dotPath], config));
             }
             if (provenance) provenance.markDatabase(applied);
         }

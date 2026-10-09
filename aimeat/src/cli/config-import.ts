@@ -12,6 +12,8 @@
  *   - runConfigImport(config, options): orchestrates source load → classify → confirm → storage.setConfigValue
  *
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A secret row is written encrypted with the node key
+ *     (services/config-at-rest.ts; secrets audit 2026-10-09, S4b).
  *   v1.1.0 — 2026-08-18 — A path the node's host sealed is reported and not written. The write
  *     would have been inert anyway (boot ignores a sealed row), and telling somebody you imported
  *     a value you are going to ignore is its own defect. docs/plans/sealed-config-plan.md
@@ -23,6 +25,7 @@ import * as readline from 'node:readline';
 import { loadFileSource } from '../services/config-loader.js';
 import { MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/config-schema.js';
 import { isSealed } from '../services/config-sealing.js';
+import { sealSettingForStorage } from '../services/config-at-rest-rows.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import type { AimeatConfig } from '../config.js';
@@ -157,7 +160,8 @@ export async function runConfigImport(
   let imported = 0;
   for (const dotPath of stats.mutable) {
     try {
-      await storage.setConfigValue(dotPath, values[dotPath]);
+      // A secret row is stored encrypted, as the Config page stores it (services/config-at-rest.ts).
+      await storage.setConfigValue(dotPath, sealSettingForStorage(dotPath, values[dotPath], config));
       imported++;
     } catch (err) {
       console.warn(`  Warning: Failed to import ${dotPath}: ${(err as Error).message}`);
