@@ -136,7 +136,8 @@ async function withLock<T>(id: string, fn: () => Promise<T>): Promise<T> {
 async function displayNameOf(storage: Storage, identity: string): Promise<string | null> {
   if (identity.includes('#')) {
     const agent = await storage.getAgent(identity);
-    return agent ? (agent as { displayName?: string; name?: string }).displayName ?? identity.split('@')[0]! : null;
+    // The agent's own name is the part before '#': `bot#alice@node` is the agent `bot`.
+    return agent ? (agent as { displayName?: string }).displayName ?? identity.slice(0, identity.indexOf('#')) : null;
   }
   const ghii = await storage.getGHII(identity);
   return ghii ? (ghii.displayName || ghii.username) : null;

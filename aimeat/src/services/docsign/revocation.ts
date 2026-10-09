@@ -21,6 +21,7 @@ import { AsnConvert, OctetString } from '@peculiar/asn1-schema';
 import { AlgorithmIdentifier, Certificate } from '@peculiar/asn1-x509';
 import { OCSPRequest, TBSRequest, Request, CertID, OCSPResponse, BasicOCSPResponse, OCSPResponseStatus } from '@peculiar/asn1-ocsp';
 import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 import { verifySignature } from './cms-verify.js';
 import { readCert, safeVerify, OID, type CertInfo } from './x509-info.js';
 
@@ -50,10 +51,8 @@ let fetchBytes: Fetch = async (url, init) => {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const len = Number(res.headers.get('content-length') ?? 0);
-  if (init && len > init.max) throw new Error('response too large');
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (init && buf.length > init.max) throw new Error('response too large');
+  const buf = await readBodyCapped(res, init?.max ?? MAX_OCSP_BYTES);
+  if (!buf) throw new Error('response too large');
   return buf;
 };
 
