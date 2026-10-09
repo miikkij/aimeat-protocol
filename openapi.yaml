@@ -29834,11 +29834,12 @@ paths:
                 marks:
                   type: object
                   description: >-
-                    The owner's switches on the chrome the node adds to the served app. Both on until
-                    switched off; merged field by field, so flipping one leaves the other alone.
+                    The owner's switches on the chrome the node adds to the served app. All on until
+                    switched off; merged field by field, so flipping one leaves the others alone.
                   properties:
                     badge: { type: boolean, description: The "publish your own app" attribution badge }
                     install: { type: boolean, description: The browser "Install this app" offer on the app's own origin }
+                    aiUse: { type: boolean, description: 'The "Use with your AI" mark, served when the app has public app tools or bound skills; it links to /v1/use-with-ai/{owner}/{filename}' }
                 author:
                   type: string
                   nullable: true
@@ -43833,10 +43834,12 @@ paths:
         own registry first, then the node library; scope/owner (or scope=workspace with
         organism + ws) address a specific registry. manifest_only=true skips bodies. A skill a
         package install published carries `fromPackage` ({ groupId, instanceId }); the owner's own
-        republish keeps it, and only that install replaces or removes the skill.
+        republish keeps it, and only that install replaces or removes the skill. Open without
+        sign-in: a caller who is not signed in reads public skills only (pass scope and owner).
       tags: [Skills]
       security:
         - BearerAuth: []
+        - {}
       parameters:
         - name: name
           in: path
@@ -44044,10 +44047,11 @@ paths:
         the layout claude.ai's skill upload expects, and unzip-ready for ~/.claude/skills
         (Claude Code / Desktop). Same addressing as the resolve route; the name segment may
         carry an @semver pin. Response headers X-Skill-Ref and X-Skill-Version echo what was
-        packed.
+        packed. Open without sign-in for a public skill, as the resolve route is.
       tags: [Skills]
       security:
         - BearerAuth: []
+        - {}
       parameters:
         - name: name
           in: path

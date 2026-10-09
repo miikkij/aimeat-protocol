@@ -74,7 +74,7 @@ export const APP_AUDIT_MAX = 500;
 /** What can happen to a published app's settings. Kept flat so a reader can grep it. */
 export type AppAuditAction =
   | 'legal.set' | 'legal.cleared'
-  | 'marks.badge' | 'marks.install'
+  | 'marks.badge' | 'marks.install' | 'marks.aiUse'
   | 'authorship.declared' | 'authorship.cleared'
   | 'seo'
   | 'parked' | 'unparked'

@@ -16,6 +16,7 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.8.1 — 2026-10-09 — isRestricted reads appHiddenFromPublicSurfaces (services/app-ai-use.ts), moved unchanged.
  *   v1.8.0 — 2026-10-08 — The listing's ai_provenance is the tool manifest record's own when it
  *     carries one, the app's only otherwise (aiprov D18).
  *   v1.7.2 — 2026-10-07 — A priced tool's payment block carries every money price (`pricesMoney`,
@@ -69,18 +70,17 @@ import { recordCallDuration } from '../services/call-timing.js';
 import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { buildAppAgentSurface } from '../services/app-agent-surface.js';
+import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';
 
-/** True when an app must not be described on a public surface (gated, priced, or moderated away). */
-function isRestricted(config: AimeatConfig, app: AppRecord): boolean {
-  if (app.accessCode) return true;
-  if (app.operatorHidden) return true;
-  if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) return true;
-  return false;
-}
+/**
+ * True when an app must not be described on a public surface (gated, priced, or moderated away).
+ * The test lives in services/app-ai-use.ts, so the "Use with your AI" mark and this listing agree.
+ */
+const isRestricted = (config: AimeatConfig, app: AppRecord): boolean => appHiddenFromPublicSurfaces(config, app);
 
 /** Load the PUBLIC tool manifest of owner/filename, or null (missing, private, malformed). */
 async function loadPublicManifest(

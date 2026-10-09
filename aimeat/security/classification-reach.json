@@ -653,6 +653,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The public tool manifest for the WebMCP listing."
     },
+    "src/services/app-ai-use.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-09, the node's own read: the same public tool manifest the WebMCP listing serves to anyone, counted for the app's \"Use with your AI\" mark; no content leaves, only the number of public tools."
+    },
     "src/services/a2a-foreign-handler.ts": {
       "reads": {
         "getMemory": 1

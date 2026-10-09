@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.20.0 — 2026-10-09 — The inline serve carries the "Use with your AI" mark when the app has public app tools or skills.
  *   v1.19.0 — 2026-10-08 — A runnable HTML app carries the on-page behaviour script unless its owner switched it off (layer D).
  *   v1.18.0 — 2026-10-08 — The app download counts the visit for AI visibility (services/visibility/),
  *     and a runnable HTML app carries its owner's own analytics tags (layer B).
@@ -94,6 +95,7 @@ import { isSameAccount } from '../../utils/same-account.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
+import { appAiUse } from '../../services/app-ai-use.js';
 import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
 import { appOfRequestOrigin } from '../../services/app-origin-target.js';
 import { appCsp } from '../../utils/app-csp.js';
@@ -654,6 +656,9 @@ export function registerReadRoutes(
         // the hash downloads the source rather than the rendered page.
         const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
         setProvenanceHeaders(res, prov);
+        const locale = detectLocale(req.headers['accept-language']);
+        // The "Use with your AI" mark rides with the visible chrome (services/app-ai-use.ts).
+        const aiUse = (runnable && isHtml) ? await appAiUse(storage, config, app) : null;
         let body = (runnable && isHtml)
             // The visible label rides ONLY on the inline (runnable) form. A raw download stays
             // byte-for-byte, which is what keeps the content hash in the record verifiable.
@@ -664,8 +669,9 @@ export function registerReadRoutes(
                 // The node's switch, then the owner's (services/app-marks.ts); on unless one is off.
                 badge: servedBadgeOn(config, app.manifest),
                 provenance: prov,
+                aiUse: aiUse ? { use: aiUse, locale } : undefined,
                 visibleLabel: {
-                    config, locale: detectLocale(req.headers['accept-language']),
+                    config, locale,
                     // As the publish decides it: an access code or a park makes the app private.
                     publiclyReadable: !app.accessCode && !app.parked,
                 },

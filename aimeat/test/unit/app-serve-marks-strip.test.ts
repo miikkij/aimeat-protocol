@@ -15,6 +15,7 @@
  *   silence: an app's own element that only looks like a mark is never touched.
  * @usage pnpm exec vitest run test/unit/app-serve-marks-strip.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The "Use with your AI" mark round-trips alone and with every other mark.
  *   v1.1.0 — 2026-10-08 — The owner's analytics tags with their banner, and the behaviour script,
  *     round-trip through the real snippet functions (AI visibility layers B and D; e2e-app-marks
  *     went red on the behaviour script before the strip knew it).
@@ -56,6 +57,11 @@ const FULL: ServeMarksSpec = {
   discovery: DISCOVERY,
 };
 
+/** The "Use with your AI" mark as services/app-ai-use.ts hands it over, in a language with non-ASCII words. */
+const AI_USE: NonNullable<ServeMarksSpec['aiUse']> = {
+  use: { tools: 2, skills: 1, guideUrl: 'https://aimeat.io/v1/use-with-ai/alice/demo.html' }, locale: 'fi',
+};
+
 const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['every mark', FULL,
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-ref', 'badge', 'chrome-reserve']],
@@ -67,6 +73,9 @@ const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['machine marks without the visible label', { isDocument: true, provenance: provFixture('labelled') }, ['ai-disclosure']],
   ['discovery without the WebMCP bridge', { isDocument: true, discovery: { ...DISCOVERY, webmcp: false } }, ['agent-discovery', 'app-ref']],
   ['the reviewer alone', { isDocument: true, reviewedBy: 'Jane "J" <Reviewer>' }, ['reviewed-by']],
+  ['the "Use with your AI" mark alone, in Finnish', { isDocument: true, aiUse: AI_USE }, ['ai-use', 'chrome-reserve']],
+  ['every mark and the "Use with your AI" mark', { ...FULL, aiUse: AI_USE },
+    ['agent-discovery', 'ai-disclosure', 'ai-label', 'ai-use', 'app-ref', 'badge', 'chrome-reserve']],
 ];
 
 describe('stripServedMarks: a served copy comes back as the author\'s bytes', () => {

@@ -36,6 +36,7 @@
  *   const out = await applyOwnerMarksUpdate(storage, { ownerGaii, filename },
  *     { marks: body.marks, author: body.author, actor: { ghii, ownerPrincipal } });
  * @version-history
+ *   v1.4.0 — 2026-10-09 — A third switch, `aiUse`: the "Use with your AI" mark (services/app-ai-use.ts). Absent = on.
  *   v1.3.0 — 2026-09-29 — servedBadgeOn(): the node's AIMEAT_APP_BADGE switch, then the per-app one.
  *   v1.2.0 — 2026-09-26 — `labelPolicy`: the declaration's note says the visible label stays on a
  *     public app under the node's strict policy, and now names the reviewer, instead of saying it
@@ -52,6 +53,7 @@ import { AUTHORSHIP_LOG_MAX } from '../storage/types/apps.js';
 import { resolveAppOwnerScope } from './app-lifecycle.js';
 import { emitChange } from './event-bus.js';
 import { recordAppAudit, type AppAuditAction } from './app-audit.js';
+import { appAiUseOn } from '../utils/app-ai-use-badge.js';
 
 export const AUTHOR_NAME_MAX = 120;
 
@@ -75,6 +77,12 @@ export function appInstallChipOn(m: AppManifest | undefined | null): boolean {
   return m?.marks?.install !== false;
 }
 
+/**
+ * The "Use with your AI" mark. Absent = on. Declared beside the mark (utils/app-ai-use-badge.ts),
+ * so services/app-ai-use.ts reads it without importing this file and closing an import cycle.
+ */
+export { appAiUseOn };
+
 /** The declared reviewer's name, or undefined when nobody has declared. */
 export function appReviewedBy(m: AppManifest | undefined | null): string | undefined {
   const name = m?.authorship?.name?.trim();
@@ -83,16 +91,16 @@ export function appReviewedBy(m: AppManifest | undefined | null): string | undef
 
 // ── Request shapes ──────────────────────────────────────────────────────────────────────────────
 
-const MARK_KEYS: ReadonlyArray<keyof AppMarks> = ['badge', 'install'];
+const MARK_KEYS: ReadonlyArray<keyof AppMarks> = ['badge', 'install', 'aiUse'];
 
-/** `{ badge?: boolean, install?: boolean }`; anything else is refused by name. */
+/** `{ badge?: boolean, install?: boolean, aiUse?: boolean }`; anything else is refused by name. */
 export function parseMarksInput(input: unknown): { marks: Partial<AppMarks> } | { error: string } {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    return { error: 'marks must be an object of booleans (badge, install)' };
+    return { error: 'marks must be an object of booleans (badge, install, aiUse)' };
   }
   const marks: Partial<AppMarks> = {};
   for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    if (!(MARK_KEYS as readonly string[]).includes(k)) return { error: `marks.${k} is not a mark (badge, install)` };
+    if (!(MARK_KEYS as readonly string[]).includes(k)) return { error: `marks.${k} is not a mark (badge, install, aiUse)` };
     if (typeof v !== 'boolean') return { error: `marks.${k} must be a boolean` };
     marks[k as keyof AppMarks] = v;
   }
@@ -118,7 +126,7 @@ export function parseAuthorInput(input: unknown): { name: string | null } | { er
 // ── State and notes ─────────────────────────────────────────────────────────────────────────────
 
 export interface AppMarksState {
-  marks: { badge: boolean; install: boolean };
+  marks: { badge: boolean; install: boolean; aiUse: boolean };
   authorship: AppAuthorship | null;
   authorshipLog: AppAuthorshipLogEntry[];
 }
@@ -126,7 +134,7 @@ export interface AppMarksState {
 export function appMarksState(app: Pick<AppSummaryRecord, 'manifest'>): AppMarksState {
   const m = app.manifest;
   return {
-    marks: { badge: appBadgeOn(m), install: appInstallChipOn(m) },
+    marks: { badge: appBadgeOn(m), install: appInstallChipOn(m), aiUse: appAiUseOn(m) },
     authorship: m?.authorship ?? null,
     authorshipLog: m?.authorshipLog ?? [],
   };
@@ -200,6 +208,11 @@ export async function applyOwnerMarksUpdate(
         ? 'Visitors are offered to install this app in their browser again.'
         : 'Visitors are no longer offered to install this app.');
     }
+    if (update.marks.aiUse !== undefined && update.marks.aiUse !== before.marks.aiUse) {
+      notes.push(update.marks.aiUse
+        ? 'The "Use with your AI" mark is shown on this app again whenever it has public app tools or skills.'
+        : 'The "Use with your AI" mark is no longer shown on this app. Its tools and skills stay public to agents.');
+    }
   }
 
   if (author !== undefined) {
@@ -231,6 +244,7 @@ export async function applyOwnerMarksUpdate(
       recordAppAudit(storage, { ownerGhii: target.ownerGaii, filename: target.filename, by: input.actor.ghii, action, detail });
     if (update.marks?.badge !== undefined && update.marks.badge !== before.marks.badge) await audit('marks.badge', { on: update.marks.badge });
     if (update.marks?.install !== undefined && update.marks.install !== before.marks.install) await audit('marks.install', { on: update.marks.install });
+    if (update.marks?.aiUse !== undefined && update.marks.aiUse !== before.marks.aiUse) await audit('marks.aiUse', { on: update.marks.aiUse });
     if (update.authorship === null) await audit('authorship.cleared', { name: before.authorship?.name ?? null });
     else if (update.authorship) await audit('authorship.declared', { name: update.authorship.name });
     // The catalogue card and the details view read these, so the views watching 'apps' have to

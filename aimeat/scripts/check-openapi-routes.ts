@@ -62,6 +62,7 @@ const NOT_API: Record<string, string> = {
     'GET /v1/oauth/consent': PAGE,
     'GET /v1/portal': PAGE,
     'GET /v1/portfolio/{}': PAGE,
+    'GET /v1/use-with-ai/{}/{}': PAGE,
     'GET /v1/privacy': PAGE,
     'GET /v1/privacy/{}': PAGE,
     'GET /v1/terms': PAGE,

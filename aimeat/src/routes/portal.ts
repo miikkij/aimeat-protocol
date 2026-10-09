@@ -67,6 +67,8 @@
  *     as sent, for Bing.
  *   v1.18.0 — 2026-09-27 — /v1/appcat serves the SPA: the app catalogue on the component library,
  *     beside the old /app-catalog.html, which stays as it is.
+ *   v1.19.0 — 2026-10-09 — /v1/use-with-ai/:owner/:filename serves the SPA with a head built for the
+ *     app: the guide the served app's "Use with your AI" mark links to.
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -88,6 +90,8 @@ import { mcpInstallLink } from '../services/mcp-install.js';
 // Shell serving and public-file lookup live in the sibling; re-exported because bootstrap.ts and
 // static-files.ts have imported them from here since before the split.
 import { BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
+import { localAccountName } from '../utils/gaii.js';
+import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { livePageMarkdown } from '../services/page-body-live.js';
 import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
@@ -511,6 +515,26 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     } else {
       res.redirect(302, '/spa.html');
     }
+  });
+
+  // The "Use with your AI" guide for one app — /v1/use-with-ai/:owner/:filename (parameterized,
+  // serves the SPA, views/use-with-ai.js). Built per app as the portfolio is, so the head names
+  // the app; a guide for an app that is not public (missing, gated, priced, hidden) is never indexed.
+  router.get('/v1/use-with-ai/:owner/:filename', async (req, res) => {
+    const spaPath = resolvePublicFile('spa.html');
+    if (!spaPath) { res.redirect(302, '/spa.html'); return; }
+    const owner = localAccountName(String(req.params.owner ?? ''));
+    const filename = String(req.params.filename ?? '');
+    const app = await storage.getAppByOwnerName(owner, filename);
+    if (!app || appHiddenFromPublicSurfaces(config, app)) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    const name = app?.manifest?.name || filename;
+    serveSpa(res, spaPath, config, undefined, {
+      path: `/v1/use-with-ai/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
+      title: `Use ${name} with your AI`,
+      description: `How your own AI, an agent or a program uses the app tools and skills of ${name} on ${config.seoSiteName}.`,
+      changefreq: 'weekly',
+      priority: '0.4',
+    });
   });
 
   // ── SPA routes — serve spa.html for all portal pages ──

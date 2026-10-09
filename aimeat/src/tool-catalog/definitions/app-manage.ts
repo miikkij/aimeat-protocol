@@ -77,6 +77,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // marks
     badge: { type: 'boolean', description: 'For marks: false takes the "publish your own app" badge off the app; true puts it back.' },
     install: { type: 'boolean', description: 'For marks: false stops offering visitors to install the app in their browser; true offers it again.' },
+    aiUse: { type: 'boolean', description: 'For marks: false takes the "Use with your AI" mark off the app (shown when it has public app tools or skills); true puts it back. The tools and skills stay public either way.' },
     // legal
     kind: { type: 'string', enum: ['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'cookies', 'support'], description: 'For legal: which page. Omit to read where the app stands.' },
     format: { type: 'string', enum: ['markdown', 'html', 'url'], description: 'For legal: markdown (rendered with every character escaped), html (served as written on the app\'s own origin) or url (a link to where the page lives).' },
@@ -224,8 +225,8 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'change name, description, per-language descriptions, parked (hidden from the public catalogue), forkable, access code or copy protection, without a new version' },
     seo: { fields: F(['filename'], ['index', 'title', 'description', 'keywords', 'image', 'lang']), scope: 'app:write',
         summary: 'decide whether the app can be found in search engines (off until you ask) and what it says there; naming nothing reports where it stands' },
-    marks: { fields: F(['filename'], ['badge', 'install']), scope: 'app:write',
-        summary: 'switch the "publish your own app" badge and the install offer; naming nothing reports them. Naming the reviewer who lifts the AI label is the account holder\'s own act and is not here' },
+    marks: { fields: F(['filename'], ['badge', 'install', 'aiUse']), scope: 'app:write',
+        summary: 'switch the "publish your own app" badge, the install offer and the "Use with your AI" mark; naming nothing reports them. Naming the reviewer who lifts the AI label is the account holder\'s own act and is not here' },
     legal: { fields: F(['filename'], ['kind', 'format', 'content', 'remove']), provenance: true, scope: 'app:write',
         summary: 'publish, replace or remove one of the app\'s legal pages (terms, privacy, imprint, refunds, accessibility, cookies, support), served under its address; no kind reports which pages it still ought to have' },
     audit: { fields: F(['filename'], ['limit', 'playtest', 'year']), scope: 'app:write',

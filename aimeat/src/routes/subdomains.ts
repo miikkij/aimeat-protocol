@@ -14,6 +14,7 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.28.0 — 2026-10-09 — A served app carries the "Use with your AI" mark when it has public app tools or skills.
  *   v1.27.0 — 2026-10-08 — The portfolio and the company page are served with their AI-provenance marks.
  *   v1.26.0 — 2026-10-08 — An app carries the on-page behaviour script unless its owner switched it off (layer D).
  *   v1.25.0 — 2026-10-08 — The owner's own analytics tags (services/visibility/analytics-tags.ts) on the
@@ -131,6 +132,7 @@ import { legalLinksFor } from '../services/app-legal.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
+import { appAiUse } from '../services/app-ai-use.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
 import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage } from '../services/app-seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
@@ -408,7 +410,10 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
     // the meta tags and nothing else) and the head metadata the app almost certainly has none of
     // (measured on a live app origin: lang, canonical, description, og:*, JSON-LD all absent —
     // authors write apps, not meta tags, and author-declared tags always win).
+    // The "Use with your AI" mark rides with the visible chrome a person sees (services/app-ai-use.ts).
+    const aiUse = visible ? await appAiUse(storage, protect.config, app) : null;
     let buf = applyServeMarks(relaxed, {
+      aiUse: aiUse && visible ? { use: aiUse, locale: visible.locale } : undefined,
       // This branch is inside a `text/html` test, so the media type is already settled and the
       // marks pass does not have to guess from a closing tag the author never had to write.
       isDocument: true,

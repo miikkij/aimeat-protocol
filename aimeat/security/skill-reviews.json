@@ -305,7 +305,7 @@
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:2ac7034b0f1463140fca1ae9"
+      "digest": "sha256:12bfe95e1b36417d51c79ffd"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-09-19",
@@ -527,7 +527,7 @@
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "9f1a3901ca43551f"
+      "aimeat/src/routes/skills.ts": "c28ef8d9d26a3b8a"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"

@@ -51,6 +51,7 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.3.0 — 2026-10-09 — The "Use with your AI" mark (utils/app-ai-use-badge.ts), `ai-use`.
  *   v1.2.0 — 2026-10-08 — The owner's analytics tags with their cookie banner (AI visibility layer B)
  *     and the on-page behaviour script (layer D) are marks too: a served copy republished by another
  *     owner would otherwise carry the first owner's analytics ids and counts into the copy.
@@ -60,6 +61,7 @@
  *     publish rather than warned about (it replaces checkServedCopy in app-artifact-lint.ts).
  */
 import { BADGE_MARK } from '../utils/app-badge.js';
+import { AI_USE_MARK } from '../utils/app-ai-use-badge.js';
 import { RESERVE_MARK } from '../utils/app-chrome-reserve.js';
 import { APP_REF_MARK, DISCOVERY_MARK } from '../utils/app-agent-discovery.js';
 import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
@@ -69,7 +71,7 @@ import { BEHAVIOUR_MARK } from './visibility/behaviour-script.js';
 
 /** Which of the node's marks a removal was. One word per block the serve pass writes. */
 export type ServedMarkKind =
-  | 'chrome-reserve' | 'badge' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by'
+  | 'chrome-reserve' | 'badge' | 'ai-use' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by'
   | 'frame-support' | 'owner-tags' | 'behaviour';
 
 /** One kind of mark taken out of an upload, with everything of that kind summed. */
@@ -97,6 +99,7 @@ const BADGE_OPEN = `<div ${BADGE_MARK}>`;
  * opening run it always had, so an app's own link that happens to carry the id is not taken for it.
  */
 const BADGE_V1_OPEN = `<a ${BADGE_MARK} href="https://aimeat.io/" target="_blank" rel="noopener noreferrer" aria-label="`;
+const AI_USE_OPEN = `<div ${AI_USE_MARK}>`;
 const PROVENANCE_OPEN = `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>`;
 const PROVENANCE_LINK_OPEN = '<link rel="ai-provenance" href="';
 const DISCLOSURE_META_OPEN = '<meta name="ai-disclosure" content="';
@@ -128,6 +131,7 @@ const BEHAVIOUR_OPEN = `<script ${BEHAVIOUR_MARK}>`;
 const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string }> = [
   { mark: 'badge', marker: BADGE_MARK, words: 'the aimeat.io attribution badge' },
   { mark: 'chrome-reserve', marker: RESERVE_MARK, words: 'the declaration of the bottom strip the node\'s chrome takes' },
+  { mark: 'ai-use', marker: AI_USE_MARK, words: 'the "Use with your AI" mark' },
   { mark: 'ai-disclosure', marker: PROVENANCE_HTML_MARK, words: 'the AI-disclosure marks (meta, record link, JSON-LD and the attribute on <html>)' },
   { mark: 'ai-label', marker: 'id="aimeat-ai-label"', words: 'the visible AI label' },
   { mark: 'agent-discovery', marker: DISCOVERY_MARK, words: 'the agent-discovery block' },
@@ -239,6 +243,13 @@ function findCuts(text: string): Cut[] {
   for (const at of anchors(BADGE_V1_OPEN)) {
     const end = endOf(at + BADGE_V1_OPEN.length, '</a>');
     if (end > 0) cut('badge', at, end);
+  }
+
+  // The "Use with your AI" mark: one `<div>` with no nested `<div>`; its style and script are raw
+  // text, so the first `</div>` in markup is its end, as for the badge.
+  for (const at of anchors(AI_USE_OPEN)) {
+    const end = endOf(at + AI_USE_OPEN.length, '</div>');
+    if (end > 0) cut('ai-use', at, end);
   }
 
   // The AI-disclosure marks: the JSON-LD carries the id, and the record link and the meta sit

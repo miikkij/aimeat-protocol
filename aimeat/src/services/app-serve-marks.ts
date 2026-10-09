@@ -46,6 +46,9 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.6.0 — 2026-10-09 — `aiUse`: the "Use with your AI" mark (utils/app-ai-use-badge.ts), after the
+ *     badge, in the visitor's language; it counts as visible chrome for the reserve strip. A spec
+ *     without it produces the same bytes, so the goldens are unchanged.
  *   v1.5.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.5.0 — 2026-09-26 — `visibleLabel.publiclyReadable`: the app as served now, for the
  *     reviewer's re-decision of the visible label. Absent means public, so the goldens are unchanged.
@@ -75,9 +78,10 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: the four serve-time injectors become one pass.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Locale } from '../i18n.js';
+import { createT, type Locale } from '../i18n.js';
 import { findOpenTag, injectBeforeClosingTag } from '../utils/html-inject.js';
 import { BADGE_MARK, badgeSnippet } from '../utils/app-badge.js';
+import { AI_USE_MARK, aiUseBadgeSnippet, type AppAiUse } from '../utils/app-ai-use-badge.js';
 import { RESERVE_MARK, reserveSnippet } from '../utils/app-chrome-reserve.js';
 import {
   APP_REF_MARK, DISCOVERY_MARK, agentDiscoverySnippet, appRefSnippet, type AppDiscoverySpec,
@@ -90,6 +94,18 @@ import {
 
 /** The attribute that names the reviewer tag, and the idempotency marker for it. */
 export const REVIEWED_MARK = 'name="aimeat-reviewed-by"';
+
+/** The "Use with your AI" mark in the visitor's language. */
+function aiUseMarkup(use: AppAiUse, locale: Locale): string {
+  const t = createT(locale);
+  return aiUseBadgeSnippet({
+    guideUrl: use.guideUrl,
+    title: t('aiUseBadge.title'),
+    counts: t('aiUseBadge.counts', { tools: use.tools, skills: use.skills }),
+    link: t('aiUseBadge.link'),
+    open: t('aiUseBadge.open'),
+  });
+}
 
 /** Before `</head>` when there is one; else before the body opens; else at the front. */
 function injectIntoHead(html: string, snippet: string): string {
@@ -168,6 +184,12 @@ export interface ServeMarksSpec {
   reviewedBy?: string;
   /** The static agent-discovery block, for an app served on its own origin. */
   discovery?: AppDiscoverySpec;
+  /**
+   * The "Use with your AI" mark (utils/app-ai-use-badge.ts): what services/app-ai-use.ts counted,
+   * and the visitor's language for its words. Absent when there is nothing to use, when the owner
+   * switched it off, or when the caller serves no visible chrome.
+   */
+  aiUse?: { use: AppAiUse; locale: Locale };
   /** The `<head>` metadata the app almost certainly has none of. */
   headMeta?: AppHeadSpec;
   /**
@@ -210,9 +232,10 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     // The reserved-strip contract rides along whenever VISIBLE chrome does (the badge or the AI
     // label): it declares `--aimeat-chrome-bottom` so the app can lift its own bottom UI clear of
     // the marks. Declaration only — an app that ignores it renders exactly as before.
-    const visibleChrome = spec.badge || (spec.provenance && spec.visibleLabel);
+    const visibleChrome = spec.badge || (spec.provenance && spec.visibleLabel) || spec.aiUse;
     if (visibleChrome && !text.includes(RESERVE_MARK)) parts.push(reserveSnippet());
     if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet());
+    if (spec.aiUse && !text.includes(AI_USE_MARK)) parts.push(aiUseMarkup(spec.aiUse.use, spec.aiUse.locale));
     if (spec.provenance && !text.includes(PROVENANCE_HTML_MARK)) {
       const { block, w3c } = aiDisclosureParts(spec.provenance,
         spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined);

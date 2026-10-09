@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-10-09",
+      "kind": "feature",
+      "title": {
+        "en": "Your visitors' own AI can now use your app",
+        "fi": "Kävijän oma tekoäly voi nyt käyttää sovellustasi"
+      },
+      "body": {
+        "en": "When your app has app tools or skills, it now shows a round button beside the AI label. The button tells the visitor that their own AI can use the app, and opens the app's own page. The page lists the tools and the skills, and shows three ways to start: an AI that connects to this service, any chat AI that reads the app's guide and helps the visitor step by step, and a program that calls the tools over HTTP. Anyone can now read the text of a public skill without signing in. You can switch the button off in the app's Marks and authorship. A skill can now be attached only to an app of its own owner, so nobody can put their text under your app.",
+        "fi": "Kun sovelluksellasi on työkaluja tai taitoja, siinä näkyy nyt pyöreä painike tekoälymerkinnän vieressä. Painike kertoo kävijälle, että hänen oma tekoälynsä voi käyttää sovellusta, ja avaa sovelluksen oman sivun. Sivulla ovat sovelluksen työkalut ja taidot sekä kolme tapaa aloittaa: tekoäly, joka yhdistyy tähän palveluun, mikä tahansa keskustelutekoäly, joka lukee sovelluksen oppaan ja neuvoo kävijää vaihe vaiheelta, ja ohjelma, joka kutsuu työkaluja HTTP-pyynnöillä. Julkisen taidon tekstin voi nyt lukea kirjautumatta. Voit piilottaa painikkeen sovelluksen Merkinnät ja tekijyys -kohdasta. Taidon voi nyt liittää vain saman omistajan sovellukseen, joten kukaan ei voi lisätä omaa tekstiään sinun sovelluksesi alle."
+      }
+    },
+    {
+      "date": "2026-10-09",
       "version": "3.25.0",
       "kind": "feature",
       "title": {

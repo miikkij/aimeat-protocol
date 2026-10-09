@@ -1,0 +1,28 @@
+/**
+ * @file use-with-ai.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Layout of the "Use with your AI" page (uwa- prefix, views/use-with-ai.js). The page
+ *   wears the connect story's showroom parts (build-story.css: the head, the title, the numbered
+ *   step; landing-showroom.css: .ld-sh-h2, .ld-sh-text, .ld-sh-box) and the shared shapes of
+ *   poster.css (the chip, the label, the aside, the copy box). This sheet only lays them out: one
+ *   column, since the steps carry no picture, and the list of tools and skills.
+ * @version-history
+ *   v1.0.0 -- 2026-10-09 -- Initial (wish-ai-skill-and-ai-app-tool-badges-on-a-published-app-with-a-pa).
+ */
+.uwa-head, .uwa-step { grid-template-columns: minmax(0, 1fr); }
+.uwa-step .bs-beat-copy { max-width: 52rem; width: 100%; }
+.uwa-step .bs-beat-copy > * { max-width: 100%; }
+
+.uwa-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; }
+.uwa-item { display: flex; flex-direction: column; align-items: flex-start; gap: .35rem; padding: .85rem 0; border-bottom: 1px solid var(--border); }
+.uwa-item:first-child { border-top: 1px solid var(--border); }
+.uwa-item-head { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+.uwa-item-name { font-family: var(--font-mono); font-size: var(--text-md); font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.uwa-item-text { font-family: var(--font-showroom-body); font-size: var(--text-base); line-height: 1.55; color: var(--text-dim); }
+.uwa-skill-text {
+  width: 100%; box-sizing: border-box; margin: .25rem 0 0; max-height: 24rem; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.5;
+}
+.uwa-links { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+.uwa-wait { padding: 3rem 0; }
