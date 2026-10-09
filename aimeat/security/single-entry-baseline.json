@@ -525,9 +525,9 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/extension-manifest.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
+      "src/services/extension-network-hosts.ts": {
+        "count": 2,
+        "why": "Not a scope test: both refuse a hostname wildcard (*.example.com), in a manifest host and in a host field value, because hosts are compared exactly. Moved from extension-manifest.ts with hostRefusal() on 2026-10-09."
       },
       "src/services/iam/define-app-iam.ts": {
         "count": 2,

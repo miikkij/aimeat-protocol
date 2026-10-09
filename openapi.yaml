@@ -43293,6 +43293,50 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/extensions/{name}/config:
+    patch:
+      operationId: setExtensionConfig
+      summary: Change config values of an installed extension
+      description: >-
+        Write the given fields over the extension's stored config, in place: no new version, no
+        reinstall, its memory and status untouched. Only fields its manifest declares; a value is a
+        string, a number or a boolean; a secret field is stored encrypted (503 ENCRYPTION_NOT_CONFIGURED
+        without a node key). A host field (manifest `network.host_fields`) takes one hostname or IPv4
+        address with an optional :port, never a scheme, path, wildcard or list, and an empty string
+        clears it; its host joins the fetch allowlist from the extension's next run on, and
+        `network_hosts` in the answer lists every host it reaches now. A refused value changes nothing
+        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. MCP:
+        aimeat_extension_config_set.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: Extension name }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [config]
+              properties:
+                config:
+                  type: object
+                  description: 'The fields to change, e.g. { "WAZUH_HOST": "wazuh.example.com:9200" }.'
+                  additionalProperties:
+                    oneOf: [{ type: string }, { type: number }, { type: boolean }]
+      responses:
+        '200':
+          description: >-
+            `data` is `{ name, changed: [field], config (secrets masked), network_hosts? }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/extensions/{name}/deactivate:
     post:
       operationId: deactivateExtension
@@ -47394,8 +47438,11 @@ paths:
         The questions a shop asks before a sale, before the customer's node exists. For an install
         bundle, every package it lists, with the bundle's own defaults given, so a field the bundle
         fills is not asked (its value is in `defaults`). Each question names its package, component and
-        field, whether it is required (an app field the install refuses without, or an extension secret),
-        whether it is secret, and for an app field its JSON Schema. Answers go in the install set:
+        field, whether it is required (an app field the install refuses without, an extension secret, or
+        an extension host field the manifest does not mark optional), whether it is secret, `host: true`
+        for an extension host field (manifest `network.host_fields`: the answer is ONE hostname or IPv4
+        address with an optional :port, which joins that install's fetch allowlist), and for an app
+        field its JSON Schema. Answers go in the install set:
         `config.<package>.<component>.<field>`; a secret goes in the secrets file under the same path.
         A listed package this node does not hold is named in `problems`. The package's author or an
         operator, or anyone on this node when the package is public, so an installer answers the
@@ -47409,7 +47456,7 @@ paths:
         '200':
           description: >-
             `data` is `{ group_id, version, bundle, name, questions: [{ package, component, field,
-            kind: app|extension, required, secret, schema? }], defaults, problems }`.
+            kind: app|extension, required, secret, host?, schema? }], defaults, problems }`.
           content:
             application/json:
               schema:

@@ -12,6 +12,8 @@
  *   (buildExtensionRecordFromManifest) + extensions/permissions.ts (write/manage guards).
  * @usage app.use(extensionsRouter(config, storage, scheduler, emailService)) in server.ts
  * @version-history
+ *   v1.5.0 — 2026-10-09 — extensions/config.ts: PATCH /v1/extensions/:name/config sets config values
+ *     of an installed extension in place.
  *   v1.4.0 — 2026-07-13 — Split into extensions/ sibling modules (crud/instances/actions/manifest/
  *     permissions) to satisfy max-file-lines; pure extraction, registration order + behavior preserved.
  *   v1.3.0 — 2026-07-10 — Security (TARGET-020): ownership guard (canManageInstalledExt) on
@@ -33,6 +35,7 @@ import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { registerExtensionCrudRoutes } from './extensions/crud.js';
 import { registerExtensionInstanceRoutes } from './extensions/instances.js';
+import { registerExtensionConfigRoutes } from './extensions/config.js';
 import { registerExtensionActionRoutes } from './extensions/actions.js';
 
 export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler, emailService?: import('../services/email.js').EmailService): Router {
@@ -41,6 +44,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   // Registration order matters (Express matches top-to-bottom): lifecycle/CRUD routes first,
   // then per-instance routes, then the /v1/ext/... action-execution routes.
   registerExtensionCrudRoutes(router, config, storage, scheduler);
+  registerExtensionConfigRoutes(router, config, storage);
   registerExtensionInstanceRoutes(router, config, storage);
   registerExtensionActionRoutes(router, config, storage, emailService);
 

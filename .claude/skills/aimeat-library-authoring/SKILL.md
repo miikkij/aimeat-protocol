@@ -72,7 +72,11 @@ guest receives is missing from that table, so change the table in the same commi
   list from a broad word match on the scripts (`fetch`, `ai`, `email`, `buy`), so a computed name
   gets nothing. The bridge's `__*` globals are deleted before the author's code runs (since 2026-10-05).
   A top-level `network: { hosts: [api.example.com] }` limits `ctx.fetch` to those exact hostnames, a
-  redirect elsewhere included, and the approval lists them (since 2026-10-08).
+  redirect elsewhere included, and the approval lists them (since 2026-10-08). A host that differs
+  per install (a customer's own server) is a config field named in
+  `network: { host_fields: { SERVER_HOST: required } }` (or `optional`): the package's config-needs
+  asks it, its value (one hostname or IPv4, optional `:port`) joins that install's list, and the owner
+  changes it with `aimeat_extension_config_set`, no new version (since 2026-10-09).
 - `aimeat_extension_install` does not upsert: pass `update: true` (it survives the presigned path).
 - **The node does not check `input` against the action's `input` schema.** The schema is published
   for callers and the market; the script checks the fields it reads.

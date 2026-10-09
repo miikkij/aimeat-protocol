@@ -20,6 +20,9 @@
  * @usage
  *   const out = await packageConfigNeeds(storage, config, { owner, isOperator }, groupId);
  * @version-history
+ *   v1.2.0 — 2026-10-09 — An extension host field (manifest `network.host_fields`) is a question with
+ *     `host: true`, required unless the manifest marks it optional. One bundle then asks each buyer
+ *     for their own host (the SOC's Wazuh address).
  *   v1.1.0 — 2026-10-01 — A public package's questions are readable by anyone on this node, so its
  *     installer can answer them first; `questionsOf` is exported for the package sheet.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 5).
@@ -28,6 +31,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { Storage, PackageRecord, InstalledComponent } from '../../../storage/interface.js';
 import { bundleOfPackage } from '../../install-set-spec.js';
 import { planPackageConfig, configPreview } from './package-config.js';
+import type { NetworkHostField } from '../../extension-network-hosts.js';
 
 /** One thing to ask. `package` and `component` place the answer in the install set's config or secrets. */
 export interface ConfigQuestion {
@@ -37,6 +41,8 @@ export interface ConfigQuestion {
     kind: 'app' | 'extension';
     required: boolean;
     secret: boolean;
+    /** An extension host field: the answer is ONE hostname (optional :port) this install's ctx.fetch may reach. */
+    host?: boolean;
     /** The field's JSON Schema, for an app field: type, title, description, enum, format, default. */
     schema?: Record<string, unknown>;
 }
@@ -69,11 +75,18 @@ export function questionsOf(
         }
         const given = new Set(part.given as string[]);
         const secrets = new Set(part.secret_fields as string[]);
+        const hosts = new Map(((part.host_fields ?? []) as NetworkHostField[]).map(h => [h.field, h.required]));
         for (const field of part.fields as string[]) {
             if (given.has(field)) continue;
             // An extension's manifest says which fields are secret but not which are required: a secret
-            // the node cannot hold for the customer is the one thing the install cannot do without.
-            questions.push({ package: pkg.packageGroupId, component, field, kind: 'extension', required: secrets.has(field), secret: secrets.has(field) });
+            // the node cannot hold for the customer is the one thing the install cannot do without. A
+            // host field (manifest network.host_fields) says it: its answer is a host this install
+            // may reach, which nobody but the customer knows.
+            const host = hosts.has(field);
+            questions.push({
+                package: pkg.packageGroupId, component, field, kind: 'extension',
+                required: secrets.has(field) || hosts.get(field) === true, secret: secrets.has(field), ...(host ? { host: true } : {}),
+            });
         }
     }
     return { ok: true, questions };

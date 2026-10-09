@@ -24,6 +24,9 @@
  *   const caps = packageCapabilities(pkg.components, config, owner);
  *   if (caps.carriesCode) ...   // an extension, app, cortex or skill part
  * @version-history
+ *   v1.4.0 — 2026-10-09 — An extension's `network.host_fields` are capabilities
+ *     (`extension:<c>:network-host-field:<field>`): the approval names the field whose value the
+ *     installer sets, never the value. `network_hosts` lists only the author's fixed hosts.
  *   v1.3.0 — 2026-10-08 — An extension's `workspace.rows` and `network.hosts` are capabilities
  *     (`extension:<c>:workspace-rows`, `extension:<c>:network-host:<host>`), shown at approval.
  *   v1.2.0 — 2026-10-05 — An extension's network, ai, email and payments come from
@@ -46,7 +49,8 @@ import { cortexComponentsOf } from '../compose/package-component-collisions.js';
 import { memoryComponentEntries } from './package-memory-component.js';
 import { skillComponentName } from './package-skill-component.js';
 import { appScopesOf } from '../../protected-resource.js';
-import { capabilitiesOfRecord } from '../../extension-capability-declaration.js';
+import { capabilitiesOfRecord, declaredHostsOf } from '../../extension-capability-declaration.js';
+import { hostFieldsOf, type NetworkHostField } from '../../extension-network-hosts.js';
 
 export interface ExtensionCapabilities {
   component: string; name: string; actions: string[];
@@ -56,6 +60,8 @@ export interface ExtensionCapabilities {
   ai_provider_hosts?: string[];
   /** The only hostnames ctx.fetch may reach (manifest network.hosts). Absent: any public address. */
   network_hosts?: string[];
+  /** Config fields whose value the installer sets as one more host (manifest network.host_fields). */
+  network_host_fields?: NetworkHostField[];
   secrets: string[];
   schedules: string[];
 }
@@ -93,6 +99,10 @@ function extensionCapabilities(comp: PackageComponent, config: AimeatConfig, own
   // shows exactly what the scripts will be allowed to do.
   const can = capabilitiesOfRecord(rec);
   const cfg = (rec.config ?? {}) as Record<string, unknown>;
+  // The author's fixed hosts, and the fields the installer answers: never a field's value, which
+  // differs per install and would make one bundle's approval differ per buyer.
+  const declaredHosts = declaredHostsOf(cfg);
+  const hostFields = hostFieldsOf(cfg);
   const ws = cfg[WORKSPACE_DECLARATION_KEY] as { read?: boolean; write?: boolean; rows?: boolean } | undefined;
   const ap = cfg[AI_PROVIDER_DECLARATION_KEY] as { hosts?: string[] } | undefined;
   const schedules = Array.isArray(cfg.__schedules) ? (cfg.__schedules as Array<Record<string, unknown>>) : [];
@@ -105,7 +115,8 @@ function extensionCapabilities(comp: PackageComponent, config: AimeatConfig, own
     email: can.email,
     payments: can.payments,
     ...(ws && (ws.read || ws.write || ws.rows) ? { workspace: { read: !!ws.read, write: !!ws.write, rows: !!ws.rows } } : {}),
-    ...(can.hosts ? { network_hosts: [...can.hosts] } : {}),
+    ...(can.hosts ? { network_hosts: [...(declaredHosts ?? [])] } : {}),
+    ...(hostFields.length ? { network_host_fields: hostFields } : {}),
     ...(ap?.hosts?.length ? { ai_provider_hosts: [...ap.hosts].sort() } : {}),
     secrets: (Array.isArray(cfg[SECRET_KEYS_FIELD]) ? cfg[SECRET_KEYS_FIELD] as string[] : []).slice().sort(),
     schedules: schedules.map(s => `${String(s.action ?? s.action_id ?? s.id ?? '')}@${String(s.cron ?? '')}`).sort(),
@@ -166,6 +177,7 @@ export function packageCapabilities(components: PackageComponent[], config: Aime
     if (e.workspace?.write) items.push(`extension:${e.component}:workspace-write`);
     if (e.workspace?.rows) items.push(`extension:${e.component}:workspace-rows`);
     for (const h of e.network_hosts ?? []) items.push(`extension:${e.component}:network-host:${h}`);
+    for (const f of e.network_host_fields ?? []) items.push(`extension:${e.component}:network-host-field:${f.field}`);
     for (const h of e.ai_provider_hosts ?? []) items.push(`extension:${e.component}:ai-host:${h}`);
     for (const s of e.secrets) items.push(`extension:${e.component}:secret:${s}`);
     for (const s of e.schedules) items.push(`extension:${e.component}:schedule:${s}`);

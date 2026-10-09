@@ -1419,10 +1419,10 @@
      "slug": "g-8-an-extension-names-the-services-it-calls",
      "cells": [
       "<strong>An extension names the services it calls</strong>",
-      "An extension can list the addresses it calls, and then it reaches those and no others, also when a service answers with a redirect elsewhere. The person installing it sees the list before approving.",
-      "manifest <code>network: { hosts: [...] }</code>"
+      "An extension can list the addresses it calls, and then it reaches those and no others, also when a service answers with a redirect elsewhere. The person installing it sees the list before approving. When the address is the customer's own (their own server), the extension names a setting instead: the package asks the customer for that address before the sale or the install, the extension then reaches that one address too, and the owner changes it later from their AI with no new version. One package then serves every customer. Limits: the setting holds one host name or IPv4 address, with an optional port; an address inside a private network is reached only on a node that allows private addresses.",
+      "manifest <code>network: { hosts: [...], host_fields: { FIELD: required\\|optional } }</code>, <code>PATCH /v1/extensions/:name/config</code>, <code>aimeat_extension_config_set</code>"
      ],
-     "plain": "An extension names the services it calls An extension can list the addresses it calls, and then it reaches those and no others, also when a service answers with a redirect elsewhere. The person installing it sees the list before approving. manifest network: { hosts: [...] }"
+     "plain": "An extension names the services it calls An extension can list the addresses it calls, and then it reaches those and no others, also when a service answers with a redirect elsewhere. The person installing it sees the list before approving. When the address is the customer's own (their own server), the extension names a setting instead: the package asks the customer for that address before the sale or the install, the extension then reaches that one address too, and the owner changes it later from their AI with no new version. One package then serves every customer. Limits: the setting holds one host name or IPv4 address, with an optional port; an address inside a private network is reached only on a node that allows private addresses. manifest network: { hosts: [...], host_fields: { FIELD: required\\|optional } }, PATCH /v1/extensions/:name/config, aimeat_extension_config_set"
     },
     {
      "slug": "g-8-extension-hooks",

@@ -2,8 +2,8 @@
  * @file extensions.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description MCP extension tools and resource registrations. Provides 7 tools for extension
- *   lifecycle management (list, invoke, install, activate, deactivate, delete, get) and 1
+ * @description MCP extension tools and resource registrations. Provides 8 tools for extension
+ *   lifecycle management (list, invoke, install, activate, config_set, deactivate, delete, get) and 1
  *   resource template for reading extension details via the MCP resource protocol.
  * @structure
  *   - registerExtensionsTools() — registers all extension tools and resources on an McpServer instance
@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   v2.9.0 — 2026-10-09 — aimeat_extension_config_set (services/extension-config-set.ts).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v2.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -98,6 +99,8 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { setExtensionConfig } from '../services/extension-config-set.js';
+import { toolError } from './tool-error.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -609,6 +612,28 @@ export function registerExtensionsTools(
             } catch (err) {
                 return { content: [{ type: 'text' as const, text: `Failed to activate extension: ${(err as Error).message}` }], isError: true };
             }
+        },
+    );
+
+    // ── aimeat_extension_config_set: PATCH /v1/extensions/:name/config, one service ──
+    mcp.tool(
+        'aimeat_extension_config_set',
+        descriptionFor('aimeat_extension_config_set'),
+        zodShapeFor('aimeat_extension_config_set'),
+        annotationsFor('aimeat_extension_config_set'),
+        async ({ name, config: values }) => {
+            const ext = await storage.getExtension(name);
+            if (!ext || !(await canManageExtensionAs(storage, config, resolveCaller(), ext.installedBy, { action: 'update', subject: name }))) {
+                return { ...toolError('NOT_FOUND', `Extension "${name}" not found`) };
+            }
+            const out = await setExtensionConfig({ storage, config }, ext, values);
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            const hosts = capabilitiesOfRecord(out.record).hosts;
+            return { content: [{ type: 'text' as const, text: JSON.stringify({
+                name, changed: out.changed,
+                config: maskSecretFields(out.record.config, getExtSecretKeys(out.record)),
+                ...(hosts ? { network_hosts: hosts } : {}),
+            }, null, 2) }] };
         },
     );
 

@@ -29,6 +29,7 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.12.1 — 2026-10-09 — An empty host list (a host field not set yet) says so in the refusal.
  *   v1.12.0 — 2026-10-08 — ctx.fetch reaches only `capabilities.hosts` when the manifest names
  *     `network: { hosts }`, refused before any secret is resolved and on every redirect hop.
  *   v1.11.0 — 2026-10-05 — `capabilities` is required: ctx.fetch refuses without `network`, and
@@ -684,7 +685,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 const h = URL.canParse(url) ? new URL(url).hostname.toLowerCase() : null;
                 if (!h || !declaredHosts.includes(h)) {
                     throw new Error(`Fetch blocked: ${h ? `host ${h}` : 'this address'} is not one of the hosts this extension declared `
-                        + `(network.hosts: ${declaredHosts.join(', ')}).`);
+                        + `(${declaredHosts.length ? `network.hosts: ${declaredHosts.join(', ')}` : 'none yet: the owner has not set its host field'}).`);
                 }
             }
             const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);

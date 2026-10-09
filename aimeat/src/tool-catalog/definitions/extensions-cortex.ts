@@ -12,6 +12,8 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.7.0 — 2026-10-09 — aimeat_extension_config_set: change an installed extension's config values
+ *     in place, which is how an owner points a host field (manifest network.host_fields) at a new address.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.6.0 — 2026-10-01 — aimeat_iam_define says what it returns (matrix, extension, apply) and how to
@@ -112,6 +114,19 @@ export const extensionsCortexTools = [
         scope: 'ext:write',
         surfaces: ['appdev'],
         input: { name: { type: 'string', required: true, description: 'Extension name.' } },
+    },
+    {
+        name: 'aimeat_extension_config_set',
+        description: 'Change config values of an installed extension in place: no new version, no reinstall, its memory and status untouched. Give only the fields to change; the answer lists what changed and the extension\'s config, secrets masked. A field the manifest does not declare is refused, and a secret field is stored encrypted. A HOST FIELD (one the manifest names in network.host_fields, e.g. WAZUH_HOST) takes one hostname or IPv4 address with an optional :port, never a scheme, path, wildcard or list; its value is a host the extension may reach from its next run on, and the answer\'s network_hosts lists every host it reaches now. Use it when your owner\'s service moved to a new address. Only the installing owner (or an operator) may change it.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Set Extension Config', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'ext:write',
+        surfaces: ['appdev'],
+        input: {
+            name: { type: 'string', required: true, description: 'Extension name.' },
+            config: { type: 'object', required: true, description: 'The fields to change: { "<field>": value }, e.g. { "WAZUH_HOST": "wazuh.example.com:9200" }. A value is a string, a number or a boolean; an empty string clears a host field.', zod: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) },
+        },
     },
     {
         name: 'aimeat_extension_get',
