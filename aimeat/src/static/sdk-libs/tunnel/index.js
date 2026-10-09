@@ -3,7 +3,8 @@
  * @description The aimeat-tunnel library (SDK-libs migration Phase 2). Exposes AIMEAT.tunnel — an
  *   auto-reconnecting WebSocket tunnel between a personal node and the operator: heartbeat with
  *   dead-connection detection, request/response handling, mailbox sync + ack, exponential-backoff
- *   reconnect with jitter, and status callbacks. Over the AIMEAT.auth session (jwt in the ws URL).
+ *   reconnect with jitter, and status callbacks. Over the AIMEAT.auth session: each connect POSTs
+ *   /v1/ws/ticket with the session jwt and opens the socket with the single-use ?ticket=.
  *   Componentized ESM source esbuild bundles to the IIFE served, unchanged, at /v1/libs/aimeat-tunnel.js.
  *   Ported verbatim from lib-tunnel.ts; NODE_URL + the default heartbeat interval come from _core/config.
  * @structure imports NODE_URL/HEARTBEAT_MS (config) + getSession (session) + attach (namespace);
@@ -11,6 +12,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-tunnel.js"></script>
  *   const tunnel = AIMEAT.tunnel.connect({ onRequest, onMailbox });
  * @version-history
+ *   v1.1.0 — 2026-10-09 — The session jwt no longer goes in the socket URL (?token=), where reverse
+ *     proxies logged it (secrets audit 2026-10-09, d3): each connect and reconnect mints a single-use
+ *     ticket (POST /v1/ws/ticket) and opens with ?ticket=. A refused ticket goes offline and backs off.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-tunnel.ts (SDK-libs migration Phase 2).
  */
 import { NODE_URL, HEARTBEAT_MS } from '../_core/config.js';
@@ -64,13 +68,46 @@ TunnelClient.prototype._setStatus = function (status) {
   }
 };
 
+/**
+ * POST /v1/ws/ticket for a single-use personal-tunnel ticket, minted with the session token. The
+ * token itself never goes in the socket URL, which reverse proxies write to their access logs.
+ * @param {string} jwt
+ * @returns {Promise<string>} the ticket
+ */
+function socketTicket(jwt) {
+  return fetch(NODE_URL + '/v1/ws/ticket', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ socket: 'personal-tunnel' }),
+  }).then(function (res) {
+    return res.json().catch(function () { return null; }).then(function (json) {
+      if (!res.ok || !json || !json.ok) {
+        throw new Error((json && json.error && json.error.message) || ('Socket ticket refused (HTTP ' + res.status + ')'));
+      }
+      return json.data.ticket;
+    });
+  });
+}
+
 TunnelClient.prototype.connect = function () {
   if (this._closed) return;
 
   this._setStatus('connecting');
 
   var session = getSession();
-  var wsUrl = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel?token=' + encodeURIComponent(session.jwt);
+  var self = this;
+  socketTicket(session.jwt).then(function (ticket) {
+    if (self._closed) return;
+    self._open(NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel?ticket=' + encodeURIComponent(ticket));
+  }, function (e) {
+    if (self._closed) return;
+    self._setStatus('offline');
+    if (self._opts.onError) self._opts.onError(e);
+    self._scheduleReconnect();
+  });
+};
+
+TunnelClient.prototype._open = function (wsUrl) {
   var self = this;
 
   try {

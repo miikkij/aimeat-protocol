@@ -10,6 +10,8 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-10-09 — realtime aiDoc and changelog: connect() opens the socket with a single-use ticket
+ *     (POST /v1/ws/ticket), never the session token in the URL (secrets audit 2026-10-09, d3).
  *   2026-10-09 — NEW hls pack (hls.js 1.7.3, /lib/hls@1/), in ./vendored-media.ts (800-line rule):
  *     HLS playback in a <video> element where the browser has none of its own (wish-tv-opas).
  *   2026-09-26 — pdfjs aiDoc: ctx.fetch reads at most 4 MB of one answer and throws
@@ -638,6 +640,10 @@ export const VENDORED_PACKS: LibraryPack[] = [
       "arrive before a handler exists are not replayed. Only 'joined' is: a handler added after the",
       'join is called with it. Anything you broadcast while the socket is still opening is queued',
       'and sent when it opens (since realtime.js v1.3.0).',
+      'connect() trades the session token for a single-use ticket (POST /v1/ws/ticket) before it opens',
+      'the socket, so the token never appears in a URL; it returns a promise you may await, and a refused',
+      "ticket arrives as 'error' then 'close'. A hand-written WebSocket does the same: POST /v1/ws/ticket",
+      "{ socket: 'realtime' } and connect with &ticket=, never &token= (deprecated, removed in 4.0.0).",
       'Rooms over HTTP first: await rt.createRoom({ app_type, name, is_public, max_peers, tags }) →',
       'room.id; await rt.listRooms({ app_type }) → rooms[]. Find-or-create by app_type and pick the',
       'LOWEST room id so concurrent creators converge on one room. Then rt.connect(room.id, nick).',
@@ -661,6 +667,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
       { version: '1', date: '2026-03-03', summary: 'Initial AIMEAT-authored realtime client at /lib/realtime.js (WS rooms + WebRTC + Yjs).' },
       { version: '1', date: '2026-07-18', summary: 'Added SharedClock (window.SharedClock) — a network-synced t0 timeline (start/stop/step/onStep, adopt, setBpm re-anchor, transport/sync-state payloads). Additive; existing AimeatRealtime API unchanged. Extracted from the Band Jam app pattern.' },
       { version: '1', date: '2026-07-19', summary: 'Constructor also accepts an options object ({ session } or { baseUrl, token }) — additive sugar; the positional (baseUrl, token) form is unchanged and existing apps are unaffected. ai_doc corrected: it previously showed a {session}-only constructor that did not exist (pitfall realtime/aimeatrealtime-constructor-is-baseurl-token), and now documents the full event list and find-or-create room guidance.' },
+      { version: '1', date: '2026-10-09', summary: 'connect() no longer puts the session token in the socket URL, where reverse proxies logged it: it POSTs /v1/ws/ticket for a single-use 60-second ticket and connects with ?ticket=. connect() now returns a promise (it never rejects; a refused ticket emits error then close), and frames sent while the ticket is fetched are queued like frames sent while the socket opens. Existing apps need no change.' },
     ],
     demoTemplateId: 'comp-realtime-room',
     tierHint: 'T1',

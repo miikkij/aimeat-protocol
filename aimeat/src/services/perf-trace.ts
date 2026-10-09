@@ -19,6 +19,8 @@
  *   app.use(perfTraceMiddleware(config.perfTrace));            // outermost middleware
  *   curl -D - 'http://localhost:40050/v1/memory?trace=1' -H 'authorization: Bearer …'  # see X-Aimeat-Perf
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The log line names the request path without its query string, which can
+ *     carry a credential (secrets audit 2026-10-09, d3).
  *   v1.0.0 — 2026-07-14 — Initial per-request storage profiler (perf audit follow-up).
  *   v1.1.0 — 2026-07-14 — Config-driven: gate on config.perfTrace passed in, instead of reading
  *     process.env directly (which could be read before .env was applied). Same mechanism as every
@@ -156,8 +158,10 @@ export function perfTraceMiddleware(enabled: boolean): RequestHandler {
       return origWriteHead(...args);
     };
     // Log independently of the header (survives header stripping by a reverse proxy). `finish` always
-    // fires once the response is fully sent. Plain string — the logger does NOT do printf %s.
-    res.on('finish', () => logger.info(`[perf] ${req.method} ${req.originalUrl} — ${summarize(store)}`));
+    // fires once the response is fully sent. Plain string — the logger does NOT do printf %s. The path
+    // only, never originalUrl: a query string can carry a credential (?ticket=, ?code=, the deprecated
+    // ?token=), and this line goes to the node log (secrets audit 2026-10-09, d3).
+    res.on('finish', () => logger.info(`[perf] ${req.method} ${store.path} — ${summarize(store)}`));
 
     als.run(store, () => next());
   };

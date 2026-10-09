@@ -5,6 +5,10 @@
  * @description AimeatRealtime — browser client for AIMEAT P2P realtime rooms (WS rooms +
  *   WebRTC data channels + Yjs CRDT sync) and SharedClock (network-synced timeline).
  * @version-history
+ *   v1.4.0 — 2026-10-09 — connect() no longer puts the session token in the socket URL, where reverse
+ *     proxies logged it (secrets audit 2026-10-09, d3): it POSTs /v1/ws/ticket for a single-use
+ *     ticket and connects with ?ticket=. connect() now returns a promise (it never rejects); frames
+ *     sent while the ticket is fetched are queued like frames sent while the socket opens.
  *   v1.3.0 — 2026-09-13 — Frames sent while the socket is still opening are queued and sent on open
  *     instead of dropped, and a 'joined' handler registered after the join is called with it. The
  *     usage example below had shown connect() before on() and broadcast(), the order that lost both.
@@ -57,6 +61,10 @@ class AimeatRealtime {
     // arrived; and the frames sent while the socket was still opening, sent once it opens.
     this._lastJoined = null;
     this._outbox = [];
+    // connect() counter and "fetching the socket ticket" flag: a frame sent meanwhile is queued, and
+    // a ticket that arrives after disconnect() or a newer connect() opens nothing.
+    this._attempt = 0;
+    this._opening = false;
     // WebRTC state
     this._peerConnections = new Map(); // peerId → { pc, dataChannel, iceServers }
     this._iceServers = null;
@@ -124,17 +132,53 @@ class AimeatRealtime {
 
   // ── WebSocket connection ──
 
+  /**
+   * Join a room. The session token never goes in the socket URL, which reverse proxies log: with a
+   * token, the client first POSTs /v1/ws/ticket for a single-use 60-second ticket and connects with
+   * ?ticket=. Without a token (anonymous mode) it connects bare. Returns a promise that resolves once
+   * the socket is being opened; it never rejects, a failure arrives as 'error' and 'close' events.
+   * Frames sent before the socket opens are queued, as before.
+   */
   connect(roomId, nick = 'anonymous') {
-    if (this.ws) this.disconnect();
+    if (this.ws || this._opening) this.disconnect();
 
     this.roomId = roomId;
-    const protocol = this.baseUrl.startsWith('https') ? 'wss' : 'ws';
-    const host = this.baseUrl.replace(/^https?:\/\//, '');
-    const url = `${protocol}://${host}/v1/realtime/ws?room=${encodeURIComponent(roomId)}&token=${encodeURIComponent(this.token)}&nick=${encodeURIComponent(nick)}`;
-
-    this.ws = new WebSocket(url);
     this._lastJoined = null;
     this._outbox = [];
+    const attempt = ++this._attempt;
+    this._opening = true;
+    const protocol = this.baseUrl.startsWith('https') ? 'wss' : 'ws';
+    const host = this.baseUrl.replace(/^https?:\/\//, '');
+    const base = `${protocol}://${host}/v1/realtime/ws?room=${encodeURIComponent(roomId)}&nick=${encodeURIComponent(nick)}`;
+
+    const ticket = this.token ? this._socketTicket() : Promise.resolve(null);
+    return ticket.then((t) => {
+      if (attempt !== this._attempt) return; // disconnect() or a newer connect() came first
+      this._opening = false;
+      this._open(t ? `${base}&ticket=${encodeURIComponent(t)}` : base);
+    }, (err) => {
+      if (attempt !== this._attempt) return;
+      this._opening = false;
+      this._outbox = [];
+      this._emit('error', { error: err });
+      this._emit('close', { code: 4401, reason: err && err.message ? err.message : 'ticket refused' });
+    });
+  }
+
+  /** POST /v1/ws/ticket: a single-use ticket for the realtime socket, minted with the session token. */
+  async _socketTicket() {
+    const res = await fetch(`${this.baseUrl}/v1/ws/ticket`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ socket: 'realtime' }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json || !json.ok) throw new Error((json && json.error && json.error.message) || `Socket ticket refused (HTTP ${res.status})`);
+    return json.data.ticket;
+  }
+
+  _open(url) {
+    this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       // What the app sent before the socket finished opening goes out now, in order.
@@ -164,6 +208,9 @@ class AimeatRealtime {
   }
 
   disconnect() {
+    // A connect() still waiting for its ticket opens nothing once this has run.
+    this._attempt++;
+    this._opening = false;
     if (this.ws) {
       this.ws.close();
       this.ws = null;
@@ -356,8 +403,9 @@ class AimeatRealtime {
   _send(msg) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
-    } else if (this.ws && this.ws.readyState === WebSocket.CONNECTING && this._outbox.length < 200) {
-      // Sent before the socket opened: kept and sent on open instead of dropped in silence.
+    } else if ((this._opening || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) && this._outbox.length < 200) {
+      // Sent before the socket opened (or while its ticket is being fetched): kept and sent on open
+      // instead of dropped in silence.
       this._outbox.push(msg);
     }
   }

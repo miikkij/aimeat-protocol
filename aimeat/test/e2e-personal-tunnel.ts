@@ -32,6 +32,11 @@
  *   heartbeat timeout.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-personal-tunnel
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The socket opens with a ticket (POST /v1/ws/ticket, then ?ticket=), as the SDK
+ *     lib now does, never with the session token in the URL (secrets audit 2026-10-09, d3). New: a spent
+ *     ticket is 401 INVALID_TICKET, a realtime ticket is 401 TICKET_WRONG_SOCKET, the header still opens
+ *     it, ?token= still opens it on a default node, and the self-spawned node runs with
+ *     AIMEAT_WS_QUERY_TOKEN=false and refuses ?token= with 401 WS_QUERY_TOKEN_DISABLED.
  *   v1.1.0 — 2026-09-24 — An agent of the anchored owner is refused the tunnel (403): the upgrade now
  *     asks isOwnerPrincipal, as the anchor door asks requireRole('owner'). It failed on the source,
  *     where the agent's token opened the socket (secaudit 2026-09, found in verification).
@@ -126,14 +131,25 @@ class HomeNodeSocket {
     closeCode: number | null = null;
     closeReason = '';
 
-    static connect(base: string, token: string): Promise<HomeNodeSocket> {
-        const c = new HomeNodeSocket();
-        return c.open(base, token);
+    /**
+     * Open the tunnel the way the SDK lib does: POST /v1/ws/ticket with the session token, then the
+     * upgrade with ?ticket=. The session token itself never goes in the URL.
+     */
+    static async connect(base: string, token: string): Promise<HomeNodeSocket> {
+        return HomeNodeSocket.connectWith(base, { ticket: await mintTunnelTicket(base, token) });
     }
 
-    private open(base: string, token: string): Promise<HomeNodeSocket> {
-        const url = `${base.replace(/^http/, 'ws').replace(/\/+$/, '')}/v1/personal/tunnel?token=${encodeURIComponent(token)}`;
-        this.ws = new WebSocket(url);
+    /** Open the tunnel with one named credential: a ticket, the deprecated ?token=, or a bearer header. */
+    static connectWith(base: string, cred: { ticket: string } | { queryToken: string } | { header: string }): Promise<HomeNodeSocket> {
+        const c = new HomeNodeSocket();
+        const root = `${base.replace(/^http/, 'ws').replace(/\/+$/, '')}/v1/personal/tunnel`;
+        if ('ticket' in cred) return c.open(`${root}?ticket=${encodeURIComponent(cred.ticket)}`);
+        if ('queryToken' in cred) return c.open(`${root}?token=${encodeURIComponent(cred.queryToken)}`);
+        return c.open(root, { Authorization: `Bearer ${cred.header}` });
+    }
+
+    private open(url: string, headers: Record<string, string> = {}): Promise<HomeNodeSocket> {
+        this.ws = new WebSocket(url, { headers });
         return new Promise((resolve, reject) => {
             let settled = false;
             this.ws.on('message', (data) => {
@@ -144,7 +160,8 @@ class HomeNodeSocket {
             });
             // The upgrade is refused with a bare status line, which ws hands over here.
             this.ws.on('unexpected-response', (_req, res) => {
-                if (!settled) { settled = true; reject(new Error(`HTTP ${res.statusCode}`)); }
+                const code = String(res.headers['x-aimeat-error'] ?? '');
+                if (!settled) { settled = true; reject(new Error(`HTTP ${res.statusCode}${code ? ` ${code}` : ''}`)); }
             });
             this.ws.on('error', (err) => {
                 if (!settled) { settled = true; reject(err); }
@@ -201,6 +218,26 @@ class HomeNodeSocket {
         const start = Date.now();
         while (this.closeCode === null && Date.now() - start < 3000) await sleep(20);
     }
+}
+
+/** POST /v1/ws/ticket for the personal tunnel; throws with the status when the node will not mint. */
+async function mintTunnelTicket(base: string, token: string, socket = 'personal-tunnel'): Promise<string> {
+    const r = await api(base)('/v1/ws/ticket', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ socket }),
+    });
+    if (r.status !== 200 || typeof r.body?.data?.ticket !== 'string') throw new Error(`ticket mint HTTP ${r.status} ${JSON.stringify(r.body?.error ?? r.body)}`);
+    return r.body.data.ticket as string;
+}
+
+/** Open, expect a refusal, and return its text ("HTTP 401 INVALID_TICKET"), or 'opened'. */
+async function refusalOf(open: () => Promise<HomeNodeSocket>): Promise<string> {
+    try {
+        const s = await open();
+        openSockets.push(s);
+        return 'opened';
+    } catch (err) { return (err as Error).message; }
 }
 
 /** Poll a JSON call until `check` holds, or give up and let the caller assert on the last answer. */
@@ -318,7 +355,7 @@ async function sharedNodePhases() {
         assert(status.includes('401'), `a tokenless upgrade must be 401, got ${status}`);
     });
 
-    await test('a valid owner with NO anchored node is refused with 403', async () => {
+    await test('a valid owner with NO anchored node is refused with 403: the stranger\'s ticket acts as the stranger, never as the anchored owner', async () => {
         let refusal = 'opened';
         try {
             const s = await HomeNodeSocket.connect(BASE, strangerToken);
@@ -326,6 +363,32 @@ async function sharedNodePhases() {
         } catch (err) { refusal = (err as Error).message; }
         assert(refusal.includes('403'),
             `a token is not enough: the tunnel is for an anchored node, expected 403, got ${refusal}`);
+    });
+
+    await test('a ticket is spent on first use: the second upgrade with it is 401 INVALID_TICKET', async () => {
+        const ticket = await mintTunnelTicket(BASE, ownerToken);
+        const first = await HomeNodeSocket.connectWith(BASE, { ticket });
+        openSockets.push(first);
+        const replay = await refusalOf(() => HomeNodeSocket.connectWith(BASE, { ticket }));
+        assert(replay === 'HTTP 401 INVALID_TICKET', `a spent ticket must be refused, got "${replay}"`);
+        assert(first.isOpen, 'the refused replay must not replace the socket the ticket opened');
+        // Leave the mailbox item for Phase 3: a disconnect frame closes without acknowledging it.
+        first.send({ type: 'disconnect', id: `dc-${stamp}-ticket`, timestamp: new Date().toISOString() });
+        await first.waitClosed();
+    });
+
+    await test('a ticket minted for a realtime room does not open the personal tunnel (401 TICKET_WRONG_SOCKET)', async () => {
+        const ticket = await mintTunnelTicket(BASE, ownerToken, 'realtime');
+        const refusal = await refusalOf(() => HomeNodeSocket.connectWith(BASE, { ticket }));
+        assert(refusal === 'HTTP 401 TICKET_WRONG_SOCKET', `a realtime ticket opened the tunnel or failed otherwise: "${refusal}"`);
+    });
+
+    await test('the session token in an Authorization header still opens the tunnel', async () => {
+        const s = await HomeNodeSocket.connectWith(BASE, { header: ownerToken });
+        openSockets.push(s);
+        assert(s.isOpen, 'the header path must open the tunnel');
+        s.send({ type: 'disconnect', id: `dc-${stamp}-header`, timestamp: new Date().toISOString() });
+        await s.waitClosed();
     });
 
     await test('an agent of the owner is refused with 403: the tunnel is the owner\'s own, as its anchor door is', async () => {
@@ -501,6 +564,14 @@ async function sharedNodePhases() {
         await second.close();
     });
 
+    await test('the deprecated ?token= still opens the tunnel while AIMEAT_WS_QUERY_TOKEN is on (the 3.x default)', async () => {
+        const s = await HomeNodeSocket.connectWith(BASE, { queryToken: ownerToken });
+        openSockets.push(s);
+        await s.waitFor('mailbox_sync');
+        assert(s.isOpen, 'a query token must still open the tunnel on a node with the default setting');
+        await s.close();
+    });
+
     // ─── Phase 8: Deregistering closes the socket ───
     console.log('Phase 8 — Deregister closes the tunnel');
 
@@ -569,6 +640,8 @@ async function startHeartbeatNode(): Promise<void> {
             // threshold that still gives a degraded tick before the timeout tick.
             AIMEAT_PERSONAL_HEARTBEAT_MS: '10000',
             AIMEAT_PERSONAL_OFFLINE_MS: '12000',
+            // The 4.0.0 behaviour, read at start: this node refuses a session token in the upgrade URL.
+            AIMEAT_WS_QUERY_TOKEN: 'false',
             AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000', AIMEAT_RL_MEMORY: '1000',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -619,6 +692,10 @@ async function heartbeatMonitorPhase() {
             }),
         });
         assert(anchor.status === 201, `anchor ${anchor.status}: ${JSON.stringify(anchor.body)}`);
+        // Started with AIMEAT_WS_QUERY_TOKEN=false: the token in the URL is refused by name, and the
+        // ticket below is what opens the socket.
+        const refusal = await refusalOf(() => HomeNodeSocket.connectWith(HB_BASE, { queryToken: hbToken }));
+        assert(refusal === 'HTTP 401 WS_QUERY_TOKEN_DISABLED', `a query token on a node with it switched off: "${refusal}"`);
         silent = await HomeNodeSocket.connect(HB_BASE, hbToken);
         openSockets.push(silent);
         const welcome = JSON.parse(silent.frames.find(f => f.type === 'welcome')!.payload!);

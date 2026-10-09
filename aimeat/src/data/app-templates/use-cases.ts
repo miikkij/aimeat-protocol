@@ -7,6 +7,8 @@
  *   {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII. Consumed by ../app-templates.ts.
  * @structure USECASE_REALTIME_SOCIAL · USECASE_MARKETPLACE · USECASE_HOMEPAGE · USECASE_APP_IAM
  * @version-history
+ *   v1.3.0 — 2026-10-09 — USECASE_REALTIME_SOCIAL opens the room socket with a single-use ticket
+ *     (POST /v1/ws/ticket) instead of the session JWT in the URL (secrets audit 2026-10-09, d3).
  *   v1.2.0 — 2026-10-01 — USECASE_APP_IAM: roles as a map of role to capabilities, so an approved
  *     member holds "use" and sees the members-only section; a closing-tag order fixed.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: USECASE_HOMEPAGE ships the AI disclosure wired —
@@ -60,7 +62,7 @@ entry: index.html
   <script src="/v1/libs/aimeat-auth.js"></script>
   <script src="/v1/libs/aimeat-data.js"></script>
   <script>
-    // Realtime protocol (server-defined): connect ws with ?room=&token=&nick=, send { type:'chat',
+    // Realtime protocol (server-defined): connect ws with ?room=&ticket=&nick=, send { type:'chat',
     // payload }, receive { type:'chat', sender, payload } broadcast to all (incl. sender). Presence
     // via { type:'joined', peers:[{nick}] } + { type:'participant', action:'join'|'leave', name }.
     var FEED_KEY = '{{app}}.feed.';     // durable history (loaded after login — memory search needs auth)
@@ -99,8 +101,10 @@ entry: index.html
       document.getElementById('composer').hidden = false;
       loadHistory();   // durable history (needs auth)
       var room = (await session.fetch('/v1/realtime/rooms', { method: 'POST', body: JSON.stringify({ name: ROOM }) })).data;
-      // ws_url already has ?room=ID; the WebSocket can't set headers, so pass the JWT + nick as query.
-      var wsUrl = location.origin.replace(/^http/, 'ws') + room.ws_url + '&token=' + encodeURIComponent(s.jwt) + '&nick=' + encodeURIComponent(me);
+      // ws_url already has ?room=ID. A browser WebSocket can't set headers, and a JWT in the URL ends up
+      // in proxy logs, so trade it for a single-use 60-second ticket and pass that + nick as query.
+      var ticket = (await session.fetch('/v1/ws/ticket', { method: 'POST', body: JSON.stringify({ socket: 'realtime' }) })).data.ticket;
+      var wsUrl = location.origin.replace(/^http/, 'ws') + room.ws_url + '&ticket=' + encodeURIComponent(ticket) + '&nick=' + encodeURIComponent(me);
       ws = new WebSocket(wsUrl);
       ws.onmessage = function (e) {
         var d = JSON.parse(e.data);

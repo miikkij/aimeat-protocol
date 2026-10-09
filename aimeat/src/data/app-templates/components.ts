@@ -11,6 +11,9 @@
  *   COMP_MERMAID_DIAGRAM · COMP_THREE_SCENE · COMP_P5_SKETCH · COMP_PIXI_STAGE · COMP_PHASER_ARCADE ·
  *   COMP_FLOW_EDITOR
  * @version-history
+ *   v1.5.0 — 2026-10-09 — COMP_REALTIME_ROOM opens the socket with a single-use ticket (POST
+ *     /v1/ws/ticket). It opened with no credential, which a node with anonymous mode off refuses (401),
+ *     and the alternative an app would reach for was the JWT in the URL (secrets audit 2026-10-09, d3).
  *   v1.4.0 — 2026-10-01 — COMP_PUBLIC_INTAKE shares the app's own page with ?form=<form id>, the
  *     link the kit's intakeAdmin copies and intakeForm reads. It handed out '/f/<org>/<ws>/<form>',
  *     which no route serves, so a link from an app built on it answered 404.
@@ -165,7 +168,9 @@ async function uploadImage(file) {
 export const COMP_REALTIME_ROOM = `// realtime-room — live presence + messages over a shared room (no backend to run).
 async function joinRoom(name, onMessage) {
   var room = (await session.fetch('/v1/realtime/rooms', { method: 'POST', body: JSON.stringify({ name: name }) })).data; // { id, ws_url }
-  var ws = new WebSocket(location.origin.replace(/^http/, 'ws') + room.ws_url);
+  // A WebSocket can't send a header: a single-use ticket stands in for the session (never the JWT in the URL).
+  var ticket = (await session.fetch('/v1/ws/ticket', { method: 'POST', body: JSON.stringify({ socket: 'realtime' }) })).data.ticket;
+  var ws = new WebSocket(location.origin.replace(/^http/, 'ws') + room.ws_url + '&ticket=' + encodeURIComponent(ticket));
   ws.onmessage = function (e) { onMessage(JSON.parse(e.data)); };
   return { send: function (msg) { ws.send(JSON.stringify(msg)); }, ws: ws };
 }

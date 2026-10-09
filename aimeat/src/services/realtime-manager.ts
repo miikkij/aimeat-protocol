@@ -25,6 +25,9 @@
  *     (runAsNode, utils/gaii.ts), also in a process that serves more than one node. One node per
  *     process in production, so nothing there changes.
  *   v1.4.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
+ *   v1.5.0 — 2026-10-09 — The federation relay sends the remote node's token in an Authorization
+ *     header on the upgrade instead of ?token= in the URL (secrets audit 2026-10-09, d3); the room id
+ *     and nick in the URL are encoded.
  */
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
@@ -676,11 +679,14 @@ export class RealtimeManager {
     const relayKey = `${localRoomId}:${remoteRoomId}`;
     if (this.federatedRelays.has(relayKey)) return true; // Already connected
 
-    // Connect to remote WS (dynamic import to avoid bundling issues)
-    const wsUrl = remoteNodeUrl.replace(/^http/, 'ws') + `/v1/realtime/ws?room=${remoteRoomId}&token=${encodeURIComponent(token)}&nick=relay:${this.config.nodeId}`;
+    // Connect to remote WS (dynamic import to avoid bundling issues). The token is one the REMOTE node
+    // issued, and it travels in the Authorization header: in the URL it was written to the remote
+    // reverse proxy's access log (secrets audit 2026-10-09, d3). A node-side client can set a header,
+    // so it needs no ticket, and every node version accepts the header on this upgrade.
+    const wsUrl = remoteNodeUrl.replace(/^http/, 'ws') + `/v1/realtime/ws?room=${encodeURIComponent(remoteRoomId)}&nick=${encodeURIComponent(`relay:${this.config.nodeId}`)}`;
 
     import('ws').then(({ default: WsConstructor }) => {
-      const remoteWs = new WsConstructor(wsUrl);
+      const remoteWs = new WsConstructor(wsUrl, { headers: { Authorization: `Bearer ${token}` } });
 
       remoteWs.on('open', () => {
         this.federatedRelays.set(relayKey, remoteWs);

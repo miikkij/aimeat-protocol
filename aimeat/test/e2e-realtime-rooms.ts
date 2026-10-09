@@ -21,6 +21,11 @@
  *   9 the idle reaper.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-realtime-rooms
  * @version-history
+ *   v1.2.0 — 2026-10-09 — Phase 2b, the socket ticket (secrets audit 2026-10-09, d3): POST /v1/ws/ticket
+ *     opens a room once and a spent ticket is 401 INVALID_TICKET; a personal-tunnel ticket is 401
+ *     TICKET_WRONG_SOCKET here; ?token= still works and is counted in /v1/stats while
+ *     security.ws_query_token is on, and is 401 WS_QUERY_TOKEN_DISABLED when it is off. The federation
+ *     relay is shown, against a stand-in remote, to send its token as a bearer header and not in the URL.
  *   v1.1.0 — 2026-10-09 — ice-servers: the TURN credential is derived from AIMEAT_TURN_SECRET, expires
  *     within the TTL, matches an HMAC computed here, and the secret appears in no response.
  *   v1.0.0 — 2026-09-08 — Initial. First suite in the repo to open a realtime socket.
@@ -181,6 +186,14 @@ class Sock {
  * destroyed socket sometimes into ECONNRESET instead.
  */
 function upgradeStatus(query: string): Promise<number> {
+    return upgradeAnswer(query).then(a => a.status);
+}
+
+/**
+ * The status of an upgrade and the refusal code the node names in its X-AIMEAT-Error header, for the
+ * refusals that say why (a spent ticket, a ticket for another socket, a query token switched off).
+ */
+function upgradeAnswer(query: string, headers: Record<string, string> = {}): Promise<{ status: number; code: string }> {
     return new Promise((resolve, reject) => {
         const req = httpRequest(`${BASE}/v1/realtime/ws?${query}`, {
             headers: {
@@ -188,14 +201,29 @@ function upgradeStatus(query: string): Promise<number> {
                 Upgrade: 'websocket',
                 'Sec-WebSocket-Key': randomBytes(16).toString('base64'),
                 'Sec-WebSocket-Version': '13',
+                ...headers,
             },
         });
         const timer = setTimeout(() => { req.destroy(); reject(new Error('upgrade timed out')); }, 8000);
-        req.on('response', res => { clearTimeout(timer); res.resume(); resolve(res.statusCode ?? 0); });
-        req.on('upgrade', (res, socket) => { clearTimeout(timer); socket.destroy(); resolve(res.statusCode ?? 101); });
+        const codeOf = (h: Record<string, unknown>) => String(h['x-aimeat-error'] ?? '');
+        req.on('response', res => { clearTimeout(timer); res.resume(); resolve({ status: res.statusCode ?? 0, code: codeOf(res.headers) }); });
+        req.on('upgrade', (res, socket) => { clearTimeout(timer); socket.destroy(); resolve({ status: res.statusCode ?? 101, code: '' }); });
         req.on('error', err => { clearTimeout(timer); reject(err); });
         req.end();
     });
+}
+
+/** POST /v1/ws/ticket: a single-use ticket for one socket kind, minted by the caller's bearer. */
+async function mintTicket(socket: string, headers: Record<string, string>) {
+    return json('/v1/ws/ticket', { method: 'POST', headers, body: JSON.stringify({ socket }) });
+}
+
+/** How many upgrades this node has accepted with ?token= on a socket kind (GET /v1/stats). */
+async function queryTokenUses(kind: string): Promise<number> {
+    const { body } = await json('/v1/stats', { headers: authA() });
+    const byType = body?.data?.ws_query_token_by_type;
+    if (!byType || typeof byType !== 'object') throw new Error(`GET /v1/stats carries no ws_query_token_by_type: ${JSON.stringify(Object.keys(body?.data ?? {}))}`);
+    return Number(byType[kind] ?? 0);
 }
 
 // ─── State ───
@@ -417,6 +445,99 @@ await test('ws upgrade — a valid owner token is accepted, in a room of its own
         if (status !== 404) await sleep(50);
     }
     assert(status === 404, `the room must go with its last peer, still ${status}`);
+});
+
+// ─── Phase 2b: The socket ticket (secrets audit 2026-10-09, d3) ───
+//
+// A session token in the upgrade URL lands in every reverse proxy's access log. A client now POSTs
+// for a single-use ticket and puts that in the URL instead; ?token= stays, deprecated, behind
+// security.ws_query_token, and each use of it is counted so the switch-off can be decided on data.
+console.log('\nPhase 2b — Socket tickets');
+
+await test('POST /v1/ws/ticket — a realtime ticket for an owner: single-use, 60 seconds', async () => {
+    const { status, body } = await mintTicket('realtime', authA());
+    assert(status === 200, `mint: ${status} ${JSON.stringify(body)}`);
+    assert(typeof body.data.ticket === 'string' && body.data.ticket.length >= 32, `ticket: ${body.data.ticket}`);
+    assert(body.data.expires === 60, `expires: ${body.data.expires}`);
+    assert(body.data.socket === 'realtime', `socket: ${body.data.socket}`);
+    assert(!JSON.stringify(body).includes(ownerA.token), 'the ticket answer must not echo the session token');
+});
+
+await test('POST /v1/ws/ticket — refused without a credential (401) and for a socket kind that does not exist (400)', async () => {
+    const res = await fetch(`${BASE}/v1/ws/ticket`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ socket: 'realtime' }),
+    });
+    await res.text();
+    assert(res.status === 401, `an anonymous mint must be 401, got ${res.status}`);
+    const bad = await mintTicket('telnet', authA());
+    assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `unknown kind: ${bad.status} ${JSON.stringify(bad.body)}`);
+});
+
+await test('ws upgrade — a ticket opens the socket once; the second use is refused with 401 INVALID_TICKET', async () => {
+    const { body } = await createRoom({ app_type: 'whiteboard', name: 'rt-ticket' });
+    const room = body.data.id;
+    // Two peers, so the room outlives the first one and the second use is refused for the TICKET.
+    const keeper = await Sock.open(`room=${room}&nick=keeper`);
+    await keeper.waitFor('joined');
+    const ticket = (await mintTicket('realtime', authA())).body.data.ticket as string;
+    const peer = await Sock.open(`room=${room}&ticket=${encodeURIComponent(ticket)}&nick=ticketed`);
+    const joined = await peer.waitFor('joined');
+    assert(joined.roomId === room, `roomId: ${joined.roomId}`);
+    const again = await upgradeAnswer(`room=${room}&ticket=${encodeURIComponent(ticket)}&nick=replay`);
+    assert(again.status === 401, `a spent ticket must be refused with 401, got ${again.status}`);
+    assert(again.code === 'INVALID_TICKET', `refusal code: "${again.code}"`);
+    peer.close();
+    keeper.close();
+});
+
+await test('ws upgrade — a ticket minted for the personal tunnel does not open a realtime room (401 TICKET_WRONG_SOCKET)', async () => {
+    // A room of its own: a wrongly admitted socket that leaves would take an empty shared room with it.
+    const room = (await createRoom({ app_type: 'whiteboard', name: 'rt-ticket-kind' })).body.data.id;
+    const ticket = (await mintTicket('personal-tunnel', authA())).body.data.ticket as string;
+    const answer = await upgradeAnswer(`room=${room}&ticket=${encodeURIComponent(ticket)}&nick=wrong`);
+    assert(answer.status === 401, `a ticket for another socket must be 401, got ${answer.status}`);
+    assert(answer.code === 'TICKET_WRONG_SOCKET', `refusal code: "${answer.code}"`);
+});
+
+await test('ws upgrade — a ticket that was never minted is 401, not the anonymous fallback', async () => {
+    // This node runs anonymous mode, so a socket with NO credential is let in. A credential that
+    // fails is not the same as no credential: it is refused.
+    const room = (await createRoom({ app_type: 'whiteboard', name: 'rt-ticket-forged' })).body.data.id;
+    const answer = await upgradeAnswer(`room=${room}&ticket=${'0'.repeat(64)}&nick=forged`);
+    assert(answer.status === 401 && answer.code === 'INVALID_TICKET', `forged ticket: ${answer.status} "${answer.code}"`);
+});
+
+await test('ws upgrade — ?token= still opens the socket while security.ws_query_token is on, and is counted', async () => {
+    const before = await queryTokenUses('realtime');
+    const { body } = await createRoom({ app_type: 'whiteboard', name: 'rt-query-token' });
+    const s = await Sock.open(`room=${body.data.id}&token=${encodeURIComponent(ownerA.token)}&nick=legacy`);
+    await s.waitFor('joined');
+    s.close();
+    const after = await queryTokenUses('realtime');
+    assert(after === before + 1, `one query-token upgrade must count once: ${before} → ${after}`);
+});
+
+await test('ws upgrade — with security.ws_query_token off, ?token= is refused (401 WS_QUERY_TOKEN_DISABLED); the header and a ticket still open it', async () => {
+    const { body } = await createRoom({ app_type: 'whiteboard', name: 'rt-query-off' });
+    const room = body.data.id;
+    const keeper = await Sock.open(`room=${room}&nick=keeper`);
+    await keeper.waitFor('joined');
+    await setConfig('security.ws_query_token', false);
+    try {
+        const before = await queryTokenUses('realtime');
+        const refused = await upgradeAnswer(`room=${room}&token=${encodeURIComponent(ownerA.token)}&nick=legacy`);
+        assert(refused.status === 401, `a query token must be refused when the setting is off, got ${refused.status}`);
+        assert(refused.code === 'WS_QUERY_TOKEN_DISABLED', `refusal code: "${refused.code}"`);
+        assert(await queryTokenUses('realtime') === before, 'a refused query token is not counted as a use');
+        const viaHeader = await upgradeAnswer(`room=${room}&nick=header`, authA());
+        assert(viaHeader.status === 101, `the Authorization header must still open the socket, got ${viaHeader.status}`);
+        const ticket = (await mintTicket('realtime', authA())).body.data.ticket as string;
+        const viaTicket = await upgradeAnswer(`room=${room}&ticket=${encodeURIComponent(ticket)}&nick=ticketed`);
+        assert(viaTicket.status === 101, `a ticket must still open the socket, got ${viaTicket.status}`);
+    } finally {
+        await setConfig('security.ws_query_token', true);
+        keeper.close();
+    }
 });
 
 // ─── Phase 3: The socket protocol ───
@@ -889,6 +1010,43 @@ await test('POST /v1/realtime/relay — a broadcast in the remote room arrives i
 
     listener.close();
     sender.close();
+});
+
+await test('POST /v1/realtime/relay — the remote token goes in the Authorization header, never in the upgrade URL', async () => {
+    // A stand-in remote node that records the upgrade it receives and refuses it. Before the fix the
+    // relay built ws://remote/v1/realtime/ws?room=…&token=<jwt>, which the remote's reverse proxy logs.
+    const seen: Array<{ url: string; authorization: string }> = [];
+    const remote = createServer((_req, res) => { res.statusCode = 404; res.end(); });
+    remote.on('upgrade', (req, socket) => {
+        seen.push({ url: req.url ?? '', authorization: String(req.headers.authorization ?? '') });
+        socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    });
+    await new Promise<void>(resolve => remote.listen(0, '127.0.0.1', () => resolve()));
+    const remoteUrl = `http://127.0.0.1:${(remote.address() as AddressInfo).port}`;
+    const local = await createRoom({ app_type: 'whiteboard', name: 'rt-relay-header' });
+    const localId = local.body.data.id;
+    const keeper = await Sock.open(`room=${localId}&nick=keeper`);
+    await keeper.waitFor('joined');
+    try {
+        const marker = `relay-token-${Date.now().toString(36)}`;
+        const { status } = await json('/v1/realtime/relay', {
+            method: 'POST',
+            headers: authA(),
+            body: JSON.stringify({ local_room_id: localId, remote_node_url: remoteUrl, remote_room_id: 'remote-room', token: marker }),
+        });
+        assert(status === 200, `relay: ${status}`);
+        for (let i = 0; i < 60 && seen.length === 0; i++) await sleep(50);
+        assert(seen.length === 1, `the relay never reached the stand-in remote: ${seen.length} upgrades`);
+        assert(!seen[0].url.includes(marker) && !seen[0].url.includes('token='), `the upgrade URL carries the token: ${seen[0].url}`);
+        assert(seen[0].authorization === `Bearer ${marker}`, `the token must travel as a bearer header, got "${seen[0].authorization}"`);
+        assert(seen[0].url.startsWith('/v1/realtime/ws?') && seen[0].url.includes('room=remote-room'), `upgrade URL: ${seen[0].url}`);
+    } finally {
+        await json('/v1/realtime/relay', {
+            method: 'DELETE', headers: authA(), body: JSON.stringify({ local_room_id: localId, remote_room_id: 'remote-room' }),
+        });
+        keeper.close();
+        await new Promise<void>(resolve => { remote.close(() => resolve()); });
+    }
 });
 
 await test('DELETE /v1/realtime/relay — refused without both room ids, and to a non-operator', async () => {

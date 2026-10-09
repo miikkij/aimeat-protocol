@@ -10,6 +10,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.27.0 — 2026-10-09 — aimeat-tunnel: aiDoc and changelog for the single-use socket ticket (secrets
+ *     audit 2026-10-09, d3).
  *   v1.26.0 — 2026-10-08 — aimeat-voice's aiDoc: the session follows the start frame's audio.sample_rate
  *     and channels for PCM (aiprov plan, A4).
  *   v1.25.0 — 2026-10-05 — aimeat-validate joins after aimeat-labels, from library-packs/sdk-validate.ts;
@@ -699,8 +701,10 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: ['aimeat-auth'],
     license: 'MIT',
     apiSurface: 'AIMEAT.tunnel',
-    aiDoc: 'Personal-node tunnel client: auto-reconnect WebSocket, heartbeat, mailbox sync, request/response. Advanced — only for apps that talk to a personal node.',
-    changelog: [],
+    aiDoc: 'Personal-node tunnel client: auto-reconnect WebSocket, heartbeat, mailbox sync, request/response. Advanced — only for apps that talk to a personal node. Each connect trades the session for a single-use ticket (POST /v1/ws/ticket); the session token never goes in the socket URL.',
+    changelog: [
+      { version: '1.1.0', date: '2026-10-09', summary: 'Each connect and reconnect mints a single-use ticket (POST /v1/ws/ticket) and opens the socket with ?ticket= instead of the session token in the URL, which reverse proxies logged. A refused ticket goes offline and backs off like a failed socket. No change for callers.' },
+    ],
     tierHint: 'T3',
     interviewTriggers: [],
     sizeEstimate: '~10KB',

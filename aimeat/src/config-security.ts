@@ -16,6 +16,8 @@
  *   interface AimeatConfig extends SecurityDoorConfig { … }
  *   return { ...securityDoorDefaults(), … };
  * @version-history
+ *   v1.3.0 — 2026-10-09 — wsQueryToken (AIMEAT_WS_QUERY_TOKEN, default true, deprecated, removed in
+ *     4.0.0): a WebSocket upgrade still takes ?token=; off, it is refused (secrets audit 2026-10-09, d3).
  *   v1.2.0 — 2026-10-09 — ownerKeyLogin (AIMEAT_OWNER_KEY_LOGIN, default true, deprecated, removed in
  *     4.0.0): the legacy owner-key sign-in can be switched off now (secrets audit 2026-10-09, S2).
  *   v1.1.0 — 2026-10-09 — adminSetupOpenAfterFirstOperator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR,
@@ -67,6 +69,16 @@ export interface SecurityDoorConfig {
    * password is reset. AIMEAT_OWNER_KEY_LOGIN, default true.
    */
   ownerKeyLogin: boolean;
+
+  /**
+   * Whether a WebSocket upgrade (/v1/realtime/ws, /v1/personal/tunnel, /v1/connect/tunnel) still takes
+   * the session token in its URL as `?token=`. A reverse proxy writes URLs to its access log, so that
+   * log held live session tokens (secrets audit 2026-10-09, d3); current clients use a single-use
+   * ticket (POST /v1/ws/ticket) or an Authorization header. DEPRECATED: default on in 3.x for older
+   * clients, removed in 4.0.0. Off: the upgrade answers 401 WS_QUERY_TOKEN_DISABLED. Read on every
+   * upgrade, so a live change applies at once. AIMEAT_WS_QUERY_TOKEN, default true.
+   */
+  wsQueryToken: boolean;
 }
 
 /**
@@ -95,5 +107,6 @@ export function securityDoorDefaults(): SecurityDoorConfig {
     loginTarpitMaxConcurrent: parseInt(process.env.AIMEAT_LOGIN_TARPIT_MAX_CONCURRENT ?? '50', 10),
     adminSetupOpenAfterFirstOperator: process.env.AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR === 'true',
     ownerKeyLogin: process.env.AIMEAT_OWNER_KEY_LOGIN !== 'false',
+    wsQueryToken: process.env.AIMEAT_WS_QUERY_TOKEN !== 'false',
   };
 }
