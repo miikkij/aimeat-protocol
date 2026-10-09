@@ -8,6 +8,8 @@
  * @structure systemMethods
  * @usage Object.assign(SqliteStorage.prototype, systemMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-09 — setNodeKey seals the private key and getNodeKey opens it
+ *     (storage/node-key-at-rest.ts), the same as postgres-kysely (secrets audit 2026-10-09, S4a).
  *   v1.0.0 — 2026-10-05 — setNodeKey, getNodeKey moved here from work.ts; getMaintenanceMode,
  *     setMaintenanceMode moved here from identity-nodes.ts; supportsConfigPersistence, setConfigValue,
  *     deleteConfigValue, getAllConfigValues moved here from apps.ts; 9 methods (flushStats, loadStats,
@@ -16,6 +18,7 @@
  */
 import type { MaintenanceState, StorageStatsSnapshot } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { sealNodePrivateKey, openNodePrivateKey, isSealedNodeKey } from '../../../node-key-at-rest.js';
 
 export const systemMethods = {
 
@@ -23,16 +26,19 @@ export const systemMethods = {
   // ── Node Key ──
   // ══════════════════════════════════════════════════════════
 
+  // The private key is sealed on write and opened on read (storage/node-key-at-rest.ts), so every
+  // caller keeps receiving the plain key; `sealed` says which form the row is in.
   async setNodeKey(this: SqliteStorage, publicKey: string, privateKey: string): Promise<void> {
     this.db.prepare(
       `INSERT OR REPLACE INTO node_key (id, publicKey, privateKey) VALUES (1, ?, ?)`
-    ).run(publicKey, privateKey);
+    ).run(publicKey, sealNodePrivateKey(privateKey, publicKey));
   },
 
-  async getNodeKey(this: SqliteStorage): Promise<{ publicKey: string; privateKey: string } | null> {
+  async getNodeKey(this: SqliteStorage): Promise<{ publicKey: string; privateKey: string; sealed: boolean } | null> {
     const row = this.db.prepare('SELECT * FROM node_key WHERE id = 1').get() as Record<string, unknown> | undefined;
     if (!row) return null;
-    return { publicKey: row.publicKey as string, privateKey: row.privateKey as string };
+    const stored = row.privateKey as string;
+    return { publicKey: row.publicKey as string, privateKey: openNodePrivateKey(stored, row.publicKey as string), sealed: isSealedNodeKey(stored) };
   },
 
   // ══════════════════════════════════════════════════════════

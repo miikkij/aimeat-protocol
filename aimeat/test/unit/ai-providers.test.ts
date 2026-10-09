@@ -10,6 +10,8 @@
  *   own machine.
  * @usage pnpm test -- ai-providers
  * @version-history
+ *   v1.1.0 — 2026-10-09 — An operator's provider names only a provider key variable as its key
+ *     (secrets audit 2026-10-09, S1); the existing operator record uses AIMEAT_AI_KEY_OP_B.
  *   v1.0.1 — 2026-09-28 — An address ending in a long run of slashes is parsed in one pass (CodeQL
  *     js/polynomial-redos, alert 1673).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
@@ -108,12 +110,36 @@ describe('the node\'s own providers', () => {
   it('an operator record may not take a key in the record, and AIMEAT_AI_PROVIDER_TYPES narrows the fixed types', () => {
     const list = nodeAiProviders(cfg({ aiProviders: JSON.stringify([
       { id: 'op-a', type: 'openai-compatible', baseUrl: 'https://a.example/v1', auth: { type: 'key' } },
-      { id: 'op-b', type: 'openai-compatible', baseUrl: 'https://b.example/v1', auth: { type: 'env', env: 'OP_B_KEY' } },
+      { id: 'op-b', type: 'openai-compatible', baseUrl: 'https://b.example/v1', auth: { type: 'env', env: 'AIMEAT_AI_KEY_OP_B' } },
     ]) }));
     expect(list.map(p => p.id)).toEqual(['op-b']);
     expect(typeAllowed(cfg({ aiProviderTypes: 'openrouter,anthropic' }), 'openai')).toBe(false);
     expect(typeAllowed(cfg({ aiProviderTypes: 'openrouter,anthropic' }), 'openai-compatible')).toBe(true);
     expect(nodeAiProviders(cfg({ openrouterInstanceKey: 'sk-node', aiProviderTypes: 'anthropic' }))).toHaveLength(0);
+  });
+});
+
+describe('the variable an operator\'s provider sends as its key (secrets audit 2026-10-09, S1)', () => {
+  const op = (env: string) => parseAiProvider(
+    { id: 'op-x', type: 'openai-compatible', baseUrl: 'https://x.example/v1', auth: { type: 'env', env } }, 'node', cfg(), { allowEnv: true });
+
+  it('refuses a variable of the node itself, naming the rule', () => {
+    for (const env of ['DATABASE_URL', 'AIMEAT_ENCRYPTION_KEY', 'AIMEAT_KEY_PASSPHRASE', 'AIMEAT_ADMIN_PASSWORD',
+      'AIMEAT_TOTP_ENCRYPTION_KEY', 'AIMEAT_TURN_SECRET', 'AIMEAT_PRIVATE_KEY', 'AIMEAT_OPENROUTER_INSTANCE_KEY', 'AIMEAT_SMTP_PASS', 'PATH']) {
+      const r = op(env);
+      expect(r.provider, env).toBeNull();
+      expect(r.problems.join(' '), env).toMatch(/AIMEAT_AI_KEY_/);
+    }
+    // And a record refused at boot is not offered at all.
+    expect(nodeAiProviders(cfg({ aiProviders: JSON.stringify([
+      { id: 'op-db', type: 'openai-compatible', baseUrl: 'https://attacker.example/v1', auth: { type: 'env', env: 'DATABASE_URL' } },
+    ]) }))).toHaveLength(0);
+  });
+
+  it('takes the node\'s prefix, a vendor-style _API_KEY name and the decision-model keys', () => {
+    for (const env of ['AIMEAT_AI_KEY_GROQ', 'ANTHROPIC_API_KEY', 'OPENROUTER_API_KEY', 'AIMEAT_DECIDE_JEFF_KEY']) {
+      expect(op(env).provider?.auth, env).toEqual({ type: 'env', env });
+    }
   });
 });
 

@@ -25,6 +25,8 @@
  *   const pw = await checkPassword(storage, config, ghiiRecord, password);
  *   if (!pw.ok) { res.status(pw.status).json(error(config.nodeId, pw.code, pw.message)); return; }
  * @version-history
+ *   v1.0.1 — 2026-10-09 — The TOTP check reads the node's general key too (services/totp.ts reads a
+ *     secret under either key; secrets audit 2026-10-09, S4).
  *   v1.0.0 — 2026-10-05 — Initial: the sign-in route's password and TOTP blocks, moved here unchanged,
  *     and the attach-email copy of the lock (secaudit 2026-10, D1 and C1).
  */
@@ -38,7 +40,7 @@ export type CheckResult = { ok: true } | CheckRefusal;
 
 type PasswordConfig = Pick<AimeatConfig, 'passwordLockoutAttempts' | 'passwordLockoutMinutes'>;
 type TotpCheckConfig = Pick<AimeatConfig, 'totpIssuer' | 'totpPeriod' | 'totpWindow' | 'totpBackupCodeCount'
-  | 'totpSecretEncryptionKey' | 'totpMaxFailedAttempts' | 'totpLockoutSeconds'>;
+  | 'totpSecretEncryptionKey' | 'encryptionKey' | 'totpMaxFailedAttempts' | 'totpLockoutSeconds'>;
 
 const WRONG: CheckRefusal = { ok: false, status: 401, code: 'AUTH_REQUIRED', message: 'Invalid username or password' };
 

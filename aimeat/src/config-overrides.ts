@@ -14,6 +14,8 @@
  * @usage
  *   import { applyConfigOverrides } from './config.js';   // re-exported
  * @version-history
+ *   v1.1.0 — 2026-10-09 — A secret row stored sealed is opened with the node key before it is applied,
+ *     and skipped when it does not open (services/config-at-rest.ts; secrets audit 2026-10-09, S4b).
  *   (2026-08-28) Applies a stored value through writeConfigField, so a site-link row
  *     (siteLinks.<name>) lands one level down like every other row.
  *   v1.0.0 — 2026-08-18 — Pure extraction from config.ts, plus the sealed-path skip. A DB row for a
@@ -25,6 +27,7 @@
 import type { AimeatConfig, RateLimitsConfig, RateLimitTier } from './config-types.js';
 import { MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable, writeConfigField } from './services/config-schema.js';
 import { isSealed } from './services/config-sealing.js';
+import { openStoredSetting } from './services/config-at-rest.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
 import type { Storage } from './storage/interface.js';
 import { logger } from './utils/logger.js';
@@ -64,8 +67,17 @@ export async function applyConfigOverrides(
     const field = MUTABLE_CONFIG_MAP[dotPath];
     if (!field) { skipped.push(dotPath); continue; }
 
+    // A secret row is stored sealed (services/config-at-rest.ts). One that does not open here (the
+    // key changed or is gone) is skipped, so the node runs on what env and file say for it.
+    const opened = openStoredSetting(dotPath, rawValue, config);
+    if (opened === null) {
+      logger.error('config: a stored secret setting could not be decrypted with this node\'s key and was not applied', { path: dotPath });
+      skipped.push(dotPath);
+      continue;
+    }
+
     try {
-      const value = parseConfigValue(field, rawValue);
+      const value = parseConfigValue(field, opened);
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
       writeConfigField(config, field, value);
       applied.push(dotPath);

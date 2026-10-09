@@ -32,6 +32,9 @@
  *   import { buildUsagePage } from '../services/usage-page.js';
  *   const data = await buildUsagePage(config, storage, { from, to, includeKeySpend: false });
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The shared chat key is sent to OpenRouter to read its spend only when it is
+ *     an OpenRouter key (AIMEAT_GOOSE_PROVIDER=openrouter, or none named and an `sk-or-` key); any
+ *     other provider's key stays on the node (secrets audit 2026-10-09, finding 1.6).
  *   v1.1.0 — 2026-10-02 — keys.chat.metered_here is true on the node route (no shared chat key): the
  *     chat's calls go through /v1/llm and are in the house and own figures. It was false on every
  *     node, so a hosted place moved off the shared key would read "one key you cannot see".
@@ -185,9 +188,21 @@ export async function buildUsagePage(
   };
 
   if (opts.includeKeySpend) {
+    // The chat key goes to OpenRouter only when it IS an OpenRouter key. It was sent there whatever
+    // AIMEAT_GOOSE_PROVIDER named, so an Anthropic or OpenAI key went to a third party (secrets
+    // audit 2026-10-09, finding 1.6).
+    const chatProvider = (config.gooseProvider || '').trim().toLowerCase();
+    const chatKey = (config.gooseProviderApiKey || '').trim();
+    const chatIsOpenRouter = chatProvider === 'openrouter' || (!chatProvider && chatKey.startsWith('sk-or-'));
     const [house, chat] = await Promise.all([
       readKeySpend(config, config.openrouterInstanceKey, 'house'),
-      readKeySpend(config, config.gooseProviderApiKey, 'chat'),
+      chatKey && !chatIsOpenRouter
+        ? Promise.resolve<KeySpend>({
+          ok: false,
+          which: 'chat',
+          reason: `This key is for ${chatProvider || 'a provider other than OpenRouter'}. This server reads the spend of an OpenRouter key only, so it does not send this key anywhere to ask.`,
+        })
+        : readKeySpend(config, config.gooseProviderApiKey, 'chat'),
     ]);
     (keys.house as Record<string, unknown>).spend = house;
     // WITHOUT THE SHARED KEY THE CHAT HAS NO KEY OF ITS OWN. Until 2026-09-28 the child process then

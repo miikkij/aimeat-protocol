@@ -120,17 +120,17 @@ The connector keeps its discovery file (`serve.json`), agent tokens, per-agent
 config and the serve daemon under a **connector home** directory. Resolution:
 
 1. `AIMEAT_HOME` environment variable — explicit override, always wins.
-2. otherwise `<cwd>/.aimeat` — the directory you launched the command / crew from.
+2. otherwise `<cwd>/.aimeat`, but only when it already holds a connector's files
+   (`tokens/`, `keys/`, `agents/`, `config.yaml` or `serve.json`): an install made
+   before 2026-10-09 keeps working. This step goes away with node 3.27.0.
+3. otherwise `~/.aimeat` in your home directory.
 
-This is **directory-scoped on purpose**: run two projects on one machine and each
-gets its own daemon, port, tokens and `serve.json`, so they never collide. (The
-old global `~/.aimeat` meant the second `aimeat connect serve` refused to start
-and clients got routed to the wrong daemon — "pid alive but does not answer".)
-
-- Want the old single global home for every project? Set `AIMEAT_HOME=~/.aimeat`.
-- Already registered an agent under the old global `~/.aimeat`? Either run with
-  `AIMEAT_HOME=~/.aimeat`, or re-run `aimeat connect add` from inside the project
-  directory so the token lands in that project's `.aimeat`.
+The default was `<cwd>/.aimeat` until 2026-10-09. That put the agent tokens and
+keys inside the project you ran the command in, where the project's `.gitignore`
+does not cover them. To run two projects on one machine with a daemon each, give
+each its own `AIMEAT_HOME`.
+- Have an agent in a project's `.aimeat`? Move the folder to `~/.aimeat` before node
+  3.27.0, or set `AIMEAT_HOME` to the project folder to keep it there.
 
 The Python liaison pins `AIMEAT_HOME` into the serve daemon it auto-spawns, so the
 Node daemon and the Python side always agree on the same home.

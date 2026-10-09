@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.1 — 2026-10-09 — The TOTP start-up warning says what a node without either key does now:
+ *     it refuses to set the factor up, rather than store the secret in plain text.
  *   v1.9.0 — 2026-10-09 — The three upgrade code paths read their credential through
  *     authenticateUpgrade (auth/ws-upgrade.ts): the Authorization header, a single-use ?ticket= from
  *     POST /v1/ws/ticket, or the deprecated ?token= while AIMEAT_WS_QUERY_TOKEN is on (secrets audit
@@ -163,8 +165,10 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     logger.info(`──────────────────────────────────────────────────────────`);
 
     // Security warnings
-    if (config.totpEnabled && !config.totpSecretEncryptionKey) {
-      logger.warn('SECURITY: TOTP is enabled but AIMEAT_TOTP_ENCRYPTION_KEY is not set. TOTP secrets are stored in plaintext.');
+    if (config.totpEnabled && !config.encryptionKey && !config.totpSecretEncryptionKey) {
+      // A secret is never stored in plain text since 2026-10-09 (services/totp.ts): without a key
+      // the setup endpoint refuses instead.
+      logger.warn('SECURITY: TOTP is enabled but neither AIMEAT_ENCRYPTION_KEY nor AIMEAT_TOTP_ENCRYPTION_KEY is set, so nobody can set up two-step sign-in.');
     }
     if (config.devMode) {
       const looksProduction = config.storageProvider !== 'memory' ||

@@ -12,6 +12,9 @@
  *   - POST /v1/ghii/totp/setup: create encrypted secret, backup codes, and provisioning URI/QR
  *
  * @version-history
+ *   v1.4.0 — 2026-10-09 — POST /v1/ghii/totp/setup answers 503 ENCRYPTION_NOT_CONFIGURED, storing
+ *     nothing, on a node with no key to encrypt the secret with; it stored it in plain text (secrets
+ *     audit 2026-10-09, S4).
  *   v1.3.1 — 2026-10-05 — The TOTP settings come from services/totp.ts totpConfigOf(), shared with the
  *     sign-in check (services/password-check.ts).
  *   v1.3.0 — 2026-09-04 — Arming and removing the factor land on the person's own feed as account
@@ -38,7 +41,9 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { eraseTotp } from '../services/totp-recovery.js';
-import { setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes, totpConfigOf } from '../services/totp.js';
+import {
+  setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes, totpConfigOf, TotpEncryptionUnavailableError,
+} from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 
 export function totpRouter(config: AimeatConfig, storage: Storage): Router {
@@ -66,7 +71,18 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const result = await setupTotp(ghiiRecord.username, totpConfig);
+    // Refused with 503 before anything is stored when the node has no key to encrypt the secret
+    // with (secrets audit 2026-10-09, S4): it used to be stored in plain text.
+    let result: Awaited<ReturnType<typeof setupTotp>>;
+    try {
+      result = await setupTotp(ghiiRecord.username, totpConfig);
+    } catch (err) {
+      if (err instanceof TotpEncryptionUnavailableError) {
+        res.status(err.status).json(error(config.nodeId, err.code, err.message));
+        return;
+      }
+      throw err;
+    }
 
     // Save encrypted secret and hashed backup codes, but keep totpEnabled = false until verified
     await storage.updateGHII(ghiiRecord.ghii, {

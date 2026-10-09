@@ -11,6 +11,9 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   v1.19.0 — 2026-10-09 — sealPlaintextTotpSecrets() and sealPlaintextConfigSecrets() at boot: TOTP
+ *     secrets and secret Config rows stored in plain text are encrypted when the node has a key
+ *     (secrets audit 2026-10-09, S4).
  *   v1.18.0 — 2026-10-09 — sealLegacyTransportSecrets() and removeDeletedAgentsConnections() at boot,
  *     after the extension secrets are bound (secrets audit 2026-10-09, chapter 2).
  *   v1.17.0 — 2026-10-09 — bindLegacyExtensionSecrets() at boot, awaited before the shipped
@@ -127,6 +130,8 @@ import { bindLegacyExtensionSecrets } from '../services/extension-secrets.js';
 import { sealLegacyTransportSecrets } from '../services/mcp-client/transport-secrets.js';
 import { removeDeletedAgentsConnections } from '../services/connections/agent-orphans.js';
 import { getEncryptionKey } from '../services/encryption.js';
+import { sealPlaintextTotpSecrets } from '../services/totp.js';
+import { sealPlaintextConfigSecrets } from '../services/config-at-rest-rows.js';
 
 export interface ServiceInitResult {
   maintenanceCache: MaintenanceState;
@@ -246,6 +251,12 @@ export async function initializeServices(
   // 2026-10-09, chapter 2). Both act on positive evidence only, are idempotent and never throw.
   await sealLegacyTransportSecrets(storage, getEncryptionKey(config));
   await removeDeletedAgentsConnections(storage, config.nodeId);
+
+  // Secrets stored in plain text before 2026-10-09 are encrypted when the node has a key: TOTP
+  // secrets (services/totp.ts) and secret Config rows (services/config-at-rest-rows.ts). Each acts only
+  // on a value it can prove is plain, reads its rewrite back first, and never throws.
+  await sealPlaintextTotpSecrets(storage, config);
+  await sealPlaintextConfigSecrets(storage, config);
 
   // Bring the built-in node-scope skills into step with this build. A skill edited on THIS node is
   // left alone and named in the log; an untouched one follows the repo. Before 2026-08-25 this was

@@ -1,3 +1,13 @@
+/**
+ * @file test/unit/totp-service.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description services/totp.ts: setup, code and backup-code validation. The at-rest rules (which key,
+ *   the refusal without one, the boot step) are in totp-at-rest.test.ts.
+ * @version-history
+ *   v1.1.0 — 2026-10-09 — Setup runs with a key: without one it refuses (secrets audit 2026-10-09,
+ *     S4). The plain-secret case is now a secret stored before that date. Header added.
+ */
 import { describe, it, expect } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes } from '../../src/services/totp.js';
@@ -19,7 +29,7 @@ const CONFIG_WITH_KEY: TotpConfig = {
 
 describe('setupTotp', () => {
   it('returns setup result with all fields', async () => {
-    const result = await setupTotp('testuser', BASE_CONFIG);
+    const result = await setupTotp('testuser', CONFIG_WITH_KEY);
     expect(result.secret).toBeTruthy();
     expect(result.uri).toContain('otpauth://totp/');
     expect(result.qrDataUrl).toContain('data:image/png;base64,');
@@ -29,20 +39,20 @@ describe('setupTotp', () => {
   });
 
   it('generates unique backup codes', async () => {
-    const result = await setupTotp('testuser', BASE_CONFIG);
+    const result = await setupTotp('testuser', CONFIG_WITH_KEY);
     const uniqueCodes = new Set(result.backupCodes);
     expect(uniqueCodes.size).toBe(result.backupCodes.length);
   });
 
   it('backup codes are 12 hex characters', async () => {
-    const result = await setupTotp('testuser', BASE_CONFIG);
+    const result = await setupTotp('testuser', CONFIG_WITH_KEY);
     for (const code of result.backupCodes) {
       expect(code).toMatch(/^[0-9a-f]{12}$/);
     }
   });
 
   it('hashed backup codes are SHA-256 hex', async () => {
-    const result = await setupTotp('testuser', BASE_CONFIG);
+    const result = await setupTotp('testuser', CONFIG_WITH_KEY);
     for (const hash of result.hashedBackupCodes) {
       expect(hash).toMatch(/^[0-9a-f]{64}$/);
     }
@@ -58,28 +68,27 @@ describe('setupTotp', () => {
     expect(result.encryptedSecret).not.toBe(result.secret);
   });
 
-  it('stores plain base32 when no encryption key', async () => {
-    const result = await setupTotp('testuser', BASE_CONFIG);
-    // Without encryption, encryptedSecret === secret (base32)
-    expect(result.encryptedSecret).toBe(result.secret);
+  // Since 2026-10-09 a secret is never stored in plain text (secrets audit 2026-10-09, S4).
+  it('refuses to set up without an encryption key', async () => {
+    await expect(setupTotp('testuser', BASE_CONFIG)).rejects.toThrow(/AIMEAT_ENCRYPTION_KEY/);
   });
 });
 
 describe('validateTotpCode', () => {
-  it('validates correct TOTP code (without encryption)', async () => {
-    const setup = await setupTotp('testuser', BASE_CONFIG);
+  it('validates correct TOTP code (a plain secret stored before 2026-10-09)', async () => {
     // Generate current code using the TOTP library
     const { TOTP, Secret } = await import('otpauth');
+    const stored = new Secret({ size: 20 }).base32;
     const totp = new TOTP({
       issuer: BASE_CONFIG.issuer,
       algorithm: BASE_CONFIG.algorithm,
       digits: BASE_CONFIG.digits,
       period: BASE_CONFIG.period,
-      secret: Secret.fromBase32(setup.secret),
+      secret: Secret.fromBase32(stored),
     });
     const currentCode = totp.generate();
 
-    const result = validateTotpCode(setup.encryptedSecret, currentCode, BASE_CONFIG);
+    const result = validateTotpCode(stored, currentCode, BASE_CONFIG);
     expect(result.valid).toBe(true);
     expect(result.delta).not.toBeNull();
   });
@@ -101,8 +110,8 @@ describe('validateTotpCode', () => {
   });
 
   it('rejects invalid TOTP code', async () => {
-    const setup = await setupTotp('testuser', BASE_CONFIG);
-    const result = validateTotpCode(setup.encryptedSecret, '000000', BASE_CONFIG);
+    const setup = await setupTotp('testuser', CONFIG_WITH_KEY);
+    const result = validateTotpCode(setup.encryptedSecret, '000000', CONFIG_WITH_KEY);
     expect(result.valid).toBe(false);
     expect(result.delta).toBeNull();
   });
@@ -110,7 +119,7 @@ describe('validateTotpCode', () => {
 
 describe('validateBackupCode', () => {
   it('validates correct backup code', async () => {
-    const setup = await setupTotp('testuser', BASE_CONFIG);
+    const setup = await setupTotp('testuser', CONFIG_WITH_KEY);
     const firstCode = setup.backupCodes[0];
     const result = validateBackupCode(firstCode, setup.hashedBackupCodes);
     expect(result.valid).toBe(true);
@@ -118,7 +127,7 @@ describe('validateBackupCode', () => {
   });
 
   it('validates last backup code', async () => {
-    const setup = await setupTotp('testuser', BASE_CONFIG);
+    const setup = await setupTotp('testuser', CONFIG_WITH_KEY);
     const lastCode = setup.backupCodes[9];
     const result = validateBackupCode(lastCode, setup.hashedBackupCodes);
     expect(result.valid).toBe(true);
@@ -126,7 +135,7 @@ describe('validateBackupCode', () => {
   });
 
   it('rejects invalid backup code', async () => {
-    const setup = await setupTotp('testuser', BASE_CONFIG);
+    const setup = await setupTotp('testuser', CONFIG_WITH_KEY);
     const result = validateBackupCode('invalid_code', setup.hashedBackupCodes);
     expect(result.valid).toBe(false);
     expect(result.index).toBe(-1);

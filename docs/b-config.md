@@ -43,8 +43,16 @@ aimeat config                      # every setting, as the running process resol
 aimeat config export --format env  # the same thing as a .env you can keep
 aimeat config export --format ini  # or as aimeat.ini
 aimeat config export --format json # or as JSON
+aimeat config export --format consul                    # the mutable settings to Consul KV
+aimeat config export --format consul --include-secrets  # ...and the secret ones too
 aimeat validate                    # what is missing, wrong, or unsafe for a public node
 ```
+
+A push to Consul KV (`--format consul`, or `POST /v1/admin/consul/export`) leaves the secret settings
+out: the node's AI keys and the TURN values. Anyone who can read the KV store could read them there.
+Pass `--include-secrets`, or `{"include_secrets": true}` in the request body, to write them as well.
+The answer says how many it left out (`secrets_skipped`). A secret setting saved on the Config page
+is stored encrypted with `AIMEAT_ENCRYPTION_KEY` in this node's database.
 
 `GET /v1/admin/config` (operator role) returns the same picture as data: for every visible field its
 value, type, range, description, whether it is mutable, whether this node can edit it, **where the

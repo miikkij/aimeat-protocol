@@ -17,6 +17,7 @@
  * @version-history v1.26.0 — 2026-07-10 — Emit securityPostureWarnings() at startup so a public-profile node flags risky settings.
  * @version-history v1.27.0 — 2026-07-13 — Extract help text, `connect` dispatch, and `start`/`serve` runtime into index-help/index-connect/index-start (max-file-lines).
  * @version-history v1.28.0 — 2026-09-28 — `aimeat init --install-set <file> [--install-set-secrets <file>]`: the install set the node applies at start-up.
+ * @version-history v1.29.0 — 2026-10-09 — `aimeat config export --format consul --include-secrets`: the Consul export leaves the secret rows out without the flag (secrets audit 2026-10-09, S3).
  */
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -61,6 +62,7 @@ const { values, positionals } = parseArgs({
     body: { type: 'string' },
     'install-set': { type: 'string' },
     'install-set-secrets': { type: 'string' },
+    'include-secrets': { type: 'boolean' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -163,7 +165,7 @@ if (subcommand === 'config') {
       process.exit(1);
     }
     const { runConfigExport } = await import('./cli/config-export.js');
-    await runConfigExport(config, format as 'env' | 'ini' | 'json' | 'consul');
+    await runConfigExport(config, format as 'env' | 'ini' | 'json' | 'consul', { includeSecrets: values['include-secrets'] === true });
     process.exit(0);
   }
 

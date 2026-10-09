@@ -5,7 +5,7 @@ AIMEAT exposes the same tool surface through two MCP transports:
 
 1. **stdio** -- spawn `aimeat connect serve` as a child process. The connector
    reads the agent's token from the connector home (`AIMEAT_HOME`, default
-   `<cwd>/.aimeat`) and authenticates automatically.
+   `~/.aimeat`; see paths.aimeat_home) and authenticates automatically.
    This is the recommended transport for local development and self-hosted
    nodes, because authentication "just works" -- whoever ran `aimeat connect
    add` once is the agent identity here.
@@ -122,7 +122,7 @@ def stdio_params(
     """
     Build StdioServerParameters that spawn `aimeat connect serve` as a
     subprocess. The connector reads the agent's stored token from the connector
-    home (`AIMEAT_HOME`, default `<cwd>/.aimeat`) so no auth header is needed here.
+    home (`AIMEAT_HOME`, default `~/.aimeat`) so no auth header is needed here.
 
     Args:
         agent_name: Which registered agent to serve. If omitted, the connector
@@ -178,7 +178,7 @@ def http_params(
         agent_token: Bearer token issued for the agent that will be the
             "voice" of this crew on the AIMEAT side. Obtain via
             `aimeat connect add` -- the token is stored under the connector
-            home (`AIMEAT_HOME`, default `<cwd>/.aimeat`) at agents/<name>/.token .
+            home (`AIMEAT_HOME`, default `~/.aimeat`) at agents/<name>/.token .
         mcp_path: Path of the MCP endpoint on the node. Defaults to "/v1/mcp".
 
     Returns:
@@ -225,7 +225,7 @@ class AimeatServeError(RuntimeError):
 
 def _aimeat_home() -> Path:
     """Connector home dir. See :func:`aimeat_crewai.paths.aimeat_home` -- the
-    single source of truth (AIMEAT_HOME env wins, else ``<cwd>/.aimeat``)."""
+    single source of truth (AIMEAT_HOME env wins, else ``~/.aimeat``)."""
     return aimeat_home()
 
 
@@ -432,7 +432,7 @@ def ensure_serve(
     return its discovery document (`{schema_version, port, pid, agents:
     [{agent, owner, node_url, transport}], started_at}`).
 
-    Discovery: reads `<AIMEAT_HOME or <cwd>/.aimeat>/serve.json`. The file is
+    Discovery: reads `<connector home>/serve.json` (paths.aimeat_home). The file is
     trusted only if its recorded pid is alive AND `GET /local/status` on the
     recorded port answers with that pid -- anything else counts as stale.
     When stale/absent and `auto_start` is True, the daemon is spawned detached

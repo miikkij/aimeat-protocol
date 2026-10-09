@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.8 — 2026-10-09 — `aimeat config export --format consul --include-secrets`.
  *   v1.1.7 — 2026-09-30 — `--scopes` on the plain `aimeat connect` usage too, and what it does on a
  *     re-approval.
  *   v1.1.6 — 2026-09-30 — `aimeat connect add --scopes`.
@@ -83,6 +84,7 @@ START OPTIONS
 
 CONFIG EXPORT OPTIONS
   --format <fmt>           Output format: env, ini, json, consul
+  --include-secrets        consul only: also write the secret settings (AI keys, TURN) to Consul KV
 
 CONFIG IMPORT OPTIONS
   --file <path>            Import from file (.env, .ini, or .json)

@@ -21,6 +21,8 @@
  *   suite's own server with the variable unset.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sealed-config.ts
  * @version-history
+ *   v1.3.0 — 2026-10-09 — 2d: a secret set on the Config page is stored sealed in the node's own
+ *     database, read raw from it (secrets audit 2026-10-09, S4b).
  *   v1.2.0 — 2026-09-24 — The operator's agent is created holding operator:admin beside '*'. Its
  *     setup no longer matched the node: an operator's agent is offered the admin tools only with that
  *     word ticked (security audit A8-1), and '*' alone does not carry it.
@@ -167,6 +169,25 @@ async function startServer(sealed: boolean): Promise<ChildProcess> {
     return waitForServer(child, BASE, { label: 'the sealed-config node' });
 }
 
+/** A config row as the node stored it, read from its own database; null when there is none. */
+async function storedSetting(path: string): Promise<string | null> {
+    if (USE_POSTGRES) {
+        const { default: pg } = await import('pg');
+        const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+        await client.connect();
+        try {
+            const r = await client.query('SELECT "value" FROM "SystemSetting" WHERE "key" = $1', [`config:${path}`]);
+            return r.rows[0]?.value ?? null;
+        } finally { await client.end(); }
+    }
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(DB_PATH, { readonly: true });
+    try {
+        const row = db.prepare('SELECT value FROM system_settings WHERE key = ?').get(`config:${path}`) as { value?: string } | undefined;
+        return row?.value ?? null;
+    } finally { db.close(); }
+}
+
 /** Stop it and wait for the port to be free, so the next boot is not talking to the old process. */
 async function stopServer(child: ChildProcess): Promise<void> {
     child.kill('SIGTERM');
@@ -269,6 +290,16 @@ async function main() {
                 const del = await json(`/v1/admin/config/${path}`, { method: 'DELETE', headers: auth(unsealedOp.token) });
                 assert(del.status === 200, `${path} delete: ${del.status}`);
             }
+        });
+
+        await test('2d. a secret set on the Config page is stored encrypted, not as the value', async () => {
+            // Secrets audit 2026-10-09, S4b: the row went into SystemSetting in plain text. 2b left
+            // ai.chat_agent_key in the database; the raw row is read straight from the node's own
+            // database, since no HTTP path returns it.
+            const raw = await storedSetting('ai.chat_agent_key');
+            assert(raw !== null, 'the row 2b wrote is in the database');
+            assert(!raw!.includes('sk-e2e-operator-probe-value-3b9e'), `the stored row holds the value: ${raw!.slice(0, 40)}`);
+            assert(raw!.startsWith('sealed:v2:'), `the stored row is the sealed form: ${raw!.slice(0, 12)}`);
         });
 
         await test('2c. THE LEAK: the node\'s AI key is not sent to an address a person saved', async () => {
