@@ -21,6 +21,8 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.5.0 — 2026-10-09 — The surface lists archiveRecords (proved in e2e-extension-workspace-batch.ts).
+ *     Went red on ad003ac26 until updated, as it is meant to.
  *   v1.4.0 — 2026-10-08 — The surface lists appendRows and readRows (proved in e2e-extension-rows.ts).
  *     The guard did its job: the change widened the surface and this line went red until updated.
  *   v1.3.0 — 2026-10-06 — The surface lists publishRecords and deleteRecords (the batch, proved in
@@ -214,7 +216,7 @@ await test('Install + activate: declared, undeclared, read-only and budget-cappe
     assert(none.body?.data?.extension?.workspace === null, `undeclared reads back null: ${JSON.stringify(none.body?.data?.extension?.workspace)}`);
 });
 
-await test('Declaration: without it ctx.workspace is undefined; with it the nine methods exist', async () => {
+await test('Declaration: without it ctx.workspace is undefined; with it the ten methods exist', async () => {
     const none = await invoke(EXT_NONE, 'probe', B.token);
     assert(none.status === 200, `probe none ${none.status}: ${JSON.stringify(none.body?.error)}`);
     // GUARD, not hole: the old tree had no ctx.workspace on any extension, so this held trivially.
@@ -225,7 +227,7 @@ await test('Declaration: without it ctx.workspace is undefined; with it the nine
     assert(some.body.data.has === true, 'a declared extension sees ctx.workspace');
     // appendRows and readRows joined on 2026-10-08 (e2e-extension-rows.ts proves them); they refuse
     // PERMISSION unless the manifest also declares workspace.rows.
-    assert(JSON.stringify(some.body.data.keys) === JSON.stringify(['appendRows', 'deleteRecords', 'get', 'index', 'publish', 'publishRecords', 'readRows', 'write', 'writeDoc']), `surface: ${JSON.stringify(some.body.data.keys)}`);
+    assert(JSON.stringify(some.body.data.keys) === JSON.stringify(['appendRows', 'archiveRecords', 'deleteRecords', 'get', 'index', 'publish', 'publishRecords', 'readRows', 'write', 'writeDoc']), `surface: ${JSON.stringify(some.body.data.keys)}`);
 });
 
 await test('Happy path: B\'s agent writes a claim through A\'s extension, reads it back, publishes it', async () => {

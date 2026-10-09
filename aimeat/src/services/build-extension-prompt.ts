@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.9 — 2026-10-09 — ADDITIVE: ctx.workspace.archiveRecords in the ctx table.
  *   v1.5.8 — 2026-10-08 — ADDITIVE: ai.speak may answer sampleRate, channels and sampleFormat, which the
  *     node reports in the speech answer's `audio` block (aiprov plan, A4).
  *   v1.5.7 — 2026-10-08 — ADDITIVE: ctx.workspace.appendRows and readRows (workspace.rows,
@@ -127,6 +128,7 @@ function sandboxSection(): string {
     '| `ctx.workspace.publish(orgId, ws, namespace, id, {expectedVersion})` | Publish the draft; `.latest` lands under the member |',
     '| `ctx.workspace.publishRecords(orgId, ws, namespace, [{id, value, visibility}], {expectedVersions, createOnly, dryRun})` | Publish up to 1000 records in ONE call. Answers `{published, skipped, failed, results: [{instance, ok, code, violations}]}`, one result per record. `dryRun` writes nothing; `createOnly` refuses an existing id (code `EXISTS`) |',
     '| `ctx.workspace.deleteRecords(orgId, ws, namespace, ids)` | Remove up to 2000 of the caller\'s own records in ONE call. Answers `{deleted: [{id, keys}], failed: [{id, reason}], rows_removed}` |',
+    '| `ctx.workspace.archiveRecords(orgId, ws, namespace, ids)` | Archive up to 500 records in ONE call: they leave every read and stay restorable. The caller must be the organism\'s creator or an admin; a token needs `organism:write`. Answers `{archived: [ids], rows}`. Use it so a space that only grows (closed tickets, finished sessions) stays fast to read |',
     '| `ctx.workspace.appendRows(orgId, ws, space, [{body, rowId, occurredAt}])` | Append up to 500 rows to a ROW space that names this extension (manifest `workspace: { rows: true }`). A repeated `rowId` replaces the stored row, which is how an ingest removes duplicates. Answers `{written, rowIds, pruned}`. Works on a schedule and a workflow step too |',
     '| `ctx.workspace.readRows(orgId, ws, space, {where, since, until, changedSince, limit, cursor, order})` | One page of such a row space, newest first: `{rows, cursor, indexed}`. `where` takes only the space\'s `indexOn` fields |',
     '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',

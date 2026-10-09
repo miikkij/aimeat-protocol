@@ -341,13 +341,13 @@
       "digest": "sha256:94d689cc97e4d19539d2730b"
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-10-06",
+      "reviewedOn": "2026-10-09",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:a327491fa7a70ed79529d8a7"
+      "digest": "sha256:6b9d604a445fd9638389671b"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-09-28",
@@ -365,13 +365,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-09",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:dd418a06a540fbb1d981902b"
+      "digest": "sha256:2c02385e0bae779ef295e5d6"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -549,7 +549,7 @@
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "d05be341732c8d00",
       "aimeat/public/css/poster.css": "5f3b7041ce0e0e7a",
-      "aimeat/public/lib/aimeat-fonts.css": "03900538c4d7edd5"
+      "aimeat/public/lib/aimeat-fonts.css": "eac732f99c743f71"
     },
     "project:aimeat-frontend-verify": {
       "aimeat/scripts/sandbox.ts": "d7a458c82439dc8d"
@@ -560,7 +560,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
       ".githooks/pre-commit": "e8840eb33aa805c0",
-      "aimeat/src/services/build-extension-prompt.ts": "a441eab35bce0b41"
+      "aimeat/src/services/build-extension-prompt.ts": "0721b07486a19ca4"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {

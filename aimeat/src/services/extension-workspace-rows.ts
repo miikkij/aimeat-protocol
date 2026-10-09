@@ -22,6 +22,7 @@
  * @usage
  *   workspace: buildUnattendedExtensionWorkspace({ config, storage, ext, ownerGhii }).workspace
  * @version-history
+ *   v1.0.1 — 2026-10-09 — archiveRecords is refused here like the other record calls: it needs a caller.
  *   v1.0.0 — 2026-10-08 — Initial (aimeat-soc core), split from extension-workspace.ts at the cycle.
  */
 import type { AimeatConfig } from '../config.js';
@@ -121,6 +122,7 @@ export function buildUnattendedExtensionWorkspace(deps: UnattendedExtensionWorks
         publish: async () => unattended(),
         publishRecords: async () => unattended(),
         deleteRecords: async () => unattended(),
+        archiveRecords: async () => unattended(),
         ...rows,
     };
     return { workspace, lastRefusal: () => last };

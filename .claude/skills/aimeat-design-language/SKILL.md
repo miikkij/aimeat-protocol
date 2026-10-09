@@ -57,10 +57,11 @@ link. Nothing on the node links a font CDN, and the CSP refuses one; a new face 
 there, with its row in `lib/fonts/LICENSE.md`, before a token names it. The list a theme may
 choose from is `THEME_FACES` in `src/services/themes/tokens.ts`, and the Design Book's copy is
 `SERVED_FONT_FAMILIES` in `src/services/app-ui/signature-tokens.ts`; a new face goes into both.
-Since 2026-10-03 the node serves twenty-three families: the ten house and palette faces above, and
-thirteen for themes that want a face of their own (Instrument Serif and Sans, Schibsted Grotesk,
-Bricolage Grotesque, Syne, Unbounded, Gloock, Mona Sans, Hubot Sans, Geist Mono, Martian Mono,
-Press Start 2P, Selawik).
+Since 2026-10-09 the node serves twenty-five families: the ten house and palette faces above, and
+fifteen for themes and apps that want a face of their own (Instrument Serif and Sans, Schibsted
+Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Mona Sans, Hubot Sans, Geist Mono, Martian
+Mono, Press Start 2P, Selawik, and IBM Plex Sans and IBM Plex Mono, vendored for the SOC console's
+accepted design on 2026-10-09).
 
 **A face can also be added to the running node, with no commit and no deploy** (the font manager,
 since 2026-10-03): the operator adds it on Admin → Themes & Styles → Fonts, or an AI does with

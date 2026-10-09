@@ -8,6 +8,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.13.1 — 2026-10-09 — archiveHandler asks archiveRoleOf (services/archive.ts), the same rule
+ *     ctx.workspace.archiveRecords asks. Same answer as memberRole for every caller.
  *   v1.13.0 — 2026-10-06 — publishDraftsBatch takes `opts`: `createOnly` refuses an id that already has
  *     a `.latest` (code EXISTS), `dryRun` decides every record and writes nothing. An expected version
  *     the caller names is held in every space, not only in a requires_expected_version space (code
@@ -69,7 +71,7 @@ import { resolveIdentity, isSameOwner, isGEAI, localAccountName } from '../../ut
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
-import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../../services/archive.js';
+import { archiveTarget, unarchiveTarget, archiveRoleOf, type ArchiveLevel } from '../../services/archive.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
@@ -720,7 +722,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const role = await memberRole(req, organism, id);
+    // The rule ctx.workspace.archiveRecords asks too (services/archive.ts archiveRoleOf).
+    const role = await archiveRoleOf(storage, organism, { principal: req.auth!.sub, ownerName: req.auth!.owner });
     if (role !== 'creator' && role !== 'admin') {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', `Only the creator or an admin can ${mode} organism content`));
       return;
