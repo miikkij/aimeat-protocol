@@ -1,9 +1,9 @@
 ---
 name: aimeat-design-language
-description: "The AIMEAT design language in words and in numbers: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use before designing or styling anything that carries the AIMEAT name, before changing a font or a colour, and to judge whether a screen looks like this product."
+description: "The look of the node's OWN screens under aimeat/public/ and aimeat/src/static/: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use only when changing or judging one of those screens, or a font or colour token they read. Not for an app published on the node, whatever its name: an app forks a Design Book genre and has a look of its own (Jouni, 2026-10-09)."
 metadata:
-  version: 1.12.0
-  updated: 2026-09-27
+  version: 1.13.0
+  updated: 2026-10-09
   owner: Jouni Miikki
 ---
 
