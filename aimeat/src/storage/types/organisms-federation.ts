@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-09 — ExtensionRecord.limits.fetchMaxBytes: the manifest's `limits.fetch_max_mb`,
+ *     optional, inside the JSON `limits` column both providers already store.
  *   v1.7.0 — 2026-09-29 — ScheduledJobRecord and ExecutionLogEntry types take 'refinery': one batch
  *     of the owner's mail refinery on each fire.
  *   v1.6.0 — 2026-09-26 — CortexActivationArtifacts.actionProvider: the identity an activation
@@ -413,6 +415,8 @@ export interface ExtensionRecord {
     memoryMb: number;
     timeoutMs: number;
     maxApiCalls: number;
+    /** The manifest's `limits.fetch_max_mb` in bytes, clamped to EXTENSION_FETCH_MAX_BYTES_CEILING. Absent: the 4 MB default. */
+    fetchMaxBytes?: number;
   };
   federation: {
     advertise: boolean;

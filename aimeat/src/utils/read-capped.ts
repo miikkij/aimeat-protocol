@@ -17,16 +17,24 @@
  *
  *   OUTBOUND_READ_MAX_BYTES is the ceiling itself for the three reads of an answer from a service a
  *   person chose to call: a connected account, an extension's ctx.fetch and a decision provider.
- * @structure OUTBOUND_READ_MAX_BYTES · readBodyCapped(resp, maxBytes) · readBodyPrefix(resp, maxBytes) ·
- *   readJsonCapped(resp, maxBytes) · readTextCapped(resp, maxBytes) · readJson(resp, maxBytes) ·
- *   readText(resp, maxBytes) · capResponseBody(resp, maxBytes) ·
- *   ResponseTooLargeError
+ *   An extension's manifest may raise its own ctx.fetch ceiling up to EXTENSION_FETCH_MAX_BYTES_CEILING
+ *   (`limits.fetch_max_mb`), and inflateCapped is the gunzip behind `ctx.fetch(url, { gunzip: true })`:
+ *   a gzipped answer is counted twice, as it arrives and as it inflates, against the same ceiling.
+ * @structure OUTBOUND_READ_MAX_BYTES · EXTENSION_FETCH_MAX_BYTES_CEILING · readBodyCapped(resp, maxBytes) ·
+ *   readBodyPrefix(resp, maxBytes) · readJsonCapped(resp, maxBytes) · readTextCapped(resp, maxBytes) ·
+ *   readJson(resp, maxBytes) · readText(resp, maxBytes) · isGzip(buf) · inflateCapped(buf, maxBytes) ·
+ *   capResponseBody(resp, maxBytes) · ResponseTooLargeError
  * @usage
  *   const body = await readBodyCapped(res, capBytes);
  *   if (body === null) return refuse(413, 'SIZE_EXCEEDED', 'That is over the limit.');
  *   const capped = capResponseBody(await safeFetch(url), 16 * 1024 * 1024);
  *   const answer = await readBodyCapped(res, OUTBOUND_READ_MAX_BYTES);
+ *   const text = inflateCapped(gzBytes, maxBytes);   // null past the ceiling, the bytes as they are when not gzip
  * @version-history
+ *   v1.4.0 — 2026-10-09 — EXTENSION_FETCH_MAX_BYTES_CEILING (32 MB), the most a manifest's
+ *     `limits.fetch_max_mb` may ask for; isGzip and inflateCapped, the gunzip behind
+ *     `ctx.fetch(url, { gunzip: true })`, counted against the same ceiling as the raw read
+ *     (an XMLTV guide of 1 MB gzipped is 6.5 MB inflated; wish-tv-opas).
  *   v1.3.0 — 2026-10-05 — readBodyPrefix (a cut read, for a link preview's page head), readJsonCapped
  *     and readTextCapped (answer the reason), readJson and readText (throw as json() and text() do):
  *     the capped forms of json() and text() (secaudit 2026-10, C6).
@@ -38,6 +46,7 @@
  *     errors at the ceiling, counted per event on an event stream (secaudit 2026-09, A2-2).
  *   v1.0.0 — 2026-09-24 — Initial: promoted from services/connections/read.ts (secaudit 2026-09, A6-13).
  */
+import { gunzipSync } from 'node:zlib';
 import { logger } from './logger.js';
 
 /**
@@ -48,6 +57,35 @@ import { logger } from './logger.js';
  * ceiling the connection read had first.
  */
 export const OUTBOUND_READ_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
+ * The most an extension's manifest may raise its own ctx.fetch ceiling to (`limits.fetch_max_mb`,
+ * services/extension-manifest.ts). A manifest that asks for more is clamped here, so the number
+ * an installer approves is the number the sandbox gets. 32 MB holds a national TV guide inflated
+ * and stays well under the 64 MB a sandbox has for everything.
+ */
+export const EXTENSION_FETCH_MAX_BYTES_CEILING = 32 * 1024 * 1024;
+
+/** Whether the bytes start with the gzip magic number. */
+export function isGzip(buf: Uint8Array): boolean {
+    return buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b;
+}
+
+/**
+ * The bytes inflated, or null once inflating would pass `maxBytes`. Bytes that are not gzip come
+ * back as they are: the caller asked for an inflate, and a plain answer (an error page, a source
+ * that stopped compressing) is still the answer it should read rather than a failure to decode.
+ * zlib stops at `maxOutputLength` and throws, so a bomb never inflates further than the ceiling.
+ */
+export function inflateCapped(buf: Buffer, maxBytes: number): Buffer | null {
+    if (!isGzip(buf)) return buf;
+    try {
+        return gunzipSync(buf, { maxOutputLength: maxBytes });
+    } catch (err) {
+        if ((err as { code?: string }).code === 'ERR_BUFFER_TOO_LARGE') return null;
+        throw err;
+    }
+}
 
 /**
  * The body as a Buffer, or null once it passes `maxBytes`. A response with no body is an empty

@@ -81,6 +81,7 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [Phaser](https://phaser.io) | 4.2.1 | MIT | Copyright (c) 2024 Richard Davey, Phaser Studio Inc. | served by the node | notice only |
 | [Drawflow](https://github.com/jerosoler/Drawflow) | 0.0.60 | MIT | Copyright (c) 2020 Jero Soler | served by the node | notice only |
 | [PDF.js (pdfjs-dist)](https://mozilla.github.io/pdf.js/) | 6.3.289 | Apache-2.0 | Copyright 2024 Mozilla Foundation | served by the node | notice only |
+| [hls.js](https://github.com/video-dev/hls.js) | 1.7.3 | Apache-2.0 | Copyright (c) 2017 Dailymotion (http://www.dailymotion.com) | served by the node | notice only |
 | [DuckDB-Wasm](https://duckdb.org) | 1.32.0 | MIT | Copyright 2018-2025 Stichting DuckDB Foundation | served by the node | notice only |
 | [Apache Arrow (JS)](https://arrow.apache.org) | 17.0.0 | Apache-2.0 | Copyright 2016-2026 The Apache Software Foundation | served by the node | notice only |
 | [TOAST UI Editor](https://ui.toast.com/tui-editor) | 3.2.2 | MIT | Copyright (c) 2020 NHN Cloud Corp. | served by the node | notice only |
@@ -7003,6 +7004,39 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### hls.js 1.7.3
+
+```text
+Copyright (c) 2017 Dailymotion (http://www.dailymotion.com)
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+src/remux/mp4-generator.js and src/demux/exp-golomb.ts implementation in this project
+are derived from the HLS library for video.js (https://github.com/videojs/videojs-contrib-hls)
+
+That work is also covered by the Apache 2 License, following copyright:
+Copyright (c) 2013-2015 Brightcove
+
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ```
 
 ### hono 4.13.12

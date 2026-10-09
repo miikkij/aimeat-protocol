@@ -29,6 +29,10 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.13.0 — 2026-10-09 — ctx.fetch takes `gunzip: true` (the answer is inflated before it is
+ *     decoded, under the same ceiling) and reads under the extension's own ceiling when its manifest
+ *     declared `limits.fetch_max_mb` (capabilities.fetchMaxBytes); RESPONSE_TOO_LARGE names the
+ *     ceiling in force (wish-tv-opas: a 1 MB gzipped XMLTV guide is 6.5 MB inflated).
  *   v1.12.2 — 2026-10-09 — The refusal names each host field the owner has not set, beside fixed hosts too.
  *   v1.12.1 — 2026-10-09 — An empty host list (a host field not set yet) says so in the refusal.
  *   v1.12.0 — 2026-10-08 — ctx.fetch reaches only `capabilities.hosts` when the manifest names
@@ -106,7 +110,7 @@ import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
-import { readBodyCapped, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
+import { readBodyCapped, inflateCapped, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
 import { parseGAII, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
 import { logger } from '../utils/logger.js';
@@ -239,19 +243,25 @@ function hostOfUrl(url: string): string | null {
  *
  * THE ANSWER IS READ UP TO A CEILING, counted while it arrives: OUTBOUND_READ_MAX_BYTES
  * (utils/read-capped.ts, 4 MB), the one a connected account's read and a decision provider's answer
- * share. Past it the rest of the stream is cancelled, nothing is decoded, and the call throws
- * `RESPONSE_TOO_LARGE: …`. The code leads the message as it does in SECRET_UNKNOWN, because the
- * message is all a script receives, and every road into the sandbox then carries the same code.
- * The message names the host the script called, so an owner whose script calls several services
- * can tell which one answered too much (hostOfUrl below).
+ * share, or the extension's own `limits.fetch_max_mb` when its manifest declared one. Past it the
+ * rest of the stream is cancelled, nothing is decoded, and the call throws `RESPONSE_TOO_LARGE: …`.
+ * With `gunzip` the bytes are inflated under the same ceiling before they are decoded, so a gzip
+ * bomb stops at the ceiling as a plain stream does. The code leads the message as it does in
+ * SECRET_UNKNOWN, because the message is all a script receives, and every road into the sandbox
+ * then carries the same code. The message names the host the script called, so an owner whose
+ * script calls several services can tell which one answered too much (hostOfUrl below).
  */
-async function decodeBody(resp: Response, url: string, strictCharset = false): Promise<string> {
-    const buf = await readBodyCapped(resp, OUTBOUND_READ_MAX_BYTES);
+async function decodeBody(resp: Response, url: string, strictCharset = false, read: { gunzip?: boolean; maxBytes?: number } = {}): Promise<string> {
+    const maxBytes = read.maxBytes ?? OUTBOUND_READ_MAX_BYTES;
+    const raw = await readBodyCapped(resp, maxBytes);
+    const buf = raw === null ? null : read.gunzip ? inflateCapped(raw, maxBytes) : raw;
     if (buf === null) {
         const host = hostOfUrl(url);
+        const mb = maxBytes / (1024 * 1024);
         throw new Error(`RESPONSE_TOO_LARGE: The answer ${host ? `from ${host} ` : ''}is larger than `
-            + `${OUTBOUND_READ_MAX_BYTES / (1024 * 1024)} MB, the most ctx.fetch reads of one answer. Ask the `
-            + 'source for less: fewer items, one page at a time, or a shorter date range.');
+            + `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB, the most ctx.fetch reads of one answer`
+            + `${raw !== null ? ' once inflated' : ''}. Ask the source for less: fewer items, one page at a time, or a `
+            + 'shorter date range; or raise `limits.fetch_max_mb` in the manifest.');
     }
     const ct = resp.headers.get('content-type') || '';
     let charset = (/charset=([^\s;]+)/i.exec(ct)?.[1] ?? '').toLowerCase();
@@ -715,7 +725,8 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             // default and a package producer gets a failed run instead of a mojibake version.
             // GUARD (2026-09-26): the answer is read up to the outbound ceiling and no further, and
             // one past it throws RESPONSE_TOO_LARGE (decodeBody above).
-            const text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true);
+            const text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true,
+                { gunzip: opts?.gunzip === true, maxBytes: deps.capabilities.fetchMaxBytes });
             const headers: Record<string, string> = {};
             resp.headers.forEach((v, k) => { headers[k] = v; });
             return { status: resp.status, ok: resp.ok, text, headers };

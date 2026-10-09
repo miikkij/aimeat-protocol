@@ -10,6 +10,8 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-10-09 — NEW hls pack (hls.js 1.7.3, /lib/hls@1/), in ./vendored-media.ts (800-line rule):
+ *     HLS playback in a <video> element where the browser has none of its own (wish-tv-opas).
  *   2026-09-26 — pdfjs aiDoc: ctx.fetch reads at most 4 MB of one answer and throws
  *     RESPONSE_TOO_LARGE past that (secaudit 2026-09, N3).
  *   2026-09-13 — realtime aiDoc: what the lib now replays ('joined') and queues (a broadcast sent
@@ -36,6 +38,7 @@
 import type { LibraryPack } from '../library-packs.js';
 import { CREATIVE_PACKS } from './vendored-creative.js';
 import { MOTION_PACKS } from './vendored-motion.js';
+import { MEDIA_PACKS } from './vendored-media.js';
 
 export const VENDORED_PACKS: LibraryPack[] = [
   {
@@ -577,6 +580,8 @@ export const VENDORED_PACKS: LibraryPack[] = [
   ...CREATIVE_PACKS,
   // motion, anime and lenis live in ./vendored-motion.ts for the same reason: one list, three files.
   ...MOTION_PACKS,
+  // hls lives in ./vendored-media.ts for the same reason: one list, four files.
+  ...MEDIA_PACKS,
   {
     id: 'fonts',
     kind: 'vendored',
