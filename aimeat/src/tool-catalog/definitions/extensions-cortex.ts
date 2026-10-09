@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.7.1 — 2026-10-09 — aimeat_extension_install says which config values an update keeps.
  *   v1.7.0 — 2026-10-09 — aimeat_extension_config_set: change an installed extension's config values
  *     in place, which is how an owner points a host field (manifest network.host_fields) at a new address.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -68,7 +69,7 @@ export const extensionsCortexTools = [
     },
     {
         name: 'aimeat_extension_install',
-        description: 'Install or update a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). BEFORE you build one to fetch something on a person\'s behalf on a schedule: check whether one of their agents should do it instead: load `node:aimeat-recurring-work`. An extension you write is a fourth parallel implementation if they already have an agent doing it, and it will not show up in any of their agent screens. Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest YAML string plus a scripts map directly. Updating an installed extension: pass update:true to upsert it in place (activation status, lifecycle fields and its ext: memory are preserved; owner-gated). Pass activate:true to activate in the same call; otherwise activate with aimeat_extension_activate.',
+        description: 'Install or update a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). BEFORE you build one to fetch something on a person\'s behalf on a schedule: check whether one of their agents should do it instead: load `node:aimeat-recurring-work`. An extension you write is a fourth parallel implementation if they already have an agent doing it, and it will not show up in any of their agent screens. Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest YAML string plus a scripts map directly. Updating an installed extension: pass update:true to upsert it in place (activation status, lifecycle fields and its ext: memory are preserved; owner-gated). On an update, config values return to the new manifest\'s, except a stored secret the manifest gives no value and a host field (network.host_fields), which keep the installed copy\'s value; change config afterwards with aimeat_extension_config_set. Pass activate:true to activate in the same call; otherwise activate with aimeat_extension_activate.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Install Extension', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

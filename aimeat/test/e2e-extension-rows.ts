@@ -23,7 +23,9 @@
  *   Host fields, manifest network.host_fields, PATCH /v1/extensions/:name/config:
  *     - unset, the extension reaches nothing and the refusal says the field is not set;
  *     - another owner setting it → 404; a URL in place of a host → 400, nothing changed;
- *     - set, ctx.fetch reaches that host and no other; changed, the list moves, same version.
+ *     - set, ctx.fetch reaches that host and no other; changed, the list moves, same version;
+ *     - an in-place update (PUT, or a ZIP upload with update:true) keeps the host, and the upload
+ *       keeps a stored secret too.
  *   A workflow's extension step, input_from:
  *     - propose → a person approves → act: the act step receives the earlier step's result and the
  *       person's answer as input, and appends the action as a row.
@@ -33,12 +35,14 @@
  *   `network:` is ignored, so the unlisted host is reached. Each assertion of the new behaviour is
  *   marked `// HOLE:`.
  * @version-history
+ *   v1.2.0 — 2026-10-09 — An in-place update keeps the host field and, by upload, the stored secret.
  *   v1.1.0 — 2026-10-09 — Host fields (wish-a-package-s-extension-hosts-settable-per-install-the-soc-s-w).
  *   v1.0.0 — 2026-10-08 — Initial (aimeat-soc core).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-rows
 
 import http from 'node:http';
+import { ZipArchive } from 'archiver';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -358,11 +362,28 @@ await test('Workflow: input_from is a read, so an agent with workflow:write and 
 const EXT_H = `exrowsh${STAMP}`;
 const setHost = (token: string, value: string) => json(`/v1/extensions/${EXT_H}/config`, {
     method: 'PATCH', headers: auth(token), body: JSON.stringify({ config: { FAR_HOST: value } }) });
+/** EXT_H's manifest at a version: an optional host field and a secret, neither with a value. */
+const hostManifest = (version: string) => {
+    const m = JSON.parse(manifestFor(EXT_H, FETCH_SCRIPTS, { capabilities: ['network'], network: { host_fields: { FAR_HOST: 'optional' } },
+        config: { FAR_HOST: { description: 'The far side' }, FAR_TOKEN: { type: 'secret', description: 'A key for the far side' } } }));
+    return JSON.stringify({ ...m, metadata: { ...m.metadata, version } });
+};
+async function zipOf(entries: Record<string, string>): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+        const archive = new ZipArchive({ zlib: { level: 0 } });
+        const chunks: Buffer[] = [];
+        archive.on('data', (d: Buffer) => chunks.push(d));
+        archive.on('end', () => resolve(Buffer.concat(chunks)));
+        archive.on('error', reject);
+        for (const [name, content] of Object.entries(entries)) archive.append(content, { name });
+        void archive.finalize();
+    });
+}
+const storedConfig = async () => (await json(`/v1/extensions/${EXT_H}`, { headers: auth(A.token) })).body.data?.extension?.config ?? {};
 
 await test('Host field: installed with no value, the extension reaches nothing and says the field is not set', async () => {
     const inst = await json('/v1/extensions', { method: 'POST', headers: auth(A.token), body: JSON.stringify({
-        manifest: manifestFor(EXT_H, FETCH_SCRIPTS, { capabilities: ['network'], network: { host_fields: { FAR_HOST: 'optional' } },
-            config: { FAR_HOST: { description: 'The far side' } } }), scripts: FETCH_SCRIPTS }) });
+        manifest: hostManifest('1.0.0'), scripts: FETCH_SCRIPTS }) });
     // HOLE: 400 before this change: network had to be a non-empty hosts list and nothing else.
     assert(inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
     const act = await json(`/v1/extensions/${EXT_H}/activate`, { method: 'POST', headers: auth(A.token) });
@@ -400,6 +421,31 @@ await test('Host field: changing it moves the allowlist with no new version', as
     assert(before.status !== 200, `localhost is no longer listed, got ${before.status}`);
     const got = await json(`/v1/extensions/${EXT_H}`, { headers: auth(A.token) });
     assert(got.body.data?.version === '1.0.0' || got.body.data?.extension?.version === '1.0.0', `version: ${JSON.stringify(got.body.data?.version ?? got.body.data?.extension?.version)}`);
+});
+
+await test('Host field: an in-place update through PUT keeps the owner\'s host', async () => {
+    const put = await json(`/v1/extensions/${EXT_H}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ manifest: hostManifest('1.0.1'), scripts: FETCH_SCRIPTS }) });
+    assert(put.status === 200, `put ${put.status}: ${JSON.stringify(put.body?.error)}`);
+    const cfg = await storedConfig();
+    // HOLE: '' before this change; the manifest's empty value replaced the owner's host.
+    assert(cfg.FAR_HOST === '127.0.0.1', `FAR_HOST after PUT: ${JSON.stringify(cfg.FAR_HOST)}`);
+    const r = await invoke(EXT_H, 'fetch_unlisted', A.token);
+    assert(r.status === 200, `127.0.0.1 still reached: ${r.status} ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Host field: an update by ZIP upload keeps the host and the stored secret', async () => {
+    const tok = await json(`/v1/extensions/${EXT_H}/config`, { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ config: { FAR_TOKEN: 'tok-e2e' } }) });
+    assert(tok.status === 200 && tok.body.data.config.FAR_TOKEN === '••••••••', `secret set and masked: ${tok.status} ${JSON.stringify(tok.body.data?.config?.FAR_TOKEN)}`);
+    const mint = await json('/v1/extensions', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ mode: 'presigned', update: true }) });
+    assert(mint.status === 200 && mint.body.data?.upload_url, `presigned: ${mint.status}`);
+    const files: Record<string, string> = { 'manifest.yaml': hostManifest('1.0.2') };
+    for (const [id, src] of Object.entries(FETCH_SCRIPTS)) files[`scripts/${id}`] = src;
+    const up = await fetch(mint.body.data.upload_url, { method: 'PUT', headers: { 'Content-Type': 'application/zip' }, body: new Uint8Array(await zipOf(files)) });
+    assert(up.status === 200, `upload ${up.status}: ${await up.text()}`);
+    const cfg = await storedConfig();
+    // HOLE: both lost before this change (the report from aimeat.io, 2026-10-09).
+    assert(cfg.FAR_TOKEN === '••••••••', `FAR_TOKEN after upload: ${JSON.stringify(cfg.FAR_TOKEN)}`);
+    assert(cfg.FAR_HOST === '127.0.0.1', `FAR_HOST after upload: ${JSON.stringify(cfg.FAR_HOST)}`);
 });
 
 // ─── Cleanup ───

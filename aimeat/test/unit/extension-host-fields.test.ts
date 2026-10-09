@@ -14,6 +14,7 @@
  *   safeFetch is replaced by a recorder, the way extension-ai-provider-ctx.test.ts does it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-host-fields.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-09 — carryHostFieldValues: an in-place update keeps the held host.
  *   v1.1.0 — 2026-10-09 — An unset field beside fixed hosts is named in the refusal.
  *   v1.0.0 — 2026-10-09 — Initial (wish-a-package-s-extension-hosts-settable-per-install-the-soc-s-w).
  */
@@ -34,7 +35,7 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
 const { buildExtensionRecordFromManifest } = await import('../../src/services/extension-manifest.js');
 const { capabilitiesOfRecord } = await import('../../src/services/extension-capability-declaration.js');
 const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
-const { parseHostFieldValue, NETWORK_HOST_FIELDS_KEY } = await import('../../src/services/extension-network-hosts.js');
+const { parseHostFieldValue, carryHostFieldValues, NETWORK_HOST_FIELDS_KEY } = await import('../../src/services/extension-network-hosts.js');
 const { setExtensionConfig } = await import('../../src/services/extension-config-set.js');
 const { questionsOf } = await import('../../src/services/packages/compose/package-config-needs.js');
 const { planPackageConfig } = await import('../../src/services/packages/compose/package-config.js');
@@ -189,6 +190,18 @@ describe('the owner changes the host without a new version', () => {
         expect(out.ok).toBe(false);
         if (!out.ok) { expect(out.code).toBe('INVALID_INPUT'); expect(out.message).toMatch(why); }
         expect(updateExtension).not.toHaveBeenCalled();
+    });
+});
+
+describe('an in-place update keeps the host the install holds', () => {
+    it('carries a held host over the new build\'s empty value, and keeps the new build\'s value when the install holds none', () => {
+        const next = record('network: { hosts: [a.example], host_fields: { X: optional } }', 'config:\n  X: { description: The indexer }').config;
+        expect(carryHostFieldValues(next, { X: 'c.example:9200' }).X).toBe('c.example:9200');
+        expect(carryHostFieldValues(next, { X: '' }).X).toBe('');
+        expect(carryHostFieldValues(next, { X: 'https://bad.example' }).X).toBe('');
+        expect(carryHostFieldValues(next, undefined).X).toBe('');
+        // Only host fields are carried; any other config value is the new build's.
+        expect(carryHostFieldValues({ ...next, REGION: 'eu' }, { X: 'c.example', REGION: 'us' }).REGION).toBe('eu');
     });
 });
 

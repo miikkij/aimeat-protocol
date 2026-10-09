@@ -24,6 +24,8 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.25.1 — 2026-10-09 — An extension upload over an installed copy keeps its host field values and
+ *     its stored secrets (prepareSecretConfigForWrite, the function the other install paths use).
  *   v1.25.0 — 2026-10-08 — The storage handler and declaredFromMeta moved to routes/upload-storage.ts
  *     (max-file-lines); the storage upload passes the token's actor and carries ai_provenance.
  *   v1.24.0 — 2026-10-08 — handleSkillUpload moved to routes/upload-skill.ts (max-file-lines), where it
@@ -154,7 +156,8 @@ import { accountOf } from '../services/app-members.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
 import { getEncryptionKey } from '../services/encryption.js';
-import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
+import { prepareSecretConfigForWrite } from '../services/extension-secrets.js';
+import { carryHostFieldValues } from '../services/extension-network-hosts.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
 import { managedChangeRefusal } from '../services/packages/install/package-managed.js';
@@ -444,10 +447,17 @@ async function handleExtensionUpload(
         if (managed) { res.status(managed.status).json({ success: false, error: managed.code, message: managed.message, details: managed.details }); return; }
     }
 
+    // A host field (manifest network.host_fields) keeps the host the installed copy holds, as on
+    // PUT /v1/extensions/:name (services/extension-lifecycle.ts).
+    if (existing) record.config = carryHostFieldValues(record.config, existing.config);
+
     // Encrypt `type: secret` config values before they are stored, exactly as POST/PUT
     // /v1/extensions do. Without this a ZIP install was a way to write an API key to the database
     // in plaintext.
-    const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
+    // prepareSecretConfigForWrite, as writeExtensionRecord uses: a secret the new manifest declares
+    // without a value keeps the installed copy's stored one. encryptSecretFields alone dropped it, so
+    // an upload over an installed copy erased the owner's API key (found 2026-10-09).
+    const encConfig = prepareSecretConfigForWrite(record.config, existing?.config, getEncryptionKey(config));
     if (encConfig === null) {
         res.status(503).json({
             success: false, error: 'ENCRYPTION_NOT_CONFIGURED',
