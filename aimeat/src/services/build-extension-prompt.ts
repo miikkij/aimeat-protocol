@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.5.11 — 2026-10-09 — ADDITIVE: `ctx.fetch(url, { gunzip: true })` and `limits.fetch_max_mb`,
+ *     the extension's own read ceiling up to the node's (wish-tv-opas).
  *   v1.5.10 — 2026-10-09 — ADDITIVE: `network.host_fields`, a host the installer gives per install.
  *   v1.5.9 — 2026-10-09 — ADDITIVE: ctx.workspace.archiveRecords in the ctx table.
  *   v1.5.8 — 2026-10-08 — ADDITIVE: ai.speak may answer sampleRate, channels and sampleFormat, which the
@@ -60,10 +62,12 @@
  *     config fields, and binary file I/O.
  */
 import type { AimeatConfig } from '../config.js';
-import { OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
+import { EXTENSION_FETCH_MAX_BYTES_CEILING, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
 
 /** How much of one answer ctx.fetch reads, in the megabytes the prompt says it in. */
 const FETCH_READ_MB = OUTBOUND_READ_MAX_BYTES / (1024 * 1024);
+/** The most a manifest's `limits.fetch_max_mb` may raise that to. */
+const FETCH_CEILING_MB = EXTENSION_FETCH_MAX_BYTES_CEILING / (1024 * 1024);
 
 export interface ExtensionPromptOpts {
   /** Reply language for the built extension's own copy; the instructions stay English. */
@@ -118,7 +122,7 @@ function sandboxSection(): string {
     '| `ctx.memory.search(prefix)` | `[{key, value}]` for every key under the prefix, private ones included |',
     '| `ctx.memory.delete(key)` | Remove one key; returns whether it existed |',
     '| `ctx.memory.getPublic(namespace, key)` | Read a PUBLIC key in another namespace (another `ext:` one, or an owner\'s), or null |',
-    `| \`ctx.fetch(url, {method, headers, body})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer, and throws \`RESPONSE_TOO_LARGE\` past that |`,
+    `| \`ctx.fetch(url, {method, headers, body, gunzip})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer (more with \`limits.fetch_max_mb\`, below), and throws \`RESPONSE_TOO_LARGE\` past that. \`gunzip: true\` inflates a gzipped answer (a \`.xml.gz\`, a compressed export) before it is decoded |`,
     '| `ctx.files.read(ref)` | A stored file as `{base64, mime, size, key}`, or null. Read with the CALLER\'s rights |',
     '| `ctx.files.write(key, base64, {mime, visibility})` | Store bytes under `ext/{name}/`, private unless `visibility: \'public\'`. Returns `{key, gaii, owner, url, size}`; `owner` is whose storage it landed in |',
     '| `ctx.datapackage.publish / validate / inferSchema / open / rows / fail` | AIMEAT Data Packages, built on the node. `publish` THROWS when the quality gate refuses; `validate` looks first without throwing |',
@@ -275,6 +279,11 @@ function sandboxSection(): string {
     '`ctx.fetch` returns `text`, never a parsed body. Parse it yourself and handle a non-ok status.',
     `It reads at most ${FETCH_READ_MB} MB of one answer. A longer answer makes the call throw`,
     '`RESPONSE_TOO_LARGE: …` and returns none of it, so ask a large source for one page at a time.',
+    'A source that has no pages (a national TV guide, a full export) is read under a larger ceiling',
+    `the manifest declares: \`limits: { fetch_max_mb: 16 }\`, at most ${FETCH_CEILING_MB}. The number is clamped,`,
+    'stored on the record and shown to the installer. A gzipped answer is inflated with',
+    '`ctx.fetch(url, { gunzip: true })`; the ceiling counts the bytes as they arrive and again as they',
+    'inflate, and an answer that is not gzip comes back as it is, so a 404 page still reads as text.',
     '',
     'GATING AN APP: declare the app in your manifest `config:` as `app: owner/file.html`, and the node',
     'resolves the caller against that app\'s member roster BEFORE your script runs, handing you',

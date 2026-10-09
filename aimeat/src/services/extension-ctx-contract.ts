@@ -13,6 +13,8 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.8.0 — 2026-10-09 — `fetch` takes `gunzip`, and ExtensionLimits carries `fetchMaxBytes`: the
+ *     manifest's `limits.fetch_max_mb`, the ceiling one answer is read under, raw and inflated.
  *   v1.7.0 — 2026-10-09 — `ctx.workspace.archiveRecords`: archive many records of one space in one
  *     call, under the archive route's creator-or-admin rule (services/archive.ts).
  *   v1.6.0 — 2026-10-08 — `ctx.workspace.appendRows` and `readRows`: a row space that names the
@@ -153,8 +155,13 @@ export interface ExtensionCtx {
      * this argument exists at all — without it the runtime had to write its own fetch, and did, and
      * the two drifted: the copy in extension-runtime.ts threw on a charset it could not name where
      * this one falls back with a warning, and it never honoured `strictCharset`.
+     *
+     * `gunzip: true` inflates a gzipped answer before it is decoded (a `.xml.gz` guide, a
+     * compressed export); an answer that is not gzip comes back as it is. The ceiling counts the
+     * bytes as they arrive and again as they inflate, and it is the extension's own
+     * (`limits.fetch_max_mb` in the manifest, 4 MB when the manifest names none).
      */
-    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
+    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string; gunzip?: boolean }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
     /** Stored FILES, by reference. Optional the way notify/email are: a road that cannot offer it
      *  simply does not, and the guest sees undefined.
      *
@@ -317,4 +324,6 @@ export interface ExtensionLimits {
     memoryMb: number;
     timeoutMs: number;
     maxApiCalls: number;
+    /** How much of one answer ctx.fetch reads, raw and inflated. Absent on a record whose manifest named none: the 4 MB default applies. */
+    fetchMaxBytes?: number;
 }

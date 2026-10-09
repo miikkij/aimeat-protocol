@@ -288,6 +288,21 @@
       "purl": "pkg:npm/pdfjs-dist@6.3.289"
     },
     {
+      "id": "hls",
+      "name": "hls.js",
+      "version": "1.7.3",
+      "spdx": "Apache-2.0",
+      "copyright": "Copyright (c) 2017 Dailymotion (http://www.dailymotion.com)",
+      "homepage": "https://github.com/video-dev/hls.js",
+      "source": "https://registry.npmjs.org/hls.js/-/hls.js-1.7.3.tgz (dist/hls.min.js)",
+      "licenseFile": "LICENSES/hls.txt",
+      "files": [
+        "hls@1/**"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/hls.js@1.7.3"
+    },
+    {
       "id": "duckdb-wasm",
       "name": "DuckDB-Wasm",
       "version": "1.32.0",

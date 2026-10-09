@@ -5,6 +5,9 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-09 — `limits.fetch_max_mb`: the ceiling this extension's ctx.fetch reads one
+ *                         answer under, stored as `limits.fetchMaxBytes` clamped to
+ *                         EXTENSION_FETCH_MAX_BYTES_CEILING; a non-positive value is refused.
  *   v1.11.0 — 2026-10-09 — `network: { host_fields: { FIELD: required|optional } }`: config fields
  *                         whose value the installer gives as one more host, stored as
  *                         `config.__networkHostFields` (services/extension-network-hosts.ts, where
@@ -60,6 +63,7 @@ import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './extensio
 import { CAPABILITY_DECLARATION_KEY, NETWORK_HOSTS_KEY, parseCapabilityDeclaration } from './extension-capability-declaration.js';
 import { NETWORK_HOST_FIELDS_KEY, hostRefusal, parseNetworkDeclaration } from './extension-network-hosts.js';
 import { localAccountName } from '../utils/gaii.js';
+import { EXTENSION_FETCH_MAX_BYTES_CEILING } from '../utils/read-capped.js';
 import {
   AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
   type ExtensionAiOp, type ExtensionAiProviderDeclaration,
@@ -627,6 +631,15 @@ export function buildExtensionRecordFromManifest(
   if (!network.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: network.message };
   const hostFieldNames = new Set((network.hostFields ?? []).map(f => f.field));
   const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
+  // `limits.fetch_max_mb` raises this extension's ctx.fetch ceiling (4 MB when absent) up to the
+  // node's own ceiling; the record stores the clamped value, so what the installer reads on the
+  // record is what the sandbox gets. A value that is not a positive number is refused rather than
+  // ignored, because an ignored limit fails at the first large answer with nothing naming why.
+  const fetchMaxMb = manifestLimits?.fetch_max_mb;
+  if (fetchMaxMb !== undefined && (typeof fetchMaxMb !== 'number' || !Number.isFinite(fetchMaxMb) || fetchMaxMb <= 0)) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `limits.fetch_max_mb must be a positive number of megabytes (at most ${EXTENSION_FETCH_MAX_BYTES_CEILING / (1024 * 1024)}), got ${describeYamlValue(fetchMaxMb)}` };
+  }
+  const fetchMaxBytes = typeof fetchMaxMb === 'number' ? Math.min(Math.round(fetchMaxMb * 1024 * 1024), EXTENSION_FETCH_MAX_BYTES_CEILING) : undefined;
   const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
   const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
 
@@ -719,6 +732,7 @@ export function buildExtensionRecordFromManifest(
       memoryMb: Math.min((manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb, config.extensionMaxMemoryMb),
       timeoutMs: Math.min((manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs, config.extensionTimeoutMs),
       maxApiCalls: Math.min((manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls, config.extensionMaxApiCalls),
+      ...(fetchMaxBytes !== undefined ? { fetchMaxBytes } : {}),
     },
     federation: {
       advertise: (manifestFederation?.advertise as boolean) ?? false,

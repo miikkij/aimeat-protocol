@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-09 -- e2e-extension-fetch-gunzip.ts joins the list (not the guard tier yet): ctx.fetch with
+ *     gunzip under a manifest's limits.fetch_max_mb (wish-tv-opas).
  *   2026-10-09 -- e2e-secret-canaries.ts joins the list (not the guard tier yet): a stored credential
  *     searched for in every listed read route (secrets audit 2026-10-09).
  *   2026-10-09 -- e2e-admin-setup-closed.ts joins the list (not the guard tier): setup/register answers
@@ -414,6 +416,9 @@ const ALL_SUITES = [
     // Its row calls: a row space that names the extension, on a call and on a schedule, and the
     // hosts a manifest names as the only ones ctx.fetch reaches (aimeat-soc core).
     'test/e2e-extension-rows.ts',
+    // ctx.fetch with gunzip, under the ceiling a manifest declares (limits.fetch_max_mb): a 6 MB
+    // guide read whole, the 4 MB default and a gzip bomb refused by name, a bad limit refused at install.
+    'test/e2e-extension-fetch-gunzip.ts',
     // The same capability on the road that did not have it: an extension on a clock, writing bytes
     // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
     'test/e2e-scheduled-ext-files.ts',
