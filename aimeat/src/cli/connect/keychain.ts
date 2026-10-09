@@ -9,7 +9,8 @@
  *   filenames so the multi-agent serve loop can load every credential at once.
  * @version-history
  *   v1.3.0 -- 2026-10-09 -- storeToken leaves the file at 0600 and the home and tokens/ at 0700 on
- *     every write, not only when it creates them (secrets audit 2026-10-09, S4).
+ *     every write, not only when it creates them, and the home holds a .gitignore of `*` (secrets
+ *     audit 2026-10-09, S4).
  *   v1.0.0 -- initial file-based store
  *   v1.1.0 -- 2026-05-29 -- Add listAllTokens() for multi-agent serve
  *   v1.2.0 -- 2026-07-19 -- Decode filenames on the FIRST '@', not the last: agent names are '@'-free
@@ -22,6 +23,7 @@ import { join } from 'node:path';
 import { getConfigDir } from './config.js';
 import { logger } from '../../utils/logger.js';
 import { writePrivateFile, ensurePrivateDir } from '../../utils/private-file.js';
+import { prepareConnectorHome } from './home-dir.js';
 
 function tokensDir(): string {
   const dir = join(getConfigDir(), 'tokens');
@@ -36,11 +38,11 @@ function tokenPath(agent: string, owner: string): string {
 /**
  * Write a token at 0600 in a 0700 folder, whether or not either existed: `writeFileSync`'s mode
  * applies only on create, so a file or a folder made earlier with the default mode stayed readable
- * to other accounts (secrets audit 2026-10-09, S4). On Windows the mode is not enforced; the user
- * profile's access list keeps the default home private (home-dir.ts).
+ * to other accounts. The home gets a .gitignore holding `*` first, so the project's git never sees
+ * the token (secrets audit 2026-10-09, S4; home-dir.ts). On Windows the mode is not enforced.
  */
 export async function storeToken(agent: string, owner: string, token: string): Promise<void> {
-  ensurePrivateDir(getConfigDir());
+  prepareConnectorHome(getConfigDir());
   ensurePrivateDir(tokensDir());
   writePrivateFile(tokenPath(agent, owner), token);
 }

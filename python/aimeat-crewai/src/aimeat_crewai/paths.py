@@ -1,19 +1,17 @@
 """
 Single source of truth for the AIMEAT connector home directory.
 
-Resolution (mirrors the Node connector's ``resolveConnectorHome`` in
-``aimeat/src/cli/connect/home-dir.ts``; the node contract wins on any mismatch):
+Resolution (directory-scoped -- mirrors the Node connector's getConfigDir in
+``aimeat/src/cli/connect/config.ts``; the node contract wins on any mismatch):
 
-  1. ``AIMEAT_HOME`` env var -- explicit override, always wins. Two projects that
-     want two daemons on one machine set it.
-  2. else ``<cwd>/.aimeat`` when it already holds connector state (``tokens/``,
-     ``keys/``, ``agents/``, ``config.yaml`` or ``serve.json``) -- an install made
-     before 2026-10-09 keeps working. Deprecated: read until node 3.27.0.
-  3. else ``~/.aimeat`` -- the user's home directory.
+  1. ``AIMEAT_HOME`` env var -- explicit override, always wins.
+  2. else ``<cwd>/.aimeat`` -- the directory the process was launched from, so
+     two projects on one machine get independent ``serve.json`` / tokens /
+     daemon instead of colliding on a single global ``~/.aimeat`` (the old
+     default, which caused last-writer / refused-daemon / wrong-agent routing
+     when several projects ran ``aimeat connect serve`` at once).
 
-The default was ``<cwd>/.aimeat`` from 2026-06-17 to 2026-10-09. It put the agent
-tokens and keys inside whatever project the command ran in, where that project's
-.gitignore does not cover them (secrets audit 2026-10-09).
+Set ``AIMEAT_HOME=~/.aimeat`` to restore the previous global behaviour.
 """
 from __future__ import annotations
 
@@ -21,20 +19,10 @@ import os
 import re
 from pathlib import Path
 
-#: What makes a ``<cwd>/.aimeat`` a connector home rather than an unrelated folder of that name.
-LEGACY_HOME_MARKERS = ("tokens", "keys", "agents", "config.yaml", "serve.json")
-
 
 def aimeat_home() -> Path:
-    """Connector home dir: ``AIMEAT_HOME``; else an existing ``<cwd>/.aimeat`` with state; else ``~/.aimeat``."""
-    explicit = (os.environ.get("AIMEAT_HOME") or "").strip()
-    if explicit:
-        return Path(explicit)
-    user = Path.home() / ".aimeat"
-    legacy = Path.cwd() / ".aimeat"
-    if legacy.resolve() != user.resolve() and any((legacy / m).exists() for m in LEGACY_HOME_MARKERS):
-        return legacy
-    return user
+    """Connector home dir. ``AIMEAT_HOME`` env wins; else ``<cwd>/.aimeat``."""
+    return Path(os.environ.get("AIMEAT_HOME") or (Path.cwd() / ".aimeat"))
 
 
 _NODE_URL_LINE = re.compile(r"""^node_url:\s*['"]?([^'"\s#]+)""", re.MULTILINE)

@@ -22,13 +22,16 @@
  *   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
  *   noteCredentialAnswer(token, res.status, body);
  * @version-history
+ *   v1.0.1 — 2026-10-09 — The home is prepared before the write: 0700 and a .gitignore of `*`
+ *     (home-dir.ts; secrets audit 2026-10-09, S4).
  *   v1.0.0 — 2026-09-24 — Created (production refusal log L-3: one expired bearer sent every few
  *     seconds by `aimeat connect call`).
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { getConfigDir } from './config.js';
+import { prepareConnectorHome } from './home-dir.js';
 
 const FIRST_HOLD_MS = 60_000;
 const LONGEST_HOLD_MS = 3_600_000;
@@ -64,7 +67,8 @@ function writeBook(book: Book): void {
   // costs at most one extra request.
   const tmp = `${file}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`;
   try {
-    mkdirSync(getConfigDir(), { recursive: true });
+    // 0700 and a .gitignore of `*` before anything is written in the home (home-dir.ts).
+    prepareConnectorHome(getConfigDir());
     writeFileSync(tmp, JSON.stringify(book, null, 2), { encoding: 'utf-8', mode: 0o600 });
     renameSync(tmp, file);
   } catch (err) {

@@ -2,61 +2,88 @@
  * @file test/unit/connector-home-default.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Where the connector keeps its tokens and keys, and with what permissions
- *   (cli/connect/home-dir.ts, keychain.ts, agent-key.ts). Secrets audit 2026-10-09, node
- *   configuration S4: the default home was `<cwd>/.aimeat`, inside whatever project `aimeat connect`
- *   ran in, where that project's .gitignore does not cover it; and a token file got 0600 only when
- *   it was created, the folders the default mode.
+ * @description Where the connector keeps its tokens and keys, and how they stay out of the project's
+ *   git (cli/connect/home-dir.ts, keychain.ts, agent-key.ts, config.ts). Secrets audit 2026-10-09,
+ *   node configuration S4: the home is `<cwd>/.aimeat`, inside the project `aimeat connect` ran in,
+ *   where the project's .gitignore may not cover it, so a token or a key could be committed; and a
+ *   token file got 0600 only when it was created, the folders the default mode.
  *
- *   The rules held here: AIMEAT_HOME wins; otherwise a `<cwd>/.aimeat` that already holds connector
- *   state is still used (one release, with a warning); otherwise the user's home directory. Every
- *   write of a token or a key leaves the file 0600 and its folder 0700. Windows keeps only the
- *   read-only attribute from a mode, so the mode bits are asserted on Unix only; there the user
- *   profile's own access list is what keeps the home private.
+ *   The rules held here: the home stays `<cwd>/.aimeat` (one daemon per project, the 2026-06-17
+ *   ruling) and AIMEAT_HOME wins; every write into the home leaves `<home>/.gitignore` holding `*`,
+ *   so git sees nothing inside whatever the project's own .gitignore says; and a token or key file is
+ *   0600 in a 0700 folder after every write. Windows keeps only the read-only attribute from a mode,
+ *   so the mode bits are asserted on Unix only.
  * @version-history
+ *   v2.0.0 — 2026-10-09 — The home stays in the project; the folder ignores itself instead of moving.
  *   v1.0.0 — 2026-10-09 — Initial.
  */
 import { describe, it, expect, afterEach, afterAll, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, chmodSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, chmodSync, statSync, readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const root = mkdtempSync(join(tmpdir(), 'aimeat-connector-home-'));
-const saved = { AIMEAT_HOME: process.env.AIMEAT_HOME, HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+const saved = process.env.AIMEAT_HOME;
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 afterEach(() => {
   vi.restoreAllMocks();
-  for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  if (saved === undefined) delete process.env.AIMEAT_HOME; else process.env.AIMEAT_HOME = saved;
 });
 
-/** config.ts reads the home once at load, so each case loads it fresh in its own cwd and home. */
-async function homeFor(opts: { env?: string; cwdState?: boolean }): Promise<{ dir: string; cwd: string; user: string }> {
-  const cwd = mkdtempSync(join(root, 'project-'));
-  const user = mkdtempSync(join(root, 'user-'));
-  if (opts.cwdState) mkdirSync(join(cwd, '.aimeat', 'tokens'), { recursive: true });
-  if (opts.env) process.env.AIMEAT_HOME = opts.env; else delete process.env.AIMEAT_HOME;
-  process.env.HOME = user;
-  process.env.USERPROFILE = user;
-  vi.spyOn(process, 'cwd').mockReturnValue(cwd);
+/** The connector modules read the home once at load, so each case loads them fresh. */
+async function fresh(opts: { cwd?: string; home?: string }) {
+  if (opts.home) process.env.AIMEAT_HOME = opts.home; else delete process.env.AIMEAT_HOME;
+  if (opts.cwd) vi.spyOn(process, 'cwd').mockReturnValue(opts.cwd);
   vi.resetModules();
-  const mod = await import('../../src/cli/connect/config.js');
-  return { dir: mod.getConfigDir(), cwd, user };
+  return {
+    config: await import('../../src/cli/connect/config.js'),
+    keychain: await import('../../src/cli/connect/keychain.js'),
+    agentKey: await import('../../src/cli/connect/agent-key.js'),
+  };
 }
 
 describe('the connector home', () => {
-  it('is the user\'s home directory by default, not the folder the command ran in', async () => {
-    const { dir, user } = await homeFor({});
-    expect(dir).toBe(join(user, '.aimeat'));
+  it('is <cwd>/.aimeat by default: one daemon per project', async () => {
+    const cwd = mkdtempSync(join(root, 'project-'));
+    const { config } = await fresh({ cwd });
+    expect(config.getConfigDir()).toBe(join(cwd, '.aimeat'));
   });
 
   it('AIMEAT_HOME still wins', async () => {
     const explicit = join(root, 'explicit');
-    expect((await homeFor({ env: explicit })).dir).toBe(explicit);
+    const { config } = await fresh({ home: explicit });
+    expect(config.getConfigDir()).toBe(explicit);
   });
 
-  it('a <cwd>/.aimeat that already holds tokens is still read, for one release', async () => {
-    const { dir, cwd } = await homeFor({ cwdState: true });
-    expect(dir).toBe(join(cwd, '.aimeat'));
+  it('a fresh home gets a .gitignore holding * on the first token written into it', async () => {
+    const home = join(root, 'fresh-home');
+    const { keychain } = await fresh({ home });
+    await keychain.storeToken('helper', 'alice', 'token-value');
+    expect(readFileSync(join(home, '.gitignore'), 'utf-8').split(/\r?\n/)).toContain('*');
+  });
+
+  it('a home that already exists without one gets it on the next write', async () => {
+    const home = join(root, 'old-home');
+    mkdirSync(join(home, 'tokens'), { recursive: true });
+    writeFileSync(join(home, 'tokens', 'helper@alice.token'), 'old');
+    const { config } = await fresh({ home });
+    config.saveConfig({ node_url: 'http://localhost:1', agent: 'helper', owner: 'alice' });
+    expect(existsSync(join(home, '.gitignore'))).toBe(true);
+  });
+
+  it('in a git repository, nothing from .aimeat shows in git status after a token, a key and a config are written', async () => {
+    const repo = mkdtempSync(join(root, 'repo-'));
+    try { execFileSync('git', ['init', '-q'], { cwd: repo }); } catch { return; /* no git on this machine */ }
+    const { keychain, agentKey, config } = await fresh({ cwd: repo });
+    await keychain.storeToken('helper', 'alice', 'token-value');
+    await agentKey.storeAgentKey('helper', 'alice', {
+      privateKey: 'k', publicKey: 'p', kid: 'kid', gaii: 'helper#alice@node', nodeId: 'node',
+    } as never);
+    config.saveConfig({ node_url: 'http://localhost:1', agent: 'helper', owner: 'alice' });
+    expect(existsSync(join(repo, '.aimeat', 'tokens', 'helper@alice.token'))).toBe(true);
+    const status = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: repo, encoding: 'utf-8' });
+    expect(status).not.toContain('.aimeat');
   });
 });
 
@@ -68,11 +95,10 @@ describe.skipIf(process.platform === 'win32')('token and key files', () => {
     const file = join(home, 'tokens', 'helper@alice.token');
     writeFileSync(file, 'old');
     chmodSync(file, 0o644);
-    process.env.AIMEAT_HOME = home;
-    vi.resetModules();
-    const { storeToken } = await import('../../src/cli/connect/keychain.js');
-    await storeToken('helper', 'alice', 'new-token');
+    const { keychain } = await fresh({ home });
+    await keychain.storeToken('helper', 'alice', 'new-token');
     expect(statSync(file).mode & 0o777).toBe(0o600);
     expect(statSync(join(home, 'tokens')).mode & 0o777).toBe(0o700);
+    expect(statSync(home).mode & 0o777).toBe(0o700);
   });
 });

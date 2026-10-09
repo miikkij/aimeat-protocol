@@ -16,6 +16,8 @@
  *   exitIfAnotherDaemonOwns() · buildDiscoveryDoc() · writeDiscoveryFile()
  * @usage import { serveDiscoveryPath, type ServeDiscovery } from './local-discovery.js';
  * @version-history
+ *   v1.3.3 — 2026-10-09 — writeDiscoveryFile prepares the home first: 0700 and a .gitignore of `*`
+ *     (cli/connect/home-dir.ts; secrets audit 2026-10-09, S4).
  *   v1.3.2 — 2026-09-29 — The note on schema 3 says that from 3.20.0 a request that sends no secret
  *     gets 401. No code change.
  *   v1.3.1 — 2026-09-26 — The note on schema 3 says from which release the daemon refuses a request
@@ -31,8 +33,9 @@
  *   v1.0.0 — 2026-09-03 — Extracted from local-server.ts (max-file-lines).
  */
 import { join } from 'node:path';
-import { writeFileSync, renameSync, existsSync, readFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { writeFileSync, renameSync, existsSync, readFileSync, chmodSync } from 'node:fs';
 import { getConfigDir } from '../config.js';
+import { prepareConnectorHome } from '../home-dir.js';
 
 /**
  * 3 since 2026-09-24: the file carries `secret`, which every request to the daemon presents. From
@@ -190,7 +193,8 @@ export function buildDiscoveryDoc(
  * mode bits it cannot express and relies on the ACL of the connector home instead.
  */
 export function writeDiscoveryFile(discoveryFile: string, doc: ServeDiscovery): void {
-  mkdirSync(getConfigDir(), { recursive: true, mode: 0o700 });
+  // 0700 and a .gitignore of `*`, so the project's git never sees the daemon's secret (home-dir.ts).
+  prepareConnectorHome(getConfigDir());
   const tmp = `${discoveryFile}.tmp-${process.pid}`;
   writeFileSync(tmp, JSON.stringify(doc, null, 2), { encoding: 'utf-8', mode: 0o600 });
   chmodSync(tmp, 0o600);
