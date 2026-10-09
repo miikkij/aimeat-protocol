@@ -214,6 +214,9 @@ importers:
       ws:
         specifier: ^8.22.0
         version: 8.22.0
+      xml-crypto:
+        specifier: ^6.3.2
+        version: 6.3.2
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -317,9 +320,6 @@ importers:
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@25.9.9)(@vitest/coverage-v8@4.1.11)(vite@7.3.6(@types/node@25.9.9)(jiti@2.6.1)(tsx@4.23.15)(yaml@2.9.1))
-      xml-crypto:
-        specifier: ^6.3.2
-        version: 6.3.2
       xmllint-wasm:
         specifier: ^5.3.0
         version: 5.3.0(@types/node@25.9.9)

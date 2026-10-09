@@ -28,6 +28,7 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.7.2 — 2026-10-09 — aimeat_docsign_request_create reviewed without provenance (a signing request's label).
  *   v1.7.1 — 2026-10-08 — aimeat_skill_publish is on the required list (aiprov E12).
  *   v1.7.0 — 2026-10-05 — Whether a tool carries ai_provenance, and whether it takes free text, is read from
  *     the schema each MCP surface registers (inventory/mcp-capture.ts), not from the registration
@@ -305,6 +306,12 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
+  // DECIDED, 2026-10-09 (the session that built document signing; the developer reviews it with the
+  // build). The free text is a signing request's title and a short note to its parties: a label for
+  // the document, which the request names by its hash and never stores. The provenance a signature
+  // needs is WHO asked and WHO signed, and the request records both as identities (createdBy, and a
+  // sealed statement per signer), so an agent that wrote the title is named as the creator already.
+  'aimeat_docsign_request_create',
   // DECIDED, 2026-10-02 (package sale design, phase 4; the developer reviews it with the build). The
   // free text is the set's listing: a title, a description, one outcome sentence and up to three
   // example prompts, the same fields aimeat_package_compose takes. The apps it packages are copied

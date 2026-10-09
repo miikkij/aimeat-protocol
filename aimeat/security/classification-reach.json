@@ -1147,6 +1147,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published data package: public by the owner's publish, and the publish step passes leave()."
     },
+    "src/services/docsign/files.ts": {
+      "reads": {
+        "getStorageFile": 1,
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-09: the caller's own stored file, read to check its signatures or hash it for a signing request. The metadata goes through readerFor(...).show() first, exactly as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file; nothing of it is shown except the signature report."
+    },
+    "src/services/docsign/records.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given."
+    },
     "src/services/db/agent-data-access-overview-db-service.ts": {
       "reads": {
         "listMemoryMeta": 1

@@ -40,6 +40,7 @@ import { DOMParser, type Element as XmlElement, type Document as XmlDocument } f
 import { SignedXml, type SignatureAlgorithm, type SignatureAlgorithmType } from 'xml-crypto';
 import type { AimeatConfig } from '../../config.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { readCert, type CertInfo } from './x509-info.js';
 
@@ -114,10 +115,8 @@ type Fetcher = (url: string) => Promise<string>;
 let fetcher: Fetcher = async (url: string) => {
   const res = await safeFetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-  const len = Number(res.headers.get('content-length') ?? 0);
-  if (len > MAX_LIST_BYTES) throw new Error(`${url} is ${len} bytes, over the limit`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_LIST_BYTES) throw new Error(`${url} is over the size limit`);
+  const buf = await readBodyCapped(res, MAX_LIST_BYTES);
+  if (!buf) throw new Error(`${url} is over the size limit`);
   return buf.toString('utf8');
 };
 
@@ -175,7 +174,7 @@ function verifyXmlSignature(xml: string, certs: string[]): string | null {
     try {
       const sx = new SignedXml({ publicCert: pem(b64) });
       sx.SignatureAlgorithms = { ...sx.SignatureAlgorithms, ...ECDSA_ALGORITHMS };
-      sx.loadSignature(sigNode as unknown as Node);
+      sx.loadSignature(sigNode as unknown as Parameters<SignedXml['loadSignature']>[0]);
       if (sx.checkSignature(xml)) return b64;
     // eslint-disable-next-line aimeat/no-silent-catch -- xml-crypto throws for the wrong certificate; the caller logs when none of them verifies
     } catch {

@@ -21,6 +21,7 @@ import { X509Certificate } from 'node:crypto';
 import * as asn1js from 'asn1js';
 import type { AimeatConfig } from '../../config.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import { readBodyCapped } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { readCert, safeVerify, type CertInfo } from './x509-info.js';
 
@@ -46,8 +47,8 @@ type CaFetcher = (url: string) => Promise<Buffer>;
 let caFetcher: CaFetcher = async (url) => {
   const res = await safeFetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.length > MAX_CERT_BYTES) throw new Error('too large');
+  const buf = await readBodyCapped(res, MAX_CERT_BYTES);
+  if (!buf) throw new Error('too large');
   return buf;
 };
 
