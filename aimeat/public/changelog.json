@@ -5,6 +5,18 @@
       "date": "2026-10-09",
       "kind": "feature",
       "title": {
+        "en": "Sign documents with a passkey, and check any signed PDF",
+        "fi": "Allekirjoita dokumentteja pääsyavaimella ja tarkista allekirjoitettu PDF"
+      },
+      "body": {
+        "en": "Ask people to sign a document, and they sign with their passkey: a fingerprint, their face or the device PIN. Only a hash of the document is kept, never the file. AIMEAT seals each signature with its own key, so anyone who has the document can check who signed it, without an account. Your AI can create the request, follow it and tell you when everyone has signed. An agent signs only in its own name, never for you. You can also check a document signed somewhere else, a PDF or a signature file. Each signature is valid, invalid or could not be confirmed, and you see why. The check compares the certificate with the EU trusted lists, asks whether it was revoked, and tells you when a signature is a qualified electronic signature, which equals a handwritten one in EU law. On aimeat.io you do both in the Allekirjoitus app. An AIMEAT signature is an electronic signature, not a qualified one.",
+        "fi": "Voit pyytää ihmisiä allekirjoittamaan dokumentin, ja he allekirjoittavat pääsyavaimella: sormenjäljellä, kasvoilla tai laitteen PIN-koodilla. Dokumentista tallennetaan vain sen tiiviste, ei itse tiedostoa. AIMEAT sinetöi jokaisen allekirjoituksen omalla avaimellaan, joten kuka tahansa, jolla on dokumentti, voi tarkistaa ilman tiliä, kuka sen allekirjoitti. Oma tekoälysi voi tehdä allekirjoituspyynnön, seurata sitä ja kertoa, kun kaikki ovat allekirjoittaneet. Agentti allekirjoittaa vain omissa nimissään, ei koskaan sinun puolestasi. Voit myös tarkistaa muualla allekirjoitetun dokumentin, PDF:n tai allekirjoitustiedoston. Jokainen allekirjoitus saa yhden kolmesta tuloksesta: kelvollinen, virheellinen tai ei voitu vahvistaa, ja näet myös syyn. Tarkistus vertaa varmennetta EU:n luotettujen palveluntarjoajien luetteloon ja selvittää, onko varmenne suljettu eli poistettu käytöstä. Se kertoo myös, onko allekirjoitus hyväksytty sähköinen allekirjoitus, joka vastaa EU:n lainsäädännössä käsin kirjoitettua allekirjoitusta. aimeat.io:ssa molemmat tehdään Allekirjoitus-sovelluksessa. AIMEAT-allekirjoitus on sähköinen allekirjoitus, mutta ei hyväksytty sähköinen allekirjoitus."
+      }
+    },
+    {
+      "date": "2026-10-09",
+      "kind": "feature",
+      "title": {
         "en": "Your visitors' own AI can now use your app",
         "fi": "Kävijän oma tekoäly voi nyt käyttää sovellustasi"
       },
