@@ -13,6 +13,11 @@
  *   - /scaffold, /:name/actions, GET|PUT /:name/scripts/:actionId: authoring endpoints
  *
  * @version-history
+ *   v1.5.0 -- 2026-10-09 -- The bundled install and the reinstall build the record with
+ *     buildExtensionRecordFromManifest and store it with writeExtensionRecord (deployBundled). Their
+ *     hand-built copy stored no capabilities, network hosts or host fields and kept secret defaults in
+ *     plain text. A reinstall now keeps an installed copy's status instead of reporting `active`, and a
+ *     manifest whose name differs from its folder is refused 400 NAME_MISMATCH.
  *   v1.4.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.0 -- 2026-09-26 -- The bundled install and the reinstall keep the version they deploy
  *     (services/component-versions.ts), and the reinstall refuses other code under a version already
@@ -25,7 +30,7 @@
  *     restarting the whole scheduler — which re-ran every @activate job on the node.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,8 +41,8 @@ import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { registerExtensionSchedules } from '../services/extension-schedules.js';
-import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
+import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
+import { writeExtensionRecord, activateExtension } from '../services/extension-lifecycle.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -169,8 +174,57 @@ function readBundledExtensionFull(name: string): { manifest: string; scripts: Re
   return { manifest: manifestYaml, scripts };
 }
 
+type Deployed =
+  | { ok: true; record: ExtensionRecord; schedulesNotRegistered?: string }
+  | { ok: false; status: number; code: string; message: string };
+
 export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler): Router {
   const router = Router();
+
+  /**
+   * Deploy a bundled extension from disk the way every other install path deploys one: the shared
+   * manifest builder (capabilities, network hosts and host fields, workspace and provider
+   * declarations, secret fields, validation) and the shared write path (install ceilings, secret
+   * encryption, kept versions, the managed-package refusal, an in-place update that keeps lifecycle,
+   * memory, instances, stored secrets and host field values). A fresh install is then switched on,
+   * as a bundled extension always was.
+   *
+   * WHY. Until 2026-10-09 both operator routes built the record by hand. That copy never stored the
+   * manifest's `capabilities`, `network.hosts` or `network.host_fields`, so an extension deployed
+   * from disk could reach any public address and had its capabilities guessed from its code, and it
+   * stored a secret default in plain text.
+   */
+  async function deployBundled(
+    req: Request, name: string, bundled: { manifest: string; scripts: Record<string, string> }, existing: ExtensionRecord | null,
+  ): Promise<Deployed> {
+    const owner = req.auth!.owner as string;
+    // The resolved identity, as the version snapshot and the schedule jobs record their actor.
+    const actor = resolveIdentity(req.auth!, config.nodeId);
+    const built = buildExtensionRecordFromManifest(bundled.manifest, bundled.scripts, config, owner, new Date().toISOString(), true);
+    if (!built.ok) return { ok: false, status: built.status, code: built.code, message: built.message };
+    if (built.record.name !== name) {
+      return { ok: false, status: 400, code: 'NAME_MISMATCH', message: `The manifest in folder "${name}" names the extension "${built.record.name}". The two must be the same.` };
+    }
+    const written = await writeExtensionRecord({ storage, config, scheduler }, built.record, {
+      existing, ownerName: owner, actor, isOperator: true,
+    });
+    if (!written.ok) return { ok: false, status: written.status, code: written.code, message: written.message };
+    if (written.action !== 'installed') return { ok: true, record: written.record };
+    // A SCHEDULE THAT FAILS TO REGISTER REACHES THE ANSWER (review item 4.6, 2026-09-06): the route
+    // once reported `status: active` while nothing it declared on a schedule would run.
+    try {
+      const active = await activateExtension({ storage, config, scheduler }, written.record, actor);
+      return { ok: true, record: active ?? written.record };
+    } catch (err) {
+      const reason = (err as Error).message;
+      logger.error(`Failed to register schedules for ${name}`, { error: reason });
+      return {
+        ok: true, record: (await storage.getExtension(name)) ?? written.record,
+        schedulesNotRegistered: `The extension is installed, but its scheduled jobs could not be registered: ${reason}. `
+          + 'Nothing it declares on a schedule will run until that is fixed.',
+      };
+    }
+  }
 
   // ── GET /v1/admin/extensions/available — List bundled extensions ──
   router.get('/v1/admin/extensions/available', requireAuth(), requireOperator(storage), async (_req, res) => {
@@ -216,120 +270,11 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
         return;
       }
 
-      // Parse manifest
-      let manifest: Record<string, unknown>;
-      try {
-        manifest = parseYaml(bundled.manifest) as Record<string, unknown>;
-      } catch {
-        res.status(500).json(error(config.nodeId, 'INVALID_MANIFEST', 'Failed to parse bundled manifest'));
-        return;
-      }
+      const deployed = await deployBundled(req, name, bundled, null);
+      if (!deployed.ok) { res.status(deployed.status).json(error(config.nodeId, deployed.code, deployed.message)); return; }
+      const { record: created, schedulesNotRegistered } = deployed;
 
-      const metadata = manifest.metadata as Record<string, unknown>;
-      const actions = manifest.actions as Array<Record<string, unknown>>;
-      const manifestConfig = manifest.config as Record<string, unknown> | undefined;
-      const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
-      const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
-      const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
-      const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
-
-      // Enforce max installed limit
-      const existing = await storage.listExtensions();
-      if (existing.length >= config.extensionMaxInstalled) {
-        res.status(409).json(error(config.nodeId, 'LIMIT_EXCEEDED',
-          `Maximum ${config.extensionMaxInstalled} extensions allowed`));
-        return;
-      }
-
-      // Build ExtensionRecord (same logic as POST /v1/extensions)
-      const record: ExtensionRecord = {
-        name: metadata.name as string,
-        version: metadata.version as string,
-        description: metadata.description as string,
-        author: metadata.author as string,
-        status: 'active',  // bundled extensions activate immediately
-        requiredApis: (manifest.required_apis as string[]) ?? [],
-        actions: actions.map(a => ({
-          id: a.id as string,
-          method: (a.method as string).toUpperCase(),
-          path: a.path as string,
-          inputSchema: (a.input as Record<string, unknown>) ?? {},
-          outputSchema: (a.output as Record<string, unknown>) ?? {},
-          scriptContent: bundled.scripts[a.script as string] || '',
-        })),
-        config: {
-          ...(manifestConfig
-            ? Object.fromEntries(
-                Object.entries(manifestConfig).map(([k, v]) => {
-                  if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                    return [k, (v as Record<string, unknown>).default];
-                  }
-                  return [k, v];
-                }),
-              )
-            : {}),
-          ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
-        },
-        limits: {
-          memoryMb: Math.min(
-            (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
-            config.extensionMaxMemoryMb,
-          ),
-          timeoutMs: Math.min(
-            (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
-            config.extensionTimeoutMs,
-          ),
-          maxApiCalls: Math.min(
-            (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
-            config.extensionMaxApiCalls,
-          ),
-        },
-        federation: {
-          advertise: (manifestFederation?.advertise as boolean) ?? false,
-          capabilities: (manifestFederation?.capabilities as string[]) ?? [],
-        },
-        ...(manifestInstances?.supported ? {
-          instances: {
-            supported: true,
-            configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
-          },
-        } : {}),
-        installedBy: req.auth!.sub,
-        installedAt: new Date().toISOString(),
-        activatedAt: new Date().toISOString(),
-      };
-
-      const created = await storage.createExtension(record);
-      // Kept like every other install (services/component-versions.ts): `name@version` is an address
-      // an app pins, and it has to answer with the code deployed here.
-      await snapshotExtensionVersion(storage, created, resolveIdentity(req.auth!, config.nodeId));
-
-      // Register the schedules the manifest declares. Through the same builder every other install
-      // door uses: this route had its own copy, which produced a second id shape (`ext.name.id`) for
-      // the same schedule and left out the owner scope the executor needs at run time. It also
-      // restarted the whole scheduler to pick the jobs up, which re-ran every @activate job on the
-      // node; addJob inside the builder does it for these jobs alone.
-      // A FAILURE HERE REACHES THE ANSWER. It used to be a `logger.warn` and nothing else, while the
-      // 201 below reported `status: active` — so the operator was told a bundled extension was
-      // installed and running when it had no schedules and no @activate jobs, and would sit there
-      // doing nothing until somebody noticed the absence of output.
-      let schedulesNotRegistered: string | undefined;
-      if (manifestSchedules && scheduler) {
-        try {
-          await registerExtensionSchedules({ storage, config, scheduler }, created, req.auth!.sub);
-          // A bundled extension installs ACTIVE, so its @activate jobs are due now. The restart used
-          // to do this as a side effect, for every extension on the node rather than for this one.
-          scheduler.runActivateJobs(name).catch(err =>
-            logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
-        } catch (schedErr) {
-          const reason = (schedErr as Error).message;
-          logger.error(`Failed to register schedules for ${name}`, { error: reason });
-          schedulesNotRegistered = `The extension is installed, but its scheduled jobs could not be registered: ${reason}. `
-            + 'Nothing it declares on a schedule will run until that is fixed.';
-        }
-      }
-
-      logger.info(`Bundled extension installed: ${created.name}`, { version: created.version, by: req.auth!.sub });
+      logger.info(`Bundled extension installed: ${created.name}`, { version: created.version, by: resolveIdentity(req.auth!, config.nodeId) });
 
       res.status(201).json(success(config.nodeId, {
         extension: {
@@ -666,108 +611,19 @@ return { ok: true };
         return;
       }
 
-      const manifest = parseYaml(bundled.manifest) as Record<string, unknown>;
-      const metadata = manifest.metadata as Record<string, unknown>;
-      const actions = manifest.actions as Array<Record<string, unknown>>;
-      const manifestConfig = manifest.config as Record<string, unknown> | undefined;
-      const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
-      const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
-      const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
-
-      // Check if already installed
+      // An update in place keeps the installed copy's lifecycle, ext: memory, instances, stored
+      // secrets and host field values; a kept version is immutable, so other code under a version
+      // already kept is refused with 409 VERSION_EXISTS before anything is written.
       const existingExt = await storage.getExtension(name);
-
-      const record: ExtensionRecord = {
-        name: metadata.name as string,
-        version: metadata.version as string,
-        description: metadata.description as string,
-        author: metadata.author as string,
-        status: 'active',
-        requiredApis: (manifest.required_apis as string[]) ?? [],
-        actions: actions.map(a => ({
-          id: a.id as string,
-          method: (a.method as string).toUpperCase(),
-          path: a.path as string,
-          inputSchema: (a.input as Record<string, unknown>) ?? {},
-          outputSchema: (a.output as Record<string, unknown>) ?? {},
-          scriptContent: bundled.scripts[a.script as string] || '',
-        })),
-        config: {
-          ...(manifestConfig
-            ? Object.fromEntries(
-                Object.entries(manifestConfig).map(([k, v]) => {
-                  if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                    return [k, (v as Record<string, unknown>).default];
-                  }
-                  return [k, v];
-                }),
-              )
-            : {}),
-        },
-        limits: {
-          memoryMb: Math.min(
-            (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
-            config.extensionMaxMemoryMb,
-          ),
-          timeoutMs: Math.min(
-            (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
-            config.extensionTimeoutMs,
-          ),
-          maxApiCalls: Math.min(
-            (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
-            config.extensionMaxApiCalls,
-          ),
-        },
-        federation: {
-          advertise: (manifestFederation?.advertise as boolean) ?? false,
-          capabilities: (manifestFederation?.capabilities as string[]) ?? [],
-        },
-        ...(manifestInstances?.supported ? {
-          instances: {
-            supported: true,
-            configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
-          },
-        } : {}),
-        installedBy: req.auth!.sub,
-        installedAt: existingExt?.installedAt ?? new Date().toISOString(),
-        activatedAt: new Date().toISOString(),
-      };
-
-      // A kept version is immutable: other code under a version already kept is refused before
-      // anything is written, the way every other deploy door refuses it, and the operator gives the
-      // change a new version in extension.yaml. The same code again is no conflict. It is asked of
-      // the extension this deploy writes: the installed one by this name, else a new one.
-      const target = existingExt ? name : record.name;
-      const kept = await keptVersionRefusal(storage, 'extension', target, record.version, extensionCodeOf(record));
-      if (kept) {
-        res.status(kept.status).json(error(config.nodeId, kept.code, kept.message));
-        return;
-      }
-
-      if (existingExt) {
-        // Update existing — preserve instances
-        await storage.updateExtension(name, {
-          version: record.version,
-          description: record.description,
-          actions: record.actions,
-          config: record.config,
-          limits: record.limits,
-          requiredApis: record.requiredApis,
-          federation: record.federation,
-          ...(record.instances ? { instances: record.instances } : {}),
-        });
-        logger.info(`Extension reinstalled (updated): ${name}`, { by: req.auth!.sub });
-      } else {
-        // Fresh install
-        await storage.createExtension(record);
-        logger.info(`Extension installed from disk: ${name}`, { by: req.auth!.sub });
-      }
-      // The version just deployed joins the kept ones; a version kept already stays as it was.
-      await snapshotExtensionVersion(storage, { ...record, name: target }, resolveIdentity(req.auth!, config.nodeId));
+      const deployed = await deployBundled(req, name, bundled, existingExt);
+      if (!deployed.ok) { res.status(deployed.status).json(error(config.nodeId, deployed.code, deployed.message)); return; }
+      const { record } = deployed;
+      logger.info(existingExt ? `Extension reinstalled (updated): ${name}` : `Extension installed from disk: ${name}`, { by: resolveIdentity(req.auth!, config.nodeId) });
 
       res.json(success(config.nodeId, {
-        extension: { name, version: record.version, status: 'active', actionsCount: record.actions.length },
+        extension: { name, version: record.version, status: record.status, actionsCount: record.actions.length },
         reinstalled: !!existingExt,
+        ...(deployed.schedulesNotRegistered ? { schedules_not_registered: deployed.schedulesNotRegistered } : {}),
       }));
       emitChange('admin-extensions');
     } catch (err) {

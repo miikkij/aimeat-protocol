@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-doors
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A reinstall from disk stores the manifest's capabilities and network hosts
+ *     (the operator routes use the shared builder now). Failed on the code before: both were absent.
  *   v1.1.0 — 2026-09-26 — A6-7: the bundled install and the reinstall keep the version they deploy,
  *     and a reinstall with other code under a kept version is refused 409. Failed on the code before
  *     the fix: no version was kept, and the reinstall answered 200.
@@ -23,7 +25,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import { existsSync, rmSync, readFileSync } from 'node:fs';
+import { existsSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -405,6 +407,18 @@ try {
         assert(back.status === 200, `script back on disk: ${back.status}`);
         const same = await json(`/v1/admin/extensions/available/${scaffoldName}/reinstall`, op({ method: 'POST' }));
         assert(same.status === 200 && same.body.data.reinstalled === true, `the kept code again: ${same.status} ${JSON.stringify(same.body)}`);
+    });
+
+    await test('A reinstall stores the manifest\'s capabilities and network hosts, as every other install path does', async () => {
+        const yamlPath = join(scaffoldDir, 'extension.yaml');
+        writeFileSync(yamlPath, `${readFileSync(yamlPath, 'utf-8').trimEnd()}\ncapabilities: [network]\nnetwork:\n  hosts: [api.example.com]\n`);
+        const r = await json(`/v1/admin/extensions/available/${scaffoldName}/reinstall`, op({ method: 'POST' }));
+        assert(r.status === 200, `reinstall: ${r.status} ${JSON.stringify(r.body)}`);
+        const cfg = (await json(`/v1/extensions/${scaffoldName}`, op())).body.data?.extension?.config ?? {};
+        // HOLE: both absent before 2026-10-09: the route built its record by hand, so an extension
+        // deployed from disk reached any public address and had its capabilities guessed from its code.
+        assert(JSON.stringify(cfg.__networkHosts) === '["api.example.com"]', `network hosts: ${JSON.stringify(cfg.__networkHosts)}`);
+        assert(JSON.stringify(cfg.__capabilities) === '["network"]', `capabilities: ${JSON.stringify(cfg.__capabilities)}`);
     });
 
     console.log('\nSection A — refusals');
