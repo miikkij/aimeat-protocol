@@ -18,6 +18,8 @@
  *   import { buildAuthMd, buildAgentAuthMetadata } from '../services/auth-md.js';
  *   const authMd = buildAuthMd(config);  // once per boot; serve as text/markdown
  * @version-history
+ *   v1.3.2 — 2026-10-09 — The ecosystem-app paragraph says how a GEAI renews: a signature by the key it
+ *     sent at hello, and one year per approval (secrets audit 2026-10-09, S-2).
  *   v1.3.1 — 2026-09-18 — The renewal section says what it is and what the node checks. The RFC had
  *     marked the signature path deprecated while this document taught it to every agent; the
  *     developer ruled that an agent renewing its own token stays the sanctioned path (RFC Core
@@ -195,7 +197,10 @@ rejected with \`INVALID_SCOPES\`. Ask for the least privilege your purpose needs
 
 External applications connect with the same consent guarantees:
 \`POST ${b}/v1/ecosystem-apps/hello\` → the owner approves (scopes + data-area allowlist)
-→ \`POST ${b}/v1/ecosystem-apps/token\`. Full guide: the node's llms-full.txt.
+→ \`POST ${b}/v1/ecosystem-apps/token\`. The app renews at \`POST ${b}/v1/auth/refresh\` with its
+Bearer and \`{ "timestamp", "signature" }\`: an Ed25519 signature of \`geai + timestamp\` by the key it
+sent at hello. One approval carries one year of renewals; then the app says hello again.
+Full guide: the node's llms-full.txt.
 
 ## Error handling
 

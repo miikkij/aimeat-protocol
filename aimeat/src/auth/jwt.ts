@@ -9,6 +9,11 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.10.0 — 2026-10-09 — verifyJWT refuses as a session any token that carries a purpose claim
+ *     (`typ`, `purpose`, `vc`), a header type other than JWT, or lacks the session claims (sub, owner,
+ *     node as strings, roles as a list of strings). A download, upload, share or app-access token, a
+ *     pending signup and a verifiable credential now answer 401 as a Bearer, not 500 (secrets audit
+ *     2026-10-09, S-1). The optional `auth_time` claim: when an ecosystem app's refresh chain began.
  *   v1.9.0 — 2026-09-29 — The optional `via: 'pat'` claim: issueJWT writes it for a token minted from a
  *     personal access token and verifyJWT carries it onto the verified token, so classification reads
  *     such a session as an AI (TARGET-082 V4). It changes no role and no scope.
@@ -101,6 +106,10 @@ export interface JWTPayload {
    *  refresh cookie). A mark for classification only (services/classification/reader-kind.ts):
    *  it grants and removes nothing. */
   via?: 'pat';
+  /** When the owner approved the credential chain this token belongs to, in epoch seconds (the
+   *  OIDC `auth_time` claim). Written on an ecosystem app's token at approval and carried across
+   *  each refresh, so the chain ends a fixed time after the owner said yes (routes/eco-refresh.ts). */
+  auth_time?: number;
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -155,6 +164,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     ...(payload.app_grant ? { app_grant: payload.app_grant } : {}),
     ...(payload.app ? { app: payload.app } : {}),
     ...(payload.via === 'pat' ? { via: 'pat' } : {}),
+    ...(typeof payload.auth_time === 'number' ? { auth_time: payload.auth_time } : {}),
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -189,6 +199,7 @@ export interface VerifiedToken {
   app?: string;         // the app's own id ("owner/filename") for role-'app' tokens
   via?: 'pat';          // made from a personal access token: set by the auth middleware on a raw PAT
                         //   and read from the `via` claim of a JWT minted from one
+  authTime?: number;    // `auth_time`: when the owner approved this token's chain (ecosystem apps)
 }
 
 /**
@@ -209,13 +220,38 @@ function asVisitor(v: VerifiedToken): VerifiedToken {
   return { ...v, sub: home, owner: home, roles: [FEDERATED_ROLE] };
 }
 
+/**
+ * The claims that mark a token minted for one purpose rather than as a session: `typ` (download,
+ * upload, share, app-access, draft-preview, frame-grant, confirm), `purpose` (the pending signup of
+ * an external login) and `vc` (a verifiable credential). issueJWT writes none of them.
+ */
+const PURPOSE_CLAIMS = ['typ', 'purpose', 'vc'] as const;
+
+/**
+ * Is this signed payload a session, as issueJWT writes one? Every short-lived token the node mints
+ * is signed with the same node key, so the signature alone says only "this node signed it". A
+ * session carries `sub`, `owner` and `node` as strings and `roles` as a list of strings, under the
+ * header type `JWT`, and none of the purpose claims above. A token that fails this is refused as a
+ * session (401), never read with a default for the missing claim (secrets audit 2026-10-09, S-1).
+ */
+function isSessionShape(payload: Record<string, unknown>, headerTyp: unknown): boolean {
+  if (headerTyp !== undefined && headerTyp !== 'JWT') return false;
+  if (PURPOSE_CLAIMS.some((claim) => payload[claim] !== undefined)) return false;
+  if (typeof payload.sub !== 'string' || typeof payload.owner !== 'string' || typeof payload.node !== 'string') return false;
+  return Array.isArray(payload.roles) && payload.roles.every((r) => typeof r === 'string');
+}
+
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
   if (!nodePublicKey) throw new Error('Node keys not initialized');
 
   try {
-    const { payload } = await jwtVerify(token, nodePublicKey, {
+    const { payload, protectedHeader } = await jwtVerify(token, nodePublicKey, {
       algorithms: ['EdDSA'],
     });
+    // A download, upload, share or app-access token, a draft preview, a frame grant, an operator
+    // confirmation, a pending signup and a verifiable credential are signed with this key too. They
+    // are not sessions, so they authenticate nothing here.
+    if (!isSessionShape(payload as Record<string, unknown>, protectedHeader.typ)) return null;
     return asVisitor({
       sub: payload.sub as string,
       owner: payload.owner as string,
@@ -240,6 +276,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       app: payload.app as string | undefined,
       // Only the one known value is carried; anything else in the claim is not ours.
       ...(payload.via === 'pat' ? { via: 'pat' as const } : {}),
+      ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}),
     });
   } catch {
     // Fail-closed by design: any verification error (bad signature, expiry, malformed claims) means

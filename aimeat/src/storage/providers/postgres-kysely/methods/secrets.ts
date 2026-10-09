@@ -10,15 +10,18 @@
  *   `setSecret` KEEPS THE EXISTING setAt. Replacing a secret is a rotation, not a new secret, and
  *   "since when do I hold this" is a different question from "when did the value last change". The
  *   same reason `usedBy` is carried forward: rotating a key does not forget who was using it.
- * @structure secretMethods — listSecrets · getSecret · setSecret · deleteSecret · noteSecretUse ·
- *   deleteSecretsByOwner
+ * @structure secretMethods — listSecrets · getSecret · setSecret · createSecretIfAbsent ·
+ *   bindSecretHost · deleteSecret · noteSecretUse · deleteSecretsByOwner
  * @version-history
+ *   v1.2.0 — 2026-10-09 — hostBinding column (migration 0099); setSecret writes the hosts and
+ *     hostBinding it is given; bindSecretHost records the binding; createSecretIfAbsent (ON CONFLICT DO NOTHING)
+ *     (secrets audit 2026-10-09, item 10).
  *   v1.1.0 — 2026-09-16 — hosts column (migration 0078) and bindSecretHost; setSecret clears the hosts.
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
-import type { SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
+import type { SecretBinding, SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
 
 /**
  * Only `db` is used here, so the `this` type names that field rather than the whole storage class.
@@ -55,6 +58,18 @@ function parseHosts(raw: unknown): string[] {
   return Array.isArray(parsed) ? parsed.filter((h): h is string => typeof h === 'string') : [];
 }
 
+/** Who bound the secret, or null. Informational, so a malformed column reads as unknown. */
+function parseBinding(raw: unknown): SecretBinding | null {
+  if (typeof raw !== 'string' || !raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as SecretBinding : null;
+  } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the binding record is informational; the hosts column decides.
+    return null;
+  }
+}
+
 function toRecord(r: Record<string, unknown>): SecretRecord {
   return {
     ownerGaii: r.ownerGaii as string,
@@ -64,8 +79,11 @@ function toRecord(r: Record<string, unknown>): SecretRecord {
     updatedAt: r.updatedAt as string,
     usedBy: parseUsedBy(r.usedBy),
     hosts: parseHosts(r.hosts),
+    hostBinding: parseBinding(r.hostBinding),
   };
 }
+
+const bindingText = (b: SecretBinding | null | undefined): string | null => (b ? JSON.stringify(b) : null);
 
 export const secretMethods = {
   async listSecrets(this: Db, ownerGaii: string): Promise<SecretRecord[]> {
@@ -90,30 +108,43 @@ export const secretMethods = {
       ...record,
       setAt: prior?.setAt ?? record.setAt,
       usedBy: prior?.usedBy ?? record.usedBy ?? {},
-      // A new value is the owner's own act, so it clears where the old one was allowed to go.
-      hosts: [],
+      // A new value is the owner's own act, so it resets where the old one was allowed to go: to
+      // the host it names, or to none until its first use.
+      hosts: record.hosts ?? [],
+      hostBinding: record.hostBinding ?? null,
     };
+    const hosts = JSON.stringify(stored.hosts);
     if (prior) {
       await this.db.updateTable('Secret')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .set({ ciphertext: stored.ciphertext, updatedAt: stored.updatedAt, hosts: '[]' } as any)
+        .set({ ciphertext: stored.ciphertext, updatedAt: stored.updatedAt, hosts, hostBinding: bindingText(stored.hostBinding) } as any)
         .where('ownerGaii', '=', stored.ownerGaii).where('name', '=', stored.name).execute();
     } else {
       await this.db.insertInto('Secret').values({
         ownerGaii: stored.ownerGaii, name: stored.name, ciphertext: stored.ciphertext,
         setAt: stored.setAt, updatedAt: stored.updatedAt, usedBy: JSON.stringify(stored.usedBy ?? {}),
-        hosts: '[]',
+        hosts, hostBinding: bindingText(stored.hostBinding),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).execute();
     }
     return stored;
   },
 
-  async bindSecretHost(this: Db, ownerGaii: string, name: string, host: string): Promise<string[]> {
+  async createSecretIfAbsent(this: Db, record: SecretRecord): Promise<boolean> {
+    const r = await this.db.insertInto('Secret').values({
+      ownerGaii: record.ownerGaii, name: record.name, ciphertext: record.ciphertext,
+      setAt: record.setAt, updatedAt: record.updatedAt, usedBy: JSON.stringify(record.usedBy ?? {}),
+      hosts: JSON.stringify(record.hosts ?? []), hostBinding: bindingText(record.hostBinding),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any).onConflict(oc => oc.columns(['ownerGaii', 'name']).doNothing()).executeTakeFirst();
+    return Number(r.numInsertedOrUpdatedRows ?? 0) > 0;
+  },
+
+  async bindSecretHost(this: Db, ownerGaii: string, name: string, host: string, binding?: SecretBinding): Promise<string[]> {
     // Conditional on the list being empty, so a second first use cannot add a second host.
     await this.db.updateTable('Secret')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .set({ hosts: JSON.stringify([host]) } as any)
+      .set({ hosts: JSON.stringify([host]), hostBinding: bindingText(binding) } as any)
       .where('ownerGaii', '=', ownerGaii).where('name', '=', name).where('hosts', '=', '[]').execute();
     const r = await this.db.selectFrom('Secret').select(['hosts'])
       .where('ownerGaii', '=', ownerGaii).where('name', '=', name).executeTakeFirst();

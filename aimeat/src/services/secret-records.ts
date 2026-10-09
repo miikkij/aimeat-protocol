@@ -26,9 +26,11 @@
  *   stays writable through the generic doors: a write without the hash leaves a password share that
  *   no password opens, which is closed, not open.
  * @structure SECRET_RECORD_KEYS · isSecretRecordKey · isWorkspaceShareKey · shownMemoryValue ·
- *   secretRecordWriteRefusal
+ *   secretRecordBinRefusal · secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.5.0 — 2026-10-09 — secretRecordBinRefusal: the generic delete and restore refuse these keys for
+ *     every principal and name the record's own route (secrets audit 2026-10-09, item 10).
  *   v1.4.0 — 2026-10-09 — The workspace share record's `passwordHash` is shown as `has_password`
  *     (secrets audit 2026-10-09, finding 1.7).
  *   v1.3.0 — 2026-09-28 — System 2's provider keys: `ai.apikey.provider.<id>` and
@@ -94,6 +96,38 @@ export function shownMemoryValue(key: string, value: unknown): unknown {
     out[field] = hint ? { configured: true, hint } : { configured: false };
   }
   return out;
+}
+
+/**
+ * The refusal the generic delete and restore give for these keys (services/memory-bin.ts), with the
+ * record's own route. Delete names the route that removes the credential; restore names the route
+ * that stores it, because an old credential is never put back from the bin: the owner stores the one
+ * they mean to use. Every principal is refused here, the owner in person included; the owner acts on
+ * the record's own route.
+ */
+export function secretRecordBinRefusal(key: string, act: 'delete' | 'restore'): { code: string; message: string } {
+  if (act === 'restore') {
+    const write = secretRecordWriteRefusal(key).message.replace(/^.*Use /, '');
+    return {
+      code: 'SECRET_RECORD',
+      message: `"${key}" holds a credential, so it is not put back through the memory bin. Store the credential again with ${write}`,
+    };
+  }
+  const door = key.startsWith(`${DECIDE_KEY_RECORD_KEY}.provider.`)
+    ? 'DELETE /v1/ai/decide/providers/{id} (the owner in person)'
+    : key.startsWith(`${AI_KEY_PREFIX}provider.`)
+    ? 'DELETE /v1/ai/providers/{id}/key (the AI settings page, the owner in person)'
+    : AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
+    ? 'DELETE /v1/agents/{name}/ai-keys/{model} (the agent\'s page)'
+    : key === OPENROUTER_KEY_RECORD
+      ? 'DELETE /v1/openrouter/settings (the AI settings page)'
+      : key === DECIDE_KEY_RECORD_KEY
+        ? 'DELETE /v1/ai/decide/settings/key (the AI settings page, Decision model)'
+        : 'DELETE /v1/commerce/payout/stripe (Wallet, Selling and payments)';
+  return {
+    code: 'SECRET_RECORD',
+    message: `"${key}" holds a credential, so it is not removed through the general memory doors. Use ${door}.`,
+  };
 }
 
 /** The refusal a generic write door gives for these keys, with the door to use instead. */

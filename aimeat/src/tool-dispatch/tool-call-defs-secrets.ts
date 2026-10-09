@@ -17,10 +17,12 @@
  * @structure secretTools[] — the shell handler table, registered by tool-call.ts
  * @usage import { secretTools } from './tool-call-defs-secrets.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-09 -- aimeat_secret_set forwards the optional `host` (secrets audit 2026-10-09,
+ *     item 10).
  *   v1.0.0 -- 2026-09-06 -- Initial. The owner's secrets vault on the fleet door.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString } from './tool-call-helpers.js';
+import { optionalString, requiredString } from './tool-call-helpers.js';
 
 export const secretTools: ConnectCliToolDefinition[] = [
     {
@@ -31,10 +33,14 @@ export const secretTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_secret_set',
         // `value` is required rather than optional: an omitted value would otherwise store the word
         // undefined as somebody's API key, and nothing here could ever read it back to notice.
-        handler: ({ client }, input) => client.put(
-            `/v1/secrets/${encodeURIComponent(requiredString(input, 'name'))}`,
-            { value: requiredString(input, 'value') },
-        ),
+        // `host` is forwarded only when given, so a call without it binds at the first use as before.
+        handler: ({ client }, input) => {
+            const host = optionalString(input, 'host');
+            return client.put(
+                `/v1/secrets/${encodeURIComponent(requiredString(input, 'name'))}`,
+                { value: requiredString(input, 'value'), ...(host !== undefined ? { host } : {}) },
+            );
+        },
     },
     {
         name: 'aimeat_secret_delete',

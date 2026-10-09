@@ -20,6 +20,9 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   v1.4.0 — 2026-10-09 — Delete and restore refuse a credential record (secret-records.ts) for every
+ *     caller, the owner in person included: 403 SECRET_RECORD naming the record's own route (secrets
+ *     audit 2026-10-09, item 10).
  *   v1.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). The service still reads 'operator' from `roles`; the REST caller computes that list with rolesWithOperator.
  *   v1.2.0 — 2026-09-29 — Delete and restore refuse a service-owned key (utils/reserved-keys.ts
  *     SERVICE_OWNED_KEY_PREFIXES, the classification policy) for every caller, the owner and an
@@ -36,12 +39,13 @@ import { emitChange } from './event-bus.js';
 import { checkDeleteGuard } from './write-guards.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { isServiceOwnedKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
 export interface MemoryBinRefusal {
   ok: false;
-  code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY';
+  code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD';
   message: string;
   /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
   status?: number;
@@ -118,6 +122,15 @@ async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'dele
   if (isServiceOwnedKey(req.key)) {
     const refusal = serverWrittenKeyRefusal(req.key);
     return { ok: false, code: refusal.code, message: refusal.message, status: 403 };
+  }
+  // A credential record (services/secret-records.ts: the owner's AI keys, the decision model's key, a
+  // seller's Stripe key) is neither removed nor put back here, by anyone: the generic write doors
+  // already refuse it, and the bin was the way around them. Any principal holding memory:delete
+  // could remove the owner's key, and memory:write could put a replaced key back. The owner acts on
+  // the record's own route, which the refusal names (secrets audit 2026-10-09, item 10).
+  if (isSecretRecordKey(req.key)) {
+    const refusal = secretRecordBinRefusal(req.key, act);
+    return { ok: false, code: 'SECRET_RECORD', message: refusal.message, status: 403 };
   }
   const operatorOverride = !!req.ownerOverride && (req.roles ?? []).includes('operator');
   if (!operatorOverride) {

@@ -7911,6 +7911,15 @@ paths:
             registered again, answers `401 SESSION_REVOKED` and ends; a deactivated account's
             answers `403 ACCOUNT_DISABLED`.
           * **Legacy (Bearer):** send a valid Bearer access token (agents / pre-cookie clients).
+          * **Ecosystem app (Bearer + key proof):** a GEAI token renews only with proof that the app
+            still holds the key it pinned at hello: `{ timestamp, signature }` in the body, where
+            `signature` is the base64 Ed25519 signature of `<geai><timestamp>` and the timestamp is
+            within five minutes of now. Without it the answer is `401 ECO_KEY_PROOF_REQUIRED`; a
+            signature by another key, a stale timestamp or a reused signature is
+            `401 ECO_KEY_PROOF_INVALID`. The chain of renewals ends one year after the owner
+            approved the app (the token's `auth_time` claim): then `401 ECO_REAPPROVAL_REQUIRED`,
+            and the app says hello again. The answer carries `reapprove_by`, and the renewed token
+            never outlives the approval.
       tags: [Auth]
       parameters:
         - in: header
@@ -7920,6 +7929,20 @@ paths:
             type: string
             enum: ['1']
           description: Required for cookie-mode refresh (CSRF guard).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timestamp:
+                  type: string
+                  format: date-time
+                  description: Ecosystem apps only. The current time, signed with the GEAI.
+                signature:
+                  type: string
+                  description: Ecosystem apps only. Base64 Ed25519 signature of `<geai><timestamp>` by the pinned key.
       security:
         - BearerAuth: []
         - {}
@@ -7929,7 +7952,7 @@ paths:
         '400':
           description: Cookie refresh missing the X-AIMEAT-Refresh header
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: Not authenticated, or for an ecosystem app ECO_KEY_PROOF_REQUIRED, ECO_KEY_PROOF_INVALID or ECO_REAPPROVAL_REQUIRED
 
   /v1/auth/revoke:
     post:
@@ -16071,6 +16094,12 @@ paths:
         a record of an append-only workspace space is not put back through the
         bin (409 WRITE_CONFLICT). Both depend on the key and the caller only, so
         they tell nothing about whether a record exists.
+
+
+        A credential record (`openrouter.apikey`, `decide.apikey`, `commerce.psp`,
+        the `ai.apikey.*` keys and the per-agent keys) is never put back through
+        the bin, by anyone: 403 SECRET_RECORD, naming the route that stores that
+        credential. The owner stores the credential they mean to use there.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -16203,6 +16232,12 @@ paths:
         if the key is not found under the owner's GHII, the server looks it up
         across the owner's agents and deletes the match. Operators may delete
         any owner's entry by passing the `owner` query parameter.
+
+
+        A credential record (`openrouter.apikey`, `decide.apikey`, `commerce.psp`,
+        the `ai.apikey.*` keys and the per-agent keys) is not removed here, by
+        anyone, the owner included: 403 SECRET_RECORD, naming the record's own
+        route (for example DELETE /v1/openrouter/settings).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -16223,6 +16258,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: Scope missing, RESERVED_KEY, or SECRET_RECORD (a credential record, removed on its own route)
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -34836,10 +34873,15 @@ paths:
         I delete this", because a secret can be named inside a document, an extension config or a
         workflow, none of which the vault can see.
 
-        `hosts` names where the secret may be sent. It is empty until the secret's first use, which
-        binds the host of that call; a call to any other host is refused with SECRET_HOST before
-        anything is sent. The address of a call is chosen by an extension's script, so without the
-        binding any extension could send the secret to its author.
+        `hosts` names where the secret may be sent. It is the host the secret was stored with, or
+        empty until the secret's first use, which binds the host of that call; a call to any other
+        host is refused with SECRET_HOST before anything is sent. The address of a call is chosen by
+        an extension's script, so without the binding any extension could send the secret to its
+        author.
+
+        `hostBinding` says who bound it: `{ how: "set", by, at }` when it was stored with a host, or
+        `{ how: "first-use", by, extension, at }` naming the principal and the extension whose call
+        bound it. Null while unbound.
 
         Needs `secrets:manage`, which no wildcard carries. An owner session bypasses scopes as
         always; an agent or an app grant must hold the exact word.
@@ -34858,8 +34900,12 @@ paths:
       description: |
         Replacing is this same call: a vault with a separate rotate door is a vault where somebody
         eventually uses the wrong one. Replacing keeps `setAt` (since when you have held this name)
-        and moves `updatedAt` (when the value changed). Replacing also clears `hosts`, so the next
-        use binds the secret to its host again.
+        and moves `updatedAt` (when the value changed). Replacing also resets `hosts`: to the
+        `host` given in this call, or to none, so the next use binds the secret to its host again.
+
+        `host` (optional) binds the secret now: it is sent only there, from its first call on, and
+        the list records who set it. Without it, the first call that uses the secret binds it, and
+        that first call may come from any of the owner's agents or apps that run an extension.
 
         The value goes in and comes out of nothing. What it is FOR is being named in an outbound
         header as `{{secret:NAME}}`: an extension writes the placeholder, the node fills in the
@@ -34889,9 +34935,15 @@ paths:
                   type: string
                   maxLength: 4096
                   description: The key or password itself, up to 4 kB of UTF-8. Encrypted at rest.
+                host:
+                  type: string
+                  description: |
+                    Optional. The one host the secret may be sent to, as `host` or `host:port`
+                    (`api.example.com`, `api.example.com:8443`): no scheme, no path. Left out, the
+                    first use binds the host.
       responses:
-        '200': { description: Stored. Answers the name and the two times, never the value }
-        '400': { description: INVALID_SECRET_NAME, INVALID_SECRET_VALUE or SECRET_TOO_LARGE }
+        '200': { description: Stored. Answers the name, the two times, the hosts and the binding, never the value }
+        '400': { description: INVALID_SECRET_NAME, INVALID_SECRET_VALUE, SECRET_TOO_LARGE or INVALID_SECRET_HOST }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '503': { description: SECRET_STORE_UNAVAILABLE — this node has no encryption key, and nothing was written }

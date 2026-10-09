@@ -8,6 +8,8 @@
  *   free (non-commercial) public call; refund-on-throw; and install-time C1/no-mint validation.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-paywall.ts
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A wrong-buyer attempt leaves the token spendable by its buyer, and the
+ *     seller's order list carries no pay token (secrets audit 2026-10-09, S-3).
  *   v1.1.0 — 2026-08-10 — The unaffordable action is priced at 9 999 rather than 10 million. What
  *     the test needs is a price above the welcome bonus (100), and the node now caps manifest prices.
  *   v1.0.0 — 2026-07-17 — Initial (Phase 4 — morsel paywall runtime proof)
@@ -208,6 +210,25 @@ if (!moneyEnabled) {
       method: 'POST', headers: { ...auth(third.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
     });
     assert(wrongBuyer.status === 402, `another owner spent the caller's token: ${wrongBuyer.status}`);
+    // Secrets audit 2026-10-09, S-3: the refused attempt must not burn the buyer's purchase. The
+    // token was deleted before the buyer was compared, so whoever held the string destroyed the
+    // call the buyer had paid for, and this spend answered 402.
+    const stillGood = await json(`/v1/ext/${EXT}/moneycall`, {
+      method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
+    });
+    assert(stillGood.status === 200, `the buyer could not spend their token after another owner tried it: ${stillGood.status}`);
+  });
+
+  await test("Money chain: the seller's order record carries no pay token", async () => {
+    // S-3: the seller's copy of the completed session (commerce.order.<id>) held the buyer's
+    // one-time token. The seller has no use for it, and a copy is one more place it can leak from.
+    const t = await buyToken();
+    const orders = await json('/v1/commerce/orders?limit=200', { headers: auth(owner.token) });
+    assert(orders.status === 200, `orders ${orders.status}: ${JSON.stringify(orders.body?.error)}`);
+    const text = JSON.stringify(orders.body.data.orders);
+    assert((orders.body.data.orders as unknown[]).length > 0, 'the seller sees the orders');
+    assert(!text.includes(t), 'the seller order list contains the buyer pay token');
+    assert(!text.includes('pay_token'), 'the seller order list carries a pay_token field');
   });
 
   await test('Money chain: and a token IS good for what it was bought for (the control)', async () => {

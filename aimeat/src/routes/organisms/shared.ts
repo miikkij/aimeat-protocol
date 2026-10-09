@@ -8,6 +8,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.13.2 — 2026-10-09 — The password gate admits a share token only when its password version
+ *     matches the share's current password (secrets audit 2026-10-09, S-6).
  *   v1.13.1 — 2026-10-09 — archiveHandler asks archiveRoleOf (services/archive.ts), the same rule
  *     ctx.workspace.archiveRecords asks. Same answer as memberRole for every caller.
  *   v1.13.0 — 2026-10-06 — publishDraftsBatch takes `opts`: `createOnly` refuses an id that already has
@@ -64,7 +66,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
-import { verifyShareToken } from '../../services/share-token.js';
+import { verifyShareToken, shareTokenVersionOf } from '../../services/share-token.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../../services/doc-images.js';
 import { resolveIdentity, isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
@@ -646,7 +648,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     if (token) {
       try {
         const v = await verifyShareToken(token);
-        if (v.org === id && v.ws === ws) return null;
+        // The token names the password it was unlocked with; after a change it opens nothing.
+        if (v.org === id && v.ws === ws && share.passwordHash && v.pwv === shareTokenVersionOf(share.passwordHash)) return null;
       // eslint-disable-next-line aimeat/no-silent-catch -- invalid/expired token falls through to the 401
       } catch { /* invalid/expired token falls through to the 401 */ }
     }

@@ -1425,6 +1425,7 @@ export interface Secret {
   updatedAt: string;
   usedBy: Generated<string>;
   hosts: Generated<string>;
+  hostBinding: string | null;
 }
 
 export interface DependencyEdge {

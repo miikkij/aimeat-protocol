@@ -29,10 +29,13 @@
  *
  * @structure
  *   - GET    /v1/secrets           — names, times, and which extensions used each one lately
- *   - PUT    /v1/secrets/:name     — set or replace. Same call either way.
+ *   - PUT    /v1/secrets/:name     — set or replace. Same call either way. Optional `host` binds it now.
  *   - DELETE /v1/secrets/:name     — remove one
  * @usage app.use(secretsRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-10-09 — PUT takes an optional `host` (host or host:port): the secret goes only there
+ *     from its first call on, and the list records who set it. Without it the first use binds, and
+ *     the list names its principal and extension (secrets audit 2026-10-09, item 10).
  *   v1.0.0 — 2026-09-06 — Initial. The owner's secrets vault.
  */
 import { Router } from 'express';
@@ -41,7 +44,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { ownerCoordinate } from '../utils/gaii.js';
+import { ownerCoordinate, resolveIdentity } from '../utils/gaii.js';
 import { SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
 import { listOwnerSecrets, putOwnerSecret, deleteOwnerSecret } from '../services/owner-secrets.js';
 
@@ -58,7 +61,10 @@ export function secretsRouter(config: AimeatConfig, storage: Storage): Router {
 
   router.put('/v1/secrets/:name', ...gate, async (req, res) => {
     const ownerGhii = ownerCoordinate(req.auth!, config.nodeId);
-    const r = await putOwnerSecret(storage, config, ownerGhii, req.params.name as string, req.body?.value);
+    // `host` binds the secret now instead of at its first use; the principal is recorded with it.
+    const r = await putOwnerSecret(storage, config, ownerGhii, req.params.name as string, req.body?.value, {
+      host: req.body?.host, by: resolveIdentity(req.auth!, config.nodeId),
+    });
     if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
     // Owner-scoped: whose vault changed is nobody else's business, and an unscoped emit would wake
     // every open stream on the node with the news that SOMEBODY set a credential.

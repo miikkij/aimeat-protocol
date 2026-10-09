@@ -22,6 +22,9 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.8.0 — 2026-10-09 — The approval token carries `auth_time`, the start of the app's refresh chain.
+ *     A refresh at POST /v1/auth/refresh now needs a signature by the key pinned here, and the chain
+ *     ends a year after the approval (services/ecosystem-refresh.ts; secrets audit 2026-10-09, S-2).
  *   v1.7.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.7.0 — 2026-09-29 — GET /:app/data shows the app's records through presentMemories, the
  *     classification check and the credential mask in one call (TARGET-082 V4).
@@ -402,6 +405,9 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
       roles: ['ecosystem'],
       scopes: finalScopes,
       eco_app: request.app,
+      // The owner's approval starts the chain of refreshes; it ends ECO_REAPPROVAL_SECONDS later
+      // (services/ecosystem-refresh.ts), and the app is approved again.
+      auth_time: Math.floor(Date.now() / 1000),
     }, config.ecoJwtTtlSeconds, sessionId);
     const expiresAt = new Date(Date.now() + config.ecoJwtTtlSeconds * 1000).toISOString();
 

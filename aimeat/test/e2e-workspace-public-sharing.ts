@@ -6,6 +6,8 @@
  *   PUBLISHED docs the share meta marks public are served, that drafts never leak, that per-doc
  *   overrides win over the space flag, and that the share write is creator/admin-gated.
  * @version-history
+ *   v1.4.0 — 2026-10-09 — 19b: a password change ends the share tokens minted under the old
+ *     password (secrets audit 2026-10-09, S-6).
  *   v1.3.0 — 2026-10-09 — 14b: the generic memory routes show has_password, never the share
  *     password's hash (secrets audit 2026-10-09, finding 1.7).
  *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit (e2e-workspace-public-sharing:103): the
@@ -275,6 +277,22 @@ await test('18. a tampered/garbage token does not open the reads', async () => {
 await test('19. an authenticated org member (creator A) passes the password gate without a token', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: AH() });
     assert(r.status === 200, `member read: ${r.status}`);
+});
+
+await test('19b. changing the password ends every share token minted under the old one', async () => {
+    // HOLE (secrets audit 2026-10-09, S-6): the share token named only the organism and the
+    // workspace, so a token unlocked with the old password kept opening the reads for its whole
+    // 24 hours after the owner changed the password to shut that person out.
+    const before = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { 'X-Share-Token': shareToken } });
+    assert(before.status === 200, `the token opens the reads before the change: ${before.status}`);
+    const put = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'password', password: `${SHARE_PW}-new` }) });
+    assert(put.status === 200, `password change ${put.status}`);
+    const after = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { 'X-Share-Token': shareToken } });
+    assert(after.status === 401 && after.body.error.code === 'SHARE_PASSWORD_REQUIRED', `the old token still opens the reads: ${after.status}`);
+    const unlock = await json(`/v1/organisms/${orgId}/workspace/share/unlock`, { method: 'POST', body: JSON.stringify({ ws: WS, password: `${SHARE_PW}-new` }) });
+    assert(unlock.status === 200, `unlock with the new password: ${unlock.status}`);
+    const fresh = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { 'X-Share-Token': unlock.body.data.share_token } });
+    assert(fresh.status === 200, `a token under the new password opens the reads: ${fresh.status}`);
 });
 
 await test('20. unlock brute force hits the per-IP rate limit (429)', async () => {

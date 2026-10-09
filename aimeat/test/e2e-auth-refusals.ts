@@ -6,6 +6,8 @@
  *   the source and the credential KIND but never a credential value — and that the list
  *   itself is operator-only.
  * @version-history
+ *   v1.1.0 -- 2026-10-09 -- A download token presented as a Bearer answers 401 on three routes, not
+ *     500 (secrets audit 2026-10-09, S-1).
  *   v1.0.0 -- 2026-08-17 -- Initial: refusals recorded, listed newest-first, gate enforced.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-auth-refusals
@@ -80,6 +82,26 @@ await test('Operator sees the refusals as a list, newest first', async () => {
     const digest = String(nonOpLine!.credential_digest ?? '');
     assert(/^[0-9a-f]{12}$/.test(digest), `digest is 12 hex chars, got "${digest}"`);
     assert(!JSON.stringify(items).includes(nonOpToken), 'no credential value appears anywhere in the list');
+});
+
+// Secrets audit 2026-10-09, S-1. A download token is signed with the node key, as a session is.
+// Before the fix it verified as a session, carried no `roles`, and the credential check threw a
+// TypeError: the request answered 500. It must answer 401 and grant nothing.
+await test('A download token presented as a Bearer is refused with 401, not 500', async () => {
+    const key = `s1probe${Date.now()}.txt`;
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${nonOpToken}` },
+        body: JSON.stringify({ key, data: Buffer.from('s1').toString('base64'), mime_type: 'text/plain' }),
+    });
+    assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body.error)}`);
+    const h = await json(`/v1/storage/${key}?mode=handle`, { headers: { Authorization: `Bearer ${nonOpToken}` } });
+    assert(h.status === 200, `handle ${h.status}: ${JSON.stringify(h.body.error)}`);
+    const downloadToken = String(h.body.data.download_url).split('/v1/download/')[1];
+    assert(!!downloadToken && downloadToken.split('.').length === 3, `a JWT download token: ${h.body.data.download_url}`);
+    for (const path of ['/v1/memory', '/v1/ghii/me', '/v1/storage']) {
+        const r = await json(path, { headers: { Authorization: `Bearer ${downloadToken}` } });
+        assert(r.status === 401, `${path} with a download token expected 401, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    }
 });
 
 await test('The list itself is operator-only', async () => {

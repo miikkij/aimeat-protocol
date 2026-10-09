@@ -10,6 +10,11 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.11.0 -- 2026-10-09 -- POST /v1/auth/refresh renews an ecosystem app only with a fresh signature
+ *     by the key pinned at hello ({ timestamp, signature } over `<geai><timestamp>`), and only within a
+ *     year of the owner's approval (`auth_time`, carried across refreshes); the renewed token keeps
+ *     `eco_app`, never outlives the approval, and the answer says `reapprove_by` (secrets audit
+ *     2026-10-09, S-2).
  *   v1.10.0 -- 2026-10-09 -- The owner-key sign-in on POST /v1/auth/token refuses an account with
  *     two-step sign-in armed (SECOND_FACTOR_REQUIRED), answers 410 OWNER_KEY_LOGIN_OFF when the node
  *     set AIMEAT_OWNER_KEY_LOGIN=false (deprecated, removed in 4.0.0), and counts each use in
@@ -82,6 +87,7 @@ import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie }
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, isExternalPrincipal, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
+import { ecosystemRefreshDecision, ECO_REAPPROVAL_SECONDS } from '../services/ecosystem-refresh.js';
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 import { getStats } from '../services/stats.js';
@@ -453,6 +459,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
 
     let freshRoles: string[];
     let freshScopes: string[] | undefined;
+    // Set for an ecosystem app: when its owner approved it, when that approval stops renewing it, and
+    // the lifetime of the token minted now, which never outlives the approval.
+    let ecoChain: { authTime: number; chainEndsAt: number; ttlSeconds: number } | null = null;
     const isAgentSession = req.auth!.roles.includes('agent') && parseGAII(req.auth!.sub) !== null;
 
     if (isAgentSession) {
@@ -480,6 +489,19 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Ecosystem app no longer active'));
         return;
       }
+      // The bearer alone does not renew an ecosystem app: it proves it holds the key pinned at hello,
+      // and the chain ends a year after the owner's approval (services/ecosystem-refresh.ts; secrets
+      // audit 2026-10-09, S-2).
+      const decision = await ecosystemRefreshDecision({
+        geai: req.auth!.sub, publicKey: ecoApp.publicKey, authTime: req.auth!.authTime, iat: req.auth!.iat,
+        timestamp: req.body?.timestamp, signature: req.body?.signature, now: new Date(),
+        maxChainSeconds: ECO_REAPPROVAL_SECONDS, ttlSeconds: config.jwtTtlSeconds,
+      });
+      if (!decision.ok) {
+        res.status(decision.status).json(error(config.nodeId, decision.code, decision.message));
+        return;
+      }
+      ecoChain = decision;
       freshRoles = ['ecosystem'];
       freshScopes = ecoApp.scopes;
     } else if (req.auth!.app_grant) {
@@ -497,7 +519,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     // P3-7: Create new session record for refreshed token
     const refreshSessionId = generateSessionId();
     const refreshNow = new Date();
-    const refreshExpiresAt = new Date(refreshNow.getTime() + config.jwtTtlSeconds * 1000);
+    const refreshTtl = ecoChain ? ecoChain.ttlSeconds : config.jwtTtlSeconds;
+    const refreshExpiresAt = new Date(refreshNow.getTime() + refreshTtl * 1000);
 
     const token = await issueJWT({
       sub: req.auth!.sub,
@@ -508,7 +531,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // A session made from a PAT stays marked across a refresh, or one refresh would turn a
       // program's session into a person's for classification (reader-kind.ts).
       ...(req.auth!.via === 'pat' ? { via: 'pat' as const } : {}),
-    }, config.jwtTtlSeconds, refreshSessionId);
+      // An ecosystem app keeps its name claim and the moment its owner approved it.
+      ...(ecoChain ? { auth_time: ecoChain.authTime, ...(req.auth!.eco_app ? { eco_app: req.auth!.eco_app } : {}) } : {}),
+    }, refreshTtl, refreshSessionId);
 
     await storage.createSession({
       sessionId: refreshSessionId,
@@ -521,7 +546,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       token,
       expires_at: refreshExpiresAt.toISOString(),
-      ttl_seconds: config.jwtTtlSeconds,
+      ttl_seconds: refreshTtl,
+      // When the owner's approval stops renewing this app; after it, hello again.
+      ...(ecoChain ? { reapprove_by: new Date(ecoChain.chainEndsAt * 1000).toISOString() } : {}),
     }));
   });
 

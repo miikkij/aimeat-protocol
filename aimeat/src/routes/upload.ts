@@ -24,6 +24,8 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.25.3 — 2026-10-09 — The PUT spends its token in storage (verifyUploadToken(token, storage)), so a
+ *     used token is refused after a restart and on another process (secrets audit 2026-10-09, S-7).
  *   v1.25.2 — 2026-10-09 — A ZIP-installed extension's secrets are encrypted bound to its name
  *     (SecretBinding; secrets audit 2026-10-09, 1.1).
  *   v1.25.1 — 2026-10-09 — An extension upload over an installed copy keeps its host field values and
@@ -174,7 +176,8 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
         // Verify token
         let verified;
         try {
-            verified = await verifyUploadToken(token);
+            // The spend is filed in storage, so single use holds across restarts and processes.
+            verified = await verifyUploadToken(token, storage);
         } catch (err) {
             if (err instanceof UploadTokenError) {
                 const status = err.code === 'TOKEN_EXPIRED' ? 410

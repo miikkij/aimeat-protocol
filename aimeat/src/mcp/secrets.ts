@@ -20,6 +20,8 @@
  * @structure registerSecretTools(mcp, storage, config, getAgentGaii)
  * @usage registerSecretTools(mcp, storage, config, agentGaii) — from mcp/register-all.ts
  * @version-history
+ *   2026-10-09 — aimeat_secret_set takes an optional `host`, the same as PUT /v1/secrets/:name (secrets
+ *     audit 2026-10-09, item 10).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-06 — Initial.
  */
@@ -48,9 +50,10 @@ export function registerSecretTools(
         return { content: [{ type: 'text' as const, text: JSON.stringify({ secrets, count: secrets.length }, null, 2) }] };
     });
 
-    mcp.tool('aimeat_secret_set', descriptionFor('aimeat_secret_set'), zodShapeFor('aimeat_secret_set'), annotationsFor('aimeat_secret_set'), async ({ name, value }) => {
+    mcp.tool('aimeat_secret_set', descriptionFor('aimeat_secret_set'), zodShapeFor('aimeat_secret_set'), annotationsFor('aimeat_secret_set'), async ({ name, value, host }) => {
         const ownerGhii = vaultOf();
-        const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
+        // `host` binds the secret now; the session's principal is recorded as the one who set it.
+        const r = await putOwnerSecret(storage, config, ownerGhii, name, value, { host, by: getAgentGaii() });
         if (!r.ok) {
             return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}` }], isError: true };
         }

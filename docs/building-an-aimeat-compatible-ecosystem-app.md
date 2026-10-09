@@ -89,7 +89,8 @@ role **`ecosystem`**.
   independent GEAIs.
 - Registration is **per-node, per-user, independent** — like a GAII. "Global" just means the same
   external software forms many independent per-node connections. Each node pins your `public_key` at first
-  connect (**TOFU**); there is no cross-instance verification.
+  connect (**TOFU**); there is no cross-instance verification. Every renewal of your credential is signed
+  with the pinned key (§3.3a).
 - **Ownership invariant:** the GEAI works in its **own** `eco:` memory namespace. `resolveIdentity()`
   returns the `eco:` sub **as-is** for the `ecosystem` role (it does not remap writes to GHII). The owner
   owns the data via owner-session aggregation (the same path that covers agents) and via refined-data
@@ -140,6 +141,37 @@ Poll with `{ device_code, grant_type }`. Before approval you get `authorization_
 (agent device-token semantics). After approval you get the **GEAI JWT** once (one-time pickup): a
 long-lived EdDSA token with `sub = eco:{app}#{owner}@{node}`, `roles: ['ecosystem']`, `owner`, `node`,
 `scopes`, and an `eco_app` claim. (`bound_ref` is **not** in the JWT — it stays on the storage record.)
+
+### 3.3a Renewing the credential: prove the pinned key (BUILT, 2026-10-09)
+
+The `public_key` you send at hello is pinned on your app record when the owner approves. A renewal
+must prove you still hold its private half; the bearer alone does not renew.
+
+```
+POST /v1/auth/refresh
+Authorization: Bearer <your current GEAI token>
+{ "timestamp": "<now, ISO 8601>", "signature": "<base64 Ed25519 signature of geai + timestamp>" }
+```
+
+- The message is your GEAI followed by the timestamp, with nothing between them
+  (`eco:zendesk#teppo@node-id2026-10-09T12:00:00.000Z`), signed with the private key whose public half
+  you sent at hello. The timestamp must be within five minutes of the node's clock, and each signature
+  is accepted once.
+- No proof: `401 ECO_KEY_PROOF_REQUIRED`. Another key, a stale timestamp or a reused signature:
+  `401 ECO_KEY_PROOF_INVALID`.
+- **One approval carries one year of renewals.** The token from the pickup carries `auth_time`, the
+  moment the owner approved, and every renewal keeps it. A year after that the renewal answers
+  `401 ECO_REAPPROVAL_REQUIRED`: send hello again, and the owner approves the app again, seeing its
+  permissions. The renewal answer carries `reapprove_by`, so you can ask the owner before it runs out,
+  and a renewed token never outlives the approval.
+- Renew while your current token is still valid: an expired bearer cannot renew, and the way back is
+  hello again.
+
+**What an app built before 2026-10-09 must change.** Generate a real Ed25519 keypair if you sent a
+placeholder as `public_key`, keep the private half, and sign every renewal as above. A credential
+issued before this change keeps working until its next renewal; that renewal needs the signature, and
+an app whose pinned key is not a real Ed25519 key connects again with hello (the owner then pins the
+new key). A token issued before this change starts its one-year chain at its own issue time.
 
 ### 3.4 Owner management
 
@@ -307,6 +339,9 @@ schema-valid output, (c) an emitter for each event in `emits`, (d) a handler for
 
 - [ ] Hello sent with `owner`, `app`, `public_key`; owner approved in Profile → Ecosystem apps; token
       picked up → GEAI JWT with `roles:['ecosystem']`, `sub = eco:{app}#{owner}@{node}`.
+- [ ] `public_key` is a real Ed25519 public key (base64), and every renewal at `POST /v1/auth/refresh`
+      carries `{ timestamp, signature }` signed with its private half (§3.3a); the app asks its owner
+      to approve again before `reapprove_by`.
 - [ ] If a `manifest` is sent, all six static checks pass (`validation.ok === true`).
 - [ ] `manifest.app` equals the hello `app`; `manifest.scopes ⊆ requested scopes`; capability ids unique.
 - [ ] Capabilities respond with schema-valid output over the tunnel; subscribed events are acknowledged;
@@ -324,6 +359,7 @@ schema-valid output, (c) an emitter for each event in `emits`, (d) a handler for
 |---|---|---|
 | GEAI identity (`eco:` helpers, role, resolveIdentity) | ✅ Built | `utils/gaii.ts` |
 | Onboarding (hello/token/pending/approve/list/revoke) | ✅ Built | `routes/ecosystem-apps.ts` |
+| Renewal signed by the pinned key; one year per approval | ✅ Built | `services/ecosystem-refresh.ts` |
 | Manifest schema + static validation | ✅ Built | `models/ecosystem-manifest.ts` |
 | Event envelope + inbound/outbound catalogs + router | ✅ Built | `models/ecosystem-event-schemas.ts`, `routes/ecosystem-events.ts` |
 | Tunnel accepts `ecosystem` role; capability invocation over tunnel | ✅ Built | tunnel upgrade + connector |

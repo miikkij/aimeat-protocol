@@ -380,11 +380,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-09",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:d440a41fd857fb8344bf4b84"
+      "digest": "sha256:f5824153b5c5bc6e33c2b4a7"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -564,7 +564,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "61669baeab8b64a8"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "1fcf7e02214eb930"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
