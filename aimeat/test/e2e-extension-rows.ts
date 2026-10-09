@@ -368,7 +368,7 @@ await test('Host field: installed with no value, the extension reaches nothing a
     const act = await json(`/v1/extensions/${EXT_H}/activate`, { method: 'POST', headers: auth(A.token) });
     assert(act.status === 200, `activate ${act.status}`);
     const r = await invoke(EXT_H, 'fetch_listed', A.token);
-    assert(r.status !== 200 && /has not set its host field/.test(JSON.stringify(r.body)), `expected the not-set refusal, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.status !== 200 && /has not set the host field FAR_HOST/.test(JSON.stringify(r.body)), `expected the not-set refusal, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
 });
 
 await test('Host field: another owner cannot set it, and a URL in place of a host is refused', async () => {

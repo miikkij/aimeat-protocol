@@ -14,6 +14,7 @@
  *   safeFetch is replaced by a recorder, the way extension-ai-provider-ctx.test.ts does it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-host-fields.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-09 — An unset field beside fixed hosts is named in the refusal.
  *   v1.0.0 — 2026-10-09 — Initial (wish-a-package-s-extension-hosts-settable-per-install-the-soc-s-w).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -108,8 +109,19 @@ describe('a host field joins the fetch allowlist of its install', () => {
         const ext = record('network: { host_fields: { X: optional } }', 'config:\n  X: { description: The indexer }');
         expect(ext.config?.X).toBe('');
         expect(capabilitiesOfRecord(ext).hosts).toEqual([]);
-        await expect(ctxOf(ext).fetch('https://a.example/')).rejects.toThrow(/Fetch blocked:.*has not set its host field/);
+        await expect(ctxOf(ext).fetch('https://a.example/')).rejects.toThrow(/Fetch blocked:.*network\.hosts: none; the owner has not set the host field X/);
         expect(calls).toEqual([]);
+    });
+
+    it('beside fixed hosts, an unset field is named in the refusal, and the fixed hosts still answer', async () => {
+        // The SOC's shape: Microsoft hosts fixed, WAZUH_HOST optional and left empty. Before v1.2.1 the
+        // refusal named only the fixed hosts (koeajo-hostfield1, 2026-10-09).
+        const ext = record('network: { hosts: [a.example], host_fields: { X: optional } }', 'config:\n  X: { description: The indexer }');
+        expect(capabilitiesOfRecord(ext)).toMatchObject({ hosts: ['a.example'], unsetHostFields: ['X'] });
+        const ctx = ctxOf(ext);
+        await expect(ctx.fetch('https://wazuh.example:9200/')).rejects.toThrow(/network\.hosts: a\.example; the owner has not set the host field X\)/);
+        expect((await ctx.fetch('https://a.example/')).status).toBe(200);
+        expect(capabilitiesOfRecord(record()).unsetHostFields).toBeUndefined();
     });
 });
 

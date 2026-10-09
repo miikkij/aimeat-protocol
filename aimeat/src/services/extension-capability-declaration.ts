@@ -25,6 +25,8 @@
  *   const caps = capabilitiesOfRecord(ext);
  *   buildExtensionCtx({ ..., capabilities: caps });
  * @version-history
+ *   v1.2.1 — 2026-10-09 — `unsetHostFields`: the host fields with no value, also when fixed hosts are
+ *     declared beside them (found on a hosted SOC trial by cc-jouni-soc-sale).
  *   v1.2.0 — 2026-10-09 — `hosts` is the declared list plus the current value of each `host_fields`
  *     field (services/extension-network-hosts.ts), so one bundle reaches each buyer's own host. A
  *     manifest with host fields and no value set yet has `hosts: []`, which reaches nothing.
@@ -47,9 +49,10 @@ export const NETWORK_HOSTS_KEY = '__networkHosts';
 /**
  * The four capabilities, and whether the manifest declared them (true) or the node inferred them
  * (false). `hosts`, when the manifest named them, is the only hostnames ctx.fetch may reach, on
- * every redirect hop too; absent means any public address, as before.
+ * every redirect hop too; absent means any public address, as before. `unsetHostFields` names the
+ * host fields with no value yet, so a refused fetch can say which one the owner still has to set.
  */
-export type ExtensionCapabilitySet = Record<ExtensionCapabilityName, boolean> & { declared: boolean; hosts?: string[] };
+export type ExtensionCapabilitySet = Record<ExtensionCapabilityName, boolean> & { declared: boolean; hosts?: string[]; unsetHostFields?: string[] };
 
 /** The manifest's `network.hosts` on an installed record, or undefined when it named none. */
 export function declaredHostsOf(config: Record<string, unknown> | undefined): string[] | undefined {
@@ -64,16 +67,18 @@ export function declaredHostsOf(config: Record<string, unknown> | undefined): st
  * field's current value. Undefined when the manifest named neither (any public address). A stored
  * value that does not read as a host adds nothing; the config writers refuse one before it is stored.
  */
-function networkHostsOf(config: Record<string, unknown> | undefined): string[] | undefined {
+function networkHostsOf(config: Record<string, unknown> | undefined): { hosts?: string[]; unsetHostFields?: string[] } {
   const declared = declaredHostsOf(config);
   const fields = hostFieldsOf(config);
-  if (!fields.length) return declared;
+  if (!fields.length) return declared ? { hosts: declared } : {};
   const hosts = new Set(declared ?? []);
+  const unset: string[] = [];
   for (const { field } of fields) {
     const parsed = parseHostFieldValue(config?.[field]);
     if (parsed.ok && parsed.host) hosts.add(parsed.host);
+    else unset.push(field);
   }
-  return [...hosts].sort();
+  return { hosts: [...hosts].sort(), ...(unset.length ? { unsetHostFields: unset } : {}) };
 }
 
 /** The broad word each capability is inferred from. Matching more than the call is the safe side. */
@@ -110,14 +115,14 @@ export function capabilitiesOfRecord(record: {
   config?: Record<string, unknown>; actions: Array<{ scriptContent?: string }>;
 }): ExtensionCapabilitySet {
   const declared = record.config?.[CAPABILITY_DECLARATION_KEY];
-  const hosts = networkHostsOf(record.config);
+  const network = networkHostsOf(record.config);
   if (Array.isArray(declared)) {
     const out = { declared: true } as ExtensionCapabilitySet;
     for (const name of EXTENSION_CAPABILITY_NAMES) out[name] = declared.includes(name);
-    return hosts ? { ...out, hosts } : out;
+    return { ...out, ...network };
   }
   const code = record.actions.map(a => a.scriptContent ?? '').join('\n');
-  return { ...inferCapabilities(code), declared: false, ...(hosts ? { hosts } : {}) };
+  return { ...inferCapabilities(code), declared: false, ...network };
 }
 
 /** The refusal a script meets when it uses a capability its extension does not have. */
