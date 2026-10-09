@@ -3,6 +3,19 @@
   "entries": [
     {
       "date": "2026-10-09",
+      "version": "3.25.0",
+      "kind": "feature",
+      "title": {
+        "en": "AI-made sound, pictures and files say how they were made",
+        "fi": "Tekoälyn tekemä ääni, kuva ja tiedosto kertovat, miten ne on tehty"
+      },
+      "body": {
+        "en": "A speech clip, a picture or any file you store now carries the record of how it was made. When you publish it, the AI label goes with it, and anyone can check it. The label says what the thing is: a clip says AI made this audio, not this text. Whether a label is needed is decided when the content is shown, so something you make public later gets the label it now needs. When an AI provider refuses a request, you see its reason and what to change, instead of being told to try again. The same record now travels with messages, board notices, delivered work, shared documents and skills. A statement your permissions do not allow is refused before anything is charged.",
+        "fi": "Puheklippi, kuva ja mikä tahansa tallentamasi tiedosto kertoo nyt, miten se on tehty. Kun julkaiset sen, tekoälymerkintä kulkee mukana, ja kuka tahansa voi tarkistaa sen. Merkintä kertoo, mistä on kyse: äänen merkinnässä lukee, että tekoäly teki äänen, ei tekstiä. Merkinnän tarve päätetään, kun sisältö näytetään, joten myöhemmin julkiseksi muutettu sisältö saa merkinnän, jonka se nyt tarvitsee. Kun tekoälypalvelu hylkää pyynnön, näet syyn ja sen, mitä muuttaa, etkä pelkkää kehotusta yrittää uudelleen. Sama tieto kulkee nyt myös viesteissä, taulujen ilmoituksissa, toimitetussa työssä, jaetuissa dokumenteissa ja skilleissä. Jos ilmoitat jotain, mihin oikeutesi eivät riitä, ilmoitus hylätään ennen kuin mitään veloitetaan."
+      }
+    },
+    {
+      "date": "2026-10-09",
       "kind": "feature",
       "title": {
         "en": "See how people and AIs find you, and what they do on your apps",
