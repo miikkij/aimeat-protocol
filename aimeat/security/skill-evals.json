@@ -8,10 +8,10 @@
       "note": "four language-table rows for the Visibility page, no instruction changed; Jouni chose \"Skip the eval\", 2026-10-09"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:4cc022c9a4a4c841dd7b2c63",
-      "decision": "skipped",
-      "on": "2026-10-06",
-      "note": "Jouni decided to skip the eval: \"skip eval\"; Jouni, 2026-10-06"
+      "digest": "sha256:3b6f67c9a50292dd23593fda",
+      "decision": "ran",
+      "on": "2026-10-09",
+      "note": "opus, 3 runs per case, run approved by Jouni 2026-10-09 (cap 10 USD, spent 9.97). Before (both arms, 5 USD cap reached after 3 cases): image-button-app with 0.92 / without 0.25 (+0.67); large-collection-duplicates 1.00 / 1.00 (0.00); mid-collection-fits-prompt with 1.00, without partial. After (with-skill arm only; the without arm does not depend on the skill): image-button-app 0.93, large-collection-duplicates 1.00, mid-collection-fits-prompt 1.00, needs-one-model 0.78, small-collection-no-embeddings 1.00, voice-note-summary 0.92 (one grader skipped at the cost cap). No case fell; no case exercises the new error-code paragraph."
     }
   }
 }

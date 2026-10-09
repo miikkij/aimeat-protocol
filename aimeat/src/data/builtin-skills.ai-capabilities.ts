@@ -18,6 +18,8 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.4.0 — 2026-10-09 — A provider's refusal: which codes say change the call (PROVIDER_REJECTED,
+ *     CONTENT_REFUSED, PROVIDER_NO_CREDIT, INVALID_VOICE) and which two are worth trying again (aiprov A1).
  *   v1.3.0 — 2026-10-05 — A direct AI call counts against the account's limit of AI calls a minute
  *     (RATE_LIMITED); a schedule, a workflow step or a job's run does not (secaudit 2026-10, C5).
  *   v1.1.0 — 2026-10-02 — `fix` is the person's sentence, `settingsUrl` the link to where it is
@@ -110,6 +112,13 @@ and do not promise a feature the node cannot run for them.
 Errors carry \`err.code\`: AI_CAPABILITY_UNAVAILABLE (with \`details.rejected\`), AI_MODEL_NOT_ALLOWED
 (with the \`allowed\` list), QUOTA_EXHAUSTED, and RATE_LIMITED (429). A refusal the person can fix carries
 \`err.fix\` and \`err.settingsUrl\`, as a capability does: show the sentence and the link; never an empty result.
+
+When the provider itself says no, the code says whether to try again. PROVIDER_REJECTED (422): the
+provider refused the call as sent, and \`details.provider_message\` says why; the same call fails again,
+so change the model, the format or the voice (speech in mp3 carries \`details.hint\`: ask for pcm).
+CONTENT_REFUSED (422): the provider's moderation refused it. PROVIDER_NO_CREDIT (402): the key that pays
+has no credit left. INVALID_VOICE (400): the voice is not one of the model's, and \`details.voices\` lists
+them. Only PROVIDER_ERROR (502) and RATE_LIMITED (429, after its \`Retry-After\`) are worth trying again.
 
 **Calls are counted per account.** Every AI call a person, an app or an agent starts directly (complete,
 image, transcribe, speech, embed, a provider test, a job start) counts against one limit for the whole
