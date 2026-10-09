@@ -52,6 +52,9 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.4.0 — 2026-10-09 — archiveRecords: up to 500 records of one space archived in one host call,
+ *     through services/archive.ts archiveRecordsBatchOp, under the archive route's rule (organism:write
+ *     of a token, creator or admin of the organism). For Lifecycle Central's closed claims.
  *   v1.3.0 — 2026-10-08 — appendRows and readRows (manifest workspace.rows), through the row
  *     service's extension path, built in extension-workspace-rows.ts, which also gives a schedule or
  *     a workflow step those two calls and nothing else (its own module, at the import cycle
@@ -80,6 +83,8 @@ import {
     type WorkspaceOpRefusal, type WorkspaceOpsCaller,
 } from './workspace-tool-ops.js';
 import { buildRowCalls, type ExtensionWorkspaceRefusal } from './extension-workspace-rows.js';
+import { archiveRecordsBatchOp } from './archive.js';
+import { emitChange } from './event-bus.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)
 // is the leaf module extension-workspace-declaration.ts, so the manifest builder and the CRUD
@@ -94,6 +99,9 @@ export const WORKSPACE_READ_SCOPE = 'organism:read';
 /** The scope such a token needs to REMOVE records for good (deleteRecords): what
  *  POST /v1/organisms/:id/workspace/records/delete asks since 2026-10-02. */
 export const WORKSPACE_PURGE_SCOPE = 'memory:purge';
+/** The scope such a token needs to ARCHIVE records (archiveRecords): what
+ *  POST /v1/organisms/:id/archive asks. */
+export const WORKSPACE_ARCHIVE_SCOPE = 'organism:write';
 
 /** A refusal the capability made, kept so the road can answer with the service's status and code
  *  rather than a generic EXTENSION_ERROR 500. Declared in extension-workspace-rows.ts. */
@@ -141,8 +149,8 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         return refuse(r.status, r.code, r.message);
     };
 
-    /** Guard 1 and 3 for a call of the given kind. A purge is a write the manifest declares as write. */
-    const allow = (kind: 'read' | 'write' | 'purge'): void => {
+    /** Guard 1 and 3 for a call of the given kind. A purge or an archive is a write the manifest declares as write. */
+    const allow = (kind: 'read' | 'write' | 'purge' | 'archive'): void => {
         if (kind === 'read' && !declaration.read) {
             refuse(403, 'PERMISSION', `Extension "${extName}" does not declare workspace read access (manifest workspace.read).`);
         }
@@ -152,9 +160,10 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         // The test requireScope makes before it asks for a word: an owner in person bypasses scopes;
         // an agent, an app grant or an ecosystem app does not.
         if (isOwnerInPerson(caller)) return;
-        const scope = kind === 'write' ? WORKSPACE_WRITE_SCOPE : kind === 'purge' ? WORKSPACE_PURGE_SCOPE : WORKSPACE_READ_SCOPE;
+        const scope = kind === 'write' ? WORKSPACE_WRITE_SCOPE : kind === 'purge' ? WORKSPACE_PURGE_SCOPE
+            : kind === 'archive' ? WORKSPACE_ARCHIVE_SCOPE : WORKSPACE_READ_SCOPE;
         if (!scopeIsCovered(caller.scopes, scope)) {
-            const act = kind === 'purge' ? 'remove records from' : kind;
+            const act = kind === 'purge' ? 'remove records from' : kind === 'archive' ? 'archive records in' : kind;
             refuse(403, 'SCOPE_DENIED', `Scope "${scope}" required to ${act} a workspace through extension "${extName}". Caller scopes: [${caller.scopes.join(', ')}]`);
         }
     };
@@ -217,6 +226,14 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             allow('purge');
             if (!Array.isArray(ids) || ids.length === 0) refuse(400, 'INVALID_INPUT', 'deleteRecords() needs a non-empty array of instance ids');
             return settle(await deleteRecordsBatchOp(ops, opsCaller, { organismId, ws, namespace, ids }));
+        },
+        // Archiving is undoable and asks what POST /v1/organisms/:id/archive asks: organism:write of a
+        // token, and the creator or an admin of the organism (services/archive.ts archiveRoleOf).
+        archiveRecords: async (organismId, ws, namespace, ids) => {
+            allow('archive');
+            const r = await archiveRecordsBatchOp(storage, { principal: caller.gaii, ownerName: caller.owner }, { organismId, ws, namespace, ids });
+            if (r.ok) emitChange('organisms');
+            return settle(r);
         },
         ...buildRowCalls({ config, storage, extName, installer: deps.installer, declaration, reader, refuse }),
     };

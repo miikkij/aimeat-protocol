@@ -107,7 +107,10 @@ guest receives is missing from that table, so change the table in the same commi
   fenced to `ext:`. Many records go through `publishRecords` (up to 1000, with `dryRun` and
   `createOnly`) and come out through `deleteRecords` (up to 2000, needs `memory:purge` on a token),
   ONE call each: a run has 500 calls and 5 seconds by default, and `write` + `publish` per record
-  cannot finish 500 records.
+  cannot finish 500 records. A space that only grows (closed claims, finished tickets) is kept
+  small with `archiveRecords` (up to 500, undoable, the organism's creator or an admin, and
+  `organism:write` on a token): an archived record leaves every read, and a workspace read costs
+  time per record, so 771 closed claims made every read of one workspace slow.
 - **A collector writes one key per PERIOD, never one per item fetched.** The namespace carries the
   same budget as any principal: 1024 kB per value, 1000 keys by default. `ext:halytyskartta-ext` keeps
   a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; `ext:luotain` kept one
