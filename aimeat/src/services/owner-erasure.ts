@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.10.0 — 2026-10-09 — The provider_clients step also deletes the app clients each agent brought
+ *     under its own GAII (secrets audit 2026-10-09, F3).
  *   v1.9.0 — 2026-10-09 — Two steps: the account's passkeys, and the extensions the person or their
  *     agents installed. Both survived erasure and passed to the next holder of the released name
  *     (secrets audit 2026-10-09, finding 1.2).
@@ -187,12 +189,17 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       return n ? `mcp_servers:${n}` : null;
     }, deletionLog);
 
-    // The client registrations a person brought themselves (their own Entra app, their own X app).
-    // They carry a client secret, so the same argument applies.
+    // The client registrations a person brought themselves (their own Entra app, their own X app),
+    // and those each of their agents brought under its own GAII. They carry a client secret, so the
+    // same argument applies. The agents' were missed until 2026-10-09 (secrets audit 2026-10-09, F3).
     await step('provider_clients', async () => {
-      const clients = await storage.listPrincipalProviderClients(ghii);
-      for (const c of clients) await storage.deletePrincipalProviderClient(c.provider, ghii);
-      return clients.length ? `provider_clients:${clients.length}` : null;
+      let n = 0;
+      for (const principal of [ghii, ...agents.map(a => a.gaii)]) {
+        const clients = await storage.listPrincipalProviderClients(principal);
+        for (const c of clients) await storage.deletePrincipalProviderClient(c.provider, principal);
+        n += clients.length;
+      }
+      return n ? `provider_clients:${n}` : null;
     }, deletionLog);
 
     await step('apps', async () => {

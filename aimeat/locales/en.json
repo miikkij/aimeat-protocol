@@ -14564,6 +14564,24 @@
     "authCodeLabel": "Authorization code:",
     "authCodeHint": "Paste this code back into the application that requested access."
   },
+  "oauthRound": {
+    "badge": "Sign-in",
+    "titleAccount": "Connect an account at {provider}?",
+    "titleServer": "Sign in to the MCP server {server}?",
+    "leadAccountAgent": "Your agent {agent} asked to connect an account at {provider}. When you continue, you sign in at {provider}, and the agent can then use the account you choose there.",
+    "leadAccountSelf": "You started to connect an account at {provider}. When you continue, you sign in at {provider}, and the account you choose there is connected to your AIMEAT account.",
+    "leadServerAgent": "Your agent {agent} asked to sign in to the MCP server {server}. When you continue, you sign in at that server, and every call through it then uses the account you choose there.",
+    "leadServerSelf": "You started to sign in to the MCP server {server}. When you continue, you sign in at that server, and every call through it then uses the account you choose there.",
+    "warn": "Continue only if you asked for this yourself. The sign-in works only in this browser, so nobody else can finish it.",
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "signInTitle": "Sign in first",
+    "signInLead": "This sign-in waits for the person whose account started it. Sign in with that account to see what it connects.",
+    "signIn": "Sign in",
+    "goneTitle": "This sign-in cannot continue",
+    "gone": "It has expired, it was already used, or it belongs to another account. Ask for a new one.",
+    "failed": "Could not continue. Try again."
+  },
   "agentConsentPage": {
     "title": "Agent Authorization",
     "loginRequired": "Sign in to approve or deny this request.",

@@ -95,12 +95,12 @@
       "digest": "sha256:c21039590693b69a201dfc6a"
     },
     "node:aimeat-mail-to-data": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-09",
       "watches": [
         "aimeat/src/tool-catalog/definitions/connections.ts",
         "aimeat/src/services/connections/providers.ts"
       ],
-      "digest": "sha256:269d6a418e6ae4125cc80df7"
+      "digest": "sha256:95b4ea1830c2e88aa9d763b7"
     },
     "node:aimeat-app-workstation": {
       "reviewedOn": "2026-10-07",
@@ -350,11 +350,11 @@
       "digest": "sha256:6b9d604a445fd9638389671b"
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-09-28",
+      "reviewedOn": "2026-10-09",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:ced3c8687c3fe839dbb2725c",
+      "digest": "sha256:f1f099829a9c5fd7ac690b03",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -419,7 +419,7 @@
       "aimeat/src/services/ai/completion.ts": "f6c2d7e866accea2"
     },
     "node:aimeat-mail-to-data": {
-      "aimeat/src/tool-catalog/definitions/connections.ts": "8b4789068c4516e9",
+      "aimeat/src/tool-catalog/definitions/connections.ts": "6a050db264b3a592",
       "aimeat/src/services/connections/providers.ts": "9350b01985108cad"
     },
     "node:aimeat-app-workstation": {
@@ -552,7 +552,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "eac732f99c743f71"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "d7a458c82439dc8d"
+      "aimeat/scripts/sandbox.ts": "5e614f360260147c"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"

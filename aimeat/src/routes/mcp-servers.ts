@@ -39,6 +39,11 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-10-09 — POST /:id/authorize binds the round to the owner's browser when the owner
+ *     starts it from a page of this node; an agent gets the node's confirmation page as authorize_url
+ *     (owner_confirms: true). The callback refuses a browser the round was not bound to with 403
+ *     NOT_THIS_BROWSER and seals nothing. POST /node refuses a stdio env with no encryption key, since
+ *     its values are sealed at rest (secrets audit 2026-10-09, chapter 2).
  *   v1.4.1 — 2026-09-26 — POST /organism hands the service the caller's owner GHII, which the group's
  *     rolls are compared against whole, so a visitor from another node named like the group's owner
  *     is refused as NOT_ALLOWED (secaudit 2026-09, a0ecb62eafb3).
@@ -79,12 +84,18 @@ import {
 } from '../services/mcp-client/registry.js';
 import { callRemoteTool, listRemoteTools, statusForRemoteRefusal } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
+import { requireEncryptionKey } from '../services/mcp-client/credential.js';
 import {
   listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
+import { browserCanBind, issueRoundBinding, readRoundBinding, clearRoundBinding } from '../middleware/oauth-round-cookie.js';
+import { callerOf } from '../middleware/caller.js';
+
+/** The callback's path, which the round cookie is scoped to (services/mcp-client/oauth.ts mcpCallbackUrl). */
+const MCP_CALLBACK_PATH = '/v1/mcp-servers/callback';
 
 export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -279,6 +290,12 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
           { settings: ['AIMEAT_MCP_STDIO_ENABLED', 'AIMEAT_MCP_STDIO_ALLOWED_COMMANDS'] },
         ));
       }
+      // A process's environment is sealed at rest like a token (services/mcp-client/transport-secrets.ts),
+      // so a node that cannot seal it does not store it.
+      if (command && b.env && typeof b.env === 'object' && Object.keys(b.env).length && !requireEncryptionKey(config)) {
+        return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY',
+          'This node has no encryption key configured, so it cannot hold the environment values of that program. Set AIMEAT_ENCRYPTION_KEY.'));
+      }
       const credential: McpServerCredential | undefined = typeof b.token === 'string' && b.token
         ? {
           shape: 'static',
@@ -454,10 +471,16 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       if (!server) return notFound(res);
 
       const b = (req.body ?? {}) as Record<string, unknown>;
+      // The owner on a page of this node binds the round to this browser now; an agent or a CLI gets
+      // the node's confirmation page instead (middleware/oauth-round-cookie.ts; secrets audit
+      // 2026-10-09, chapter 2).
+      const inBrowser = browserCanBind(req, callerOf(req, config.nodeId, storage).inPerson);
       const started = await startMcpOAuth({
         storage, config, server,
         ownerGhii: ownerOf(req),
+        startedBy: callerPrincipal(req.auth!, config.nodeId),
         ...(typeof b.return_url === 'string' ? { returnUrl: b.return_url } : {}),
+        ...(inBrowser ? { bindBrowser: (state: string, ttl: number) => issueRoundBinding(req, res, state, MCP_CALLBACK_PATH, ttl) } : {}),
       });
       if (!started.ok) {
         const status = started.code === 'NO_ENCRYPTION_KEY' ? 503
@@ -467,29 +490,32 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       // An empty address means the far side needed nothing from a person: a client that was already
       // registered with a grant in place. Saying which happened beats an address that goes nowhere.
       return res.json(success(config.nodeId, {
-        authorize_url: started.authorizeUrl,
+        authorize_url: started.authorizeUrl && !inBrowser ? started.approvalUrl : started.authorizeUrl,
         state: started.state,
         needs_person: started.authorizeUrl !== '',
+        owner_confirms: started.authorizeUrl !== '' && !inBrowser,
       }));
     });
 
   /**
    * THE ONE UNAUTHENTICATED ROUTE HERE, and it has to be: the far side redirects a BROWSER to it,
-   * and that browser carries no bearer of ours. Its gate is the single-use `state`, which is bound
-   * to the owner who started the round and consumed before the code is exchanged.
+   * and that browser carries no bearer of ours. Its gates are the single-use `state`, consumed before
+   * the code is exchanged, and the round's browser binding: a browser the round was not bound to is
+   * refused and nothing is sealed.
    */
   router.get('/v1/mcp-servers/callback', async (req: Request, res: Response) => {
     const state = typeof req.query.state === 'string' ? req.query.state : '';
     const code = typeof req.query.code === 'string' ? req.query.code : '';
+    if (state) clearRoundBinding(req, res, state, MCP_CALLBACK_PATH);
     if (!state || !code) {
       return res.status(400).json(error(
         config.nodeId, 'BAD_REQUEST', 'That sign-in did not come back complete. Start again.',
       ));
     }
 
-    const done = await finishMcpOAuth({ storage, config, state, code });
+    const done = await finishMcpOAuth({ storage, config, state, code, binding: readRoundBinding(req, state) });
     if (!done.ok) {
-      return res.status(done.code === 'BAD_STATE' ? 400 : 502)
+      return res.status(done.code === 'BAD_STATE' ? 400 : done.code === 'NOT_THIS_BROWSER' ? 403 : 502)
         .json(error(config.nodeId, done.code, done.message));
     }
     // Now that it has a credential, learn what it can do. Done HERE and not in the OAuth service

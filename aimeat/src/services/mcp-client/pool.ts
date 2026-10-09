@@ -25,6 +25,8 @@
  * @structure McpClientPool — acquire · invalidate · closeAll · size
  * @usage const client = await pool.acquire(server, credential, identity);
  * @version-history
+ *   v1.2.0 — 2026-10-09 — The transport's sealed env and headers are opened at the connect and
+ *     nowhere else (transport-secrets.ts; secrets audit 2026-10-09, chapter 2).
  *   v1.1.0 — 2026-09-17 — The node id reaches the transport, for the loop-brake header.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
@@ -32,6 +34,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
 import type { AimeatConfig } from '../../config.js';
 import { buildTransport, MCP_CONNECT_TIMEOUT_MS } from './transport.js';
+import { openTransportSecrets } from './transport-secrets.js';
 import { logger } from '../../utils/logger.js';
 
 /** How long a client may sit unused before the sweeper closes it. */
@@ -68,7 +71,7 @@ export class McpClientPool {
      * http and sse paths are unchanged, and a missing one is a refusal rather than a default: an
      * unanswered question about running a program is a no.
      */
-    config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands' | 'nodeId'>,
+    config?: Pick<AimeatConfig, 'mcpStdioEnabled' | 'mcpStdioAllowedCommands' | 'nodeId' | 'encryptionKey' | 'totpSecretEncryptionKey'>,
   ): Promise<Client> {
     const key = this.key(server.id, identity);
     const existing = this.entries.get(key);
@@ -85,7 +88,10 @@ export class McpClientPool {
       { capabilities: {} },
     );
     const connecting = (async () => {
-      const transport = buildTransport(server, credential, config);
+      // The transport's env and headers are sealed at rest (transport-secrets.ts) and opened only
+      // here, for the connect. Without a config there is no key, and a sealed value is left out.
+      const opened = { ...server, transport: openTransportSecrets(server.transport, config ?? { encryptionKey: null, totpSecretEncryptionKey: null }, server.id) };
+      const transport = buildTransport(opened, credential, config);
       await client.connect(transport, { timeout: MCP_CONNECT_TIMEOUT_MS });
       const entry = this.entries.get(key);
       if (entry) entry.connecting = null;

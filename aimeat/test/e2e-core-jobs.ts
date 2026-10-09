@@ -45,6 +45,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   v1.2.1 -- 2026-10-09 -- Comment only: core:nonce-cleanup is seeded on every node now.
  *   v1.2.0 -- 2026-09-30 -- core:classification-audit-prune: seeded and fired as its own job.
  *   v1.1.0 -- 2026-09-25 -- core:usage-visit-retention: seeded, fired, and a visit made today keeps
  *     its account.
@@ -210,9 +211,10 @@ async function startNode(): Promise<void> {
             // The nudge is off unless an operator turns it on — unsolicited mail is never a deploy
             // side effect, so the job no-ops on a default node however hard a test fires it.
             AIMEAT_INACTIVITY_NUDGE: 'true',
-            // core:nonce-cleanup is seeded only when a wallet-verification flow is on. It is FTN and
-            // not EUDIW because src/config-eudiw-guard.ts refuses to BOOT with AIMEAT_EUDIW_ENABLED
-            // =true (holder binding is unfinished), and job-seeding takes either flag.
+            // core:nonce-cleanup was seeded only with a wallet-verification flow on until 2026-10-09;
+            // it is seeded on every node now. FTN stays on here for the verification doors it opens,
+            // and it is FTN and not EUDIW because src/config-eudiw-guard.ts refuses to BOOT with
+            // AIMEAT_EUDIW_ENABLED=true (holder binding is unfinished).
             AIMEAT_FTN_ENABLED: 'true',
             // Outbound connections, for the one door that mints a verification nonce without a live
             // identity provider behind it. No server is needed: only the authorize URL is built.

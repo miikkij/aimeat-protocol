@@ -20,6 +20,8 @@
  *   dead connection gives
  * @usage cd aimeat && node --import tsx test/e2e-mail-connections.ts
  * @version-history
+ *   v1.3.1 — 2026-10-09 — A round starts as the owner's browser does and finishes with its cookie
+ *     (secrets audit 2026-10-09, chapter 2).
  *   v1.3.0 — 2026-09-28 — store: true on the attachment read: a Gmail and a Graph attachment become
  *     private files named in the answer and readable back byte for byte; a store without an attachment
  *     id and a store by an app without storage:write are refused before the provider is called.
@@ -40,6 +42,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
 import type { RecordedCall } from './helpers/fake-mail-upstreams.js';
+import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
 
 const PORT = parseInt(process.env.E2E_MAIL_PORT ?? '40286', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -149,13 +152,19 @@ async function registerAndLogin(username: string, password: string): Promise<str
 
 /** One full authorization round, returning the authorize URL and this owner's connections after it. */
 async function connect(bearer: string, provider: string, opts: { instance?: string } = {}): Promise<{ authorizeUrl: string; connections: any[] }> {
-  const start = await api('/v1/connections/start', {
-    bearer,
-    body: { provider, mode: 'personal', return_url: '/profile#access', ...(opts.instance ? { instance: opts.instance } : {}) },
+  // Started as the owner's browser does, and finished with the cookie that start set: the callback
+  // seals only for that browser (secrets audit 2026-10-09, chapter 2).
+  const res = await fetch(`${BASE}/v1/connections/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}`, ...BROWSER_START },
+    body: JSON.stringify({ provider, mode: 'personal', return_url: '/profile#access', ...(opts.instance ? { instance: opts.instance } : {}) }),
   });
+  const start = { status: res.status, data: await res.json() as any };
   assert(start.status === 200 && start.data?.ok, `start ${provider}: ${start.status} ${start.data?.error?.message}`);
   const state = start.data.data.state as string;
-  const cb = await fetch(`${BASE}/v1/connections/callback?state=${encodeURIComponent(state)}&code=code-${provider}`, { redirect: 'manual' });
+  const cb = await fetch(`${BASE}/v1/connections/callback?state=${encodeURIComponent(state)}&code=code-${provider}`, {
+    redirect: 'manual', headers: { Cookie: roundCookie(res) },
+  });
   assert(cb.status === 302, `callback ${provider}: ${cb.status} ${await cb.text()}`);
   const list = await api('/v1/connections', { method: 'GET', bearer });
   return { authorizeUrl: start.data.data.authorize_url as string, connections: list.data.data.connections as any[] };

@@ -1106,6 +1106,9 @@
       '/v1/home':        () => import('/views/home/index.js' + B),
       '/v1/app-grant':   () => import('/views/app-grant.js' + B),
       '/v1/invite':      () => import('/views/invite-accept.js' + B),
+      // The owner confirms a sign-in round an agent started (secrets audit 2026-10-09). A spaRoute
+      // in routes/portal.ts too, or F5 is a 404.
+      '/v1/oauth-round': () => import('/views/oauth-round.js' + B),
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),

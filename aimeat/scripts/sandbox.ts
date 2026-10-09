@@ -48,6 +48,8 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.3.1 — 2026-10-09 — The test mailbox round starts as the owner's browser does and finishes with
+ *     its cookie (secrets audit 2026-10-09, chapter 2).
  *   v1.3.0 — 2026-09-29 — THE APP ORIGIN IS ON, at `apps.localhost`. With it off, an app ran in an
  *     opaque frame (origin null) and the browser refused its sign-in (CORS on a credentialed
  *     request), so Postinjalostamo could be looked at only after it reached production and three
@@ -345,12 +347,20 @@ async function ensureMailServer(mailPort: number): Promise<number> {
  * provider's consent (which approves itself), the node's callback. Returns the connection id.
  */
 async function connectMailbox(token: string): Promise<string> {
-    const start = await api<{ authorize_url: string }>('/v1/connections/start', { method: 'POST', token, body: { provider: 'fake-mail', return_url: '/' } });
+    // Started as the owner's browser does (Sec-Fetch-Site), and finished with the round cookie the
+    // start set: the callback seals only for that browser (secrets audit 2026-10-09, chapter 2).
+    const res = await fetch(`${BASE}/v1/connections/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'Sec-Fetch-Site': 'same-origin' },
+        body: JSON.stringify({ provider: 'fake-mail', return_url: '/' }),
+    });
+    const start = { body: await res.json() as Envelope<{ authorize_url: string }> };
     if (start.body.ok !== true || !start.body.data) throw new Error(`connect the test mailbox: ${JSON.stringify(start.body.error)}`);
+    const cookie = res.headers.getSetCookie().filter(c => c.startsWith('aimeat_oauth_')).map(c => c.split(';')[0]).join('; ');
     const consent = await fetch(start.body.data.authorize_url, { redirect: 'manual' });
     const callback = consent.headers.get('location');
     if (!callback) throw new Error('the test mailbox did not send the browser back');
-    const done = await fetch(callback, { redirect: 'manual' });
+    const done = await fetch(callback, { redirect: 'manual', headers: { Cookie: cookie } });
     if (done.status >= 400) throw new Error(`the node refused the test mailbox: ${done.status} ${await done.text()}`);
     const list = await api<{ connections: Array<{ id: string; provider: string }> }>('/v1/connections', { token });
     const found = (list.body.data?.connections ?? []).find(c => c.provider === 'fake-mail');

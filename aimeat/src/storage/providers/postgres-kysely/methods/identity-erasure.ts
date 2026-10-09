@@ -17,6 +17,9 @@
  *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   v1.4.0 — 2026-10-09 — Connection, ConnectionDelegation and ProviderClient join the per-identity
+ *     cascade, so deleteAgent takes an agent's outside accounts and its own app clients (secrets
+ *     audit 2026-10-09, chapter 2).
  *   v1.3.0 — 2026-09-29 — ClassificationAudit joins the per-identity cascade (TARGET-082 V4).
  *   v1.2.0 — 2026-09-29 — ContentLabel joins the per-identity cascade (TARGET-082).
  *   v1.1.0 — 2026-09-26 — deleteAccountCredentialsDb: what deleteOwnerCascade deleted inline for the
@@ -162,6 +165,16 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // name a working key to the previous person's accounts. The same argument the Connection rows
   // carry, one step sharper: nothing about this row identifies whose key it is.
   await db.deleteFrom('Secret').where('ownerGaii', '=', gaii).execute();
+
+  // Outside accounts this identity connected, the delegations over them, and the app registrations
+  // it brought. An agent's are stored under its own GAII, and a new agent made with the same name
+  // gets the same GAII, so a surviving row handed the newcomer the old mailbox (secrets audit
+  // 2026-10-09, chapter 2). Delegations first: they key on connectionId with no foreign key.
+  await db.deleteFrom('ConnectionDelegation')
+    .where('connectionId', 'in', db.selectFrom('Connection').select('id').where('principal', '=', gaii))
+    .execute();
+  await db.deleteFrom('Connection').where('principal', '=', gaii).execute();
+  await db.deleteFrom('ProviderClient').where('principal', '=', gaii).execute();
 }
 
 /**

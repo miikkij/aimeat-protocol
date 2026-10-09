@@ -5,6 +5,9 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   v2.5.0 — 2026-10-09 — The EUDIW and FTN doors that consume a state take only a round of their
+ *     own flow (type 'eudiw' or 'ftn'); another flow's round is refused as an unknown state and left
+ *     in place for its own callback (secrets audit 2026-10-09, chapter 2).
  *   v2.4.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v2.3.0 — 2026-09-04 — The two doors that OPEN a verification join the two that close it. Each
  *     mints a nonce stamped with `req.auth!.owner` and hands back a state; the callback that
@@ -105,10 +108,11 @@ export function verificationRouter(
         return;
       }
 
-      // Validate nonce/state if provided
+      // Validate nonce/state if provided. Only a round of THIS flow: a state another flow minted
+      // (a connection's, a sign-in's) is not one, and is left untouched for its own callback.
       if (state) {
         const nonceRecord = await storage.getVerificationNonce(state);
-        if (!nonceRecord) {
+        if (!nonceRecord || nonceRecord.type !== 'eudiw') {
           res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'This verification link has expired. Start the check again and you will get a fresh one.'));
           return;
         }
@@ -184,8 +188,10 @@ export function verificationRouter(
         return;
       }
 
+      // An EUDIW round only. Until 2026-10-09 any flow's state was taken and consumed here, so a
+      // connection's or a sign-in's round could be spent by this unauthenticated callback.
       const nonceRecord = await storage.getVerificationNonce(state);
-      if (!nonceRecord) {
+      if (!nonceRecord || nonceRecord.type !== 'eudiw') {
         res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'This verification link has expired. Start the check again and you will get a fresh one.'));
         return;
       }
@@ -297,8 +303,9 @@ export function verificationRouter(
         return;
       }
 
+      // An FTN round only: another flow's state is not this callback's to spend (2026-10-09).
       const nonceRecord = await storage.getVerificationNonce(state);
-      if (!nonceRecord) {
+      if (!nonceRecord || nonceRecord.type !== 'ftn') {
         res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'Invalid or expired state'));
         return;
       }

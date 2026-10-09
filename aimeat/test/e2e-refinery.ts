@@ -29,6 +29,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-refinery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-refinery.ts
  * @version-history
+ *   v1.0.1 — 2026-10-09 — The mailbox round starts as the owner's browser does and finishes with its
+ *     cookie (secrets audit 2026-10-09, chapter 2).
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
 import * as ed from '@noble/ed25519';
@@ -39,6 +41,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeMailServer, type FakeMailServer } from '../scripts/lib/fake-mail-server.js';
@@ -171,12 +174,18 @@ const toolText = (r: any): string => String(r?.result?.content?.[0]?.text ?? r?.
 
 /** Connect the owner to the test mailbox through the real round: start, consent, callback. */
 async function connectMailbox(owner: Owner): Promise<string> {
-  const start = await json('/v1/connections/start', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ provider: 'fake-mail', return_url: '/' }) });
+  // Started as the owner's browser does, and finished with the cookie that start set: the callback
+  // seals only for that browser (secrets audit 2026-10-09, chapter 2).
+  const res = await fetch(`${BASE}/v1/connections/start`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(owner.token), ...BROWSER_START },
+    body: JSON.stringify({ provider: 'fake-mail', return_url: '/' }),
+  });
+  const start = { status: res.status, body: await res.json() as any };
   assert(start.status === 200, `connections/start ${start.status}: ${JSON.stringify(start.body?.error)}`);
   const consent = await fetch(start.body.data.authorize_url, { redirect: 'manual' });
   const callback = consent.headers.get('location');
   assert(!!callback, 'the mailbox sent the browser back');
-  const done = await fetch(callback!, { redirect: 'manual' });
+  const done = await fetch(callback!, { redirect: 'manual', headers: { Cookie: roundCookie(res) } });
   assert(done.status < 400, `callback ${done.status}`);
   const list = await json('/v1/connections', { headers: auth(owner.token) });
   const found = (list.body.data?.connections ?? []).find((c: any) => c.provider === 'fake-mail');

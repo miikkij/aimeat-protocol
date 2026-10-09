@@ -14,6 +14,9 @@
  * @version-history
  *   v1.6.0 — 2026-09-29 — classification_audit joins the cascade (TARGET-082 V4).
  *   v1.5.0 — 2026-09-29 — content_labels joins the cascade (TARGET-082).
+ *   v1.5.0 — 2026-10-09 — connections, connection_delegations and provider_clients join the
+ *     per-identity cascade, so deleteAgent takes an agent's outside accounts and its own app clients
+ *     (secrets audit 2026-10-09, chapter 2).
  *   v1.4.0 — 2026-09-26 — Work leaves the per-identity cascade: deleteOwner and deleteAgent settle it
  *     first by one rule (repos/work-erasure.ts), and the rows that rule keeps belong to the other side.
  *   v1.3.0 — 2026-09-19 — ai_decisions joins the cascade (TARGET-080).
@@ -142,5 +145,13 @@ export const cascadeMethods = {
     // that name a working key to the previous person's accounts. The same argument the connections
     // rows carry, one step sharper: nothing about this row identifies whose key it is.
     this.db.prepare('DELETE FROM secrets WHERE ownerGaii = ?').run(gaii);
+
+    // Outside accounts this identity connected, the delegations over them, and the app registrations
+    // it brought. An agent's are stored under its own GAII, and a new agent made with the same name
+    // gets the same GAII, so a surviving row handed the newcomer the old mailbox (secrets audit
+    // 2026-10-09, chapter 2). Delegations first: they key on connectionId with no foreign key.
+    this.db.prepare('DELETE FROM connection_delegations WHERE connectionId IN (SELECT id FROM connections WHERE principal = ?)').run(gaii);
+    this.db.prepare('DELETE FROM connections WHERE principal = ?').run(gaii);
+    this.db.prepare('DELETE FROM provider_clients WHERE principal = ?').run(gaii);
   },
 };

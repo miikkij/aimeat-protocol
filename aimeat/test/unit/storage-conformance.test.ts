@@ -21,6 +21,8 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.21.0 -- 2026-10-09 -- deleteAgent takes the agent's connections, the delegations over them and
+ *     its own app clients on every provider, and leaves the owner's (secrets audit 2026-10-09, F2/F3).
  *   v1.20.0 -- 2026-09-26 -- The start step for credentials, on every provider: a name no account holds
  *     loses its app grants, personal access tokens and session rows (revoked ones included), an older
  *     grant and token of a held name stay and open the incident on their own, the holder's own stay,
@@ -997,6 +999,47 @@ describe('storage providers agree on what they do, not just on their signatures'
 
             await storage.deleteOwner(p.erased);
             await storage.deleteOwner(p.other);
+        }
+    }, 60_000);
+
+    // An agent connects its own outside accounts under its own GAII, and may bring its own app. A
+    // new agent made with the same name gets the same GAII, so a connection that outlived its agent
+    // handed the newcomer the old mailbox (secrets audit 2026-10-09, chapter 2, F2/F3).
+    it('deleteAgent takes the agent\'s connections, their delegations and its own app clients, and nothing of the owner\'s', async () => {
+        for (const { name, storage } of provs) {
+            const owner = `cxconf${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const { ghii, gaii } = await seedOwner(storage, owner);
+            const now = new Date().toISOString();
+            const conn = (principal: string, ext: string) => ({
+                id: randomUUID(), principal, mode: 'shared' as const, provider: 'fake', instance: null,
+                accountLabel: ext, externalId: ext, credential: 'iv:tag:ct', credentialShape: 'oauth2' as const,
+                scopes: [], expiresAt: null, status: 'active' as const, lastOkAt: null, lastError: null,
+                providerClientId: null, createdAt: now, updatedAt: now,
+            });
+            const agentConn = conn(gaii, `agent-${owner}`);
+            const ownerConn = conn(ghii, `owner-${owner}`);
+            await storage.createConnection(agentConn);
+            await storage.createConnection(ownerConn);
+            await storage.upsertDelegation({
+                id: randomUUID(), connectionId: agentConn.id, appId: `app-${owner}`, action: 'publish',
+                fixed: {}, perUserLimit: null, moderation: 'hold', enabled: true, createdAt: now, updatedAt: now,
+            });
+            for (const principal of [gaii, ghii]) {
+                await storage.upsertPrincipalProviderClient({
+                    id: randomUUID(), provider: 'fake', instance: null, principal, clientId: `c-${principal}`,
+                    clientSecret: 'iv:tag:ct', tenant: null, registeredAt: now,
+                });
+            }
+
+            await storage.deleteAgent(gaii);
+
+            expect.soft(await storage.listConnections({ principal: gaii }), `${name}: the agent's connection survived`).toEqual([]);
+            expect.soft(await storage.findDelegation(`app-${owner}`, 'publish'), `${name}: the delegation over it survived`).toBeFalsy();
+            expect.soft(await storage.getPrincipalProviderClient('fake', gaii), `${name}: the agent's own app client survived`).toBeFalsy();
+            expect.soft((await storage.listConnections({ principal: ghii })).map(c => c.id), `${name}: the owner's connection went too`).toEqual([ownerConn.id]);
+            expect.soft(await storage.getPrincipalProviderClient('fake', ghii), `${name}: the owner's app client went too`).toBeTruthy();
+
+            await storage.deleteOwner(owner);
         }
     }, 60_000);
 

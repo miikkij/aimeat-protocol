@@ -10,6 +10,12 @@
  *   never put in the redirect URL. Carrying it in the URL would let whoever reaches the callback
  *   choose which provider their code is redeemed against and whose connection it becomes.
  *
+ *   THE STATE NAMES WHO, THE BINDING NAMES WHICH BROWSER. The state alone said whose connection the
+ *   account becomes, and nothing said who approved it, so an authorize address handed to somebody
+ *   else connected THEIR account to the starter. The callback now also needs the round's browser
+ *   binding (services/oauth-round-secrets.ts): the starter's own browser, or the owner's after they
+ *   confirmed a round an agent started (secrets audit 2026-10-09, chapter 2).
+ *
  *   WHY THE STATE IS CONSUMED FIRST. `completeAuthorization` deletes the nonce BEFORE it exchanges
  *   the code. A replayed callback then finds nothing and stops, rather than racing the original and
  *   producing two connections from one authorization.
@@ -21,6 +27,11 @@
  * @structure startAuthorization · completeAuthorization · resolveClient · fetchAccountIdentity
  * @usage import { startAuthorization, completeAuthorization } from './oauth.js';
  * @version-history
+ *   v1.2.0 — 2026-10-09 — A round is bound to one browser: the start stores the hash of a cookie
+ *     (bindBrowser) and the completion refuses a callback without it (NOT_THIS_BROWSER) before the
+ *     code is exchanged. The PKCE verifier is sealed to the round, and the provider address is kept
+ *     for the owner's confirmation step. Only the caller whose delete consumed the state goes on.
+ *     The comment that claimed a check by principal is gone: there was none (secrets audit 2026-10-09).
  *   v1.1.1 — 2026-10-05 — The token and profile answers are read under a ceiling (readJson; secaudit 2026-10, C6).
  *   v1.1.0 — 2026-09-29 — The sandbox's `fake-mail` provider asks the same /me as `fake`.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1c.
@@ -34,6 +45,7 @@ import { readJson } from '../../utils/read-capped.js';
  *  more than this to sign a person in (secaudit 2026-10, C6). */
 const OAUTH_ANSWER_MAX_BYTES = 256 * 1024;
 import { sealCredential, openCredential } from './credential.js';
+import { bindingMatches, roundApprovalUrl, sealRoundSecret, openRoundSecret } from '../oauth-round-secrets.js';
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
 import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
 import type { AimeatConfig } from '../../config.js';
@@ -55,11 +67,22 @@ interface StatePayload {
   provider: string;
   instance: string | null;
   mode: ConnectionMode;
+  /**
+   * SHA-256 of the cookie that binds the round to one browser (services/oauth-round-secrets.ts).
+   * Absent until the owner confirms a round started outside their browser.
+   */
+  bind?: string;
+  /** The provider's authorize address, kept so the confirmation step can hand it to the owner. */
+  authorizeUrl?: string;
 }
 
 export type StartResult =
-  | { ok: true; authorizeUrl: string; state: string }
+  /** `authorizeUrl` is the provider's; `approvalUrl` is the node's confirmation page for this round. */
+  | { ok: true; authorizeUrl: string; approvalUrl: string; state: string; ttlMs: number }
   | { ok: false; code: string; reason: string };
+
+/** The context the PKCE verifier of a waiting connection round is sealed to. */
+const verifierContext = (state: string): string => `connect-oauth-round:${state}:verifier`;
 
 export type CompleteResult =
   | { ok: true; connection: ConnectionRecord; returnUrl: string; created: boolean }
@@ -135,7 +158,15 @@ async function resolveClient(
  */
 export async function startAuthorization(
   ctx: ConnectContext,
-  input: { principal: string; provider: string; instance?: string; mode: ConnectionMode; returnUrl: string },
+  input: {
+    principal: string; provider: string; instance?: string; mode: ConnectionMode; returnUrl: string;
+    /**
+     * Makes the binding for this browser and returns its hash, when the start comes from the owner's
+     * own browser (middleware/oauth-round-cookie.ts). Called once the state exists. Absent for every
+     * other caller, whose round then waits for the owner to confirm it on the node's page.
+     */
+    bindBrowser?: (state: string, ttlMs: number) => string;
+  },
 ): Promise<StartResult> {
   const provider = findProvider(ctx.providers, input.provider);
   if (!provider) return { ok: false, code: 'UNKNOWN_PROVIDER', reason: `no provider '${input.provider}'` };
@@ -174,22 +205,6 @@ export async function startAuthorization(
 
   const state = b64url(randomBytes(24));
   const verifier = b64url(randomBytes(32));
-  const payload: StatePayload = { provider: provider.id, instance, mode: input.mode };
-
-  await ctx.storage.createVerificationNonce({
-    id: randomUUID(),
-    // Binding the state to the principal is the CSRF gate: a code redeemed by anyone else lands on
-    // a nonce whose owner is not them, and the callback refuses.
-    owner: input.principal,
-    type: 'connect',
-    state,
-    // The PKCE verifier stays HERE. It is the half of the exchange that never travels.
-    nonce: verifier,
-    redirectUri: input.returnUrl,
-    payload: JSON.stringify(payload),
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + STATE_TTL_MS).toISOString(),
-  });
 
   const q = new URLSearchParams({
     response_type: 'code',
@@ -212,8 +227,32 @@ export async function startAuthorization(
     q.set('access_type', 'offline');
     q.set('prompt', 'consent');
   }
+  const authorizeUrl = `${endpoints.authorize}?${q.toString()}`;
 
-  return { ok: true, authorizeUrl: `${endpoints.authorize}?${q.toString()}`, state };
+  // The state names who the connection will belong to (`owner`); the binding names which browser
+  // may finish it. Without the second, whoever approved this address at the provider connected
+  // THEIR account to the starter (secrets audit 2026-10-09, chapter 2).
+  const bind = input.bindBrowser?.(state, STATE_TTL_MS);
+  const payload: StatePayload = {
+    provider: provider.id, instance, mode: input.mode, authorizeUrl, ...(bind ? { bind } : {}),
+  };
+
+  await ctx.storage.createVerificationNonce({
+    id: randomUUID(),
+    owner: input.principal,
+    type: 'connect',
+    state,
+    // The PKCE verifier stays HERE, sealed to this round. It is the half of the exchange that never travels.
+    nonce: sealRoundSecret(verifier, ctx.key, verifierContext(state)),
+    redirectUri: input.returnUrl,
+    payload: JSON.stringify(payload),
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+  });
+
+  return {
+    ok: true, authorizeUrl, approvalUrl: roundApprovalUrl(ctx.config, state), state, ttlMs: STATE_TTL_MS,
+  };
 }
 
 /** The provider's answer to a token request, narrowed to what is actually used. */
@@ -391,15 +430,20 @@ async function fetchAccountIdentity(
  * which is what makes "reconnect" a repair rather than a way to accumulate duplicates.
  */
 export async function completeAuthorization(
-  ctx: ConnectContext, input: { state: string; code: string },
+  ctx: ConnectContext,
+  /** `binding` is the round cookie the callback request carried ('' when it carried none). */
+  input: { state: string; code: string; binding: string },
 ): Promise<CompleteResult> {
   const nonce = await ctx.storage.getVerificationNonce(input.state);
   if (!nonce || nonce.type !== 'connect') {
     return { ok: false, code: 'UNKNOWN_STATE', reason: 'this authorization is not one we started' };
   }
   // Consumed BEFORE the exchange: a replayed callback then finds nothing, rather than racing the
-  // original and producing two connections from one authorization.
-  await ctx.storage.deleteVerificationNonce(input.state);
+  // original and producing two connections from one authorization. Only the caller whose delete
+  // removed the row goes on.
+  if (!(await ctx.storage.deleteVerificationNonce(input.state))) {
+    return { ok: false, code: 'UNKNOWN_STATE', reason: 'this authorization is not one we started' };
+  }
   if (new Date(nonce.expiresAt).getTime() < Date.now()) {
     return { ok: false, code: 'STATE_EXPIRED', reason: 'the authorization took too long; start again' };
   }
@@ -410,6 +454,17 @@ export async function completeAuthorization(
   } catch {
     return { ok: false, code: 'BAD_STATE', reason: 'the stored authorization is unreadable' };
   }
+  // The browser that approved at the provider must be the one the round was bound to: the starter's
+  // own, or the owner's after they confirmed it on the node's page. Refused before the code is
+  // exchanged, so nothing is sealed for anybody else (secrets audit 2026-10-09, chapter 2).
+  if (!bindingMatches(input.binding, payload.bind)) {
+    return {
+      ok: false, code: 'NOT_THIS_BROWSER',
+      reason: 'this sign-in was not started in this browser, so nothing was connected. Start again from your own account.',
+    };
+  }
+  const verifier = openRoundSecret(nonce.nonce, ctx.key, verifierContext(input.state));
+  if (verifier === null) return { ok: false, code: 'BAD_STATE', reason: 'the stored authorization is unreadable' };
 
   const provider = findProvider(ctx.providers, payload.provider);
   if (!provider?.enabled) {
@@ -426,7 +481,7 @@ export async function completeAuthorization(
     grant_type: 'authorization_code',
     code: input.code,
     redirect_uri: callbackUrl(ctx.config),
-    ...(provider.pkce ? { code_verifier: nonce.nonce } : {}),
+    ...(provider.pkce ? { code_verifier: verifier } : {}),
   });
 
   let token: TokenResponse;

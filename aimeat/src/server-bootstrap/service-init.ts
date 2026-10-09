@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   v1.18.0 — 2026-10-09 — sealLegacyTransportSecrets() and removeDeletedAgentsConnections() at boot,
+ *     after the extension secrets are bound (secrets audit 2026-10-09, chapter 2).
  *   v1.17.0 — 2026-10-09 — bindLegacyExtensionSecrets() at boot, awaited before the shipped
  *     extensions are seeded (secrets audit 2026-10-09, 1.1).
  *   v1.16.0 — 2026-10-08 — startPendingEnrolment(): a connector connecting gets the offer for its
@@ -122,6 +124,8 @@ import { registerCoreHandlers } from '../services/core-jobs.js';
 import { runRefineryJob } from '../services/refinery/scheduled-job.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { bindLegacyExtensionSecrets } from '../services/extension-secrets.js';
+import { sealLegacyTransportSecrets } from '../services/mcp-client/transport-secrets.js';
+import { removeDeletedAgentsConnections } from '../services/connections/agent-orphans.js';
 import { getEncryptionKey } from '../services/encryption.js';
 
 export interface ServiceInitResult {
@@ -237,6 +241,11 @@ export async function initializeServices(
   // on the sandbox opens only a bound value, and the seed's carry-forward must see the new form.
   // Idempotent; a value that does not open is left as it is; never throws.
   await bindLegacyExtensionSecrets(storage, getEncryptionKey(config));
+  // A remote MCP server's stdio env and transport headers written before 2026-10-09 are sealed, and
+  // the outside-account connections of agents deleted before that date are removed (secrets audit
+  // 2026-10-09, chapter 2). Both act on positive evidence only, are idempotent and never throw.
+  await sealLegacyTransportSecrets(storage, getEncryptionKey(config));
+  await removeDeletedAgentsConnections(storage, config.nodeId);
 
   // Bring the built-in node-scope skills into step with this build. A skill edited on THIS node is
   // left alone and named in the log; an untouched one follows the repo. Before 2026-08-25 this was

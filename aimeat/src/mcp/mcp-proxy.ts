@@ -30,6 +30,9 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.4.0 — 2026-10-09 — aimeat_mcp_authorize hands back the node's confirmation page, where the
+ *     owner confirms the sign-in in their own browser, never the far side's address (secrets audit
+ *     2026-10-09, chapter 2).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.1 — 2026-09-26 — Attaching to a group hands the service the owner GHII, not a name cut from it,
  *     the same identity POST /v1/mcp-servers/organism hands it (secaudit 2026-09, a0ecb62eafb3).
@@ -213,6 +216,7 @@ export function registerMcpProxyTools(
 
       const started = await startMcpOAuth({
         storage, config, server: row, ownerGhii: ownerGhii(),
+        startedBy: getAgentGaii(),
         ...(return_url ? { returnUrl: return_url } : {}),
       });
       if (!started.ok) return fail(started.message);
@@ -223,9 +227,13 @@ export function registerMcpProxyTools(
       }
       return ok({
         server: row.slug,
-        authorize_url: started.authorizeUrl,
-        next: 'Give this address to the PERSON and wait. Nothing here can approve it for them, and '
-          + 'fetching it yourself does nothing. Say in one sentence what it is for.',
+        // The node's confirmation page, never the far side's address: the round waits until the
+        // owner signs in there and confirms it in their own browser (secrets audit 2026-10-09).
+        authorize_url: started.approvalUrl,
+        owner_confirms: true,
+        next: 'Give this address to your owner and wait. They sign in to this node, confirm, and sign in at '
+          + 'the server; nothing here can approve it for them, and fetching it yourself does nothing. '
+          + 'Say in one sentence what it is for.',
       });
     });
 
