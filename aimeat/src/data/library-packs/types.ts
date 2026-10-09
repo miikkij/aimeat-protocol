@@ -17,6 +17,9 @@
  *   about what the author meant. → docs/pitfalls.md on the hook reading the worktree.
  * @structure PackChange · PackProof · LibraryPack
  * @version-history
+ *   v1.1.0 — 2026-10-09 — Now the one definition: library-packs.ts imports and re-exports these three
+ *     instead of keeping its own copy, and vendored-media.ts imports from here, so a pack file no
+ *     longer stands in a cycle with the registry (pnpm gate, check:deps).
  *   v1.0.0 — 2026-09-05 — Restored from history after c932f2f17 shipped without it.
  */
 
