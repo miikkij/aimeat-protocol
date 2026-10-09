@@ -13,6 +13,8 @@
  * @structure MemoryTabService.overview(reader, ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
  * @usage const m = await createMemoryTabService(config, storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.3.0 — 2026-10-09 — The agents go out without their webhook signing secret (agentRecordView),
+ *     found by e2e-secret-canary-sweep (secrets audit 2026-10-09).
  *   v1.2.1 — 2026-10-05 — A file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.2.0 — 2026-09-29 — TARGET-082 review: the memory keys and the files pass the caller's
  *     classification reader, as the two endpoints this composite folds already did.
@@ -29,6 +31,7 @@ import { resolveOwnerIdentities } from './owner-identity.js';
 import { visibilityToZone } from '../../routes/memory/shared.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
+import { agentRecordView } from '../agent-record-view.js';
 
 export interface MemoryTabOverview {
   agents: unknown[];
@@ -116,7 +119,8 @@ export class MemoryTabService {
       });
 
       return {
-        agents,
+        // Without the webhook signing secret (services/agent-record-view.ts).
+        agents: agents.map(agentRecordView),
         memory,
         // The tab states the upload limit from this number. Hardcoding it in the form is how it
         // came to say "Max 10MB per file" on a node configured for 50.

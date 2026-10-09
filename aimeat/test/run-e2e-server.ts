@@ -197,6 +197,9 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     'e2e-mcp',
     'e2e-agent-v2',
     'e2e-agent-refusals',
+    // A planted secret searched for in every route as nobody: with anonymous mode on, "nobody" would
+    // be the anonymous identity and the sweep would prove less (secrets audit 2026-10-09).
+    'e2e-secret-canary-sweep',
 ];
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */

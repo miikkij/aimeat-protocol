@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-09 -- e2e-secret-canary-sweep.ts joins the list (not the guard tier): every contract GET
+ *     route and read-only MCP tool searched for planted secrets, as six principals.
  *   2026-10-09 -- e2e-docsign.ts joins the list: document signing and signature validation.
  *   2026-10-09 -- e2e-extension-fetch-gunzip.ts joins the list (not the guard tier yet): ctx.fetch with
  *     gunzip under a manifest's limits.fetch_max_mb (wish-tv-opas).
@@ -311,6 +313,9 @@ const ALL_SUITES = [
     // Secret canaries: a stored credential searched for in every listed read route, as the owner and
     // as an agent (secrets audit 2026-10-09).
     'test/e2e-secret-canaries.ts',
+    // The sweep: a planted value in every secret store, searched for in every contract GET route and
+    // every read-only MCP tool, as six principals (secrets audit 2026-10-09).
+    'test/e2e-secret-canary-sweep.ts',
     // The operator's memory doors — the listing, the cross-owner content search, one record, and
     // the bin. This surface had no test at all until 2026-09-12, and it is the one an operator
     // deletes anybody's data through.

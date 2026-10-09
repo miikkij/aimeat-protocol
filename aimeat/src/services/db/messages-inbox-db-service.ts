@@ -12,6 +12,8 @@
  * @structure MessagesInboxService.overview(ownerGhii, ownerName, { inPerson }) → { requests, conversations, important, tracked, agents, groups, peerNames }
  * @usage const inbox = await createMessagesInboxService(storage).overview(ghii, owner);
  * @version-history
+ *   v1.4.0 — 2026-10-09 — The agents go out without their webhook signing secret (agentRecordView),
+ *     found by e2e-secret-canary-sweep (secrets audit 2026-10-09).
  *   v1.3.0 — 2026-09-13 — peerNames also covers the rows folded under another and, on a folded row,
  *     who opened each thread and to whom, which is how the Messages list names them.
  *   v1.2.0 — 2026-09-12 — `inPerson: false`: the messages part only, for an app or an agent reading in
@@ -27,6 +29,7 @@ import { conversationIdFor, messagePreview } from '../../utils/messaging.js';
 import { listTrackedResponses } from '../tracked-response.js';
 import { MessagingDbService, type OwnerConversation } from './messaging-db-service.js';
 import { logger } from '../../utils/logger.js';
+import { agentRecordView, type AgentRecordView } from '../agent-record-view.js';
 
 /** The `message-flag.<id>` key prefix marks a message the owner flagged "important" (record-presence =
  *  flagged; un-flag deletes it). Mirrors public/js/services/tracked-responses.js FLAG_PREFIX. */
@@ -38,7 +41,7 @@ export interface InboxOverview {
   conversations: OwnerConversation[];
   important: string[];
   tracked: unknown[];
-  agents: AgentRecord[];
+  agents: AgentRecordView[];
   groups: unknown[];
   /** Display name per on-screen principal id (conversation peers, their owners, request contacts).
    *  '' = looked up but not resolvable here (e.g. a federated peer) — the client keeps the handle. */
@@ -95,7 +98,8 @@ export class MessagesInboxService {
 
       const peerNames = await this.resolvePeerNames(convos.conversations, requests);
 
-      return { requests, conversations: convos.conversations, important, tracked, agents, groups, peerNames };
+      // The agents without their webhook signing secret (services/agent-record-view.ts).
+      return { requests, conversations: convos.conversations, important, tracked, agents: agents.map(agentRecordView), groups, peerNames };
     });
   }
 
