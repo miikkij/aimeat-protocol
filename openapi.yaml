@@ -44041,10 +44041,13 @@ paths:
       summary: Registry skills bound to an app
       description: >-
         Skills whose frontmatter metadata.binding names this app (app:{owner}/{filename}),
-        across node + user scopes. Anonymous callers see only public-bound skills.
+        across node + user scopes. A user-scope skill is listed only when its owner owns the
+        app; publishing a user skill bound to another account's app is refused with 422
+        BAD_FIELD. Open without sign-in: a caller who is not signed in sees only public skills.
       tags: [Skills]
       security:
         - BearerAuth: []
+        - {}
       parameters:
         - name: owner
           in: path

@@ -32,6 +32,7 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.8.0 -- 2026-10-09 -- A user skill binds only to its publisher's own app (assertSkillBinding, skill-refs.ts); listSkillsByBinding leaves out a user skill whose owner does not own the bound app.
  *   v1.7.0 -- 2026-10-08 -- publishSkill records how SKILL.md was made (skill-provenance.ts) and sets
  *     the record on the SKILL.md file and the manifest; the summary names it (aiprov E12).
  *     listAcrossOwners and freshestByKey moved to skill-records.ts (max-file-lines).
@@ -70,7 +71,7 @@ import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenan
 import {
   parseSkillRef, formatSkillRef, scopeOwnerGhii,
   manifestKey, filePrefix, fileKey, VERSION_SNAPSHOTS_KEPT, versionPrefix, versionKey,
-  wsVersionPrefix, wsVersionKey, BINDING_RE, wsManifestKey, wsFilePrefix, wsFileKey,
+  wsVersionPrefix, wsVersionKey, assertSkillBinding, bindingOwner, wsManifestKey, wsFilePrefix, wsFileKey,
   MANIFEST_KEY_RE, WS_MANIFEST_KEY_RE, type SkillScope, type SkillRef,
 } from './skill-refs.js';
 export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type SkillScope, type SkillRef } from './skill-refs.js';
@@ -273,12 +274,10 @@ export async function publishSkill(
   const now = new Date().toISOString();
 
   // 2d: an app binding travels in the frontmatter (metadata.binding) so it survives
-  // export/clone; validated here and copied to the manifest top level for filtering.
+  // export/clone; validated here (shape, and a user skill names its publisher's own app)
+  // and copied to the manifest top level for filtering.
   const binding = parsed.frontmatter.metadata?.binding;
-  if (binding !== undefined && (typeof binding !== 'string' || !BINDING_RE.test(binding))) {
-    throw new SkillValidationError('BAD_FIELD',
-      'metadata.binding must be "app:{owner}/{filename}" (lowercase owner, the app file name)');
-  }
+  assertSkillBinding(binding, opts.scope, opts.owner);
 
   // A retired skill names its successor the same way: in its own frontmatter, so the fact travels
   // with the file. A ref or a bare name; nothing else, since a reader will paste it into a load.
@@ -505,7 +504,10 @@ export async function listSkillsByBinding(
     .filter(r => MANIFEST_KEY_RE.test(r.key))
     .filter(r => (r.value as SkillManifestValue)?.binding === binding);
   const ownerOf = (r: MemoryRecord) => (r.ownerGaii === systemGhii ? null : localAccountName(r.ownerGaii));
-  const gated = records.filter(r => mayRead(r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r), accessor));
+  // A user skill counts only when its owner owns the app; one bound to another account's app
+  // before publish refused it (2026-10-09) stays in its owner's registry and is not listed here.
+  const own = records.filter(r => r.ownerGaii === systemGhii || ownerOf(r) === bindingOwner(binding));
+  const gated = own.filter(r => mayRead(r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r), accessor));
   return (await showSkillRecords({ storage, config }, accessor, gated))
     .map(r => toSummary(r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r)));
 }

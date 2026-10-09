@@ -19,6 +19,8 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.6.0 -- 2026-10-09 -- GET /v1/apps/:owner/:filename/skills answers a caller who is not signed in
+ *     (public skills only), as the app's agent surfaces already advertised; it answered 401 before.
  *   v1.5.0 -- 2026-10-08 -- POST /v1/skills takes `ai_provenance` and `ai_provenance_id`, records how
  *     SKILL.md was written (the node's stamp for an agent publisher) and answers `ai_provenance_id`;
  *     a declaration the publisher may not make is 403 SCOPE_DENIED before anything is stored (aiprov E12).
@@ -453,8 +455,10 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /* ── 2d: GET /v1/apps/:owner/:filename/skills — registry skills bound to one app.
    *    Mounted before the apps router, so this wins over the greedy app-download route.
-   *    Anonymous callers see only public-bound skills (the scope read gates apply). ── */
-  router.get('/v1/apps/:owner/:filename/skills', requireAuth(), async (req, res) => {
+   *    Open to a caller who is not signed in: the app's llms.txt, AGENTS.md and agent-discovery
+   *    block name this URL as public discovery. accessorOf gives such a caller no owner, so the
+   *    scope read gate lets only public skills through. ── */
+  router.get('/v1/apps/:owner/:filename/skills', async (req, res) => {
     try {
       const ownerParam = req.params.owner as string;
       const owner = localAccountName(ownerParam);

@@ -8,14 +8,16 @@
  *   registry writes (manifest, files, version snapshots, workspace-prefixed forms). Moved out of
  *   skills.ts unchanged when that file crossed 800 lines; skills.ts re-exports the public part.
  * @structure SkillScope / SkillRef, parseSkillRef / formatSkillRef, scopeOwnerGhii,
- *   readNodeSkillBody, key helpers and regexes
+ *   readNodeSkillBody, key helpers and regexes, bindingOwner / assertSkillBinding
  * @usage import { parseSkillRef, manifestKey } from './skill-refs.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-09 -- bindingOwner and assertSkillBinding: a user-scope skill may bind only to
+ *     an app of its own publisher, refused at publish with BAD_FIELD (the shape check moved here too).
  *   v1.0.0 -- 2026-09-03 -- Extracted from services/skills.ts (pure move).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { SKILL_NAME_RE } from './skill-md.js';
+import { SKILL_NAME_RE, SkillValidationError } from './skill-md.js';
 
 // ── Refs & scopes ──
 
@@ -100,6 +102,29 @@ export const wsVersionKey = (org: string, ws: string, name: string, v: string): 
 
 /** Binding target for 2d app-bound skills: app:{ownerName}/{filename}. */
 export const BINDING_RE = /^app:[a-z0-9][a-z0-9_-]*\/[A-Za-z0-9._-]+$/;
+
+/** The account a well-formed binding names: `app:alice/notes.html` → `alice`. */
+export const bindingOwner = (binding: string): string => binding.slice('app:'.length, binding.indexOf('/'));
+
+/**
+ * Refuse a frontmatter metadata.binding before anything is stored: it has the binding's shape, and
+ * a user-scope skill names an app of its own publisher. The app's public surfaces (the WebMCP
+ * listing, llms.txt, the App Catalog) list a bound skill as that app's guide, so a binding to
+ * another account's app would put one person's text under someone else's app. Node scope is the
+ * operator's library and may name any app on the node. A workspace skill is never listed on an
+ * app's surfaces (listSkillsByBinding reads the `skills.` prefix only), so its binding stays free.
+ */
+export function assertSkillBinding(binding: unknown, scope: SkillScope, owner: string | undefined): void {
+  if (binding === undefined) return;
+  if (typeof binding !== 'string' || !BINDING_RE.test(binding)) {
+    throw new SkillValidationError('BAD_FIELD',
+      'metadata.binding must be "app:{owner}/{filename}" (lowercase owner, the app file name)');
+  }
+  if (scope === 'user' && bindingOwner(binding) !== owner) {
+    throw new SkillValidationError('BAD_FIELD',
+      `metadata.binding names ${binding}, which is an app of another account. A skill can be bound only to an app of your own: app:${owner}/{filename}.`);
+  }
+}
 
 // Workspace scope: keys live under the workspace prefix (so they ride workspace
 // export/import/templates), OWNED by the publishing member's GHII (the organism
