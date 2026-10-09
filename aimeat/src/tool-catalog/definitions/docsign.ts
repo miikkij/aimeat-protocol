@@ -23,7 +23,7 @@ export const docsignTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Validate Document Signatures', readOnlyHint: true, openWorldHint: true },
-        surfaces: ['agent', 'primitives', 'chat'],
+        surfaces: ['agent'],
         input: {
             storage_key: { type: 'string', description: 'Key of the signed file in your storage (aimeat_storage_upload). For a .p7s, the signature file.', zod: z.string().max(1024) },
             document_storage_key: { type: 'string', description: 'For a detached .p7s: the key of the document it signs.', zod: z.string().max(1024) },
@@ -37,7 +37,7 @@ export const docsignTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Look Up AIMEAT Signatures', readOnlyHint: true, openWorldHint: false },
-        surfaces: ['agent', 'primitives', 'chat'],
+        surfaces: ['agent'],
         input: {
             sha256: { type: 'string', required: true, description: 'The SHA-256 of the document, 64 hex characters.', zod: SHA256 },
         },
@@ -49,7 +49,7 @@ export const docsignTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Create a Signing Request', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'memory:write',
-        surfaces: ['agent', 'chat'],
+        surfaces: ['agent'],
         input: {
             title: { type: 'string', description: 'What is being signed, in the words the parties use (e.g. "Lease agreement, flat A1").', zod: z.string().max(200) },
             message: { type: 'string', description: 'A note to the parties.', zod: z.string().max(2000) },
@@ -68,7 +68,7 @@ export const docsignTools = [
         visibility: agentEverywhere,
         annotations: { title: 'List Signing Requests', readOnlyHint: true, openWorldHint: false },
         scope: 'memory:read',
-        surfaces: ['agent', 'chat'],
+        surfaces: ['agent'],
         input: {
             state: { type: 'string', description: 'Filter by state.', enum: ['open', 'complete', 'cancelled', 'waiting-for-me'] },
         },
@@ -80,7 +80,7 @@ export const docsignTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Read a Signing Request', readOnlyHint: true, openWorldHint: false },
         scope: 'memory:read',
-        surfaces: ['agent', 'chat'],
+        surfaces: ['agent'],
         input: {
             id: { type: 'string', required: true, description: 'The request id (ds-…).', zod: z.string().max(60) },
         },
@@ -92,7 +92,7 @@ export const docsignTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Sign as This Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'memory:write',
-        surfaces: ['agent', 'chat'],
+        surfaces: ['agent'],
         input: {
             id: { type: 'string', required: true, description: 'The request id (ds-…).', zod: z.string().max(60) },
             method: { type: 'string', required: true, description: 'session or key.', enum: ['session', 'key'] },
@@ -106,7 +106,7 @@ export const docsignTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Cancel a Signing Request', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         scope: 'memory:write',
-        surfaces: ['agent', 'chat'],
+        surfaces: ['agent'],
         input: {
             id: { type: 'string', required: true, description: 'The request id (ds-…).', zod: z.string().max(60) },
         },
