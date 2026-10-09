@@ -22,10 +22,10 @@
  *     config (or synthesize one from the global config for legacy installs)
  *
  * @version-history
- *   v2.5.0 -- 2026-10-09 -- The default home is ~/.aimeat (home-dir.ts), no longer <cwd>/.aimeat;
- *                           AIMEAT_HOME still wins, and an existing <cwd>/.aimeat with connector
- *                           state is still used until 3.27.0, with a warning. saveConfig leaves the
- *                           home at 0700 (secrets audit 2026-10-09, S4).
+ *   v2.5.0 -- 2026-10-09 -- The home is resolved in home-dir.ts (still AIMEAT_HOME, else
+ *                           <cwd>/.aimeat), and saveConfig and savePerAgentConfig prepare it before
+ *                           they write: 0700, and a .gitignore holding `*`, so the project's git
+ *                           never sees the tokens and keys (secrets audit 2026-10-09, S4).
  *   v2.4.0 -- 2026-09-24 -- `peekPerAgentConfig` (the settings an agent is served with, read without
  *                           the migration's write) and `fallbackConfigFor` (the loader's rule for a
  *                           bearer with no per-agent file, moved out of loadAllAgents unchanged), so
@@ -47,28 +47,25 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
-import { resolveConnectorHome } from './home-dir.js';
-import { ensurePrivateDir } from '../../utils/private-file.js';
+import { resolveConnectorHome, prepareConnectorHome } from './home-dir.js';
 import { parse, stringify } from 'yaml';
 import { listAllTokens } from './keychain.js';
 import { listAllAgentKeys } from './agent-key.js';
 import { gaiiFromToken, isGaii } from './agent-gaii.js';
 import { logger } from '../../utils/logger.js';
 
-// Connector home resolution (home-dir.ts): AIMEAT_HOME when set; else an existing <cwd>/.aimeat
-// that holds connector state (deprecated, read until 3.27.0); else ~/.aimeat. The default was
-// <cwd>/.aimeat until 2026-10-09, which put credentials inside whatever project the command ran in
-// (secrets audit 2026-10-09, S4). Two projects that want two daemons set AIMEAT_HOME. Captured once
-// at module load.
-const RESOLVED_HOME = resolveConnectorHome();
-const CONFIG_DIR = RESOLVED_HOME.dir;
+// Connector home resolution (directory-scoped, home-dir.ts):
+//   1. AIMEAT_HOME env var — explicit override, always wins.
+//   2. else <cwd>/.aimeat — the directory the `aimeat` command was launched
+//      from. This keeps each project's daemon, tokens and serve.json isolated
+//      so running `aimeat connect serve` from two projects on one machine no
+//      longer fights over a single global ~/.aimeat (last-writer / refused
+//      daemon / wrong-agent routing). Set AIMEAT_HOME=~/.aimeat for the old
+//      global behaviour. Captured once at module load = the launch directory.
+// Every write into it goes through prepareConnectorHome(), which keeps the folder out of the
+// project's git (secrets audit 2026-10-09, S4).
+const CONFIG_DIR = resolveConnectorHome().dir;
 const CONFIG_FILE = join(CONFIG_DIR, 'config.yaml');
-if (RESOLVED_HOME.source === 'cwd-legacy') {
-  logger.warn(`The connector is using ${CONFIG_DIR}, a folder inside the project it was started in. `
-    + `From 3.27.0 the connector home is ${join(homedir(), '.aimeat')} unless AIMEAT_HOME names another. `
-    + 'Move the folder there, or set AIMEAT_HOME to keep this one.');
-}
 
 export function getConfigDir(): string { return CONFIG_DIR; }
 
@@ -99,8 +96,8 @@ export function loadConfig(): AimeatConnectConfig | null {
 }
 
 export function saveConfig(config: AimeatConnectConfig): void {
-  // The home holds the tokens and keys too: 0700 on every write (utils/private-file.ts).
-  ensurePrivateDir(CONFIG_DIR);
+  // The home holds the tokens and keys too: 0700 and a .gitignore on every write (home-dir.ts).
+  prepareConnectorHome(CONFIG_DIR);
   writeFileSync(CONFIG_FILE, stringify(config), 'utf-8');
 }
 
@@ -302,6 +299,7 @@ export function fallbackConfigFor(agent: string, owner: string, global: AimeatCo
  */
 export function savePerAgentConfig(agent: string, owner: string, config: AimeatPerAgentConfig): void {
   const dir = perAgentDir(agent, owner);
+  prepareConnectorHome(CONFIG_DIR);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const slim: AimeatPerAgentConfig = { node_url: config.node_url };
   if (config.primary !== undefined) slim.primary = config.primary;

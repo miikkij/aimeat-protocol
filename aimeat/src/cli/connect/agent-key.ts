@@ -30,7 +30,8 @@
  *   const token = await resolveToken(agent, owner, nodeUrl);
  * @version-history
  *   v1.2.0 — 2026-10-09 — storeAgentKey leaves the key file at 0600 and the home and keys/ at 0700 on
- *     every write, not only when it creates them (secrets audit 2026-10-09, S4).
+ *     every write, not only when it creates them, and the home holds a .gitignore of `*` (secrets
+ *     audit 2026-10-09, S4).
  *   v1.1.0 — 2026-09-04 — `resolveToken` tells a failed mint apart from a missing credential:
  *     `MintFailedError` instead of the same null. They were one value, and on a live 62-identity
  *     fleet the node's mint budget ran out during the joining burst and twenty-two agents holding
@@ -39,6 +40,7 @@
  */
 import { readFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { writePrivateFile, ensurePrivateDir } from '../../utils/private-file.js';
+import { prepareConnectorHome } from './home-dir.js';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { CompactSign, importJWK, calculateJwkThumbprint, generateKeyPair, exportJWK } from 'jose';
@@ -109,8 +111,9 @@ export async function storeAgentKey(agent: string, owner: string, record: AgentK
     privateKey: record.privateKey, publicKey: record.publicKey, kid: record.kid,
     gaii: record.gaii, nodeId: record.nodeId,
   };
-  // 0600 in a 0700 folder on every write, not only when created (secrets audit 2026-10-09, S4).
-  ensurePrivateDir(getConfigDir());
+  // 0600 in a 0700 folder on every write, not only when created, in a home git ignores (secrets
+  // audit 2026-10-09, S4; home-dir.ts).
+  prepareConnectorHome(getConfigDir());
   ensurePrivateDir(keysDir());
   writePrivateFile(keyPath(agent, owner), JSON.stringify(doc));
 }

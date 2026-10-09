@@ -21,12 +21,15 @@
  * @structure getInstallId()
  * @usage headers: { 'X-AIMEAT-Install': getInstallId() }
  * @version-history
+ *   v1.0.1 — 2026-10-09 — The home is prepared before the write: 0700 and a .gitignore of `*`
+ *     (home-dir.ts; secrets audit 2026-10-09, S4).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 5).
  */
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { getConfigDir } from './config.js';
+import { prepareConnectorHome } from './home-dir.js';
 import { logger } from '../../utils/logger.js';
 
 /** Read once per process: the file does not change under a running daemon. */
@@ -53,7 +56,8 @@ export function getInstallId(): string {
       if (stored) { cached = stored.slice(0, 64); return cached; }
     }
     const minted = randomUUID();
-    mkdirSync(dirname(path), { recursive: true });
+    // The home is made 0700 with a .gitignore of `*` before anything is written in it (home-dir.ts).
+    prepareConnectorHome(dirname(path));
     writeFileSync(path, `${minted}\n`, { encoding: 'utf-8', mode: 0o600 });
     cached = minted;
     return cached;

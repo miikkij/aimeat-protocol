@@ -16,11 +16,13 @@
  * @version-history v1.9.12 -- 2026-05-28 -- Add correct post-onboarding setup guidance for actual commands, config, and knowledge artifacts.
  * @version-history v1.9.13 -- 2026-05-28 -- Add shared owner-memory tag guidance.
  * @version-history v1.9.14 -- 2026-05-28 -- Pull MCP tool sequence from shared onboarding-prompt.ts (removes hardcoded duplicate).
+ * @version-history v1.9.15 -- 2026-10-09 -- The home is prepared before the bundle is written: 0700 and a .gitignore of `*` (home-dir.ts; secrets audit 2026-10-09, S4).
  */
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import yauzl from 'yauzl';
 import { getConfigDir } from './config.js';
+import { prepareConnectorHome } from './home-dir.js';
 import type { AimeatClient } from './api-client.js';
 import { HELLO_INTEGRATION_TOOL_SEQUENCE } from './onboarding-prompt.js';
 
@@ -227,6 +229,8 @@ export function readSkillBundleGuide(bundle: DownloadedSkillBundle): string {
 
 export async function downloadSkillBundle(client: AimeatClient, agentName: string): Promise<DownloadedSkillBundle> {
   const bundleDir = join(getConfigDir(), agentName);
+  // The home is made 0700 with a .gitignore of `*` before anything is written in it (home-dir.ts).
+  prepareConnectorHome(getConfigDir());
   if (!existsSync(bundleDir)) mkdirSync(bundleDir, { recursive: true });
 
   const url = `${client.getBaseUrl()}/v1/agents/${encodeURIComponent(agentName)}/skill-bundle`;

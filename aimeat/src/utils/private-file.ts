@@ -13,10 +13,9 @@
  *   (secrets audit 2026-10-09, node configuration S4d and the CLI credential files).
  *
  *   WINDOWS. Node maps a mode to the read-only attribute only; the file's access list is inherited
- *   from its folder, and chmod does not change it. What protects a secret there is the folder: the
- *   user profile (C:\Users\<name>) is private to its account by default, which is why the
- *   connector's home is under it (cli/connect/home-dir.ts), and cli/connect/home-access.ts warns at
- *   daemon start when the folder's access list lets other accounts read it.
+ *   from its folder, and chmod does not change it. What protects a secret there is the folder's
+ *   access list, which these functions do not change; cli/connect/home-access.ts warns at daemon
+ *   start when the connector home's access list lets other accounts read it.
  *
  *   A chmod that fails (a file system without Unix modes, a file another account owns) is logged and
  *   the write stands: the data is on disk either way, and refusing after the write would only lose it.
