@@ -14,6 +14,9 @@
  *   through services/password-check.ts, with the same per-account lock as the sign-in route, and an
  *   account with two-step sign-in needs its code here too.
  * @version-history
+ *   v1.4.0 -- 2026-10-10 -- A peer that has once sent a verified audience or delivery proof is refused a
+ *     verify request without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal;
+ *     secaudit 2026-10-10 I21).
  *   v1.3.0 -- 2026-10-06 -- The verify request names this node as its audience (audienceRefusal;
  *     secaudit 2026-10 follow-up, A7).
  *   v1.2.1 -- 2026-10-06 -- A signed verify request passes once (signedMessageRefusal): the password is
@@ -40,7 +43,7 @@ import { gatePeer } from '../services/federation-peer-gate.js';
 import { federationAuthPayload } from '../services/federation-auth-payload.js';
 import { checkPassword, checkSecondFactor } from '../services/password-check.js';
 import { sign, verify } from '../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal } from '../services/signed-node-request.js';
+import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../services/signed-node-request.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 
@@ -108,10 +111,11 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             // passwords for this person for five minutes: a signature carries one try (secaudit 2026-10
             // follow-up, A7). The window is checked again here, after the signature.
             // And it names this node as its audience, so a sign-in asked of another node does not pass here (A7).
-            const replayed = await audienceRefusal({
+            // A peer that has once sent the proof is held to it (pinnedRefusal; secaudit 2026-10-10 I21).
+            const replayed = await pinnedRefusal(await federationPeerProofPin(storage, gate.peer), req.body ?? {}, provenSince => audienceRefusal({
                 signed: payload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
-                publicKey: gate.peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-            }) ?? signedMessageRefusal(requesting_node, timestamp, signature);
+                publicKey: gate.peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+            })) ?? signedMessageRefusal(requesting_node, timestamp, signature);
             if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
             // One answer for a missing consent, a missing account and a wrong password: the caller

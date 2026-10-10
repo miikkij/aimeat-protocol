@@ -5,6 +5,9 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is refused a
+ *     memory-list request without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal;
+ *     secaudit 2026-10-10 I21).
  *   v1.3.0 — 2026-10-06 — The memory-list request names this node as its audience (audienceRefusal;
  *     secaudit 2026-10 follow-up, A7).
  *   v1.2.1 — 2026-10-06 — A signed memory-list request passes once (signedMessageRefusal; secaudit
@@ -27,7 +30,7 @@ import type { PeerInfo } from '../../services/federation.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { sign, verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal } from '../../services/signed-node-request.js';
+import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
@@ -248,10 +251,11 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
         }
         // A person's key inventory: one listing per signed request (secaudit 2026-10 follow-up, A7).
         // And it names this node as its audience (A7).
-        const replayed = await audienceRefusal({
+        // A peer that has once sent the proof is held to it (pinnedRefusal; secaudit 2026-10-10 I21).
+        const replayed = await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
             signed: listPayload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
-            publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-        }) ?? signedMessageRefusal(String(requesting_node), timestamp, String(signature));
+            publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+        })) ?? signedMessageRefusal(String(requesting_node), timestamp, String(signature));
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         try {

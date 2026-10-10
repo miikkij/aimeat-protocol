@@ -17,11 +17,13 @@
  *   how a repository operator says which nodes it serves at all, before any entitlement. A peer that
  *   shares no catalogue is heard when it holds an entitlement here (the `entitled` callback), which is
  *   the packages-only peer a grant registers.
- * @structure signedPackageHeaders() · verifyPackageNode()
+ * @structure fieldsOf() · signedPackageHeaders() · verifyPackageNode()
  * @usage
  *   const headers = await signedPackageHeaders(storage, config, groupId, repositoryNodeId);
  *   const who = await verifyPackageNode(req.headers, peers, groupId, config.nodeId);   // null when unsigned
  * @version-history
+ *   v1.3.1 — 2026-10-10 — fieldsOf is exported, so the pending-peer check verifies the same fields
+ *     (secaudit 2026-10-10 I7).
  *   v1.3.0 — 2026-10-05 — Signing and checking are services/signed-node-request.ts, which the sale
  *     requests use too; the signed string is the same (secaudit 2026-10, C6).
  *   v1.2.0 — 2026-10-05 — The signed message names the node it is for (x-audience) and a one-time
@@ -38,8 +40,9 @@ import type { PeerInfo } from '../../federation.js';
 import { gatePeer } from '../../federation-peer-gate.js';
 import { signNodeRequest, checkNodeRequest } from '../../signed-node-request.js';
 
-/** What a package request signs besides the common fields (services/signed-node-request.ts). */
-const fieldsOf = (groupId: string): Record<string, string> => ({ purpose: 'package', group_id: groupId });
+/** What a package request signs besides the common fields (services/signed-node-request.ts). Exported
+ *  for the pending-peer check that runs before verifyPackageNode (sale/package-entitlements.ts). */
+export const fieldsOf =(groupId: string): Record<string, string> => ({ purpose: 'package', group_id: groupId });
 
 /** Headers that prove this node asked `audience` for `groupId`, or none when the node has no key yet. */
 export async function signedPackageHeaders(storage: Storage, config: AimeatConfig, groupId: string, audience: string): Promise<Record<string, string>> {

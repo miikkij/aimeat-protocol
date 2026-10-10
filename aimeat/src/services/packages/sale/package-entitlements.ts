@@ -30,7 +30,7 @@
  * @version-history
  *   v1.9.0 — 2026-10-10 — resolveNodeRead adopts a pending node only for a request signed with the key
  *     its grant named (pendingPeerProof); an unsigned request naming it had its card read and the node
- *     registered (secaudit 2026-10-10 I7).
+ *     registered (secaudit 2026-10-10 I7). pendingPeerProof takes its fields from package-node-auth.ts.
  *   v1.8.0 — 2026-10-05 — A grant and a revoke change their own node with a compare-and-swap write
  *     (record-cas.ts writeNode); they wrote the whole record from a copy read before the network
  *     step, so concurrent grants wiped each other (secaudit 2026-10, PKG-7).
@@ -65,7 +65,7 @@
  */
 import type { Storage, PackageRecord } from '../../../storage/interface.js';
 import type { PeerInfo } from '../../federation.js';
-import { verifyPackageNode } from '../peer/package-node-auth.js';
+import { verifyPackageNode, fieldsOf } from '../peer/package-node-auth.js';
 import { bundleOfPackage } from '../../install-set-spec.js';
 import { linkPackagePeer, adoptPendingPeer } from '../peer/package-peer-register.js';
 import { nodeRequestSignedBy } from '../../signed-node-request.js';
@@ -388,13 +388,13 @@ export async function resolveNodeRead(
 
 /**
  * Whether a package request for `groupId` is signed with `publicKey`, without taking its nonce: what
- * adoptPendingPeer asks before it reads a pending node's card. The fields are the ones
- * package-node-auth.ts signs a package request with.
+ * adoptPendingPeer asks before it reads a pending node's card, over the fields package-node-auth.ts
+ * signs a package request with.
  */
 export function pendingPeerProof(
     headers: Record<string, string | string[] | undefined>, groupId: string, thisNodeId: string,
 ): (publicKey: string) => Promise<boolean> {
-    return publicKey => nodeRequestSignedBy(headers, { thisNodeId, fields: { purpose: 'package', group_id: groupId }, publicKey });
+    return publicKey => nodeRequestSignedBy(headers, { thisNodeId, fields: fieldsOf(groupId), publicKey });
 }
 
 /** The node a signed request names (x-source-node), or undefined. */
