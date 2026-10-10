@@ -8,6 +8,8 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-10 — deleteOwner also deletes the OTK rows stored under the bare account name
+ *     (secaudit 2026-10-10 C0).
  *   v1.0.0 — 2026-10-05 — createOwner, getOwner, listOwners, updateOwner, deleteOwner, deserializeOwner moved
  *     here from owner.ts; 9 methods (createAgent, getAgent, getAgentsByOwner, …) moved here from agents.ts;
  *     10 methods (createGHII, getGHII, getGHIIByOwner, …) moved here from identity-nodes.ts; revokeToken,
@@ -134,6 +136,11 @@ export const identityMethods = {
       // 3d. The person's own ledger lines from before 2026-08-16, which were filed under the bare
       // account name. They are theirs, so they go with the account, like the lines under the GHII.
       this.db.prepare('DELETE FROM wallet_transactions WHERE gaii = ?').run(name);
+      // Connectivity keys minted before 2026-10-10, stored under the bare account name (the owner
+      // session's raw `sub`). The per-identity pass above deletes the ones under the GHII. A key that
+      // survived here was redeemed by POST /v1/agents/connect into an agent under whoever registered
+      // the name next (secaudit 2026-10-10 C0).
+      this.db.prepare('DELETE FROM otks WHERE ownerGaii = ?').run(name);
 
       // 3d. The cortexes this person installed, now that the actions under their own identities are
       // gone: each record, with what its activation made and what is keyed by its name

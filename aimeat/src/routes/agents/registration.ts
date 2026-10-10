@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-10 — POST /v1/agents/connect refuses a key minted before the owner record it
+ *     names was created: an earlier holder of a released name minted it (secaudit 2026-10-10 C0).
  *   v1.5.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.5.0 — 2026-09-09 — The mode refusal behind the schema's enum is gone; it could not fire.
  *   v1.4.0 — 2026-08-29 — The pending listing carries `requested_scopes`: what the agent asked for,
@@ -77,6 +79,14 @@ export function registerRegistrationRoutes(
     const ownerRecord = await storage.getOwner(owner);
     if (!ownerRecord) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${owner}" not found`));
+      return;
+    }
+    // A key older than the account it names was minted by an earlier holder of the name. A deleted
+    // username is released for reuse, and keys minted before 2026-10-10 were stored under the bare
+    // name, which the erasure cascade did not delete, so such a row can still sit in a database. It
+    // gets the same answer as a key that does not exist (secaudit 2026-10-10 C0).
+    if (Date.parse(ownerRecord.createdAt) > Date.parse(otk.createdAt)) {
+      res.status(404).json(error(config.nodeId, 'INVALID_KEY', 'Connectivity key not found, already used, or invalid'));
       return;
     }
 

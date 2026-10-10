@@ -26,6 +26,9 @@
  *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.12.0 — 2026-10-10 — 49: the erasure deletes the account's connectivity keys, so the old key
+ *     is INVALID_KEY. 49b: a key minted by an erased account creates no agent under the next holder of
+ *     the name (secaudit 2026-10-10 C0). 54b: `%25zz` as an agent name answers 4xx, not 500 (I0).
  *   v1.11.0 — 2026-09-26 — 64: when an account is deleted, its app grants and personal access tokens
  *     go with it: the new holder of the name lists none, and its own grant of an app with the same id
  *     reads its records.
@@ -820,16 +823,37 @@ await test('48. Connect naming an agent that already exists → 409 NAME_TAKEN',
     assert(r.status === 409 && r.body.error?.code === 'NAME_TAKEN', `expected 409 NAME_TAKEN, got ${r.status} ${r.body.error?.code}`);
 });
 
-await test('49. Connect on a key whose owner has since been erased → 404 NOT_FOUND', async () => {
+await test('49. Connect on a key whose owner has since been erased → 404 INVALID_KEY', async () => {
     const key = await mintKey(D, 'orphaned');
     const erase = await json(`/v1/owners/${D.name}`, { method: 'DELETE', headers: auth(D.token) });
     assert(erase.status === 200 && erase.body.data.deleted === true, `erase owner ${erase.status}: ${JSON.stringify(erase.body.error)}`);
-    // The key survives the erasure (no OTK step in services/owner-erasure.ts), so the door reaches
-    // its owner lookup and refuses there.
+    // The erasure deletes the key with the account (secaudit 2026-10-10 C0). Until then the key was
+    // stored under the bare account name, which the cascade did not walk, and the door refused it
+    // only at its owner lookup (404 NOT_FOUND) for as long as nobody registered the name again.
     const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key }) });
     assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
-    assert(r.body.error?.code === 'NOT_FOUND', `expected NOT_FOUND, got ${r.body.error?.code}`);
-    assert(/not found/i.test(r.body.error?.message ?? ''), `message names the missing owner: ${r.body.error?.message}`);
+    assert(r.body.error?.code === 'INVALID_KEY', `the key must be gone with the account, got ${r.body.error?.code}`);
+});
+
+// secaudit 2026-10-10 C0. A deleted username is released for reuse. A connectivity key minted by
+// the previous holder outlived the erasure for up to 365 days, and once the name was registered
+// again, POST /v1/agents/connect created an agent under the NEW account from it and returned the
+// agent's private key to whoever held the old key.
+await test('49b. A key minted by an erased account creates no agent under the next holder of the name', async () => {
+    const first = await setupOwner('otkgone');
+    const key = await mintKey(first, 'inherited');
+    const erase = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(erase.status === 200 && erase.body.data.deleted === true, `erase owner ${erase.status}: ${JSON.stringify(erase.body.error)}`);
+    const again = await registerAgain(first.name);
+    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key }) });
+    const list = await json('/v1/agents', { headers: auth(again.token) });
+    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
+
+    assert(r.status === 404 && r.body.error?.code === 'INVALID_KEY',
+        `the old key must be refused, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.agent)}`);
+    assert(typeof r.body.data?.private_key !== 'string', 'no private key may be issued from the old key');
+    const inherited = (list.body.data?.agents ?? []).filter((a: any) => a.gaii === `inherited#${first.name}@${NODE_ID}`);
+    assert(inherited.length === 0, `the new account holds an agent made from the old key: ${JSON.stringify(inherited)}`);
 });
 
 await test('50. Connect with a valid key and a recognisable User-Agent → 201, keys, scopes, platform', async () => {
@@ -919,6 +943,26 @@ await test('54. The operator sees nothing of A\'s agents through another owner\'
     // the operator role is not a way into somebody else's fleet through these names.
     const r = await json(`/v1/agents/${agentA.name}/cors`, { headers: auth(OP.token) });
     assert(r.status === 404, `the operator's own fleet has no such agent, got ${r.status}`);
+});
+
+// secaudit 2026-10-10 I0. Express 5 decodes a path parameter once. requireScopeUnlessSelf and the
+// handlers behind it decoded `:name` a second time, so `%25zz` reached decodeURIComponent as `%zz`
+// and threw a URIError, which answered 500.
+await test('54b. An agent name that is a percent sign after decoding is a 4xx on every door, not a 500', async () => {
+    const h = auth(A.token);
+    const calls: Array<[string, RequestInit]> = [
+        ['/v1/agents/%25zz/tags', { method: 'PATCH', headers: h, body: JSON.stringify({ tags: ['x'] }) }],
+        ['/v1/agents/%25zz/runtime-source', { method: 'PATCH', headers: h, body: JSON.stringify({ runtime_source: 'probe' }) }],
+        ['/v1/agents/%25zz/crew/llm', { headers: h }],
+        ['/v1/agents/%25zz/crew', { headers: h }],
+        ['/v1/agents/%25zz/mode', { method: 'PATCH', headers: h, body: JSON.stringify({ mode: 'interactive' }) }],
+        ['/v1/agents/%25zz/engagements', { headers: h }],
+        ['/v1/agents/%25zz', {}],
+    ];
+    for (const [path, opts] of calls) {
+        const r = await json(path, opts);
+        assert(r.status >= 400 && r.status < 500, `${opts.method ?? 'GET'} ${path} must be a 4xx, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    }
 });
 
 // ─── Phase 12 — erasure ───

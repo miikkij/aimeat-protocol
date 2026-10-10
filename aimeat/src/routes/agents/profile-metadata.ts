@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.1 — 2026-10-10 — `:name` and `:gaii` are read as Express 5 decoded them. The second
+ *     decodeURIComponent threw a URIError (500) on a path such as `%25zz`; the tags and runtime-source
+ *     handlers now resolve the same target as requireScopeUnlessSelf (secaudit 2026-10-10 I0).
  *   v1.14.0 — 2026-10-02 — PATCH /v1/agents/:name/runtime-source: an agent reports its own runtime
  *     (now with `llm`, where its model calls go) without agent:write; a sibling's still need it.
  *   v1.13.0 — 2026-10-02 — PATCH /v1/agents/:name/tags: an agent sets its own tags without
@@ -83,8 +86,9 @@ function agentWriteStatus(code: AgentWriteRefusal['code']): number {
 export function registerProfileMetadataRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/agents/:gaii — public agent profile (no auth)
   router.get('/v1/agents/:gaii', async (req, res) => {
-    // GAII contains # and @ which need URL encoding
-    const gaii = decodeURIComponent(req.params.gaii as string);
+    // GAII contains # and @ which need URL encoding. Express 5 has already decoded the parameter; a
+    // second decode threw a URIError (500) on `%25zz` (secaudit 2026-10-10 I0).
+    const gaii = req.params.gaii as string;
     const agent = await storage.getAgent(gaii);
     if (!agent) {
       // A ported agent's pointer, honoured only towards an active federation peer and built from that
@@ -321,7 +325,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // runtime sets them on every start, and an agent without the word finished no task. A sibling's
   // tags still need it.
   router.patch('/v1/agents/:name/tags', requireAuth(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
-    const identifier = decodeURIComponent(req.params.name as string);
+    const identifier = (req.params.name as string);
     // Ownership, normalisation and the write are services/agent-profile-write.ts, shared with
     // aimeat_agent_tags_set.
     const outcome = await setAgentTags({ storage, config }, req.auth!.owner, identifier, req.body?.tags);
@@ -341,7 +345,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // (active + retired), for the agent-detail Contracts tab. Same-owner gated (only the owner sees where
   // their agent works). Enriched with organism + workspace display names.
   router.get('/v1/agents/:name/engagements', requireAuth(), requireRole('owner'), async (req, res) => {
-    const identifier = decodeURIComponent(req.params.name as string);
+    const identifier = (req.params.name as string);
     const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
     const agent = await storage.getAgent(gaii);
     if (!agent) { res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`)); return; }
@@ -388,7 +392,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // Cross-owner is rejected by the ownership check below. Affects Hello Integration step set:
   // task-runner gets a reduced 7-step flow, workstation the narrowest 4-step flow.
   router.patch('/v1/agents/:name/mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
-    const identifier = decodeURIComponent(req.params.name as string);
+    const identifier = (req.params.name as string);
     // Ownership, the mode vocabulary, the write and the Hello Integration step-list re-derive are
     // services/agent-profile-write.ts, shared with aimeat_agent_mode_set.
     const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode);
@@ -414,7 +418,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // deliberately absent from APP_GRANTABLE_SCOPES, and an app editing where an agent is "managed"
   // would be editing a link its owner is invited to click.
   router.patch('/v1/agents/:name/console-url', requireAuth(), requireScope('agent:write'), async (req, res) => {
-    const identifier = decodeURIComponent(req.params.name as string);
+    const identifier = (req.params.name as string);
     const outcome = await setAgentConsoleUrl({ storage, config }, req.auth!.owner, identifier, req.body?.console_url);
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
@@ -462,7 +466,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
    */
   router.patch('/v1/agents/:name/description', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const outcome = await setAgentDescription({ storage, config }, req.auth!.owner as string,
-      decodeURIComponent(req.params.name as string), req.body?.description);
+      (req.params.name as string), req.body?.description);
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;
@@ -479,7 +483,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // or delete as the owner, and the answer says so (`task_start_held_by`).
   router.patch('/v1/agents/:name/task-start', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const outcome = await setAgentTaskStart({ storage, config }, req.auth!.owner as string,
-      resolveIdentity(req.auth!, config.nodeId), decodeURIComponent(req.params.name as string), req.body?.task_start);
+      resolveIdentity(req.auth!, config.nodeId), (req.params.name as string), req.body?.task_start);
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;
@@ -489,7 +493,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
 
   router.patch('/v1/agents/:name/run-mode', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const outcome = await setAgentRunMode({ storage, config }, req.auth!.owner as string,
-      decodeURIComponent(req.params.name as string), req.body?.run_mode);
+      (req.params.name as string), req.body?.run_mode);
     if (!outcome.ok) {
       res.status(outcome.code === 'AGENT_NOT_FOUND' ? 404 : outcome.code === 'INVALID_INPUT' ? 400 : 403)
         .json(error(config.nodeId, outcome.code, outcome.message));
@@ -522,7 +526,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
    */
   router.patch('/v1/agents/:name/runtime-source', requireAuth(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
     const outcome = await setAgentRuntimeSource({ storage, config }, req.auth!.owner as string,
-      decodeURIComponent(req.params.name as string), req.body?.runtime_source);
+      (req.params.name as string), req.body?.runtime_source);
     if (!outcome.ok) {
       res.status(outcome.code === 'AGENT_NOT_FOUND' ? 404 : outcome.code === 'INVALID_INPUT' ? 400 : 403)
         .json(error(config.nodeId, outcome.code, outcome.message));
@@ -538,7 +542,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // stores/exposes the number (read from the integration kit's watchdog_spec);
   // the runner enforces it. >1 needs a concurrency-capable engine.
   router.patch('/v1/agents/:name/max-concurrent-tasks', requireAuth(), requireRole('owner'), async (req, res) => {
-    const identifier = decodeURIComponent(req.params.name as string);
+    const identifier = (req.params.name as string);
     const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
     const agent = await storage.getAgent(gaii);
     if (!agent) {
@@ -576,7 +580,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // budget guards (applied to schedules created for it). Opt-in; off by default.
   // Body: { daily_spend_limit?: number|null, constraints?: ScheduleConstraint[] }
   router.patch('/v1/agents/:name/schedule-constraints', requireAuth(), requireRole('owner'), async (req, res) => {
-    const identifier = decodeURIComponent(req.params.name as string);
+    const identifier = (req.params.name as string);
     const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
     const agent = await storage.getAgent(gaii);
     if (!agent) {
