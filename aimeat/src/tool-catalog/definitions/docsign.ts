@@ -11,6 +11,7 @@
  *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and aimeat_docsign_wallet_status: signing with
  *     an EU Digital Identity Wallet (wish-allekirjoitus-eudi-lompakolla).
  *   v1.2.0 — 2026-10-10 — aimeat_docsign_wallet_start's storage_key is optional.
+ *   v1.3.0 — 2026-10-10 — aimeat_docsign_delete.
  */
 
 import { z } from 'zod';
@@ -108,6 +109,18 @@ export const docsignTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Cancel a Signing Request', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        scope: 'memory:write',
+        surfaces: ['agent'],
+        input: {
+            id: { type: 'string', required: true, description: 'The request id (ds-…).', zod: z.string().max(60) },
+        },
+    },
+    {
+        name: 'aimeat_docsign_delete',
+        description: 'Delete a signing request nobody has signed: a draft, a mistake or a test you created (or your agent created for you). It leaves every list, and the files the node stored for it go too (the PDF kept for wallet signing, a PDF a wallet returned and the node refused). A request that carries a signature is a record and is refused with HAS_SIGNATURES: cancel that one instead.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Delete an Unsigned Signing Request', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         scope: 'memory:write',
         surfaces: ['agent'],
         input: {

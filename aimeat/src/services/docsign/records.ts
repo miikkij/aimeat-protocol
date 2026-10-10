@@ -28,7 +28,7 @@
  * @structure DocSignRecord · DocSignature · DocsignError · createRequest · getRequest ·
  *   listRequests · lookupByHash · beginPasskeySignature · signRequest · cancelRequest ·
  *   verifyRecordSignatures · publicView · walletSigner · recordWalletSignature · signedDocument ·
- *   nextPdfToSign
+ *   nextPdfToSign · deleteRequest
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
@@ -40,6 +40,8 @@
  *     (nextPdfToSign); requestFile is the one read of a party's file for another party.
  *   v1.3.0 — 2026-10-10 — walletLastAttempt: why the last wallet answer was refused, kept on the
  *     request (noteWalletAttempt), because a session's own error is gone with the session.
+ *   v1.4.0 — 2026-10-10 — deleteRequest: a request nobody signed can be deleted by its creator,
+ *     with the files the node stored for it (Jouni: cancelled tests were left in the list for good).
  */
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
@@ -49,6 +51,7 @@ import type { CallerContext } from '../caller-context.js';
 import { verify as verifyEd25519 } from '../../auth/keypair.js';
 import { beginSigning, finishSigning } from '../passkeys.js';
 import { notify } from '../notify.js';
+import { removeStorageFile } from '../storage-file-write.js';
 import { readerFor } from '../classification/reader.js';
 import { fileTarget } from '../classification/labels.js';
 import { logger } from '../../utils/logger.js';
@@ -321,6 +324,53 @@ export async function cancelRequest(ctx: DocsignCtx, caller: CallerContext, id: 
     rec.cancelledAt = new Date().toISOString();
     await writeJson(ctx.storage, reqKey(id), rec, ['docsign']);
     return rec;
+  });
+}
+
+async function removeFromIndex(storage: Storage, key: string, id: string): Promise<void> {
+  const idx = await readJson<{ ids: string[] }>(storage, key);
+  if (!idx?.ids.includes(id)) return;
+  idx.ids = idx.ids.filter((x) => x !== id);
+  await writeJson(storage, key, idx, ['docsign-index']);
+}
+
+/**
+ * Delete a request nobody has signed: a draft, a mistake, a test. Its creator only, as for cancel.
+ * A request that carries a signature is a record of something that happened and is never deleted;
+ * cancel it instead. With the request go the files the node stored FOR it in a party's files
+ * (the PDF kept for wallet signing, a PDF a wallet returned and the node refused), unless another
+ * request of the same document still uses the same stored PDF.
+ */
+export async function deleteRequest(ctx: DocsignCtx, caller: CallerContext, id: string): Promise<{ id: string; files_removed: number }> {
+  return withLock(id, async () => {
+    const rec = await getRequest(ctx, caller, id);
+    if (rec.createdBy !== caller.principal && !(rec.createdBy.includes('#') && ownsAgent(caller.principal, rec.createdBy))) {
+      throw new DocsignError('FORBIDDEN', 403, 'Only whoever created the request can delete it.');
+    }
+    if (Object.keys(rec.signatures).length) {
+      throw new DocsignError('HAS_SIGNATURES', 409, 'Someone has signed this request, so it is a record and stays. Cancel it instead.');
+    }
+    const files: { owner: string; key: string }[] = [];
+    const src = rec.document.source;
+    if (src?.key.startsWith('docsign/')) {
+      const others = (await readJson<{ ids: string[] }>(ctx.storage, hashKey(rec.document.sha256)))?.ids.filter((x) => x !== id) ?? [];
+      let shared = false;
+      for (const other of others) {
+        const o = await readJson<DocSignRecord>(ctx.storage, reqKey(other));
+        if (o?.document.source?.owner === src.owner && o.document.source.key === src.key) { shared = true; break; }
+      }
+      if (!shared) files.push(src);
+    }
+    if (rec.walletLastAttempt?.rejectedKey) files.push({ owner: rec.walletLastAttempt.signer, key: rec.walletLastAttempt.rejectedKey });
+    let removed = 0;
+    for (const f of files) {
+      const out = await removeStorageFile({ storage: ctx.storage, config: ctx.config }, f.owner, f.key);
+      if (out.ok) removed++;
+    }
+    await removeFromIndex(ctx.storage, hashKey(rec.document.sha256), id);
+    for (const p of new Set([...rec.parties.map((x) => x.identity), rec.createdBy])) await removeFromIndex(ctx.storage, partyKey(p), id);
+    await ctx.storage.deleteMemory(NS, reqKey(id), caller.principal);
+    return { id, files_removed: removed };
   });
 }
 

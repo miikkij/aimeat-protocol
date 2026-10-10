@@ -25641,6 +25641,25 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/AimeatError'
+    delete:
+      operationId: deleteDocsignRequest
+      summary: Delete a signing request nobody has signed (its creator)
+      description: Removes the request from every list, with the files the node stored for it in a party's files (the PDF kept for wallet signing, a PDF a wallet returned and the node refused). A request that carries a signature is a record and is refused with 409 HAS_SIGNATURES; cancel it instead.
+      tags: [Document signing]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/docsign/requests/{id}/passkey-options:
     post:
