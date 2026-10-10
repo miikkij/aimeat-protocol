@@ -10,6 +10,7 @@
  * @usage const bytes = await readOwnFile(ctx, caller, 'contracts/lease.pdf');
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-10 — documentFromStorage also says where the file is (source).
  */
 import { createHash } from 'node:crypto';
 import type { CallerContext } from '../caller-context.js';
@@ -33,8 +34,16 @@ export async function readOwnFile(ctx: DocsignCtx, caller: CallerContext, key: s
   return { data: whole.data, name: key.split('/').pop() ?? key, mimeType: file.mimeType };
 }
 
-/** A signing request's document, named by a stored file: its hash, name, size and type. */
-export async function documentFromStorage(ctx: DocsignCtx, caller: CallerContext, key: string): Promise<{ sha256: string; name: string; size: number; mediaType: string | null }> {
+/**
+ * A signing request's document, named by a stored file: its hash, name, size and type, and where
+ * the file is, so a wallet signature can start from it without the file being sent again.
+ */
+export async function documentFromStorage(ctx: DocsignCtx, caller: CallerContext, key: string): Promise<{
+  sha256: string; name: string; size: number; mediaType: string | null; source: { owner: string; key: string };
+}> {
   const file = await readOwnFile(ctx, caller, key);
-  return { sha256: createHash('sha256').update(file.data).digest('hex'), name: file.name, size: file.data.length, mediaType: file.mimeType };
+  return {
+    sha256: createHash('sha256').update(file.data).digest('hex'), name: file.name, size: file.data.length, mediaType: file.mimeType,
+    source: { owner: caller.principal, key },
+  };
 }

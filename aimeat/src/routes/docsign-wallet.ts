@@ -24,6 +24,8 @@
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
  *   v1.0.1 — 2026-10-10 — The raw PDF is taken with rawBodyBytes (code scanning alerts 1721-1725).
  *   v1.1.0 — 2026-10-10 — The fixed response addresses for an x509_san_uri access certificate.
+ *   v1.2.0 — 2026-10-10 — Starting with no file uses the PDF the node holds for the request
+ *     (nextPdfToSign); 409 DOCUMENT_NEEDED when it holds none.
  */
 import { Router, raw, urlencoded, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -33,7 +35,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { callerOf } from '../middleware/caller.js';
-import { DocsignError, signedDocument } from '../services/docsign/records.js';
+import { DocsignError, signedDocument, nextPdfToSign } from '../services/docsign/records.js';
 import { readOwnFile } from '../services/docsign/files.js';
 import {
   walletStatus, startWalletSignature, walletSessionStatus, walletRequestObject, walletDocument, receiveWalletResponse,
@@ -46,7 +48,7 @@ const StartJsonSchema = z.object({
   content_base64: z.string().optional(),
   storage_key: z.string().max(1024).optional(),
   name: z.string().max(255).optional(),
-}).refine((v) => !!v.content_base64 !== !!v.storage_key, { message: 'Send the PDF once: the body itself, content_base64, or storage_key.' });
+}).refine((v) => !(v.content_base64 && v.storage_key), { message: 'Send the PDF once: the body itself, content_base64, or storage_key.' });
 
 export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -85,8 +87,16 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
         if (d.storage_key) {
           const file = await readOwnFile(ctx, caller, d.storage_key);
           doc = { bytes: file.data, name: d.name ?? file.name };
+        } else if (d.content_base64) {
+          doc = { bytes: Buffer.from(d.content_base64, 'base64'), ...(d.name ? { name: d.name } : {}) };
         } else {
-          doc = { bytes: Buffer.from(d.content_base64!, 'base64'), ...(d.name ? { name: d.name } : {}) };
+          // No file sent: the PDF this node already holds for the request, when it holds one.
+          const held = await nextPdfToSign(ctx, caller, req.params.id as string);
+          if (!held) {
+            res.status(409).json(error(config.nodeId, 'DOCUMENT_NEEDED', 'This node does not hold the PDF of this request (it was made from a hash). Send the PDF.'));
+            return;
+          }
+          doc = { bytes: held.data, name: held.name };
         }
       }
       const started = await startWalletSignature(ctx, caller, req.params.id as string, doc);

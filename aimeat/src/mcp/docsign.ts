@@ -19,6 +19,8 @@
  *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and _wallet_status (services/docsign/eudi.ts):
  *     the AI prepares a wallet signature for the person, who confirms it in their own wallet
  *     (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.2.0 — 2026-10-10 — aimeat_docsign_wallet_start without storage_key uses the PDF the node
+ *     already holds for the request.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
@@ -30,7 +32,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import {
   createRequest, getRequest, listRequests, signRequest, cancelRequest, verifyRecordSignatures, lookupWithNodeKey,
-  DocsignError,
+  nextPdfToSign, DocsignError,
 } from '../services/docsign/records.js';
 import { validateDocument } from '../services/docsign/validate-input.js';
 import { ValidationInputError } from '../services/docsign/validate.js';
@@ -79,7 +81,7 @@ export function registerDocsignTools(
     async ({ title, message, storage_key, document: doc, parties }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
-        let document: { sha256: string; name: string; size: number; mediaType: string | null };
+        let document: { sha256: string; name: string; size: number; mediaType: string | null; source?: { owner: string; key: string } };
         if (storage_key && !doc) {
           document = await documentFromStorage(ctx, caller(), String(storage_key));
         } else if (doc && !storage_key) {
@@ -142,7 +144,12 @@ export function registerDocsignTools(
       const disabled = off(); if (disabled) return disabled;
       try {
         const c = caller();
-        const file = await readOwnFile(ctx, c, String(storage_key));
+        // Without storage_key, the PDF this node already holds for the request (its stored
+        // document, or the newest wallet-signed one).
+        const file = storage_key
+          ? await readOwnFile(ctx, c, String(storage_key)).then((f) => ({ data: f.data, name: f.name }))
+          : await nextPdfToSign(ctx, c, String(id));
+        if (!file) return toolError('DOCUMENT_NEEDED', 'This node does not hold the PDF of this request (it was made from a hash). Upload the PDF and pass it as storage_key.');
         const started = await startWalletSignature(ctx, c, String(id), { bytes: file.data, name: file.name });
         // The QR image is for a page; in a chat it is kilobytes of base64 nobody reads.
         return ok({

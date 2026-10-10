@@ -25741,7 +25741,8 @@ paths:
       description: |
         The body is the PDF itself (application/pdf, optional ?name=), or JSON with content_base64 or
         storage_key. It must be the request's document, or once a wallet has signed, the newest signed
-        PDF. Returns wallet_link (eudi-rqes://…) for the person to open on the phone with the wallet,
+        PDF. An empty JSON body ({}) uses the PDF this node holds for the request (it was made from a
+        stored file, or a wallet has signed it); 409 DOCUMENT_NEEDED when it holds none. Returns wallet_link (eudi-rqes://…) for the person to open on the phone with the wallet,
         or to show as a QR code. A person signs for themselves; an agent or app acting for a person
         starts it for that person. Valid for 15 minutes.
       tags: [Document signing]
