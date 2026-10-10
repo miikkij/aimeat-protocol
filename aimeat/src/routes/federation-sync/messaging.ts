@@ -5,6 +5,10 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is held to
+ *     it: replicate, the receipt, the message, the broadcast and the storage grant without the proof
+ *     are refused from it whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal; secaudit
+ *     2026-10-10 I21). Stripping the proof had let a captured replicate be sent again.
  *   v1.8.0 — 2026-10-06 — Replicate and the receipt check a delivery proof: the node they are for and
  *     a send time, heard once inside five minutes (deliveryRefusal; secaudit 2026-10 last items, D3).
  *   v1.7.0 — 2026-10-06 — The message, the broadcast and the storage grant name this node as their
@@ -55,7 +59,9 @@ import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal, deliveryRefusal } from '../../services/signed-node-request.js';
+import {
+    signedMessageRefusal, audienceRefusal, deliveryRefusal, pinnedRefusal, federationPeerProofPin,
+} from '../../services/signed-node-request.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
@@ -95,12 +101,13 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
      */
     const refuseOldOrReplayed = async (
         res: Response, sourceNode: string, timestamp: unknown, signature: string,
-        audience: { signed: string; body: Record<string, unknown>; publicKey: string },
+        audience: { signed: string; body: Record<string, unknown>; peer: PeerInfo },
     ): Promise<boolean> => {
-        const refusal = await audienceRefusal({
+        // A peer that has once sent the proof is held to it (pinnedRefusal; secaudit 2026-10-10 I21).
+        const refusal = await pinnedRefusal(await federationPeerProofPin(storage, audience.peer), audience.body, provenSince => audienceRefusal({
             signed: audience.signed, audience: audience.body.audience, audienceSignature: audience.body.audience_signature,
-            publicKey: audience.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-        }) ?? signedMessageRefusal(sourceNode, timestamp, signature);
+            publicKey: audience.peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+        })) ?? signedMessageRefusal(sourceNode, timestamp, signature);
         if (refusal) res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
         return !!refusal;
     };
@@ -108,14 +115,15 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
     /**
      * After the signature, for the two messages here that sign no send time of their own (replicate,
      * receipt): the delivery proof names this node and a send time inside five minutes, once
-     * (deliveryRefusal, signed-node-request.ts; secaudit 2026-10 last items, D3). True when refused.
+     * (deliveryRefusal, signed-node-request.ts; secaudit 2026-10 last items, D3), and a peer that has
+     * once sent it is held to it (secaudit 2026-10-10 I21). True when refused.
      */
     const refuseUndelivered = async (
-        res: Response, sourceNode: string, signed: string, body: Record<string, unknown>, publicKey: string,
+        res: Response, sourceNode: string, signed: string, body: Record<string, unknown>, peer: PeerInfo,
     ): Promise<boolean> => {
-        const refusal = await deliveryRefusal({
-            sourceNode, signed, body, publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-        });
+        const refusal = await pinnedRefusal(await federationPeerProofPin(storage, peer), body, provenSince => deliveryRefusal({
+            sourceNode, signed, body, publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+        }));
         if (refusal) res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
         return !!refusal;
     };
@@ -149,7 +157,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             return;
         }
         // The signed timestamp is the record's own update time, so the send time comes in the proof.
-        if (await refuseUndelivered(res, source_node, replicatePayload, req.body, peer.publicKey)) return;
+        if (await refuseUndelivered(res, source_node, replicatePayload, req.body, peer)) return;
 
         // Store replicated memory with cross-node prefix
         const replicaKey = `replica:${source_node}:${key}`;
@@ -247,7 +255,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on message'));
             return;
         }
-        if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: messagePayload, body: req.body ?? {}, publicKey: peer.publicKey })) return;
+        if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: messagePayload, body: req.body ?? {}, peer })) return;
         // The signature proves which node sent this, not who wrote it: `senderGhii` is the sending
         // node's word. A node speaks for its own people only, so a sender on another node is refused.
         // Until 2026-10-01 a peer could deliver a message that read as from bob@<any node>, and the
@@ -475,7 +483,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on broadcast'));
             return;
         }
-        if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: payload, body: req.body ?? {}, publicKey: peer.publicKey })) return;
+        if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: payload, body: req.body ?? {}, peer })) return;
 
         const senderGhii: string = broadcast.senderGhii;
         // The title a peer sent, bounded here rather than trusted. Everything else on this frame is
@@ -549,7 +557,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             return;
         }
         // The signed timestamp is when the message was read, so the send time comes in the proof.
-        if (await refuseUndelivered(res, source_node, receiptPayload, req.body, peer.publicKey)) return;
+        if (await refuseUndelivered(res, source_node, receiptPayload, req.body, peer)) return;
 
         if (kind === 'read') {
             await storage.setMessageReadReceipt(message_id, timestamp ?? new Date().toISOString());
@@ -586,7 +594,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             return;
         }
         // Each grant hands out a fresh download link, so a grant passes once, inside the window.
-        if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: grantPayload, body: req.body ?? {}, publicKey: peer.publicKey })) return;
+        if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: grantPayload, body: req.body ?? {}, peer })) return;
 
         // Authority check: this node must hold the sender's copy of that message, addressed to the
         // requesting recipient, and it must actually reference this storage key.

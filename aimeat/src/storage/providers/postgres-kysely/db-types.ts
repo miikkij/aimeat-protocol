@@ -1474,6 +1474,7 @@ export interface FederationPeer {
   relayClaim: string | null;
   lastClaimedRelayAt: Timestamp | null;
   lastUnclaimedRelayAt: Timestamp | null;
+  deliveryProofAt: Timestamp | null;
   publicKey: Generated<string>;
   replicateMemory: Generated<boolean>;
   shareCatalogue: Generated<boolean>;
@@ -1500,6 +1501,7 @@ export interface Flag {
 export interface GenesisPeer {
   catalogueHash: string;
   createdAt: Generated<Timestamp>;
+  deliveryProofAt: Timestamp | null;
   genesisNodeId: string;
   genesisUrl: string;
   id: Generated<string>;

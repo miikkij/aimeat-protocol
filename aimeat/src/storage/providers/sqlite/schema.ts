@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-10 — federation_peers.deliveryProofAt and genesis_peers.deliveryProofAt (migration 0100).
  *   2026-10-09 — The extension_instances and secrets column block moves to schema-columns-extensions.ts
  *     unchanged (max-file-lines), and gains secrets.hostBinding (migration 0099).
  *   2026-10-08 — work.aiProvenanceId and agent_v2_tasks.aiProvenanceId (migration 0098).
@@ -257,6 +258,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('federation_peers', 'relayClaim', 'TEXT');
   safeAddColumn('federation_peers', 'lastClaimedRelayAt', 'TEXT');
   safeAddColumn('federation_peers', 'lastUnclaimedRelayAt', 'TEXT');
+  // The delivery-proof pin, NULL until a peer's first verified proof (Postgres 0100; secaudit 2026-10-10 I21).
+  safeAddColumn('federation_peers', 'deliveryProofAt', 'TEXT');
+  safeAddColumn('genesis_peers', 'deliveryProofAt', 'TEXT');
 
   // The `contact` tier (federation's floor: messages and nothing else) needs words for three doors
   // that had none, so they could be refused. DEFAULT 1 is deliberate: every peer that exists today

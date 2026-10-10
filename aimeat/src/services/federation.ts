@@ -11,6 +11,7 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.8.1 — 2026-10-10 — PeerInfo.deliveryProofAt: the delivery-proof pin (secaudit 2026-10-10 I21).
  *   v1.8.0 — 2026-10-06 — The heartbeat ping names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.6.0 — 2026-10-05 — peerCarriesAgents: agent resolution asks, and names a GAII to, only peers
@@ -128,6 +129,10 @@ export interface PeerInfo {
      *  arrived without a claim naming it. Each written at most every ten minutes. */
     lastClaimedRelayAt?: string | null;
     lastUnclaimedRelayAt?: string | null;
+    /** When this peer first sent a delivery proof this node verified; from then on a replicate,
+     *  catalogue sync or read receipt without one is refused. Undefined until read from storage
+     *  (services/signed-node-request.ts peerDeliveryPin), null when it never sent one. */
+    deliveryProofAt?: string | null;
 }
 
 /**

@@ -8,6 +8,8 @@
  *   queue (with best-effort mailboxUsedBytes accounting), and the genesis-peer registry. Translated
  *   1:1 from the Prisma (Mongo) provider against the same tables.
  * @version-history
+ *   v1.2.0 — 2026-10-10 — deliveryProofAt on federation and genesis peers; a federation peer saved
+ *     without it keeps the stored pin (migration 0100; secaudit 2026-10-10 I21).
  *   v1.1.0 — 2026-09-25 — A peer's own relay-claim setting and its last claimed and unclaimed relay
  *     times (migration 0083).
  *   v1.0.0 — 2026-07-15 — Phase 5: federation on Postgres+Kysely.
@@ -53,6 +55,7 @@ function toFederationPeer(r: Selectable<FederationPeer>): FederationPeerRecord {
     relayClaim: r.relayClaim === 'optional' || r.relayClaim === 'required' ? r.relayClaim : null,
     lastClaimedRelayAt: r.lastClaimedRelayAt ? iso(r.lastClaimedRelayAt) : null,
     lastUnclaimedRelayAt: r.lastUnclaimedRelayAt ? iso(r.lastUnclaimedRelayAt) : null,
+    deliveryProofAt: r.deliveryProofAt ? iso(r.deliveryProofAt) : null,
   };
 }
 function toPeeringRequest(r: Selectable<PeeringRequest>): PeeringRequestRecord {
@@ -85,6 +88,7 @@ function toGenesisPeer(r: Selectable<GenesisPeer>): GenesisPeerRecord {
     id: r.id, genesisNodeId: r.genesisNodeId, genesisUrl: r.genesisUrl, publicKey: r.publicKey,
     status: r.status as GenesisPeerRecord['status'], lastSyncAt: iso(r.lastSyncAt), catalogueHash: r.catalogueHash,
     createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
+    deliveryProofAt: r.deliveryProofAt ? iso(r.deliveryProofAt) : null,
   };
 }
 
@@ -107,10 +111,16 @@ export const federationMethods = {
       lastClaimedRelayAt: peer.lastClaimedRelayAt ? new Date(peer.lastClaimedRelayAt) : null,
       lastUnclaimedRelayAt: peer.lastUnclaimedRelayAt ? new Date(peer.lastUnclaimedRelayAt) : null,
     };
+    // The delivery-proof pin is only ever set: a record without it keeps the stored one, so a peer
+    // record built without the field (a tier change, a re-add) cannot undo it (secaudit 2026-10-10 I21).
+    const deliveryProofAt = peer.deliveryProofAt ? new Date(peer.deliveryProofAt) : null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await this.db.insertInto('FederationPeer').values({ nodeId: peer.nodeId, addedAt: new Date(peer.addedAt), ...shared } as any)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .onConflict(oc => oc.column('nodeId').doUpdateSet(shared as any)).execute();
+    await this.db.insertInto('FederationPeer').values({ nodeId: peer.nodeId, addedAt: new Date(peer.addedAt), ...shared, deliveryProofAt } as any)
+      .onConflict(oc => oc.column('nodeId').doUpdateSet({
+        ...shared,
+        deliveryProofAt: sql`COALESCE(EXCLUDED."deliveryProofAt", "FederationPeer"."deliveryProofAt")`,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any)).execute();
   },
   async listFederationPeers(this: PostgresKyselyStorage): Promise<FederationPeerRecord[]> {
     return (await this.db.selectFrom('FederationPeer').selectAll().execute()).map(toFederationPeer);
@@ -263,6 +273,7 @@ export const federationMethods = {
       id: record.id, genesisNodeId: record.genesisNodeId, genesisUrl: record.genesisUrl, publicKey: record.publicKey,
       status: record.status, lastSyncAt: new Date(record.lastSyncAt), catalogueHash: record.catalogueHash,
       createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt ?? record.createdAt),
+      deliveryProofAt: record.deliveryProofAt ? new Date(record.deliveryProofAt) : null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
     return record;
@@ -290,6 +301,7 @@ export const federationMethods = {
       if (updates.lastSyncAt !== undefined) data.lastSyncAt = new Date(updates.lastSyncAt);
       if (updates.catalogueHash !== undefined) data.catalogueHash = updates.catalogueHash;
       if (updates.createdAt !== undefined) data.createdAt = new Date(updates.createdAt);
+      if (updates.deliveryProofAt) data.deliveryProofAt = new Date(updates.deliveryProofAt);
       data.updatedAt = updates.updatedAt ? new Date(updates.updatedAt) : new Date();
       const rows = await this.db.updateTable('GenesisPeer').set(data as never).where('id', '=', id).returningAll().execute();
       return rows[0] ? toGenesisPeer(rows[0]) : null;

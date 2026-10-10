@@ -19,12 +19,15 @@
  * @structure One round-trip per tier, plus the legacy-row defaults.
  * @usage pnpm exec vitest run test/unit/federation-peer-flag-roundtrip.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-10 — The delivery-proof pin (deliveryProofAt) on federation and genesis peers
+ *     round-trips, and a save without it keeps it (secaudit 2026-10-10 I21).
  *   v1.1.0 — 2026-09-25 — A peer's own relay-claim setting and its last claimed and unclaimed relay
  *     times round-trip on both providers.
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { rmSync, existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, FederationPeerRecord } from '../../src/storage/interface.js';
 import { deriveTierFlags, type PeerTier } from '../../src/services/federation-tiers.js';
@@ -171,6 +174,58 @@ describe('a peer\'s flags survive the round trip', () => {
             expect((await readBack(storage, kept)).relayClaim, `${name}: required reads back`).toBe('required');
             await storage.saveFederationPeer({ ...k, relayClaim: null });
             expect((await readBack(storage, kept)).relayClaim ?? null, `${name}: cleared back to the node's`).toBe(null);
+        }
+    }, 30_000);
+
+    it('the delivery-proof pin persists, reads back null when never written, and a save without it keeps it', async () => {
+        // secaudit 2026-10-10 I21. The pin decides whether a delivery WITHOUT the proof is refused
+        // from that peer. A peer record built in memory without the field (a tier change, a re-add, an
+        // approval) is saved over the row, and that save must not undo the pin: that would reopen
+        // the downgrade the pin closes, in the direction nobody notices.
+        for (const { name, storage } of provs) {
+            const never = `aimeat-test-deliverypin-never-${name}`;
+            const seen = `aimeat-test-deliverypin-seen-${name}`;
+            const when = '2026-10-10T08:09:10.000Z';
+            await storage.deleteFederationPeer(never);
+            await storage.deleteFederationPeer(seen);
+            await storage.saveFederationPeer(peerAt('member', never));
+            await storage.saveFederationPeer(peerAt('member', seen, { deliveryProofAt: when }));
+
+            expect((await readBack(storage, never)).deliveryProofAt ?? null, `${name}: never proved`).toBe(null);
+            const back = (await readBack(storage, seen)).deliveryProofAt;
+            expect(back ? new Date(back).toISOString() : null, `${name}: the same instant came back`).toBe(when);
+
+            await storage.saveFederationPeer(peerAt('contact', seen));
+            const kept = (await readBack(storage, seen)).deliveryProofAt;
+            expect(kept ? new Date(kept).toISOString() : null, `${name}: a save without the field keeps the pin`).toBe(when);
+
+            // Deleting the peer is the one thing that clears it.
+            await storage.deleteFederationPeer(seen);
+            await storage.saveFederationPeer(peerAt('member', seen));
+            expect((await readBack(storage, seen)).deliveryProofAt ?? null, `${name}: a re-added peer starts unpinned`).toBe(null);
+        }
+    }, 30_000);
+
+    it('a genesis peer\'s delivery-proof pin persists through create and update', async () => {
+        for (const { name, storage } of provs) {
+            const now = new Date().toISOString();
+            const id = randomUUID();
+            await storage.createGenesisPeer({
+                id, genesisNodeId: `aimeat-test-genesispin-${name}-${id.slice(0, 8)}`, genesisUrl: 'https://genesis.example',
+                publicKey: 'k', status: 'active', lastSyncAt: now, catalogueHash: '', createdAt: now, updatedAt: now,
+            });
+            try {
+                expect((await storage.getGenesisPeer(id))?.deliveryProofAt ?? null, `${name}: never proved`).toBe(null);
+                const when = '2026-10-10T09:10:11.000Z';
+                await storage.updateGenesisPeer(id, { deliveryProofAt: when });
+                const back = (await storage.getGenesisPeer(id))?.deliveryProofAt;
+                expect(back ? new Date(back).toISOString() : null, `${name}: the pin came back`).toBe(when);
+                await storage.updateGenesisPeer(id, { catalogueHash: 'h2' });
+                const kept = (await storage.getGenesisPeer(id))?.deliveryProofAt;
+                expect(kept ? new Date(kept).toISOString() : null, `${name}: another update keeps it`).toBe(when);
+            } finally {
+                await storage.deleteGenesisPeer(id);
+            }
         }
     }, 30_000);
 

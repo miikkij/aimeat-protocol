@@ -12,8 +12,8 @@
  *   - genesis-catalogue-ingest: verifies active peer + Ed25519 signature, stores entries as __genesis__ memory
  *   - genesis-memory-read (POST/GET): forwards reads to peers or answers peer reads under federation consent
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
- *
  * @version-history
+ *   v1.10.0 — 2026-10-10 — A genesis peer that has once sent a verified delivery proof is held to it: an ingest without one is refused whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal, deliveryProofAt; secaudit 2026-10-10 I21).
  *   v1.9.0 — 2026-10-06 — genesis-catalogue-ingest checks a delivery proof: this node named, sent inside five minutes, heard once (deliveryRefusal; secaudit 2026-10 last items, D3).
  *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.7.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
@@ -47,7 +47,7 @@ import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { verify } from '../auth/keypair.js';
-import { deliveryRefusal } from '../services/signed-node-request.js';
+import { deliveryRefusal, pinnedRefusal, genesisPeerProofPin } from '../services/signed-node-request.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from '../services/event-bus.js';
@@ -343,11 +343,11 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                 res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on genesis catalogue ingest'));
                 return;
             }
-            // Nothing above says when it was sent, so the delivery proof does (secaudit 2026-10 last items, D3).
-            const undelivered = await deliveryRefusal({
+            // Nothing above says when it was sent, so the delivery proof does (secaudit 2026-10, D3); a peer that sent one is held to it (2026-10-10 I21).
+            const undelivered = await pinnedRefusal(genesisPeerProofPin(storage, genesisPeer), req.body, provenSince => deliveryRefusal({
                 sourceNode: source_node, signed: payload, body: req.body, publicKey: genesisPeer.publicKey,
-                thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-            });
+                thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+            }));
             if (undelivered) {
                 res.status(undelivered.status).json(error(config.nodeId, undelivered.code, undelivered.message));
                 return;

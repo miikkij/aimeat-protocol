@@ -8,6 +8,8 @@
  * @structure federationMethods
  * @usage Object.assign(SqliteStorage.prototype, federationMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-10 — deliveryProofAt on federation and genesis peers; a federation peer saved
+ *     without it keeps the stored pin (migration 0100; secaudit 2026-10-10 I21).
  *   v1.0.0 — 2026-10-05 — 21 methods (createPeeringRequest, getPeeringRequest, listPeeringRequests, …) moved
  *     here from identity-nodes.ts; createGenesisPeer, getGenesisPeer, getGenesisPeerByNodeId,
  *     listGenesisPeers, updateGenesisPeer, deleteGenesisPeer, deserializeGenesisPeer moved here from
@@ -279,12 +281,12 @@ export const federationMethods = {
 
   async createGenesisPeer(this: SqliteStorage, record: GenesisPeerRecord): Promise<GenesisPeerRecord> {
     this.db.prepare(
-      `INSERT INTO genesis_peers (id, genesisNodeId, genesisUrl, publicKey, status, lastSyncAt, catalogueHash, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO genesis_peers (id, genesisNodeId, genesisUrl, publicKey, status, lastSyncAt, catalogueHash, createdAt, updatedAt, deliveryProofAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.genesisNodeId, record.genesisUrl, record.publicKey,
       record.status, record.lastSyncAt, record.catalogueHash,
-      record.createdAt, record.updatedAt,
+      record.createdAt, record.updatedAt, record.deliveryProofAt ?? null,
     );
     return record;
   },
@@ -313,10 +315,11 @@ export const federationMethods = {
     const updated = { ...existing, ...updates };
     this.db.prepare(
       `UPDATE genesis_peers SET genesisNodeId = ?, genesisUrl = ?, publicKey = ?, status = ?,
-       lastSyncAt = ?, catalogueHash = ?, createdAt = ?, updatedAt = ? WHERE id = ?`
+       lastSyncAt = ?, catalogueHash = ?, createdAt = ?, updatedAt = ?, deliveryProofAt = ? WHERE id = ?`
     ).run(
       updated.genesisNodeId, updated.genesisUrl, updated.publicKey, updated.status,
-      updated.lastSyncAt, updated.catalogueHash, updated.createdAt, updated.updatedAt, id,
+      updated.lastSyncAt, updated.catalogueHash, updated.createdAt, updated.updatedAt,
+      updated.deliveryProofAt ?? null, id,
     );
     return updated;
   },
@@ -337,6 +340,7 @@ export const federationMethods = {
       catalogueHash: row.catalogueHash as string,
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
+      deliveryProofAt: (row.deliveryProofAt as string) ?? null,
     };
   },
 
@@ -346,8 +350,12 @@ export const federationMethods = {
 
   async saveFederationPeer(this: SqliteStorage, peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, allowMessaging, allowBroadcast, allowSettlement, supportUpstream, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash, relayClaimAt, relayClaim, lastClaimedRelayAt, lastUnclaimedRelayAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      // deliveryProofAt keeps the stored pin when the record carries none: a peer record built
+      // without it (a tier change, a re-add) must not undo the pin (secaudit 2026-10-10 I21). The
+      // subquery reads the row before REPLACE deletes it.
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, allowMessaging, allowBroadcast, allowSettlement, supportUpstream, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash, relayClaimAt, relayClaim, lastClaimedRelayAt, lastUnclaimedRelayAt, deliveryProofAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+         COALESCE(?, (SELECT deliveryProofAt FROM federation_peers WHERE nodeId = ?)))`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
       peer.allowMessaging ? 1 : 0, peer.allowBroadcast ? 1 : 0, peer.allowSettlement ? 1 : 0,
@@ -357,7 +365,8 @@ export const federationMethods = {
       peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null,
       peer.heartbeatOk ?? 0, peer.heartbeatTotal ?? 0, peer.availabilityWindow ?? null, peer.availabilityPct ?? null,
       peer.softwareVersion ?? null, peer.nodeCardHash ?? null, peer.relayClaimAt ?? null,
-      peer.relayClaim ?? null, peer.lastClaimedRelayAt ?? null, peer.lastUnclaimedRelayAt ?? null);
+      peer.relayClaim ?? null, peer.lastClaimedRelayAt ?? null, peer.lastUnclaimedRelayAt ?? null,
+      peer.deliveryProofAt ?? null, peer.nodeId);
   },
 
   async listFederationPeers(this: SqliteStorage): Promise<FederationPeerRecord[]> {
@@ -395,6 +404,7 @@ export const federationMethods = {
       relayClaim: r.relayClaim === 'optional' || r.relayClaim === 'required' ? r.relayClaim : null,
       lastClaimedRelayAt: (r.lastClaimedRelayAt as string) ?? null,
       lastUnclaimedRelayAt: (r.lastUnclaimedRelayAt as string) ?? null,
+      deliveryProofAt: (r.deliveryProofAt as string) ?? null,
     }));
   },
 
