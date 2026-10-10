@@ -22,8 +22,9 @@
  *
  *   ONCE PER CONNECT, AFTER A SHORT WAIT. A connector opens its socket and then attaches the agents
  *   it already holds; an older connector opens one socket per agent. The offer waits SETTLE_MS after
- *   the first socket of an owner opens, so a burst of sockets is one offer and the connector is ready
- *   to answer it. One offer per owner runs at a time.
+ *   the first socket of an owner's connector opens, so a burst of sockets is one offer and the
+ *   connector is ready to answer it. One offer per owner runs at a time; a second connector of the
+ *   same owner arriving meanwhile is asked after it.
  *
  *   A REFUSAL LEAVES THE AGENT PENDING. A connector that refuses or is too old enrols nothing, the
  *   records stay as they are, and the node log says why (event agent_v2.pending_offer_refused). The
@@ -37,6 +38,8 @@
  *   installId) · schedulePendingEnrolment(deps, info) · scheduleOffer() · startPendingEnrolment(deps)
  * @usage startPendingEnrolment({ config, storage });   // once, after the tunnel manager exists
  * @version-history
+ *   v1.1.0 — 2026-10-10 — An agent ordered to one connector is offered to that connector only
+ *     (services/connector-registry.ts wantedInstalls).
  *   v1.0.0 — 2026-10-08 — Initial: an agent approved while the connector was down gets its key when
  *     the connector connects, without a press.
  */
@@ -45,6 +48,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AgentRecord } from '../storage/interface.js';
 import { offerEnrolment, isBeingOffered, type EnrolCandidate } from './agent-enrolment-offer.js';
 import { onTunnelSocketOpened, type TunnelSocketOpened } from './connect-tunnel-hooks.js';
+import { wantedInstalls } from './connector-registry.js';
 import { emitChange } from './event-bus.js';
 import { runAsNode } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
@@ -104,10 +108,20 @@ const scheduled = new Map<string, ReturnType<typeof setTimeout>>();
 export async function offerPendingEnrolment(
   deps: Deps, owner: string, installId: string | null,
 ): Promise<{ offered: string[]; enrolled: string[]; code?: string }> {
-  if (inFlight.has(owner)) return { offered: [], enrolled: [], code: 'IN_FLIGHT' };
+  if (inFlight.has(owner)) {
+    // Another connector of this owner is being offered right now. This one is asked after it, so
+    // an agent ordered to this connector is not left waiting for its next connect.
+    scheduleOffer(deps, owner, installId, SETTLE_MS);
+    return { offered: [], enrolled: [], code: 'IN_FLIGHT' };
+  }
   inFlight.add(owner);
   try {
-    const all = await pendingAgents(deps.storage, owner);
+    // AN AGENT ORDERED TO ONE CONNECTOR WAITS FOR THAT ONE. The owner chose the machine, and "run
+    // this on my laptop" answered by the server is not a smaller version of the request. An agent
+    // with no order goes to whichever connector arrives, as before.
+    const wanted = await wantedInstalls(deps, owner);
+    const all = (await pendingAgents(deps.storage, owner))
+      .filter(a => !wanted[a.name] || wanted[a.name] === installId);
     const now = Date.now();
     const pending = all.filter(a => untilAllSettled([a], now) === 0);
     // A just-created agent is its creating route's to offer; come back when that route is done.
@@ -144,7 +158,7 @@ export async function offerPendingEnrolment(
   }
 }
 
-/** Schedule one offer for this owner SETTLE_MS from now, unless one is already scheduled. */
+/** Schedule one offer for this owner's connector SETTLE_MS from now, unless one is already scheduled. */
 export function schedulePendingEnrolment(deps: Deps, info: TunnelSocketOpened): void {
   // An ecosystem app's socket is not a connector that can hold agent keys (basic-agents.ts
   // connectedDaemons filters them the same way).
@@ -153,15 +167,20 @@ export function schedulePendingEnrolment(deps: Deps, info: TunnelSocketOpened): 
   scheduleOffer(deps, info.owner, info.installId, SETTLE_MS);
 }
 
-/** One offer for this owner `delayMs` from now, unless one is already scheduled. */
+/**
+ * One offer for this owner's connector `delayMs` from now, unless one is already scheduled for it.
+ * Per connector, because an agent can be ordered to one: two connectors of one owner arriving in
+ * the same two seconds are two offers, each naming what that connector may take.
+ */
 function scheduleOffer(deps: Deps, owner: string, installId: string | null, delayMs: number): void {
-  if (scheduled.has(owner)) return;
+  const key = `${owner}\n${installId ?? ''}`;
+  if (scheduled.has(key)) return;
   const timer = setTimeout(() => {
-    scheduled.delete(owner);
+    scheduled.delete(key);
     runAsNode(deps.config.nodeId, () => { void offerPendingEnrolment(deps, owner, installId); });
   }, delayMs);
   timer.unref?.();
-  scheduled.set(owner, timer);
+  scheduled.set(key, timer);
 }
 
 /** Listen for connectors connecting. Called once at start, after the tunnel manager exists. */

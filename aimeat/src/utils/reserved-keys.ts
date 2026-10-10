@@ -20,6 +20,9 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.21.0 — 2026-10-10 — `agents.connectors.` is reserved: the owner's connectors and the orders
+ *     that wait for one, which the node resolves a proposal's connector by. A new key, so nothing
+ *     wrote it through the memory API before this.
  *   v1.20.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.20.0 — 2026-10-02 — `scope-use.` is a SERVICE-OWNED prefix: the record of the permissions an
@@ -137,6 +140,14 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // and the owner approving a name and a purpose would mint it. Only the propose route writes this
   // prefix; the owner reads and settles through the agent-proposals routes.
   'agents.proposals.',
+  // 2026-10-10: `agents.connectors.registry` is the owner's connectors and the orders that wait for one
+  // (services/connector-registry.ts). The node ACTS on it: a proposal's `connector` is resolved to
+  // an install id by the names in this record, and an agent that is waiting is offered only to the
+  // connector the record names for it. A granted app that could write the key could rename a
+  // machine, or point an approved agent's order at another machine, so the agent's key would be
+  // minted where the owner did not choose. Only the registry writes it, server-side; the owner
+  // renames and forgets through /v1/agents/v2/connectors.
+  'agents.connectors.',
   // `ai.jobs.<id>` is a live AI job and `ai.jobs.log.<day>` is the record of what the finished ones
   // cost. Both are read by the server as fact: a job record says which model to call, whose key
   // pays, what prompt to send and which key to write the answer to. A granted app that could write

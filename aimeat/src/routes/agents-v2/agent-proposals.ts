@@ -23,6 +23,9 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.6.0 — 2026-10-10 — Approval takes `install_id` (else the proposal's own), offers the agent to
+ *     that connector alone, records the order so a waiting agent waits for that connector, and
+ *     answers with `connector`. An unknown connector is refused before anything is created.
  *   v1.5.0 — 2026-10-08 — With no connector connected, the answer carries `waiting_for_connector`
  *     and says the agent gets its key when the connector connects (services/agent-pending-enrolment.ts).
  *   v1.4.0 — 2026-10-02 — Approval decides the run mode again against the connected connector
@@ -50,6 +53,7 @@ import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/mid
 import { buildGAII } from '../../utils/gaii.js';
 import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
 import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
+import { findConnector, setWanted, clearWanted, type ConnectorView } from '../../services/connector-registry.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import {
@@ -166,6 +170,21 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       return;
     }
 
+    // WHICH MACHINE. The approval's own choice first, then the proposal's. Decided before any
+    // write: a connector this account does not have is refused with nothing created, because an
+    // agent ordered to a machine that does not exist would wait for it for ever.
+    const askedInstall = typeof req.body?.install_id === 'string' ? req.body.install_id.trim() : (proposal.install_id ?? '');
+    let target: ConnectorView | null = null;
+    if (askedInstall) {
+      const hit = await findConnector({ config, storage }, owner, askedInstall);
+      if (!hit || hit === 'ambiguous') {
+        res.status(409).json(error(config.nodeId, 'UNKNOWN_CONNECTOR',
+          'You have no such connector. Nothing was created; choose one of your connectors, or none.'));
+        return;
+      }
+      target = hit;
+    }
+
     const now = new Date().toISOString();
     const gaii = buildGAII(proposal.name, owner, config.nodeId);
     // What any crew agent needs to start, whatever the proposer wrote (services/agent-proposals.ts
@@ -177,7 +196,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
     // The run mode the connected connector can run, decided again now: the proposal may be older
     // than the connector, and an approved `resident` agent on a spawning connector sits active and
     // never runs (measured 2026-10-02 on a hosted place).
-    const runMode = proposalRunModeFor(owner, proposal.run_mode);
+    const runMode = proposalRunModeFor(owner, proposal.run_mode, target?.id);
     const runModeCorrected = runMode.corrected ?? proposal.run_mode_corrected ?? null;
     await storage.createAgent({
       name: proposal.name,
@@ -202,6 +221,9 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       // sibling-delete gate reads; the owner approving is recorded as an account event below.
       registeredBy: proposal.proposed_by,
     });
+    // Recorded as soon as the agent exists, so no other connector of this owner is offered it in
+    // the meantime (services/agent-pending-enrolment.ts reads this).
+    if (target) await setWanted({ config, storage }, owner, proposal.name, target.id);
 
     // ── Something to BE, or nothing at all ──
     if (proposal.crew_def) {
@@ -222,6 +244,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
         // afterwards, so leaving it behind would recreate the exact state this path removes.
         try {
           await storage.deleteAgent(gaii);
+          if (target) await clearWanted({ config, storage }, owner, proposal.name);
         } catch (err) {
           logger.error('Agent proposal rollback failed; an agent may be left without a definition', {
             event: 'agent_v2.proposal_rollback_failed', owner, name: proposal.name, error: String(err),
@@ -259,7 +282,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       mode: proposal.mode,
       // From the record we just wrote: the proposal the owner approved, with the runtime's words.
       scopes,
-    }]);
+    }], { installId: target?.id });
 
     await settleProposal({ config, storage }, owner, proposal, 'approved');
 
@@ -289,6 +312,9 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       attach_problem: enrolment.ok ? null : { code: enrolment.code, message: enrolment.message },
       // True when no connector was connected: the agent gets its key when one connects.
       waiting_for_connector: !enrolment.ok && NO_CONNECTOR.has(enrolment.code),
+      // The connector the agent was ordered to, or null when none was chosen. With a choice, a
+      // waiting agent waits for THIS connector, and no other one of the owner's is offered it.
+      connector: target ? { id: target.id, name: target.name } : null,
       next_step: nextStep(proposal.display_name, !!proposal.crew_def, enrolment.ok,
         !enrolment.ok && NO_CONNECTOR.has(enrolment.code)),
     }, [

@@ -22,6 +22,8 @@
  *   import { describeBasicAgents } from '../services/basic-agents.js';
  *   const view = await describeBasicAgents(config, storage, req.auth!.owner);
  * @version-history
+ *   v1.3.0 — 2026-10-10 — A connected daemon carries the name its connector reported, and
+ *     residentRunnable() answers for one named connector when the caller names it.
  *   v1.2.0 — 2026-10-02 — A connected daemon carries the run modes its connector presented, and
  *     residentRunnable() says whether any of the owner's daemons can keep an agent up.
  *   v1.1.0 — 2026-10-02 — Each basic agent in the view carries `task_start`.
@@ -78,15 +80,20 @@ export interface ConnectedDaemon {
   target: string;
   /** The run modes the connector presented at connect; null from one older than 2026-10-02. */
   runModes: string[] | null;
+  /** The name the connector reported for its installation; null when it reported none. */
+  name: string | null;
 }
 
 /**
  * Whether one of the owner's connected daemons can keep an agent resident: true when one says so
  * or does not say (an older connector, given the benefit of the doubt), false when every one of
- * them runs by spawning, null when none is connected, so nothing can be said.
+ * them runs by spawning, null when none is connected, so nothing can be said. With `installId` the
+ * answer is for that connector alone: an agent ordered to one machine runs the way that machine
+ * runs agents, whatever the owner's other machines can do.
  */
-export function residentRunnable(owner: string): boolean | null {
-  const daemons = connectedDaemons(owner);
+export function residentRunnable(owner: string, installId?: string | null): boolean | null {
+  const all = connectedDaemons(owner);
+  const daemons = installId ? all.filter(d => d.installId === installId) : all;
   if (daemons.length === 0) return null;
   return daemons.some(d => d.runModes === null || d.runModes.includes('resident'));
 }
@@ -109,7 +116,7 @@ export function connectedDaemons(owner: string): ConnectedDaemon[] {
   return tunnels.daemonsForOwner(owner)
     .map(d => ({ ...d, principals: d.principals.filter(p => !p.startsWith('eco:')) }))
     .filter(d => d.principals.length > 0)
-    .map(d => ({ installId: d.installId, principals: d.principals, target: d.principals[0], runModes: d.runModes }));
+    .map(d => ({ installId: d.installId, principals: d.principals, target: d.principals[0], runModes: d.runModes, name: d.name }));
 }
 
 /**

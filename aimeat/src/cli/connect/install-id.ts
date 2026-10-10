@@ -18,9 +18,17 @@
  *   goes to, and nothing else: the node still verifies the token on every socket, and every fence
  *   downstream is unchanged. Forging one gets you a different one of your own machines.
  *
- * @structure getInstallId()
- * @usage headers: { 'X-AIMEAT-Install': getInstallId() }
+ *   THE NAME BESIDE IT. A UUID tells two machines apart and tells a person nothing, so the connector
+ *   also reports a name: AIMEAT_INSTALL_NAME when the person set one, else the host name. The node
+ *   shows it to the connector's own owner, who can replace it with a name of their own there. It is
+ *   sent URI-encoded, because a host name may hold characters an HTTP header may not, and a header
+ *   the client library refuses would stop the connector from connecting at all.
+ *
+ * @structure getInstallId() · getInstallName() · installHeaders()
+ * @usage headers: { Authorization: `Bearer ${token}`, ...installHeaders() }
  * @version-history
+ *   v1.1.0 — 2026-10-10 — getInstallName() and installHeaders(): the connector reports a name for
+ *     its installation (X-AIMEAT-Install-Name), which the node's connector list shows.
  *   v1.0.1 — 2026-10-09 — The home is prepared before the write: 0700 and a .gitignore of `*`
  *     (home-dir.ts; secrets audit 2026-10-09, S4).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 5).
@@ -28,6 +36,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { hostname } from 'node:os';
 import { getConfigDir } from './config.js';
 import { prepareConnectorHome } from './home-dir.js';
 import { logger } from '../../utils/logger.js';
@@ -66,4 +75,32 @@ export function getInstallId(): string {
     cached = randomUUID();
     return cached;
   }
+}
+
+/** The longest name sent. The node keeps the same length. */
+const INSTALL_NAME_MAX = 60;
+
+/**
+ * The name this installation reports: AIMEAT_INSTALL_NAME when set, else the host name, else none.
+ * Read per call, because it costs nothing and an operator may set the variable between starts.
+ */
+export function getInstallName(): string | null {
+  const fromEnv = (process.env.AIMEAT_INSTALL_NAME ?? '').trim();
+  let name = fromEnv;
+  if (!name) {
+    try { name = hostname().trim(); } catch (err) {
+      logger.warn('connect: the host name could not be read; the connector reports no name', { error: String(err) });
+      name = '';
+    }
+  }
+  name = name.slice(0, INSTALL_NAME_MAX).trim();
+  return name === '' ? null : name;
+}
+
+/** The two headers that say which installation a tunnel socket belongs to. */
+export function installHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'X-AIMEAT-Install': getInstallId() };
+  const name = getInstallName();
+  if (name) headers['X-AIMEAT-Install-Name'] = encodeURIComponent(name);
+  return headers;
 }

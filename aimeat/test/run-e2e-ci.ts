@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-10 -- e2e-agent-connectors.ts joins the list (not the guard tier): connectors as named,
+ *     remembered machines, and an agent ordered to one.
  *   2026-10-09 -- e2e-secret-canary-sweep.ts joins the list (not the guard tier): every contract GET
  *     route and read-only MCP tool searched for planted secrets, as six principals.
  *   2026-10-09 -- e2e-docsign.ts joins the list: document signing and signature validation.
@@ -470,6 +472,9 @@ const ALL_SUITES = [
     // connected — a mock would prove the handler and not the thing. Carries the cross-owner,
     // scope-escalation, replay, forged-card and grant-reuse refusals.
     'test/e2e-agent-v2.ts',
+    // The owner's connectors as named, remembered machines: listed, renamed and forgotten, a proposal
+    // that names one, and an agent that waits for the machine it was ordered to. Opens real tunnels.
+    'test/e2e-agent-connectors.ts',
     // Agent v2 V2: the two primitives (discover + invoke) and, as much of the suite as the feature
     // itself, the proof that the old door is unchanged — the same call refused by scope directly is
     // refused through invoke, and nothing reachable before stopped being reachable.

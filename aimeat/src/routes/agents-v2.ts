@@ -16,6 +16,7 @@
  *     /v1/agents/v2/push-config        where to reach a principal that is not connected
  *     /v1/agents/v2/tasks              the handle a caller holds while work runs
  *     /v1/agents/v2/migrate            move existing v1 agents onto a key and a card
+ *     /v1/agents/v2/connectors         the owner's connectors as named, remembered machines
  *     GET  /v1/agents/:gaii/card       the agent's signed card (public)
  *     GET  /v1/agents/:gaii/jwks.json  the key that verifies it (public)
  *
@@ -26,6 +27,8 @@
  * @structure agentsV2Router(config, storage) — mounts basic-agents, enrolment, token and card routes
  * @usage app.use(agentsV2Router(config, storage));  // BEFORE agentsRouter
  * @version-history
+ *   v1.4.0 — 2026-10-10 — The connector routes and the move route, mounted before the card routes
+ *     like everything literal.
  *   v1.3.0 — 2026-09-08 — The attach route, mounted before the card routes like everything literal.
  *   v1.2.0 — 2026-09-01 — V5: the task doors, in MCP's task shape with the A2A state derived.
  *   v1.1.0 — 2026-09-01 — V4: the message doors and the delivery target, mounted before the card
@@ -45,6 +48,8 @@ import { registerAgentV2TaskRoutes } from './agents-v2/tasks.js';
 import { registerAgentV2MigrateRoutes } from './agents-v2/migrate.js';
 import { registerAgentProposalRoutes } from './agents-v2/agent-proposals.js';
 import { registerAgentAttachRoute } from './agents-v2/attach.js';
+import { registerConnectorRoutes } from './agents-v2/connectors.js';
+import { registerAgentMoveRoute } from './agents-v2/move.js';
 
 export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -59,6 +64,8 @@ export function agentsV2Router(config: AimeatConfig, storage: Storage): Router {
   // `/v1/agents/v2/agents/:name/attach` is literal up to the name, so it goes before the card
   // routes for the same reason everything else here does.
   registerAgentAttachRoute(router, config, storage);
+  registerAgentMoveRoute(router, config, storage);
+  registerConnectorRoutes(router, config, storage);
   registerAgentCardRoutes(router, config, storage);
   registerAgentProposalRoutes(router, config, storage);
 

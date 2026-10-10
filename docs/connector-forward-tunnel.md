@@ -95,6 +95,24 @@ The tunnel is full-duplex JSON frames, id-correlated where applicable.
 | `disconnect` | both | graceful close |
 | `error` | S→C | `{ code, message }` — malformed/forbidden frame |
 
+## Which installation a socket belongs to
+
+The WebSocket upgrade carries three headers beside `Authorization`. None of them is signed and none
+is a credential: the token still authenticates, and these only tell one owner's own machines apart.
+
+| header | value | what the node does with it |
+|--------|-------|----------------------------|
+| `X-AIMEAT-Install` | a UUID the connector minted once, kept in `<AIMEAT_HOME>/install-id` | groups the owner's sockets into connectors, so an enrolment offer can name one machine |
+| `X-AIMEAT-Install-Name` | the host name, or `AIMEAT_INSTALL_NAME` when set, URI-encoded, at most 60 characters | shows it to the owner as the connector's name until they give it one of their own |
+| `X-AIMEAT-Run-Modes` | `spawn` unless the runtime behind the connector declared more by starting it with `AIMEAT_RUN_MODES` (`spawn,resident`) | corrects a proposed run mode the connector could not run, and shows the owner what each machine can run |
+
+The node records each connector for its owner when it connects and keeps it after it disconnects:
+`GET /v1/agents/v2/connectors` lists them with their names, whether each is connected, when it was
+last seen, the agents on it and the agents that wait for it. A proposal (`connector`), an approval
+(`install_id`) and `POST /v1/agents/v2/agents/:name/move` name one connector, and only that one is
+offered the agent. The id belongs to the connector folder, so two folders on one computer are two
+connectors, and a copied folder carries its id with it.
+
 ## Forward API call (agent → server)
 
 Every MCP tool call and every daemon REST call becomes a `request` frame on the

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.9 — 2026-10-10 — The serve help names the install id, AIMEAT_INSTALL_NAME and AIMEAT_RUN_MODES.
  *   v1.1.8 — 2026-10-09 — `aimeat config export --format consul --include-secrets`.
  *   v1.1.7 — 2026-09-30 — `--scopes` on the plain `aimeat connect` usage too, and what it does on a
  *     re-approval.
@@ -158,6 +159,16 @@ USAGE
       Prefer this for CrewAI crews / clients that make many calls; the default
       stdio mode stays for one-shot and CI/serverless use.
       e.g. aimeat connect serve --http
+
+      The daemon tells the node which installation it is: an id kept in
+      <AIMEAT_HOME>/install-id, and a name. The name is this computer's host
+      name unless AIMEAT_INSTALL_NAME is set, and the owner sees it in their
+      list of connectors, where they can replace it with a name of their own.
+      e.g. AIMEAT_INSTALL_NAME="Office server" aimeat connect serve --http
+
+      The daemon also says how its runtime runs agents. It says "spawn" (a
+      worker per piece of work). A runtime that keeps agents running sets
+      AIMEAT_RUN_MODES=spawn,resident when it starts the daemon.
 
   aimeat connect tui [--once] [--interval <ms>] [--no-color]
       Watch the running serve daemon in the terminal: how long it has run,

@@ -30,6 +30,7 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.13.0 -- 2026-10-10 -- The upgrade carries X-AIMEAT-Install-Name beside the id (./install-id.ts installHeaders).
  *   v1.12.0 -- 2026-10-07 -- A forwarded 401 detaches an identity only when its code says the CALLER'S
  *     credential was refused (./tunnel-credential-verdict.ts): the node's AI routes answer 401
  *     INVALID_API_KEY when the provider refuses the node's key, and that detached a healthy crm agent
@@ -94,7 +95,7 @@
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
-import { getInstallId } from './install-id.js';
+import { installHeaders } from './install-id.js';
 import { CONNECTOR_RUN_MODES } from './run-modes.js';
 import { onScopesChanged } from './tunnel-scopes-changed.js';
 import { TunnelTraffic, type TrafficSnapshot } from './tunnel-traffic.js';
@@ -452,7 +453,7 @@ export class ConnectTunnelClient {
         ws = new WebSocket(this.opts.wsUrl ?? wsUrl(this.opts.nodeUrl), {
           headers: {
             Authorization: `Bearer ${token}`,
-            'X-AIMEAT-Install': getInstallId(),
+            ...installHeaders(),
             // How this connector runs agents, so the node corrects a proposal it could not run.
             'X-AIMEAT-Run-Modes': CONNECTOR_RUN_MODES.join(','),
           },

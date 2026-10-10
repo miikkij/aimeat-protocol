@@ -34,6 +34,9 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-10 — A move grant: an agent that holds a key gets a new one from the connector
+ *     the owner moved it to. Its sessions end before the new key is pinned, and the old connector's
+ *     socket identity is detached after.
  *   v1.1.0 — 2026-10-08 — A create grant refuses an agent that already has a key, so a second offer
  *     naming it cannot pin a second key over the first.
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
@@ -175,7 +178,10 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
           defects.push({ field: 'name', reason: 'That agent is not a key-and-card agent.' });
         } else if (grant.kind === 'migrate' && record.identityVersion === 2 && record.enrolledAt) {
           defects.push({ field: 'name', reason: 'That agent has already moved to a key and card.' });
-        } else if (grant.kind !== 'migrate' && record.enrolledAt) {
+        } else if (grant.kind === 'move' && !record.enrolledAt) {
+          // A move replaces a key. An agent with none is given its first one by a create grant.
+          defects.push({ field: 'name', reason: 'That agent has no key to replace.' });
+        } else if (grant.kind !== 'migrate' && grant.kind !== 'move' && record.enrolledAt) {
           // Two offers can name one agent: the approve route's, and the one a connector's connect
           // starts for pending agents (services/agent-pending-enrolment.ts). The second must not pin
           // a second key over the first, which is the attach route's ALREADY_ATTACHED rule.
@@ -239,6 +245,12 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
       //
       // `identityVersion` is included only for a migration: the create path's agents are already 2,
       // and writing it there would be a second place deciding what they are.
+      //
+      // A MOVE ENDS THE OLD MACHINE'S HOLD FIRST. The owner moved this agent to the connector that
+      // is enrolling it now, so every credential minted from the old key stops here, before the new
+      // key is pinned: there is no moment at which both machines can act as the agent. The old
+      // connector's socket identity is detached after the write, as when an agent is deleted.
+      if (grant.kind === 'move') await storage.revokeSessionsByGaii(gaii);
       await storage.updateAgent(gaii, {
         publicKey: item.publicKeyBase64,
         cardJws: item.jws,
@@ -247,6 +259,14 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
         lastSeen: now,
         ...(grant.kind === 'migrate' ? { identityVersion: 2 } : {}),
       });
+      if (grant.kind === 'move') {
+        // The old connector verified its bearer once, at upgrade, so revoking the sessions does not
+        // reach its open socket. Closing a socket identity is not a storage write and cannot roll
+        // back, so it comes after the key is pinned and a failure is only logged.
+        try { tunnels.closeForGaii(gaii); } catch (err) {
+          logger.warn('Agent move: the old connector\'s socket identity was not detached', { event: 'agent_v2.move_detach_failed', gaii, error: String(err) });
+        }
+      }
 
       const sessionId = generateSessionId();
       const ttl = config.agentV2TokenTtlSeconds;

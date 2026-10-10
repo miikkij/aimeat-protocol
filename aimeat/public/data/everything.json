@@ -1112,6 +1112,15 @@
      "plain": "Agent proposals An AI proposes an agent with its purpose and instructions. The account owner approves or declines it. Approval creates the agent and its definition, then attempts to attach it to the owner's runtime. The proposal's answer gives the address of the page where the owner approves it. The owner's own agent reaches the proposal tool, and the handbooks tell it to build the agent on the owner's organisms and workspaces instead of pointing to an outside builder. An agent that comes with an app is proposed with the permissions the app declares for it, and only those its proposer may give: never all permissions or one of the permissions only you grant by hand, and the answer names what was left out. Approval gives the agent the permissions its runtime needs to start, and ai:use when your crews think through this node. When your connector starts agents per job, a request to keep the agent running becomes start-per-job, and the answer says so. /v1/agents/v2/agent-proposals (run_mode_corrected), aimeat_agent_propose"
     },
     {
+     "slug": "g-7-connectors-as-named-machines",
+     "cells": [
+      "<strong>Connectors as named machines</strong>",
+      "Each connector (<code>aimeat connect serve</code>) that holds your agents is listed as a machine: its name, whether it is connected, when it was last seen, the agents on it and the agents that wait for it. The connector reports its computer's name, and you can give it your own. A machine stays on the list after it disconnects, and you can forget one that is not connected. When you propose or approve an agent you can name the machine that runs it. Only that machine is given the agent: when it is switched off the agent waits for it, and your other machines are not given it. You can move an agent to another machine: an agent that waits is sent there, and an agent that is running gets a new key on the new machine while the old machine's key stops working. Your AI reads the same list and can name a machine in a proposal. Limits: an agent that is running moves only to a machine that is connected; files a runtime kept on the old machine's disk do not move; the machine id and its reported name are not signed, so they tell your own machines apart and prove nothing; a connector released before 2026-10-10 reports no name; a connector from before September 2026 has no id and cannot be chosen.",
+      "<code>GET /v1/agents/v2/connectors</code>, <code>PATCH</code> and <code>DELETE /v1/agents/v2/connectors/:id</code>, <code>connector</code> on <code>POST /v1/agents/v2/agent-proposals</code>, <code>install_id</code> on its <code>/approve</code>, <code>POST /v1/agents/v2/agents/:name/move</code>, <code>aimeat_connector_list</code>, <code>aimeat_connector_rename</code>"
+     ],
+     "plain": "Connectors as named machines Each connector (aimeat connect serve) that holds your agents is listed as a machine: its name, whether it is connected, when it was last seen, the agents on it and the agents that wait for it. The connector reports its computer's name, and you can give it your own. A machine stays on the list after it disconnects, and you can forget one that is not connected. When you propose or approve an agent you can name the machine that runs it. Only that machine is given the agent: when it is switched off the agent waits for it, and your other machines are not given it. You can move an agent to another machine: an agent that waits is sent there, and an agent that is running gets a new key on the new machine while the old machine's key stops working. Your AI reads the same list and can name a machine in a proposal. Limits: an agent that is running moves only to a machine that is connected; files a runtime kept on the old machine's disk do not move; the machine id and its reported name are not signed, so they tell your own machines apart and prove nothing; a connector released before 2026-10-10 reports no name; a connector from before September 2026 has no id and cannot be chosen. GET /v1/agents/v2/connectors, PATCH and DELETE /v1/agents/v2/connectors/:id, connector on POST /v1/agents/v2/agent-proposals, install_id on its /approve, POST /v1/agents/v2/agents/:name/move, aimeat_connector_list, aimeat_connector_rename"
+    },
+    {
      "slug": "g-7-agent-v2-messages-and-tasks",
      "cells": [
       "<strong>Agent v2 messages and tasks</strong>",
@@ -3907,6 +3916,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 391
+  "rows": 392
  }
 }

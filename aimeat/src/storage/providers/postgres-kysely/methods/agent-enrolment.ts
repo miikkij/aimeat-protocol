@@ -7,10 +7,12 @@
  * @structure agentEnrolmentMethods — create / get / consume / cleanupExpired / deleteByOwner
  * @usage Object.assign(PostgresKyselyStorage.prototype, agentEnrolmentMethods)
  * @version-history
+ *   v1.1.0 — 2026-10-10 — A grant's kind is read as EnrolmentGrantKind, which gained 'move'.
  *   v1.0.0 — 2026-08-31 — Initial, with the basic-agents button.
  */
 import type { Selectable } from 'kysely';
 import type { AgentEnrolmentGrantRecord } from '../../../interface.js';
+import type { EnrolmentGrantKind } from '../../../types/identity.js';
 import type { AgentEnrolmentGrant } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { dbError } from '../helpers.js';
@@ -18,7 +20,7 @@ import { dbError } from '../helpers.js';
 function toRecord(r: Selectable<AgentEnrolmentGrant>): AgentEnrolmentGrantRecord {
   return {
     id: r.id, owner: r.owner, agents: r.agents ?? [],
-    kind: ((r.kind ?? 'create') as 'create' | 'migrate'),
+    kind: ((r.kind ?? 'create') as EnrolmentGrantKind),
     createdBy: r.createdBy,
     createdAt: r.createdAt, expiresAt: r.expiresAt,
     usedAt: r.usedAt ?? null, usedBy: r.usedBy ?? null,

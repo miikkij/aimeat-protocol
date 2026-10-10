@@ -21,6 +21,8 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-10-10 — `agents.connectors.` makes twenty-three: the owner's connectors and the
+ *     orders that wait for one.
  *   v1.x — 2026-09-29 — `classification.policy.` is refused to the owner session too (TARGET-082
  *     review finding 2): the classification service is its one writer.
  *   v1.x — 2026-09-29 — `classification.policy.` makes twenty-two: the owner's classification switch.
@@ -62,7 +64,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all twenty-two, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all twenty-three, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -96,8 +98,12 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // bound to it. An app that could write it could bind its own role, the owner's approval.
         // `classification.policy.` (2026-09-29, TARGET-082): whether classification is on for the
         // owner's content. An app that could write it could switch the owner's classification off.
+        // `agents.connectors.` (2026-10-10): the owner's connectors and the orders that wait for one.
+        // A proposal's connector is resolved by the names in it, and a waiting agent is offered only
+        // to the connector it names, so an app that could write it could have an agent's key made on
+        // a machine the owner did not choose.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'classification.policy.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
+            ['agents.connectors.', 'agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'classification.policy.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
         );
     });
 

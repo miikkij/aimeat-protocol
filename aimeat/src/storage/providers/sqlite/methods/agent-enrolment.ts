@@ -7,9 +7,11 @@
  * @structure agentEnrolmentMethods — create / get / consume / cleanupExpired / deleteByOwner
  * @usage Object.assign(SqliteStorage.prototype, agentEnrolmentMethods)
  * @version-history
+ *   v1.1.0 — 2026-10-10 — A grant's kind is read as EnrolmentGrantKind, which gained 'move'.
  *   v1.0.0 — 2026-08-31 — Initial, with the basic-agents button.
  */
 import type { AgentEnrolmentGrantRecord } from '../../../interface.js';
+import type { EnrolmentGrantKind } from '../../../types/identity.js';
 import type { SqliteStorage } from '../index.js';
 
 function toRecord(row: Record<string, unknown>): AgentEnrolmentGrantRecord {
@@ -17,7 +19,7 @@ function toRecord(row: Record<string, unknown>): AgentEnrolmentGrantRecord {
     id: row.id as string,
     owner: row.owner as string,
     agents: JSON.parse((row.agents as string) || '[]') as string[],
-    kind: ((row.kind as string) ?? 'create') as 'create' | 'migrate',
+    kind: ((row.kind as string) ?? 'create') as EnrolmentGrantKind,
     createdBy: row.createdBy as string,
     createdAt: row.createdAt as string,
     expiresAt: row.expiresAt as string,

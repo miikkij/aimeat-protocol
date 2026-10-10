@@ -25,6 +25,8 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.5.0 -- 2026-10-10 -- A connection carries the name its connector reported (X-AIMEAT-Install-Name),
+ *     and a socket closing is announced to connect-tunnel-hooks.ts listeners.
  *   v2.4.0 -- 2026-10-08 -- A socket opened by an upgrade is announced to connect-tunnel-hooks.ts listeners.
  *   v2.3.0 -- 2026-10-02 -- A connection carries the run modes its connector presented at upgrade
  *     (X-AIMEAT-Run-Modes), and daemonsForOwner reports them per daemon. The ConnectConnection type
@@ -109,7 +111,7 @@ import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
   daemonsForOwner as rosterDaemonsForOwner,
-  parseRunModes,
+  parseRunModes, parseInstallName, type ConnectedDaemonEntry,
 } from './connect-tunnel-roster.js';
 import {
   onDeliveryEvent, offDeliveryEvent, type DeliveryEvent,
@@ -129,7 +131,7 @@ import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
 import { revokeByToken, revokeByGaii, revokeByOwner } from './connect-tunnel-revocation.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel-connection.js';
-import { emitTunnelSocketOpened } from './connect-tunnel-hooks.js';
+import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel-hooks.js';
 
 
 /**
@@ -235,7 +237,7 @@ export class ConnectTunnelManager {
    * connection for the same principal replaces the first — enforcing the
    * single-socket-per-principal invariant.
    */
-  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null, runModes?: string | null): void {
+  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null, runModes?: string | null, installName?: string | null): void {
     const principal = identity.sub;
     const socketId = this.sockets.open(ws, principal);
     this.replaceIdentity(principal);
@@ -243,7 +245,7 @@ export class ConnectTunnelManager {
     const conn: ConnectConnection = {
       principal, ws, socketId, identity, rawToken, lastHeartbeat: Date.now(),
       installId: installId && installId.trim() !== '' ? installId.trim().slice(0, 64) : null,
-      runModes: parseRunModes(runModes),
+      runModes: parseRunModes(runModes), installName: parseInstallName(installName),
     };
     this.connections.set(principal, conn);
     this.stats.connectionsTotal++;
@@ -320,6 +322,7 @@ export class ConnectTunnelManager {
       this.sockets.close(socketId);
       this.stats.activeConnections = this.connections.size;
       logger.info('Connect tunnel disconnected', { event: 'connect_tunnel.disconnect', principal, active: this.connections.size, sockets: this.sockets.socketCount });
+      emitTunnelSocketClosed({ nodeId: this.config.nodeId, principal, owner: identity.owner, installId: conn.installId });
     });
 
     ws.on('error', (err) => {
@@ -400,7 +403,7 @@ export class ConnectTunnelManager {
         // upgrade declared. It answers "which of this owner's machines", and the machine is the
         // same machine for every identity on one socket.
         installId: this.connections.get(rec.primary)?.installId ?? null,
-        runModes: this.connections.get(rec.primary)?.runModes ?? null,
+        runModes: this.connections.get(rec.primary)?.runModes ?? null, installName: this.connections.get(rec.primary)?.installName ?? null,
       };
       this.connections.set(payload.sub, conn);
       this.stats.activeConnections = this.connections.size;
@@ -696,7 +699,7 @@ export class ConnectTunnelManager {
    * An owner's connected DAEMONS, one entry per machine, grouped on the install id each connector
    * presents. Body in connect-tunnel-roster.ts.
    */
-  daemonsForOwner(owner: string): Array<{ installId: string | null; principals: string[]; runModes: string[] | null }> {
+  daemonsForOwner(owner: string): ConnectedDaemonEntry[] {
     return rosterDaemonsForOwner(this.connections.values(), owner);
   }
 

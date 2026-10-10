@@ -37,6 +37,8 @@ export interface ConnectConnection {
    * single legacy daemon — exactly the behaviour they had before, and no worse.
    */
   installId: string | null;
+  /** The name the connector reported for its installation (X-AIMEAT-Install-Name), or null. Unsigned; shown to the owner only. */
+  installName: string | null;
   /** The run modes the connector presented at upgrade (X-AIMEAT-Run-Modes), or null when it did not say. */
   runModes: string[] | null;
   /** The raw agent JWT verified at upgrade, reused verbatim as the forward bearer. */
