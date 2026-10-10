@@ -32,6 +32,7 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.4.1 — 2026-10-10 — Comment: why the raw-token branch has no flag (secaudit 2026-10-10 I19).
  *   v1.4.0 — 2026-10-09 — The token is stored as its SHA-256 (the row id), never as itself; a row
  *     written before, keyed by the raw token, is still redeemed for one release (findLoginLinkRow)
  *     (secrets audit 2026-10-09, auth S3).
@@ -67,6 +68,10 @@ const tokenHashOf = (token: string): string => createHash('sha256').update(token
  * is keyed by the token's hash. One issued before is keyed by the raw token, with its hash in
  * `code`; it is still found for one release, because a welcome link lasts seven days.
  * DEPRECATED: the raw-id branch below is removed in 3.27.0 (rows issued by 3.25.x have expired by then).
+ * There is no config flag to turn it off before then, because it has nothing left to protect: every
+ * raw-token row was issued before the hashing deploy and expires at most WELCOME_LINK_TTL_MS (seven
+ * days) after it, and redeemLoginLink() checks the expiry before it reads the account or spends the row,
+ * so from that day the branch can only answer EXPIRED (secaudit 2026-10-10 I19).
  */
 async function findLoginLinkRow(storage: Storage, token: string) {
     const hashed = tokenHashOf(token);

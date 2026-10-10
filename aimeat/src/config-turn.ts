@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description The TURN relay settings that GET /v1/realtime/ice-servers reads: the relay's URL, the
  *   coturn shared secret the node derives each client's expiring credential from, and how long that
- *   credential stays valid. The static username and credential pair is deprecated and still served
- *   when no secret is set, so an existing deployment keeps its relay.
+ *   credential stays valid. The static username and credential pair is deprecated, still served
+ *   when no secret is set so an existing deployment keeps its relay, and removed in 4.0.0.
  *
  *   Its own file because config.ts and config-types.ts are at the line ceiling. The three existing
  *   fields moved here unchanged; turnSecret and turnTtlSeconds are new.
@@ -14,6 +14,7 @@
  *   import { turnDefaults } from './config-turn.js';
  *   const config = { ...turnDefaults(), ... };
  * @version-history
+ *   v1.0.1 — 2026-10-10 — Comments: the static pair is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23).
  *   v1.0.0 — 2026-10-09 — Initial: turnServer, turnUsername and turnCredential moved from config.ts
  *     unchanged; turnSecret (AIMEAT_TURN_SECRET) and turnTtlSeconds (AIMEAT_TURN_TTL_SECONDS) added.
  */
@@ -27,9 +28,9 @@ export const TURN_TTL_MAX_SECONDS = 86400;
 export interface TurnConfig {
   /** TURN relay URL handed to WebRTC clients, e.g. `turn:turn.example.com:3478`. Null: no relay. */
   turnServer: string | null;
-  /** Deprecated static username, served only when turnSecret is not set. */
+  /** Deprecated static username, served only when turnSecret is not set. Removed in 4.0.0. */
   turnUsername: string | null;
-  /** Deprecated static credential, served only when turnSecret is not set. */
+  /** Deprecated static credential, served only when turnSecret is not set. Removed in 4.0.0. */
   turnCredential: string | null;
   /**
    * The coturn `static-auth-secret` (coturn runs with `use-auth-secret`). Never sent to a client:

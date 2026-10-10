@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Realtime, load-balancer, extensions, generator, app-origin, cortex, portfolio, agent-scope, moderation, setup, consul, metrics config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.1 — 2026-10-10 — The static TURN pair says it is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23).
  *   v1.1.0 — 2026-10-09 — AIMEAT_TURN_SECRET and AIMEAT_TURN_TTL_SECONDS; the static TURN pair is marked deprecated.
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
@@ -80,13 +81,13 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
         },
         {
           envVar: 'AIMEAT_TURN_USERNAME',
-          description: 'TURN server username (deprecated: use AIMEAT_TURN_SECRET)',
+          description: 'TURN server username (deprecated, removed in 4.0.0: use AIMEAT_TURN_SECRET)',
           value: config.turnUsername ?? '(not set)',
           defaultVal: '(none)',
         },
         {
           envVar: 'AIMEAT_TURN_CREDENTIAL',
-          description: 'TURN server credential (deprecated: use AIMEAT_TURN_SECRET)',
+          description: 'TURN server credential (deprecated, removed in 4.0.0: use AIMEAT_TURN_SECRET)',
           value: config.turnCredential ? '****' : '(not set)',
           defaultVal: '(none)',
           secret: true,

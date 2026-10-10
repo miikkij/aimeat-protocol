@@ -45,18 +45,20 @@
  *     response arrives at that one address and the session is found by its state.
  *   v1.2.0 — 2026-10-10 — A refused wallet answer is logged, noted on the request
  *     (walletLastAttempt) and, when a PDF came back, that PDF is kept in the signer's files.
+ *   v1.2.1 — 2026-10-10 — The request is checked (checkWalletSignature) before the signed PDF is
+ *     stored, and a PDF stored for an answer the seal then refuses is removed (secaudit 2026-10-10 I14).
  */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { randomBytes, createPrivateKey, createPublicKey, timingSafeEqual, X509Certificate, type KeyObject } from 'node:crypto';
 import { SignJWT } from 'jose';
 import type { CallerContext } from '../caller-context.js';
-import { writeStorageFile } from '../storage-file-write.js';
+import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
 import { logger } from '../../utils/logger.js';
 import { docsignMaxBytes } from '../../config-docsign.js';
 import { validatePdf } from './validate.js';
 import {
-  DocsignError, walletSigner, recordWalletSignature, noteWalletAttempt, noteDocumentSource, documentHash,
+  DocsignError, walletSigner, checkWalletSignature, recordWalletSignature, noteWalletAttempt, noteDocumentSource, documentHash,
   type DocsignCtx, type WalletEvidence,
 } from './records.js';
 
@@ -442,6 +444,15 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
     throw new DocsignError('SIGNATURE_NOT_VALID', 422, `The returned signature did not check out: ${why}`);
   }
 
+  // The request may have moved on while the person was in the wallet (cancelled, signed some other
+  // way, a newer wallet PDF). Checked before the PDF is stored, so such an answer writes nothing to
+  // the signer's files and charges nothing to their quota (secaudit 2026-10-10 I14).
+  try {
+    await checkWalletSignature(ctx, s.requestId, s.signer, s.sha256);
+  } catch (err) {
+    await refuse(err instanceof DocsignError ? err.code : 'DOCSIGN_ERROR', err instanceof Error ? err.message : String(err));
+    throw err;
+  }
   const signedSha = documentHash(signed);
   const base = s.name.replace(/\.pdf$/i, '').replace(/[^\p{L}\p{N}._ -]+/gu, '_').slice(0, 120) || 'document';
   const key = `docsign/${s.requestId}/${base}-signed-${signedSha.slice(0, 8)}.pdf`;
@@ -468,6 +479,10 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   try {
     await recordWalletSignature(ctx, s.requestId, s.signer, s.sha256, wallet, `${base}-signed.pdf`);
   } catch (err) {
+    // The request moved on between the check above and the seal: the stored PDF is no signature's,
+    // so it goes. The overage charge, if the write made one, is not refunded (quota.ts has no refund).
+    const removed = await removeStorageFile({ storage: ctx.storage, config: ctx.config }, s.signer, key);
+    if (!removed.ok) logger.warn('docsign: the signed PDF of a refused wallet answer could not be removed', { request: s.requestId, key, code: removed.code });
     await refuse(err instanceof DocsignError ? err.code : 'DOCSIGN_ERROR', err instanceof Error ? err.message : String(err));
     throw err;
   }

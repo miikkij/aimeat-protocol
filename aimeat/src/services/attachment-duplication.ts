@@ -12,6 +12,8 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.5.1 -- 2026-10-10 -- A file found under the sender's agent passes leave() with that file's
+ *     workspace binding; it was checked with none, so an organism's label never applied (secaudit 2026-10-10 I9).
  *   v1.5.0 -- 2026-10-06 -- The storage grant request names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.4.1 -- 2026-10-05 -- The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.4.0 -- 2026-10-01 -- No storage-grant request to a peer whose messaging is off, or that is not
@@ -115,12 +117,15 @@ async function fetchAttachmentBytes(
     // mailbox with the owner's name on a file its agent uploaded, and the sweep would retry it every
     // minute until it expired. The same account's own agents are searched once, so those messages
     // heal on the next sweep instead of needing the sender to send them again.
-    const held = file ? { holder: att.ownerGhii, data: file.data } : await readFromOwnAgents(ctx, att);
+    const held = file ? { holder: att.ownerGhii, data: file.data, workspaceRef: file.workspaceRef } : await readFromOwnAgents(ctx, att);
     if (!held) return null;
     // The copy goes to another account, so the sender's file passes leave() first (TARGET-082). A
     // cross-node copy is checked by the origin node when it mints the grant (federation-sync/messaging.ts).
+    // The workspace binding is the HOLDER's file's, whichever principal held it: a file found under an
+    // agent and checked without its binding was classified under the agent's own scope, so an
+    // organism's "may not leave" label never applied to it (secaudit 2026-10-10 I9).
     const { left } = await systemReader(ctx, held.holder)
-      .leave([held], h => fileTarget(h.holder, att.storageKey, file?.workspaceRef), { kind: 'external', to: message.recipientGhii });
+      .leave([held], h => fileTarget(h.holder, att.storageKey, h.workspaceRef), { kind: 'external', to: message.recipientGhii });
     if (left.length) {
       logger.warn('attachment duplication: classified, not copied', {
         messageId: message.id, attachmentId: att.id, key: att.storageKey, label: left[0]!.label, reason: left[0]!.reason,
@@ -132,8 +137,9 @@ async function fetchAttachmentBytes(
   return requestStorageGrant(ctx, message, att);
 }
 
-/** The sender account's own agents, searched for a file the named principal does not have. */
-async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment): Promise<{ holder: string; data: Buffer } | null> {
+/** The sender account's own agents, searched for a file the named principal does not have. The
+ *  found file's workspace binding comes back with it, for the classification check. */
+async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment): Promise<{ holder: string; data: Buffer; workspaceRef?: string } | null> {
   const owner = localAccountName(att.ownerGhii);
   const agents = await ctx.storage.getAgentsByOwner(owner).catch(err => {
     logger.warn('attachment duplication: agent lookup failed', { error: String(err), owner });
@@ -144,7 +150,7 @@ async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachmen
     const file = await ctx.storage.getStorageFile(agent.gaii, att.storageKey);
     if (file) {
       logger.info('attachment duplication: found under the account\'s own agent', { key: att.storageKey, holder: agent.gaii });
-      return { holder: agent.gaii, data: file.data };
+      return { holder: agent.gaii, data: file.data, workspaceRef: file.workspaceRef };
     }
   }
   return null;

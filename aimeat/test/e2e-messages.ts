@@ -4,6 +4,8 @@
 // v1.1.0 -- 2026-09-06 -- Tests 16 and 17 REGISTER the agent they message. They used to invent a GAII
 //   and say "need not exist", which passed only because the send checked the owner and not the agent —
 //   the defect that answered `delivered` for an agent nobody had created. What they assert is unchanged.
+// v1.2.0 -- 2026-10-10 -- S4c: a workspace file the sender's agent holds is refused at the copy step into
+//   a support thread, with classification on (secaudit 2026-10-10 I9).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -477,6 +479,80 @@ await test('S4b. A file sent into a support thread is the operator\'s own readab
     assert(att.mode === 'duplicate', `the operator must own their copy, not a pointer at the sender's storage (mode=${att.mode})`);
     const file = await json(`/v1/storage/${att.localKey.split('/').map(encodeURIComponent).join('/')}`, { headers: { Authorization: `Bearer ${op.token}` } });
     assert(file.status === 200, `the operator reads the bytes: ${file.status}`);
+});
+
+// secaudit 2026-10-10 I9. A group send names the OWNER on every attachment, and a file the owner's
+// AGENT holds is found by the copy step under that agent. The classification check was then given no
+// workspace binding, so a file bound to an organism workspace was judged as the agent's personal file
+// and its organism's "may not leave" label never applied. Against the old code the workspace file
+// below arrives in the operator's storage as `duplicate`.
+await test('S4c. A workspace file the sender\'s AGENT holds does not leave the organism into a support thread', async () => {
+    const policy = await json('/v1/classification/policy?level=owner', { headers: { Authorization: `Bearer ${op.token}` } });
+    const before = policy.body?.data?.mode ?? 'off';
+    const setMode = (mode: string) => json('/v1/admin/config', {
+        method: 'PUT', headers: { Authorization: `Bearer ${op.token}` },
+        body: JSON.stringify({ changes: [{ path: 'classification.mode', value: mode }] }),
+    });
+    const on = await setMode('all');
+    assert(on.status === 200, `classification on: ${on.status} ${JSON.stringify(on.body?.error)}`);
+    try {
+        const org = await json('/v1/organisms', {
+            method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+            body: JSON.stringify({ name: `DM Org ${stamp}`, type: 'project', join_policy: 'invite_only', visibility: 'private' }),
+        });
+        assert(org.status === 201, `organism: ${org.status} ${JSON.stringify(org.body?.error)}`);
+        const orgId = org.body.data.organism.id;
+        const ws = await json(`/v1/organisms/${orgId}/workspaces`, {
+            method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+            body: JSON.stringify({ name: 'DM Notes', manifest: {
+                manifestVersion: '1.0', name: 'DM Notes', kind: 'project', status: 'active',
+                objectTypes: [{ name: 'note', schemaRef: 'schema:note@1', namespace: 'notes', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }],
+            } }),
+        });
+        assert(ws.status === 201 && typeof ws.body?.data?.ws === 'string', `workspace: ${ws.status} ${JSON.stringify(ws.body?.error)}`);
+
+        const bot = await createAgent(aliceName, alice.token, `dmfilebot${stamp}`, ['storage:write', 'storage:read']);
+        const bound = `org-plan-${stamp}.md`;
+        const own = `bot-note-${stamp}.md`;
+        const upBound = await json('/v1/storage', {
+            method: 'POST', headers: { Authorization: `Bearer ${bot.token}` },
+            body: JSON.stringify({ key: bound, data: Buffer.from('# the plan').toString('base64'), mime_type: 'text/markdown', visibility: 'workspace', workspace_refs: [`${orgId}/${ws.body.data.ws}`] }),
+        });
+        assert(upBound.status === 201 && upBound.body.data.owner_gaii === bot.gaii, `the agent holds the workspace file: ${upBound.status} ${JSON.stringify(upBound.body)}`);
+        const upOwn = await json('/v1/storage', {
+            method: 'POST', headers: { Authorization: `Bearer ${bot.token}` },
+            body: JSON.stringify({ key: own, data: Buffer.from('# a note').toString('base64'), mime_type: 'text/markdown', visibility: 'private' }),
+        });
+        assert(upOwn.status === 201, `the agent holds the personal file: ${upOwn.status} ${JSON.stringify(upOwn.body)}`);
+
+        const BODY = `Two files ${stamp}.`;
+        const send = await json('/v1/messages', {
+            method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+            body: JSON.stringify({
+                conversation_id: supportConvId, body: BODY,
+                attachments: [
+                    { storage_key: bound, mime: 'text/markdown', size: 10, kind: 'file', name: 'plan.md' },
+                    { storage_key: own, mime: 'text/markdown', size: 8, kind: 'file', name: 'note.md' },
+                ],
+            }),
+        });
+        assert(send.status === 201, `send status ${send.status}: ${JSON.stringify(send.body)}`);
+
+        const thread = await json(`/v1/messages/conversations/${supportConvId}`, { headers: { Authorization: `Bearer ${op.token}` } });
+        const msg = thread.body.data.messages.find((m: any) => m.body === BODY);
+        assert(!!msg, 'the operator has the message');
+        const [orgAtt, ownAtt] = msg.attachments;
+        // POSITIVE CONTROL: the copy step found the agent's file and copied it, so the refusal below
+        // comes from the label and not from a file nobody could read.
+        assert(ownAtt?.mode === 'duplicate', `the agent's personal file is the operator's copy (mode=${ownAtt?.mode})`);
+        assert(orgAtt?.mode === 'reference' && orgAtt?.expired === true && !orgAtt?.localKey,
+            `the workspace file must stay inside the organism: ${JSON.stringify(orgAtt)}`);
+        const files = await json('/v1/storage', { headers: { Authorization: `Bearer ${op.token}` } });
+        const list = JSON.stringify(files.body?.data ?? {});
+        assert(!list.includes(`/${orgAtt.id}"`), `no copy of the workspace file in the operator's storage: ${list.slice(0, 300)}`);
+    } finally {
+        await setMode(before);
+    }
 });
 
 await test('S5. support@<node-id> is the same address in long form', async () => {
