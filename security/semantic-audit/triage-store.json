@@ -3061,9 +3061,9 @@
       "line": 68,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
-      "decidedBy": "ai",
+      "verdict": "legit",
+      "reason": "Reitti vaatii omistajaroolin, joten ownerGaii saa pelkän tilinimen, mutta tilin poisto (cascadeDeleteAgentData ja identity-erasure) poistaa avaimet täydellä tunnuksella `WHERE ownerGaii = gaii`, joten vuoden voimassa oleva yhdistämisavain voi jäädä poiston jälkeen voimaan, ja /v1/agents/connect luo sillä agentin params.owner-nimiselle tilille. Korjattu commiteissa ce7158d8d ja d1247aabe: avain tallennetaan GHII:llä, tilin poisto poistaa myös paljaalla nimellä tallennetut avaimet, ja /v1/agents/connect hylkää avaimen, joka on tiliä vanhempi. Testi e2e-account-doors 49b.",
+      "decidedBy": "human",
       "date": "2026-10-10",
       "commit": "9542a9f834f2baa8e2db78ee4569e9b1feae37a8"
     },
@@ -3074,9 +3074,9 @@
       "line": 541,
       "source": "ast-grep",
       "severity": "warning",
-      "verdict": "confirm",
-      "reason": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
-      "decidedBy": "ai",
+      "verdict": "legit",
+      "reason": "Tarkistus `!req.auth` ei koskaan täsmää anonyymiin, koska optionalAuth antaa sillekin tunnuksen, joten 401 ei laukea, vaikka ovi pitää silti, koska ownerCoordinate ja hasValidLicense palauttavat anonyymille 402-vastauksen; ihmisen kannattaa vaihtaa tarkistukseksi `req.auth.anonymous`. Korjattu commitissa ce7158d8d: tarkistus on nyt !req.auth || req.auth.anonymous. Testi e2e-app-store-license.",
+      "decidedBy": "human",
       "date": "2026-10-10",
       "commit": "9542a9f834f2baa8e2db78ee4569e9b1feae37a8"
     },
@@ -3624,218 +3624,242 @@
     {
       "invariant": 13,
       "file": "aimeat/src/auth/self-or-scope.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "requireScopeUnlessSelf purkaa Expressin jo purkaman req.params.name-arvon toiseen kertaan decodeURIComponentilla, joten portti arvioi eri nimen kuin käsittelijä käyttää, ja virheellinen %-jakso kaatuu poikkeukseen portissa.",
       "id": "049ea3a16f07",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Osittain aiheellinen: portti ja käsittelijä ratkaisevat saman kohteen, mutta virheellinen %-jakso kaatoi pyynnön. Toinen purku poistettu portista ja käsittelijöistä, commit ce7158d8d, testi e2e-account-doors 54b."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/commerce/agent-order-intake.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa agent-order-intake.ts intakeAgentOrder luo täyttötehtävät createFulfillmentTask-kutsulla ennen kuin se tarkistaa toisen kerran, onko tilaus jo olemassa, joten kaksi samanaikaista Stripe-toimitusta samasta istunnosta läpäisevät ensimmäisen tarkistuksen ja kumpikin kirjoittaa tehtävät, vaikka jälkimmäinen palauttaa already_taken.",
       "id": "5ad7b776eb9b",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 0da4cd06b: tilausavain varataan createMemoryIfAbsent-kutsulla ennen tehtäviä. Testi unit agent-order-intake."
     },
     {
       "invariant": 16,
       "file": "aimeat/src/config-turn.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedosto merkitsee kiinteän TURN-tunnusparin (AIMEAT_TURN_USERNAME ja AIMEAT_TURN_CREDENTIAL) vanhentuneeksi, mutta se ei nimeä poistoversiota eikä omaa lippua, jolla parin voi kytkeä pois. Parin palvelemisen ratkaisee vain se, onko turnSecret asetettu.",
       "id": "fbc38a8ba3e4",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: poistoversio 4.0.0 kommentteihin. Erillistä lippua ei tarvita, koska pari on oletuksena pois ja sen poistaminen on kytkin."
     },
     {
       "invariant": 13,
       "file": "aimeat/src/middleware/relay-gate.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "relay-gate.ts valitsee vertaisen pelkän todentamattoman forwarded-from-otsakkeen perusteella, ja effectiveRelayClaim käyttää tämän vertaisen omaa relay_claim-asetusta solmun asetuksen sijasta, joten kuka tahansa ohittaa solmun `required`-asetuksen, kun se nimeää otsakkeessa vertaisen, jonka asetus on `optional` ja joka ei ole vielä koskaan allekirjoittanut väitettä.",
       "id": "966beb5765c0",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Ei vika: ohituksesta ei saa mitään, mitä otsakkeen poisjättäminen ei antaisi, koska req.relay asetetaan vain varmennetusta väitteestä. Vertaiskohtainen optional on operaattorin tietoinen valinta ja poistuu versiossa 4.0.0."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/routes/admin-config.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa admin-config.ts PUT-reitti tarkistaa switchRefusal-kutsulla vain ensimmäisen classification.mode-muutoksen (`find`), mutta applyConfigChanges kirjoittaa jokaisen muutoksen järjestyksessä eikä poista kaksoispolkuja, joten tekoälyn tunniste voi lähettää ensin arvon 'all' ja sen perään arvon 'off', ja luokittelu kytkeytyy pois ilman että mikään tarkistus koskee kirjoitusta, joka sen tekee.",
       "id": "06b71c206029",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Ei vika, Jounin linjaus 2026-10-10: operator:admin-oikeuksin toimiva agentti saa muuttaa luokittelutilaa, myös samassa erässä ja poistoreitin kautta."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/routes/appeals.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa aimeat/src/routes/appeals.ts POST /v1/flags/:flagId/appeal kutsuu operatorOverride-funktiota, joka kirjoittaa operaattorin jäljen sisällön omistajan tilille, ennen kuin reitti tarkistaa, onko liputuksesta jo valitettu, joten 409 ALREADY_APPEALED -hylkäys jättää omistajan tilille merkinnän toimesta, jota ei koskaan tehty.",
       "id": "982860d2ec1c",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 0da4cd06b: 409 tarkistetaan ennen operaattorin jälkeä. Testi e2e-appeals 11b."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/routes/oauth-rounds.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Reitti POST /v1/oauth-rounds/:state/approve asettaa sidontaevästeen issueRoundBinding-kutsulla ennen kuin bindRound tarkistaa, onko kierros jo käytetty, joten 409-vastaus antaa selaimelle silti uuden evästeen, ja saman selaimen kahdessa samanaikaisessa hyväksynnässä hävinneen pyynnön eväste voi korvata voittaneen evästeen, jolloin paluukutsu hylkää omistajan oman kirjautumisen.",
       "id": "55df1d8980e2",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 0da4cd06b: eväste asetetaan vasta onnistuneen bindRoundin jälkeen, ja bindRound hylkää jo sidotun kierroksen. Testi e2e-connections."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/routes/package-entitlements.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Reitti GET /v1/federation/packages kutsuu adoptPendingPeer-funktiota pelkän allekirjoittamattoman otsakkeen solmutunnuksen perusteella, ja se kirjoittaa vertaisrekisteriin ja odottavaan vertaistietueeseen ennen kuin verifyPackageNode tarkistaa pyynnön allekirjoituksen, joten kuka tahansa voi käynnistää kirjoituksen, vaikka kommentti lupaa rekisteröinnin vasta allekirjoitetusta pyynnöstä.",
       "id": "d64f69923693",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 09eaf6a80: odottava vertainen otetaan käyttöön vasta, kun pyyntö on allekirjoitettu odottavan tietueen avaimella. Testi e2e-peer-registration-proof vaihe 4."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/routes/schemas.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa aimeat/src/routes/schemas.ts PUT /v1/memory/:key/schema kutsuu operatorOverride-funktiota, joka kirjoittaa ylläpitäjän ohitusmerkinnän, ennen kuin semanticContextErrors-tarkistus on ajettu, joten jos tarkistus hylkää pyynnön, lokiin jää merkintä ohituksesta, jota ei koskaan tehty.",
       "id": "fb70039901ed",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 0da4cd06b: semanticContextErrors ajetaan ennen operaattorin jälkeä. Testi e2e-operator-override."
     },
     {
       "invariant": 13,
       "file": "aimeat/src/services/attachment-duplication.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa attachment-duplication.ts luokitusportti leave() lukee työtilasidoksen nimetyn päämiehen tiedostosta (`file?.workspaceRef`), joka on null, kun liite löytyy readFromOwnAgents-polulta agentin alta, joten agentin hallussa olevan tiedoston työtilaan sidottu luokitus jää tarkistamatta ja liite voidaan kopioida vastaanottajalle.",
       "id": "b34a6fd18c87",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: readFromOwnAgents palauttaa tiedoston workspaceRef-sidoksen. Testi e2e-messages S4c."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/services/classification/reader.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedoston reader.ts useForAi() kirjoittaa sovelluksen automaattiset 'ai-send'-poikkeukset (recordAutoException) ennen kuin se tarkistaa refused-listan ja heittää CLASSIFIED-virheen, joten poikkeusloki kertoo tekoälylle annetusta sisällöstä silloinkin, kun kutsu lopulta hylätään yleisötarkistuksen takia.",
       "id": "98e9ee264644",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 0da4cd06b: automaattiset poikkeukset kirjataan vasta hylkäystarkistuksen jälkeen. Testi unit classification-exceptions."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/services/company/company-service.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "createCompany tallentaa kuvauksen AI-alkuperätietueen (descriptionProvenance → provenanceForWrite) ennen kuin storage.createCompany ratkaisee osoitteen (slug) yksilöllisyyden, joten SLUG_TAKEN-hylkäys jättää orpotietueen; company-portfolio.ts pitää tietueen odottamassa (held) ja tallentaa sen vasta onnistuneen kirjoituksen jälkeen, ja samaa järjestystä tarvitaan tässä.",
       "id": "41d44a45a096",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 0da4cd06b: alkuperätietue pidetään odottamassa ja tallennetaan vasta onnistuneen kirjoituksen jälkeen. Testi e2e-mcp-companies 15."
     },
     {
       "invariant": 16,
       "file": "aimeat/src/services/config-schema.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedoston config-schema.ts versiohistoria (v1.24.0) ja rivit realtime.turn_username ja realtime.turn_credential merkitsevät staattisen TURN-tunnusparin vanhentuneeksi, mutta eivät kerro poistoversiota eivätkä omaa kytkintä, toisin kuin samassa muutoksessa vanhennetut security.owner_key_login ja security.ws_query_token, joille poistoversioksi on merkitty 4.0.0.",
       "id": "4dd3002bb312",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: Config-sivun kuvaukset ja en/fi/es-tekstit nimeävät poistoversion 4.0.0."
     },
     {
       "invariant": 16,
       "file": "aimeat/src/services/config-schema.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedosto merkitsee kentät turnUsername ja turnCredential vanhentuneiksi, mutta kuvaus ei kerro, missä versiossa ne poistetaan, joten pysyvät TURN-tunnukset jäävät palvelluiksi aina, kun turnSecret on tyhjä.",
       "id": "bab10d253160",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: Config-sivun kuvaukset ja en/fi/es-tekstit nimeävät poistoversion 4.0.0."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/services/docsign/eudi.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa aimeat/src/services/docsign/eudi.ts funktio receiveWalletResponse tallentaa allekirjoitetun PDF:n allekirjoittajan tiedostoihin (writeStorageFile) ennen kuin recordWalletSignature tarkistaa osapuolen (partyCheckFor) ja sen, ettei toinen lompakko ole jo allekirjoittanut pyyntöä (CONFLICT), joten hylätty allekirjoitus jättää tiedoston ja sen kiintiökäytön jäljelle.",
       "id": "3cf5b9c474b0",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: checkWalletSignature ajetaan ennen tallennusta, ja kilpatilanteessa tallennettu tiedosto poistetaan. Testi e2e-docsign."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/services/docsign/records.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa records.ts funktio recordWalletSignature kirjoittaa lompakon palauttaman PDF:n tiivisteen hakemistoon (addToIndex) ennen kuin sealInto tarkistaa, onko solmulla allekirjoitusavain, joten NODE_KEY_MISSING-hylkäys jättää hakemistoon tiivisteen, joka osoittaa pyyntöön ilman tätä allekirjoitusta.",
       "id": "e83aa382caa4",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: hakemistomerkintä kirjoitetaan vasta onnistuneen sinetöinnin jälkeen. Testi unit docsign-wallet-record."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/services/extension-ctx.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedoston extension-ctx.ts ctx.fetch kutsuu ensin resolveOutboundSecrets-funktiota, joka sitoo holvisalaisuuden ensimmäisen käytön isäntään (storage.bindSecretHost), ja vasta sen jälkeen tarkistaa, kulkeeko palveluntarjoajan avain https-yhteydellä, joten http-osoitteeseen tehty provider-kutsu ehtii kirjoittaa sidoksen ennen kuin se hylätään.",
       "id": "346ede55ba27",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 0da4cd06b: https-tarkistus ajetaan ennen salaisuuden isäntäsidontaa. Testi unit extension-ai-provider-ctx."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/services/install-set-apply.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "prepare() kirjoittaa repositorion aktiiviseksi member-tason vertaiseksi (linkRepository → saveFederationPeer) ja tallentaa vedetyt pakettikopiot ennen kuin paketin bundle-muoto, koko asennusjoukon jäsennys ja ongelmalista on tarkistettu, joten NOT_A_BUNDLE-, INVALID_INPUT- tai CANNOT_APPLY-kieltäytyminen jättää pysyvän luottamussuhteen, vaikka vastaus sanoo, ettei mitään luotu.",
       "id": "761d2cd3cefc",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa a1c124ddf: oikea asennus ajaa ensin suunnitelman ja linkittää repositorion vasta puhtaan suunnitelman jälkeen. Testi e2e-install-set-grants vaihe 7."
     },
     {
       "invariant": 13,
       "file": "aimeat/src/services/install-set-trust.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedosto install-set-trust.ts luottaa repositorioon ilman operaattoritarkistusta aina, kun tallennetun tietueen applied_by on merkkijono 'startup'. install-bundle-owner.ts kirjoittaa samaan kenttään omistajan paljaan tilinimen (caller.sub), joten 'startup'-niminen tili, jolla on packages:write, saa oman bundlensa repositorion luotettujen pakettilähteiden joukkoon, vaikka pakettifederaatio on pois päältä.",
       "id": "a21f0a632aac",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa a1c124ddf: käynnistyksen tietue merkitään via-kentällä, applied_by on GHII ja nimi startup on varattu. Testi e2e-install-set-grants vaihe 7, unit package-trust ja gaii."
     },
     {
       "invariant": 16,
       "file": "aimeat/src/services/login-link.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedoston login-link.ts funktiossa findLoginLinkRow vanha haara, joka hyväksyy raakatunnuksella tallennetun kirjautumislinkin, on merkitty vanhentuneeksi ja sen poistoversioksi on nimetty 3.27.0, mutta merkintä ei nimeä lippua eikä oletusarvoa, joten haara on käytössä jokaisella solmulla eikä operaattori voi sulkea sitä ennen poistoa.",
       "id": "68872262459f",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: kommentti kertoo, miksi lippua ei tarvita (rivit vanhenevat 7 päivässä) ja että haara poistetaan versiossa 3.27.0."
     },
     {
       "invariant": 14,
       "file": "aimeat/src/services/packages/compose/package-compose-set.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedostossa package-compose-set.ts composeSet julkaisee jokaisen sovelluksen paketin ennen kuin koostepaketin nimi ja muut createPackageGroup- tai addPackageVersion-tarkistukset ajetaan, joten virheellinen koosteen nimi tai koostepaketin hylkäys jättää sovelluspaketit jo kirjoitetuiksi, vaikka tiedoston otsikkokommentti lupaa, että kutsu hylätään ennen kuin mitään kirjoitetaan.",
       "id": "263fee73075a",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa a1c124ddf: näkyvyys, katot ja kiintiö tarkistetaan suunnitteluvaiheessa ennen kirjoituksia. Testi e2e-package-sets."
     },
     {
       "invariant": 5,
       "file": "aimeat/src/services/signed-node-request.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "audienceRefusal ja deliveryRefusal tarkistavat audience- ja sent_at-allekirjoituksen vain silloin, kun viestissä on nämä kentät, joten hyökkääjä voi poistaa kolme kenttää kaapatusta replicate-viestistä ja lähettää sen uudelleen loputtomasti niin kauan kuin AIMEAT_FEDERATION_AUDIENCE_REQUIRED on oletusarvoisesti pois päältä.",
       "id": "96ceac3a094a",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commiteissa 09eaf6a80 ja 6c1f93687: vertainen, joka on kerran lähettänyt todisteen, ei voi enää lähettää ilman sitä. Testit e2e-federation 12e-12g ja vaihe 3d."
     },
     {
       "invariant": 16,
       "file": "aimeat/src/services/signed-node-request.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Vanha viestimuoto ilman audience-kenttää on käytännössä vanhentunut ja nimeää lipun AIMEAT_FEDERATION_AUDIENCE_REQUIRED ja oletusarvon (pois), mutta ei versiota, jossa lipun oletus kääntyy tai vanha muoto poistetaan, vaan sanoo vain \"kunnes jokainen vertaissolmu ajaa tätä versiota\".",
       "id": "37eb4cda7397",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 09eaf6a80: AUDIENCE_REQUIRED_BY_DEFAULT_IN 3.27.0 ja UNPROVEN_FORMAT_REMOVED_IN 4.0.0 config-federation.ts:ssä, oletus seuraa versiota."
     },
     {
       "invariant": 16,
       "file": "aimeat/src/utils/env-config/sections-platform.ts",
-      "note": "Kirjattu secaudit/open-findings.json -tiedostoon, joka on gitignored: korjaamattoman havainnon sanamuoto ei mene julkiseen repoon.",
+      "note": "Tiedosto merkitsee AIMEAT_TURN_USERNAME- ja AIMEAT_TURN_CREDENTIAL-parin vanhentuneeksi pelkällä tekstillä \"deprecated: use AIMEAT_TURN_SECRET\", eikä tiedosto tai src/config-turn.ts nimeä versiota, jossa staattinen pari poistetaan, joten node jakaa sen asiakkaille edelleen aina, kun AIMEAT_TURN_SECRET puuttuu.",
       "id": "b3edef04561a",
       "commitRange": "d5fbfc3439c761926601030ea8eee2ac1b1e4fb9..9542a9f834f2baa8e2db78ee4569e9b1feae37a8",
       "date": "2026-10-10",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu commitissa 32bac637d: env-config-osio nimeää poistoversion 4.0.0."
     }
   ],
   "invariantReviewCoverage": {
