@@ -54,6 +54,8 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.5.1 — 2026-10-10 — useForAi() records an app's automatic 'ai-send' exception only after the
+ *     refusal check passes, so a refused mixed call records none (secaudit 2026-10-10 I10).
  *   v2.5.0 — 2026-09-30 — An exception covers its item only while the item's label is no stricter
  *     than the label it was made for (stillCovers): a later raise lapses it (TARGET-082 second
  *     review, finding S2). useForAi(): an app's AI call takes content hidden from AI and records the
@@ -336,6 +338,14 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         if (d.label.aiVisibility === 'warning') warn(d);
       }
       const purpose = [use.capability, use.model].filter(Boolean).join(' ');
+      if (refused.length) {
+        for (const d of refused) audit(d, 'refused', purpose);
+        const names = [...new Set(refused.map(d => d.label.name.en))].join(', ');
+        throw new ClassificationError('CLASSIFIED', 403,
+          `${refused.length} of the items for this AI call are classified ${names}, which no AI may read here: ${refused.slice(0, 5).map(d => d.target.key).join(', ')}${refused.length > 5 ? ', …' : ''}. Leave them out, or ask the person who owns them.`);
+      }
+      // Recorded only once the call is accepted: a refused call sends nothing to the AI, so it has
+      // no automatic exception to record (secaudit 2026-10-10 I10).
       for (const { d, n } of appActs.values()) {
         const appId = who.auth?.app ?? who.principal;
         await recordAutoException(deps, {
@@ -343,12 +353,6 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
           label: d.label.id, action: 'ai-send', destination: `ai:${purpose || 'call'}`, count: n,
           reason: `app ${appId} gave ${n === 1 ? 'an item' : `${n} items`} classified ${d.label.name.en}, which no AI may read, to an AI (${purpose || 'call'})`,
         });
-      }
-      if (refused.length) {
-        for (const d of refused) audit(d, 'refused', purpose);
-        const names = [...new Set(refused.map(d => d.label.name.en))].join(', ');
-        throw new ClassificationError('CLASSIFIED', 403,
-          `${refused.length} of the items for this AI call are classified ${names}, which no AI may read here: ${refused.slice(0, 5).map(d => d.target.key).join(', ')}${refused.length > 5 ? ', …' : ''}. Leave them out, or ask the person who owns them.`);
       }
       for (const d of decided) if (d && d.label.audit) audit(d, 'used', purpose);
     },

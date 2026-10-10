@@ -12,6 +12,8 @@
  *   Also covers the scope fence (an agent without company:write is refused) and the ownership
  *   fence (the tools resolve the agent's OWNER, never a client-supplied id).
  * @version-history
+ *   2026-10-10 — 15: a create refused SLUG_TAKEN leaves no provenance record for its description
+ *     (secaudit 2026-10-10 I11).
  *   2026-10-05 — Phase 4: the description carries AI provenance (the developer's decision). A declared
  *     write is recorded and kept on the company, an update without a description keeps it, a declaration
  *     without provenance:write is refused before the write, an agent's silence is recorded, and the
@@ -408,6 +410,29 @@ await test('14. the owner writing the description in person is not stamped', asy
     });
     assert(res.status === 201, `create ${res.status}: ${JSON.stringify(res.body).slice(0, 300)}`);
     assert(res.body.data.company.descriptionProvenanceId === null, `an owner's own words were stamped: ${res.body.data.company.descriptionProvenanceId}`);
+});
+
+/** The provenance records the owner's session finds for these exact bytes (their own included). */
+async function recordsForText(ownerToken: string, text: string): Promise<number> {
+    const hash = createHash('sha256').update(text, 'utf-8').digest('hex');
+    const r = await json(`/v1/provenance/by-hash/${hash}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(r.status === 200, `by-hash ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    return Number(r.body.data.count);
+}
+
+await test('15. a create refused SLUG_TAKEN leaves no provenance record behind (secaudit 2026-10-10 I11)', async () => {
+    // Control: the lookup finds the record test 10 stored for its description.
+    assert(await recordsForText(declaring.ownerToken, 'We build quiet tools for loud workshops.') >= 1,
+        'the by-hash lookup does not find a record that was stored');
+    const description = `Refused at the address, ${Date.now().toString(36)}.`;
+    const body = await mcpRpc(declaring.session, 'tools/call', {
+        name: 'aimeat_company_create',
+        arguments: { name: `Taken Oy ${Date.now().toString(36).slice(-5)}`, slug, description, ai_provenance: { level: 'ai-generated', model: 'e2e/test-model' } },
+    }, nextId());
+    assert(body.result?.isError === true, `expected a refusal, got ${JSON.stringify(body).slice(0, 300)}`);
+    assert(/SLUG_TAKEN/.test(toolError(body)), `expected SLUG_TAKEN, got: ${toolError(body)}`);
+    const left = await recordsForText(declaring.ownerToken, description);
+    assert(left === 0, `the refused create left ${left} provenance record(s) for its description`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

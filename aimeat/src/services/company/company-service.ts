@@ -21,6 +21,8 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   2026-10-10 — The description's provenance record is held and stored only after the company row
+ *     is written, so a SLUG_TAKEN create leaves no orphan record (secaudit 2026-10-10 I11).
  *   2026-10-08 — The description's record is minted against the owner's surface, not a public one: no
  *     public page shows it (aiprov E14).
  *   2026-10-05 — The description carries AI provenance (CompanyProvenanceInput): a declaration is refused
@@ -33,11 +35,11 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
 import type { CompanyRecord, NewCompanyInput, CompanyFrontPage } from '../../models/company-schemas.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../../routes/subdomains.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from '../ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, type DeclaredProvenance } from '../ai-provenance.js';
 
 export class CompanyError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {
@@ -128,8 +130,14 @@ async function refuseDeclaration(storage: Storage, p: CompanyProvenanceInput | u
   if (refusal) throw new CompanyError(refusal.code, 403, refusal.message);
 }
 
-/** The provenance record of a description just written, or null when there is none to record. */
-async function descriptionProvenance(storage: Storage, description: string | null, p: CompanyProvenanceInput | undefined): Promise<string | null> {
+/**
+ * The provenance record of a description about to be written, or null when there is none to record.
+ * A newly minted record is pushed onto `held` and stored by the caller only after the company write
+ * succeeded, so a refused write (SLUG_TAKEN) leaves no orphan record (secaudit 2026-10-10 I11).
+ */
+async function descriptionProvenance(
+  storage: Storage, description: string | null, p: CompanyProvenanceInput | undefined, held: AiProvenanceRecordRow[],
+): Promise<string | null> {
   if (!description || !p) return null;
   const id = await provenanceForWrite(storage, {
     principal: p.principal,
@@ -147,6 +155,7 @@ async function descriptionProvenance(storage: Storage, description: string | nul
     nodeId: p.config.nodeId,
     baseUrl: p.config.baseUrl,
     enabled: p.config.aiProvenance,
+    held,
   });
   return id ?? null;
 }
@@ -160,10 +169,11 @@ export async function createCompany(storage: Storage, ownerGhii: string, input: 
   await refuseDeclaration(storage, provenance);
   const now = new Date().toISOString();
   const description = trimOrNull(input.description, 500);
+  const held: AiProvenanceRecordRow[] = [];
   const record: CompanyRecord = {
     id: randomUUID(), slug, ownerGhii, name,
     description,
-    descriptionProvenanceId: await descriptionProvenance(storage, description, provenance),
+    descriptionProvenanceId: await descriptionProvenance(storage, description, provenance, held),
     organismId: trimOrNull(input.organismId, 80),
     frontPage: { kind: 'none', target: '' },
     businessId: trimOrNull(input.businessId, 35),
@@ -189,6 +199,7 @@ export async function createCompany(storage: Storage, ownerGhii: string, input: 
     if (taken) throw new CompanyError('SLUG_TAKEN', 409, `The address "${slug}" is already taken`);
     throw e;
   }
+  await storeHeldProvenance(storage, held);
   return record;
 }
 
@@ -200,11 +211,12 @@ export async function updateCompany(storage: Storage, ownerGhii: string, id: str
   const descriptionChanges = input.description !== undefined;
   if (descriptionChanges) await refuseDeclaration(storage, provenance);
   const description = descriptionChanges ? trimOrNull(input.description, 500) : company.description;
+  const held: AiProvenanceRecordRow[] = [];
   const next: CompanyRecord = {
     ...company,
     name: newName,
     description,
-    descriptionProvenanceId: descriptionChanges ? await descriptionProvenance(storage, description, provenance) : company.descriptionProvenanceId,
+    descriptionProvenanceId: descriptionChanges ? await descriptionProvenance(storage, description, provenance, held) : company.descriptionProvenanceId,
     organismId: input.organismId !== undefined ? trimOrNull(input.organismId, 80) : company.organismId,
     businessId: input.businessId !== undefined ? trimOrNull(input.businessId, 35) : company.businessId,
     vatId: input.vatId !== undefined ? trimOrNull(input.vatId, 35) : company.vatId,
@@ -222,6 +234,7 @@ export async function updateCompany(storage: Storage, ownerGhii: string, id: str
   };
   // The slug is the published address: renaming the company never silently moves it.
   await storage.updateCompany(next);
+  await storeHeldProvenance(storage, held);
   return next;
 }
 

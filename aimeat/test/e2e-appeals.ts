@@ -31,6 +31,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-appeals.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-appeals
  * @version-history
+ *   v1.2.0 — 2026-10-10 — 11b: the operator's refused second appeal leaves no operator_acted event
+ *     (secaudit 2026-10-10 I5).
  *   v1.1.0 — 2026-09-08 — The three tests that pinned the wrong answer assert the fix; a fifth
  *     flag carries the operator's own appeal.
  *   v1.0.0 — 2026-09-08 — Initial. 28 tests, 14 of them refusals, 3 of them pinning today's wrong
@@ -342,6 +344,26 @@ await test('11. An operator may appeal on the content owner\'s behalf', async ()
     });
     assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error)}`);
     assert(body.data.appealedBy === OP, `appealedBy: ${body.data.appealedBy}`);
+});
+
+/** The operator_acted events for appeals in the content owner's account feed. */
+async function appealTrail(token: string): Promise<any[]> {
+    const r = await json('/v1/account/events?limit=200', { headers: authed(token) });
+    assert(r.status === 200, `account events: ${r.status} ${JSON.stringify(r.body)}`);
+    return (r.body.data.events as any[]).filter((e) => e.kind === 'operator_acted' && e.data?.area === 'appeal');
+}
+
+await test('11b. The operator\'s refused second appeal leaves no operator trail (secaudit 2026-10-10 I5)', async () => {
+    const before = (await appealTrail(cToken)).length;
+    assert(before === 1, `the first operator appeal wrote one trail event, got ${before}`);
+    const { status, body } = await json(`/v1/flags/${flagMemoryOrgKey2}/appeal`, {
+        method: 'POST', headers: authed(opToken),
+        body: JSON.stringify({ reason: 'filed again' }),
+    });
+    assert(status === 409, `expected 409, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.error?.code === 'ALREADY_APPEALED', `code: ${body.error?.code}`);
+    const after = (await appealTrail(cToken)).length;
+    assert(after === before, `a refused appeal wrote an operator trail: ${before} → ${after}`);
 });
 
 // ─── Phase 2: GET /v1/appeals ───

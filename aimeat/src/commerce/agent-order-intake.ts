@@ -21,10 +21,13 @@
  *   `payment_intent.agent_details` (private preview, so read defensively).
  *
  *   ONCE PER SESSION. The order key is the Stripe session id: a redelivered event finds the order
- *   and does nothing more.
+ *   and does nothing more. The key is claimed with an atomic insert before any task is created, so
+ *   two deliveries running at the same moment produce one set of tasks.
  * @structure ACS_STRIPE_VERSION · intakeAgentOrder · IntakeResult
  * @usage const r = await intakeAgentOrder(storage, config, ownerGhii, sessionObject, event.id);
  * @version-history
+ *   v1.1.0 — 2026-10-10 — The order key is claimed with createMemoryIfAbsent before the fulfilment
+ *     tasks are created; a concurrent delivery answers already_taken (secaudit 2026-10-10 I1).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
  */
 import type { Storage } from '../storage/interface.js';
@@ -148,6 +151,18 @@ export async function intakeAgentOrder(
     createdAt: now, updatedAt: now, expiresAt: now,
   };
 
+  // Claim the order key before any side effect (secaudit 2026-10-10 I1). Two parallel deliveries of
+  // the same event, or a Stripe retry after a slow first attempt, both pass the getMemory check at the
+  // top; only one of them wins this insert, and the other answers already_taken without creating
+  // tasks, counting the purchase or writing payment_received a second time.
+  if (!storage.createMemoryIfAbsent) throw new Error('Agent order intake requires atomic storage creation.');
+  order.fulfillment = { taskIds: [] };
+  const claimed = await storage.createMemoryIfAbsent({
+    key: orderKey(stripeSessionId), ownerGaii: sellerGhii, value: { ...order } as unknown as Record<string, unknown>,
+    visibility: 'owner', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+  });
+  if (!claimed) return { action: 'already_taken', orderId: stripeSessionId };
+
   const taskIds: string[] = [];
   for (const item of order.items) {
     try {
@@ -159,12 +174,13 @@ export async function intakeAgentOrder(
     }
   }
   order.fulfillment = { taskIds };
-  const existing = await storage.getMemory(sellerGhii, orderKey(stripeSessionId));
-  if (existing) return { action: 'already_taken', orderId: stripeSessionId };
-  await storage.setMemory({
-    key: orderKey(stripeSessionId), ownerGaii: sellerGhii, value: order as unknown as Record<string, unknown>,
-    visibility: 'owner', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-  });
+  try {
+    await storage.setMemory({ ...claimed, value: order as unknown as Record<string, unknown>, updatedAt: new Date().toISOString() });
+  } catch (e) {
+    // The order is already claimed and its tasks exist; a retry would answer already_taken, so a
+    // failed update is logged rather than thrown, and the purchase is still counted once.
+    logger.error('agent-order: the task ids could not be written to the order', { order: stripeSessionId, taskIds, error: String(e) });
+  }
   recordPurchase(storage, config, { sellerGhii, channel: 'ai', family, via: 'agent', amount: total, currency: order.currency });
   void recordAccountEvent(storage, {
     ownerGhii: sellerGhii, kind: 'payment_received', actorGaii: sellerGhii, subject: stripeSessionId,

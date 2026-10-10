@@ -15,10 +15,12 @@
  *
  *   THE ROUND IS RE-WRITTEN, NOT UPDATED. Binding consumes the stored row (the delete that removes it
  *   is the one that goes on) and writes it again with the binding, under the same state and expiry.
- *   Two confirmations at once bind once; the storage needs no update method for one field.
+ *   Two confirmations at once bind once; the storage needs no update method for one field. A round
+ *   that already carries a binding is refused, so a later confirmation cannot re-bind it.
  * @structure findOwnersRound · describeRound · bindRound
  * @usage const found = await findOwnersRound(storage, state, caller.ownerGhii);
  * @version-history
+ *   v1.1.0 — 2026-10-10 — bindRound refuses a round that is already bound (secaudit 2026-10-10 I6).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  */
 import type { Storage } from '../storage/interface.js';
@@ -101,6 +103,10 @@ export async function describeRound(storage: Storage, providers: OutboundProvide
  */
 export async function bindRound(storage: Storage, found: OwnersRound, bindHash: string): Promise<{ authorizeUrl: string } | null> {
   const { round, payload } = found;
+  // Compare-and-set (secaudit 2026-10-10 I6): a round already bound to a browser stays bound to it.
+  // The delete below cannot refuse alone, because the bound round is re-written under the same state
+  // and a later delete finds it; without this check a second approve re-bound it with 200.
+  if (typeof payload.bind === 'string' && payload.bind) return null;
   if (!(await storage.deleteVerificationNonce(round.state))) return null;
   // A round an agent started usually names no page to come back to; the owner confirmed it in this
   // browser, so the browser lands on the page that says the account is connected.

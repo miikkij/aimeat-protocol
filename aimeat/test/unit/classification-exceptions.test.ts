@@ -17,6 +17,8 @@
  *      remove records, and a month with a person's exception in force stays.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exceptions.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-10 — An app's AI call refused for another item records no automatic 'ai-send'
+ *     exception (secaudit 2026-10-10 I10).
  *   v1.2.0 — 2026-09-30 — An exception lapses when the item's label is raised after it (TARGET-082
  *     second review, finding S2). An app's AI call takes content hidden from AI, as an exception.
  *   v1.1.0 — 2026-09-30 — An 'ai-send' exception shows the item to an AI reader (reader.show()).
@@ -262,6 +264,21 @@ describe('classification exceptions and apps (decided 2026-09-30)', () => {
       await expect(readerFor(deps(), { sub: 'alice', owner: 'alice', roles: ['owner'] }).useForAi([t(own('secret'))], use))
         .rejects.toMatchObject({ code: 'CLASSIFIED' });
       await expect(readerForAgent(deps(), AGENT).useForAi([t(own('secret'))], use)).rejects.toMatchObject({ code: 'CLASSIFIED' });
+    });
+
+    it('records no exception for an AI call that is refused for another item (secaudit 2026-10-10 I10)', async () => {
+      await setLabel(deps(), alice, t(own('secret')), { label: 'salainen' });
+      const use = { capability: 'chat', model: 'test-model' };
+      // Bob's item is outside alice's audience, so the whole call is refused; alice's hidden item,
+      // which the app alone could have sent, was never sent and has no exception to record.
+      await storage.setMemory({
+        key: 'bob.private', ownerGaii: BOB, value: { note: 'bob' }, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: stamp, updatedAt: stamp,
+      });
+      await writePolicy(deps(), bob, 'owner', null, { labels: [{ id: 'vain-bob', rank: 45, name: { en: 'Bob only' }, audience: { people: ['bob'] } }] });
+      await setLabel(deps(), bob, memoryTarget(BOB, 'bob.private'), { label: 'vain-bob' });
+      const mixed = [t(own('secret')), memoryTarget(BOB, 'bob.private')];
+      await expect(readerFor(deps(), appAuth).useForAi(mixed, use)).rejects.toMatchObject({ code: 'CLASSIFIED' });
+      expect(await appExceptions('ai-send')).toEqual([]);
     });
 
     it('sends out what its label keeps in, as one exception per act with the count', async () => {

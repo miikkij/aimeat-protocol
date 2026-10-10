@@ -6,6 +6,7 @@
  *   its feed id, the order and one fulfilment task are written once, the purchase is counted under
  *   the agent, and a checkout that is not from the feed is left alone.
  * @version-history
+ *   v1.1.0 — 2026-10-10 — Two concurrent deliveries create one set of tasks (secaudit 2026-10-10 I1).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -47,6 +48,11 @@ function fakeStorage() {
     mem,
     getMemory: async (o: string, k: string) => mem.get(`${o}|${k}`) ?? null,
     setMemory: async (r: { ownerGaii: string; key: string; value: unknown }) => { put(r.ownerGaii, r.key, r.value); return r; },
+    createMemoryIfAbsent: async (r: { ownerGaii: string; key: string; value: unknown }) => {
+      if (mem.has(`${r.ownerGaii}|${r.key}`)) return null;
+      put(r.ownerGaii, r.key, r.value);
+      return r;
+    },
     listAllMemory: async ({ prefix }: { prefix: string }) => ({ items: [...mem.values()].filter((r) => r.key.startsWith(prefix)) }),
     getOwner: async () => ({ name: 'shop', displayName: 'Shop' }),
   };
@@ -86,6 +92,20 @@ describe('intakeAgentOrder', () => {
     expect(again.action).toBe('already_taken');
     expect(tasks).toHaveLength(1);
     expect(purchases).toHaveLength(1);
+  });
+
+  it('creates one set of tasks when two deliveries of the same session run at once (secaudit 2026-10-10 I1)', async () => {
+    const storage = fakeStorage();
+    stripeSession = { id: 'cs_test_race01', currency: 'usd', amount_total: 1999, line_items: { data: [{ quantity: 1, price: { external_reference: feedIdOf(SKU), unit_amount: 1999 } }] } };
+    const [a, b] = await Promise.all([
+      intakeAgentOrder(storage as never, config, SELLER, { id: 'cs_test_race01' }, 'evt_1'),
+      intakeAgentOrder(storage as never, config, SELLER, { id: 'cs_test_race01' }, 'evt_1'),
+    ]);
+    expect([a.action, b.action].sort()).toEqual(['agent_order', 'already_taken']);
+    expect(tasks).toHaveLength(1);
+    expect(purchases).toHaveLength(1);
+    const order = (await storage.getMemory(SELLER, 'commerce.order.cs_test_race01'))!.value as Record<string, any>;
+    expect(order.fulfillment).toEqual({ taskIds: ['task-1'] });
   });
 
   it('leaves alone a checkout whose lines name no product of the feed, and an id that is not a session', async () => {

@@ -15,6 +15,8 @@
  *   safeFetch is replaced by a recorder, the way outbound-read-cap.test.ts does it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-ai-provider-ctx.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-10 — A provider call refused for plain http binds no secret to its host:port
+ *     (secaudit 2026-10-10 I16).
  *   v1.0.0 — 2026-09-28 — System 2 plan, V6: initial.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -32,6 +34,8 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
     return {
         ...actual,
         safeFetch: vi.fn(async (url: string, init: SafeFetchInit = {}) => { calls.push({ url, init }); return farSide(url, init); }),
+        // The test hosts do not resolve; the address check before a secret is bound passes them.
+        validateOutboundUrl: vi.fn(async () => ({ valid: true })),
     };
 });
 
@@ -110,6 +114,41 @@ describe('ctx.fetch in a provider run', () => {
         // Without a key to carry, a listed http host is reached as before.
         await ctxWith({ hosts: HOSTS }).fetch('http://api.example-ai.com/v1/health');
         expect(calls).toHaveLength(2);
+    });
+
+    it('a refused http call binds no secret, so the later https call to the real host works (secaudit 2026-10-10 I16)', async () => {
+        // A stand-in for the secret rows: the extension's shared value is bound to the host of its
+        // first use (owner-secrets.ts resolveSecretForHeaders), as a vault secret is.
+        const rows = new Map<string, { hosts: string[] }>();
+        const storage = {
+            getSecret: async (owner: string, name: string) => rows.get(`${owner}|${name}`) ?? null,
+            createSecretIfAbsent: async (r: { ownerGaii: string; name: string; hosts: string[] }) => {
+                if (rows.has(`${r.ownerGaii}|${r.name}`)) return null;
+                rows.set(`${r.ownerGaii}|${r.name}`, { hosts: [...r.hosts] });
+                return r;
+            },
+            bindSecretHost: async (owner: string, name: string, host: string) => {
+                const row = rows.get(`${owner}|${name}`) ?? { hosts: [] };
+                if (!row.hosts.length) row.hosts.push(host);
+                rows.set(`${owner}|${name}`, row);
+                return row.hosts;
+            },
+        } as unknown as Storage;
+        const ctx = buildExtensionCtx({ capabilities: { network: true, ai: true, email: true, payments: true, declared: true },
+            config, storage, extMemoryOwner: 'ext:example-ai',
+            caller: { gaii: 'alice@node-1', owner: 'alice', roles: ['operator'] },
+            extConfig: { secrets: { ORG_ID: 'org-shared-1' } }, logPrefix: '[ext:example-ai]',
+            extension: { name: 'example-ai', owner: 'alice' },
+            providerCall: { hosts: HOSTS, inject: { name: 'x-api-key', value: KEY } },
+        });
+        const headers = { 'x-org': '{{secret:ORG_ID}}' };
+        await expect(ctx.fetch('http://api.example-ai.com:8080/v1/chat', { headers }))
+            .rejects.toThrow(/^Fetch blocked: the owner's key is sent only over https/);
+        expect([...rows.values()].flatMap((r) => r.hosts)).toEqual([]);
+        const res = await ctx.fetch('https://api.example-ai.com/v1/chat', { headers });
+        expect(res.status).toBe(200);
+        expect(sentHeaders(calls[0])['x-org']).toBe('org-shared-1');
+        expect([...rows.values()].flatMap((r) => r.hosts)).toEqual(['api.example-ai.com']);
     });
 
     it('refuses an address that does not parse', async () => {

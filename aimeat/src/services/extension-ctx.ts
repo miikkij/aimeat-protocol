@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.14.2 — 2026-10-10 — ctx.fetch refuses a provider call over http before resolveOutboundSecrets,
+ *     so the refused call does not bind a vault secret to its host:port (secaudit 2026-10-10 I16).
  *   v1.14.1 — 2026-10-10 — decodeBody, looksLikeUtf8 and hostOfUrl moved to
  *     services/extension-fetch-decode.ts unchanged (800-line rule; pure extraction).
  *   v1.14.0 — 2026-10-09 — ctx.fetch removes from the response every value the node put into the
@@ -605,6 +607,15 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
         // Checked here before any secret is resolved, and again on every redirect hop by safeFetch.
         fetch: async (url, opts, host) => {
             if (deps.providerCall) assertProviderHost(deps.providerCall, url);
+            const inject = deps.providerCall?.inject;
+            // The owner's key never travels in clear text: over https only, or http to localhost on
+            // this machine (a provider's own test service). Refused, not sent without the key, so
+            // the extension's author learns why. Checked before resolveOutboundSecrets, which binds
+            // a vault secret to the host of its first use: a refused http call must not bind it to
+            // the wrong host:port (secaudit 2026-10-10 I16).
+            if (inject && URL.canParse(url) && new URL(url).protocol !== 'https:' && new URL(url).hostname.toLowerCase() !== 'localhost') {
+                throw new Error(`Fetch blocked: the owner's key is sent only over https; ${new URL(url).origin} is not.`);
+            }
             const declaredHosts = deps.capabilities.hosts;
             if (declaredHosts) {
                 const h = URL.canParse(url) ? new URL(url).hostname.toLowerCase() : null;
@@ -615,13 +626,6 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 }
             }
             const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);
-            const inject = deps.providerCall?.inject;
-            // The owner's key never travels in clear text: over https only, or http to localhost on
-            // this machine (a provider's own test service). Refused, not sent without the key, so
-            // the extension's author learns why.
-            if (inject && URL.canParse(url) && new URL(url).protocol !== 'https:' && new URL(url).hostname.toLowerCase() !== 'localhost') {
-                throw new Error(`Fetch blocked: the owner's key is sent only over https; ${new URL(url).origin} is not.`);
-            }
             const resp = await safeFetch(url, {
                 method: opts?.method || 'GET',
                 headers: inject ? injectProviderHeader(inject, outbound.values) : outbound.values,
