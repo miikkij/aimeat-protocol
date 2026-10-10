@@ -12881,6 +12881,9 @@
       "give": "Anna tehtävä",
       "giving": "Lähetetään…",
       "given": "Tehtävä on agentilla. Tulos näkyy alla.",
+      "talkTitle": "Puhu sille",
+      "talkDeaf": "Tämä agentti ei lue viestejä. Se aloittaa työn tehtävästä: anna sille tehtävä yllä.",
+      "talkWaits": "Se lukee viestisi, kun sen kone on ottanut sen vastaan.",
       "latestTitle": "Viimeisimmät työt",
       "latestNone": "Sille ei ole vielä annettu yhtään työtä.",
       "taskDone": "valmis",
@@ -12923,7 +12926,11 @@
       "addTitle": "Lisää kone",
       "addDesc": "Oma tietokoneesi tai palvelimesi. Agentit toimivat sillä ja voivat käyttää malleja, joihin sillä on pääsy. Aja nämä kaksi komentoa koneella ja hyväksy sen näyttämä koodi. Kone ilmestyy tälle sivulle, ja annat sille nimen.",
       "addNote": "Kone tekee työtä vain silloin, kun se on päällä.",
-      "canSilent": "Kone ei vastannut. Ohjelma, joka ajaa agentteja koneella, voi olla pysähdyksissä."
+      "canSilent": "Kone ei vastannut. Ohjelma, joka ajaa agentteja koneella, voi olla pysähdyksissä.",
+      "hostedTitle": "Kone, jota me ylläpidämme",
+      "hostedDesc": "Me pidämme sen päällä, eikä sinun tarvitse asentaa mitään. Tilaat sen kaupasta.",
+      "order": "Tilaa kone →",
+      "orderSoon": "Kauppa avautuu pian."
     },
     "apps": {
       "title": "Sovelluksesi",

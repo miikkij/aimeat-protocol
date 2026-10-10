@@ -354,7 +354,7 @@
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:889d26d991efc6fd6b683adc",
+      "digest": "sha256:8dce8acee7fa4b64bfa85114",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -552,7 +552,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "eac732f99c743f71"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "5840bc208c859e0b"
+      "aimeat/scripts/sandbox.ts": "4c99a9e26238b0f3"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"

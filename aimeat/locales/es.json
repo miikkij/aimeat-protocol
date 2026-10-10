@@ -11189,6 +11189,9 @@
       "give": "Dar la tarea",
       "giving": "Enviando…",
       "given": "El agente ya tiene la tarea. El resultado aparece abajo.",
+      "talkTitle": "Habla con él",
+      "talkDeaf": "Este agente no lee mensajes. Empieza a trabajar con una tarea: dale una arriba.",
+      "talkWaits": "Lee tu mensaje cuando su máquina lo haya recibido.",
       "latestTitle": "Trabajo reciente",
       "latestNone": "Todavía no ha recibido ningún trabajo.",
       "taskDone": "lista",
@@ -11231,7 +11234,11 @@
       "addTitle": "Agregar una máquina",
       "addDesc": "Tu propia computadora o servidor. Los agentes funcionan en ella y pueden usar los modelos a los que tiene acceso. Ejecuta estos dos comandos en ella y aprueba el código que muestra. La máquina aparece en esta página y le pones un nombre.",
       "addNote": "La máquina trabaja solo mientras está encendida.",
-      "canSilent": "La máquina no respondió. Puede que el programa que ejecuta los agentes en ella esté detenido."
+      "canSilent": "La máquina no respondió. Puede que el programa que ejecuta los agentes en ella esté detenido.",
+      "hostedTitle": "Una máquina que mantenemos por ti",
+      "hostedDesc": "La mantenemos encendida y no instalas nada. La pides en la tienda.",
+      "order": "Pedir una máquina →",
+      "orderSoon": "La tienda abre pronto."
     },
     "apps": {
       "title": "Tus aplicaciones",

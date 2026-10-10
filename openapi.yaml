@@ -14270,6 +14270,10 @@ paths:
                                 display_name: { type: string }
                                 description: { type: string }
                                 when: { type: string, enum: [ask, clock, talk, always] }
+                                hears_messages:
+                                  type: boolean
+                                  nullable: true
+                                  description: Whether the agent's crew definition wakes on a message or a DM. Null when the definition was not read (the list skips it for a clock or resident agent; `?agent=` always reads it) or the agent has no definition on this node.
                                 schedule:
                                   type: object
                                   nullable: true

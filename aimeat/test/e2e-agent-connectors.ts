@@ -489,6 +489,7 @@ async function run() {
         assert(late.connector?.id === LAPTOP && late.connector?.name === 'Kotikone' && late.connector?.online === false,
             `and with the machine it waits for, got ${JSON.stringify(late.connector)}`);
         assert(late.when === 'ask', `a task runner with no schedule works when asked, got ${late.when}`);
+        assert(late.hears_messages === false, `its definition wakes on tasks only, got ${JSON.stringify(late.hears_messages)}`);
         const settled = workers.find(w => w.name === 'laptop-watcher');
         assert(!!settled && settled.has_key === true && settled.connector?.id === LAPTOP,
             `laptop-watcher holds a key on the laptop, got ${JSON.stringify(settled)}`);
@@ -508,6 +509,16 @@ async function run() {
         assert(names.length === 1 && names[0] === 'late-watcher', `exactly that agent, got ${JSON.stringify(names)}`);
         const none = await homeAgents(authA, '?agent=no-such-agent');
         assert(none.status === 200 && (none.body.data.workers as any[]).length === 0, 'an unknown name answers with no worker');
+    });
+
+    await test('an agent whose definition wakes on messages reads as one a person can talk to', async () => {
+        const p = await propose('chat-watcher', { connector: SERVER, crew_def: { ...DEF, listen_for: ['tasks', 'messages'] } });
+        assert(p.status === 201 || p.status === 200, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+        const r = await approve(p.body.data.proposal.id);
+        assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const one = await homeAgents(authA, '?agent=chat-watcher');
+        const w = (one.body.data.workers as any[])[0];
+        assert(w?.hears_messages === true && w?.when === 'talk', `it hears messages and works when written to, got ${JSON.stringify({ hears: w?.hears_messages, when: w?.when })}`);
     });
 
     await test('the home\'s agents are the owner\'s in person, and never another account\'s', async () => {
