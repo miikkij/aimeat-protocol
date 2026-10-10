@@ -26,6 +26,8 @@
  *   v1.1.0 — 2026-10-10 — The fixed response addresses for an x509_san_uri access certificate.
  *   v1.2.0 — 2026-10-10 — Starting with no file uses the PDF the node holds for the request
  *     (nextPdfToSign); 409 DOCUMENT_NEEDED when it holds none.
+ *   v1.3.0 — 2026-10-10 — Log lines for each step a wallet takes, and for every POST to the
+ *     node address, because the first real wallet signature vanished without a trace.
  */
 import { Router, raw, urlencoded, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -43,6 +45,7 @@ import {
 } from '../services/docsign/eudi.js';
 import { docsignMaxBytes } from '../config-docsign.js';
 import { rawBodyBytes } from '../utils/raw-body.js';
+import { logger } from '../utils/logger.js';
 
 const StartJsonSchema = z.object({
   content_base64: z.string().optional(),
@@ -127,6 +130,7 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
   router.get('/v1/docsign/wallet/:session/request', enabled, walletLimit, async (req, res) => {
     try {
       const jws = await walletRequestObject(ctx, req.params.session as string);
+      logger.info('docsign: a wallet fetched the request object', { session: String(req.params.session).slice(0, 8), agent: String(req.headers['user-agent'] ?? '').slice(0, 80) });
       res.setHeader('Content-Type', 'application/oauth-authz-req+jwt');
       res.setHeader('Cache-Control', 'no-store');
       res.send(jws);
@@ -136,6 +140,7 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
   router.get('/v1/docsign/wallet/:session/document/:token', enabled, walletLimit, (req, res) => {
     try {
       const doc = walletDocument(req.params.session as string, req.params.token as string);
+      logger.info('docsign: a wallet downloaded the document', { session: String(req.params.session).slice(0, 8), bytes: doc.bytes.length });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.name)}"`);
@@ -164,12 +169,17 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
     } catch (err) { fail(res, err); }
   });
   router.post('/', (req, res, next) => {
-    if (!config.docsignEnabled || !config.docsignEudiEnabled || !isForm(req)) { next(); return; }
+    if (!config.docsignEnabled || !config.docsignEudiEnabled) { next(); return; }
+    // Nothing else posts to the node's own address, so every such request is worth one log line:
+    // it says whether a wallet's answer arrived at all, and in what form.
+    const seen = { contentType: req.headers['content-type'] ?? null, bytes: req.headers['content-length'] ?? null, agent: String(req.headers['user-agent'] ?? '').slice(0, 80) };
+    if (!isForm(req)) { logger.warn('docsign: a POST to the node address that is not a form', seen); next(); return; }
     walletLimit(req, res, () => walletForm(req, res, async (err?: unknown) => {
-      if (err) { next(err); return; }
+      if (err) { logger.warn('docsign: a form posted to the node address could not be read', { ...seen, error: String(err) }); next(err); return; }
       try {
-        const out = await receiveWalletResponseByState(ctx, (req.body ?? {}) as Record<string, unknown>);
-        if (!out) { next(); return; }
+        const form = (req.body ?? {}) as Record<string, unknown>;
+        const out = await receiveWalletResponseByState(ctx, form);
+        if (!out) { logger.warn('docsign: a form posted to the node address matched no open wallet session', { ...seen, fields: Object.keys(form).slice(0, 12) }); next(); return; }
         res.json(out);
       } catch (e) { fail(res, e); }
     }));
