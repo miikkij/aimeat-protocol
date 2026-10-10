@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-10 — FederationPeerRecord.deliveryProofAt and GenesisPeerRecord.deliveryProofAt:
+ *     the first verified delivery proof pins the peer to sending one (migration 0100; secaudit 2026-10-10 I21).
  *   v1.8.0 — 2026-10-09 — ExtensionRecord.limits.fetchMaxBytes: the manifest's `limits.fetch_max_mb`,
  *     optional, inside the JSON `limits` column both providers already store.
  *   v1.7.0 — 2026-09-29 — ScheduledJobRecord and ExecutionLogEntry types take 'refinery': one batch
@@ -241,6 +243,9 @@ export interface GenesisPeerRecord {
   catalogueHash: string;
   createdAt: string;
   updatedAt: string;
+  /** When this genesis peer first sent a catalogue ingest with a delivery proof this node verified;
+   *  from then on one without the proof is refused (as FederationPeerRecord.deliveryProofAt). */
+  deliveryProofAt?: string | null;
 }
 
 // Federation Peers — persisted active peer connections
@@ -305,6 +310,12 @@ export interface FederationPeerRecord {
    *  the sender, so this says a peer has not updated rather than proving it. At most every ten
    *  minutes, like the one above. */
   lastUnclaimedRelayAt?: string | null;
+  /** When this peer first sent a replicate, catalogue sync or read receipt with a delivery proof
+   *  this node verified (services/signed-node-request.ts deliveryRefusal). Once set, a delivery
+   *  without the proof is refused from that peer whatever `federation.audience_required` says, so a
+   *  captured message cannot be replayed with the proof stripped. A save never clears it: both
+   *  providers keep the stored value when the record carries none (secaudit 2026-10-10 I21). */
+  deliveryProofAt?: string | null;
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

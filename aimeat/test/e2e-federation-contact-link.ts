@@ -17,6 +17,10 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   v1.5.0 — 2026-10-10 — P8b, P12b: a peer that has sent an audience or delivery proof is refused a
+ *     message or receipt without one while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off; peer D, which
+ *     never sent one, is the older node P8 and P12 hear. R9 signs the grant's audience (secaudit
+ *     2026-10-10 I21).
  *   v1.4.0 — 2026-10-06 — P9–P12: a read receipt names the node it is for and its send time, and is
  *     heard once inside five minutes (secaudit 2026-10 last items, D3).
  *   v1.3.0 — 2026-10-06 — P5–P8: a message names the node it is for (secaudit 2026-10 follow-up, A7):
@@ -114,6 +118,16 @@ async function asPeer(path: string, payload: Record<string, unknown>, signOver?:
     });
 }
 
+// Peer D is a node on an older version: it signs its messages but never adds the audience or
+// delivery proof. It is what AIMEAT_FEDERATION_AUDIENCE_REQUIRED off exists for (secaudit
+// 2026-10-10 I21: C, once it has sent a proof, is held to it; D, which never has, is still heard).
+const D_NODE = 'aimeat-peer-001-contactd';
+let dKeys: { publicKey: string; privateKey: string };
+async function asOlderPeer(path: string, payload: Record<string, unknown>) {
+    const signature = await sign(dKeys.privateKey, JSON.stringify(payload));
+    return V.json(path, { method: 'POST', headers: { 'x-source-node': D_NODE }, body: JSON.stringify({ ...payload, signature }) });
+}
+
 /** Every boolean permission the peer row carries, as V reports it. */
 async function peerRow(): Promise<any> {
     const r = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
@@ -138,6 +152,17 @@ await test('Boot V, one operator, peer C admitted at tier contact', async () => 
     });
     assert(demote.status === 200, `demote: ${demote.status} ${JSON.stringify(demote.body)}`);
     assert(demote.body.data.tier === 'contact', `tier is contact, got ${demote.body.data.tier}`);
+
+    dKeys = await generateKeyPair();
+    const addD = await V.json('/v1/federation/peers', {
+        method: 'POST', headers: auth(V.ownerToken),
+        body: JSON.stringify({ node_id: D_NODE, url: 'http://localhost:49996', public_key: dKeys.publicKey }),
+    });
+    assert(addD.status === 201, `add peer D: ${addD.status} ${JSON.stringify(addD.body)}`);
+    const actD = await V.json(`/v1/federation/peers/${D_NODE}`, {
+        method: 'PUT', headers: auth(V.ownerToken), body: JSON.stringify({ status: 'active', tier: 'contact' }),
+    });
+    assert(actD.status === 200, `activate peer D: ${actD.status} ${JSON.stringify(actD.body)}`);
 });
 
 // ── The positive control. Runs first, so a node refusing everything cannot pass this suite. ──
@@ -233,17 +258,28 @@ await test('P7. An audience the sending node did not sign is refused (401)', asy
     const r = await withAudience({ source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() }, V.nodeId, 'something else');
     assert(r.status === 401 && r.body.error?.code === 'UNAUTHORIZED', `expected 401 UNAUTHORIZED, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
+const olderMessage = () => ({
+    source_node: D_NODE, message: { ...freshMessage(), senderGhii: `someone@${D_NODE}` }, timestamp: new Date().toISOString(),
+});
 await test('P8. With the audience required, a message from an older node that names none is refused; off, it is heard', async () => {
-    const legacy = { source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() };
+    const legacy = olderMessage();
     V.config.federationAudienceRequired = true;
     try {
-        const r = await asPeer('/v1/federation/message', legacy);
+        const r = await asOlderPeer('/v1/federation/message', legacy);
         assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
     } finally {
         V.config.federationAudienceRequired = false;
     }
-    const heard = await asPeer('/v1/federation/message', { ...legacy, timestamp: new Date(Date.now() + 1).toISOString() });
+    const heard = await asOlderPeer('/v1/federation/message', { ...legacy, timestamp: new Date(Date.now() + 1).toISOString() });
     assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
+});
+// Secaudit 2026-10-10 I21. C signed an audience in P5, so it runs a version that always does: a
+// message from it without one is a captured message with the proof stripped, and is refused with the
+// setting off. Failed on the old code (200, delivered).
+await test('P8b. A peer that has sent an audience proof is refused a message without one, with the setting off', async () => {
+    assert(V.config.federationAudienceRequired === false, 'the setting is off');
+    const r = await asPeer('/v1/federation/message', { source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() });
+    assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
 // The read receipt is one of the four messages that sign no send time of their own (with memory
@@ -279,15 +315,24 @@ await test('P11. A read receipt signed for another node is refused here (401 WRO
     assert(r.status === 401 && r.body.error?.code === 'WRONG_AUDIENCE', `expected 401 WRONG_AUDIENCE, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 await test('P12. With the audience required, a read receipt from an older node is refused; off, it is heard', async () => {
+    const olderReceipt = () => ({ ...receipt(), source_node: D_NODE });
     V.config.federationAudienceRequired = true;
     try {
-        const r = await asPeer('/v1/federation/message/receipt', receipt());
+        const r = await asOlderPeer('/v1/federation/message/receipt', olderReceipt());
         assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
     } finally {
         V.config.federationAudienceRequired = false;
     }
-    const heard = await asPeer('/v1/federation/message/receipt', receipt());
+    const heard = await asOlderPeer('/v1/federation/message/receipt', olderReceipt());
     assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
+});
+// Secaudit 2026-10-10 I21. C sent a delivery proof in P9: a receipt from it with the three proof
+// fields stripped (its own signature still verifies) is refused with the setting off. Failed on the
+// old code (200).
+await test('P12b. A peer that has sent a delivery proof is refused a read receipt without one, with the setting off', async () => {
+    assert(V.config.federationAudienceRequired === false, 'the setting is off');
+    const r = await asPeer('/v1/federation/message/receipt', receipt());
+    assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
 // ── The promise. Each one signed correctly, each one read back. ──
@@ -392,7 +437,13 @@ await test('R9. An attachment download is MESSAGING, so the door opens — and t
         storage_key: 'anything', owner_ghii: V.ownerGhii, recipient_ghii: `someone@${C_NODE}`,
         timestamp: new Date().toISOString(),
     };
-    const r = await asPeer('/v1/federation/storage/grant', payload);
+    // C has signed an audience since P5, so it is held to it (secaudit 2026-10-10 I21): the grant
+    // carries one, as a node of this version sends it.
+    const signed = JSON.stringify(payload);
+    const r = await V.json('/v1/federation/storage/grant', {
+        method: 'POST', headers: { 'x-source-node': C_NODE },
+        body: JSON.stringify({ ...payload, signature: await sign(cKeys.privateKey, signed), ...await audienceProof(cKeys.privateKey, signed, V.nodeId) }),
+    });
     assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
     assert(r.body.error?.code !== 'POLICY_DENIED', 'a contact peer is entitled to this door; the relationship is what refuses');
     assert(!r.body.data?.download_url, 'no download capability may be issued');

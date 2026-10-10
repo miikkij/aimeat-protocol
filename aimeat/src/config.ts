@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.25.1 — 2026-10-10 — federationAudienceRequired comes from federationDefaults(), its default following the version (secaudit 2026-10-10 I22).
  *   v1.25.0 — 2026-10-09 — docsignDefaults() (config-docsign.ts); the AI-label posture moved to config-ai-label.ts unchanged.
  *   v1.24.0 — 2026-10-09 — turnDefaults(): the TURN settings, with turnSecret and turnTtlSeconds (config-turn.ts).
  *   v1.23.0 — 2026-10-08 — visibilityDefaults(): one switch per visibility layer (config-visibility.ts).
@@ -385,7 +386,6 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     federationDefaultScopes: (process.env.AIMEAT_FEDERATION_DEFAULT_SCOPES ?? 'memory:read,catalogue:read').split(',').filter(Boolean),
     federationOpenJoin: process.env.AIMEAT_FEDERATION_OPEN_JOIN === 'true',
     federationBookListed: process.env.AIMEAT_FEDERATION_BOOK_LISTED !== 'false',
-    federationAudienceRequired: process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED === 'true',
     federationAvailabilityWindowDays: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_WINDOW_DAYS ?? '30', 10),
     federationAvailabilityPermanentThreshold: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_PERMANENT_THRESHOLD ?? '90', 10),
     federationAvailabilityMinSamples: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_MIN_SAMPLES ?? '288', 10),

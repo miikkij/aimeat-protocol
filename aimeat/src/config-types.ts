@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.17.1 — 2026-10-10 — federationAudienceRequired names the two versions and the per-peer pin (secaudit 2026-10-10 I21, I22).
  *   v1.17.0 — 2026-10-09 — DocsignConfig mixed in (config-docsign.ts); ExtensionHooks and HookName
  *     moved to config-types-hooks.ts unchanged and re-exported here.
  *   v1.16.0 — 2026-10-09 — TurnConfig mixed in (config-turn.ts): the TURN fields moved there unchanged, plus turnSecret and turnTtlSeconds.
@@ -441,9 +442,12 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   federationBookListed: boolean;
   /** Refuse a federation message in the older format (a message, broadcast, storage grant, ping,
    *  heartbeat, presence, introduction, sign-in verification or memory list) that does not name this
-   *  node as its audience (services/signed-node-request.ts audienceRefusal). Default off while peers
-   *  on an older version send none; a message that names an audience is checked either way. Planned
-   *  to default on in 3.27.0 (secaudit 2026-10 follow-up, A7). */
+   *  node as its audience (services/signed-node-request.ts audienceRefusal), and a replicate, catalogue
+   *  sync, genesis catalogue ingest or read receipt without its delivery proof (deliveryRefusal). The
+   *  default follows the version: off before AUDIENCE_REQUIRED_BY_DEFAULT_IN (3.27.0), on from it, and
+   *  the unproven format goes in UNPROVEN_FORMAT_REMOVED_IN (4.0.0), both in config-federation.ts. A
+   *  message that names an audience is checked either way, and a peer that has once sent a delivery
+   *  proof is held to it whatever this says (secaudit 2026-10 follow-up, A7; 2026-10-10 I21, I22). */
   federationAudienceRequired: boolean;
   /** Peer availability window (days) over which heartbeat uptime % is computed. */
   federationAvailabilityWindowDays: number;

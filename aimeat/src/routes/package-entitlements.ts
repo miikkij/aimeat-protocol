@@ -10,6 +10,7 @@
  *   GET /v1/packages/:groupId/entitlements · PUT and DELETE /v1/packages/:groupId/entitlements/:nodeId
  *   GET /v1/federation/packages (signed by the calling node) · GET /v1/packages/:groupId/config-needs
  * @version-history
+ *   v1.5.1 — 2026-10-10 — The listing adopts a pending node only for a request signed with the key its grant named (secaudit 2026-10-10 I7).
  *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.0 — 2026-10-05 — A grant passes the repository role (PKG-8), and the signed listing must name
  *     this node as its audience (PKG-10; secaudit 2026-10).
@@ -26,7 +27,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import {
-    listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing, entitledGroupsOf, headerNode,
+    listEntitlements, grantEntitlement, revokeEntitlement, repositoryListing, entitledGroupsOf, headerNode, pendingPeerProof,
 } from '../services/packages/sale/package-entitlements.js';
 import { adoptPendingPeer } from '../services/packages/peer/package-peer-register.js';
 import { verifyPackageNode } from '../services/packages/peer/package-node-auth.js';
@@ -89,8 +90,10 @@ export function registerPackageEntitlementRoutes(
             res.status(404).json(error(config.nodeId, 'NOT_A_REPOSITORY', 'This node does not serve packages as a repository.'));
             return;
         }
-        // A node granted while it did not answer is registered on its first signed request.
-        await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId }, headerNode(req.headers));
+        // A node granted while it did not answer is registered on its first request signed with the key
+        // the grant named; nothing is fetched or written for a request that is not (secaudit 2026-10-10 I7).
+        await adoptPendingPeer({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId },
+            headerNode(req.headers), pendingPeerProof(req.headers, '*', config.nodeId));
         // A packages-only peer (catalogue not shared, registered with its grant) is heard for what it
         // holds, and its listing carries only that: the public catalogue is what the flag withholds.
         const who = await verifyPackageNode(req.headers, peers, '*', config.nodeId, Date.now(),

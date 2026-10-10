@@ -4,6 +4,9 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   v1.3.0 — 2026-10-10 — Phase 3c: a peer that has sent a delivery proof is held to it; its replicate
+ *     and catalogue sync without the proof are refused, also after the operator saves the peer again
+ *     (secaudit 2026-10-10 I21).
  *   v1.2.0 — 2026-10-09 — A public route's 500 answer carries a sentence and the request id, never the
  *     exception text (secrets audit 2026-10-09, 07-side-channels d4).
  *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit, two findings. Phase 3b: every replication
@@ -51,6 +54,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { deliveryProof } from '../src/services/signed-node-request.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -570,6 +574,58 @@ await test('14c. Catalogue sync from an active peer is refused unsigned and tamp
     const ids = ((cat.body.data?.actions ?? cat.body.data ?? []) as any[]).map(a => a.id);
     assert(!ids.includes('remote-action-unsigned') && !ids.includes('remote-action-swapped'),
         `a refused sync must land nothing: ${JSON.stringify(ids)}`);
+});
+
+// ─── Phase 3c: the delivery-proof pin (secaudit 2026-10-10 I21) ───
+// A replicate signs the record's own update time, so a send time and the node it is for travel in a
+// second signature (the delivery proof). With AIMEAT_FEDERATION_AUDIENCE_REQUIRED off, a replicate
+// without the proof still passed, so a captured one could be sent again with the proof stripped and
+// bring a deleted record back. The peer's first verified proof now pins it to sending one. Test 12
+// above is the compatibility side: this peer had sent no proof then, and its replicate was stored.
+console.log('\nPhase 3c — A peer that has sent the delivery proof is held to it');
+
+const replicateBody = (key: string) => ({
+    source_node: directPeerNodeId, gaii: agentGaii, key,
+    value: { theme: 'pinned' }, visibility: 'public', version: 1, timestamp: new Date().toISOString(),
+});
+
+await test('12e. A replicate with a delivery proof is stored', async () => {
+    const payload = replicateBody('proven-pref');
+    const signed = JSON.stringify(payload);
+    const proof = await deliveryProof(directPeerPrivKeyB64, signed, NODE_ID);
+    const { status, body } = await json('/v1/federation/replicate', {
+        method: 'POST', body: JSON.stringify({ ...payload, signature: await signMsg(directPeerPrivKeyB64, signed), ...proof }),
+    });
+    assert(status === 200 && body.data?.replicated === true, `proven replicate: ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    assert(await replicaExists('proven-pref'), 'the proven replica is stored');
+});
+
+await test('12f. The same peer\'s replicate WITHOUT the proof is now refused (401), and nothing is written', async () => {
+    // Correctly signed, as a captured replicate with its three proof fields stripped would be.
+    const payload = replicateBody('stripped-pref');
+    const { status, body } = await json('/v1/federation/replicate', {
+        method: 'POST', body: JSON.stringify({ ...payload, signature: await signMsg(directPeerPrivKeyB64, JSON.stringify(payload)) }),
+    });
+    assert(status === 401 && body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${status}: ${JSON.stringify(body.error ?? body.data)}`);
+    assert(!(await replicaExists('stripped-pref')), 'an unproven replicate from a pinned peer must write nothing');
+});
+
+await test('12g. The pin holds after the operator saves the peer again, and covers catalogue sync too', async () => {
+    // A PUT rebuilds the peer record; the stored pin must survive it.
+    const put = await json(`/v1/federation/peers/${directPeerNodeId}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ url: 'http://localhost:9997' }),
+    });
+    assert(put.status === 200, `PUT: ${put.status} ${JSON.stringify(put.body.error)}`);
+    const payload = { source_node: directPeerNodeId, actions: [], since_timestamp: null, catalogue_hash: null };
+    const { status, body } = await json('/v1/federation/catalogue-sync', {
+        method: 'POST', body: JSON.stringify({ ...payload, signature: await signMsg(directPeerPrivKeyB64, JSON.stringify(payload)) }),
+    });
+    assert(status === 401 && body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${status}: ${JSON.stringify(body.error ?? body.data)}`);
+    const again = replicateBody('stripped-after-put');
+    const r = await json('/v1/federation/replicate', {
+        method: 'POST', body: JSON.stringify({ ...again, signature: await signMsg(directPeerPrivKeyB64, JSON.stringify(again)) }),
+    });
+    assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `replicate after the PUT: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
 });
 
 // ─── Phase 4: De-peering ───

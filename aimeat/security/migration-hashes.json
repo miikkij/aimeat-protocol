@@ -100,6 +100,7 @@
     "0095_company_description_provenance.sql": "c59bc74cdcff0532fb82a437262cfca5cc240f01ec67df16e2f955f8a6be2b9d",
     "0096_storage_file_provenance.sql": "a57d163df773b7b6e1629ba17b668709b7e0fc2a2752b8c1fb57665282378091",
     "0098_work_task_provenance.sql": "696a19c8f0fd1c1173ce623b786bfa29c2325dc7b89cba1490ea75b2578b7111",
-    "0099_secret_host_binding.sql": "59e217ae0c30a203ff6aab70eeaa8d3094410da43e71279429169b4eda6970f5"
+    "0099_secret_host_binding.sql": "59e217ae0c30a203ff6aab70eeaa8d3094410da43e71279429169b4eda6970f5",
+    "0100_peer_delivery_proof_pin.sql": "4f4f1401cb58f39ce8c8937e4666f5f1b694ad0a6df019463a09a11db8ac8093"
   }
 }

@@ -25,9 +25,10 @@
  *   such peer arrived (peer-origin.ts) and removes one with DELETE /v1/federation/peers/:nodeId.
  *
  *   A SALE DOES NOT FAIL ON A NODE THAT IS DOWN. When the card cannot be read at all, a grant still
- *   stands and the registration waits (`pending`); the node's first signed request to this repository
- *   reads the card and finishes it (adoptPendingPeer). A card that answers with another id or key is a
- *   refusal, not a wait: that is the grant naming the wrong node.
+ *   stands and the registration waits (`pending`); the node's first request to this repository that
+ *   is signed with the key the grant named reads the card and finishes it (adoptPendingPeer). A card
+ *   that answers with another id or key is a refusal, not a wait: that is the grant naming the wrong
+ *   node.
  *
  *   AN EXISTING PEER IS NEVER CHANGED. Under another key it is refused (PEER_KEY_MISMATCH); switched
  *   off it is refused (PEER_NOT_ACTIVE), because the operator switched it off and a sale does not
@@ -38,8 +39,11 @@
  *   const link = await linkPackagePeer({ storage, peers, timeoutMs }, nodeId, input.node,
  *       { source: 'package-grant', by: owner, groupId }, { pendingWhenUnreachable: true });
  *   if (!link.ok) return link;                          // nothing was written
- *   await adoptPendingPeer({ storage, peers, timeoutMs }, headerNodeId);   // before verifyPackageNode
+ *   await adoptPendingPeer({ storage, peers, timeoutMs }, headerNodeId, proves);   // before verifyPackageNode
  * @version-history
+ *   v2.3.0 — 2026-10-10 — adoptPendingPeer takes `proves`: the request must be signed with the key the
+ *     grant named before the card is read or anything is written; an unsigned request naming a pending
+ *     node registered it (secaudit 2026-10-10 I7).
  *   v2.2.0 — 2026-10-02 — A new packages-only peer from a grant, a sale or a named seller counts against
  *     the node's cap (`cap`, package-peer-limits.ts): beyond it 409 PACKAGE_PEER_CAP, nothing written.
  *   v2.1.0 — 2026-10-01 — With `thisNodeId` in the deps, a card that answers as another node or key and
@@ -207,14 +211,21 @@ const RETRY_GAP_MS = 10_000;
 /**
  * The node that signs this request has a pending registration here: read its card now and register
  * it when the card answers with the id and key the grant named. Anything else leaves the pending
- * record as it was, with the problem noted. Called before the request's signature is checked, which
- * is safe: the grant that wrote the pending record was the decision, and the card read is the same
- * proof the grant would have made; the signature is then checked against the registered key.
+ * record as it was, with the problem noted.
+ *
+ * `proves` checks the request's signature against the key the grant named (without taking its
+ * nonce), and nothing is read over the network or written before it holds: x-source-node is typed by
+ * the caller, so an unsigned request naming a pending node made this node fetch that node's card,
+ * rewrite its pending record and register it as a peer (secaudit 2026-10-10 I7). The request's
+ * signature is then checked again, against the registered key, and takes its nonce there.
  */
-export async function adoptPendingPeer(deps: PeerLinkDeps, nodeId: string | undefined): Promise<void> {
+export async function adoptPendingPeer(
+    deps: PeerLinkDeps, nodeId: string | undefined, proves: (publicKey: string) => Promise<boolean>,
+): Promise<void> {
     if (!nodeId || deps.peers.has(nodeId)) return;
     const pending = await readPendingPeer(deps.storage, nodeId);
     if (!pending) return;
+    if (!await proves(pending.publicKey)) return;
     if (pendingExpired(pending)) { await deletePendingPeer(deps.storage, nodeId); return; }
     const now = Date.now();
     if (now - (lastTry.get(nodeId) ?? 0) < RETRY_GAP_MS) return;

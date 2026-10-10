@@ -25,6 +25,8 @@
  *   routes the sweep found · cleanup
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-peer-registration-proof
  * @version-history
+ *   v1.2.0 — 2026-10-10 — Phase 4: an unsigned request, or one signed with another key, naming a waiting
+ *     node writes nothing to its pending record or the peer registry (secaudit 2026-10-10 I7).
  *   v1.1.0 — 2026-10-01 — Phase 6: the Security page entries for a failed card check and a held node
  *     id. Phase 7: the five sweep defects (a pending introduction no longer deletes a leaving peer,
  *     an open join cannot replace a held id, a message waits for a live link, a peer speaks only for
@@ -293,9 +295,35 @@ await test('A second grant naming the waiting node under another key is refused'
     assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `expected 409 PEER_KEY_MISMATCH: ${r.status} ${JSON.stringify(r.body)}`);
 });
 
-await test('The node\'s first signed request reads its card, registers it, and is served what it was sold', async () => {
-    // The node comes up, under the key the grant named, and asks the repository what it may pull.
+// Secaudit 2026-10-10 I7. x-source-node is typed by the caller, and the listing adopted the pending
+// node it named before any signature was checked: a request with no signature at all made this node
+// read the card and register the peer. The node is up here, so on the old code the first request below
+// registered it (and wrote its pending record); now nothing is fetched or written for it.
+await test('An unsigned request, or one signed with another key, naming the waiting node writes nothing', async () => {
+    // The node comes up, under the key the grant named.
     const node = await startStub(waiting, { port: waitingPort, cardKey: waitingKeys.publicKey }); stubs.push(node);
+    const before = (await peerList()).pending_registrations.find(p => p.node_id === waiting);
+    assert(!!before, 'the registration is pending');
+
+    const bare = await R.json('/v1/federation/packages', { headers: { 'x-source-node': waiting } });
+    assert(bare.status === 401, `unsigned: ${bare.status} ${JSON.stringify(bare.body)}`);
+
+    const other = await generateKeyPair();
+    const timestamp = new Date().toISOString();
+    const nonce = randomBytes(16).toString('hex');
+    const forged = await sign(other.privateKey, JSON.stringify({ source_node: waiting, timestamp, purpose: 'package', group_id: '*', audience: R.nodeId, nonce }));
+    const wrongKey = await R.json('/v1/federation/packages', { headers: { 'x-source-node': waiting, 'x-timestamp': timestamp, 'x-audience': R.nodeId, 'x-nonce': nonce, 'x-signature': forged } });
+    // Still no peer by that id, so the peer gate answers before the signature is read.
+    assert(wrongKey.status === 403, `another key: ${wrongKey.status} ${JSON.stringify(wrongKey.body)}`);
+
+    const list = await peerList();
+    assert(!list.peers.some(p => p.node_id === waiting), `not registered: ${JSON.stringify(list.peers.find(p => p.node_id === waiting))}`);
+    const after = list.pending_registrations.find(p => p.node_id === waiting);
+    assert(JSON.stringify(after) === JSON.stringify(before), `the pending record is unchanged: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+});
+
+await test('The node\'s first signed request reads its card, registers it, and is served what it was sold', async () => {
+    // The node is up (the test above started it) and asks the repository what it may pull.
     const timestamp = new Date().toISOString();
     // The repository it is for and a one-time nonce are part of the signed message (secaudit 2026-10, PKG-10).
     const nonce = randomBytes(16).toString('hex');
