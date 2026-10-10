@@ -9,6 +9,10 @@ The earlier guide's claim of complete verification was incorrect.
 This page describes the code that exists. It is not an instruction to enable EUDIW
 and does not establish certification or compatibility with a wallet provider.
 
+**Signing a PDF with a wallet is a different feature** and works: its settings are
+`docsign.eudi_*` (`AIMEAT_DOCSIGN_EUDI_*`), never `AIMEAT_EUDIW_*`. See
+[document-signing.md](document-signing.md).
+
 ## Existing routes
 
 The routes are defined in [verification.ts](../aimeat/src/routes/verification.ts).
