@@ -39,6 +39,10 @@
  *   fillable elements through slotInto, declare the lines — and describe() picks them up from
  *   the JSDoc on the next `pnpm build:atelier-parts`.
  * @version-history
+ *   v0.66.1 — 2026-10-10 — schedule: bookings that share hours are drawn beside each other
+ *     (planner-lanes.js), each at an equal share of its day. They were drawn at full width on
+ *     top of each other, so of three programmes at 21:00 a person saw one. A booking alone on
+ *     its hours is drawn exactly as before.
  *   v0.51.0 — 2026-09-05 — THE CARD TAKES WHAT THE APP GIVES IT: named parts on every element of
  *     the board, `extra` and `aside` left empty on a card, `parts.card` for the whole card and
  *     `parts.colhead` for a column's own heading, two variants and three tokens. The drag, the
@@ -58,6 +62,7 @@ import { el, clear, resolve, reducedMotion, motionOff } from './dom.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
 import { flipFrom } from './flow-parts.js';
+import { scheduleLanes } from './planner-lanes.js';
 import { partEl, slotInto, applyVariant, partValue, fillPart } from './parts-model.js';
 
 const TONES = ['ok', 'warn', 'err', 'accent'];
@@ -337,18 +342,33 @@ export function schedule(spec) {
         el('span', { class: 'ak-schedule__dayname', text: label }),
       ]);
       const well = el('div', { class: 'ak-schedule__well' });
+      // Bookings that share hours stand beside each other, each at an equal share of the day.
+      const places = scheduleLanes(inDay);
       inDay.forEach((e, i) => {
+        const { lane, lanes } = places[i];
         const block = el(spec.onPick ? 'button' : 'span', {
-          class: 'ak-schedule__event ak-schedule__event--' + toneOf(e.tone, 'accent'),
+          class: 'ak-schedule__event ak-schedule__event--' + toneOf(e.tone, 'accent')
+            + (lanes > 1 ? ' ak-schedule__event--shared' : '') + (lanes > 2 ? ' ak-schedule__event--tight' : ''),
           type: spec.onPick ? 'button' : undefined,
           title: `${e.label} · ${e.from}–${e.to}`,
+          // A third of a narrow day has no room for the name, so the name is also said aloud.
+          'aria-label': lanes > 2 ? `${e.label} · ${e.from}–${e.to}` : undefined,
         }, [
           el('span', { class: 'ak-schedule__eventname', text: e.label }),
-          // A short booking has room for its name only; the title carries the hours anyway.
-          e.toMin - e.fromMin >= 75 ? el('span', { class: 'ak-schedule__eventtime', text: `${e.from}–${e.to}` }) : null,
+          // A short booking has room for its name only, and so has one that shares its hours
+          // with two others; the title carries the hours anyway.
+          e.toMin - e.fromMin >= 75 && lanes <= 2 ? el('span', { class: 'ak-schedule__eventtime', text: `${e.from}–${e.to}` }) : null,
         ]);
         block.style.top = Y(e.fromMin) + '%';
         block.style.height = Math.max(Y(e.toMin) - Y(e.fromMin), 4) + '%';
+        if (lanes > 1) {
+          // The stylesheet's 3px inset on both sides stays; the room between is divided, with
+          // 2px left between neighbours. A booking alone on its hours gets no inline width at
+          // all, so it is drawn by the stylesheet exactly as before.
+          block.style.insetInlineStart = `calc(3px + (100% - 6px) * ${lane} / ${lanes})`;
+          block.style.insetInlineEnd = 'auto';
+          block.style.width = `calc((100% - 6px) / ${lanes} - ${lane < lanes - 1 ? 2 : 0}px)`;
+        }
         if (spec.onPick) block.addEventListener('click', () => spec.onPick(e));
         if (!reducedMotion()) { block.classList.add('ak-schedule__event--enter'); block.style.animationDelay = `${(di * 3 + i) * 50}ms`; }
         well.appendChild(block);

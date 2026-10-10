@@ -57,6 +57,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.66.1 — 2026-10-10 — schedule(): bookings that share hours stand beside each other, each
+ *     at an equal share of its day (planner-lanes.js). They lay on top of each other at full
+ *     width, so only the last one drawn was seen. A booking alone on its hours is unchanged.
  *   v0.66.0 — 2026-10-05 — form() checks through the validate core (validate/core.js): one JSON
  *     Schema from the fields and the host's `schema`, a message per field in the person's language,
  *     a format's hint under its field, the check when a field is left and the mark when it is right,
@@ -477,7 +480,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.66.0',
+  version: '0.66.1',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
