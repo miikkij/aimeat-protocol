@@ -7,6 +7,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and _wallet_status (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.2.0 — 2026-10-10 — aimeat_docsign_wallet_start's storage_key is optional.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { requiredString, optionalString, optionalBoolean, optionalRecord, requiredArray, query } from './tool-call-helpers.js';
@@ -81,9 +82,10 @@ export const docsignCliTools: ConnectCliToolDefinition[] = [
     {
         // → POST /v1/docsign/requests/:id/wallet (JSON: the PDF named by a stored file)
         name: 'aimeat_docsign_wallet_start',
-        handler: ({ client }, input) => client.post(`/v1/docsign/requests/${id(input)}/wallet`, {
-            storage_key: requiredString(input, 'storage_key'),
-        }),
+        handler: ({ client }, input) => {
+            const storageKey = optionalString(input, 'storage_key');
+            return client.post(`/v1/docsign/requests/${id(input)}/wallet`, storageKey ? { storage_key: storageKey } : {});
+        },
     },
     {
         // → GET /v1/docsign/requests/:id/wallet/:session

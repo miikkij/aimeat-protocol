@@ -27,13 +27,17 @@
  *   parties signing at once: a node is one process, so an in-process lock is the whole answer.
  * @structure DocSignRecord · DocSignature · DocsignError · createRequest · getRequest ·
  *   listRequests · lookupByHash · beginPasskeySignature · signRequest · cancelRequest ·
- *   verifyRecordSignatures · publicView · walletSigner · recordWalletSignature · signedDocument
+ *   verifyRecordSignatures · publicView · walletSigner · recordWalletSignature · signedDocument ·
+ *   nextPdfToSign
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Wallet signatures: the sealing step is shared (sealInto), a request keeps
  *     the newest wallet-signed PDF's place and hash, and any party reads that PDF
  *     (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.2.0 — 2026-10-10 — A request made from a stored file remembers where it is
+ *     (document.source), so a wallet signature starts without the file being sent again
+ *     (nextPdfToSign); requestFile is the one read of a party's file for another party.
  */
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
@@ -102,7 +106,11 @@ export interface DocSignRecord {
   state: 'open' | 'complete' | 'cancelled';
   title: string;
   message: string | null;
-  document: { sha256: string; name: string; size: number; mediaType: string | null };
+  /**
+   * `source`: where the creator's own copy is, when the request was made from a stored file. The
+   * file stays in its owner's files; this lets a wallet signature start without sending it again.
+   */
+  document: { sha256: string; name: string; size: number; mediaType: string | null; source?: { owner: string; key: string } };
   parties: { identity: string; name: string | null }[];
   signatures: Record<string, DocSignature>;
   createdBy: string;
@@ -203,7 +211,7 @@ function refuseVisitor(caller: CallerContext): void {
 export interface CreateInput {
   title: string;
   message?: string | null;
-  document: { sha256: string; name: string; size: number; mediaType?: string | null };
+  document: { sha256: string; name: string; size: number; mediaType?: string | null; source?: { owner: string; key: string } };
   parties: string[];
 }
 
@@ -227,7 +235,10 @@ export async function createRequest(ctx: DocsignCtx, caller: CallerContext, inpu
     v: 1, id: `ds-${randomUUID()}`, state: 'open',
     title: input.title.trim().slice(0, 200) || input.document.name,
     message: input.message?.trim().slice(0, 2000) || null,
-    document: { sha256: sha, name: input.document.name.trim().slice(0, 255), size: Math.max(0, Math.floor(input.document.size)), mediaType: input.document.mediaType ?? null },
+    document: {
+      sha256: sha, name: input.document.name.trim().slice(0, 255), size: Math.max(0, Math.floor(input.document.size)), mediaType: input.document.mediaType ?? null,
+      ...(input.document.source ? { source: input.document.source } : {}),
+    },
     parties: named, signatures: {}, createdBy: caller.principal, createdAt: new Date().toISOString(),
     completedAt: null, cancelledAt: null,
   };
@@ -453,21 +464,45 @@ export async function recordWalletSignature(
   });
 }
 
+/**
+ * A file a party stored for this request, read for another party: the signed PDF a wallet returned
+ * (in the signer's files) or the request's own document (in the creator's files). Reading it here
+ * is the request's own purpose, shared with the parties who agreed to sign the same document. A
+ * classification label the owner put on the file still decides, through the same reader GET
+ * /v1/storage/{key} uses, and a file whose bytes no longer have the recorded hash is not it.
+ */
+async function requestFile(ctx: DocsignCtx, caller: CallerContext, owner: string, key: string, sha256: string): Promise<Buffer | null> {
+  const meta = await ctx.storage.getStorageFileMeta(owner, key);
+  const [shown] = meta ? await readerFor(ctx, caller.auth).show([meta], () => fileTarget(owner, key, meta.workspaceRef)) : [];
+  const file = shown ? await ctx.storage.getStorageFile(owner, key) : null;
+  return file && documentHash(file.data) === sha256 ? file.data : null;
+}
+
 /** The newest wallet-signed PDF of a request, for any party who may read the request. */
 export async function signedDocument(ctx: DocsignCtx, caller: CallerContext, id: string): Promise<{ data: Buffer; name: string; sha256: string }> {
   const rec = await getRequest(ctx, caller, id);
   const doc = rec.walletDocument;
   if (!doc) throw new DocsignError('NOT_FOUND', 404, 'Nobody has signed this request with a wallet yet, so there is no signed PDF.');
-  // The signer stored it in their own files for this request; reading it here is the request's own
-  // purpose, shared with the parties who agreed to sign the same document. A classification label
-  // the signer put on the file still decides, through the same reader GET /v1/storage/{key} uses.
-  const meta = await ctx.storage.getStorageFileMeta(doc.owner, doc.key);
-  const [shown] = meta ? await readerFor(ctx, caller.auth).show([meta], () => fileTarget(doc.owner, doc.key, meta.workspaceRef)) : [];
-  const file = shown ? await ctx.storage.getStorageFile(doc.owner, doc.key) : null;
-  if (!file || documentHash(file.data) !== doc.sha256) {
-    throw new DocsignError('GONE', 410, 'The signed PDF is no longer in the signer\'s files. Ask them for a copy; its hash still finds this request.');
+  const data = await requestFile(ctx, caller, doc.owner, doc.key, doc.sha256);
+  if (!data) throw new DocsignError('GONE', 410, 'The signed PDF is no longer in the signer\'s files. Ask them for a copy; its hash still finds this request.');
+  return { data, name: doc.name, sha256: doc.sha256 };
+}
+
+/**
+ * The PDF a wallet signs next, when this node holds it: the newest wallet-signed PDF, or else the
+ * request's document when it was created from a stored file. Null when neither is here (the
+ * request was made from a hash alone), and the caller then sends the file.
+ */
+export async function nextPdfToSign(ctx: DocsignCtx, caller: CallerContext, id: string): Promise<{ data: Buffer; name: string } | null> {
+  const rec = await getRequest(ctx, caller, id);
+  if (rec.walletDocument) {
+    const data = await requestFile(ctx, caller, rec.walletDocument.owner, rec.walletDocument.key, rec.walletDocument.sha256);
+    return data ? { data, name: rec.walletDocument.name } : null;
   }
-  return { data: file.data, name: doc.name, sha256: doc.sha256 };
+  const src = rec.document.source;
+  if (!src) return null;
+  const data = await requestFile(ctx, caller, src.owner, src.key, rec.document.sha256);
+  return data ? { data, name: rec.document.name } : null;
 }
 
 async function registeredKey(storage: Storage, identity: string): Promise<string | null> {

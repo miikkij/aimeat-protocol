@@ -33,6 +33,7 @@
  *   v1.1.0 — 2026-10-10 — Signing with an EU Digital Identity Wallet, the suite playing the wallet
  *     (wish-allekirjoitus-eudi-lompakolla).
  *   v1.2.0 — 2026-10-10 — A wallet answering at the node's own address, the session found by state.
+ *   v1.3.0 — 2026-10-10 — A request made from a stored PDF starts a wallet signature with no file sent.
  */
 import * as ed from '@noble/ed25519';
 import { createHash, X509Certificate } from 'node:crypto';
@@ -459,6 +460,31 @@ async function main() {
         assert(ok.status === 200 && String((await ok.json() as any).redirect_uri).includes(id), `POST / with the session's state: ${ok.status}`);
         const done = await json(`/v1/docsign/requests/${id}`, { headers: auth(alice.token) });
         assert(done.body.data.request.state === 'complete' && done.body.data.request.signatures[ghii(names.alice)].statement.method === 'eudi-wallet', `complete: ${done.body.data.request.state}`);
+    });
+
+    await test('a request made from a stored PDF starts a wallet signature with no file sent; one made from a hash asks for the PDF', async () => {
+        const pdf = plainPdf(`Vuokrasopimus PDF ${stamp}`);
+        const up = await json('/v1/storage', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key: `docsign/${stamp}/vuokra.pdf`, data: pdf.toString('base64'), mime_type: 'application/pdf', visibility: 'private' }) });
+        assert(up.status === 201 || up.status === 200, `upload: ${up.status} ${JSON.stringify(up.body.error)}`);
+        const r = await post('/v1/docsign/requests', alice.token, { title: 'Vuokra', storage_key: `docsign/${stamp}/vuokra.pdf`, parties: [ghii(names.alice), ghii(names.bob)] });
+        assert(r.status === 201 && r.body.data.request.document.source?.key === `docsign/${stamp}/vuokra.pdf`, `create from storage: ${r.status} ${JSON.stringify(r.body.data?.request?.document ?? r.body.error)}`);
+        const id = r.body.data.request.id;
+        const started = await post(`/v1/docsign/requests/${id}/wallet`, alice.token, {});
+        assert(started.status === 201 && String(started.body.data.wallet_link).startsWith('eudi-rqes://'), `start with no file: ${started.status} ${JSON.stringify(started.body.error)}`);
+        const { claims, pdf: got } = await walletOpens(started.body.data.wallet_link);
+        assert(got.equals(pdf), 'the wallet downloads the stored PDF');
+        const signed = appendSignature(got, walletSigner.cert, walletSigner.key, walletSigner.chain);
+        const res = await walletPosts(claims, { state: claims.state, documentWithSignature: JSON.stringify([signed.toString('base64')]) });
+        assert(res.status === 200, `wallet response: ${res.status}`);
+        // Bob, the second party, starts from the signed PDF that sits in alice's files, again sending nothing.
+        const bobStart = await post(`/v1/docsign/requests/${id}/wallet`, bob.token, {});
+        assert(bobStart.status === 201, `bob with no file: ${bobStart.status} ${JSON.stringify(bobStart.body.error)}`);
+        const bobOpens = await walletOpens(bobStart.body.data.wallet_link);
+        assert(bobOpens.pdf.equals(signed), 'bob\'s wallet gets the signed PDF');
+        // A request made from a hash alone: the node holds no PDF and says so.
+        const fromHash = await post('/v1/docsign/requests', alice.token, { title: 'Pelkkä tiiviste', document: { sha256: createHash('sha256').update(pdf).digest('hex'), name: 'x.pdf', size: pdf.length, media_type: 'application/pdf' }, parties: [ghii(names.alice)] });
+        const none = await post(`/v1/docsign/requests/${fromHash.body.data.request.id}/wallet`, alice.token, {});
+        assert(none.status === 409 && none.body.error?.code === 'DOCUMENT_NEEDED', `hash only: ${none.status} ${none.body.error?.code}`);
     });
 
     // ── cancelling ──
