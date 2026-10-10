@@ -107,7 +107,15 @@ in-memory store:
 
 For a local dev node, these two are convenient (do **not** use them on a public node):
 `AIMEAT_DEV_MODE=true` and `AIMEAT_ANONYMOUS=true`. Leave `AIMEAT_ADMIN_PASSWORD` unset to let the server
-generate one on startup (it prints it once).
+generate one on startup (it writes it to a file, see Step 4).
+
+**The node's keys live in `.env`, and they must never change or be lost.** The data key encrypts every
+stored secret (AI keys, the secrets vault, extension secrets, two-step sign-in secrets): that is
+`AIMEAT_ENCRYPTION_KEY`, or `AIMEAT_TOTP_ENCRYPTION_KEY` when the first is not set, and `aimeat init`
+generates the second. `AIMEAT_KEY_PASSPHRASE` encrypts the node's identity key; `aimeat init`
+generates it too. Tell the user to keep a copy of `.env` somewhere safe, together with the key file
+`~/.aimeat/nodes/<node id>/node-key.json`: the database alone no longer restores the node's identity,
+and a changed data key makes every stored secret unreadable.
 
 > Going public later? `.env.example` documents the **REQUIRED operator/GDPR fields**
 > (`AIMEAT_OPERATOR_*`) — without them `/v1/privacy` returns 503 by design. Skip for local dev.

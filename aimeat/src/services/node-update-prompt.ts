@@ -19,6 +19,8 @@
  * @structure InstallMethod · UpdatePromptInput · buildNodeUpdatePrompt()
  * @usage const prompt = buildNodeUpdatePrompt({ current, latest, releasedAt, baseUrl, install, storage });
  * @version-history
+ *   v1.1.0 — 2026-10-10 — The backup step names the node key file and the keys set outside `.env`:
+ *     the identity key's database copy is encrypted since the 2026-10-09 secrets audit.
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 
@@ -44,14 +46,23 @@ const METHOD_LABEL: Record<InstallMethod, string> = {
   unknown: 'could not be told from its files',
 };
 
+/**
+ * The keys a backup must carry beside the data. The node's identity key is kept encrypted in the
+ * database since 2026-10-09, so the database alone no longer restores it, and every stored secret is
+ * encrypted with the data key.
+ */
+const KEYS_TOO = ' Also copy the node key file `~/.aimeat/nodes/<node id>/node-key.json` (or the path AIMEAT_NODE_KEY_PATH names). '
+  + 'If AIMEAT_ENCRYPTION_KEY, AIMEAT_TOTP_ENCRYPTION_KEY or AIMEAT_KEY_PASSPHRASE are set outside `.env` (Docker, systemd), copy them from there too, '
+  + 'and do not change any of them during the update: a changed key leaves the stored secrets unreadable.';
+
 function backupStep(input: UpdatePromptInput): string {
   if (input.storage === 'sqlite') {
-    return `Make a backup first: copy the SQLite database file (\`${input.sqlitePath}\`, relative to the working directory) and the \`.env\` file to a safe place, and tell me where they are.`;
+    return `Make a backup first: copy the SQLite database file (\`${input.sqlitePath}\`, relative to the working directory) and the \`.env\` file to a safe place, and tell me where they are.${KEYS_TOO}`;
   }
   if (input.storage === 'postgres-kysely') {
-    return 'Make a backup first: take a `pg_dump` of the PostgreSQL database that AIMEAT_DATABASE_URL in the `.env` names, copy the `.env` file to a safe place, and tell me where they are.';
+    return `Make a backup first: take a \`pg_dump\` of the PostgreSQL database that AIMEAT_DATABASE_URL in the \`.env\` names, copy the \`.env\` file to a safe place, and tell me where they are.${KEYS_TOO}`;
   }
-  return 'Make a backup first: copy the `.env` file to a safe place and tell me where it is. This node keeps its data in memory, so a restart starts it empty.';
+  return `Make a backup first: copy the \`.env\` file to a safe place and tell me where it is. This node keeps its data in memory, so a restart starts it empty.${KEYS_TOO}`;
 }
 
 export function buildNodeUpdatePrompt(input: UpdatePromptInput): string {
