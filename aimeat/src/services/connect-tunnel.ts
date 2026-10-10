@@ -664,7 +664,7 @@ export class ConnectTunnelManager {
   onTokenRevoked(rawToken: string): void { revokeByToken(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), rawToken); }
 
   /** Deleting ONE agent: its socket goes, and nothing else on that daemon is touched. */
-  closeForGaii(gaii: string): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii); }
+  closeForGaii(gaii: string, reason: 'moved' | 'deleted' = 'deleted'): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
 
   /** Deactivating an account: every principal acting for that owner. */
   closeForOwner(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }

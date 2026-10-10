@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-10-11 — `install_id` on the agent list: the connector that holds the agent, or
+ *     the one it waits for. A fleet runtime read the agent list and the connector list every 30 s
+ *     to learn which agents were its own.
  *   v1.14.1 — 2026-10-10 — `:name` and `:gaii` are read as Express 5 decoded them. The second
  *     decodeURIComponent threw a URIError (500) on a path such as `%25zz`; the tags and runtime-source
  *     handlers now resolve the same target as requireScopeUnlessSelf (secaudit 2026-10-10 I0).
@@ -74,6 +77,7 @@ import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js'
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
 import { portRedirectFor } from '../../services/agent-port-redirect.js';
+import { agentInstalls } from '../../services/connector-registry.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -223,6 +227,16 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         })
         : null;
 
+    // Which connector holds each agent, for the audience the connector list has (GET
+    // /v1/agents/v2/connectors): the owner and the owner's own agents. How an account's machines
+    // are set up is not an app grant's, an ecosystem app's or a visitor's to read.
+    const installOf: Record<string, string> = seesAccess && agents.length > 0
+        ? await agentInstalls({ config, storage }, req.auth!.owner).catch((err) => {
+          logger.warn('GET /v1/agents: connector placements not read, the list goes without them', { error: String(err) });
+          return {};
+        })
+        : {};
+
     if (wantStats && agents.length > 0) {
       const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
       const gaiis = agents.map(a => a.gaii);
@@ -293,6 +307,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // running when this ran" for a crew whose definition lives on someone else's disk.
         runtime_source: a.runtimeSource ?? null,
         identity_version: a.identityVersion ?? 1,
+        // Which of the owner's connectors holds it, or the one it waits for (card_enrolled says
+        // which); null when the node cannot place it. A runtime reads its roster and its own share
+        // of it in this one call (services/connector-registry.ts agentInstalls).
+        install_id: installOf[a.name] ?? null,
         // Credential health at a glance: a v2 agent with no card is created and unconnected.
         card_enrolled: !!a.enrolledAt,
         enrolled_at: a.enrolledAt ?? null,

@@ -9506,6 +9506,14 @@ paths:
                             properties:
                               id: { type: string }
                               name: { type: string, nullable: true }
+                          run_mode: { type: string, nullable: true, description: The agent's run mode after the move }
+                          run_mode_corrected:
+                            type: object
+                            nullable: true
+                            description: Set when a resident agent went to a connector that keeps no agent running, and so became spawn.
+                            properties:
+                              asked: { type: string }
+                              reason: { type: string }
                           agent: { type: object, nullable: true }
                           next_step: { type: string }
         '403': { description: Not the account holder in person }
@@ -11700,6 +11708,10 @@ paths:
                                 - $ref: '#/components/schemas/AgentProfile'
                                 - type: object
                                   properties:
+                                    install_id:
+                                      type: string
+                                      nullable: true
+                                      description: The id of the owner's connector that holds the agent, or the one it waits for when it has no key yet (`card_enrolled` false). Null when the node cannot place it, and always null for an app grant, an ecosystem app or a visitor.
                                     task_start:
                                       type: string
                                       nullable: true

@@ -112,22 +112,28 @@ async function mintEcoToken(owner: string, ownerAuth: Record<string, string>, ap
 interface FakeDaemon {
     ws: WebSocket;
     onEnrol: ((offer: any) => Promise<{ ok: boolean; result: unknown }>) | null;
+    /** Every auth_revoked frame the node sent on this socket, and every attach it accepted. */
+    revoked: any[];
+    attached: string[];
     close(): void;
 }
 
 /** `installName` is sent the way the connector sends it: URI-encoded, because a host name may not be ASCII. */
-function openDaemon(token: string, installId: string, installName?: string): Promise<FakeDaemon> {
+function openDaemon(token: string, installId: string, installName?: string, runModes?: string): Promise<FakeDaemon> {
     return new Promise((resolve, reject) => {
         const wsUrl = BASE.replace(/^http/, 'ws') + '/v1/connect/tunnel';
         const headers: Record<string, string> = { Authorization: `Bearer ${token}`, 'X-AIMEAT-Install': installId };
         if (installName) headers['X-AIMEAT-Install-Name'] = encodeURIComponent(installName);
+        if (runModes) headers['X-AIMEAT-Run-Modes'] = runModes;
         const ws = new WebSocket(wsUrl, { headers });
-        const daemon: FakeDaemon = { ws, onEnrol: null, close: () => { try { ws.close(); } catch { /* already gone */ } } };
+        const daemon: FakeDaemon = { ws, onEnrol: null, revoked: [], attached: [], close: () => { try { ws.close(); } catch { /* already gone */ } } };
         const timer = setTimeout(() => reject(new Error('tunnel did not welcome in time')), 10_000);
         ws.on('message', (data) => {
             let frame: any;
             try { frame = JSON.parse(data.toString()); } catch { return; }
             if (frame.type === 'welcome') { clearTimeout(timer); resolve(daemon); return; }
+            if (frame.type === 'auth_revoked') { daemon.revoked.push(frame); return; }
+            if (frame.type === 'attached') { daemon.attached.push(String(frame.agent)); return; }
             if (frame.type !== 'invoke') return;
             const answer = frame.capability === ENROL_CAPABILITY && daemon.onEnrol
                 ? daemon.onEnrol(frame.input)
@@ -558,6 +564,11 @@ async function run() {
     await test('an agent moves to another connected machine, and the key on the old machine stops working', async () => {
         const oldKey = keysByAgent.get('laptop-watcher')!;
         assert(await keyWorks(gaiiOf('laptop-watcher'), oldKey), 'before the move the laptop\'s key works');
+        // The laptop holds the agent on its socket, as a connector does: attached with a credential
+        // minted from the agent's key. That socket identity is what the move has to reach.
+        const minted = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion: await signAssertion(gaiiOf('laptop-watcher'), oldKey) }) });
+        dLaptop.ws.send(JSON.stringify({ type: 'attach', id: randomUUID(), agent: gaiiOf('laptop-watcher'), token: minted.body?.access_token ?? minted.body?.data?.access_token }));
+        await until('the laptop to hold laptop-watcher on its socket', async () => dLaptop.attached.includes(gaiiOf('laptop-watcher')));
         heardLaptop.length = 0; heardServer.length = 0;
         const r = await move(authA, 'laptop-watcher', SERVER);
         assert(r.status === 200, `move ${r.status}: ${JSON.stringify(r.body?.error)}`);
@@ -567,6 +578,15 @@ async function run() {
         assert(newKey.kid !== oldKey.kid, 'the server made a key of its own');
         assert(await keyWorks(gaiiOf('laptop-watcher'), newKey), 'the server\'s key works');
         assert(!(await keyWorks(gaiiOf('laptop-watcher'), oldKey)), 'the laptop\'s key no longer does');
+        // The old connector is told WHY, so it removes the agent instead of keeping a dead key, and
+        // a mint with that key is answered as a verdict on the key, not as a passing failure.
+        await until('the laptop to be told', async () => dLaptop.revoked.some(f => f.agent === gaiiOf('laptop-watcher')), 5_000);
+        const told = dLaptop.revoked.find(f => f.agent === gaiiOf('laptop-watcher'));
+        assert(told?.reason === 'moved', `the frame says the agent moved, got ${JSON.stringify(told)}`);
+        assert(!dLaptop.revoked.some(f => f.agent !== gaiiOf('laptop-watcher')), 'and no other identity on that connector is revoked');
+        const refused = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion: await signAssertion(gaiiOf('laptop-watcher'), oldKey) }) });
+        assert(refused.status === 401 && refused.body?.error?.details?.reason === 'key_not_pinned',
+            `the old key is refused as a key the node does not pin, got ${refused.status} ${JSON.stringify(refused.body?.error)}`);
         const server = await connectorOf(SERVER);
         const laptop = await connectorOf(LAPTOP);
         assert((server.agents as string[]).includes('laptop-watcher'), 'the server lists it');
@@ -585,6 +605,64 @@ async function run() {
         assert(noAgent.status === 404, `expected 404 for an agent that does not exist, got ${noAgent.status}`);
         assert(await keyWorks(gaiiOf('laptop-watcher'), key), 'and the agent\'s key still works');
     });
+
+    // ── 6b. A move re-decides the run mode against the connector the agent goes to ──
+    // Found by a real two-connector run on 2026-10-11: a resident agent moved to a connector that
+    // only starts a worker per job kept `resident`, and nobody ran it there.
+    const ALWAYS = 'mmm-always';
+    const SPAWN_ONLY = 'sss-spawn-only';
+    const seatAlways = await addV1Agent(a.owner, a.ownerToken, 'seat-always');
+    const seatSpawn = await addV1Agent(a.owner, a.ownerToken, 'seat-spawn');
+    const heardAlways: string[][] = [];
+    const heardSpawn: string[][] = [];
+    const dAlways = await openDaemon(seatAlways.token, ALWAYS, 'Aina päällä', 'spawn,resident');
+    dAlways.onEnrol = enrolWith(seatAlways.token, a.owner, heardAlways);
+    const dSpawn = await openDaemon(seatSpawn.token, SPAWN_ONLY, 'Vain spawn', 'spawn');
+    dSpawn.onEnrol = enrolWith(seatSpawn.token, a.owner, heardSpawn);
+    await until('both run-mode connectors to be listed', async () => !!(await connectorOf(ALWAYS)) && !!(await connectorOf(SPAWN_ONLY)));
+
+    await test('a resident agent keeps its run mode on a connector that keeps agents running, or that never said', async () => {
+        const p = await propose('stay-up', { connector: ALWAYS, run_mode: 'resident' });
+        const r = await approve(p.body.data.proposal.id);
+        assert(r.status === 200 && r.body.data.attached === true, `approve ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        assert((await recordOf('stay-up'))?.run_mode === 'resident', 'approved as resident on a connector that says it keeps agents running');
+        const toServer = await move(authA, 'stay-up', SERVER);
+        assert(toServer.status === 200, `move to the server ${toServer.status}: ${JSON.stringify(toServer.body?.error)}`);
+        assert(toServer.body.data.run_mode === 'resident' && toServer.body.data.run_mode_corrected === null,
+            `a connector that never said how it runs agents is not second-guessed, got ${JSON.stringify(toServer.body.data)}`);
+        assert((await recordOf('stay-up'))?.run_mode === 'resident', 'and the record still says resident');
+    });
+
+    await test('a resident agent moved to a connector that only starts a worker per job becomes spawn, and the answer says so', async () => {
+        const r = await move(authA, 'stay-up', SPAWN_ONLY);
+        assert(r.status === 200, `move ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.run_mode === 'spawn', `the answer carries the run mode it has now, got ${JSON.stringify(r.body.data.run_mode)}`);
+        assert(r.body.data.run_mode_corrected?.asked === 'resident' && typeof r.body.data.run_mode_corrected?.reason === 'string',
+            `and says what it was and why, got ${JSON.stringify(r.body.data.run_mode_corrected)}`);
+        assert((await recordOf('stay-up'))?.run_mode === 'spawn', 'the record is spawn, so the connector\'s spawner serves it');
+        const back = await move(authA, 'stay-up', ALWAYS);
+        assert(back.status === 200 && back.body.data.run_mode === 'spawn' && back.body.data.run_mode_corrected === null,
+            `moving back changes nothing more: nobody asked for resident again, got ${JSON.stringify(back.body?.data)}`);
+    });
+
+    await test('the agent list names the connector each agent is on, for the owner and the owner\'s agents only', async () => {
+        const rows = (await json('/v1/agents?owner=' + a.owner, { headers: authA })).body.data.agents as any[];
+        const at = (name: string) => rows.find(x => x.name === name)?.install_id;
+        assert(at('stay-up') === ALWAYS, `stay-up is on the connector it was last moved to, got ${JSON.stringify(at('stay-up'))}`);
+        assert(at('laptop-watcher') === SERVER, `laptop-watcher is on the server since its move, got ${JSON.stringify(at('laptop-watcher'))}`);
+        const asAgent = (await json('/v1/agents?owner=' + a.owner, { headers: { Authorization: `Bearer ${seatServer.token}` } })).body.data.agents as any[];
+        assert(asAgent.find(x => x.name === 'stay-up')?.install_id === ALWAYS, 'an agent of the owner reads the same placement: a runtime reads its roster this way');
+        const eco = await mintEcoToken(a.owner, authA, 'roster-reader');
+        const asApp = await json('/v1/agents?owner=' + a.owner, { headers: { Authorization: `Bearer ${eco}` } });
+        const appRows = (asApp.body?.data?.agents ?? []) as any[];
+        assert(appRows.every(x => x.install_id === null || x.install_id === undefined),
+            `an ecosystem app learns no placement, got ${JSON.stringify(appRows.filter(x => x.install_id).map(x => x.name))}`);
+        const other = (await json('/v1/agents?owner=' + b.owner, { headers: authB })).body.data.agents as any[];
+        assert(!other.some(x => [ALWAYS, SPAWN_ONLY, SERVER, LAPTOP].includes(x.install_id)), 'another owner\'s list names none of these connectors');
+    });
+
+    dAlways.close();
+    dSpawn.close();
 
     // ── 7. Forget ─────────────────────────────────────────────────────────────
     const forget = (auth: Record<string, string>, id: string) => json(`/v1/agents/v2/connectors/${encodeURIComponent(id)}`, { method: 'DELETE', headers: auth });

@@ -153,9 +153,13 @@ export default function AgentView({ navigate }) {
       const out = await moveAgent(name, target);
       setMoving(false);
       setTarget('');
-      setSaid({ ok: true, at: 'move', text: out?.waiting_for_connector
+      const where = out?.waiting_for_connector
         ? p('movedWaiting', 'It now waits for that machine, and starts when the machine connects.')
-        : p('moved', 'It runs on that machine now.') });
+        : p('moved', 'It runs on that machine now.');
+      // The node changes an always-on agent to one started per job when its new machine keeps none running.
+      setSaid({ ok: true, at: 'move', text: out?.run_mode_corrected
+        ? `${where} ${p('movedSpawn', 'That machine starts an agent when work arrives, so this agent is no longer always on.')}`
+        : where });
       await load();
     } catch (err) { setSaid({ ok: false, at: 'move', text: err?.message || String(err) }); }
     finally { setBusy(false); }

@@ -324,6 +324,20 @@ export function clearWanted(ctx: RegistryContext, owner: string, agentName: stri
   });
 }
 
+/**
+ * Agent name → the install id of the connector that holds it, or, for an agent with no key yet,
+ * the one it was ordered to. Built from listConnectors(), so the agent list and the connector list
+ * cannot name two connectors for one agent. An agent the node cannot place is absent.
+ */
+export async function agentInstalls(ctx: RegistryContext, owner: string): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const c of await listConnectors(ctx, owner)) {
+    for (const n of c.waiting) out[n] = c.id;
+    for (const n of c.agents) out[n] = c.id;
+  }
+  return out;
+}
+
 /** Agent name → the install id each waiting agent was ordered to. */
 export async function wantedInstalls(ctx: RegistryContext, owner: string): Promise<Record<string, string>> {
   return (await readRegistry(ctx, owner)).wanted;

@@ -263,7 +263,7 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
         // The old connector verified its bearer once, at upgrade, so revoking the sessions does not
         // reach its open socket. Closing a socket identity is not a storage write and cannot roll
         // back, so it comes after the key is pinned and a failure is only logged.
-        try { tunnels.closeForGaii(gaii); } catch (err) {
+        try { tunnels.closeForGaii(gaii, 'moved'); } catch (err) {
           logger.warn('Agent move: the old connector\'s socket identity was not detached', { event: 'agent_v2.move_detach_failed', gaii, error: String(err) });
         }
       }

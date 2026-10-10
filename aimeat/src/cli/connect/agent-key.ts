@@ -200,13 +200,33 @@ export async function mintAgentToken(
     body: JSON.stringify({ grant_type: AGENT_KEY_GRANT, assertion }),
   });
   const text = await res.text();
-  let body: { access_token?: string; expires_in?: number; error?: { message?: string } } | null;
+  let body: { access_token?: string; expires_in?: number; error?: { message?: string; details?: { reason?: string } } } | null;
   // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer: the node did not send JSON, and the status below is what the caller needs
   try { body = text ? JSON.parse(text) : null; } catch { body = null; }
   if (!res.ok || !body?.access_token) {
-    throw new Error(body?.error?.message ?? `Token exchange failed (${res.status})`);
+    const message = body?.error?.message ?? `Token exchange failed (${res.status})`;
+    if (res.status === 401 && body?.error?.details?.reason === 'key_not_pinned') throw new KeyRefusedError(key.gaii, message);
+    throw new Error(message);
   }
   return { token: body.access_token, expiresInSeconds: body.expires_in ?? 3600 };
+}
+
+/**
+ * The node no longer accepts this key: no key is pinned for the agent, or another one is.
+ *
+ * A VERDICT, NOT A FAILED ATTEMPT. The owner moved the agent to another connector, or it was
+ * enrolled again somewhere else, and no later attempt with this key can succeed. Its own type for
+ * the reason MintFailedError has one: the caller's next move differs. A connector whose agent had
+ * moved away read this as a passing failure, reported the agent as reachable over direct HTTP and
+ * minted again every 30 seconds for as long as it ran (measured by a two-connector run,
+ * 2026-10-11). Only a node that says `key_not_pinned` produces it, so against an older node the
+ * connector behaves as it did.
+ */
+export class KeyRefusedError extends Error {
+  constructor(public readonly gaii: string, message: string) {
+    super(message);
+    this.name = 'KeyRefusedError';
+  }
 }
 
 /**
@@ -249,6 +269,12 @@ export async function resolveToken(agent: string, owner: string, nodeUrl: string
     tokenCache.set(cacheKey, { token: minted.token, expiresAtMs: Date.now() + minted.expiresInSeconds * 1000 });
     return minted.token;
   } catch (err) {
+    // THE ONE REFUSAL THAT IS NULL: the node said this key is not the agent's any more. That is "no
+    // credential, and waiting will not produce one", which is what null means to every caller.
+    if (err instanceof KeyRefusedError) {
+      logger.warn('agent-key: the node no longer accepts this agent\'s key; it moved to another connector or was enrolled again', { agent, owner });
+      return null;
+    }
     // THROWN, NOT NULL. A key-holder that could not mint right now is not an agent with no
     // credential, and returning the same value for both told the tunnel client the wrong story: it
     // stopped for good with "No stored token. Run: aimeat connect" while the key on disk was

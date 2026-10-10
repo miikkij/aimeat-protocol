@@ -11,6 +11,8 @@
  *   spaceKeyOf(); coerceSpaceRef()
  * @usage import type { ConnectFrame } from './connect-tunnel-wire.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-11 -- `reason` on auth_revoked ('moved' | 'deleted'), so a connector can tell
+ *     an agent that went to another connector from a credential it may mint again.
  *   v1.4.0 -- 2026-09-06 -- `scopes_changed` frame: a stale credential, not a dead one.
  *   v1.1.0 -- 2026-08-28 -- `timeout_ms` on the invoke frame, so a connector daemon can drop an
  *     invoke nobody collected once the server has stopped waiting for it.
@@ -85,6 +87,13 @@ export interface ConnectFrame {
   // ── error (S→C) ──
   code?: string;
   message?: string;
+  /**
+   * auth_revoked (S→C): why the identity was detached, when the node knows. 'moved' means the owner
+   * sent the agent to another connector and its key here is replaced for good, so this connector
+   * removes the agent from its home; 'deleted' means the agent no longer exists. Absent for a
+   * revoked token or a deactivated account, where the credential may be replaced.
+   */
+  reason?: 'moved' | 'deleted';
   timestamp?: string;
 }
 
