@@ -36,8 +36,10 @@
  *   getNodeKey() → { publicKey, privateKey: openNodePrivateKey(row.privateKey, row.publicKey), sealed }
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S4a).
+ *   v1.0.1 — 2026-10-10 — The cache of opened rows compares the secrets instead of keying on a
+ *     SHA-256 of them (code scanning alert 1726).
  */
-import { createCipheriv, createDecipheriv, createHash, pbkdf2Sync, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
 
 export interface NodeKeySecrets {
   /** AIMEAT_KEY_PASSPHRASE. */
@@ -58,7 +60,12 @@ export const SEALED_NODE_KEY_PREFIX = 'nk1:';
 const PBKDF2_ROUNDS = 100_000;
 
 let configured: NodeKeySecrets | null = null;
-const opened = new Map<string, string>();
+/**
+ * Opened rows, keyed by public key and stored form, with the secrets each was opened with. The
+ * secrets are compared as they are rather than hashed into the key: a fast hash of a passphrase is
+ * what code scanning alert 1726 flagged, and this process holds the plain secrets anyway.
+ */
+const opened = new Map<string, { plain: string; passphrase: string | null; dataKeyHex: string | null }>();
 
 /** Set the secrets this process seals and opens with. initializeNode calls it before it reads the row. */
 export function configureNodeKeySecrets(secrets: NodeKeySecrets | null): void {
@@ -111,10 +118,10 @@ export function sealNodePrivateKey(privateKey: string, publicKey: string, secret
 /** The plain private key from a stored row. A plain row is returned as it is; a sealed one is opened or refused. */
 export function openNodePrivateKey(stored: string, publicKey: string, secrets: NodeKeySecrets = secretsNow()): string {
   if (!isSealedNodeKey(stored)) return stored;
-  const fingerprint = createHash('sha256').update(`${secrets.passphrase ?? ''}\u0000${secrets.dataKeyHex ?? ''}`).digest('hex');
-  const cacheKey = `${fingerprint}:${publicKey}:${stored}`;
+  const cacheKey = `${publicKey}:${stored}`;
   const hit = opened.get(cacheKey);
-  if (hit !== undefined) return hit;
+  // A hit counts only for the secrets it was opened with: a changed secret opens the row again.
+  if (hit && hit.passphrase === (secrets.passphrase ?? null) && hit.dataKeyHex === (secrets.dataKeyHex ?? null)) return hit.plain;
 
   const parts = stored.slice(SEALED_NODE_KEY_PREFIX.length).split(':');
   if (parts.length !== 5 || (parts[0] !== 'p' && parts[0] !== 'e')) {
@@ -145,6 +152,6 @@ export function openNodePrivateKey(stored: string, publicKey: string, secrets: N
     throw new NodeKeyLockedError(`The node key in the database does not open with the ${kind === 'p' ? 'AIMEAT_KEY_PASSPHRASE' : 'AIMEAT_ENCRYPTION_KEY'} this server has: the value changed, or the row was altered.`, publicKey);
   }
   if (opened.size > 8) opened.clear();
-  opened.set(cacheKey, plain);
+  opened.set(cacheKey, { plain, passphrase: secrets.passphrase ?? null, dataKeyHex: secrets.dataKeyHex ?? null });
   return plain;
 }

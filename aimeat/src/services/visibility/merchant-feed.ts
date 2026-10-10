@@ -31,6 +31,8 @@
  * @usage const { products } = await listOwnerProducts(storage, config, ownerGhii, settings);
  * @version-history
  *   v1.0.0 — 2026-10-08 — Initial (layer E).
+ *   v1.0.1 — 2026-10-10 — oneLine drops tags until nothing changes, then any `<` or `>` left (code
+ *     scanning alert 1710).
  */
 import { createHash } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
@@ -85,9 +87,15 @@ export function feedIdOf(sku: string): string {
   return `aim${createHash('sha256').update(sku).digest('hex').slice(0, 20)}`;
 }
 
-/** One line of text a tab-separated or a comma-separated file can hold: no tab, no line break. */
+/**
+ * One line of text a tab-separated or a comma-separated file can hold: no tab, no line break, no
+ * HTML. Tags are dropped until nothing changes, so a tag split by another tag (`<scr<b>ipt>`)
+ * cannot survive one pass, and then any `<` or `>` left over (code scanning alert 1710).
+ */
 function oneLine(text: string, max: number): string {
-  return text.replace(/[\t\r\n]+/g, ' ').replace(/<[^>]*>/g, '').replace(/\s{2,}/g, ' ').trim().slice(0, max);
+  let s = text.replace(/[\t\r\n]+/g, ' ');
+  for (let prev = ''; prev !== s;) { prev = s; s = s.replace(/<[^<>]*>/g, ''); }
+  return s.replace(/[<>]/g, '').replace(/\s{2,}/g, ' ').trim().slice(0, max);
 }
 
 /** Micro-units to "12.34". Null when the amount is not whole cents. */

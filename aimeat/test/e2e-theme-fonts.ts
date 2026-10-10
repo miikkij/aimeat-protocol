@@ -18,12 +18,15 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=theme-fonts
  * @version-history
  *   v1.0.0 — 2026-10-03 — Initial suite (font manager).
+ *   v1.0.1 — 2026-10-10 — The base-face count is read from THEME_FACES (nightly sweep red since IBM
+ *     Plex Sans and Mono made it 25), and every base face must have its licence trail.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { THEME_FACES } from '../src/services/themes/tokens.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
@@ -183,11 +186,15 @@ await test('Register an ordinary member', async () => {
 
 console.log('\nThe base faces');
 
-await test('GET /v1/themes/fonts — public: the 23 base faces, each with its licence trail, no owners\' files', async () => {
+// The count is read from THEME_FACES, so a face added to the code needs no edit here.
+const BASE_FACE_COUNT = Object.keys(THEME_FACES).length;
+
+await test('GET /v1/themes/fonts — public: every base face, each with its licence trail, no owners\' files', async () => {
     const { status, body } = await json('/v1/themes/fonts');
     assert(status === 200, `status ${status}: ${JSON.stringify(body.error ?? body).slice(0, 200)}`);
     const base = body.data.base as any[];
-    assert(base.length === 23, `23 base faces, got ${base.length}`);
+    assert(base.length === BASE_FACE_COUNT, `${BASE_FACE_COUNT} base faces, got ${base.length}`);
+    assert(base.every((f) => f.licenceStatus === 'stated'), `every base face has its licence trail: ${base.filter((f) => f.licenceStatus !== 'stated').map((f) => f.family).join(', ')}`);
     const fjalla = base.find((f) => f.family === 'Fjalla One');
     assert(!!fjalla && fjalla.origin === 'base', 'Fjalla One is base setup');
     assert(fjalla.licence === 'OFL-1.1' && fjalla.licenceStatus === 'stated', `licence ${fjalla.licence} ${fjalla.licenceStatus}`);

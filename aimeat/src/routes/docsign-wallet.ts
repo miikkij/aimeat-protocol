@@ -20,6 +20,7 @@
  * @usage router.use(docsignWalletRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.0.1 — 2026-10-10 — The raw PDF is taken with rawBodyBytes (code scanning alerts 1721-1725).
  */
 import { Router, raw, urlencoded, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -35,6 +36,7 @@ import {
   walletStatus, startWalletSignature, walletSessionStatus, walletRequestObject, walletDocument, receiveWalletResponse,
 } from '../services/docsign/eudi.js';
 import { docsignMaxBytes } from '../config-docsign.js';
+import { rawBodyBytes } from '../utils/raw-body.js';
 
 const StartJsonSchema = z.object({
   content_base64: z.string().optional(),
@@ -69,8 +71,9 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
     try {
       const caller = callerOf(req, config.nodeId, storage);
       let doc: { bytes: Buffer; name?: string };
-      if (Buffer.isBuffer(req.body)) {
-        doc = { bytes: req.body, ...(typeof req.query.name === 'string' ? { name: req.query.name } : {}) };
+      const raw = rawBodyBytes(req.body);
+      if (raw) {
+        doc = { bytes: raw, ...(typeof req.query.name === 'string' ? { name: req.query.name } : {}) };
       } else {
         const parsed = StartJsonSchema.safeParse(req.body ?? {});
         if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.message)); return; }

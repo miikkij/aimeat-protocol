@@ -17,6 +17,8 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-10-10 — 17j: an area longer than one part is split, and each part names the next (the
+ *     Automation area had reached 28 292 characters and failed the size bound in the nightly sweep).
  *   2026-10-03 — Test 2 bounds the END of the agent surface line by the measured cut (2 052); the
  *     core alone now runs past the old start bound of 1 900.
  *   2026-10-02 — 17l/17m: the setting explanations (tier "settings"), on MCP and REST, in three languages.
@@ -589,6 +591,13 @@ async function main() {
             const parts = list.body.data.parts as Array<{ id: string; chars: number }>;
             assert(parts.length > 10 && parts[0].id === 'start', `the parts: ${parts.length}`);
             for (const p of parts) assert(p.chars > 0 && p.chars < 24_000, `${p.id} fits one tool result: ${p.chars}`);
+            // A long area is split between features, and each part names the next one.
+            for (const later of parts.filter(p => /\.\d+$/.test(p.id))) {
+                const n = Number(later.id.split('.').pop());
+                const prevId = n === 2 ? later.id.replace(/\.\d+$/, '') : later.id.replace(/\.\d+$/, `.${n - 1}`);
+                const prev = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: `features/${prevId}` } }, 441)).body);
+                assert(prev.includes(`\`features/${later.id}\``), `${prevId} names ${later.id}: ${prev.slice(-160)}`);
+            }
             const apps = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'features/g-10' } }, 419)).body);
             assert(apps.startsWith('# Apps') && !/<[a-z]+[ >]/.test(apps), `an area in plain text, no HTML left: ${apps.slice(0, 120)}`);
             const handbook = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: {} }, 420)).body);

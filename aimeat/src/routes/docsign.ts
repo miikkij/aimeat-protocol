@@ -25,6 +25,7 @@
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Mounts docsignWalletRouter: signing with an EU Digital Identity Wallet
  *     (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.1.1 — 2026-10-10 — The raw file is taken with rawBodyBytes (code scanning alerts 1712-1719).
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -43,6 +44,7 @@ import { ValidationInputError } from '../services/docsign/validate.js';
 import { documentFromStorage } from '../services/docsign/files.js';
 import { docsignMaxBytes } from '../config-docsign.js';
 import { docsignWalletRouter } from './docsign-wallet.js';
+import { rawBodyBytes } from '../utils/raw-body.js';
 
 const CreateSchema = z.object({
   title: z.string().max(200).optional().default(''),
@@ -161,8 +163,9 @@ export function docsignRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/docsign/validate', enabled, validateLimit, rawBody, optionalAuth(), async (req, res) => {
     try {
       let input: Parameters<typeof validateDocument>[2];
-      if (Buffer.isBuffer(req.body)) {
-        input = { content: req.body, online: req.query.online !== 'false' };
+      const raw = rawBodyBytes(req.body);
+      if (raw) {
+        input = { content: raw, online: req.query.online !== 'false' };
       } else {
         const parsed = ValidateJsonSchema.safeParse(req.body ?? {});
         if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.message)); return; }
