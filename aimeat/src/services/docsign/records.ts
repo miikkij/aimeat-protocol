@@ -473,6 +473,20 @@ export async function recordWalletSignature(
   });
 }
 
+/**
+ * Remember where a party stored the request's own document, for a request that was made from a
+ * hash alone: the next wallet signature then starts without the file being sent again. Only the
+ * first place is kept, and only for the bytes the request names.
+ */
+export async function noteDocumentSource(ctx: DocsignCtx, id: string, source: { owner: string; key: string }): Promise<void> {
+  await withLock(id, async () => {
+    const rec = await load(ctx, id);
+    if (rec.document.source) return;
+    rec.document.source = source;
+    await writeJson(ctx.storage, reqKey(id), rec, ['docsign']);
+  });
+}
+
 /** Note on the request why a wallet's answer was refused (services/docsign/eudi.ts). */
 export async function noteWalletAttempt(ctx: DocsignCtx, id: string, attempt: NonNullable<DocSignRecord['walletLastAttempt']>): Promise<void> {
   await withLock(id, async () => {

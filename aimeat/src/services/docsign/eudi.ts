@@ -56,7 +56,7 @@ import { logger } from '../../utils/logger.js';
 import { docsignMaxBytes } from '../../config-docsign.js';
 import { validatePdf } from './validate.js';
 import {
-  DocsignError, walletSigner, recordWalletSignature, noteWalletAttempt, documentHash,
+  DocsignError, walletSigner, recordWalletSignature, noteWalletAttempt, noteDocumentSource, documentHash,
   type DocsignCtx, type WalletEvidence,
 } from './records.js';
 
@@ -262,6 +262,14 @@ export async function startWalletSignature(ctx: DocsignCtx, caller: CallerContex
     expires: Date.now() + SESSION_TTL_MS, status: 'waiting', error: null,
   };
   sessions.set(s.id, s);
+  // A request made from a hash alone: keep the PDF the signer just sent in their own files and
+  // remember it on the request, so a second try (or the next signer) is not asked for it again.
+  if (!rec.document.source && !rec.walletDocument) {
+    const key = `docsign/${rec.id}/${s.name.replace(/[\\/]+/g, '_')}`;
+    const kept = await writeStorageFile({ storage: ctx.storage, config: ctx.config }, signer, { key, data: doc.bytes, mimeType: 'application/pdf', visibility: 'private' });
+    if (kept.ok) await noteDocumentSource(ctx, rec.id, { owner: signer, key });
+    else logger.warn('docsign: the request\'s PDF could not be kept for later wallet signatures', { request: rec.id, code: kept.code });
+  }
   const u = urls(ctx, s);
   const host = new URL(ctx.config.baseUrl).hostname.toLowerCase();
   const walletClientId = clientIdOf(ctx, credential(ctx).client);
