@@ -103,12 +103,12 @@
       "digest": "sha256:95b4ea1830c2e88aa9d763b7"
     },
     "node:aimeat-app-workstation": {
-      "reviewedOn": "2026-10-07",
+      "reviewedOn": "2026-10-10",
       "watches": [
         "aimeat/src/services/app-size-health.ts",
         "aimeat/src/services/app-publish-next-steps.ts"
       ],
-      "digest": "sha256:3a28cc25a9078b400e12c341"
+      "digest": "sha256:0616f65dadb980487d16a50a"
     },
     "node:aimeat-app-builder": {
       "reviewedOn": "2026-09-20",
@@ -424,7 +424,7 @@
     },
     "node:aimeat-app-workstation": {
       "aimeat/src/services/app-size-health.ts": "b0683f91995656e0",
-      "aimeat/src/services/app-publish-next-steps.ts": "38c2f525da2da4c2"
+      "aimeat/src/services/app-publish-next-steps.ts": "9754eccc2c25fb6f"
     },
     "node:aimeat-app-builder": {
       "aimeat/src/services/build-app-layers.ts": "11efd2e166cbd6e7",

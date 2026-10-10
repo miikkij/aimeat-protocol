@@ -14,9 +14,15 @@
  *   BEST-EFFORT, ALWAYS. Enrichment must never be able to fail a publish that has already happened,
  *   so every lookup here swallows its own failure and the whole thing returns undefined rather than
  *   throwing.
- * @structure buildPublishNextSteps(storage, config, ownerName, filename) -> record | undefined
+ * @structure buildPublishNextSteps(storage, config, ownerName, filename) -> record | undefined ·
+ *   documentSteps(ownerName, filename, documents) -> the data map and design spec lines
  * @usage import { buildPublishNextSteps } from './app-publish-next-steps.js';
  * @version-history
+ *   v1.3.0 — 2026-10-10 — `data_map` and `design_spec`, with `data_map_present` and
+ *     `design_spec_present`: stated on every publish, present or not, like the face and the skill.
+ *     The answer named two of the four things an app owes, and the two it named got done: the
+ *     Allekirjoitus app reached version 4 with a face and a bound skill and with neither a data map
+ *     nor a design spec, until its owner asked why (Jouni, 2026-10-10).
  *   2026-09-19 — `design_book`: an Atelier app that carries styles of its own beyond the kit and its
  *     genre is asked to propose them to the Design Book, which held 90 parts and none from a builder.
  *   v1.2.0 — 2026-09-05 — `acceptance`, on an Atelier app only: the app is accepted from
@@ -48,9 +54,41 @@ import { levelStep } from './app-build-level.js';
  * to do about each. Returns undefined when the lookups fail — a publish response missing this field
  * is fine, a publish that failed because of it is not.
  */
+/**
+ * The two documents beside an app, as the publish that just happened found them: the data map
+ * (where its data lives and why) and the design spec (what it is for, its screens, what was
+ * decided). `designSpecVersion` is the app version the spec was written against, or undefined when
+ * there is none.
+ */
+export interface DocumentsBesideApp {
+  dataMapMissing: boolean;
+  dataMapRowsWithoutWhy: number;
+  designSpecVersion: number | undefined;
+  newVersion: number;
+}
+
+/** What the answer says about the data map and the design spec, present or not, every time. */
+export function documentSteps(ownerName: string, filename: string, d: DocumentsBesideApp): Record<string, unknown> {
+  const app = `${ownerName}/${filename}`;
+  const dataMap = d.dataMapMissing
+    ? `No data map yet. Write one with aimeat_datamap_set { app: "${app}", data_map }: what the app is for and, for each family of keys or files, where it lives, who owns and reads it, and ONE sentence on why there. You are the only one who knows where you put things; the next builder has no other way to find out.`
+    : d.dataMapRowsWithoutWhy > 0
+      ? `This app has a data map, and ${d.dataMapRowsWithoutWhy} row(s) in it say no \`why\` yet. Read it with aimeat_datamap_get { app: "${app}" }, fill what you know, and update it if this change moved or added data.`
+      : `This app has a data map. If this change moved or added where data lives, read it (aimeat_datamap_get { app: "${app}" }) and write the whole map back with aimeat_datamap_set.`;
+  const designSpec = d.designSpecVersion === undefined
+    ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", filename: "${filename}", markdown }: what the app is for, its screens, where its data lives, what was decided and why, what is open, and what bit you; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
+    : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
+  return {
+    data_map_present: !d.dataMapMissing,
+    design_spec_present: d.designSpecVersion !== undefined,
+    data_map: dataMap,
+    design_spec: designSpec,
+  };
+}
+
 export async function buildPublishNextSteps(
   storage: Storage, config: AimeatConfig, ownerName: string, filename: string, publishedBytes?: number,
-  track?: 'classic' | 'atelier', register?: string, html?: string,
+  track?: 'classic' | 'atelier', register?: string, html?: string, documents?: DocumentsBesideApp,
 ): Promise<Record<string, unknown> | undefined> {
   try {
     // Resolve the face across the owner's whole keyspace (GHII + the owner's agents), matching what
@@ -114,6 +152,10 @@ export async function buildPublishNextSteps(
       bound_skill: boundSkills.length > 0
         ? `${boundSkills.length} skill(s) bound to this app. Keep them current with what the app does.`
         : `No skill bound yet. Write the operating guide as a skill with metadata.binding "app:${ownerName}/${filename}" (aimeat_skill_publish) — that is how anyone's AI learns to USE this app rather than guess at it.`,
+      // The other two things an app owes, stated the same way. Until 2026-10-10 this answer named
+      // the face and the skill and stayed silent on these, and a builder who had read "next_steps
+      // is the node's list of what this app still owes" shipped four versions without either.
+      ...(documents ? documentSteps(ownerName, filename, documents) : {}),
       template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Learnings that would bite the next builder go to aimeat_appdev_pitfall_report.',
     };
   } catch (err) {

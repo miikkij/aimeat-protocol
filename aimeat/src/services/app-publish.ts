@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-10 — nextSteps is told how the data map and the design spec stand (app-publish-next-steps.ts).
  *   2026-10-08 — The board announcement post carries a provenance record of its own text (aiprov D13).
  *   2026-10-08 — The app's provenance record states `mediaKind: code` and the app's MIME type.
  *   2026-10-02 — The design spec's stamp is copied onto the new manifest, and `designSpecHint` says
@@ -731,7 +732,12 @@ export async function publishApp(
     })
     : undefined;
   const steps = await buildPublishNextSteps(
-    storage, config, ownerName, filename, data.length, track, declaredRegister, isHtml ? html : undefined);
+    storage, config, ownerName, filename, data.length, track, declaredRegister, isHtml ? html : undefined,
+    // The data map and the design spec, as this publish found them (HTML apps only: both describe an app).
+    isHtml && dataMap ? {
+      dataMapMissing: dataMap.missing, dataMapRowsWithoutWhy: dataMap.rowsWithoutWhy,
+      designSpecVersion: designSpec?.version, newVersion,
+    } : undefined);
 
   const specHint = designSpecHint({ stamp: designSpec, newVersion, shared });
 
