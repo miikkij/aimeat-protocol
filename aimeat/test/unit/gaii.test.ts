@@ -170,6 +170,10 @@ describe('RESERVED_NAMES', () => {
         expect(RESERVED_NAMES.has('operator')).toBe(true);
     });
 
+    it('reserves "startup", the start-up install set\'s applier name (secaudit 2026-10-10, I18)', () => {
+        expect(validateOwnerName('startup')).toContain('reserved');
+    });
+
     it('does not contain non-reserved names', () => {
         expect(RESERVED_NAMES.has('my-agent')).toBe(false);
     });

@@ -10,6 +10,7 @@
  *   place's apps arrive at 5 min instead of 2 (aimeat-commercial, 2026-10-07).
  * @usage pnpm test -- install-set-startup
  * @version-history
+ *   v1.2.0 — 2026-10-10 — The apply is marked as the start-up apply (secaudit 2026-10-10, I18).
  *   v1.1.0 — 2026-10-08 — The retry schedule after BUNDLE_UNAVAILABLE and after other refusals.
  *   v1.0.0 — 2026-09-28 — Initial.
  */
@@ -121,5 +122,17 @@ describe('the start-up install set tries again on a schedule', () => {
     applyInstallSet.mockReset().mockResolvedValue(refused('INVALID_BUNDLE'));
     await vi.runOnlyPendingTimersAsync();
     expect(announced(info)).toEqual([]);
+  });
+});
+
+describe('the start-up apply says it is the start-up apply', () => {
+  afterEach(() => { applyInstallSet.mockReset(); readFile.fake = null; });
+
+  it('passes startup: true, which marks its record via "startup" (secaudit 2026-10-10, I18)', async () => {
+    readFile.fake = '{}';
+    vi.spyOn(logger, 'info').mockImplementation(() => logger);
+    applyInstallSet.mockResolvedValue({ ok: true, dry_run: true });
+    await applyStartupInstallSet(deps(join(dir, 'set.json'), null));
+    expect(applyInstallSet).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ appliedBy: 'startup', startup: true }));
   });
 });

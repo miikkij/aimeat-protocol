@@ -16,6 +16,8 @@
  *   - Phase 6: an agent without organism:write cannot install a set that makes organisms
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sets
  * @version-history
+ *   v1.1.0 — 2026-10-10 — Phase 4: a refusal only the write found (an invalid visibility) is refused
+ *     before any app package gets a version (secaudit 2026-10-10, I20).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 4).
  */
 import * as ed from '@noble/ed25519';
@@ -173,6 +175,18 @@ await test('compose-set writes one package per app and the set; again, a new ver
     const again = await composeSet({ name: SET, apps: [SHOP, BACK], title: 'Shop kit', visibility: 'public', defaults: { [SHOP]: { shop_name: 'Acme' } } });
     assert(again.status === 201 && again.body.data.set.new_version === true && again.body.data.packages.every((p: any) => p.new_version === true), `again: ${JSON.stringify(again.body.data)}`);
     assert(await versionsOf(shopGroup) === 2 && await versionsOf(`${SET}::${author}`) === 2, 'two versions each');
+});
+
+await test('A refusal only the write found is a problem of the plan: no app package gets a version (secaudit 2026-10-10, I20)', async () => {
+    // The bundle's own write refused the visibility, after each app's package had been published as
+    // a new version (addPackageVersion keeps the group's visibility and never read the value).
+    const other = `sets-other-${stamp}`;
+    const real = await composeSet({ name: other, apps: [SHOP, BACK], visibility: 'everyone', defaults: { [SHOP]: { shop_name: 'Acme' } } });
+    const counts = [await versionsOf(shopGroup), await versionsOf(`sets-back-${stamp}::${author}`), await versionsOf(`${other}::${author}`)];
+    assert(counts.join() === '2,2,0', `no app package got a version and no set was written: ${counts.join()} (${real.status} ${real.body.error?.code})`);
+    assert(real.status === 409 && real.body.error?.code === 'SET_HAS_PROBLEMS', `refused: ${real.status} ${JSON.stringify(real.body)}`);
+    const dry = await composeSet({ name: other, apps: [SHOP, BACK], visibility: 'everyone', defaults: { [SHOP]: { shop_name: 'Acme' } }, dry_run: true });
+    assert((dry.body.data?.problems as string[] ?? []).some(p => /visibility/.test(p)), `the dry run lists it: ${dry.status} ${JSON.stringify(dry.body)}`);
 });
 
 console.log('\nPhase 5 — The buyer installs the set');

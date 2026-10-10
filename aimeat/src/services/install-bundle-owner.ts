@@ -20,6 +20,9 @@
  *   what was made is kept in the same record an install set keeps.
  * @structure bundleInstallOf() · installSetForOwner()
  * @version-history
+ *   v1.2.0 — 2026-10-10 — The record's applied_by is the owner's GHII, and the set's pulls no longer
+ *     say they are an install set's, so with package federation off an owner's set install cannot pull
+ *     from a peer (secaudit 2026-10-10, I18).
  *   v1.1.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.1.0 — 2026-10-04 — `grantApps` passes to each package's install, whose answer the record keeps
  *     in `app_grants`; the plan names each package's apps and whether the install approves them.
@@ -104,7 +107,8 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
     for (const pkg of bundle.packages) {
         const local = localGroupOf(pkg.groupId, owner, !!remote);
         if (await installedInstanceOf(storage, owner, local)) { planned.push({ group_id: pkg.groupId, local_group_id: local, result: 'present' }); continue; }
-        const got = await reach(deps, owner, remote, pkg.groupId, true);
+        // No `installSet`: the owner's pulls meet the package federation switch (secaudit 2026-10-10, I18).
+        const got = await reach(deps, owner, remote, pkg.groupId, { preview: true, installSet: false });
         if (!got.ok) { problems.push(got.message); continue; }
         if (!got.local) { planned.push({ group_id: pkg.groupId, local_group_id: local, result: 'would_pull' }); continue; }
         const dry = await installPackage(deps, caller, { groupId: local, mode: pkg.mode, config: configOf(pkg.groupId, pkg.config), dryRun: true });
@@ -134,9 +138,11 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
     }
     if (problems.length) return { ok: false, status: 409, code: 'CANNOT_INSTALL_SET', message: 'The set was not installed, and nothing was made. Each problem names its package.', problems };
 
+    // applied_by is the owner's GHII, never the bare account name: the bare name "startup" read as the
+    // start-up apply's record in install-set-trust.ts (secaudit 2026-10-10, I18).
     const key = appliedRecordKey(owner, input.groupId);
-    const record = (await readRecord(storage, key)) ?? newAppliedRecord(owner, { group_id: input.groupId, local_group_id: input.groupId, node_id: remote?.nodeId ?? null, version: '', name: bundle.name }, caller.sub);
-    record.applied_by = caller.sub;
+    const record = (await readRecord(storage, key)) ?? newAppliedRecord(owner, { group_id: input.groupId, local_group_id: input.groupId, node_id: remote?.nodeId ?? null, version: '', name: bundle.name }, caller.ownerGhii);
+    record.applied_by = caller.ownerGhii;
     record.applied_at = new Date().toISOString();
     record.runs += 1;
     const warnings: string[] = [];
@@ -147,7 +153,7 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
             const local = localGroupOf(pkg.groupId, owner, !!remote);
             const present = await installedInstanceOf(storage, owner, local);
             if (present) { record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: present.id, result: 'present', mode: present.mode ?? 'editable' }; continue; }
-            const got = await reach(deps, owner, remote, pkg.groupId, false);
+            const got = await reach(deps, owner, remote, pkg.groupId, { preview: false, installSet: false });
             if (!got.ok) throw new Error(got.message);
             const out = await installOrRequest(deps, caller, { groupId: local, mode: pkg.mode, config: configOf(pkg.groupId, pkg.config), label: bundle.name, grantApps: input.grantApps });
             if (!out.ok) throw new Error(`${pkg.groupId}: ${out.code}: ${out.message}`);

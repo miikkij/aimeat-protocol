@@ -34,6 +34,11 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   v1.10.0 — 2026-10-10 — A real apply runs the plan first and links the repository and pulls only
+ *     when the plan found nothing to refuse (I17); the plan checks a package's expects before it is
+ *     pulled. The start-up apply marks its record `via: 'startup'`, and reach() passes `installSet` to
+ *     the pull only when its caller says so: the owner's bundle install no longer passes the package
+ *     federation switch (I18). Both secaudit 2026-10-10.
  *   v1.9.0 — 2026-10-05 — An apply into an account that existed before writes the operator trail in
  *     that account (recordOperatorAction, area install-set): its holder reads in their feed which set
  *     was installed and how many apps were given permissions (secaudit 2026-10, S4; Jouni: "this
@@ -77,7 +82,7 @@ import { installPackage, type PackageInstallCaller, type PackageInstallPreview }
 import { pullPackage } from './packages/peer/package-pull.js';
 import { getPackageFor } from './packages/compose/package-read.js';
 import { planPackageConfig, missingConfigMessage } from './packages/compose/package-config.js';
-import { expectsMissingMessage } from './packages/compose/package-expects.js';
+import { expectsMissingMessage, missingExpects, type PackageExpects } from './packages/compose/package-expects.js';
 import { createOrganismRecord } from './organism-lifecycle.js';
 import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from './workspace-provision.js';
 import { deployAppAgent } from './app-agent-deploy.js';
@@ -106,6 +111,11 @@ export interface ApplyInput {
     dryRun?: boolean;
     /** Who applies it, for the record: the operator's name, or `startup` for the start-up file. */
     appliedBy: string;
+    /**
+     * The start-up file's apply (install-set-startup.ts passes it, nothing else does): the record gets
+     * `via: 'startup'`, which install-set-trust.ts reads. `appliedBy` is not proof of that.
+     */
+    startup?: boolean;
 }
 
 export interface PackageStep {
@@ -132,6 +142,8 @@ export interface AppliedRecord {
     /** The node path the owner's welcome link opens (the set's `landing`), or null; never the token. */
     landing_path?: string | null;
     applied_by: string;
+    /** 'startup' when the start-up file applied this set (ApplyInput.startup); kept on later runs. */
+    via?: 'startup';
     created_at: string;
     applied_at: string;
     runs: number;
@@ -199,17 +211,23 @@ export async function installedInstanceOf(storage: Storage, owner: string, group
  * The parts of one package: the owner's local copy, or, from a repository, a copy pulled into the
  * owner's packages. In a plan the pull is a preview and stores nothing; a copy already on this node
  * and current is read from here in both cases.
+ *
+ * `installSet` lets the pull reach the repository with package federation off (package-pull.ts). Only
+ * the operator's and the start-up apply pass it; an owner's own bundle install (install-bundle-owner.ts)
+ * does not, so its pulls meet the federation switch like any other pull (secaudit 2026-10-10, I18).
  */
 export async function reach(
-    deps: ApplyDeps, owner: string, remote: { nodeId: string } | null, groupId: string, preview: boolean, version?: string,
-): Promise<{ ok: true; local: PackageRecord | null; components: PackageComponent[]; version: string } | { ok: false; message: string }> {
+    deps: ApplyDeps, owner: string, remote: { nodeId: string } | null, groupId: string,
+    opts: { preview: boolean; installSet: boolean; version?: string },
+): Promise<{ ok: true; local: PackageRecord | null; components: PackageComponent[]; version: string; expects?: PackageExpects } | { ok: false; message: string }> {
+    const { preview, installSet, version } = opts;
     const localGroup = localGroupOf(groupId, owner, !!remote);
     if (remote) {
         const out = await pullPackage({ storage: deps.storage, config: deps.config, peers: deps.peers }, { owner, isOperator: false },
-            { groupId, nodeId: remote.nodeId, ...(version ? { version } : {}), preview, installSet: true });
+            { groupId, nodeId: remote.nodeId, ...(version ? { version } : {}), preview, installSet });
         if (!out.ok) return { ok: false, message: `${groupId}: ${out.code}: ${out.message}` };
         if (out.applied === false && out.reason === 'preview') {
-            return { ok: true, local: null, components: out.parsed.components as PackageComponent[], version: out.upstream.version };
+            return { ok: true, local: null, components: out.parsed.components as PackageComponent[], version: out.upstream.version, ...(out.parsed.expects ? { expects: out.parsed.expects } : {}) };
         }
     }
     const local = await getPackageFor(deps.storage, localGroup, owner);
@@ -275,7 +293,8 @@ async function linkRepository(
 /**
  * Read the set, reach the bundle and check everything that can refuse, before an account, an install
  * or an organism exists. A real apply writes only the repository link and the pulled package copies
- * here; a plan writes nothing.
+ * here; a plan writes nothing. applyInstallSet runs it as a plan first, so a real run starts only on a
+ * set the plan found no refusal and no problem in.
  */
 async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
     | { ok: false; status: number; code: string; message: string; problems?: string[] }
@@ -296,7 +315,7 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
     if (!linked.ok) return linked;
     const ctx: ApplyDeps = { ...deps, peers: linked.peers };
 
-    const reached = await reach(ctx, ownerName, remote, shape.value.bundle.groupId, preview, shape.value.bundle.version);
+    const reached = await reach(ctx, ownerName, remote, shape.value.bundle.groupId, { preview, installSet: true, version: shape.value.bundle.version });
     if (!reached.ok) return { ok: false, status: remote ? 502 : 404, code: 'BUNDLE_UNAVAILABLE', message: `The bundle could not be read. ${reached.message}` };
     const parsedBundle = bundleOfComponents(reached.components);
     if (!parsedBundle) return { ok: false, status: 400, code: 'NOT_A_BUNDLE', message: `${shape.value.bundle.groupId} is a package, and it carries no install bundle (a memory component with spec "aimeat.install-bundle/1").` };
@@ -319,7 +338,7 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
     for (const pkg of bundle.packages) {
         const localGroup = localGroupOf(pkg.groupId, ownerName, !!remote);
         if (await installedInstanceOf(storage, ownerName, localGroup)) continue;
-        const got = await reach(ctx, ownerName, remote, pkg.groupId, preview);
+        const got = await reach(ctx, ownerName, remote, pkg.groupId, { preview, installSet: true });
         if (!got.ok) { problems.push(got.message); continue; }
         const merged = mergedConfig(pkg, full.value, secrets);
         if (got.local) {
@@ -338,6 +357,9 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
         const plan = planPackageConfig(got.components, planned, merged, { config, owner: ownerName });
         if (!plan.ok) problems.push(`${pkg.groupId}: ${plan.code}: ${plan.message}`);
         else if (plan.missingCount > 0) problems.push(`${pkg.groupId}: CONFIG_REQUIRED: ${missingConfigMessage(plan)}`);
+        // The install's own expects check, so a real apply's plan finds it before anything is pulled.
+        const missing = got.expects ? await missingExpects(storage, got.expects) : null;
+        if (missing) problems.push(`${pkg.groupId}: EXPECTS_MISSING: ${expectsMissingMessage(missing)}`);
         // The skills the install would leave out, by the check the install itself makes.
         warnings.push(...(await skillsLeftOut(deps, ownerName, localGroup, got.components)).map(w => `${pkg.groupId}: ${w}`));
     }
@@ -347,14 +369,18 @@ async function prepare(deps: ApplyDeps, input: ApplyInput): Promise<
 /** Apply (or with dryRun, plan) an install set. The caller has already been checked as the operator. */
 export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promise<ApplyResult> {
     const { storage, config } = deps;
-    const prep = await prepare(deps, input);
-    if (!prep.ok) return prep;
-    const { set, bundle, bundleVersion, remote, secrets } = prep;
-    const ownerName = set.owner.name;
+    // The plan first, for a real apply too: a real prepare links the repository as an active peer and
+    // stores the pulled copies, and it used to do that before the refusals it then returned
+    // (NOT_A_BUNDLE, CANNOT_APPLY and the rest said "nothing was created"; secaudit 2026-10-10, I17).
+    const checked = await prepare(deps, { ...input, dryRun: true });
+    if (!checked.ok) return checked;
+    const cannotApply = (problems: string[]): ApplyResult =>
+        ({ ok: false, status: 409, code: 'CANNOT_APPLY', message: 'The set was not applied, and nothing was created. Each problem names its package.', problems });
 
     if (input.dryRun) {
+        const { set, bundle, bundleVersion } = checked;
         const plan: Record<string, unknown> = {
-            owner: { name: ownerName, email: set.owner.email, exists: prep.ownerExists },
+            owner: { name: set.owner.name, email: set.owner.email, exists: checked.ownerExists },
             bundle: { group_id: set.bundle.groupId, node_id: set.bundle.nodeId ?? null, name: bundle.name, version: bundleVersion },
             packages: bundle.packages.map(p => ({ group_id: p.groupId, mode: p.mode })),
             organisms: bundle.organisms.map(o => ({ key: o.key, name: set.organismNames[o.key] ?? o.name, workspaces: o.workspaces.map(w => w.key) })),
@@ -363,15 +389,19 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
             auto_update: set.autoUpdate,
             grant_apps: set.grantApps,
             landing: set.landing ? { group_id: set.landing.groupId, app: set.landing.app } : null,
-            problems: prep.problems,
+            problems: checked.problems,
             // What the install would leave out: not a problem, the set applies, but the operator hears it.
-            warnings: prep.warnings,
+            warnings: checked.warnings,
         };
         return { ok: true, dry_run: true, plan };
     }
-    if (prep.problems.length > 0) {
-        return { ok: false, status: 409, code: 'CANNOT_APPLY', message: 'The set was not applied, and nothing was created. Each problem names its package.', problems: prep.problems };
-    }
+    if (checked.problems.length > 0) return cannotApply(checked.problems);
+
+    const prep = await prepare(deps, input);
+    if (!prep.ok) return prep;
+    if (prep.problems.length > 0) return cannotApply(prep.problems);
+    const { set, bundle, bundleVersion, remote, secrets } = prep;
+    const ownerName = set.owner.name;
 
     const owner = await ensureOwner(storage, config, set.owner);
     if (!owner.ok) return owner;
@@ -384,6 +414,7 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
         input.appliedBy);
     record.bundle.version = bundleVersion;
     record.applied_by = input.appliedBy;
+    if (input.startup === true) record.via = 'startup';
     record.applied_at = now;
     record.runs += 1;
     record.secrets_given = [...new Set([...record.secrets_given, ...Object.entries(secrets).flatMap(([g, comps]) =>

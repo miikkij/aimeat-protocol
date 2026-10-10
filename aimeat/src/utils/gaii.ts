@@ -20,6 +20,7 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.10.2 — 2026-10-10 — 'startup' is a reserved name (secaudit 2026-10-10, I18).
  *   v1.10.1 — 2026-10-05 — isValidAgentName: validateAgentName as a yes or no (secaudit 2026-10, M2).
  *   v1.10.0 — 2026-10-05 — isOwnerInPerson moves here from auth/effective-scopes.ts, the one test for
  *     the account holder in person (secaudit 2026-10, C4). resolveIdentity asks it too.
@@ -99,6 +100,9 @@ export const RESERVED_NAMES = new Set([
   'registry', 'anonymous', 'null', 'undefined', 'test', 'debug', 'internal',
   'public', 'private', 'shared', 'all', 'none', 'any', 'self', 'global',
   'security-system', 'scheduler',
+  // The start-up install set's applier name (install-set-startup.ts): an account of this name wrote
+  // install-set records that read as the start-up apply's (secaudit 2026-10-10, I18).
+  'startup',
   // The node's own Content Classifier labels content as classifier@<node> (TARGET-082).
   'classifier',
 ]);
