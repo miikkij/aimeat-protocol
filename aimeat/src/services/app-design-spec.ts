@@ -209,8 +209,9 @@ export function isDesignSpecStale(spec: { version: number } | null | undefined, 
 
 /**
  * What a publish response says about the spec. Undefined when there is nothing to say: an app one
- * person builds alone, with no spec, is not nagged on every publish (next_steps already lists what
- * the app lacks). A shared app without a spec is told once per publish, because the people who
+ * person builds alone, with no spec, gets no separate hint here, because next_steps says it
+ * (`design_spec`, app-publish-next-steps.ts, since 2026-10-10; until then this comment claimed
+ * next_steps listed it and it did not). A shared app without a spec is told once per publish, because the people who
  * lose by its absence are the other builders. A stale spec is told on every app, because the
  * question "did this change alter what the spec describes?" has to be asked of whoever published.
  */

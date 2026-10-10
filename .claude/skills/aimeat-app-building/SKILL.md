@@ -44,6 +44,24 @@ Non-negotiables that flow enforces:
 
 App sources live in the `aimeat-apps/` repo, not in this protocol repo.
 
+## When an app is finished: five records beside it
+
+An app is not done when it is published and works. It is done when these five exist, and "done" is not said to Jouni before that. Every one of them is written for whoever opens the app next, who has only these to go on.
+
+| Record | What it says | How it is written | The publish answer shows it as |
+|---|---|---|---|
+| **Agent face** | what the app does, for an agent that opens its address | `AIMEATAgentFace.publish` in the app | `next_steps.agent_face_present` |
+| **Bound skill** | how to USE the app | `aimeat_skill_publish`, `metadata.binding: app:{owner}/{file}` | `next_steps.bound_skills_count` |
+| **Data map** | what the app is for, and per family of keys or files where it lives, who owns and reads it, and why there | `aimeat_datamap_set { app, data_map }` | `next_steps.data_map_present` |
+| **Design spec** | purpose, screens, data, decisions and why, AI and agents, open questions, traps | `aimeat_app_manage { action: "spec_set", filename, markdown }` (`spec` answers the outline) | `next_steps.design_spec_present` |
+| **App Development Note** | how it was built: commits, prod ids, what broke, what is open | a document in `ws-mslr8u99kzk` (the `note-writer` agent) | not in the answer: it is ours, not the node's |
+
+Three habits keep them from being forgotten:
+
+- **Read the whole publish answer and keep it whole.** Never pipe it through `head` or cut it to its first characters. `next_steps` is the node's list of what the app still owes, and the four booleans above are in it. On 2026-10-10 the Allekirjoitus app reached version 4 with a face and a skill and with neither a data map nor a design spec: the answer was cut to 200 characters on every publish, and until that day `next_steps` did not name those two at all.
+- **Write the data map and the design spec straight after the first publish**, while you still know why each thing is where it is. Leave a `why` you do not know empty.
+- **Write them again after a publish that changed the screens, a decision, or where data lives.** A design that is reversed mid-build (a request that kept only a hash, then kept the PDF) is exactly what the next builder cannot work out from the code.
+
 ## The app-building prompt system
 
 The canonical prompt is **node-served** at `GET /v1/prompts/build-app`; source of truth is `src/services/build-app-prompt.ts`. It builds single-file HTML apps.

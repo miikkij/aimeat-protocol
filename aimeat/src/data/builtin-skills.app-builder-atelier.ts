@@ -18,6 +18,9 @@
  *     describe-data.js after form gained the alert and gate parts.
  *   v1.30.0 — 2026-10-02 — Research first reads the design spec of an app that already exists, and
  *     writes it back after the publish (services/app-design-spec.ts).
+ *   v1.31.0 — 2026-10-10 — Step 9 names the four things every app owes after a publish (face, bound
+ *     skill, data map, design spec) and that the app is not finished while one is missing; the
+ *     publish answer states all four now (services/app-publish-next-steps.ts).
  *   v1.30.0 — 2026-10-03 — Kit 0.65.0: the handbook (handbook.js) and app({ help }), named beside the
  *     board family. Read against describe-data.js after it joined.
  *   v1.29.1 — 2026-10-02 — The board's tow, anchored rings and onDrop, and requestPanel's extra host,
@@ -393,6 +396,14 @@ moved under you says so.
    figure, the printed maths, the sentence and the state all follow it in the same paint.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
+   Read the WHOLE answer and keep it whole. Four of its lines are owed by every app, and the app
+   is not finished while one is missing: the **agent face** (\`agent_face_present\`), the **bound
+   skill** (\`bound_skills_count\` above zero), the **data map** (\`data_map_present\`: write it
+   with \`aimeat_datamap_set\` \`{ app: "{owner}/{filename}", data_map }\`, what the app is for and,
+   for each family of keys or files, where it lives, who owns and reads it and one sentence on why
+   there) and the **design spec** (\`design_spec_present\`: \`aimeat_app_manage\`
+   \`{ action: "spec_set" }\`). Write the two documents after the first publish and again after
+   any publish that changed the screens, the decisions or where data lives.
 10. **Write down why, and put nothing into the Design Book because the build is finished.** As
    you choose, the page carries your reasons, one true sentence each, in
    \`<script type="application/json" id="aimeat-build-notes">\`: \`took\` (a Book part in this

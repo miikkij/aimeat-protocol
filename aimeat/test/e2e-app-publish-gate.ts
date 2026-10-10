@@ -484,6 +484,35 @@ const publish = (token: string, body: Record<string, unknown>) =>
         assert(!await appRow(o.name, registerless, o.token), 'the refused app is in the catalogue');
     });
 
+    await test('the publish answer says the app has no data map and no design spec, and says so differently once both are written', async () => {
+        const f = `gatedocs${Date.now()}.html`;
+        const body = { filename: f, mime_type: 'text/html', content: b64(app(f)), name: 'Documents beside an app', description: 'An app with nothing written beside it yet.' };
+        const first = await publish(o.token, body);
+        assert(first.status === 201, `publish: ${first.status} ${JSON.stringify(first.body?.error)}`);
+        const s1 = first.body.data.next_steps ?? {};
+        assert(s1.data_map_present === false && String(s1.data_map).includes('aimeat_datamap_set') && String(s1.data_map).includes(`${o.name}/${f}`),
+            `a new app is told it has no data map and how to write one: ${JSON.stringify(s1.data_map)}`);
+        assert(s1.design_spec_present === false && String(s1.design_spec).includes('spec_set') && String(s1.design_spec).includes(f),
+            `a new app is told it has no design spec and how to write one: ${JSON.stringify(s1.design_spec)}`);
+
+        const map = await json(`/v1/datamap/apps/${o.name}/${f}`, { method: 'PUT', headers: auth(o.token), body: JSON.stringify({
+            spec: 'aimeat.datamap/2', what: 'A test app.', usedFor: 'Proving the publish answer.', form: 'one-person',
+            arrangement: 'One record in the owner\'s own memory.', machinery: [], leaves: [], elsewhere: [],
+            held: [{ what: 'gatedocs.note', holds: 'one note', kind: 'user-written', usedFor: 'user-returns-to-read', where: 'owner-memory-private', owner: 'person',
+                readers: 'owner-only', writers: ['person-in-the-ui'], shape: 'one-record', keptFor: 'until-deleted', lossRisk: 'user-can-rewrite', personalData: 'no', why: '' }],
+        }) });
+        assert(map.status === 200, `data map: ${map.status} ${JSON.stringify(map.body?.error)}`);
+        const spec = await json(`/v1/apps/${o.name}/${f}/design-spec`, { method: 'PUT', headers: auth(o.token), body: JSON.stringify({ markdown: '# Design spec\n\n## Purpose\nA test app.\n' }) });
+        assert(spec.status === 201, `design spec: ${spec.status} ${JSON.stringify(spec.body?.error)}`);
+
+        const second = await publish(o.token, body);
+        const s2 = second.body.data.next_steps ?? {};
+        assert(s2.data_map_present === true && /1 row\(s\) in it say no `why` yet/.test(String(s2.data_map)),
+            `a map with an unanswered why is named as such: ${JSON.stringify(s2.data_map)}`);
+        assert(s2.design_spec_present === true && /written against version 1; this publish made version 2/.test(String(s2.design_spec)),
+            `a spec the app moved past is named with both versions: ${JSON.stringify(s2.design_spec)}`);
+    });
+
     await test('the same registerless app publishes when its owner chose a quick prototype, is told its level, and is warned once it is styled by hand', async () => {
         const f = `gateproto${Date.now()}.html`;
         const level = (html: string, l: string) => html.replace('<meta name="aimeat-track"', `<meta name="aimeat-level" content="${l}">\n<meta name="aimeat-track"`);

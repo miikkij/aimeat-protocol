@@ -24,6 +24,9 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.9.0 — 2026-10-10 — The finish has a fifth step, the data map, and names when an app is
+ *     finished: the four things next_steps shows present (face, bound skill, data map, design spec).
+ *     An app reached version 4 with the first two and without the last two (Jouni, 2026-10-10).
  *   v1.8.0 — 2026-10-02 — The app's design spec: read it in the research step on an app that exists,
  *     write it back as the fourth step of the finish (services/app-design-spec.ts).
  *   v1.7.0 — 2026-10-01 — "Which model builds it": on any model but Claude Opus or Fable, the first
@@ -231,6 +234,18 @@ After a successful publish (the publish response's \`next_steps\` shows what is 
    the AI and agents it uses, what is open, and what bit you. The next builder, and your own next
    session, reads it before touching the app; the publish answer's \`design_spec_hint\` says when it
    has fallen behind, and the same text again marks it current.
+5. Write the app's **data map**: \`aimeat_datamap_set\` \`{ app: "{owner}/{filename}", data_map }\`
+   (read it first with \`aimeat_datamap_get\` when there is one; the set replaces the whole map).
+   It says what the app is for and, for each family of keys or files, where it lives, who owns and
+   reads it, and one sentence on why there. Leave a \`why\` you do not know empty. Write it again
+   whenever a change moves or adds where data lives.
+
+**An app is finished when the publish answer's \`next_steps\` shows all four present:**
+\`agent_face_present\`, \`bound_skills_count\` above zero, \`data_map_present\` and
+\`design_spec_present\`. Read the WHOLE publish answer and keep it whole: an answer cut to its
+first lines is how the face and the skill got written and the data map and the design spec did
+not. Do not tell the owner the app is done while one of the four is missing; write it, or say
+which one is missing and why.
 
 ## Workflow
 
