@@ -21,6 +21,7 @@
  *     (wish-allekirjoitus-eudi-lompakolla).
  *   v1.2.0 — 2026-10-10 — aimeat_docsign_wallet_start without storage_key uses the PDF the node
  *     already holds for the request.
+ *   v1.2.1 — 2026-10-10 — DOCUMENT_NEEDED says why in plain words, as the REST route does.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
@@ -158,7 +159,7 @@ export function registerDocsignTools(
         const file = storage_key
           ? await readOwnFile(ctx, c, String(storage_key)).then((f) => ({ data: f.data, name: f.name }))
           : await nextPdfToSign(ctx, c, String(id));
-        if (!file) return toolError('DOCUMENT_NEEDED', 'This node does not hold the PDF of this request (it was made from a hash). Upload the PDF and pass it as storage_key.');
+        if (!file) return toolError('DOCUMENT_NEEDED', 'This server does not have the PDF of this request, because the request was made without the file. Upload the PDF and pass it as storage_key.');
         const started = await startWalletSignature(ctx, c, String(id), { bytes: file.data, name: file.name });
         // The QR image is for a page; in a chat it is kilobytes of base64 nobody reads.
         return ok({

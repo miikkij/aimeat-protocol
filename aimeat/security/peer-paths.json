@@ -25,6 +25,10 @@
       "count": 1,
       "why": "removePeer, behind the operator role on REST and operator:admin on MCP: sets de-peering status with its grace end. Status only."
     },
+    "src/services/signed-node-request.ts": {
+      "count": 1,
+      "why": "federationPeerProofPin: sets deliveryProofAt on the stored peer record, and only after the message's delivery or audience proof verified against that peer's pinned key. It saves the peer record this process holds in memory, as the heartbeat loop in federation.ts does; the message changes no other field, so the url, the key, the status and the tier are written back as held (secaudit 2026-10-10 I21)."
+    },
     "src/services/federation.ts": {
       "count": 3,
       "why": "The heartbeat loop: availability, version and status from a ping signed by this node. Status and statistics only; never the url or the key."

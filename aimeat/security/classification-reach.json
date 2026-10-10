@@ -1,6 +1,12 @@
 {
   "about": "Every file under src/ that calls a storage method loading content (memory, files, workspace rows), how many calls of each, and why. The reads either pass the classification reader (services/classification/, TARGET-082) or are the node's own. pnpm check:classification-reach fails on a new file, a count that grew, and a line that is stale; --shrink lowers the counts that fell. Reasoning: aimeat/scripts/check-classification-reach.ts.",
   "files": {
+    "src/commerce/agent-order-intake.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the seller's order record (commerce.order.*) to stay idempotent and the sealed selling key (commerce.psp) for the seller's own Stripe call. No content."
+    },
     "src/commerce/agent-purchase-limit.ts": {
       "reads": {
         "getMemory": 3
@@ -72,6 +78,13 @@
         "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The checkout-session and order ledger, returned to its buyer or seller."
+    },
+    "src/commerce/ucp-guest-checkout.ts": {
+      "reads": {
+        "getMemory": 9,
+        "listMemoryKeysByPrefix": 2
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the UCP guest checkout's own records under the seller (commerce.ucp.session.*, commerce.order.*, commerce.ucp.pending.*) and the sealed selling key (commerce.psp) for the seller's own Stripe charge; the key listing only counts open checkouts and finds webhooks that wait. No content."
     },
     "src/commerce/x402.ts": {
       "reads": {
@@ -647,17 +660,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The draft passes presentMemory."
     },
+    "src/routes/ucp-checkout.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the stored answer to a repeated Idempotency-Key (commerce.ucp.idem.*) under the seller, written by this route. No content."
+    },
     "src/routes/webmcp.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The public tool manifest for the WebMCP listing."
-    },
-    "src/services/app-ai-use.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-09, the node's own read: the same public tool manifest the WebMCP listing serves to anyone, counted for the app's \"Use with your AI\" mark; no content leaves, only the number of public tools."
     },
     "src/services/a2a-foreign-handler.ts": {
       "reads": {
@@ -727,12 +740,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter."
     },
-    "src/services/ai/completion.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key, settings and usage counter, read to plan an AI call."
-    },
     "src/services/ai-inputs.ts": {
       "reads": {
         "getMemory": 1,
@@ -784,6 +791,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The system AI model catalogue and its meta record."
     },
+    "src/services/ai/completion.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key, settings and usage counter, read to plan an AI call."
+    },
     "src/services/ai/policy-store.ts": {
       "reads": {
         "getMemory": 2
@@ -827,6 +840,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public offer declarations and the deploy state record."
+    },
+    "src/services/app-ai-use.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-09, the node's own read: the same public tool manifest the WebMCP listing serves to anyone, counted for the app's \"Use with your AI\" mark; no content leaves, only the number of public tools."
     },
     "src/services/app-audit-archive.ts": {
       "reads": {
@@ -1147,21 +1166,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published data package: public by the owner's publish, and the publish step passes leave()."
     },
-    "src/services/docsign/files.ts": {
-      "reads": {
-        "getStorageFile": 1,
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-09: the caller's own stored file, read to check its signatures or hash it for a signing request. The metadata goes through readerFor(...).show() first, exactly as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file; nothing of it is shown except the signature report."
-    },
-    "src/services/docsign/records.ts": {
-      "reads": {
-        "getMemory": 2,
-        "getStorageFile": 1,
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given. Reviewed 2026-10-10 (wish-allekirjoitus-eudi-lompakolla): signedDocument() reads the wallet-signed PDF a signer stored for this request, for a party who may read the request; the metadata goes through readerFor(...).show() first, as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file."
-    },
     "src/services/db/agent-data-access-overview-db-service.ts": {
       "reads": {
         "listMemoryMeta": 1
@@ -1328,6 +1332,21 @@
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads a file only to confirm it exists and widen its visibility; no bytes are returned."
+    },
+    "src/services/docsign/files.ts": {
+      "reads": {
+        "getStorageFileMeta": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-09: the caller's own stored file, read to check its signatures or hash it for a signing request. The metadata goes through readerFor(...).show() first, exactly as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file; nothing of it is shown except the signature report."
+    },
+    "src/services/docsign/records.ts": {
+      "reads": {
+        "getMemory": 2,
+        "getStorageFileMeta": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given. Reviewed 2026-10-10 (wish-allekirjoitus-eudi-lompakolla): signedDocument() reads the wallet-signed PDF a signer stored for this request, for a party who may read the request; the metadata goes through readerFor(...).show() first, as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file."
     },
     "src/services/ecosystem-automation-advisories.ts": {
       "reads": {
@@ -1752,18 +1771,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner-scope read helper; each caller that hands a value on is listed and checked on its own."
     },
-    "src/services/packages/install/package-app-tools.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-02, the node's own read: whether the installer already has a tool list for the app, so an install never overwrites it. Only the presence is used; nothing is shown."
-    },
-    "src/services/packages/install/package-approvals.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 2), the node's own read: the approval record of an install, in the system namespace package-approvals that no principal addresses, read to answer GET /v1/instances/:id and to tell whether an update adds to what was approved. It holds capability names, not the owner's content."
-    },
     "src/services/packages/compose/package-component-collisions.ts": {
       "reads": {
         "getMemory": 2
@@ -1776,12 +1783,29 @@
       },
       "why": "Reviewed 2026-10-02, the node's own read: the composer's own tool list for an app they put in a package, copied into the package without prices. Tool names and schemas are the app's interface, not classified content, and the composer reads their own record."
     },
-    "src/services/packages/sale/package-entitlements.ts": {
+    "src/services/packages/compose/package-notices.ts": {
       "reads": {
-        "getMemory": 1,
-        "listMemory": 1
+        "getMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An update-notice marker. Moved from package-upstream-refresh.ts unchanged on 2026-10-02."
+    },
+    "src/services/packages/compose/package-withdrawals.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the withdrawn versions of a package group and their reasons, in the system namespace package-withdrawals that no principal addresses."
+    },
+    "src/services/packages/install/package-app-tools.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-02, the node's own read: whether the installer already has a tool list for the app, so an install never overwrites it. Only the presence is used; nothing is shown."
+    },
+    "src/services/packages/install/package-approvals.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 2), the node's own read: the approval record of an install, in the system namespace package-approvals that no principal addresses, read to answer GET /v1/instances/:id and to tell whether an update adds to what was approved. It holds capability names, not the owner's content."
     },
     "src/services/packages/install/package-install-request-store.ts": {
       "reads": {
@@ -1790,17 +1814,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Install-request state records."
     },
-    "src/services/packages/compose/package-notices.ts": {
+    "src/services/packages/install/package-skill-component.ts": {
       "reads": {
-        "getMemory": 1
+        "listMemory": 1,
+        "getMemory": 7
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An update-notice marker. Moved from package-upstream-refresh.ts unchanged on 2026-10-02."
-    },
-    "src/services/packages/sale/package-offer.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: a package's offer (prices, update period, licence reference, support contacts) in the package-entitlements system namespace that no principal addresses, written by the package's author to be read by seller nodes and buyers. Commercial terms, not anybody's content."
+      "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first. Since 2026-10-02 install also reads whether the node's own library has a skill of that name, only to leave the package's skill out; no value leaves."
     },
     "src/services/packages/peer/package-peer-limits.ts": {
       "reads": {
@@ -1808,6 +1827,19 @@
         "listMemory": 2
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the cap marker, and the grants and sellers in the package-entitlements system namespace, read only for which node ids they name."
+    },
+    "src/services/packages/sale/package-entitlements.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
+    },
+    "src/services/packages/sale/package-offer.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-02 (package sale design, phase 3), the node's own read: a package's offer (prices, update period, licence reference, support contacts) in the package-entitlements system namespace that no principal addresses, written by the package's author to be read by seller nodes and buyers. Commercial terms, not anybody's content."
     },
     "src/services/packages/sale/package-renewals.ts": {
       "reads": {
@@ -1833,19 +1865,6 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller registry."
-    },
-    "src/services/packages/install/package-skill-component.ts": {
-      "reads": {
-        "listMemory": 1,
-        "getMemory": 7
-      },
-      "why": "Reviewed 2026-09-30, the node's own read: compose copies the composer's OWN skills bound to their own app into their own package, by their own act, as it copies the app's bytes and the cortex's libs; install, update and uninstall read the installer's own skill manifest to decide overwrite or delete, and hash its files. Nothing goes into a model prompt unless through fetchComponentContentForAi (component-content.ts), which asks useForAi for skillFileTargets first. Since 2026-10-02 install also reads whether the node's own library has a skill of that name, only to leave the package's skill out; no value leaves."
-    },
-    "src/services/packages/compose/package-withdrawals.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the withdrawn versions of a package group and their reasons, in the system namespace package-withdrawals that no principal addresses."
     },
     "src/services/peer-incidents.ts": {
       "reads": {
@@ -1965,82 +1984,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Signal stream config and monthly counters."
     },
-    "src/services/visibility/visibility-counter.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemoryMeta": 1
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the month count records under the reserved signals.visibility. prefix, which only this counter writes. No content."
-    },
-    "src/services/visibility/visibility-settings.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer B), the node's own read: the owner's visibility settings record (signals.visibility.settings, reserved prefix): the counting switch and the analytics tag ids. No content."
-    },
-    "src/services/visibility/merchant-feed.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the owner's public, priced agent offers (agents.{name}.offers), the same records the public commerce feed lists. Only public offers reach a feed."
-    },
-    "src/services/visibility/merchant-feed-settings.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the owner's feed settings record (signals.visibility.feed, reserved prefix) and the sealed selling key (commerce.psp) for the owner's own Stripe call. No content."
-    },
-    "src/commerce/ucp-guest-checkout.ts": {
-      "reads": {
-        "getMemory": 9,
-        "listMemoryKeysByPrefix": 2
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the UCP guest checkout's own records under the seller (commerce.ucp.session.*, commerce.order.*, commerce.ucp.pending.*) and the sealed selling key (commerce.psp) for the seller's own Stripe charge; the key listing only counts open checkouts and finds webhooks that wait. No content."
-    },
-    "src/routes/ucp-checkout.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the stored answer to a repeated Idempotency-Key (commerce.ucp.idem.*) under the seller, written by this route. No content."
-    },
-    "src/commerce/agent-order-intake.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the seller's order record (commerce.order.*) to stay idempotent and the sealed selling key (commerce.psp) for the seller's own Stripe call. No content."
-    },
-    "src/services/visibility/visibility-report.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the owner's own month count records (signals.visibility.month.*), returned to the owner. Counts only, no content."
-    },
-    "src/services/visibility/behaviour-counter.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: one app's behaviour count record (signals.behaviour.app.*, reserved prefix), read to merge counts into it. Counts only, no content."
-    },
-    "src/services/visibility/behaviour-settings.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's behaviour settings record (signals.behaviour.settings, reserved prefix): the apps switched off and the fixing agent's switch. No content."
-    },
-    "src/services/visibility/behaviour-report.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's own behaviour count records (signals.behaviour.app.*), returned to the owner. Counts and the app author's element names only, no page content."
-    },
-    "src/services/visibility/behaviour-fixer.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemoryKeysByPrefix": 1
-      },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's fixing-agent run log (signals.behaviour.runs, reserved prefix), and the key listing of signals.behaviour.settings to find the owners who switched the weekly run on. The app the agent fixes is the owner's own app, read through getApp and sent to the owner's own AI at the owner's request. No other content."
-    },
     "src/services/site-tags.ts": {
       "reads": {
         "getMemory": 2
@@ -2055,6 +1998,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's site template, portal keys and header navigation."
     },
+    "src/services/skill-records.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Moved out of skills.ts unchanged on 2026-10-09 (max-file-lines, aiprov E12); reviewed there 2026-09-29 (TARGET-082 V4): listAcrossOwners collects the registry's own records under a skill key prefix, and the bodies it returns pass the reader (skill-reader.ts) in listing, resolve and pinned reads."
+    },
     "src/services/skill-refs.ts": {
       "reads": {
         "getMemory": 2
@@ -2066,12 +2015,6 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Seed fingerprint stamps."
-    },
-    "src/services/skill-records.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Moved out of skills.ts unchanged on 2026-10-09 (max-file-lines, aiprov E12); reviewed there 2026-09-29 (TARGET-082 V4): listAcrossOwners collects the registry's own records under a skill key prefix, and the bodies it returns pass the reader (skill-reader.ts) in listing, resolve and pinned reads."
     },
     "src/services/skills.ts": {
       "reads": {
@@ -2158,6 +2101,63 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence."
+    },
+    "src/services/visibility/behaviour-counter.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: one app's behaviour count record (signals.behaviour.app.*, reserved prefix), read to merge counts into it. Counts only, no content."
+    },
+    "src/services/visibility/behaviour-fixer.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemoryKeysByPrefix": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's fixing-agent run log (signals.behaviour.runs, reserved prefix), and the key listing of signals.behaviour.settings to find the owners who switched the weekly run on. The app the agent fixes is the owner's own app, read through getApp and sent to the owner's own AI at the owner's request. No other content."
+    },
+    "src/services/visibility/behaviour-report.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's own behaviour count records (signals.behaviour.app.*), returned to the owner. Counts and the app author's element names only, no page content."
+    },
+    "src/services/visibility/behaviour-settings.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's behaviour settings record (signals.behaviour.settings, reserved prefix): the apps switched off and the fixing agent's switch. No content."
+    },
+    "src/services/visibility/merchant-feed-settings.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the owner's feed settings record (signals.visibility.feed, reserved prefix) and the sealed selling key (commerce.psp) for the owner's own Stripe call. No content."
+    },
+    "src/services/visibility/merchant-feed.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the owner's public, priced agent offers (agents.{name}.offers), the same records the public commerce feed lists. Only public offers reach a feed."
+    },
+    "src/services/visibility/visibility-counter.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the month count records under the reserved signals.visibility. prefix, which only this counter writes. No content."
+    },
+    "src/services/visibility/visibility-report.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer A), the node's own read: the owner's own month count records (signals.visibility.month.*), returned to the owner. Counts only, no content."
+    },
+    "src/services/visibility/visibility-settings.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-08 (AI visibility, layer B), the node's own read: the owner's visibility settings record (signals.visibility.settings, reserved prefix): the counting switch and the analytics tag ids. No content."
     },
     "src/services/workflow/engine-ai-step.ts": {
       "reads": {
