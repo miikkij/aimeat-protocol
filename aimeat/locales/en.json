@@ -12882,6 +12882,9 @@
       "give": "Give the task",
       "giving": "Sending…",
       "given": "The task is with the agent. Its result appears below.",
+      "talkTitle": "Talk to it",
+      "talkDeaf": "This agent does not read messages. It starts work from a task: give it one above.",
+      "talkWaits": "It reads your message when its machine has taken it on.",
       "latestTitle": "Latest work",
       "latestNone": "It has not been given any work yet.",
       "taskDone": "done",
@@ -12924,7 +12927,11 @@
       "addTitle": "Add a machine",
       "addDesc": "Your own computer or server. Agents run on it and can use the models it reaches. Run these two commands on it, approve the code it shows, and the machine appears on this page, where you give it a name.",
       "addNote": "The machine does work only while it is switched on.",
-      "canSilent": "The machine did not answer. The program that runs agents on it may be stopped."
+      "canSilent": "The machine did not answer. The program that runs agents on it may be stopped.",
+      "hostedTitle": "A machine we run for you",
+      "hostedDesc": "We keep it switched on, and you install nothing. You order it in the store.",
+      "order": "Order a machine →",
+      "orderSoon": "The store opens soon."
     },
     "apps": {
       "title": "Your apps",

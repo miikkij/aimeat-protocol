@@ -17,10 +17,15 @@
  *   AN AGENT CAN ONLY USE WHAT ITS MACHINE CAN DO AND WHAT ITS OWNER ALLOWED. The lede says it,
  *   because it is the one rule that explains every row on this page.
  *
+ *   A MACHINE SOMEBODY ELSE RUNS IS ORDERED IN THE STORE. The store is the one place a price
+ *   exists (js/site.js storeHref), so the page links there and shows no offer of its own; a node
+ *   with no store shows nothing, and a store that does not take orders yet reads "opens soon".
+ *
  *   Composed from library components only; it has no sheet of its own.
  * @structure default MachinesView({ navigate }); internal: Machine
  * @usage routed at /v1/home?machines=1 by spa.html
  * @version-history
+ *   v1.1.0 — 2026-10-10 — The way to the store for a machine the operator runs.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import { h } from 'preact';
@@ -50,6 +55,7 @@ import { useConfirm } from '/components/Modal.js';
 import { ConnectorSteps } from '/views/profile/agents/agent-guide.js';
 import { moveAgent } from '/js/services/agent-draft.js';
 import { machineName } from '/views/home/agents-band.js';
+import { storeHref, storeOpensSoon } from '/js/site.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const m = (key, fallback) => tr('home.machines.' + key, fallback);
@@ -254,6 +260,14 @@ export default function MachinesView({ navigate }) {
       <//>
       <${ConnectorSteps} session=${session} />
       <${Note} kind="quiet">${m('addNote', 'The machine does work only while it is switched on.')}<//>
+
+      ${storeHref() && html`
+        <${SubHeading} level=${2} desc=${m('hostedDesc', 'We keep it switched on, and you install nothing. You order it in the store.')}>
+          ${m('hostedTitle', 'A machine we run for you')}
+        <//>
+        ${storeOpensSoon()
+          ? html`<${Note} kind="quiet">${m('orderSoon', 'The store opens soon.')}<//>`
+          : html`<${FormActions}><${Action} href=${storeHref()} newTab>${m('order', 'Order a machine →')}<//><//>`}`}
 
       <${ConfirmUI} />
     <//>`;
