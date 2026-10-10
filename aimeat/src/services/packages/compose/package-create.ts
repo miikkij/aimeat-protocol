@@ -23,6 +23,8 @@
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.4.0 — 2026-10-10 — checkCeilings is exported and checkAuthorQuota takes how many groups the
+ *     caller adds, so the set composer checks every write before the first (secaudit 2026-10-10, I20).
  *   v1.3.0 — 2026-10-02 — The per-author quota counts package groups that are not archived
  *     (storage.countPackageGroups), not version rows.
  *   v1.2.0 — 2026-09-28 — The `beta` status: a version on a repository's beta channel only.
@@ -174,8 +176,11 @@ export async function nextPackageVersion(storage: Storage, groupId: string): Pro
     return sameMinute.length > 0 ? `${version}-${sameMinute.length + 1}` : version;
 }
 
-/** Component count and total byte size against the node's ceilings. */
-function checkCeilings(config: AimeatConfig, components: PackageComponent[]): PackageWriteResult | null {
+/**
+ * Component count and total byte size against the node's ceilings. Exported for the set composer,
+ * which checks every package it will write before it writes the first (package-compose-set.ts).
+ */
+export function checkCeilings(config: AimeatConfig, components: PackageComponent[]): PackageWriteResult | null {
     if (components.length > config.packageMaxComponents) {
         return {
             ok: false, status: 413, code: 'COMPONENT_LIMIT_EXCEEDED',
@@ -197,13 +202,15 @@ function checkCeilings(config: AimeatConfig, components: PackageComponent[]): Pa
  * How many package groups this author already holds, against the per-author ceiling. A group counts
  * once however many versions it has, and an archived group does not count, which is what the refusal
  * tells the author to do. It used to read `listPackages(...).total`, a count of version rows.
+ * `adding` is how many new groups the caller will create; the set composer asks for all of its own at
+ * once (package-compose-set.ts).
  */
 export async function checkAuthorQuota(
-    deps: PackageCreateDeps, owner: string,
+    deps: PackageCreateDeps, owner: string, adding = 1,
 ): Promise<PackageWriteResult | null> {
     const maxPerAuthor = deps.config.packageMaxPerAuthor ?? MAX_PACKAGES_PER_AUTHOR;
     const groups = await deps.storage.countPackageGroups(owner);
-    if (groups >= maxPerAuthor) {
+    if (groups + adding > maxPerAuthor) {
         return {
             ok: false, status: 413, code: 'QUOTA_EXCEEDED',
             message: `Maximum ${maxPerAuthor} packages per author. Archive unused packages first.`,

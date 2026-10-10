@@ -5,6 +5,7 @@
  *   for the capabilities its approval showed; an aliased or computed call and the raw `__*` host
  *   functions get nothing. PKG-4: the package approval and the grant read an app's scopes the same way.
  * @version-history
+ *   v1.1.0 — 2026-10-10 — An owner account named "startup" is not the start-up apply (secaudit 2026-10-10, I18).
  *   v1.0.0 — 2026-10-05 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -252,12 +253,29 @@ describe('PKG-9: only an install set an operator applied names a trusted package
                 { key: 'install-sets.op.set1', value: { bundle: { node_id: 'repo-trusted' }, applied_by: 'op' } },
                 { key: 'install-sets.alice.mine', value: { bundle: { node_id: 'repo-alice-chose' }, applied_by: 'alice' } },
                 { key: 'install-sets.bot.mine', value: { bundle: { node_id: 'repo-agent-chose' }, applied_by: 'bot#alice@n' } },
-                { key: 'install-sets.dco.boot', value: { bundle: { node_id: 'repo-at-startup' }, applied_by: 'startup' } },
+                { key: 'install-sets.dco.boot', value: { bundle: { node_id: 'repo-at-startup' }, applied_by: 'startup', via: 'startup' } },
             ],
             getOwner: async (name: string) => ({ name, roles: name === 'op' ? ['owner', 'operator'] : ['owner'] }),
             getMemory: async () => null,
         } as unknown as Storage;
         expect([...await installSetRepositories(storage)].sort()).toEqual(['repo-at-startup', 'repo-trusted']);
+    });
+
+    it('an owner account named "startup" does not pass for the start-up apply (secaudit 2026-10-10, I18)', async () => {
+        const storage = {
+            listMemory: async () => [
+                // What install-bundle-owner.ts wrote for an owner session of the account "startup":
+                // the bare name, and no accounts_created.
+                { key: 'install-sets.startup.mine', value: { bundle: { node_id: 'repo-startup-chose' }, applied_by: 'startup' } },
+                // The same account after the fix writes its GHII.
+                { key: 'install-sets.startup.mine2', value: { bundle: { node_id: 'repo-startup-ghii' }, applied_by: 'startup@test-node' } },
+                // A start-up record from before `via`: applyInstallSet always wrote accounts_created.
+                { key: 'install-sets.dco.old', value: { bundle: { node_id: 'repo-old-startup' }, applied_by: 'startup', accounts_created: [] } },
+            ],
+            getOwner: async (name: string) => ({ name, roles: ['owner'] }),
+            getMemory: async () => null,
+        } as unknown as Storage;
+        expect([...await installSetRepositories(storage)]).toEqual(['repo-old-startup']);
     });
 });
 

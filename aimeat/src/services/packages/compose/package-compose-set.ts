@@ -22,6 +22,9 @@
  *   problem the dry run would list, before anything is written.
  * @structure ComposeSetInput · ComposeSetResult · composeSet(deps, caller, input)
  * @version-history
+ *   v1.1.0 — 2026-10-10 — The plan checks what the writes would refuse: the visibility, each package's
+ *     and the bundle's ceilings, a group of another author, and the author quota for the new groups. A
+ *     failure is a problem, so nothing is published (secaudit 2026-10-10, I20).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 4).
  */
 import type { PackageComponent } from '../../../storage/interface.js';
@@ -29,7 +32,10 @@ import {
     planComposeFromApps, composePackageFromApps,
     type PackageComposeDeps, type PackageComposeCaller, type ComposeExpectations,
 } from './package-compose.js';
-import { createPackageGroup, addPackageVersion, normalizeComponents, type RawComponentInput } from './package-create.js';
+import {
+    createPackageGroup, addPackageVersion, normalizeComponents, checkCeilings, checkAuthorQuota, VALID_VISIBILITIES,
+    type RawComponentInput,
+} from './package-create.js';
 import { packageCapabilities, type CapabilitySummary } from '../install/package-capabilities.js';
 import { parseBundledCrews } from '../../app-bundled-crews.js';
 import { checkAppConfigValues, type AppConfigSchema } from '../../app-config.js';
@@ -129,6 +135,8 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
     const expects: ComposeExpectations = { cortex: [], extensions: [], packs: [] };
     const addExpect = (kind: keyof ComposeExpectations, values: string[]) => { for (const v of values) if (!expects[kind].includes(v)) expects[kind].push(v); };
     const components: RawComponentInput[] = [];
+    /** Each app's own package components, in the order of `packages`. */
+    const perApp: RawComponentInput[][] = [];
     const packages: ComposeSetAnswer['packages'] = [];
     const questions: SetQuestion[] = [];
     const contracts = new Map<string, { decl: AppWorkspaceDeclaration; apps: string[] }>();
@@ -143,6 +151,7 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
         const plan = await planComposeFromApps(deps, caller, { name: pkgName, apps: [filename], includeCortex: input.includeCortex, includeSkills: input.includeSkills, allowExpectations: true });
         if (!plan.ok) return plan;
         components.push(...plan.components);
+        perApp.push(plan.components);
         addExpect('cortex', plan.expects.cortex);
         addExpect('packs', plan.expects.packs);
         addExpect('extensions', plan.expects.extensions);
@@ -196,9 +205,34 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
     const parsed = parseInstallBundle(bundleDoc);
     if (!parsed.ok) problems.push(`The bundle would not parse: ${parsed.message}`);
 
+    // The refusals the writes below would meet, found here, so the dry run lists them and the real call
+    // stops before the first app's package is published. The writes found them one by one, after the
+    // packages before them were already published and a managed install on the stable channel had
+    // received them (secaudit 2026-10-10, I20).
+    const visibility = input.visibility ?? 'private';
+    if (!(VALID_VISIBILITIES as readonly string[]).includes(visibility)) problems.push(`visibility must be one of: ${VALID_VISIBILITIES.join(', ')}.`);
+    const bundleComponent: RawComponentInput = { id: 'install-bundle', type: 'memory', label: 'Install bundle', content: JSON.stringify(bundleDoc), dependencies: [] };
+    const setGroupId = `${name}::${caller.owner}`;
+    let newGroups = 0;
+    const writes: Array<[string, string, RawComponentInput[]]> = [
+        ...packages.map((p, i): [string, string, RawComponentInput[]] => [p.app, p.group_id, perApp[i]!]),
+        ['The bundle', setGroupId, [bundleComponent]],
+    ];
+    for (const [label, groupId, comps] of writes) {
+        const ceiling = checkCeilings(config, normalizeComponents(comps));
+        if (ceiling && !ceiling.ok) problems.push(`${label}: ${ceiling.message}`);
+        const held = await storage.listVersions(groupId, 1, 0);
+        if (held.total === 0) newGroups++;
+        else if (held.versions[0] && held.versions[0].author !== caller.owner) problems.push(`${label}: the package ${groupId} has another author, so a version cannot be added to it.`);
+    }
+    if (newGroups > 0) {
+        const quota = await checkAuthorQuota({ storage, config }, caller.owner, newGroups);
+        if (quota && !quota.ok) problems.push(`The set needs ${newGroups} new package${newGroups === 1 ? '' : 's'}: ${quota.message}`);
+    }
+
     const answer: ComposeSetAnswer = {
         dry_run: input.dryRun === true,
-        set: { group_id: `${name}::${caller.owner}`, name: title },
+        set: { group_id: setGroupId, name: title },
         packages, bundle: bundleDoc, questions, expects,
         not_carried: [...NOT_CARRIED, ...(expects.extensions.length ? [`extensions (${expects.extensions.join(', ')})`] : [])],
         capabilities: packageCapabilities(normalizeComponents(components) as PackageComponent[], config, caller.owner).capabilities,
@@ -208,7 +242,6 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
     if (problems.length) return { ok: false, status: 409, code: 'SET_HAS_PROBLEMS', message: 'The set was not composed, and nothing was written. Each problem says what to change.', problems };
 
     // Every app's package first, so the bundle never lists a group that failed to write.
-    const visibility = input.visibility ?? 'private';
     for (const p of packages) {
         const out = await composePackageFromApps(deps, caller, {
             name: packageNameOf(p.app), apps: [p.app], category: input.category, tags: input.tags, visibility, status: 'published',
@@ -218,7 +251,6 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
         p.version = out.package.version;
         p.new_version = out.newVersion;
     }
-    const bundleComponent: RawComponentInput = { id: 'install-bundle', type: 'memory', label: 'Install bundle', content: JSON.stringify(bundleDoc), dependencies: [] };
     const changelog = `Composed from ${input.apps.join(', ')}`;
     const sheet = {
         ...(typeof input.outcome === 'string' && input.outcome.trim() ? { outcome: input.outcome.trim().slice(0, 300) } : {}),

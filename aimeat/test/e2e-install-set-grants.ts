@@ -19,8 +19,13 @@
  *   - Phase 6: an owner installing a package: someone else's package records no grant unless the
  *     owner chooses grant_apps, the owner's own package approves its app, an agent approves no scope
  *     it lacks, and a grant_apps that is not a boolean is refused
+ *   - Phase 7: a repository node R (secaudit 2026-10-10): a real apply refused as NOT_A_BUNDLE links
+ *     no peer and pulls nothing (I17); "startup" is a reserved account name; an owner's set install
+ *     cannot pull from a peer with package federation off, records the owner's GHII, and adds no
+ *     trusted package source (I18)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-set-grants
  * @version-history
+ *   v1.3.0 — 2026-10-10 — Phase 7: a repository node, for secaudit 2026-10-10 I17 and I18.
  *   v1.2.0 — 2026-10-05 — Phase 3: an apply into an account that existed before leaves the operator
  *     trail (operator_acted) in its feed, and the first apply, which created it, leaves none
  *     (secaudit 2026-10, S4).
@@ -37,6 +42,7 @@ import type { Storage } from '../src/storage/interface.js';
 import { setActiveEmailService, type EmailService } from '../src/services/email.js';
 import { hostRequest } from './helpers/host-request.js';
 import { sign } from '../src/auth/keypair.js';
+import { installSetRepositories } from '../src/services/install-set-trust.js';
 
 let passed = 0;
 let failed = 0;
@@ -420,6 +426,126 @@ await test('grant_apps that is not true or false is refused', async () => {
     assert(r.status === 400 && /grant_apps/.test(r.body.error?.message ?? ''), `expected 400: ${r.status} ${JSON.stringify(r.body)}`);
 });
 
+console.log('\nPhase 7 — A repository the set names (secaudit 2026-10-10, I17 and I18)');
+
+// 40753: the repository node; no other suite names it. Booting it in this process takes over the
+// token signing, so the accounts of this node get their tokens minted again (e2e-install-sets.ts).
+const R_PORT = 40753;
+const R_BASE = `http://127.0.0.1:${R_PORT}`;
+const R_ID = `aimeat-test-001-isgrantrepo${ts}`;
+let rServer: Server | undefined;
+let rAdminPw = '';
+let rVendor = '';
+let rShop = '';
+let rSetup = '';
+const rJson = async (path: string, opts: RequestInit = {}) => {
+    const res = await fetch(`${R_BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
+    return { status: res.status, body: await res.json() as any };
+};
+const mintAgain = async (name: string): Promise<string> => {
+    const tok = await json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ owner: name, private_key: ownerKeys.get(name) }) });
+    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
+    return tok.body.token as string;
+};
+const peersOfN = async () => ((await json('/v1/federation/peers', { headers: auth(opsToken) })).body.data?.peers ?? []) as any[];
+const rPublicKey = async () => (await rJson('/.well-known/aimeat')).body.data.public_key as string;
+const pullFromR = (token: string, group: string) => json('/v1/federation/packages/pull', { method: 'POST', headers: auth(token), body: JSON.stringify({ group_id: group, node_id: R_ID }) });
+
+await test('Boot a repository node R that serves a public app package and a public bundle that lists it', async () => {
+    rAdminPw = randomBytes(16).toString('base64url');
+    process.env.AIMEAT_PORT = String(R_PORT);
+    process.env.AIMEAT_ADMIN_PASSWORD = rAdminPw;
+    process.env.AIMEAT_NODE_ID = R_ID;
+    process.env.AIMEAT_BASE_URL = R_BASE;
+    const { config: rConfig } = loadConfig({});
+    Object.assign(rConfig, {
+        port: R_PORT, nodeId: R_ID, baseUrl: R_BASE, devMode: true, testMode: true, adminPassword: rAdminPw,
+        storageProvider: 'memory', packagesEnabled: true, packageFederationEnabled: true, packageRepository: true,
+        packageCreateRole: 'owner', adminAuthRateLimitMax: 100,
+    });
+    const made = await createServer(rConfig);
+    rServer = await new Promise<Server>((resolve) => { const s = made.app.listen(R_PORT, '127.0.0.1', () => resolve(s)); });
+    const reg = await rJson('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': rAdminPw }, body: JSON.stringify({ name: `rvendor${ts}` }) });
+    assert(reg.status === 200, `register on R: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const tok = await rJson('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': rAdminPw }, body: JSON.stringify({ owner: `rvendor${ts}`, private_key: reg.body.private_key }) });
+    rVendor = tok.body.token;
+    opsToken = await mintAgain(`ops${ts}`);
+    const shop = await rJson('/v1/packages', { method: 'POST', headers: auth(rVendor),
+        body: JSON.stringify({ name: `rshop${ts}`, description: 'A shop app', category: 'utility', visibility: 'public',
+            components: [{ id: 'app-shop', type: 'app', label: 'Shop', content: APP_HTML, dependencies: [] }] }) });
+    assert(shop.status === 201, `shop on R: ${shop.status} ${JSON.stringify(shop.body)}`);
+    rShop = shop.body.data.packageGroupId;
+    const bundle = { spec: 'aimeat.install-bundle/1', name: 'Repository setup', packages: [{ group_id: rShop, mode: 'managed' }], organisms: [], agents: [] };
+    const setup = await rJson('/v1/packages', { method: 'POST', headers: auth(rVendor),
+        body: JSON.stringify({ name: `rsetup${ts}`, description: 'The setup', category: 'utility', visibility: 'public',
+            components: [{ id: 'install-bundle', type: 'memory', label: 'Install bundle', content: JSON.stringify(bundle), dependencies: [] }] }) });
+    assert(setup.status === 201, `bundle on R: ${setup.status} ${JSON.stringify(setup.body)}`);
+    rSetup = setup.body.data.packageGroupId;
+    // R knows this node, so a signed read from it is answered; this node does not know R yet.
+    const nCard = await json('/.well-known/aimeat');
+    const add = await rJson('/v1/federation/peers', { method: 'POST', headers: auth(rVendor), body: JSON.stringify({ node_id: NODE_ID, url: BASE, public_key: nCard.body.data.public_key }) });
+    assert(add.status === 201, `R adds this node: ${add.status} ${JSON.stringify(add.body)}`);
+    const act = await rJson(`/v1/federation/peers/${encodeURIComponent(NODE_ID)}`, { method: 'PUT', headers: auth(rVendor), body: JSON.stringify({ status: 'active', share_catalogue: true }) });
+    assert(act.status === 200, `R activates this node: ${act.status} ${JSON.stringify(act.body)}`);
+    assert(!(await peersOfN()).some(p => p.node_id === R_ID), 'this node has no link to R yet');
+});
+
+await test('I17: a real apply refused as NOT_A_BUNDLE links no repository and pulls no copy', async () => {
+    const owner = `trust${ts}`;
+    const r = await json('/v1/install-sets/apply', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ install_set: {
+        spec: 'aimeat.install-set/1', bundle: { group_id: rShop, node_id: R_ID }, owner: { name: owner, email: `${owner}@example.org` },
+        repository: { node_id: R_ID, url: R_BASE, public_key: await rPublicKey() },
+    } }) });
+    assert(r.status === 400 && r.body.error?.code === 'NOT_A_BUNDLE', `expected 400 NOT_A_BUNDLE: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(!(await peersOfN()).some(p => p.node_id === R_ID), `no peer was linked: ${JSON.stringify(await peersOfN())}`);
+    assert((await storage.listVersions(`rshop${ts}::${owner}`, 1, 0)).total === 0, 'no copy was pulled');
+});
+
+await test('I18: an owner named "startup" cannot register', async () => {
+    const reg = await json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name: 'startup' }) });
+    assert(reg.status === 400 && /reserved/.test(JSON.stringify(reg.body)), `expected 400 reserved: ${reg.status} ${JSON.stringify(reg.body)}`);
+});
+
+const OSCAR = `oscar${ts}`;
+const PIA = `pia${ts}`;
+let oscarToken = '';
+let piaToken = '';
+await test('With package federation on, two owners pull the bundle from R, now an active peer', async () => {
+    const add = await json('/v1/federation/peers', { method: 'POST', headers: auth(opsToken), body: JSON.stringify({ node_id: R_ID, url: R_BASE, public_key: await rPublicKey() }) });
+    assert(add.status === 201, `add R: ${add.status} ${JSON.stringify(add.body)}`);
+    const act = await json(`/v1/federation/peers/${encodeURIComponent(R_ID)}`, { method: 'PUT', headers: auth(opsToken), body: JSON.stringify({ status: 'active', share_catalogue: true }) });
+    assert(act.status === 200, `activate R: ${act.status} ${JSON.stringify(act.body)}`);
+    config.packageFederationEnabled = true;
+    oscarToken = await setupOwner(OSCAR);
+    piaToken = await setupOwner(PIA);
+    for (const t of [oscarToken, piaToken]) {
+        const p = await pullFromR(t, rSetup);
+        assert(p.status === 201, `pull the bundle: ${p.status} ${JSON.stringify(p.body)}`);
+    }
+});
+
+await test('I18: with package federation off, an owner\'s set install cannot pull its packages from the peer', async () => {
+    config.packageFederationEnabled = false;
+    try {
+        const group = `rsetup${ts}::${PIA}`;
+        const dry = await installPkg(piaToken, group, { dry_run: true });
+        assert(dry.status === 200 && (dry.body.data.problems as string[]).some(p => p.includes('PACKAGE_FEDERATION_DISABLED')), `the plan names the switch: ${dry.status} ${JSON.stringify(dry.body)}`);
+        const r = await installPkg(piaToken, group);
+        assert(r.status === 409 && r.body.error?.code === 'CANNOT_INSTALL_SET', `expected 409 CANNOT_INSTALL_SET: ${r.status} ${JSON.stringify(r.body)}`);
+        assert((await storage.listVersions(`rshop${ts}::${PIA}`, 1, 0)).total === 0, 'no copy of the app package was pulled');
+    } finally {
+        config.packageFederationEnabled = true;
+    }
+});
+
+await test('I18: an owner\'s set install records the owner\'s GHII and adds no trusted package source', async () => {
+    const r = await installPkg(oscarToken, `rsetup${ts}::${OSCAR}`);
+    assert(r.status === 201 && r.body.data.record?.applied_by === `${OSCAR}@${NODE_ID}`, `install: ${r.status} ${JSON.stringify(r.body.data?.record ?? r.body)}`);
+    assert(r.body.data.record.bundle.node_id === R_ID, `the record names R: ${JSON.stringify(r.body.data.record.bundle)}`);
+    assert(!(await installSetRepositories(storage)).has(R_ID), 'R is not a trusted package source');
+});
+
+rServer?.close();
 server.close();
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

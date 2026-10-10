@@ -19,6 +19,8 @@
  * @structure applyStartupInstallSet(deps)
  * @usage await applyStartupInstallSet({ storage, config, peers, scheduler });
  * @version-history
+ *   v1.3.1 — 2026-10-10 — The apply is marked `startup: true`, so its record carries `via: 'startup'`,
+ *     which install-set-trust.ts reads instead of `applied_by` (secaudit 2026-10-10, I18).
  *   v1.3.0 — 2026-10-08 — BUNDLE_UNAVAILABLE is tried every 30 s for the first ten minutes, then on
  *     the long schedule. The store grants a new node its entitlement one to two minutes after the
  *     node is live, and the 1-then-5-minute wait made a new place's apps arrive at 5 min, not 2.
@@ -88,7 +90,7 @@ export async function applyStartupInstallSet(deps: ApplyDeps, attempt = 0, start
     }
     let code: string;
     try {
-        const out = await applyInstallSet(deps, { installSet: set.value, secrets, appliedBy: 'startup' });
+        const out = await applyInstallSet(deps, { installSet: set.value, secrets, appliedBy: 'startup', startup: true });
         if (out.ok) {
             if (out.dry_run) return;
             const pending = Object.values(out.record.agents).filter(a => a.result === 'pending').length;

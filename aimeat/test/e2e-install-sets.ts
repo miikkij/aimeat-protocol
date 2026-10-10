@@ -613,7 +613,7 @@ await test('A new node started with an install set links the repository, waits f
         await new Promise(r => setTimeout(r, 500));
         sets = (await D.json('/v1/install-sets', { headers: auth(dToken) })).body.data?.install_sets ?? [];
     }
-    assert(sets.length === 1 && sets[0].owner === 'dco' && sets[0].applied_by === 'startup', `applied at start-up: ${JSON.stringify(sets).slice(0, 400)}`);
+    assert(sets.length === 1 && sets[0].owner === 'dco' && sets[0].applied_by === 'startup' && sets[0].via === 'startup', `applied at start-up: ${JSON.stringify(sets).slice(0, 400)}`);
     assert(sets[0].packages[shopOnR]?.result === 'installed' && typeof sets[0].organisms.team?.id === 'string', `what it made: ${JSON.stringify(sets[0]).slice(0, 400)}`);
     const peers = await D.json('/v1/federation/peers', { headers: auth(dToken) });
     const link = (peers.body.data?.peers as any[] ?? []).find((p) => p.node_id === R.nodeId);

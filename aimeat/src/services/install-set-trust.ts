@@ -18,6 +18,8 @@
  *   install set on this node names that repository (the records in the system namespace below).
  * @structure NS_INSTALL_SETS · installSetRepositories() · rememberClaimedRepository()
  * @version-history
+ *   v1.3.0 — 2026-10-10 — The start-up apply's record is recognised by `via: 'startup'`, not by
+ *     `applied_by`, which an owner account named "startup" could write (secaudit 2026-10-10, I18).
  *   v1.2.1 — 2026-10-05 — The applying account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-10-05 — Only an install set an operator applied names a trusted repository; an
  *     owner's own bundle record no longer does (secaudit 2026-10, PKG-9).
@@ -47,12 +49,16 @@ export async function installSetRepositories(storage: Storage): Promise<Set<stri
     const out = new Set<string>();
     const operator = new Map<string, boolean>();
     for (const row of rows) {
-        const value = row.value as { bundle?: { node_id?: unknown }; applied_by?: unknown } | undefined;
+        const value = row.value as { bundle?: { node_id?: unknown }; applied_by?: unknown; via?: unknown; accounts_created?: unknown } | undefined;
         const node = value?.bundle?.node_id;
         if (typeof node !== 'string' || !node || typeof value?.applied_by !== 'string') continue;
-        // 'startup': the set the operator configured for this node, applied when it starts
-        // (install-set-startup.ts).
-        if (value.applied_by === 'startup') { out.add(node); continue; }
+        // The set the operator configured for this node, applied when it starts (install-set-startup.ts).
+        // `via` is written only for that apply. `applied_by === 'startup'` alone is not proof: an owner
+        // account named "startup" wrote that value through its own bundle install (secaudit 2026-10-10,
+        // I18). A record from before `via` counts when it also carries `accounts_created`, which only
+        // applyInstallSet writes; an owner's bundle record (install-bundle-owner.ts) never has it.
+        if (value.via === 'startup' || (value.applied_by === 'startup' && Array.isArray(value.accounts_created))) { out.add(node); continue; }
+        if (value.applied_by === 'startup') continue;
         const account = localAccountName(value.applied_by);
         if (!operator.has(account)) operator.set(account, isOperatorAccount(await storage.getOwner(account)));
         if (operator.get(account)) out.add(node);
