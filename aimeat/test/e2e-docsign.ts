@@ -34,6 +34,7 @@
  *     (wish-allekirjoitus-eudi-lompakolla).
  *   v1.2.0 — 2026-10-10 — A wallet answering at the node's own address, the session found by state.
  *   v1.3.0 — 2026-10-10 — A request made from a stored PDF starts a wallet signature with no file sent.
+ *   v1.4.0 — 2026-10-10 — A wallet answer for a request cancelled meanwhile stores nothing (secaudit 2026-10-10 I14).
  */
 import * as ed from '@noble/ed25519';
 import { createHash, X509Certificate } from 'node:crypto';
@@ -496,6 +497,31 @@ async function main() {
         assert(once.status === 201, `the PDF sent once: ${once.status}`);
         const again = await post(`/v1/docsign/requests/${hashId}/wallet`, alice.token, {});
         assert(again.status === 201, `the second try with no file: ${again.status} ${JSON.stringify(again.body.error)}`);
+    });
+
+    // secaudit 2026-10-10 I14. The signed PDF was written to the signer's files before the request
+    // was checked again, and a refusal at the seal left it there, charged to their quota. Against the
+    // old code the file below is in alice's storage.
+    await test('a wallet answer for a request cancelled meanwhile is refused and leaves no file in the signer\'s storage', async () => {
+        const pdf = plainPdf(`Peruttu lompakossa ${stamp}`);
+        const psha = createHash('sha256').update(pdf).digest('hex');
+        const r = await post('/v1/docsign/requests', alice.token, { title: 'Peruttu', document: { sha256: psha, name: 'peruttu.pdf', size: pdf.length, media_type: 'application/pdf' }, parties: [ghii(names.alice), ghii(names.bob)] });
+        assert(r.status === 201, `create: ${r.status}`);
+        const id = r.body.data.request.id;
+        const started = await fetch(`${BASE}/v1/docsign/requests/${id}/wallet?name=peruttu.pdf`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: pdf });
+        assert(started.status === 201, `start: ${started.status}`);
+        const s = (await started.json() as any).data;
+        const { claims, pdf: got } = await walletOpens(s.wallet_link);
+        const signed = appendSignature(got, walletSigner.cert, walletSigner.key, walletSigner.chain);
+        const cancelled = await post(`/v1/docsign/requests/${id}/cancel`, alice.token, {});
+        assert(cancelled.status === 200, `cancel: ${cancelled.status}`);
+        const res = await walletPosts(claims, { state: claims.state, documentWithSignature: JSON.stringify([signed.toString('base64')]) });
+        assert(res.status === 409, `the wallet answer for a cancelled request: ${res.status}`);
+        const files = await json('/v1/storage', { headers: auth(alice.token) });
+        const left = (files.body.data.files as any[]).map(f => f.key).filter(k => k.startsWith(`docsign/${id}/`) && k.includes('-signed-'));
+        assert(left.length === 0, `no signed PDF in alice's files: ${JSON.stringify(left)}`);
+        const noted = (await json(`/v1/docsign/requests/${id}`, { headers: auth(alice.token) })).body.data.request.walletLastAttempt;
+        assert(noted?.code === 'NOT_OPEN' && !noted.rejectedKey, `the reason is noted, with no file kept: ${JSON.stringify(noted)}`);
     });
 
     // ── cancelling ──

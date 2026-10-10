@@ -27,7 +27,7 @@
  *   parties signing at once: a node is one process, so an in-process lock is the whole answer.
  * @structure DocSignRecord · DocSignature · DocsignError · createRequest · getRequest ·
  *   listRequests · lookupByHash · beginPasskeySignature · signRequest · cancelRequest ·
- *   verifyRecordSignatures · publicView · walletSigner · recordWalletSignature · signedDocument ·
+ *   verifyRecordSignatures · publicView · walletSigner · checkWalletSignature · recordWalletSignature · signedDocument ·
  *   nextPdfToSign · deleteRequest
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
@@ -42,6 +42,8 @@
  *     request (noteWalletAttempt), because a session's own error is gone with the session.
  *   v1.4.0 — 2026-10-10 — deleteRequest: a request nobody signed can be deleted by its creator,
  *     with the files the node stored for it (Jouni: cancelled tests were left in the list for good).
+ *   v1.4.1 — 2026-10-10 — checkWalletSignature: the wallet checks before the signed PDF is stored
+ *     (secaudit 2026-10-10 I14); the signed PDF's hash is indexed after the seal succeeds (I15).
  */
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
@@ -510,17 +512,37 @@ export async function recordWalletSignature(
 ): Promise<DocSignRecord> {
   return withLock(id, async () => {
     const rec = await load(ctx, id);
-    partyCheckFor(rec, signer);
-    if ((rec.walletDocument?.sha256 ?? rec.document.sha256) !== inputSha256) {
-      throw new DocsignError('CONFLICT', 409, 'Someone else signed this request with a wallet meanwhile. Start again with the latest signed PDF.');
-    }
+    walletStillOpen(rec, signer, inputSha256);
     const ghii = await ctx.storage.getGHII(signer);
     const assurance: Assurance = { verificationLevel: ghii?.verificationLevel ?? 0, userVerified: true, principalKind: 'person' };
     rec.walletDocument = { sha256: wallet.signed.sha256, size: wallet.signed.size, owner: wallet.signed.owner, key: wallet.signed.key, name };
     delete rec.walletLastAttempt;
+    const sealed = await sealInto(ctx, rec, signer, 'eudi-wallet', { wallet }, assurance);
+    // Indexed only once the signature is sealed and stored: a seal that throws (no node key, a
+    // storage error) left the signed PDF's hash pointing at a request that holds no such signature
+    // (secaudit 2026-10-10 I15).
     await addToIndex(ctx.storage, hashKey(wallet.signed.sha256), rec.id);
-    return sealInto(ctx, rec, signer, 'eudi-wallet', { wallet }, assurance);
+    return sealed;
   });
+}
+
+/** The checks recordWalletSignature makes, as a throw: the request is open, the signer is a party
+ *  who has not signed, and the wallet was given the request's latest PDF. */
+function walletStillOpen(rec: DocSignRecord, signer: string, inputSha256: string): void {
+  partyCheckFor(rec, signer);
+  if ((rec.walletDocument?.sha256 ?? rec.document.sha256) !== inputSha256) {
+    throw new DocsignError('CONFLICT', 409, 'Someone else signed this request with a wallet meanwhile. Start again with the latest signed PDF.');
+  }
+}
+
+/**
+ * The same checks before the wallet's PDF is stored (services/docsign/eudi.ts), so an answer for a
+ * request that was cancelled, signed or moved on meanwhile writes nothing to the signer's files and
+ * charges nothing to their quota (secaudit 2026-10-10 I14). recordWalletSignature checks again
+ * under the lock, for the race that remains.
+ */
+export async function checkWalletSignature(ctx: DocsignCtx, id: string, signer: string, inputSha256: string): Promise<void> {
+  walletStillOpen(await load(ctx, id), signer, inputSha256);
 }
 
 /**

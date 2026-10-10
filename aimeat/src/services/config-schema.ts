@@ -12,14 +12,14 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.28.1 — 2026-10-10 — The descriptions say the versions: realtime.turn_username and turn_credential are removed in 4.0.0; federation.audience_required is on by default from 3.27.0 and the older message format is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23, I22).
  *   v1.28.0 — 2026-10-09 — security.ws_query_token (AIMEAT_WS_QUERY_TOKEN), mutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, d3).
  *   v1.27.0 — 2026-10-09 — The document signing rows (config-schema-docsign.ts), beside identity verification.
  *   v1.26.0 — 2026-10-09 — security.owner_key_login (AIMEAT_OWNER_KEY_LOGIN), immutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, S2).
  *   v1.25.0 — 2026-10-09 — security.admin_setup_open_after_first_operator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR), immutable, default off: test nodes only (secrets audit 2026-10-09, 1.4).
  *   v1.24.0 — 2026-10-09 — realtime.turn_secret (a secret row) and realtime.turn_ttl_seconds; the static TURN pair is marked deprecated.
  *   v1.23.0 — 2026-10-08 — The visibility rows (config-schema-visibility.ts), beside the visitor geography.
- *   v1.22.0 — 2026-10-06 — The site-link rows moved to config-schema-site-links.ts unchanged (max-file-lines),
- *     where site.store_status and the store notes joined them.
+ *   v1.22.0 — 2026-10-06 — The site-link rows moved to config-schema-site-links.ts unchanged (max-file-lines), where site.store_status and the store notes joined them.
  *   v1.21.0 — 2026-10-02 — federation.package_peer_cap (AIMEAT_PACKAGE_PEER_CAP): the most packages-only
  *     peers a repository registers (package sale design, finding F).
  *   v1.20.0 — 2026-10-01 — apps.audit_keep_default (AIMEAT_APP_AUDIT_KEEP): the node's default limit
@@ -408,7 +408,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'federationDefaultScopes', dotPath: 'federation.default_scopes', envVar: 'AIMEAT_FEDERATION_DEFAULT_SCOPES', type: 'string', validate: () => true, immutable: false, description: 'Default scopes for federated users (comma-separated)' },
   { key: 'federationOpenJoin', dotPath: 'federation.open_join', envVar: 'AIMEAT_FEDERATION_OPEN_JOIN', type: 'boolean', validate: () => true, immutable: false, description: 'Open join: a signed introduce self-admits as a low-trust visiting peer (no manual approval)' },
   { key: 'federationBookListed', dotPath: 'federation.book_listed', envVar: 'AIMEAT_FEDERATION_BOOK_LISTED', type: 'boolean', validate: () => true, immutable: false, description: 'List this node (operators + resources) in the federation book; off = privacy opt-out' },
-  { key: 'federationAudienceRequired', dotPath: 'federation.audience_required', envVar: 'AIMEAT_FEDERATION_AUDIENCE_REQUIRED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Refuse a message from another node that does not name this node as the one it is for. Off: a node on an older version, which names none, is still heard; a message that names another node is refused either way' },
+  { key: 'federationAudienceRequired', dotPath: 'federation.audience_required', envVar: 'AIMEAT_FEDERATION_AUDIENCE_REQUIRED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Refuse a message from another node that does not name this node as the one it is for. Off: a node on an older version, which names none, is still heard; a message that names another node is refused either way. On by default from 3.27.0; the older message format, without the audience proof, is removed in 4.0.0' },
 
   // ── Security limits (mutable) ──
   { key: 'screenshotEgress', dotPath: 'security.screenshot_egress', envVar: 'AIMEAT_SCREENSHOT_EGRESS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'Exact addresses (scheme, host, port) of your own private servers that a page the node renders (a screenshot, a playtest, a Design Book bench) may reach, comma separated. Empty: public addresses and the node\'s own only', range: 'http://intranet.local:8080,http://192.168.1.20:3000' },
@@ -602,8 +602,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'realtimeRateLimitPerSecond', dotPath: 'realtime.rate_limit_per_second', envVar: 'AIMEAT_REALTIME_RATE_LIMIT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'P2P messages per second rate limit', range: '1-1000' },
   { key: 'stunServers', dotPath: 'realtime.stun_servers', envVar: 'AIMEAT_STUN_SERVERS', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'STUN servers for P2P (comma-separated)' },
   { key: 'turnServer', dotPath: 'realtime.turn_server', envVar: 'AIMEAT_TURN_SERVER', type: 'string', validate: () => true, immutable: false, description: 'TURN server URL for P2P relay' },
-  { key: 'turnUsername', dotPath: 'realtime.turn_username', envVar: 'AIMEAT_TURN_USERNAME', type: 'string', validate: () => true, immutable: false, description: 'TURN server username (deprecated: set the TURN shared secret instead; served only while that is empty)', adminDisplay: 'configured' },
-  { key: 'turnCredential', dotPath: 'realtime.turn_credential', envVar: 'AIMEAT_TURN_CREDENTIAL', type: 'string', validate: () => true, immutable: false, description: 'TURN server credential (deprecated: set the TURN shared secret instead; served only while that is empty)', adminDisplay: 'configured' },
+  { key: 'turnUsername', dotPath: 'realtime.turn_username', envVar: 'AIMEAT_TURN_USERNAME', type: 'string', validate: () => true, immutable: false, description: 'Deprecated, removed in 4.0.0. TURN server username: set the TURN shared secret instead; served only while that is empty', adminDisplay: 'configured' },
+  { key: 'turnCredential', dotPath: 'realtime.turn_credential', envVar: 'AIMEAT_TURN_CREDENTIAL', type: 'string', validate: () => true, immutable: false, description: 'Deprecated, removed in 4.0.0. TURN server credential: set the TURN shared secret instead; served only while that is empty', adminDisplay: 'configured' },
   { key: 'turnSecret', dotPath: 'realtime.turn_secret', envVar: 'AIMEAT_TURN_SECRET', type: 'string', validate: v => v === null || typeof v === 'string', immutable: false, description: 'TURN shared secret (secret): the coturn static-auth-secret. It never leaves the node; each client receives a credential derived from it that expires', adminDisplay: 'configured' },
   { key: 'turnTtlSeconds', dotPath: 'realtime.turn_ttl_seconds', envVar: 'AIMEAT_TURN_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 86400, immutable: false, description: 'How long a TURN credential handed to a client stays valid, in seconds', range: '60-86400' },
 
