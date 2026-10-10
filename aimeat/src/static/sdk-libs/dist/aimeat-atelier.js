@@ -14546,6 +14546,35 @@ Known schemas:
     };
   }
 
+  // src/static/sdk-libs/atelier/planner-lanes.js
+  function scheduleLanes(events) {
+    const out = events.map(() => ({ lane: 0, lanes: 1 }));
+    const order = events.map((_, i) => i).sort((a, b) => events[a].fromMin - events[b].fromMin || events[b].toMin - events[a].toMin || a - b);
+    let group = [];
+    let laneEnds = [];
+    let groupEnd = -Infinity;
+    const close = () => {
+      for (const i of group) out[i].lanes = laneEnds.length;
+      group = [];
+      laneEnds = [];
+      groupEnd = -Infinity;
+    };
+    for (const i of order) {
+      const e = events[i];
+      if (group.length && e.fromMin >= groupEnd) close();
+      let lane = laneEnds.findIndex((end) => end <= e.fromMin);
+      if (lane < 0) {
+        lane = laneEnds.length;
+        laneEnds.push(e.toMin);
+      } else laneEnds[lane] = e.toMin;
+      out[i].lane = lane;
+      group.push(i);
+      groupEnd = Math.max(groupEnd, e.toMin);
+    }
+    close();
+    return out;
+  }
+
   // src/static/sdk-libs/atelier/planner.js
   var TONES6 = ["ok", "warn", "err", "accent"];
   var CARD_SPRING = { stiffness: 300, damping: 26 };
@@ -14800,18 +14829,28 @@ Known schemas:
           el("span", { class: "ak-schedule__dayname", text: label })
         ]);
         const well = el("div", { class: "ak-schedule__well" });
+        const places = scheduleLanes(inDay);
         inDay.forEach((e, i) => {
+          const { lane, lanes } = places[i];
           const block = el(spec.onPick ? "button" : "span", {
-            class: "ak-schedule__event ak-schedule__event--" + toneOf3(e.tone, "accent"),
+            class: "ak-schedule__event ak-schedule__event--" + toneOf3(e.tone, "accent") + (lanes > 1 ? " ak-schedule__event--shared" : "") + (lanes > 2 ? " ak-schedule__event--tight" : ""),
             type: spec.onPick ? "button" : void 0,
-            title: `${e.label} · ${e.from}–${e.to}`
+            title: `${e.label} · ${e.from}–${e.to}`,
+            // A third of a narrow day has no room for the name, so the name is also said aloud.
+            "aria-label": lanes > 2 ? `${e.label} · ${e.from}–${e.to}` : void 0
           }, [
             el("span", { class: "ak-schedule__eventname", text: e.label }),
-            // A short booking has room for its name only; the title carries the hours anyway.
-            e.toMin - e.fromMin >= 75 ? el("span", { class: "ak-schedule__eventtime", text: `${e.from}–${e.to}` }) : null
+            // A short booking has room for its name only, and so has one that shares its hours
+            // with two others; the title carries the hours anyway.
+            e.toMin - e.fromMin >= 75 && lanes <= 2 ? el("span", { class: "ak-schedule__eventtime", text: `${e.from}–${e.to}` }) : null
           ]);
           block.style.top = Y(e.fromMin) + "%";
           block.style.height = Math.max(Y(e.toMin) - Y(e.fromMin), 4) + "%";
+          if (lanes > 1) {
+            block.style.insetInlineStart = `calc(3px + (100% - 6px) * ${lane} / ${lanes})`;
+            block.style.insetInlineEnd = "auto";
+            block.style.width = `calc((100% - 6px) / ${lanes} - ${lane < lanes - 1 ? 2 : 0}px)`;
+          }
           if (spec.onPick) block.addEventListener("click", () => spec.onPick(e));
           if (!reducedMotion()) {
             block.classList.add("ak-schedule__event--enter");
@@ -31385,7 +31424,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.66.0",
+    version: "0.66.1",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

@@ -9,6 +9,8 @@
  *   them; entrances are finite and reduced-motion drops them, like the rest of the kit.
  * @structure .ak-kanban · .ak-plan · .ak-schedule · reduced-motion
  * @version-history
+ *   v0.66.1 — 2026-10-10 — .ak-schedule__event--shared: a booking that shares its hours with
+ *     others and stands beside them (atelier/planner-lanes.js). Nothing else changed.
  *   v0.38.0 — 2026-09-05 — The board reads its own tokens instead of the literals it carried:
  *     --ak-kanban-col-min, --ak-kanban-gap, --ak-kanban-card-pad. Every default is the value that
  *     was there. The card's empty parts and the board's variants live in custom.css.
@@ -229,6 +231,27 @@ button.ak-schedule__event { cursor: pointer; }
 /* The hours inside a booking block: an annotation on the name above it, so it reads at the micro
  * size. 0.68rem resolved to 10.9px. */
 .ak-schedule__eventtime { font-size: var(--ak-text-micro); color: var(--ak-ink-dim); font-variant-numeric: tabular-nums; }
+/* A booking that shares its hours stands beside the others at a share of the day (planner.js
+ * sets its start and its width). The share is narrow, so the name starts at the top, may break
+ * onto more lines and gives up some of its side padding; what does not fit is cut by the block. */
+.ak-schedule__event--shared { justify-content: flex-start; padding-inline: 5px 3px; }
+.ak-schedule__event--shared .ak-schedule__eventname { white-space: normal; overflow-wrap: anywhere; line-height: 1.15; }
+/* Three or more beside each other: a share that narrow breaks a name one letter to a line, so the
+ * name runs down the block on one line and ends in an ellipsis. In a day too narrow for even
+ * that (a week on a phone) the block is a bar of its tone, and its title and label say the name. */
+.ak-schedule__well { container-type: inline-size; }
+.ak-schedule__event--tight { padding: 5px 0 4px; align-items: center; }
+.ak-schedule__event--tight .ak-schedule__eventname {
+  writing-mode: vertical-rl;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  min-height: 0;
+  max-height: 100%;
+  line-height: 1;
+}
+@container (max-width: 66px) {
+  .ak-schedule__event--tight .ak-schedule__eventname { display: none; }
+}
 .ak-schedule__event--enter { opacity: 0; animation: ak-band-in calc(var(--ak-motion) * 1.6) var(--ak-ease) forwards; }
 
 /* ── Steps: the process tracker ──────────────────────────────────────────────────────────── */

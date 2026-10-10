@@ -56,6 +56,8 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.66.1 — 2026-10-10 — planner.css: a schedule booking that shares its hours and stands
+ *     beside the others (.ak-schedule__event--shared).
  *   v0.66.0 — 2026-10-05 — data.css: a field that passed its rules (.ak-form__field--valid), the
  *     form's alert for a problem of no one field, the line under a held button (.ak-form__gate) and
  *     a held .ak-btn (form validation from one JSON Schema, atelier/form.js).
