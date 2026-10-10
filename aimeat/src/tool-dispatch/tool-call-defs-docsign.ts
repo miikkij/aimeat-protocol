@@ -80,6 +80,11 @@ export const docsignCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.post(`/v1/docsign/requests/${id(input)}/cancel`, {}),
     },
     {
+        // → DELETE /v1/docsign/requests/:id
+        name: 'aimeat_docsign_delete',
+        handler: ({ client }, input) => client.delete(`/v1/docsign/requests/${id(input)}`),
+    },
+    {
         // → POST /v1/docsign/requests/:id/wallet (JSON: the PDF named by a stored file)
         name: 'aimeat_docsign_wallet_start',
         handler: ({ client }, input) => {

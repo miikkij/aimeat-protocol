@@ -516,6 +516,33 @@ async function main() {
         assert(look.body.data.requests.length === 0, 'a cancelled request is not shown');
     });
 
+    await test('a request nobody signed is deleted by its creator, with the PDF kept for it; a signed one stays', async () => {
+        const pdf = plainPdf(`Poistettava ${stamp}`);
+        const psha = createHash('sha256').update(pdf).digest('hex');
+        const r = await post('/v1/docsign/requests', alice.token, { title: 'Poistettava', document: { sha256: psha, name: 'poistettava.pdf', size: pdf.length, media_type: 'application/pdf' }, parties: [ghii(names.alice), ghii(names.bob)] });
+        const id = r.body.data.request.id;
+        // Sending the PDF once keeps it in alice's files for the request.
+        await fetch(`${BASE}/v1/docsign/requests/${id}/wallet?name=poistettava.pdf`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: pdf });
+        const kept = (await json(`/v1/docsign/requests/${id}`, { headers: auth(alice.token) })).body.data.request.document.source;
+        assert(!!kept?.key, `the PDF is kept: ${JSON.stringify(kept)}`);
+        const byBob = await json(`/v1/docsign/requests/${id}`, { method: 'DELETE', headers: auth(bob.token) });
+        assert(byBob.status === 403, `bob deletes: ${byBob.status}`);
+        const del = await json(`/v1/docsign/requests/${id}`, { method: 'DELETE', headers: auth(alice.token) });
+        assert(del.status === 200 && del.body.data.files_removed === 1, `alice deletes: ${del.status} ${JSON.stringify(del.body.data ?? del.body.error)}`);
+        const gone = await json(`/v1/docsign/requests/${id}`, { headers: auth(alice.token) });
+        assert(gone.status === 404, `the request is gone: ${gone.status}`);
+        const listed = await json('/v1/docsign/requests', { headers: auth(bob.token) });
+        assert(!listed.body.data.requests.some((q: any) => q.id === id), 'it left bob\'s list too');
+        const file = await fetch(`${BASE}/v1/storage/${kept.key}`, { headers: auth(alice.token) });
+        assert(file.status === 404, `the kept PDF went with it: ${file.status}`);
+        // The request from the top of the suite carries two signatures: it is a record.
+        const signed = await json(`/v1/docsign/requests/${requestId}`, { method: 'DELETE', headers: auth(alice.token) });
+        assert(signed.status === 409 && signed.body.error?.code === 'HAS_SIGNATURES', `a signed request: ${signed.status} ${signed.body.error?.code}`);
+        const viaTool = await post('/v1/docsign/requests', agent.token, { title: 'Agentin luonnos', document: { sha256: sha, name: 'x.txt', size: 1 }, parties: [agent.gaii] });
+        const toolOut = toolText(await mcpCall(agent.token, 'aimeat_docsign_delete', { id: viaTool.body.data.request.id }));
+        assert(toolOut.includes('"files_removed"'), `delete tool: ${toolOut.slice(0, 160)}`);
+    });
+
     console.log(`\n${passed} passed, ${failed} failed\n`);
     process.exit(failed ? 1 : 0);
 }

@@ -32,7 +32,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import {
   createRequest, getRequest, listRequests, signRequest, cancelRequest, verifyRecordSignatures, lookupWithNodeKey,
-  nextPdfToSign, DocsignError,
+  nextPdfToSign, deleteRequest, DocsignError,
 } from '../services/docsign/records.js';
 import { validateDocument } from '../services/docsign/validate-input.js';
 import { ValidationInputError } from '../services/docsign/validate.js';
@@ -135,6 +135,15 @@ export function registerDocsignTools(
       const disabled = off(); if (disabled) return disabled;
       try {
         return ok({ request: await cancelRequest(ctx, caller(), String(id)) });
+      } catch (err) { return fail(err); }
+    });
+
+  mcp.tool('aimeat_docsign_delete', descriptionFor('aimeat_docsign_delete'), zodShapeFor('aimeat_docsign_delete'),
+    annotationsFor('aimeat_docsign_delete'),
+    async ({ id }) => {
+      const disabled = off(); if (disabled) return disabled;
+      try {
+        return ok({ deleted: await deleteRequest(ctx, caller(), String(id)) });
       } catch (err) { return fail(err); }
     });
 

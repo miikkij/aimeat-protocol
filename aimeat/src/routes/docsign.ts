@@ -17,6 +17,7 @@
  *   - POST /v1/docsign/requests/:id/passkey-options   start a passkey signature
  *   - POST /v1/docsign/requests/:id/sign              sign (passkey | key | session)
  *   - POST /v1/docsign/requests/:id/cancel            cancel an open request (its creator)
+ *   - DELETE /v1/docsign/requests/:id                 delete a request nobody signed (its creator)
  *   - GET  /v1/docsign/lookup/:sha256                 public: who signed this document on this node
  *   - POST /v1/docsign/validate                       public: validate a signed PDF or CMS file
  *   - the wallet signing endpoints                    routes/docsign-wallet.ts, mounted here
@@ -26,6 +27,7 @@
  *   v1.1.0 — 2026-10-10 — Mounts docsignWalletRouter: signing with an EU Digital Identity Wallet
  *     (wish-allekirjoitus-eudi-lompakolla).
  *   v1.1.1 — 2026-10-10 — The raw file is taken with rawBodyBytes (code scanning alerts 1712-1719).
+ *   v1.2.0 — 2026-10-10 — DELETE /v1/docsign/requests/:id: a request nobody signed.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -36,7 +38,7 @@ import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { callerOf } from '../middleware/caller.js';
 import {
-  createRequest, getRequest, listRequests, beginPasskeySignature, signRequest, cancelRequest,
+  createRequest, getRequest, listRequests, beginPasskeySignature, signRequest, cancelRequest, deleteRequest,
   verifyRecordSignatures, lookupWithNodeKey, DocsignError,
 } from '../services/docsign/records.js';
 import { validateDocument } from '../services/docsign/validate-input.js';
@@ -145,6 +147,12 @@ export function docsignRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/docsign/requests/:id/cancel', enabled, requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       res.json(success(config.nodeId, { request: await cancelRequest(ctx, callerOf(req, config.nodeId, storage), req.params.id as string) }));
+    } catch (err) { fail(res, err); }
+  });
+
+  router.delete('/v1/docsign/requests/:id', enabled, requireAuth(), requireScope('memory:write'), async (req, res) => {
+    try {
+      res.json(success(config.nodeId, await deleteRequest(ctx, callerOf(req, config.nodeId, storage), req.params.id as string)));
     } catch (err) { fail(res, err); }
   });
 
