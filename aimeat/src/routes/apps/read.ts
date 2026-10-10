@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.21.1 — 2026-10-10 — The paid-app gate answers the anonymous identity 401, as it answers no
+ *     identity, instead of 402 (secaudit 2026-10-10 C1).
  *   v1.21.0 — 2026-10-09 — A protected app's code is waived for a caller who could set it (the owner in
  *     person, or the owner's principal holding app:write), not for every token in the owner's name
  *     (secrets audit 2026-10-09, finding 1.5).
@@ -538,7 +540,9 @@ export function registerReadRoutes(
 
         // Paid app check: if marketplace enabled and app has a price, require valid license
         if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) {
-            if (!req.auth) {
+            // The anonymous identity (AIMEAT_ANONYMOUS_MODE) carries a req.auth, and it can hold no
+            // licence, so it gets the 401 that tells a caller to sign in (secaudit 2026-10-10 C1).
+            if (!req.auth || req.auth.anonymous) {
                 res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED',
                     'This is a paid app. Authenticate and purchase it first via POST /v1/app-store/purchase'));
                 return;

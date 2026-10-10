@@ -22,6 +22,8 @@
  * @structure isSelfAgentTarget(auth, identifier, nodeId) · requireScopeUnlessSelf(scope, nodeId)
  * @usage router.patch('/v1/agents/:name/tags', requireAuth(), requireScopeUnlessSelf('agent:write', config.nodeId), handler)
  * @version-history
+ *   v1.0.1 — 2026-10-10 — `:name` is read as Express 5 decoded it; the second decode threw a URIError
+ *     (500) on `%25zz` (secaudit 2026-10-10 I0).
  *   v1.0.0 — 2026-10-02 — Initial, for PATCH /v1/agents/:name/tags and aimeat_agent_tags_set.
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -43,7 +45,10 @@ export function isSelfAgentTarget(auth: SelfAuth | undefined, identifier: string
 export function requireScopeUnlessSelf(scope: string, nodeId: string) {
   const gate = requireScope(scope);
   return (req: Request, res: Response, next: NextFunction) => {
-    const name = typeof req.params.name === 'string' ? decodeURIComponent(req.params.name) : '';
+    // Express 5 has already decoded `:name`. A second decode threw a URIError (500) on `%25zz`, and
+    // the handlers behind this gate read the parameter the same way, so both resolve one target
+    // (secaudit 2026-10-10 I0).
+    const name = typeof req.params.name === 'string' ? req.params.name : '';
     if (isSelfAgentTarget(req.auth, name, nodeId)) { next(); return; }
     gate(req, res, next);
   };

@@ -36,6 +36,8 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.17.0 — 2026-10-10 — deleteOwnerCascade deletes the OTK rows stored under the bare account name
+ *     (secaudit 2026-10-10 C0).
  *   v1.16.0 — 2026-10-05 — deleteOwner gives the classification audit rows where the person was the
  *     reader of somebody else's content the erasure's pseudonym (secaudit 2026-10, STO-1).
  *   v1.15.0 — 2026-09-26 — The app grants, the personal access tokens and the sessions go through
@@ -216,6 +218,11 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // The person's own ledger lines from before 2026-08-16, which were filed under the bare account
   // name. They are theirs, so they go with the account, like the lines under the GHII.
   await db.deleteFrom('Transaction').where('gaii', '=', name).execute();
+  // Connectivity keys minted before 2026-10-10, stored under the bare account name (the owner
+  // session's raw `sub`). The per-identity pass above deletes the ones under the GHII. A key that
+  // survived here was redeemed by POST /v1/agents/connect into an agent under whoever registered the
+  // name next (secaudit 2026-10-10 C0).
+  await db.deleteFrom('Otk').where('ownerGaii', '=', name).execute();
 
   // The cortexes this person installed, now that the actions under their own identities are gone:
   // each record, with what its activation made and what is keyed by its name (../../../erased-cortex.ts).

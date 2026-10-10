@@ -19,6 +19,8 @@
  *   sale, while the books keep the amount, the date and the app.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-store-license
  * @version-history
+ *   v1.4.0 — 2026-10-10 — A caller with no credential gets 401 on the paid app's download, also as the
+ *     anonymous identity (secaudit 2026-10-10 C1).
  *   v1.3.0 — 2026-09-26 — Erasure: the other side's ledger line for the sale names the erased buyer
  *     or seller by the receipt's pseudonym.
  *   v1.2.0 — 2026-09-26 — The receipt's manifest carries none of the seller's own findings (A6-10).
@@ -174,6 +176,16 @@ await test('Someone who has NOT bought it is still refused (402)', async () => {
     const dl = await json(`/v1/apps/${sellerName}/${PAID}`, auth(stranger.token));
     assert(dl.status === 402, `an unpaid caller must be refused, got ${dl.status}: ${JSON.stringify(dl.body).slice(0, 200)}`);
     await json(`/v1/owners/apstr${ts}`, { ...auth(stranger.token), method: 'DELETE' });
+});
+
+// secaudit 2026-10-10 C1. With anonymous mode on (this suite's default), a request with no
+// credential carries the node's anonymous identity in req.auth, so `!req.auth` let it past the 401
+// and it got 402: an invitation to buy for an identity that can hold no licence.
+await test('A caller with no credential is told to sign in (401), also when the node gives it the anonymous identity', async () => {
+    if (!marketplaceOn) return;
+    const dl = await json(`/v1/apps/${sellerName}/${PAID}`);
+    assert(dl.status === 401 && dl.body.error?.code === 'AUTH_REQUIRED',
+        `an unauthenticated caller must get 401 AUTH_REQUIRED, got ${dl.status}: ${JSON.stringify(dl.body).slice(0, 200)}`);
 });
 
 await test('A THIRD party — neither buyer nor seller — is refused the purchase detail (403)', async () => {

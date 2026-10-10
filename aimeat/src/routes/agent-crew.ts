@@ -25,6 +25,8 @@
  *   - GET    /v1/agents/:name/crew/llm        the model choice that applies now, for the runtime
  * @usage app.use(agentCrewRouter(config, storage));
  * @version-history
+ *   v1.3.1 — 2026-10-10 — `:name` is read as Express 5 decoded it; the second decode threw a URIError
+ *     (500) on `%25zz` (secaudit 2026-10-10 I0).
  *   2026-10-05 — The crew caller is the request's CallerContext (middleware/caller.ts; secaudit 2026-10, C9).
  *   v1.3.0 — 2026-10-02 — GET .../crew/llm: the choice that applies to the agent's crew now, with
  *     thinking through the node as the default for an agent holding ai:use when the node can pay.
@@ -73,7 +75,9 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
 
   // The request's caller (middleware/caller.ts, secaudit 2026-10, C9), in the shape the crew service takes.
   const callerOf = (req: Request, pipeline: string): CrewCaller => ({ ...requestCaller(req, config.nodeId, storage).principalView, pipeline });
-  const name = (req: Request) => decodeURIComponent(req.params.name as string);
+  // Express 5 has already decoded `:name`. A second decode threw a URIError (500) on `%25zz`, and it
+  // must match requireScopeUnlessSelf, which reads the parameter the same way (secaudit 2026-10-10 I0).
+  const name = (req: Request) => req.params.name as string;
   const refuse = (res: Response, r: CrewRefusal) => { res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details)); };
 
   // GET /v1/agents/:name/crew — the live definition, the draft, the kept revisions, what the

@@ -13,6 +13,8 @@
  * @structure registerOtkRoutes(router, config, storage)
  * @usage registerOtkRoutes(router, config, storage) from authRouter().
  * @version-history
+ *   v2.2.0 -- 2026-10-10 -- The key is stored under the owner's GHII (resolveIdentity), not the bare
+ *     account name in `sub`, so the erasure cascade finds it (secaudit 2026-10-10 C0).
  *   v2.1.0 -- 2026-09-14 -- requireLocalSession, which POST /v1/agents has and this older road to
  *     the same place did not: a federated login carries roles ['owner'], so a visitor minted a key
  *     naming the LOCAL account of their name, and /v1/agents/connect built the agent from it.
@@ -27,7 +29,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireLocalSession } from '../auth/middleware.js';
-import { validateAgentName, buildGAII } from '../utils/gaii.js';
+import { validateAgentName, buildGAII, resolveIdentity } from '../utils/gaii.js';
 import { generateOtk } from '../utils/otk.js';
 
 export function registerOtkRoutes(
@@ -67,7 +69,10 @@ export function registerOtkRoutes(
 
     await storage.createOtk({
       key,
-      ownerGaii: req.auth!.sub,
+      // The owner's GHII, not the raw `sub`: on an owner session `sub` is the bare account name, and
+      // the erasure cascade deletes OTK rows by identity. A row stored under the bare name outlived the
+      // account and created an agent under whoever registered the name next (secaudit 2026-10-10 C0).
+      ownerGaii: resolveIdentity(req.auth!, config.nodeId),
       action: 'register_agent',
       params: {
         owner,
