@@ -5,6 +5,9 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is refused a
+ *     heartbeat or presence push without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says
+ *     (pinnedRefusal; secaudit 2026-10-10 I21).
  *   v1.9.0 — 2026-10-06 — The heartbeat and the presence push name this node as their audience
  *     (audienceRefusal; secaudit 2026-10 follow-up, A7).
  *   v1.8.0 — 2026-10-06 — The heartbeat and the presence push pass only inside the five-minute window
@@ -46,7 +49,7 @@ import { logger } from '../../utils/logger.js';
 import { PeeringDecisionSchema, validateBody } from '../../models/schemas.js';
 import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal } from '../../services/signed-node-request.js';
+import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../../services/presence.js';
@@ -254,10 +257,11 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
             // For this node, inside the five-minute window and once, as the ping (secaudit 2026-10 follow-up, A7).
-            const stale = await audienceRefusal({
+            // A peer that has once sent the proof is held to it (pinnedRefusal; secaudit 2026-10-10 I21).
+            const stale = await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
                 signed: messageToVerify, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
-                publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-            }) ?? signedMessageRefusal(from_node_id, timestamp, signature);
+                publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+            })) ?? signedMessageRefusal(from_node_id, timestamp, signature);
             if (stale) { res.status(stale.status).json(error(config.nodeId, stale.code, stale.message)); return; }
 
             peer.lastSeen = new Date().toISOString();
@@ -319,11 +323,12 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             }
         }
         // For this node, and once inside the window checked above (secaudit 2026-10 follow-up, A7).
-        const replayed = (peer.publicKey ? await audienceRefusal({
+        // A peer that has once sent the proof is held to it (pinnedRefusal; secaudit 2026-10-10 I21).
+        const replayed = (peer.publicKey ? await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
             signed: presenceSignString(from_node_id, timestamp, updates as PresenceUpdate[]),
             audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
-            publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-        }) : null) ?? signedMessageRefusal(from_node_id, timestamp, String(signature));
+            publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+        })) : null) ?? signedMessageRefusal(from_node_id, timestamp, String(signature));
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         presence.applyRemoteUpdates(from_node_id, updates as PresenceUpdate[]);

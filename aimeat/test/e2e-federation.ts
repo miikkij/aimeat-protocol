@@ -4,6 +4,9 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   v1.4.0 — 2026-10-10 — Phase 3d: the pin covers the ping, heartbeat, presence push, memory-list
+ *     request, sign-in verification and introduction; a peer that never sent a proof is still heard
+ *     on each (secaudit 2026-10-10 I21).
  *   v1.3.0 — 2026-10-10 — Phase 3c: a peer that has sent a delivery proof is held to it; its replicate
  *     and catalogue sync without the proof are refused, also after the operator saves the peer again
  *     (secaudit 2026-10-10 I21).
@@ -627,6 +630,87 @@ await test('12g. The pin holds after the operator saves the peer again, and cove
     });
     assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `replicate after the PUT: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
 });
+
+// ─── Phase 3d: the pin on the older-format messages (secaudit 2026-10-10 I21, second half) ───
+// The ping, heartbeat, presence push, memory-list request, federated sign-in verification and the
+// introduction carry the A7 audience proof. The direct peer is pinned since 12e, so each of them
+// without the proof is refused from it; a peer that has never sent a proof is still heard while
+// AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off. On the old code every "pinned" case below passed.
+console.log('\nPhase 3d — The pin covers the ping, heartbeat, presence, memory list, sign-in and introduction');
+
+const legacyPeerNodeId = `aimeat-legacy-peer-${Date.now()}`;
+const legacyPriv = ed.utils.randomSecretKey();
+const legacyPrivB64 = Buffer.from(legacyPriv).toString('base64');
+const legacyPubB64 = Buffer.from(await ed.getPublicKeyAsync(legacyPriv)).toString('base64');
+const pinnedSender = { nodeId: directPeerNodeId, priv: directPeerPrivKeyB64, pub: directPeerPubKeyB64 };
+const olderSender = { nodeId: legacyPeerNodeId, priv: legacyPrivB64, pub: legacyPubB64 };
+type Sender = typeof pinnedSender;
+
+/** Each older-format message, signed correctly and sent WITHOUT the audience proof. */
+const unproven: Record<string, (s: Sender) => Promise<{ status: number; body: any }>> = {
+    ping: async (s) => {
+        const timestamp = new Date().toISOString();
+        const signature = await signMsg(s.priv, JSON.stringify({ node_id: s.nodeId, timestamp }));
+        return json('/v1/federation/ping', { method: 'POST', body: JSON.stringify({ node_id: s.nodeId, timestamp, signature }) });
+    },
+    heartbeat: async (s) => {
+        const timestamp = new Date().toISOString();
+        const signature = await signMsg(s.priv, `${s.nodeId}${timestamp}`);
+        return json('/v1/federation/heartbeat', { method: 'POST', body: JSON.stringify({ from_node_id: s.nodeId, timestamp, status: 'healthy', signature }) });
+    },
+    presence: async (s) => {
+        const timestamp = new Date().toISOString();
+        const signature = await signMsg(s.priv, `${s.nodeId}|${timestamp}|${JSON.stringify([])}`);
+        return json('/v1/federation/presence', { method: 'POST', body: JSON.stringify({ from_node_id: s.nodeId, timestamp, updates: [], signature }) });
+    },
+    'memory list': async (s) => {
+        const timestamp = new Date().toISOString();
+        const signature = await signMsg(s.priv, JSON.stringify({ requesting_node: s.nodeId, gaii: agentGaii, timestamp }));
+        return json('/v1/federation/memory/list', { method: 'POST', body: JSON.stringify({ requesting_node: s.nodeId, gaii: agentGaii, timestamp, signature }) });
+    },
+    'sign-in verification': async (s) => {
+        const timestamp = new Date().toISOString();
+        const signature = await signMsg(s.priv, JSON.stringify({ purpose: 'federation-auth-verify', username: ownerName, requesting_node: s.nodeId, timestamp }));
+        return json('/v1/federation/auth/verify', { method: 'POST', body: JSON.stringify({ username: ownerName, password: 'not-the-password', requesting_node: s.nodeId, timestamp, signature }) });
+    },
+    introduction: async (s) => {
+        const timestamp = new Date().toISOString();
+        const url = 'http://localhost:9995';
+        const signature = await signMsg(s.priv, `${s.nodeId}${url}${timestamp}`);
+        return json('/v1/federation/peer/introduce', { method: 'POST', body: JSON.stringify({ node_id: s.nodeId, node_url: url, public_key: s.pub, role: 'contributor', timestamp, signature }) });
+    },
+};
+
+await test('Setup: a peer that never sends the proof (an older node)', async () => {
+    const add = await json('/v1/federation/peers', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ node_id: legacyPeerNodeId, url: 'http://localhost:9994', public_key: legacyPubB64 }),
+    });
+    assert(add.status === 201, `add: ${add.status} ${JSON.stringify(add.body.error)}`);
+    const act = await json(`/v1/federation/peers/${legacyPeerNodeId}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ status: 'active' }),
+    });
+    assert(act.status === 200, `activate: ${act.status} ${JSON.stringify(act.body.error)}`);
+});
+
+/** What the older peer gets once past the audience check: the route's own answer. The sign-in then
+ *  fails on its password and consent, and the introduction on the id already being a peer. */
+const heardAs: Record<string, { status: number; code?: string }> = {
+    ping: { status: 200 }, heartbeat: { status: 200 }, presence: { status: 200 }, 'memory list': { status: 200 },
+    'sign-in verification': { status: 401, code: 'FEDERATION_AUTH_FAILED' }, introduction: { status: 409, code: 'CONFLICT' },
+};
+
+for (const [kind, send] of Object.entries(unproven)) {
+    await test(`12h. ${kind}: refused from the pinned peer without the proof (401 AUDIENCE_REQUIRED), heard from the older peer`, async () => {
+        const pinned = await send(pinnedSender);
+        assert(pinned.status === 401 && pinned.body.error?.code === 'AUDIENCE_REQUIRED',
+            `pinned peer: expected 401 AUDIENCE_REQUIRED, got ${pinned.status} ${JSON.stringify(pinned.body.error ?? pinned.body.data)}`);
+        const older = await send(olderSender);
+        const want = heardAs[kind]!;
+        assert(older.status === want.status && (older.body.error?.code ?? undefined) === want.code,
+            `older peer: expected ${want.status} ${want.code ?? ''}, got ${older.status} ${JSON.stringify(older.body.error ?? older.body.data)}`);
+    });
+}
 
 // ─── Phase 4: De-peering ───
 console.log('\nPhase 4 — De-peering');

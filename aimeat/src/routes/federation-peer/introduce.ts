@@ -5,6 +5,9 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-10 — A peer held under the signing key that has once sent a verified audience or
+ *     delivery proof is refused an introduction without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED
+ *     says (pinnedRefusal; secaudit 2026-10-10 I21).
  *   v1.5.0 — 2026-10-06 — The introduction names this node as its audience (audienceRefusal; secaudit
  *     2026-10 follow-up, A7).
  *   v1.4.1 — 2026-10-06 — A signed introduction passes once (signedMessageRefusal; secaudit 2026-10
@@ -35,7 +38,7 @@ import { executeHooks } from '../../services/hooks.js';
 import { PeeringRequestSchema, validateBody } from '../../models/schemas.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal } from '../../services/signed-node-request.js';
+import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
@@ -169,10 +172,17 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             return;
         }
         // For this node, and once inside the window checked above (secaudit 2026-10 follow-up, A7).
-        const replayed = await audienceRefusal({
+        // A peer this node already holds under the key that signed here, and that has once sent the
+        // proof, is held to it (pinnedRefusal; secaudit 2026-10-10 I21). A node under another key is
+        // not that peer and has no pin; it is refused below as a held id.
+        const known = peers.get(node_id);
+        const pin = known && known.publicKey === public_key
+            ? await federationPeerProofPin(storage, known)
+            : { at: null, set: async () => {} };
+        const replayed = await pinnedRefusal(pin, req.body ?? {}, provenSince => audienceRefusal({
             signed: messageToVerify, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
-            publicKey: public_key, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
-        }) ?? signedMessageRefusal(node_id, timestamp, signature);
+            publicKey: public_key, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+        })) ?? signedMessageRefusal(node_id, timestamp, signature);
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         // Check if already a peer (allow re-introduction if depeering/offline). This is a pure
