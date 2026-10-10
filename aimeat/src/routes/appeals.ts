@@ -11,6 +11,7 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   v1.2.1 — 2026-10-10 — POST /v1/flags/:flagId/appeal decides operator admission with isOperatorCaller and writes the operator trail only after the ALREADY_APPEALED check, so a refused second appeal leaves no operator_acted event (secaudit 2026-10-10 I5).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-09-08 — Two identities read in the wrong alphabet: the organism-admin arms compared
  *     admins[] (bare owner names) to a GHII and never matched, and a memory flag's `gaii::key`
@@ -132,22 +133,30 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             }
         }
 
-        // Operators can also appeal on behalf of content owners. An appeal for content whose owner is
-        // known writes the operator trail in that owner's account; with no owner found, there is no
-        // account to write it in.
-        if (!isOwner && !(contentOwner
-            ? await operatorOverride(storage, config, req.auth, { ownerOf: contentOwner, area: 'appeal', action: 'create', subject: flagId })
-            : await isOperatorCaller(storage, req.auth))) {
+        // Operators can also appeal on behalf of content owners. Admission is decided here without a
+        // write; the operator trail is written only once the appeal is going to be created, so a
+        // refused attempt (409 below) leaves none (secaudit 2026-10-10 I5).
+        if (!isOwner && !(await isOperatorCaller(storage, req.auth))) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
                 'Only the content owner can appeal a flag'));
             return;
         }
 
-        // Check if already appealed
+        // Check if already appealed. Asked after the ownership check, so a non-owner never learns
+        // that an appeal exists.
         const existing = await storage.getAppealByFlagId(flagId);
         if (existing) {
             res.status(409).json(error(config.nodeId, 'ALREADY_APPEALED',
                 'This flag has already been appealed'));
+            return;
+        }
+
+        // An operator's appeal for content whose owner is known writes the operator trail in that
+        // owner's account; with no owner found, there is no account to write it in.
+        if (!isOwner && contentOwner
+            && !(await operatorOverride(storage, config, req.auth, { ownerOf: contentOwner, area: 'appeal', action: 'create', subject: flagId }))) {
+            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+                'Only the content owner can appeal a flag'));
             return;
         }
 

@@ -15,9 +15,11 @@
  *   other start is left unbound and handed the confirmation page instead. A client that fakes the
  *   header only changes which address it is given: the cookie then sits in that client, and the
  *   person who approves at the provider in their own browser is still refused.
- * @structure browserCanBind · issueRoundBinding · readRoundBinding · clearRoundBinding
+ * @structure browserCanBind · issueRoundBinding · newRoundBinding · setRoundBinding · readRoundBinding · clearRoundBinding
  * @usage const bind = browserCanBind(req, caller.inPerson) ? issueRoundBinding(req, res, state, path, ttl) : null;
  * @version-history
+ *   v1.1.0 — 2026-10-10 — newRoundBinding and setRoundBinding split the value from the cookie, so the
+ *     approve route sets the cookie only after the round is bound (secaudit 2026-10-10 I6).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -48,11 +50,28 @@ export function browserCanBind(req: Request, ownerInPerson: boolean): boolean {
 export function issueRoundBinding(
   req: Request, res: Response, state: string, callbackPath: string, ttlMs: number,
 ): string {
+  const binding = newRoundBinding();
+  setRoundBinding(req, res, state, callbackPath, ttlMs, binding.value);
+  return binding.hash;
+}
+
+/**
+ * A fresh binding value and the hash the round stores, with no cookie set yet. For a caller that
+ * must store the hash first and set the cookie only when the store succeeded (POST
+ * /v1/oauth-rounds/:state/approve; secaudit 2026-10-10 I6).
+ */
+export function newRoundBinding(): { value: string; hash: string } {
   const value = randomBytes(32).toString('base64url');
+  return { value, hash: bindingHash(value) };
+}
+
+/** Set the binding cookie for `state` to `value`, scoped to `callbackPath` for `ttlMs`. */
+export function setRoundBinding(
+  req: Request, res: Response, state: string, callbackPath: string, ttlMs: number, value: string,
+): void {
   res.cookie(cookieName(state), value, {
     httpOnly: true, secure: cookieSecure(req), sameSite: 'lax', path: callbackPath, maxAge: ttlMs,
   });
-  return bindingHash(value);
 }
 
 /** The binding value this request carries for `state`, or '' when it carries none. */

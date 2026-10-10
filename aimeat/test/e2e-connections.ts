@@ -19,6 +19,8 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.6.1 — 2026-10-10 — A second confirmation of a bound round answers 409 with no Set-Cookie,
+ *     and the first browser still finishes the round (secaudit 2026-10-10 I6).
  *   v1.6.0 — 2026-10-09 — Phase 2d: the owner lists their agents' connections (no credential) and
  *     revokes one in person; the agent itself, another owner and the owner's own connection are refused.
  *   v1.5.0 — 2026-10-09 — Phases 2b and 2c (secrets audit 2026-10-09, chapter 2): the callback seals
@@ -393,6 +395,12 @@ async function main(): Promise<void> {
       assert(ok.status === 200, `the owner could not confirm: ${ok.status} ${ok.data?.error?.message}`);
       assert(!!ok.cookie, 'confirming set no round cookie');
       assert(new URL(ok.data.data.authorize_url).origin !== new URL(BASE).origin, 'confirming did not hand over the provider address');
+      // Secaudit 2026-10-10 I6: a second confirmation of the same round is refused and sets no
+      // cookie, so it neither re-binds the round nor overwrites the first browser's binding.
+      const again = await api(`/v1/oauth-rounds/${encodeURIComponent(state)}/approve`, { bearer: jwtA, browser: true });
+      assert(again.status === 409, `a second confirmation of a bound round answered ${again.status}`);
+      assert(again.data?.error?.code === 'ALREADY_USED', `code: ${again.data?.error?.code}`);
+      assert(!again.cookieLine, `a refused confirmation set a cookie: ${again.cookieLine}`);
       const cb = await callback(state, 'code-agentbox', ok.cookie);
       assert(cb.status === 302, `the confirmed round did not finish: ${cb.status} ${await cb.text()}`);
       const list = await api('/v1/connections', { method: 'GET', bearer: agentToken });

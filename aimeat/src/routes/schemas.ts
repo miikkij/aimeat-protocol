@@ -11,6 +11,7 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   v1.2.1 — 2026-10-10 — semantic_context is checked before the lock check, so an operator's refused schema write leaves no operator trail (secaudit 2026-10-10 I8).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-08 — semantic_context is checked before the write: its prefixes must resolve,
  *     and every field its `properties` map names must be a field of the schema it describes. Both
@@ -60,22 +61,24 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
     const mode = schema_mode;
     const now = new Date().toISOString();
 
-    const existing = await storage.getSchema(key, apply_to);
-
-    if (existing && existing.lockedBy !== req.auth!.sub && !(await operatorOverride(storage, config, req.auth,
-      { ownerOf: existing.lockedBy, area: 'schema', action: 'update', subject: key }))) {
-      res.status(403).json(error(config.nodeId, 'SCHEMA_LOCKED_BY_OTHER', `This structure is locked by ${existing.lockedBy}. Ask them to unlock it, or make your own copy.`));
-      return;
-    }
-
     // The semantic context is checked BEFORE anything is written or evicted: a prefix nobody
     // declared, or a per-field mapping naming a field this schema does not have, describes nothing
-    // and must not be stored looking as though it does.
+    // and must not be stored looking as though it does. The check reads only the request body, so it
+    // also runs before the lock check, whose operator pass writes the operator trail: a refused
+    // write leaves no trail (secaudit 2026-10-10 I8).
     const semanticProblems = semanticContextErrors(semantic_context, schema);
     if (semanticProblems.length > 0) {
       res.status(400).json(error(config.nodeId, 'INVALID_SEMANTIC_CONTEXT', semanticProblems[0], 400, {
         violations: semanticProblems.map((message) => ({ path: 'semantic_context', message })),
       }));
+      return;
+    }
+
+    const existing = await storage.getSchema(key, apply_to);
+
+    if (existing && existing.lockedBy !== req.auth!.sub && !(await operatorOverride(storage, config, req.auth,
+      { ownerOf: existing.lockedBy, area: 'schema', action: 'update', subject: key }))) {
+      res.status(403).json(error(config.nodeId, 'SCHEMA_LOCKED_BY_OTHER', `This structure is locked by ${existing.lockedBy}. Ask them to unlock it, or make your own copy.`));
       return;
     }
 

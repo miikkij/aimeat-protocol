@@ -7,6 +7,8 @@
  *   moved to services/operator-override.ts.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-operator-override
  * @version-history
+ *   v1.1.0 — 2026-10-10 — An operator's schema write refused for its semantic context leaves no
+ *     operator trail (secaudit 2026-10-10 I8).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, C2).
  */
 import * as ed from '@noble/ed25519';
@@ -154,6 +156,23 @@ await test('A board of the operator\'s own leaves no trail', async () => {
     });
     assert(r.status === 200, `own rules: ${r.status} ${JSON.stringify(r.body)}`);
     assert((await operatorTrail(OP.token)).length === 0, 'the operator\'s own board wrote an operator trail');
+});
+
+await test('FAILURE: the operator\'s schema write refused for its semantic context leaves no trail (secaudit 2026-10-10 I8)', async () => {
+    const key = `oo-schema-${Date.now().toString(36)}`;
+    const schema = { type: 'object', properties: { temperature: { type: 'number' } } };
+    const own = await json(`/v1/memory/${encodeURIComponent(key)}/schema`, {
+        method: 'PUT', headers: authed(B.token), body: JSON.stringify({ schema, apply_to: 'exact', schema_mode: 'open' }),
+    });
+    assert(own.status === 200, `the person locks a schema: ${own.status} ${JSON.stringify(own.body)}`);
+    const r = await json(`/v1/memory/${encodeURIComponent(key)}/schema`, {
+        method: 'PUT', headers: authed(OP.token),
+        body: JSON.stringify({ schema, apply_to: 'exact', schema_mode: 'open', semantic_context: { '@type': 'weather:Reading' } }),
+    });
+    assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body)}`);
+    assert(r.body.error?.code === 'INVALID_SEMANTIC_CONTEXT', `code: ${r.body.error?.code}`);
+    const trail = (await operatorTrail(B.token)).filter((e) => e.data?.area === 'schema');
+    assert(trail.length === 0, `a refused schema write wrote an operator trail: ${trail.length}`);
 });
 
 await test('An operator route (requireOperator) admits the operator\'s agent on operator:admin and refuses it without', async () => {
