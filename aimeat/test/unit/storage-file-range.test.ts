@@ -21,6 +21,7 @@
  *   payload · the UTF-8 verdict settled on write
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-file-range.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-10 — A value larger than one database read (33 MB) comes back whole and exact.
  *   v1.0.0 — 2026-08-15 — Initial (TARGET-063: the streaming read path).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -180,4 +181,52 @@ describe('a stored file can be read in parts, identically on every provider', ()
             await clear(storage, ghii);
         }
     }, 60_000);
+});
+
+describe('a value larger than one database read comes back whole and exact', () => {
+    // Postgres hands bytea to the driver as hex text, and one query for 256 MB or more built a string
+    // V8 refuses: the node process exited (measured 2026-10-10 with a 400 MB file). The provider now
+    // reads in slices of BYTEA_SLICE_BYTES (32 MB). This file is one slice and a bit, so both the
+    // first slice and a short last one are read, on a size a unit run can afford. The 400 MB and
+    // 1000 MB cases were measured by hand; the numbers are in the Platform Development Notes.
+    const BIG = 33 * 1024 * 1024 + 4321;
+    const big = Buffer.allocUnsafe(BIG);
+    for (let off = 0; off < BIG; off += 4) big.writeUInt32LE((off * 2654435761) >>> 0, Math.min(off, BIG - 4));
+
+    it('getStorageFile returns every byte, and a long range returns exactly its bytes', async () => {
+        for (const { name, storage } of provs) {
+            const ghii = ghiiFor();
+            await put(storage, ghii, 'r/big.bin', 'application/octet-stream', big);
+
+            const whole = await storage.getStorageFile(ghii, 'r/big.bin');
+            expect(whole, `${name}: the file did not come back`).not.toBeNull();
+            expect(whole!.data.length, `${name}: length of the whole read`).toBe(BIG);
+            expect(whole!.data.equals(big), `${name}: the whole read differs from what was stored`).toBe(true);
+            expect(whole!.size, `${name}: size`).toBe(BIG);
+            expect(whole!.mimeType, `${name}: the metadata still rides with the bytes`).toBe('application/octet-stream');
+
+            // Longer than one slice, starting off a slice boundary, ending inside the last slice.
+            const start = 777, length = 32 * 1024 * 1024 + 1000;
+            const part = await storage.readStorageFileRange(ghii, 'r/big.bin', start, length);
+            expect(part!.length, `${name}: length of the long range`).toBe(length);
+            expect(part!.equals(big.subarray(start, start + length)), `${name}: the long range differs`).toBe(true);
+
+            // A range that runs past the end is clamped by the database, on every provider alike.
+            const tail = await storage.readStorageFileRange(ghii, 'r/big.bin', BIG - 10, 34 * 1024 * 1024);
+            expect(tail!.equals(big.subarray(BIG - 10)), `${name}: a range past the end`).toBe(true);
+
+            expect(await storage.getStorageFile(ghii, 'r/absent.bin'), `${name}: a missing file must be null`).toBeNull();
+
+            // A second write to the same key replaces every field. On Postgres the update half of
+            // the statement reads the proposed row (`excluded`), so the bytes are bound once.
+            const small = Buffer.from('replaced');
+            await put(storage, ghii, 'r/big.bin', 'text/plain', small);
+            const after = await storage.getStorageFile(ghii, 'r/big.bin');
+            expect(after!.data.equals(small), `${name}: the re-upload did not replace the bytes`).toBe(true);
+            expect(after!.size, `${name}: the re-upload did not replace the size`).toBe(small.length);
+            expect(after!.mimeType, `${name}: the re-upload did not replace the type`).toBe('text/plain');
+            expect((await storage.listStorageFiles(ghii)).length, `${name}: a re-upload must not add a second row`).toBe(1);
+            await clear(storage, ghii);
+        }
+    }, 180_000);
 });

@@ -18,6 +18,9 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
+ *   v1.10.0 — 2026-10-10 — The pool and its clients have `error` listeners: a connection that ends
+ *     while idle or in use is logged and its query rejects. Without them the event was an uncaught
+ *     exception and the node process exited.
  *   v1.9.0 — 2026-09-29 — classificationAuditMethods bound (TARGET-082 V4, the classification audit log).
  *   v1.8.0 — 2026-09-29 — contentLabelMethods bound (TARGET-082, classification labels).
  *   v1.7.0 — 2026-09-26 — heldNameMethods bound (what migration 0086 left for the operator).
@@ -33,6 +36,7 @@ import pg from 'pg';
 import type { ChunkedUploadRecord, MemoryRecord, Storage } from '../../interface.js';
 import type { DB } from './db-types.js';
 import { runMigrations } from './migrate.js';
+import { logger } from '../../../utils/logger.js';
 import { memoryMethods } from './methods/memory.js';
 import { systemMethods } from './methods/system.js';
 import { identityMethods } from './methods/identity.js';
@@ -121,6 +125,22 @@ export class PostgresKyselyStorage {
 
   constructor(connectionString: string) {
     this.pool = new pg.Pool({ connectionString, max: 20 });
+    // A CONNECTION THAT ENDS MUST NOT END THE PROCESS. node-postgres emits `error` on a client
+    // whose socket ends, and an EventEmitter `error` with no listener is thrown as an uncaught
+    // exception. The pool only listens while a client is idle, and it re-emits what it hears on
+    // itself. With neither listener here, every way a connection can end took the node down: the
+    // database restarting, a network reset, or the database dropping a connection over a statement
+    // it would not take (measured 2026-10-10: a 700 MB file in one INSERT, "read ECONNRESET").
+    // The query that was running on the connection still rejects, through the driver, and its
+    // caller answers for it; these listeners only keep the event from reaching the process.
+    this.pool.on('error', (err) => {
+      logger.warn('postgres: an idle connection ended', { error: String(err) });
+    });
+    this.pool.on('connect', (client) => {
+      client.on('error', (err) => {
+        logger.warn('postgres: a connection ended while in use; its query has been rejected', { error: String(err) });
+      });
+    });
     this.rootDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: this.pool }) });
     this.ready = runMigrations(this.pool);
   }
