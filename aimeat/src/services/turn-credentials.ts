@@ -73,6 +73,7 @@ export function deriveTurnCredential(
 ): { username: string; credential: string; expiresAt: number } {
   const expiresAt = Math.floor(nowMs / 1000) + clampTtl(ttlSeconds);
   const username = `${expiresAt}:${turnOpaqueId(secret, identity)}`;
+  // HMAC-SHA1 is what coturn computes for use-auth-secret; any other digest is a credential it refuses.
   const credential = createHmac('sha1', secret).update(username).digest('base64');
   return { username, credential, expiresAt };
 }

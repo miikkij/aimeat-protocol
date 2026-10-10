@@ -77,6 +77,9 @@ function certIdParts(cert: CertInfo, issuer: CertInfo): { nameHash: Buffer; keyH
   const subjectDer = rawOf(fields[off + 4]!);
   const keyBits = Buffer.from(parsedIssuer.tbsCertificate.subjectPublicKeyInfo.subjectPublicKey);
   const serial = Buffer.from(AsnConvert.parse(cert.der, Certificate).tbsCertificate.serialNumber);
+  // SHA-1 here names the certificate in the request; it protects nothing. RFC 5019 (the profile
+  // the large OCSP responders run) requires SHA-1 in the CertID, and some responders answer only
+  // that form. The response itself is verified with its own signature algorithm.
   return {
     nameHash: createHash('sha1').update(subjectDer).digest(),
     keyHash: createHash('sha1').update(keyBits).digest(),
