@@ -14,6 +14,7 @@
  *   2026-10-04 -- aimeat_task_decline → POST …/decline, `reason` required.
  *   2026-10-03 -- `tier`: "settings" also holds the system's words in plain language ("settings/concept.<id>").
  *   2026-10-02 -- `tier` names "settings" and "settings/<term>", the setting explanations in parts.
+ *   2026-10-10 -- aimeat_agent_propose forwards `connector`, the machine the agent is ordered to.
  *   2026-10-02 -- aimeat_agent_propose: the node adds memory:read and memory:write itself.
  *   2026-10-02 -- aimeat_agent_runtime_report forwards `llm` ('node' | 'machine').
  *   2026-10-02 -- aimeat_agent_propose gives the smallest crew_def that runs, as the catalog does.
@@ -275,8 +276,10 @@ export const agentTools: ConnectCliToolDefinition[] = [
             mode: { type: 'string', description: 'Task handling: task-runner, autonomous, interactive, coordinator or workstation.' },
             run_mode: { type: 'string', description: "'spawn' (a worker per piece of work) or 'resident' (stays up)." },
             crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape.' },
+            connector: { type: 'string', description: "Which of the account's connectors runs it, by name or id (aimeat_connector_list). Leave out when the person did not say." },
         },
         handler: ({ client }, input) => client.post('/v1/agents/v2/agent-proposals', {
+            connector: optionalString(input, 'connector'),
             name: requiredString(input, 'name'),
             purpose: requiredString(input, 'purpose'),
             display_name: optionalString(input, 'display_name'),

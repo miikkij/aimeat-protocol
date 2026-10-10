@@ -715,6 +715,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent proposal approval queue, listed and settled for its owner."
     },
+    "src/services/connector-registry.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-10, the node's own read: the owner's connector record (agents.connectors.registry), which the registry reads to list, rename and forget connectors and holds no content anybody classified."
+    },
     "src/services/agent-refusals.ts": {
       "reads": {
         "getMemory": 5,

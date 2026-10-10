@@ -14,6 +14,8 @@
  * @structure agentV2CliTools[] — the handler table, spread by tool-call-defs-agent.ts
  * @usage import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-10 -- aimeat_connector_list and aimeat_connector_rename, over
+ *     /v1/agents/v2/connectors: the machines the owner's agents run on.
  *   v1.0.0 -- 2026-09-08 -- Extracted from tool-call-defs-agent.ts (max-file-lines).
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -197,5 +199,25 @@ export const agentV2CliTools: ConnectCliToolDefinition[] = [
             const reason = optionalString(input, 'reason'); if (reason) body.reason = reason;
             return client.post(`/v1/agents/v2/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/cancel`, body);
         },
+    },
+    {
+        // → GET /v1/agents/v2/connectors
+        name: 'aimeat_connector_list',
+        description: "The machines this account's agents run on: each connector's id, name, whether it is connected, when it was last seen, the agents on it and the agents that wait for it. Read it before aimeat_agent_propose when the person says where an agent is to run, and pass the name or id as `connector`.",
+        input: {},
+        handler: ({ client }) => client.get('/v1/agents/v2/connectors'),
+    },
+    {
+        // → PATCH /v1/agents/v2/connectors/:id (the route takes the id or the present name)
+        name: 'aimeat_connector_rename',
+        description: "Give one of the account's connectors a name the person recognises. 1 to 60 characters; two connectors cannot share one.",
+        input: {
+            connector: { type: 'string', required: true, description: 'The connector to name: its id or its present name.' },
+            name: { type: 'string', required: true, description: 'The new name, 1 to 60 characters.' },
+        },
+        handler: ({ client }, input) => client.patch(
+            `/v1/agents/v2/connectors/${encodeURIComponent(requiredString(input, 'connector'))}`,
+            { name: requiredString(input, 'name') },
+        ),
     },
 ];

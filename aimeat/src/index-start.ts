@@ -11,6 +11,8 @@
  *     POST /v1/ws/ticket, or the deprecated ?token= while AIMEAT_WS_QUERY_TOKEN is on (secrets audit
  *     2026-10-09, d3). A refusal names its code in X-AIMEAT-Error. A realtime upgrade with a credential
  *     that fails is refused; only an upgrade with no credential falls back to anonymous mode.
+ *   v1.9.0 — 2026-10-10 — The connect tunnel upgrade reads X-AIMEAT-Install-Name, the name the
+ *     connector reports for its installation, and hands it to the tunnel manager.
  *   v1.8.0 — 2026-10-09 — The generated admin secret is no longer written to stderr. While the node
  *     has no owner it goes to a 0600 file, admin-setup-secret in the data directory, and the log
  *     names only the file; once the node has an owner a file left from an earlier boot is deleted
@@ -330,8 +332,12 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           // decides only whether a proposed run mode is corrected to one the connector can run.
           const modesHeader = request.headers['x-aimeat-run-modes'];
           const runModes = Array.isArray(modesHeader) ? modesHeader[0] : modesHeader;
+          // The name the connector reports for its installation (its host name unless the person
+          // set one), URI-encoded. Unsigned as well: the owner reads it and nothing decides on it.
+          const nameHeader = request.headers['x-aimeat-install-name'];
+          const installName = Array.isArray(nameHeader) ? nameHeader[0] : nameHeader;
           connectWss.handleUpgrade(request, socket, head, (ws) => {
-            connectTunnelManager.handleConnection(ws, payload, token, installId ?? null, runModes ?? null);
+            connectTunnelManager.handleConnection(ws, payload, token, installId ?? null, runModes ?? null, installName ?? null);
           });
         } catch (err) {
           logger.warn('index-start: suppressed failure, continuing', { error: String(err) });

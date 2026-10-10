@@ -35,6 +35,9 @@
  *   const out = await offerEnrolment({ config, storage }, owner, candidates, { installId });
  *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.3.0 — 2026-10-10 — After an enrolment the connector registry records that the agents live on
+ *     the connector that took them (services/connector-registry.ts recordPlacement). Kind 'move':
+ *     an enrolled agent offered to another connector, read back by its key having changed.
  *   v1.2.0 — 2026-10-08 — The agents an offer names are recorded while it runs (isBeingOffered), so
  *     the offer a connector's connect starts for pending agents does not name them twice.
  *   v1.1.0 — 2026-10-02 — The offer carries the node's public key, which the connector compares with
@@ -45,8 +48,10 @@
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { EnrolmentGrantKind } from '../storage/types/identity.js';
 import { connectedDaemons } from './basic-agents.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { recordPlacement } from './connector-registry.js';
 import { cardUri, jwksUri } from '../routes/agents-v2/card.js';
 import { logger } from '../utils/logger.js';
 
@@ -88,15 +93,17 @@ export type EnrolmentOutcome =
 /**
  * Credential `agents` on the owner's connected daemon.
  *
- * `kind` decides one thing in the enrolment route and nothing here: 'create' requires the record to
- * be v2 already, 'migrate' accepts a v1 record and upgrades it. Anything this service is asked to
- * do for a freshly created agent is 'create'.
+ * `kind` decides what the enrolment route accepts: 'create' requires the record to be v2 already
+ * and keyless, 'migrate' accepts a v1 record and upgrades it, 'move' requires an agent that holds a
+ * key and pins the new one over it. Here it decides one thing: after a move, an agent counts as
+ * enrolled only when its key changed. Anything this service is asked to do for a freshly created
+ * agent is 'create'.
  */
 export async function offerEnrolment(
   deps: { config: AimeatConfig; storage: Storage },
   owner: string,
   agents: EnrolCandidate[],
-  opts: { installId?: string; kind?: 'create' | 'migrate' } = {},
+  opts: { installId?: string; kind?: EnrolmentGrantKind } = {},
 ): Promise<EnrolmentOutcome> {
   if (agents.length === 0) {
     return { ok: false, status: 400, code: 'NOTHING_TO_ENROL', message: 'No agents were named.' };
@@ -147,11 +154,18 @@ async function offerOnDaemon(
   deps: { config: AimeatConfig; storage: Storage },
   owner: string,
   agents: EnrolCandidate[],
-  chosen: { target: string },
-  kind: 'create' | 'migrate',
+  chosen: { target: string; installId: string | null },
+  kind: EnrolmentGrantKind,
 ): Promise<EnrolmentOutcome> {
   const { config, storage } = deps;
   await storage.cleanupExpiredAgentEnrolmentGrants();
+
+  // A MOVE pins a new key over an old one, so "has it enrolled" is already true before the offer
+  // and says nothing afterwards. The key each agent holds now is what the read-back compares with.
+  const keysBefore = new Map<string, string>();
+  if (kind === 'move') {
+    for (const a of await storage.getAgentsByOwner(owner)) keysBefore.set(a.name, a.publicKey ?? '');
+  }
 
   // The grant: exactly these agents, for this owner, for a few minutes, once.
   const grantId = `aeg-${randomBytes(16).toString('hex')}`;
@@ -219,7 +233,8 @@ async function offerOnDaemon(
   const wanted = new Set(agents.map(a => a.name));
   const after = await storage.getAgentsByOwner(owner);
   const enrolled: EnrolledAgent[] = after
-    .filter(a => wanted.has(a.name) && a.enrolledAt)
+    .filter(a => wanted.has(a.name) && a.enrolledAt
+      && (kind !== 'move' || (a.publicKey ?? '') !== keysBefore.get(a.name)))
     .map(a => ({
       name: a.name,
       gaii: a.gaii,
@@ -238,6 +253,14 @@ async function offerOnDaemon(
         : 'Your connector did not take on the agents. They are here and unconnected.',
       details: { grant_id: grantId, connector_said: detail },
     };
+  }
+
+  // The enrolled agents live on this connector now, and no longer wait for one. A failure here is
+  // logged and nothing more: the keys are pinned, and the record catches up at the next connect.
+  try {
+    await recordPlacement(deps, owner, enrolled.map(e => e.name), chosen.installId);
+  } catch (err) {
+    logger.warn('Enrolment: the connector record was not updated', { event: 'connector.placement_failed', owner, error: String(err) });
   }
 
   logger.info('Agents enrolled through an offer', {

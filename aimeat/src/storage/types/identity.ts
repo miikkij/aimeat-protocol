@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-10 — EnrolmentGrantKind, with 'move': a grant that pins a new key over an
+ *     enrolled agent's old one, for an agent the owner moves to another connector.
  *   v1.6.0 — 2026-10-02 — AgentRuntimeSource.llm: where the crew's model calls go ('node' | 'machine').
  *   v1.5.0 — 2026-10-02 — AgentRecord.taskStart: whether the agent's tasks start on their own,
  *     separate from `mode`, which also picks the Hello Integration flow.
@@ -266,6 +268,9 @@ export interface AgentRecord {
  * spent it. Both are recorded because "who asked" and "who carried it out" are different questions,
  * and here the second one is a machine.
  */
+/** What an enrolment grant is for: see `kind` on AgentEnrolmentGrantRecord. */
+export type EnrolmentGrantKind = 'create' | 'migrate' | 'move';
+
 export interface AgentEnrolmentGrantRecord {
   id: string;
   /** Bare owner name. Every check in the enrolment path compares against THIS, never the request. */
@@ -279,12 +284,16 @@ export interface AgentEnrolmentGrantRecord {
    *             requires `identityVersion === 2` and refuses anything else.
    *   'migrate' the agents are EXISTING v1 agents, so the route accepts a v1 record and writes
    *             `identityVersion: 2` in the same update that pins the key.
+   *   'move'    the agents already hold a key, on another connector. The route requires that, ends
+   *             the agent's sessions, and pins the new key over the old one: the agent now lives on
+   *             the connector that spent the grant (POST /v1/agents/v2/agents/:name/move).
    *
    * The distinction is here rather than inferred from the record because inferring it would mean
-   * the create path silently accepting a v1 agent whose name happened to collide. Null or absent is
-   * 'create': every grant written before 2026-09-01 is one.
+   * the create path silently accepting a v1 agent whose name happened to collide, or pinning a
+   * second key over a working one. Null or absent is 'create': every grant written before
+   * 2026-09-01 is one.
    */
-  kind?: 'create' | 'migrate' | null;
+  kind?: EnrolmentGrantKind | null;
   /** The principal that pressed the button (the owner's bare name). */
   createdBy: string;
   createdAt: string;

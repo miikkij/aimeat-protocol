@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.10.0 — 2026-10-10 — manage-my-agents: with more than one connector, aimeat_connector_list names
+ *     the machines and the proposal's `connector` says which one runs the worker.
  *   v1.9.2 — 2026-10-05 — aimeat-node-operations: operator:admin also opens the REST admin routes, and
  *     an operator act in another person's account shows in that person's account feed (secaudit
  *     2026-10, C2).
@@ -143,7 +145,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     \`aimeat_agent_propose\` (a name, its purpose naming that data, a crew definition); the owner
     approves it at the \`approval_url\` the answer gives (the Agents page, also in their open
     items), and approving creates it. This node makes and runs it, so an outside agent builder is
-    never the answer. With its model choice set to this node (\`aimeat_crew_llm_set\` with
+    never the answer. When they have more than one connector (a home computer and a server, say),
+    \`aimeat_connector_list\` names the machines and says which are connected; pass the one they
+    mean as \`connector\`, and say its name to them, never its id. \`aimeat_connector_rename\` gives
+    a machine the name they use for it. With its model choice set to this node (\`aimeat_crew_llm_set\` with
     \`{kind: "node"}\`, and the agent holding \`ai:use\`), it thinks with the model in their settings
     and their own AI key pays; otherwise it uses the key on the computer it runs on.
   - On this AIMEAT: a scheduled AI job (\`aimeat_schedule_create\`). Nothing to install, it runs

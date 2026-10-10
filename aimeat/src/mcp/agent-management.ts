@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-10 — aimeat_connector_list and aimeat_connector_rename: the machines the owner's agents
+ *     run on, through services/connector-registry.ts, the same functions the REST routes call.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.9.0 -- 2026-10-02 -- aimeat_agent_runtime_report takes `llm` ('node' | 'machine'), and an agent
@@ -59,6 +61,7 @@ import { toolError } from './tool-error.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
+import { listConnectors, renameConnector } from '../services/connector-registry.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -283,6 +286,39 @@ export function registerAgentManagementTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Tool: aimeat_connector_list ──
+    // The machines the owner's agents run on. The same function GET /v1/agents/v2/connectors calls.
+    mcp.tool(
+        'aimeat_connector_list',
+        descriptionFor('aimeat_connector_list'),
+        zodShapeFor('aimeat_connector_list'),
+        annotationsFor('aimeat_connector_list'),
+        async () => {
+            const connectors = await listConnectors({ config, storage }, caller().owner);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ connectors, online: connectors.filter(c => c.online).length }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_connector_rename ──
+    // The owner's name for one machine. The scope is asked here as PATCH /v1/agents/v2/connectors/:id
+    // asks it, so the word decides on both interfaces.
+    mcp.tool(
+        'aimeat_connector_rename',
+        descriptionFor('aimeat_connector_rename'),
+        zodShapeFor('aimeat_connector_rename'),
+        annotationsFor('aimeat_connector_rename'),
+        async ({ connector, name }) => {
+            const who = caller();
+            // The failures are written in the result shape the success uses, with the code first as
+            // toolError writes it, so the handler has one return type.
+            const refused = (code: string, message: string) => ({ content: [{ type: 'text' as const, text: `${code}: ${message}` }], isError: true });
+            if (!who.has('agent:write')) return refused('SCOPE_DENIED', 'Scope "agent:write" is required to name a connector.');
+            const out = await renameConnector({ config, storage }, who.owner, String(connector ?? ''), name);
+            if (!out.ok) return refused(out.code, out.message);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ connector: out.connector }, null, 2) }] };
         },
     );
 

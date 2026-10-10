@@ -869,6 +869,30 @@ components:
               per_day: { type: number, nullable: true, description: Major units; null means no limit set, so no spending }
               spent_today: { type: number, description: Major units, spent since 00:00 UTC }
         note: { type: string }
+    AgentConnector:
+      type: object
+      description: One of an owner's connectors (an `aimeat connect serve` installation), as GET /v1/agents/v2/connectors lists it.
+      required: [id, name, reported_name, online, first_seen, last_seen, run_modes, agents, waiting]
+      properties:
+        id: { type: string, description: The install id the connector presents }
+        name: { type: string, nullable: true, description: "The owner's name for it, else the reported name, else null" }
+        reported_name: { type: string, nullable: true, description: The name the connector reported for its installation }
+        online: { type: boolean, description: Whether it holds a tunnel right now }
+        first_seen: { type: string, format: date-time }
+        last_seen: { type: string, format: date-time, description: When it last connected or disconnected; the time of the call while it is connected }
+        run_modes:
+          type: array
+          nullable: true
+          items: { type: string, enum: [spawn, resident] }
+          description: The run modes it presented at its last connect; null from a connector that did not say
+        agents:
+          type: array
+          items: { type: string }
+          description: Names of the owner's agents that live on it
+        waiting:
+          type: array
+          items: { type: string }
+          description: Names of agents ordered to it that have no key yet
     AimeatEnvelope:
       type: object
       required: [ok, protocol, version, node, timestamp, request_id]
@@ -9086,6 +9110,15 @@ paths:
                 for_owner:
                   type: string
                   description: Must be the caller's own owner when given.
+                connector:
+                  type: string
+                  maxLength: 80
+                  description: |
+                    One of the owner's connectors (GET /v1/agents/v2/connectors), by install id or by
+                    name. The proposal stores it as `install_id` with `connector_name`, and the run
+                    mode is then corrected against that connector alone. A name the account does not
+                    have is refused with UNKNOWN_CONNECTOR and nothing is written. Omitted: the
+                    approval may name one, else the first connected connector takes the agent.
       responses:
         '201':
           description: |
@@ -9093,7 +9126,8 @@ paths:
             waiting answers with the standing proposal and `already_waiting: true`. The proposal's
             `scopes` carry the crew runtime's words (memory:read, memory:write) and `ai:use` when the
             owner's crews think through this node; its `run_mode_corrected` is set when the run mode
-            asked for was changed to one the connector can run.
+            asked for was changed to one the connector can run. `install_id` and `connector_name`
+            are set when the proposal named a connector.
           content:
             application/json:
               schema:
@@ -9113,7 +9147,7 @@ paths:
                             type: string
                             description: One sentence for the person, naming approval_url.
                           proposal: { type: object }
-        '400': { description: A name, purpose or crew definition that could not work }
+        '400': { description: 'A name, purpose or crew definition that could not work, or a connector the account does not have (UNKNOWN_CONNECTOR, AMBIGUOUS_CONNECTOR)' }
         '403': { description: Another owner, an app or ecosystem principal, or more scope than the proposer holds }
         '409': { description: An agent of that name already exists on this account }
     get:
@@ -9169,6 +9203,12 @@ paths:
         true), and when a connector of the same owner next connects, the node offers it the keys of
         every pending agent of that owner, once per connect. A connector that refuses or is too old
         leaves them pending, and the node log says why.
+
+        WHICH MACHINE. `install_id` in the body, else the proposal's own, names the connector the
+        agent is ordered to. Only that connector is offered it: when it is not connected the agent
+        waits for it (`waiting_for_connector` true, `connector` naming it), and another connector of
+        the same owner connecting is offered nothing. A connector the account does not have is
+        refused with UNKNOWN_CONNECTOR before anything is created.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -9177,6 +9217,16 @@ paths:
           in: path
           required: true
           schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                install_id:
+                  type: string
+                  description: The connector the agent is ordered to, by install id or by name. Overrides the proposal's own choice.
       responses:
         '200':
           description: The agent exists, with its definition
@@ -9204,7 +9254,14 @@ paths:
                               message: { type: string }
                           waiting_for_connector:
                             type: boolean
-                            description: True when no connector was connected. The agent gets its key when one of the owner's connectors next connects.
+                            description: True when no connector was connected, or the chosen one was not. The agent gets its key when the chosen connector, or with no choice any of the owner's connectors, next connects.
+                          connector:
+                            type: object
+                            nullable: true
+                            description: The connector the agent was ordered to; null when none was chosen.
+                            properties:
+                              id: { type: string }
+                              name: { type: string, nullable: true }
                           next_step: { type: string }
                           agent: { type: object }
                           run_mode_corrected:
@@ -9219,8 +9276,118 @@ paths:
                               reason: { type: string }
         '403': { description: Not the account holder in person }
         '404': { description: No such proposal on this account }
-        '409': { description: Already settled, or the name has been taken since }
+        '409': { description: 'Already settled, the name has been taken since, or a connector the account does not have (UNKNOWN_CONNECTOR)' }
         '502': { description: The definition could not be seeded, so nothing was created }
+
+  /v1/agents/v2/connectors:
+    get:
+      operationId: listConnectors
+      summary: The owner's connectors, as named machines
+      description: |
+        A connector is one `aimeat connect serve` installation: the program that holds an owner's
+        agents on one machine. It presents an install id and, since 2026-10-10, a name (its host
+        name unless the person set AIMEAT_INSTALL_NAME). The node records each one when it connects
+        and keeps it after it disconnects, so an owner can see a machine that is switched off, and an
+        agent can be ordered to it.
+
+        `online` and the agents a connected connector holds are read from the tunnel at the moment
+        of the call. `name` is the owner's own name for the connector when they gave one, else the
+        reported name, else null. `waiting` lists the agents that were ordered to this connector and
+        have no key yet.
+
+        For the account holder and their own agents holding `memory:read`. An app grant and an
+        ecosystem app are refused. The install id and the reported name are unsigned: they tell an
+        owner's own machines apart and authenticate nothing.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The connectors, connected ones first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          online: { type: integer, description: How many are connected right now }
+                          connectors:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentConnector'
+        '403': { description: 'No memory:read, or an app or ecosystem principal' }
+
+  /v1/agents/v2/connectors/{id}:
+    patch:
+      operationId: renameConnector
+      summary: The owner's name for one connector
+      description: |
+        Names a connector, addressed by its install id or by its present name. 1 to 60 characters.
+        Two connectors of one owner cannot share a name (NAME_TAKEN), because the name is what a
+        proposal's `connector` accepts. The reported name is kept beside the owner's.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The install id, or the connector's present name
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 60 }
+      responses:
+        '200':
+          description: The connector with its new name
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          connector:
+                            $ref: '#/components/schemas/AgentConnector'
+        '400': { description: An empty name, or one over 60 characters }
+        '403': { description: 'No agent:write, or an app or ecosystem principal' }
+        '404': { description: No such connector on this account }
+        '409': { description: 'Another connector carries that name (NAME_TAKEN), or the name given as address fits more than one (AMBIGUOUS_CONNECTOR)' }
+    delete:
+      operationId: forgetConnector
+      summary: Forget a connector that is not connected
+      description: |
+        THE ACCOUNT HOLDER IN PERSON. Removes the connector from the owner's list. Its agents stay:
+        they are records on the node. An agent that was waiting for this connector is then offered
+        to whichever of the owner's connectors connects next. A connected connector is refused
+        (CONNECTOR_ONLINE), because it would be listed again at once.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The install id
+          schema: { type: string }
+      responses:
+        '200': { description: Forgotten }
+        '403': { description: Not the account holder in person }
+        '404': { description: No such connector on this account }
+        '409': { description: The connector is connected right now }
 
   /v1/agents/v2/agents/{name}/attach:
     post:
@@ -9277,6 +9444,74 @@ paths:
         '404': { description: No agent of this account by that name }
         '409': { description: Already attached, a v1 agent, or no connector is running }
         '502': { description: The connector could not be reached, or did not take it on }
+
+  /v1/agents/v2/agents/{name}/move:
+    post:
+      operationId: moveAgentV2
+      summary: Send one of the owner's agents to another of their connectors
+      description: |
+        THE ACCOUNT HOLDER IN PERSON, like attach: this hands a machine the authority to mint an
+        agent's key.
+
+        An agent that WAITS (approved, no key yet) has its order changed to the named connector.
+        When that connector is connected it is offered the agent at once; when it is not, the agent
+        waits for it (`waiting_for_connector` true), and the connector it was ordered to before is
+        no longer offered it.
+
+        An agent that HOLDS A KEY gets a new one on the named connector. The agent's sessions end,
+        the new key is pinned over the old one, and the old connector's socket identity is detached,
+        so the old machine can no longer act as the agent. The named connector has to be connected
+        (DAEMON_NOT_CONNECTED otherwise), because the machine that takes an agent makes its key.
+
+        The agent's record, definition, permissions, schedules and tasks are on the node and do not
+        move. Files a runtime kept on the old machine's own disk stay there.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The bare agent name
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [install_id]
+              properties:
+                install_id:
+                  type: string
+                  description: The connector that takes the agent, by install id or by name
+      responses:
+        '200':
+          description: The agent runs on the named connector, or now waits for it
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          moved: { type: boolean }
+                          attached: { type: boolean, description: Whether the agent holds a key on the named connector now }
+                          waiting_for_connector: { type: boolean }
+                          connector:
+                            type: object
+                            properties:
+                              id: { type: string }
+                              name: { type: string, nullable: true }
+                          agent: { type: object, nullable: true }
+                          next_step: { type: string }
+        '403': { description: Not the account holder in person }
+        '404': { description: No agent of this account by that name }
+        '409': { description: 'No such connector (UNKNOWN_CONNECTOR), the agent already runs there (ALREADY_THERE), the connector is not connected (DAEMON_NOT_CONNECTED), or a v1 agent (V1_AGENT)' }
+        '502': { description: The connector could not be reached, or did not take the agent }
 
   /v1/agents/v2/agent-proposals/{id}/decline:
     post:

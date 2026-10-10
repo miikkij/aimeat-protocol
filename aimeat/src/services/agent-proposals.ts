@@ -31,6 +31,9 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.6.0 — 2026-10-10 — A proposal may name one of the owner's connectors (`connector`, by id or
+ *     by name); it is stored as `install_id` with `connector_name`, and the run mode is then
+ *     corrected against that connector alone.
  *   v1.5.0 — 2026-10-02 — A `resident` ask on an account whose connected connectors all run by
  *     spawning is stored as `spawn` with `run_mode_corrected` saying so (proposalRunModeFor), and a
  *     proposal carries `ai:use` when the owner's crews think through the node (proposalScopesFor).
@@ -56,6 +59,7 @@ import { withCrewRuntimeScopes } from '../data/crew-runtime-scopes.js';
 import { addItem, listItems, closeItem } from './open-items.js';
 import { basicAgentsApprovalUrl, residentRunnable } from './basic-agents.js';
 import { ownerDefaultIsNode } from './crew-menu.js';
+import { findConnector, listConnectors } from './connector-registry.js';
 import { logger } from '../utils/logger.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
@@ -96,9 +100,11 @@ export interface RunModeCorrection {
  * minutes because nothing there keeps an agent up. With no connector connected nothing can be
  * said, and the ask stands. Ruled by Jouni on 2026-10-02.
  */
-export function proposalRunModeFor(owner: string, asked: string | undefined): { run_mode: string; corrected: RunModeCorrection | null } {
+export function proposalRunModeFor(owner: string, asked: string | undefined, installId?: string | null): { run_mode: string; corrected: RunModeCorrection | null } {
   const wanted = String(asked ?? 'spawn');
-  if (wanted !== 'resident' || residentRunnable(owner) !== false) return { run_mode: wanted, corrected: null };
+  // With a connector named, the answer is that connector's: the agent runs the way the machine it
+  // is ordered to runs agents. A named connector that is not connected says nothing, and the ask stands.
+  if (wanted !== 'resident' || residentRunnable(owner, installId) !== false) return { run_mode: wanted, corrected: null };
   return {
     run_mode: 'spawn',
     corrected: {
@@ -137,6 +143,13 @@ export interface AgentProposal {
    * and `run_mode` is the one they can: what was asked, and why it changed. Absent or null otherwise.
    */
   run_mode_corrected?: RunModeCorrection | null;
+  /**
+   * The connector the agent is proposed for, by install id, and its name when the proposal was
+   * written. Absent or null when the proposer named none: the approval then decides, or the first
+   * connected connector takes it.
+   */
+  install_id?: string | null;
+  connector_name?: string | null;
   /** What it would BE. Optional: an owner may approve a proposal and seed it later. */
   crew_def: CrewDefDoc | null;
   /** Who asked. A GAII, or the owner's own name when a person drafted it in their session. */
@@ -189,6 +202,8 @@ export async function proposeAgent(
   input: {
     name: string; display_name?: string; purpose: string; scopes?: string[];
     mode?: string; run_mode?: string; crew_def?: CrewDefDoc | null; for_owner?: string;
+    /** One of the owner's connectors, by install id or by name. */
+    connector?: string;
   },
 ): Promise<{ ok: true; proposal: AgentProposal; alreadyWaiting?: boolean } | Fail> {
   const { config, storage } = ctx;
@@ -288,8 +303,31 @@ export async function proposeAgent(
   // the whole list on the proposal before pressing, and approving adds them again for a proposal
   // stored before this.
   const scopes = await proposalScopesFor(ctx, owner, asked);
+
+  // WHICH MACHINE, when the proposer says. Resolved now to the install id, so the owner approves a
+  // machine and not a name that could mean another one by then. A name nobody has is refused
+  // before anything is written, and the refusal lists what there is to choose from.
+  let installId: string | null = null;
+  let connectorName: string | null = null;
+  const askedConnector = typeof input.connector === 'string' ? input.connector.trim() : '';
+  if (askedConnector) {
+    const hit = await findConnector(ctx, owner, askedConnector);
+    if (hit === 'ambiguous') {
+      return fail(400, 'AMBIGUOUS_CONNECTOR',
+        `More than one of this account's connectors is called "${askedConnector}". Name it by its id (GET /v1/agents/v2/connectors).`);
+    }
+    if (!hit) {
+      const known = (await listConnectors(ctx, owner)).map(c => c.name ?? c.id);
+      return fail(400, 'UNKNOWN_CONNECTOR', known.length
+        ? `This account has no connector called "${askedConnector}". It has: ${known.join(', ')}.`
+        : `This account has no connector yet, so none can be named. Leave connector out, and the agent goes to the first one that connects.`);
+    }
+    installId = hit.id;
+    connectorName = hit.name;
+  }
+
   // A run mode nobody connected here can run is corrected now, so the owner approves what will run.
-  const runMode = proposalRunModeFor(owner, input.run_mode);
+  const runMode = proposalRunModeFor(owner, input.run_mode, installId);
 
   const now = new Date().toISOString();
   const proposal: AgentProposal = {
@@ -301,6 +339,8 @@ export async function proposeAgent(
     mode: String(input.mode ?? 'task-runner'),
     run_mode: runMode.run_mode,
     run_mode_corrected: runMode.corrected,
+    install_id: installId,
+    connector_name: connectorName,
     crew_def: input.crew_def ?? null,
     proposed_by: principal.sub,
     proposed_at: now,

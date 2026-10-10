@@ -19,6 +19,7 @@
  * @usage
  *   import { NEW_AGENT_MD } from './new-agent.js';
  * @version-history
+ *   v1.1.0 — 2026-10-10 — Which machine: aimeat_connector_list and the proposal's `connector`.
  *   v1.0.1 — 2026-10-02 — The node adds memory:read and memory:write to a proposal itself.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
@@ -36,7 +37,9 @@ runs it on the person's own connector.
    the open deals in your Sales workspace each morning and lists what to act on"), the scopes the
    job needs (the node adds \`memory:read\` and \`memory:write\`, which a crew runtime reads its
    definition and writes its result with), and a \`crew_def\`. It creates nothing. Skill \`add-a-crew-agent\` has the
-   definition's shape and how to check it.
+   definition's shape and how to check it. When the person says which machine runs it, or has more
+   than one connector, \`aimeat_connector_list\` names their machines: pass the one they mean as
+   \`connector\`, and say its name to them, never its id.
 3. **Tell them where to approve.** The answer carries \`approval_url\` and \`next_step\`: give them
    both, in their words. Their own press makes the agent. Work on a clock comes after that, as a
    schedule of kind \`agent_task\` for the new agent.`;

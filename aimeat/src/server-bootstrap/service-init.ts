@@ -18,6 +18,8 @@
  *     after the extension secrets are bound (secrets audit 2026-10-09, chapter 2).
  *   v1.17.0 — 2026-10-09 — bindLegacyExtensionSecrets() at boot, awaited before the shipped
  *     extensions are seeded (secrets audit 2026-10-09, 1.1).
+ *   v1.17.0 — 2026-10-10 — startConnectorRegistry(): connectors are recorded as they connect and
+ *     disconnect.
  *   v1.16.0 — 2026-10-08 — startPendingEnrolment(): a connector connecting gets the offer for its
  *     owner's approved agents that have no key yet (services/agent-pending-enrolment.ts).
  *   v1.15.0 — 2026-10-02 — migrateImplicitFreeModelOnce(): once per node, the free router a key-only
@@ -87,6 +89,7 @@ import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { ConnectTunnelManager, setActiveConnectTunnelManager } from '../services/connect-tunnel.js';
 import { startPendingEnrolment } from '../services/agent-pending-enrolment.js';
+import { startConnectorRegistry } from '../services/connector-registry.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
 import { seedCsmTemplates } from '../services/csm-seed.js';
 import { seedManifestSchema } from '../services/manifest-schema.js';
@@ -613,6 +616,8 @@ export async function initializeServices(
     setActiveConnectTunnelManager(connectTunnelManager);
     // An agent approved while the owner's connector was down gets its key when the connector connects.
     startPendingEnrolment({ config, storage });
+    // Each connector is recorded for its owner as it connects and disconnects (services/connector-registry.ts).
+    startConnectorRegistry({ config, storage });
     logger.info('Connector forward tunnel enabled');
   }
 
