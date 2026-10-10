@@ -7,6 +7,8 @@
  *   offers the copy route, a stored result is drawn again without a call, and the model field is a
  *   select with the library and a text field without it.
  * @version-history
+ *   v1.2.1 - 2026-10-10 - The cost line is compared with the SDK formatter's own output, so the
+ *     test passes on a machine whose locale is not English.
  *   v1.2.0 - 2026-10-02 - A stored result: show() and `result` draw it with its label, model and
  *     date and no call; a fresh result carries `at`; render() gets both.
  *   v1.1.0 - 2026-10-01 - The cost line in Finnish: the SDK money formatter and the budget's currency.
@@ -132,7 +134,9 @@ describe('aiTask', () => {
     expect(part(host, 'body')[0].textContent).toBe('MD:# Reading\nThe answer.');
     expect(calls.find((c) => c.op === 'disclose')?.args).toEqual({ record: { id: 'prov-1' } });
     expect(part(host, 'model')[0].textContent).toBe('Model: openai/gpt-4o-mini');
-    expect(part(host, 'cost')[0].textContent).toBe('AI use today: $0.04 of $1.00');
+    // The amounts are in the reader's own number format, so the expected text uses the same formatter
+    // rather than an English literal that fails on a machine whose locale is not English.
+    expect(part(host, 'cost')[0].textContent).toBe(`AI use today: ${kit.money(0.04)} of ${kit.money(1)}`);
     expect(part(host, 'truncated')).toEqual([]);
     expect(got.provenance).toEqual({ record: { id: 'prov-1' } });
     h.destroy();
