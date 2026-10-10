@@ -12875,6 +12875,7 @@
       "movingNow": "Moving…",
       "moved": "It runs on that machine now.",
       "movedWaiting": "It now waits for that machine, and starts when the machine connects.",
+      "movedSpawn": "That machine starts an agent when work arrives, so this agent is no longer always on.",
       "giveTitle": "Give it a task",
       "giveLabel": "What should it do now?",
       "givePlaceholder": "Say it as you would say it to a person.",

@@ -113,6 +113,28 @@ last seen, the agents on it and the agents that wait for it. A proposal (`connec
 offered the agent. The id belongs to the connector folder, so two folders on one computer are two
 connectors, and a copied folder carries its id with it.
 
+### When an agent leaves a connector
+
+The node detaches one identity with an `auth_revoked` frame that names it (`agent`), and since
+2026-10-11 the frame says why when the node knows: `reason: "moved"` when the owner sent the agent
+to another connector, `reason: "deleted"` when the agent no longer exists. A revoked token and a
+deactivated account carry no reason, because that credential may be minted again.
+
+- **Moved.** The connector removes the agent from its home: the key file, a stored bearer, the
+  agent's `config.yaml`, and the agent's directory when that left it empty. It rewrites `serve.json`.
+  After a restart it does not list the agent. A connector that was not running when the agent moved
+  gets no frame; at its next start the mint is answered 401 with `details.reason: "key_not_pinned"`,
+  and it reports the agent as `auth_failed` and does not try again. Its files stay, because a
+  refusal read at start is an inference and a deleted key cannot be put back.
+- **The identity that opened the shared socket.** Its credential authenticated the upgrade, so the
+  client stops when it is revoked. The connector then opens a new socket on another identity's
+  credential and puts every other identity of that node on it. Each keeps its channel: a runtime
+  waiting on a long-poll, the queued deliveries and the subscriptions are the same afterwards.
+- **A move re-decides the run mode.** A `resident` agent moved to a connector that reported `spawn`
+  only becomes `spawn`, and the answer of the move says so (`run_mode_corrected`).
+- **`GET /v1/agents` rows carry `install_id`**: the connector that holds the agent, or the one it
+  waits for. A runtime reads its roster and its own share of it in that one call.
+
 ## Forward API call (agent → server)
 
 Every MCP tool call and every daemon REST call becomes a `request` frame on the

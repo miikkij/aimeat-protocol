@@ -11182,6 +11182,7 @@
       "movingNow": "Moviendo…",
       "moved": "Ahora funciona en esa máquina.",
       "movedWaiting": "Ahora espera esa máquina y empieza cuando se conecte.",
+      "movedSpawn": "Esa máquina inicia un agente cuando llega trabajo, así que este agente ya no está siempre encendido.",
       "giveTitle": "Dale una tarea",
       "giveLabel": "¿Qué debe hacer ahora?",
       "givePlaceholder": "Dilo como se lo dirías a una persona.",

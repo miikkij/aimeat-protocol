@@ -12874,6 +12874,7 @@
       "movingNow": "Siirretään…",
       "moved": "Agentti toimii nyt sillä koneella.",
       "movedWaiting": "Agentti odottaa nyt sitä konetta ja käynnistyy, kun kone on yhteydessä.",
+      "movedSpawn": "Tuo kone käynnistää agentin, kun työtä tulee, joten tämä agentti ei ole enää aina päällä.",
       "giveTitle": "Anna sille tehtävä",
       "giveLabel": "Mitä sen pitää tehdä nyt?",
       "givePlaceholder": "Sano se niin kuin sanoisit ihmiselle.",

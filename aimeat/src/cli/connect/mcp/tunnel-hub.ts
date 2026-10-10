@@ -19,9 +19,12 @@
  *   AN OLDER NODE IS NOT AN ERROR. `hubFor` answers null when the node does not advertise
  *   multiplex, and the caller opens a private socket exactly as before. Nobody chooses a version.
  *
- * @structure TunnelHub — hubFor() · ownerOf() · isShared() · sockets()
+ * @structure TunnelHub — hubFor() · join() · owns() · release() · retire() · socketCount; rehome()
  * @usage const hub = await hubs.hubFor(entry, identity);
  * @version-history
+ *   v1.2.0 — 2026-10-11 — retire() and rehome(): when the identity that opened the shared socket
+ *     loses its credential, the other identities get a new socket and keep their channels. They
+ *     read `stopped` until a restart.
  *   v1.1.0 — 2026-09-05 — The hub client is built with the opener's own `gaii`, so a frame for an
  *     identity it has since evicted is dropped rather than landing on these handlers by default —
  *     which is how one owner's task reached another owner's queue.
@@ -145,6 +148,64 @@ export class TunnelHub {
     void client.close().catch((err: unknown) => logger.warn('tunnel-hub release: ignore', { error: String(err) }));
   }
 
+  /**
+   * The identity that OPENED its node's socket has lost its credential.
+   *
+   * The client stops when that happens, by design: the upgrade stood on that credential, and a
+   * reconnect would present it again. So the socket is forgotten here, and the next join opens a new
+   * one on another identity's credential. Answers the stopped client when this identity was the
+   * opener, null when it only rode the socket (the client detached it alone, and nothing else moved).
+   */
+  retire(entry: RegisteredAgent): ConnectTunnelClient | null {
+    const url = entry.config.node_url;
+    const own = this.owners.get(url);
+    if (!own || own.entry.gaii !== entry.gaii) return null;
+    this.owners.delete(url);
+    this.byNode.delete(url);
+    return own.hub;
+  }
+
   /** How many sockets this daemon holds upstream. The number the whole change is about. */
   get socketCount(): number { return this.byNode.size; }
+}
+
+/** What rehome() needs of a channel: the socket it is on, and what it had subscribed to there. */
+interface RidingChannel {
+  tunnel?: unknown;
+  getSubscriptions(): unknown[];
+}
+
+/**
+ * Every identity that rode a socket whose opener lost its credential gets a new socket.
+ *
+ * WHY THIS EXISTS. One agent's dead credential must stop that agent and nobody else. That held for
+ * an identity that JOINED a shared socket and failed for the one that OPENED it: the client stopped,
+ * and every other agent of that connector read `stopped` until the daemon was restarted. Deleting a
+ * connector's first agent did it, and so does moving that agent to another connector, which an owner
+ * now does from their home page (measured with a real daemon on 2026-10-11:
+ * test/e2e-connect-serve-loopback.ts, "Losing the agent that opened the shared socket").
+ *
+ * EACH KEEPS ITS CHANNEL. `attach` is given the channel the identity already has, so a runtime
+ * parked on a long-poll, the queued deliveries and the subscriptions are the same objects afterwards;
+ * only the socket under them is new. One after another, because the first to attach opens the
+ * socket the others join. The subscriptions are sent again: they die with the socket they were on.
+ */
+export async function rehome<E extends { gaii: string; agent: string; owner: string }, C extends RidingChannel>(
+  stopped: unknown, lost: string, entries: E[], channelOf: (gaii: string) => C | undefined,
+  attach: (entry: E, kept: C) => Promise<void>, resubscribe: (entry: E, ch: C) => void,
+): Promise<number> {
+  let moved = 0;
+  for (const e of entries) {
+    const ch = channelOf(e.gaii);
+    if (e.gaii === lost || !ch || ch.tunnel !== stopped) continue;
+    try {
+      await attach(e, ch);
+      if (ch.getSubscriptions().length) resubscribe(e, ch);
+      moved++;
+    } catch (err) {
+      console.error(`[serve] ${e.agent}@${e.owner}: could not be put on a new tunnel: ${String(err)}`);
+    }
+  }
+  if (moved) console.error(`[serve] the agent that opened the shared tunnel lost its credential; ${moved} other agent(s) are on a new tunnel`);
+  return moved;
 }

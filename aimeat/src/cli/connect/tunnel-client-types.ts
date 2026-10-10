@@ -13,6 +13,8 @@
  *   decide whether a failure is a verdict or a hiccup, and the one pure function. What does not:
  *   anything that reads `this`. That line is what keeps the split a move rather than a rewrite.
  * @version-history
+ *   v1.3.0 -- 2026-10-11 -- `reason` on the frame and on onAuthFailure: the node says when an identity was
+ *     detached because the agent moved to another connector, and the serve daemon acts on it.
  *   v1.2.0 -- 2026-10-07 -- `forgetToken` on an identity: one that can mint is re-attached with a new
  *     credential before a refusal gives it up. `handlersFor` moved here from tunnel-client.ts (that
  *     file passed 800 lines); its client state became parameters.
@@ -97,8 +99,8 @@ export interface ConnectTunnelClientOptions {
    * incrementing per reconnect.
    */
   onConnect?: (connectCount: number) => void;
-  /** Fired once when the client stops due to an auth failure. */
-  onAuthFailure?: (message: string) => void;
+  /** Fired once when the client stops due to an auth failure. `reason` is the node's, when it gave one ('moved', 'deleted'). */
+  onAuthFailure?: (message: string, reason?: string) => void;
   onStatusChange?: (status: TunnelStatus) => void;
   /** Defaults below are pre-welcome fallbacks; the server `welcome` overrides them. */
   heartbeatIntervalMs?: number;
@@ -133,7 +135,7 @@ export interface TunnelIdentity {
   onInvoke?: (frame: { id: string; capability: string; input: unknown; caller?: string; timeout_ms?: number }) => void;
   onBacklog?: (payload: { tasks: unknown[]; messages: unknown[] }) => void;
   onConnect?: (connectCount: number) => void;
-  onAuthFailure?: (message: string) => void;
+  onAuthFailure?: (message: string, reason?: string) => void;
   /**
    * Drop the cached credential, so the next getToken() produces a new one. Given by an identity that
    * mints its credential: when the node refuses the pinned one, the client mints and re-attaches once
@@ -158,6 +160,8 @@ export interface TunnelFrame {
   payload?: unknown;
   code?: string;
   message?: string;
+  /** auth_revoked: why the node detached the identity, when it says ('moved', 'deleted'). */
+  reason?: string;
   timestamp?: string;
   // ── invoke (S→C) / invoke_result (C→S) ──
   capability?: string;

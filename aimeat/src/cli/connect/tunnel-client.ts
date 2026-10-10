@@ -30,6 +30,7 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.14.0 -- 2026-10-11 -- auth_revoked hands its `reason` to onAuthFailure, for a moved agent (./tunnel-client-types.ts).
  *   v1.13.0 -- 2026-10-10 -- The upgrade carries X-AIMEAT-Install-Name beside the id (./install-id.ts installHeaders).
  *   v1.12.0 -- 2026-10-07 -- A forwarded 401 detaches an identity only when its code says the CALLER'S
  *     credential was refused (./tunnel-credential-verdict.ts): the node's AI routes answer 401
@@ -400,12 +401,12 @@ export class ConnectTunnelClient {
     this.pending.clear();
   }
 
-  private authFailure(message: string): void {
+  private authFailure(message: string, reason?: string): void {
     if (this.authFailed) return;
     this.authFailed = true;
     console.error(`[${this.label}] Stopped: ${message}. ${RE_AUTH_GUIDANCE}`);
     this.stop();
-    try { this.opts.onAuthFailure?.(message); } catch (err) { logger.warn('close: listener error — ignore', { error: String(err) }); }
+    try { this.opts.onAuthFailure?.(message, reason); } catch (err) { logger.warn('close: listener error — ignore', { error: String(err) }); }
   }
 
   /**
@@ -682,13 +683,13 @@ export class ConnectTunnelClient {
         const attached = revoked ? this.identities.get(revoked) : undefined;
         if (attached) {
           this.identities.delete(revoked);
-          try { attached.onAuthFailure?.(frame.message ?? 'Token revoked by server'); }
+          try { attached.onAuthFailure?.(frame.message ?? 'Token revoked by server', frame.reason); }
           catch (err) { console.error(`[${this.label}] onAuthFailure handler error: ${(err as Error).message}`); }
           break;
         }
         // Server revoked the pinned bearer — stop + surface re-auth guidance (same path as a
         // forwarded 401). Removes the client's periodic auth-liveness probe.
-        this.authFailure(frame.message ?? 'Token revoked by server');
+        this.authFailure(frame.message ?? 'Token revoked by server', frame.reason);
         break;
       }
       case 'error': {

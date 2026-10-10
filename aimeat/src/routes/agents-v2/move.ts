@@ -27,6 +27,9 @@
  * @structure registerAgentMoveRoute(router, config, storage)
  * @usage registerAgentMoveRoute(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A resident agent moved to a connector that keeps no agent running
+ *     becomes spawn, and the answer says so (`run_mode`, `run_mode_corrected`). It kept `resident`
+ *     and nobody ran it.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import type { Router } from 'express';
@@ -80,6 +83,20 @@ export function registerAgentMoveRoute(router: Router, config: AimeatConfig, sto
       return;
     }
 
+    // THE AGENT RUNS THE WAY THE CONNECTOR IT GOES TO RUNS AGENTS, as at approval
+    // (proposalRunModeFor). A resident agent sent to a connector that only starts a worker per job
+    // would keep its run mode and be run by nobody: the spawner skips a resident agent and nothing
+    // on that connector keeps one up. A connector that never said how it runs agents is given the
+    // benefit of the doubt, as at approval. Found by a real two-connector run on 2026-10-11.
+    const runsResident = !Array.isArray(target.run_modes) || target.run_modes.includes('resident');
+    const corrected = record.runMode === 'resident' && !runsResident;
+    const runMode = corrected ? 'spawn' : (record.runMode ?? null);
+    const runModeCorrected = corrected ? {
+      asked: 'resident',
+      reason: `${target.name ?? 'That connector'} starts a worker per job and keeps no agent running, so ${label} runs as spawn there.`,
+    } : null;
+    const applyRunMode = async () => { if (corrected) await storage.updateAgent(record.gaii, { runMode: 'spawn' }); };
+
     // A waiting agent's order is changed first, so the connector it was ordered to before is no
     // longer offered it, whatever the offer below answers.
     if (!keyed) await setWanted(ctx, owner, name, target.id);
@@ -89,7 +106,7 @@ export function registerAgentMoveRoute(router: Router, config: AimeatConfig, sto
       gaii: record.gaii,
       displayName: label,
       description: record.description ?? '',
-      runMode: record.runMode ?? null,
+      runMode,
       mode: record.mode ?? null,
       scopes: record.defaultScopes ?? [],
     }], { installId: target.id, kind: keyed ? 'move' : 'create' });
@@ -99,8 +116,10 @@ export function registerAgentMoveRoute(router: Router, config: AimeatConfig, sto
       // A waiting agent whose new connector is not connected has still been re-ordered: it gets its
       // key when that connector connects (services/agent-pending-enrolment.ts).
       if (!keyed && NOT_CONNECTED.has(out.code)) {
+        await applyRunMode();
         res.json(success(config.nodeId, {
           moved: true, attached: false, waiting_for_connector: true, connector,
+          run_mode: runMode, run_mode_corrected: runModeCorrected,
           next_step: `${label} now waits for ${target.name ?? 'that connector'}, and starts when it connects.`,
         }));
         emitChange('agents');
@@ -111,11 +130,13 @@ export function registerAgentMoveRoute(router: Router, config: AimeatConfig, sto
       return;
     }
 
+    await applyRunMode();
     logger.info('Agent moved to another connector', {
-      event: 'agent_v2.moved', owner, name, installId: target.id, replacedKey: keyed,
+      event: 'agent_v2.moved', owner, name, installId: target.id, replacedKey: keyed, runModeCorrected: corrected,
     });
     res.json(success(config.nodeId, {
       moved: true, attached: true, waiting_for_connector: false, connector,
+      run_mode: runMode, run_mode_corrected: runModeCorrected,
       agent: out.enrolled[0] ?? null,
       next_step: `${label} runs on ${target.name ?? 'that connector'} now.`,
     }, [

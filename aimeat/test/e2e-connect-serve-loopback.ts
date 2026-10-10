@@ -1364,6 +1364,60 @@ await test('Stop the two-owner daemon', async () => {
   await waitForExit(daemon3!.child);
 });
 
+// ─── Losing the identity that opened the shared socket ───
+//
+// The test above deletes the agent that JOINED the shared socket. The one that OPENED it is a
+// different case: its credential authenticated the upgrade, and a revocation of it used to stop
+// the whole client. Moving an agent to another connector revokes its key on the old one, so the
+// first agent of a connector being moved is ordinary, and every other agent there must stay up.
+console.log('\nLosing the agent that opened the shared socket');
+let home4 = '';
+let daemon4: { child: ChildProcess; stderr: () => string } | null = null;
+let lb4 = '';
+let acc4a: NodeAccount | null = null;
+let acc4b: NodeAccount | null = null;
+
+await test('A second two-agent daemon starts, both agents online', async () => {
+  home4 = resolve(process.cwd(), `test/.tmp-serve-home4-${stamp}`);
+  acc4a = await registerOwnerAndAgent(BASE, NODE_ID, `opena${stamp}`, 'concierge');
+  acc4b = await registerOwnerAndAgent(BASE, NODE_ID, `openb${stamp}`, 'concierge');
+  writeConnectorHome(home4, 'concierge', acc4a.ownerName, BASE, acc4a.agentToken);
+  writeFileSync(join(home4, 'tokens', `concierge@${acc4b.ownerName}.token`), acc4b.agentToken, 'utf-8');
+  daemon4 = spawnDaemon(home4);
+  const disc = await waitForDiscovery(home4).catch((err) => {
+    throw new Error(`${err.message}\n--- daemon stderr ---\n${daemon4!.stderr()}`);
+  });
+  lb4 = `http://127.0.0.1:${disc.port}`;
+  loopbackSecrets.set(lb4, disc.secret);
+  const st = await json(lb4, '/local/status');
+  const rows = (st.body.data?.agents ?? []) as any[];
+  assert(rows.length === 2 && rows.every(r => r.tunnel_status === 'online'), `both online, got ${JSON.stringify(rows.map(r => [r.owner, r.tunnel_status]))}`);
+});
+
+await test('Deleting EITHER agent leaves the other connected and working, whichever opened the socket', async () => {
+  // Which of the two opened the socket is the daemon's own business, so both orders are run: the
+  // first deletion here, and the mirror image in the two-owner daemon above (which deleted the
+  // agent written second). One of the two deletions is the opener's.
+  const gaiiA = `concierge#${acc4a!.ownerName}@${NODE_ID}`;
+  const gaiiB = `concierge#${acc4b!.ownerName}@${NODE_ID}`;
+  const del = await json(BASE, '/v1/agents/concierge', { method: 'DELETE', headers: { Authorization: `Bearer ${acc4a!.ownerToken}` } });
+  assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+  const row = async (gaii: string) => ((await json(lb4, '/local/status')).body.data?.agents ?? [] as any[]).find((a: any) => a.gaii === gaii);
+  for (let i = 0; i < 40; i++) { if ((await row(gaiiA))?.tunnel_status !== 'online') break; await sleep(100); }
+  await sleep(1500);
+  const neighbour = await row(gaiiB);
+  assert(neighbour?.tunnel_status === 'online',
+    `the other agent must stay connected, got ${neighbour?.tunnel_status}\n--- daemon stderr ---\n${daemon4!.stderr().slice(-1500)}`);
+  const r = await json(lb4, '/v1/agents?owner=' + encodeURIComponent(acc4b!.ownerName), { headers: { 'X-Aimeat-Agent': gaiiB } });
+  assert(r.status === 200, `and its calls must still be answered, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Stop the second two-agent daemon', async () => {
+  const sd = await json(lb4, '/local/shutdown', { method: 'POST' });
+  assert(sd.status === 200, `shutdown ${sd.status}`);
+  await waitForExit(daemon4!.child);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner + stop children + remove temp homes', async () => {
@@ -1371,12 +1425,12 @@ await test('Cascade-delete owner + stop children + remove temp homes', async () 
     method: 'DELETE', headers: { Authorization: `Bearer ${account.ownerToken}` },
   });
   assert(status === 200, `owner delete status ${status}`);
-  for (const d of [daemon1, daemon2, daemon3]) {
+  for (const d of [daemon1, daemon2, daemon3, daemon4]) {
     if (d && d.child.exitCode === null) { try { d.child.kill('SIGKILL'); } catch { /* ignore */ } }
   }
   if (node2 && node2.exitCode === null) { try { node2.kill('SIGKILL'); } catch { /* ignore */ } }
   await sleep(300); // let handles release before rm
-  for (const dir of [home1, home2, home3].filter(Boolean)) { try { rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ } }
+  for (const dir of [home1, home2, home3, home4].filter(Boolean)) { try { rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ } }
   for (const suffix of ['', '-shm', '-wal']) { try { rmSync(node2Db + suffix, { force: true }); } catch { /* ignore */ } }
 });
 

@@ -34,6 +34,9 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-10-11 -- An identity whose credential the node refuses: the others on a socket it opened get a new
+ *     socket and keep their channels (./tunnel-hub.ts rehome), an agent the node says was MOVED is removed
+ *     from this home (../forget-agent.ts), and serve.json is rewritten. It stayed listed, with its key on disk.
  *   2026-10-07 -- Each identity hands the tunnel `forgetToken`, so a refused pinned credential is
  *     re-minted and re-attached before the agent is reported auth_failed; the REST proxy forwards
  *     over the tunnel only while the identity itself is on it.
@@ -139,8 +142,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
-import { TunnelHub, statusOfIdentity, principalRow } from './tunnel-hub.js';
+import { TunnelHub, statusOfIdentity, principalRow, rehome } from './tunnel-hub.js';
 import { resolveToken, forgetCachedToken } from '../agent-key.js';
+import { forgetLocalAgent } from '../forget-agent.js';
 import { refusedCredential, noteCredentialAnswer } from '../refused-credentials.js';
 import { type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
@@ -226,14 +230,17 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
    */
   /** One socket per node, shared by every identity on it. See ./tunnel-hub.ts. */
   const hubs = new TunnelHub();
-  async function attachRegistered(entry: RegisteredAgent): Promise<void> {
-    const ch = new AgentChannel(entry);
+  // Rewrites serve.json once it exists. A no-op until the startup write: an auth failure during startup must not call a function declared later.
+  let identityChanged: () => void = () => { /* the startup write covers it */ };
+  // `kept`: an identity that is given a NEW socket keeps its channel and its invoke queue (rehome).
+  async function attachRegistered(entry: RegisteredAgent, kept?: AgentChannel): Promise<void> {
+    const ch = kept ?? new AgentChannel(entry);
     ch.onActivity = (kind, item) => stats.record(entry, kind, item);
     channels.set(entry.gaii, ch);
     // Server-initiated invokes (Crew tab validate/try) queue here and are answered back over the
     // same socket. `tunnel` is assigned just below; the reply closure only runs after it exists.
     // Answered on whichever socket this identity ended up on, named so a shared one routes it.
-    const inv = new InvokeChannel((id, ok, result) => ch.tunnel?.replyInvoke(id, ok, result, entry.gaii));
+    const inv = (kept && invokeChannels.get(entry.gaii)) || new InvokeChannel((id, ok, result) => ch.tunnel?.replyInvoke(id, ok, result, entry.gaii));
     invokeChannels.set(entry.gaii, inv);
 
     // THE WIRE THIS IDENTITY ENDS UP ON lives on the channel (`ch.forward`), filled in by whichever
@@ -304,12 +311,24 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         const subs = ch.getSubscriptions();
         if (subs.length) ch.tunnel?.subscribe(subs, entry.gaii);
       },
-      onAuthFailure: () => {
+      onAuthFailure: (_message, reason) => {
         // Token died mid-session: fall back to direct fetch so already-running
         // tool calls fail with the node's own 401 (clear guidance) instead of
         // "Tunnel not connected".
         ch.transportMode = 'auth_failed';
         entry.client.setTransport(null);
+        // The identity that OPENED the shared socket takes the socket with it, so every other
+        // identity on it is given a new one (./tunnel-hub.ts rehome).
+        const stopped = hubs.retire(entry);
+        if (stopped) void rehome<RegisteredAgent, AgentChannel>(stopped, entry.gaii, registry.list(), g => channels.get(g), attachRegistered, (e, c) => c.tunnel?.subscribe(c.getSubscriptions(), e.gaii)).then(identityChanged);
+        // The owner moved it to another connector: it is not this home's agent any more.
+        if (reason === 'moved') {
+          detachAgent(entry.gaii);
+          void forgetLocalAgent(entry.agent, entry.owner).then(gone => console.error(
+            `[serve] ${entry.agent}@${entry.owner}: moved to another connector, removed from this one (key ${gone.key ? 'removed' : 'absent'}, config ${gone.config ? 'removed' : 'absent'})`,
+          )).catch(err => console.error(`[serve] ${entry.agent}@${entry.owner}: moved away, but its files could not be removed: ${String(err)}`));
+        }
+        identityChanged();
       },
     };
 
@@ -748,7 +767,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     const doc = buildDiscoveryDoc(port, startedAt, registry.list(), gaii => channels.get(gaii)!.transportMode, secret);
     writeDiscoveryFile(discoveryFile, doc);
   };
-  writeDiscovery();
+  writeDiscovery(); identityChanged = writeDiscovery;
 
   let shuttingDown = false;
   async function shutdown(code: number): Promise<void> {

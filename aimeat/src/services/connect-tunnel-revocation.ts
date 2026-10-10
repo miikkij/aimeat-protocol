@@ -24,6 +24,9 @@
  *   import { revokeByGaii } from './connect-tunnel-revocation.js';
  *   revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii);
  * @version-history
+ *   2026-10-11 — revokeByGaii takes the reason ('deleted' by default, 'moved' from the enrolment of
+ *     a move) and puts it on the frame with a message that names it. A moved agent's old connector
+ *     was told "Agent deleted".
  *   2026-09-26 — revokeByToken compares token ids (auth/jwt.ts tokenIdOf), not strings, so the
  *     socket of any spelling of a revoked token is told and cut (secaudit 2026-09, N4).
  *   2026-09-03 — These detach ONE identity instead of closing a socket. Closing was right while a
@@ -65,8 +68,8 @@ type Detach = (socketId: string, principal: string, reason: string) => void;
  * whose it is so a shared client stops the right one, and the socket closes only if the manager's
  * detach finds nobody left on it.
  */
-function cut(send: Send, detach: Detach, conn: Closable, message: string, where: string): void {
-  send(conn.ws, { type: 'auth_revoked', agent: conn.principal, message, timestamp: new Date().toISOString() });
+function cut(send: Send, detach: Detach, conn: Closable, message: string, where: string, reason?: 'moved' | 'deleted'): void {
+  send(conn.ws, { type: 'auth_revoked', agent: conn.principal, message, ...(reason ? { reason } : {}), timestamp: new Date().toISOString() });
   try { detach(conn.socketId, conn.principal, where); } catch (err) { logger.warn(`${where}: ignore`, { error: String(err) }); }
 }
 
@@ -104,10 +107,12 @@ export function revokeByToken(connections: Map<string, Closable>, send: Send, de
  * five agents sharing the daemon. Same mechanism as both, with the predicate this case needs —
  * and `connections` is keyed by the GAII, so it is one lookup rather than a scan.
  */
-export function revokeByGaii(connections: Map<string, Closable>, send: Send, detach: Detach, gaii: string): void {
+export function revokeByGaii(connections: Map<string, Closable>, send: Send, detach: Detach, gaii: string, reason: 'moved' | 'deleted' = 'deleted'): void {
   const conn = connections.get(gaii);
   if (!conn) return;
-  cut(send, detach, conn, 'Agent deleted', 'closeForGaii');
+  // The frame says which of the two it is: a connector removes a moved agent from its home, and
+  // the message is what its log shows a person.
+  cut(send, detach, conn, reason === 'moved' ? 'Agent moved to another connector' : 'Agent deleted', 'closeForGaii', reason);
 }
 
 /**

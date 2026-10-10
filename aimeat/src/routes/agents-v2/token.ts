@@ -24,6 +24,9 @@
  * @structure registerAgentV2TokenRoute(router, config, storage)
  * @usage registerAgentV2TokenRoute(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The two refusals of the key carry `details.reason: 'key_not_pinned'`. A
+ *     connector whose agent had moved away could not tell them from a passing failure and minted
+ *     again every 30 seconds for as long as it ran.
  *   v1.1.0 — 2026-09-01 — The single-use spend moved to services/assertion-spend.ts, unchanged in
  *     behaviour. It was the only implementation, the A2A door needed the same one, and a second
  *     copy of a hash-and-namespace is how two doors come to disagree about what has been spent.
@@ -51,6 +54,15 @@ export const AGENT_KEY_GRANT = 'urn:aimeat:params:oauth:grant-type:agent-key';
 const MAX_ASSERTION_LIFETIME_SECONDS = 300;
 /** How far ahead of us an assertion's `iat` may sit before we call it wrong rather than skewed. */
 const MAX_CLOCK_SKEW_SECONDS = 60;
+
+/**
+ * The detail on both refusals that are a verdict on the KEY: no key is pinned for the agent, or the
+ * assertion is signed by another key than the pinned one. A connector reads it to tell a key that
+ * will never work again (the agent moved to another connector, or was enrolled again) from a
+ * refusal worth another attempt (a spent rate budget, a clock that is off). The same value on both,
+ * so it tells a caller nothing the two messages did not already say.
+ */
+const KEY_NOT_PINNED = { reason: 'key_not_pinned' };
 
 interface AssertionClaims {
   sub?: unknown; aud?: unknown; iat?: unknown; exp?: unknown; jti?: unknown;
@@ -130,13 +142,13 @@ export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, 
     // One answer for "no such agent", "not a v2 agent" and "never enrolled". Distinguishing them
     // here would let an unauthenticated caller enumerate which agents exist and which have keys.
     if (!agent || agent.identityVersion !== 2 || !agent.publicKey) {
-      res.status(401).json(error(config.nodeId, 'INVALID_ASSERTION', 'No key is pinned for that agent.'));
+      res.status(401).json(error(config.nodeId, 'INVALID_ASSERTION', 'No key is pinned for that agent.', undefined, KEY_NOT_PINNED));
       return;
     }
 
     const verified = await verifyCardJws(assertion, { x: base64KeyToJwkX(agent.publicKey) });
     if (!verified) {
-      res.status(401).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion is not signed by the key pinned for that agent.'));
+      res.status(401).json(error(config.nodeId, 'INVALID_ASSERTION', 'The assertion is not signed by the key pinned for that agent.', undefined, KEY_NOT_PINNED));
       return;
     }
 
