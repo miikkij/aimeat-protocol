@@ -160,6 +160,7 @@ The source column identifies the implementation or rule to read at the next chan
 | [docs/csm-spec.md](csm-spec.md) | maintained | CSM grammar with ignored constraint spellings called out | `aimeat/src/services/csm-parser.ts` |
 | [docs/csp/csp-management-spec.md](csp/csp-management-spec.md) | historical | Earlier plan, draft or audit; retained as history, not current instructions | `docs/README.md` |
 | [docs/data-processing-agreement-template.md](data-processing-agreement-template.md) | reference | Operator contract template; requires case-specific completion and review | `docs/ai-transparency.md` |
+| [docs/document-signing.md](document-signing.md) | maintained | Operator settings and setup for document signing, signature checks and EU wallet signing; verify against config-schema-docsign.ts when changing it | `aimeat/src/services/config-schema-docsign.ts` |
 | [docs/datakartta-maaritelma.md](datakartta-maaritelma.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
 | [docs/ecosystem-app-automation-howto.md](ecosystem-app-automation-howto.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
 | [docs/examples/agent-commissioner.html](examples/agent-commissioner.html) | reference | Example artifact; adapt and validate before publishing | `docs/portal-developer-guide.md` |
