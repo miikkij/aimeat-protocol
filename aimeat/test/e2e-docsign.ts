@@ -490,6 +490,12 @@ async function main() {
         const fromHash = await post('/v1/docsign/requests', alice.token, { title: 'Pelkkä tiiviste', document: { sha256: createHash('sha256').update(pdf).digest('hex'), name: 'x.pdf', size: pdf.length, media_type: 'application/pdf' }, parties: [ghii(names.alice)] });
         const none = await post(`/v1/docsign/requests/${fromHash.body.data.request.id}/wallet`, alice.token, {});
         assert(none.status === 409 && none.body.error?.code === 'DOCUMENT_NEEDED', `hash only: ${none.status} ${none.body.error?.code}`);
+        // Sent once, the PDF is kept for the request: the next try is not asked for it again.
+        const hashId = fromHash.body.data.request.id;
+        const once = await fetch(`${BASE}/v1/docsign/requests/${hashId}/wallet?name=x.pdf`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: pdf });
+        assert(once.status === 201, `the PDF sent once: ${once.status}`);
+        const again = await post(`/v1/docsign/requests/${hashId}/wallet`, alice.token, {});
+        assert(again.status === 201, `the second try with no file: ${again.status} ${JSON.stringify(again.body.error)}`);
     });
 
     // ── cancelling ──
