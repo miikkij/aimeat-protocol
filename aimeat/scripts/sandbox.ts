@@ -48,6 +48,10 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.4.0 — 2026-10-10 — The connector tunnel is on, so `pnpm sandbox:machines` can stand machines
+ *     up on the sandbox and the home's agent pages have something to show. A second run refreshes
+ *     an owner's token with the password when the stored key is refused: a browser sign-in replaces
+ *     the account's key on the node, and the run after it stopped at "Invalid signature".
  *   v1.3.1 — 2026-10-09 — The test mailbox round starts as the owner's browser does and finishes with
  *     its cookie (secrets audit 2026-10-09, chapter 2).
  *   v1.3.0 — 2026-09-29 — THE APP ORIGIN IS ON, at `apps.localhost`. With it off, an app ran in an
@@ -170,6 +174,9 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         AIMEAT_EXTENSIONS_ENABLED: 'true',
         AIMEAT_METRICS_ENABLED: 'true',
         AIMEAT_TEST_MONEY_HANDLER: 'true',
+        // The connector tunnel, which the agent pages need: a machine exists on a node only through
+        // it. `pnpm sandbox:machines` stands two stand-in machines up on it.
+        AIMEAT_CONNECT_TUNNEL_ENABLED: 'true',
 
         // Ceilings high, so a look at a feature is not a look at a limit.
         AIMEAT_MEMORY_MAX_VALUE_SIZE_KB: '1024',
@@ -304,6 +311,23 @@ async function mintToken(nameOrGaii: string, privateKey: string, isAgent: boolea
     const { body } = await api<{ token: string }>('/v1/auth/token', { method: 'POST', body: payload });
     if (body.ok !== true || !body.data) throw new Error(`token for ${nameOrGaii}: ${JSON.stringify(body.error)}`);
     return body.data.token;
+}
+
+/**
+ * A fresh JWT for an owner the sandbox already has. A browser sign-in from a browser that holds no
+ * owner key replaces the account's key on the node, and the stored key then no longer signs; the
+ * password still does, so a refused key falls back to the password sign-in. That token is a
+ * browser session's and lasts fifteen minutes where the key's lasts a day; `pnpm sandbox` again
+ * gives a new one.
+ */
+async function refreshOwnerToken(o: Account): Promise<string> {
+    try {
+        return await mintToken(o.name, o.privateKey, false);
+    } catch (keyErr) {
+        const { body } = await api<{ token: string }>('/v1/ghii/login', { method: 'POST', body: { username: o.name, password: o.password } });
+        if (body.ok !== true || !body.data) throw keyErr;
+        return body.data.token;
+    }
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -526,7 +550,7 @@ async function up(reset: boolean): Promise<void> {
     if (s && await isUp(s.baseUrl)) {
         BASE = s.baseUrl;
         // The node is up and already seeded; the tokens are the only thing that goes stale.
-        for (const o of s.owners) o.token = await mintToken(o.name, o.privateKey, false);
+        for (const o of s.owners) o.token = await refreshOwnerToken(o);
         if (s.agent) s.agent.token = await mintToken(s.agent.gaii, s.agent.privateKey, true);
         s = await ensureMailbox(s);
         writeState(s);
@@ -548,7 +572,7 @@ async function up(reset: boolean): Promise<void> {
     // keeps its accounts instead of failing on a name that is taken.
     const existing = s?.owners?.length ? s : null;
     if (existing) {
-        for (const o of existing.owners) o.token = await mintToken(o.name, o.privateKey, false);
+        for (const o of existing.owners) o.token = await refreshOwnerToken(o);
         if (existing.agent) existing.agent.token = await mintToken(existing.agent.gaii, existing.agent.privateKey, true);
         const next: SandboxState = await ensureMailbox({ ...existing, pid, baseUrl, port, dbPath });
         writeState(next);
@@ -591,7 +615,7 @@ async function main(): Promise<void> {
         if (!s) { console.log('  no sandbox on record. `pnpm sandbox` makes one.'); return; }
         if (!await isUp(s.baseUrl)) { console.log(`  the sandbox on :${s.port} is down. \`pnpm sandbox\` brings it back.`); return; }
         BASE = s.baseUrl;
-        for (const o of s.owners) o.token = await mintToken(o.name, o.privateKey, false);
+        for (const o of s.owners) o.token = await refreshOwnerToken(o);
         if (s.agent) s.agent.token = await mintToken(s.agent.gaii, s.agent.privateKey, true);
         writeState(s);
         report(s);

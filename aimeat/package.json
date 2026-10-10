@@ -136,6 +136,7 @@
     "ai:catalog:refresh": "tsx scripts/ai-catalog-refresh.ts",
     "gate:full": "tsx scripts/gate.ts --full",
     "sandbox": "tsx scripts/sandbox.ts",
+    "sandbox:machines": "tsx scripts/sandbox-machines.ts",
     "ui:compare": "tsx scripts/ui-compare.ts",
     "cold-agent": "tsx scripts/cold-agent/run.ts",
     "sandbox:stop": "tsx scripts/sandbox.ts --stop",

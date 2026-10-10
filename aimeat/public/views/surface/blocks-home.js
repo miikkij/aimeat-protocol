@@ -13,10 +13,12 @@
  *   WHAT THIS CHANGES IS WHEN THINGS ARE READ. The old home ran eleven requests through one loader
  *   and re-ran all eleven on any SSE event whatsoever. Here a mailbox arriving re-reads the mailbox.
  * @structure NameplateBlock · McpConnectBlock · MatBlock · MailboxBlock · YourTurnBlock · ChatDoorBlock · FleetBlock ·
- *   ThingsBlock · PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock ·
+ *   AgentsBlock · ThingsBlock · PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock ·
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-10: AgentsBlock, the band where a person makes an agent from one sentence and sees the
+ *     ones at work and their machines (views/home/agents-band.js, GET /v1/home/agents).
  *   2026-10-06: OwnAimeatBlock passes `soon` and the discount code, so its slab gives the code when
  *     pressed (site.store_soon_code).
  *   2026-10-06: OwnAimeatBlock's slab says "Opens soon" and leads nowhere while the store does not
@@ -51,6 +53,7 @@ import {
 import { HomeHeader } from '/views/home/header.js';
 import { HomeJourney } from '../home/journey.js';
 import { HomeFeed } from '/views/home/feed.js';
+import { AgentsBand } from '/views/home/agents-band.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
@@ -131,6 +134,20 @@ export function FleetBlock() {
   const { state } = useHomeState();
   if (!state?.agent) return null;
   return html`<${FleetLine} agent=${state.agent} />`;
+}
+
+/**
+ * The agents band: a new agent from one sentence, the proposals that wait, the agents at work and
+ * the machines they run on. One read (GET /v1/home/agents), re-read when an agent, a proposal or a
+ * schedule changes. A finished home only: a person who has not connected an AI yet has the steps.
+ */
+export function AgentsBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx, props = {} }) {
+  const max = Number.isFinite(props.max) ? props.max : 5;
+  const { state } = useHomeState();
+  const { data } = useShared('home-agents', state?.initialized ? `/v1/home/agents?limit=${max}` : '',
+    ['agents', 'open-items', 'scheduler']);
+  if (!state?.initialized || !data) return null;
+  return html`<${AgentsBand} data=${data} navigate=${ctx?.navigate} />`;
 }
 
 /**

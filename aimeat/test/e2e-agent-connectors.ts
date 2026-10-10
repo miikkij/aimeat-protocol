@@ -21,6 +21,9 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-connectors
  * @version-history
+ *   v1.1.0 — 2026-10-10 — The home's read of the same state (GET /v1/home/agents): each worker
+ *     with its machine and whether it waits, one agent by name, and the refusals (an agent, an
+ *     ecosystem app, no credential, another owner).
  *   v1.0.0 — 2026-10-10 — Initial, with the connector registry (services/connector-registry.ts).
  */
 import { WebSocket } from 'ws';
@@ -463,6 +466,56 @@ async function run() {
         assert(heardServer.length === 0, `the connected server is not asked instead, got ${JSON.stringify(heardServer)}`);
         const row = await connectorOf(LAPTOP);
         assert((row.waiting as string[]).includes('late-watcher'), `the laptop lists it as waiting, got ${JSON.stringify(row.waiting)}`);
+    });
+
+    // ── 5b. The home's read of the same state (GET /v1/home/agents) ────────────
+    // Here the laptop is away with laptop-watcher on it and late-watcher waiting for it, and the
+    // server is connected: every state the home's rows tell apart exists at once.
+    const homeAgents = (auth: Record<string, string>, query = '?limit=20') => json('/v1/home/agents' + query, { headers: auth });
+
+    await test('the home reads each worker with its machine and whether it still waits', async () => {
+        const r = await homeAgents(authA);
+        assert(r.status === 200, `home agents ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const workers = r.body.data.workers as any[];
+        const machines = r.body.data.connectors as any[];
+        const late = workers.find(w => w.name === 'late-watcher');
+        assert(!!late && late.has_key === false, `late-watcher is listed without a key, got ${JSON.stringify(late)}`);
+        assert(late.connector?.id === LAPTOP && late.connector?.name === 'Kotikone' && late.connector?.online === false,
+            `and with the machine it waits for, got ${JSON.stringify(late.connector)}`);
+        assert(late.when === 'ask', `a task runner with no schedule works when asked, got ${late.when}`);
+        const settled = workers.find(w => w.name === 'laptop-watcher');
+        assert(!!settled && settled.has_key === true && settled.connector?.id === LAPTOP,
+            `laptop-watcher holds a key on the laptop, got ${JSON.stringify(settled)}`);
+        assert(!workers.some(w => w.name === 'seat-laptop' || w.name === 'plain-reader'),
+            'a chat agent that only holds a connection is not a worker');
+        const laptop = machines.find(c => c.id === LAPTOP);
+        const server = machines.find(c => c.id === SERVER);
+        assert(laptop?.online === false && laptop?.waiting === 1, `the laptop is away with one agent waiting, got ${JSON.stringify(laptop)}`);
+        assert(server?.online === true, `the server is connected, got ${JSON.stringify(server)}`);
+        assert(r.body.data.worker_total >= workers.length, 'the total counts at least the rows shown');
+    });
+
+    await test('the home reads one agent by name, and an unknown name is an empty answer', async () => {
+        const one = await homeAgents(authA, '?agent=late-watcher');
+        assert(one.status === 200, `one agent ${one.status}`);
+        const names = (one.body.data.workers as any[]).map(w => w.name);
+        assert(names.length === 1 && names[0] === 'late-watcher', `exactly that agent, got ${JSON.stringify(names)}`);
+        const none = await homeAgents(authA, '?agent=no-such-agent');
+        assert(none.status === 200 && (none.body.data.workers as any[]).length === 0, 'an unknown name answers with no worker');
+    });
+
+    await test('the home\'s agents are the owner\'s in person, and never another account\'s', async () => {
+        const asAgent = await homeAgents({ Authorization: `Bearer ${seatServer.token}` });
+        assert(asAgent.status === 403, `an agent carrying the owner's name is not the owner: got ${asAgent.status}`);
+        const eco = await mintEcoToken(a.owner, authA, 'home-reader');
+        const asApp = await homeAgents({ Authorization: `Bearer ${eco}` });
+        assert(asApp.status === 403, `expected 403 for an ecosystem app, got ${asApp.status}`);
+        const anonymous = await homeAgents({});
+        assert(anonymous.status === 401 || anonymous.status === 403, `no credential is refused, got ${anonymous.status}`);
+        const other = await homeAgents(authB);
+        assert(other.status === 200, `the other owner reads their own home, got ${other.status}`);
+        assert(!(other.body.data.workers as any[]).some(w => w.name === 'late-watcher'), 'and none of this owner\'s agents');
+        assert(!(other.body.data.connectors as any[]).some(c => c.id === LAPTOP || c.id === SERVER), 'and none of this owner\'s machines');
     });
 
     await test('the other machine reconnecting is offered nothing', async () => {

@@ -28,6 +28,8 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   v1.4.0 — 2026-10-10 — home.agents: a new agent from one sentence, the proposals that wait, the
+ *     agents at work and their machines.
  *   v1.3.0 — 2026-09-15 — home.own-aimeat: a demo site's card pointing at the store, added by the
  *     operator and never part of a built-in home.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
@@ -126,6 +128,26 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         props: {},
         maxPerSurface: 1,
         summary: 'How many of their agents are home and whether any of them is in trouble.',
+    },
+    {
+        // Where a person makes an agent from one sentence and sees the ones at work. It reads
+        // GET /v1/home/agents: proposals that wait for them, workers, and the machines they run on.
+        id: 'home.agents',
+        surfaces: ['home'],
+        presence: { kind: 'always' },
+        localeStem: 'home.agents',
+        liveDomains: ['agents', 'open-items', 'scheduler'],
+        props: {
+            max: {
+                type: 'number',
+                default: 5,
+                min: 1,
+                max: 20,
+                description: 'How many agents at work to name before the rest are counted.',
+            },
+        },
+        maxPerSurface: 1,
+        summary: 'One field that makes a new agent from a sentence, the proposals waiting for them, their agents at work and the machines those run on.',
     },
     {
         id: 'home.things',
