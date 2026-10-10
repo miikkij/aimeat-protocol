@@ -43,6 +43,8 @@
  *   v1.1.0 — 2026-10-10 — x509_san_uri: the EU test registrar's access certificate for aimeat.io
  *     names URI:https://aimeat.io, and the wallet then requires response_uri to equal it, so the
  *     response arrives at that one address and the session is found by its state.
+ *   v1.2.0 — 2026-10-10 — A refused wallet answer is logged, noted on the request
+ *     (walletLastAttempt) and, when a PDF came back, that PDF is kept in the signer's files.
  */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -54,7 +56,7 @@ import { logger } from '../../utils/logger.js';
 import { docsignMaxBytes } from '../../config-docsign.js';
 import { validatePdf } from './validate.js';
 import {
-  DocsignError, walletSigner, recordWalletSignature, documentHash,
+  DocsignError, walletSigner, recordWalletSignature, noteWalletAttempt, documentHash,
   type DocsignCtx, type WalletEvidence,
 } from './records.js';
 
@@ -378,17 +380,38 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   const appBase = ctx.config.docsignAppUrl || ctx.config.baseUrl.replace(/\/+$/, '');
   const redirect_uri = `${appBase}/?request=${encodeURIComponent(s.requestId)}`;
   const finish = (status: SessionStatus, error: WalletSession['error']) => { s.status = status; s.error = error; s.bytes = null; };
+  /**
+   * A refused answer leaves a trace that outlives the session: a log line, the reason on the
+   * request (so the page and an AI can say why nothing was signed), and, when the wallet did
+   * return a PDF, that PDF in the signer's own files so it can be looked at.
+   */
+  const refuse = async (code: string, message: string, returned?: Buffer) => {
+    finish('failed', { code, message });
+    let rejectedKey: string | undefined;
+    if (returned?.length) {
+      const k = `docsign/${s.requestId}/rejected-${documentHash(returned).slice(0, 8)}.pdf`;
+      const kept = await writeStorageFile({ storage: ctx.storage, config: ctx.config }, s.signer, { key: k, data: returned, mimeType: 'application/pdf', visibility: 'private' });
+      if (kept.ok) rejectedKey = k;
+    }
+    logger.warn('docsign: a wallet response was refused', { request: s.requestId, session: s.id.slice(0, 8), code, message, rejectedKey });
+    try {
+      await noteWalletAttempt(ctx, s.requestId, { at: new Date().toISOString(), signer: s.signer, code, message, ...(rejectedKey ? { rejectedKey } : {}) });
+    } catch (err) {
+      logger.warn('docsign: the refused wallet response could not be noted on the request', { request: s.requestId, error: String(err) });
+    }
+  };
 
   if (typeof form.error === 'string' && form.error) {
     const code = form.error.slice(0, 60);
-    finish('failed', { code, message: code === 'user_cancelled' ? 'The person cancelled in the wallet.' : `The wallet answered ${code}${typeof form.error_description === 'string' ? `: ${form.error_description.slice(0, 300)}` : ''}.` });
+    await refuse(code, code === 'user_cancelled' ? 'The person cancelled in the wallet.' : `The wallet answered ${code}${typeof form.error_description === 'string' ? `: ${form.error_description.slice(0, 300)}` : ''}.`);
     return { redirect_uri };
   }
   const original = s.bytes;
   if (!original) throw new DocsignError('NOT_OPEN', 409, 'This wallet session has expired.');
   const docs = parseDocumentWithSignature(form);
   if (docs.length !== 1) {
-    finish('failed', { code: 'NO_SIGNED_DOCUMENT', message: `The wallet returned ${docs.length} documents; one signed PDF was expected.` });
+    const fields = Object.entries(form).map(([k, v]) => `${k}(${typeof v === 'string' ? v.length : Array.isArray(v) ? `${v.length} values` : typeof v})`).join(', ');
+    await refuse('NO_SIGNED_DOCUMENT', `The wallet returned ${docs.length} documents; one signed PDF was expected. Form fields: ${fields.slice(0, 400) || 'none'}.`);
     throw new DocsignError('INVALID_INPUT', 400, 'documentWithSignature must hold the one signed PDF.');
   }
   const signed = fromBase64(docs[0]!);
@@ -396,14 +419,18 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   // The wallet appends its signature to the PDF it was given, so the given bytes come first,
   // unchanged. That is what proves the signed file is this request's document.
   if (signed.length <= original.length || !signed.subarray(0, original.length).equals(original)) {
-    finish('failed', { code: 'DOCUMENT_CHANGED', message: 'The PDF the wallet returned does not start with the PDF it was given, so it cannot be shown to be the same document.' });
+    let at = 0;
+    while (at < original.length && at < signed.length && original[at] === signed[at]) at++;
+    await refuse('DOCUMENT_CHANGED', `The PDF the wallet returned does not start with the PDF it was given, so it cannot be shown to be the same document (sent ${original.length} bytes, returned ${signed.length}, first difference at byte ${at}).`, signed);
     throw new DocsignError('DOCUMENT_CHANGED', 422, 'The returned PDF is not an incremental update of the document that was sent.');
   }
   const report = await validatePdf(ctx.config, signed);
   const newest = report.signatures.filter((x) => x.kind === 'signature').sort((a, b) => b.index - a.index)[0];
   if (!newest || !newest.integrity.contentIntact || !newest.integrity.signatureValid || newest.verdict === 'invalid' || newest.coverage?.wholeFile === false) {
-    const why = newest ? `${newest.verdict}: ${newest.summary}` : 'no signature in the returned PDF';
-    finish('failed', { code: 'SIGNATURE_NOT_VALID', message: `The wallet's signature did not check out (${why}).` });
+    const why = newest
+      ? `${newest.verdict}: ${newest.summary} [reasons ${newest.reasons.join(',') || 'none'}; content intact ${newest.integrity.contentIntact}; signature valid ${newest.integrity.signatureValid}; algorithm ${newest.integrity.algorithm}; whole file ${newest.coverage?.wholeFile}]`
+      : `no signature in the returned PDF (${report.signatures.length} fields)`;
+    await refuse('SIGNATURE_NOT_VALID', `The wallet's signature did not check out (${why}).`, signed);
     throw new DocsignError('SIGNATURE_NOT_VALID', 422, `The returned signature did not check out: ${why}`);
   }
 
@@ -412,7 +439,7 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   const key = `docsign/${s.requestId}/${base}-signed-${signedSha.slice(0, 8)}.pdf`;
   const stored = await writeStorageFile({ storage: ctx.storage, config: ctx.config }, s.signer, { key, data: signed, mimeType: 'application/pdf', visibility: 'private' });
   if (!stored.ok) {
-    finish('failed', { code: stored.code, message: `The signed PDF could not be stored in your files: ${stored.message}` });
+    await refuse(stored.code, `The signed PDF could not be stored in your files: ${stored.message}`);
     throw new DocsignError(stored.code, stored.status, stored.message);
   }
   const ghii = await ctx.storage.getGHII(s.signer);
@@ -433,9 +460,10 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   try {
     await recordWalletSignature(ctx, s.requestId, s.signer, s.sha256, wallet, `${base}-signed.pdf`);
   } catch (err) {
-    finish('failed', { code: err instanceof DocsignError ? err.code : 'DOCSIGN_ERROR', message: err instanceof Error ? err.message : String(err) });
+    await refuse(err instanceof DocsignError ? err.code : 'DOCSIGN_ERROR', err instanceof Error ? err.message : String(err));
     throw err;
   }
   finish('signed', null);
+  logger.info('docsign: a wallet signature was recorded', { request: s.requestId, session: s.id.slice(0, 8), verdict: newest.verdict, trust: newest.trust.source });
   return { redirect_uri };
 }

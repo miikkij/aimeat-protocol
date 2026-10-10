@@ -398,6 +398,11 @@ async function main() {
         assert(r.status === 422, `forged: ${r.status}`);
         const st = await json(`/v1/docsign/requests/${walletRequestId}/wallet/${s.session_id}`, { headers: auth(alice.token) });
         assert(st.body.data.status === 'failed' && st.body.data.error.code === 'DOCUMENT_CHANGED', `status: ${JSON.stringify(st.body.data)}`);
+        // The reason outlives the session: it is on the request, with the PDF the wallet returned kept in the signer's files.
+        const noted = (await json(`/v1/docsign/requests/${walletRequestId}`, { headers: auth(alice.token) })).body.data.request.walletLastAttempt;
+        assert(noted?.code === 'DOCUMENT_CHANGED' && /first difference at byte \d+/.test(noted.message) && /rejected-[0-9a-f]{8}\.pdf$/.test(noted.rejectedKey ?? ''), `noted: ${JSON.stringify(noted)}`);
+        const kept = await fetch(`${BASE}/v1/storage/${noted.rejectedKey}`, { headers: auth(alice.token) });
+        assert(kept.status === 200 && Buffer.from(await kept.arrayBuffer()).equals(forged), `the returned PDF is kept: ${kept.status}`);
     });
 
     let signedPdf = Buffer.alloc(0);

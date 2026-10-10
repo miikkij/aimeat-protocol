@@ -38,6 +38,8 @@
  *   v1.2.0 — 2026-10-10 — A request made from a stored file remembers where it is
  *     (document.source), so a wallet signature starts without the file being sent again
  *     (nextPdfToSign); requestFile is the one read of a party's file for another party.
+ *   v1.3.0 — 2026-10-10 — walletLastAttempt: why the last wallet answer was refused, kept on the
+ *     request (noteWalletAttempt), because a session's own error is gone with the session.
  */
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
@@ -122,6 +124,12 @@ export interface DocSignRecord {
    * every wallet signature lands in one file. Absent until the first wallet signature.
    */
   walletDocument?: { sha256: string; size: number; owner: string; key: string; name: string };
+  /**
+   * The last wallet answer this node refused, so the page and an AI can say why nothing was
+   * signed. `rejectedKey` is the PDF the wallet returned, kept in the signer's files. Cleared by
+   * the next wallet signature.
+   */
+  walletLastAttempt?: { at: string; signer: string; code: string; message: string; rejectedKey?: string };
 }
 
 export class DocsignError extends Error {
@@ -459,8 +467,18 @@ export async function recordWalletSignature(
     const ghii = await ctx.storage.getGHII(signer);
     const assurance: Assurance = { verificationLevel: ghii?.verificationLevel ?? 0, userVerified: true, principalKind: 'person' };
     rec.walletDocument = { sha256: wallet.signed.sha256, size: wallet.signed.size, owner: wallet.signed.owner, key: wallet.signed.key, name };
+    delete rec.walletLastAttempt;
     await addToIndex(ctx.storage, hashKey(wallet.signed.sha256), rec.id);
     return sealInto(ctx, rec, signer, 'eudi-wallet', { wallet }, assurance);
+  });
+}
+
+/** Note on the request why a wallet's answer was refused (services/docsign/eudi.ts). */
+export async function noteWalletAttempt(ctx: DocsignCtx, id: string, attempt: NonNullable<DocSignRecord['walletLastAttempt']>): Promise<void> {
+  await withLock(id, async () => {
+    const rec = await load(ctx, id);
+    rec.walletLastAttempt = attempt;
+    await writeJson(ctx.storage, reqKey(id), rec, ['docsign']);
   });
 }
 
