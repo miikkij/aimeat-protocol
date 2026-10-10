@@ -17,10 +17,13 @@
  *   - GET  /v1/docsign/wallet/:session/request               wallet: the signed request object
  *   - GET  /v1/docsign/wallet/:session/document/:token       wallet: the PDF to sign
  *   - POST /v1/docsign/wallet/:session/response              wallet: the signed PDF, or an error
+ *   - POST /v1/docsign/wallet/response                       the same, the session found by state
+ *   - POST /                                                 the same, for a certificate naming the bare origin
  * @usage router.use(docsignWalletRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
  *   v1.0.1 — 2026-10-10 — The raw PDF is taken with rawBodyBytes (code scanning alerts 1721-1725).
+ *   v1.1.0 — 2026-10-10 — The fixed response addresses for an x509_san_uri access certificate.
  */
 import { Router, raw, urlencoded, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -34,6 +37,7 @@ import { DocsignError, signedDocument } from '../services/docsign/records.js';
 import { readOwnFile } from '../services/docsign/files.js';
 import {
   walletStatus, startWalletSignature, walletSessionStatus, walletRequestObject, walletDocument, receiveWalletResponse,
+  receiveWalletResponseByState,
 } from '../services/docsign/eudi.js';
 import { docsignMaxBytes } from '../config-docsign.js';
 import { rawBodyBytes } from '../utils/raw-body.js';
@@ -134,6 +138,31 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
       const out = await receiveWalletResponse(ctx, req.params.session as string, (req.body ?? {}) as Record<string, unknown>);
       res.json(out);
     } catch (err) { fail(res, err); }
+  });
+
+  // An access certificate that names an address (x509_san_uri) makes the wallet answer at exactly
+  // that address, so the session comes from the form's state. /v1/docsign/wallet/response is for a
+  // certificate naming that path; "/" is for one naming the bare origin (https://aimeat.io), which is
+  // what the EU test registrar issued. "/" takes only a form whose state belongs to an open session;
+  // everything else passes on as if this route were not here.
+  const isForm = (req: Request) => /application\/x-www-form-urlencoded/i.test(req.headers['content-type'] || '');
+  router.post('/v1/docsign/wallet/response', enabled, walletLimit, walletForm, async (req, res) => {
+    try {
+      const out = await receiveWalletResponseByState(ctx, (req.body ?? {}) as Record<string, unknown>);
+      if (!out) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No open wallet session has that state.')); return; }
+      res.json(out);
+    } catch (err) { fail(res, err); }
+  });
+  router.post('/', (req, res, next) => {
+    if (!config.docsignEnabled || !config.docsignEudiEnabled || !isForm(req)) { next(); return; }
+    walletLimit(req, res, () => walletForm(req, res, async (err?: unknown) => {
+      if (err) { next(err); return; }
+      try {
+        const out = await receiveWalletResponseByState(ctx, (req.body ?? {}) as Record<string, unknown>);
+        if (!out) { next(); return; }
+        res.json(out);
+      } catch (e) { fail(res, e); }
+    }));
   });
 
   return router;
