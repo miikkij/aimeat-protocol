@@ -17,8 +17,10 @@
  *     - home/first-agent.ts — POST /v1/home/first-agent
  *     - home/feed.ts        — GET /v1/home/feed, POST /v1/home/room
  *     - home/track.ts       — GET + PUT /v1/home/ui-track (the start page)
+ *     - home/agents.ts      — GET /v1/home/agents (the Agents block's read)
  * @usage app.use(homeRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-10-10 — GET /v1/home/agents.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
  */
 import { Router } from 'express';
@@ -29,6 +31,7 @@ import { registerHomeStateRoutes } from './home/state.js';
 import { registerFirstAgentRoutes } from './home/first-agent.js';
 import { registerHomeFeedRoutes } from './home/feed.js';
 import { registerHomeTrackRoutes } from './home/track.js';
+import { registerHomeAgentsRoutes } from './home/agents.js';
 
 export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -39,6 +42,7 @@ export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     registerFirstAgentRoutes(router, ctx);
     registerHomeFeedRoutes(router, ctx);
     registerHomeTrackRoutes(router, ctx);
+    registerHomeAgentsRoutes(router, ctx);
 
     return router;
 }

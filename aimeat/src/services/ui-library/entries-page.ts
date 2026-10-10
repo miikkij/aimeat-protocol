@@ -214,9 +214,9 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         id: 'named-row', name: 'NamedRow', kind: 'component', status: 'active',
         summary: 'A row with its category word in a fixed left column and its content on the right, under a 3px ink rule.',
         module: '/components/NamedRow.js', sheet: '/css/components/named-row.css',
-        data: { shape: 'NamedRow({ label, title, children })', fields: { label: 'the category word', title: 'the full category on hover', children: 'the row content' } },
+        data: { shape: 'NamedRow({ label, title, stack, children })', fields: { label: 'the category word', title: 'the full category on hover', stack: 'the content one part under another at the row\'s full width', children: 'the row content' } },
         useFor: ['A band that lists several kinds of thing, one kind per row.'],
-        variants: [],
+        variants: [{ name: 'stack', class: 'poster-named-row-body--stack', prop: 'stack', when: 'the row holds a form field, or a list with a way on under it' }],
         example: { label: 'Apps', children: 'ThingLink × n' },
     },
     {

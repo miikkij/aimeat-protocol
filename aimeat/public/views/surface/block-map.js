@@ -39,6 +39,7 @@ export const BLOCKS = {
   'home.your-turn': () => import('/views/surface/blocks-home.js').then(m => m.YourTurnBlock),
   'home.chat-door': () => import('/views/surface/blocks-home.js').then(m => m.ChatDoorBlock),
   'home.fleet': () => import('/views/surface/blocks-home.js').then(m => m.FleetBlock),
+  'home.agents': () => import('/views/surface/blocks-home.js').then(m => m.AgentsBlock),
   'home.things': () => import('/views/surface/blocks-home.js').then(m => m.ThingsBlock),
   'home.playbooks': () => import('/views/surface/blocks-home.js').then(m => m.PlaybooksBlock),
   'home.achievements': () => import('/views/surface/blocks-home.js').then(m => m.AchievementsBlock),

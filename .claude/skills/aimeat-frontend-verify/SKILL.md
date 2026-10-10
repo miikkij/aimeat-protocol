@@ -15,6 +15,8 @@ Against your own sandbox node (`pnpm sandbox`, port 40600 upward, owners and pas
 
 **An app that reads mail or asks a model is checked on the sandbox's stand-ins.** The first owner is connected to a test mailbox (18 sample messages, a PDF invoice with a text layer and a scanned one; the connection id is `mailbox` in `.sandbox.json`), and the node's decision model and completion model are local stand-ins that answer each sample with the class and fields a person would give it. A batch, a classification or an extraction therefore runs in the sandbox with no paid key, and its result is known before you look.
 
+**A page about agents and the machines that run them is checked with `pnpm sandbox:machines`.** It leaves two stand-in machines on the sandbox while it runs (one connected, one away), agents on them that work by the clock, when asked and when written to, one agent that waits for the absent machine and one proposal that waits for the owner, and it puts the first owner on the finished home. The completion stand-in also answers the home's "new agent" sentence with a draft. Sign in with the password: a browser sign-in replaces the owner's key on the node, and `pnpm sandbox` then refreshes that owner's token with the password, for fifteen minutes at a time.
+
 **An app built from an approved drawing is compared with it before Jouni sees it: `pnpm ui:compare`.** Publish the approved genre (or the page he approved) to the sandbox beside the app, then, from `aimeat/`:
 
 ```bash

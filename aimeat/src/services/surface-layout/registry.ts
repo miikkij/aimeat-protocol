@@ -28,6 +28,7 @@
  *   import { blocksForSurface, defaultLayout } from './registry.js';
  *   const offered = blocksForSurface('home', config);
  * @version-history
+ *   v1.4.0 — 2026-10-10 — The default home has home.agents under the fleet line.
  *   v1.3.0 — 2026-09-14 — The built-in portal is the message frame's page (TARGET-075): seven
  *     portal.frame-* blocks and a new default order; the showroom blocks stay in the catalogue.
  *   2026-09-09: Home journey starts with a connected AI; useful prompts and account settings are within reach.
@@ -200,6 +201,9 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         // The two status lines first and the door after them: on the poster home the door is the
         // coral band, and a band reads as the close of the "now" group, not as a line inside it.
         b('home.fleet'),
+        // The agents band under the fleet line: the line says how the agents are, the band is where
+        // a person makes one and sees which are at work and on which machine.
+        b('home.agents'),
         b('home.things'),
         // The playbooks and the achievements strip share one titled band, exactly as they do today.
         // This is why the schema has a nesting level at all: a flat list cannot say "these two go

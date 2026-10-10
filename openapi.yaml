@@ -14181,6 +14181,117 @@ paths:
                             nullable: true
                             description: The short variant, offered after a failed paste. Null when already short.
 
+  /v1/home/agents:
+    get:
+      operationId: getHomeAgents
+      summary: What the home says about the account's agents
+      description: |
+        One read for the home's Agents block: the agent proposals that wait for the owner, the
+        agents that do work, and the owner's machines.
+
+        A worker is an agent a connector runs: a key-and-card agent, or one with a run mode. A chat
+        AI the person connected is left out, and so is the node's own chat agent. `workers` holds
+        the most recently active ones, with an agent that still waits for a machine first, and
+        `worker_total` says how many there are in all.
+
+        `when` says when a worker works, in one word, decided in this order: `always` when its run
+        mode is resident, `clock` when an enabled schedule of kind agent_task names it (`schedule`
+        carries its cron and the zone the cron's hour belongs to), `talk` when its crew definition
+        listens for messages or DMs, else `ask`. `connector` is the machine the agent lives on, or
+        the one it waits for; `has_key` is false while it waits.
+
+        Requires the account holder's own session. An AI reads the same facts with
+        `GET /v1/agents` and `GET /v1/agents/v2/connectors`.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: How many workers to list. 5 when omitted, 20 at most.
+          schema: { type: integer, minimum: 1, maximum: 20 }
+        - name: agent
+          in: query
+          description: One agent's bare name. `workers` then holds that agent alone, or nothing when the account has no such worker.
+          schema: { type: string }
+      responses:
+        '200':
+          description: Proposals, workers and machines
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          proposals:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string }
+                                display_name: { type: string }
+                                purpose: { type: string }
+                                proposed_by: { type: string }
+                                by_person: { type: boolean, description: True when the owner drafted it in their own session }
+                                connector:
+                                  type: object
+                                  nullable: true
+                                  properties:
+                                    id: { type: string }
+                                    name: { type: string, nullable: true }
+                          workers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                display_name: { type: string }
+                                description: { type: string }
+                                when: { type: string, enum: [ask, clock, talk, always] }
+                                schedule:
+                                  type: object
+                                  nullable: true
+                                  properties:
+                                    id: { type: string }
+                                    cron: { type: string }
+                                    timezone: { type: string }
+                                    next_run_at: { type: string, format: date-time, nullable: true }
+                                connector:
+                                  type: object
+                                  nullable: true
+                                  properties:
+                                    id: { type: string }
+                                    name: { type: string, nullable: true }
+                                    online: { type: boolean }
+                                has_key: { type: boolean }
+                                queued: { type: integer }
+                                active: { type: integer }
+                                last_at: { type: string, format: date-time, nullable: true }
+                                last_failed_at: { type: string, format: date-time, nullable: true }
+                          worker_total: { type: integer }
+                          connectors:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                name: { type: string, nullable: true }
+                                online: { type: boolean }
+                                last_seen: { type: string, format: date-time }
+                                run_modes:
+                                  type: array
+                                  nullable: true
+                                  items: { type: string }
+                                agents: { type: integer, description: How many agents live on it }
+                                waiting: { type: integer, description: How many agents wait for it }
+        '403': { description: Not the account holder in person }
+
   /v1/home/state:
     get:
       operationId: getHomeState

@@ -16,6 +16,8 @@
  * @structure startFakeMailServer(port) · decideAnswer · chatAnswer · the CLI entry (`tsx scripts/lib/fake-mail-server.ts <port>`)
  * @usage node --import tsx scripts/lib/fake-mail-server.ts 40703
  * @version-history
+ *   v1.2.0 — 2026-10-10 — The completion stand-in also answers the home's agent-draft prompt, so
+ *     "say one sentence, see the agent" runs in the sandbox with no paid key.
  *   v1.1.0 — 2026-09-29 — The decision and completion stand-ins, recording what each received; a
  *     token from before a restart still reads; port 0 binds any free port and the answer names it
  *     (test/e2e-refinery.ts runs it in process).
@@ -92,12 +94,46 @@ function promptText(body: Record<string, unknown>): string {
     : Array.isArray(m.content) ? (m.content as Array<{ text?: string }>).map((p) => p.text ?? '').join('\n') : '')).join('\n');
 }
 
+/** The opening words of the home's agent-draft prompt (public/js/services/agent-draft.js draftPrompt). */
+const AGENT_DRAFT_MARK = 'You design one agent for a person';
+
+/**
+ * An agent draft from the person's sentence, in the shape the home's "new agent" page asks a model
+ * for. No understanding: the name is the sentence's first words, the purpose is the sentence, and
+ * a sentence that names a rhythm gets a weekday-morning clock. It lets the page be looked at with
+ * no paid key.
+ */
+function agentDraft(body: Record<string, unknown>): string {
+  const msgs = Array.isArray(body.messages) ? body.messages as Array<{ role?: string; content?: unknown }> : [];
+  const said = [...msgs].reverse().find((m) => m.role === 'user');
+  const sentence = (typeof said?.content === 'string' ? said.content : '').trim() || 'Do the work I give you.';
+  const words = sentence.split(/\s+/).slice(0, 3);
+  const slug = words.join('-').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9-]/g, '').replace(/^[^a-z]+/, '').replace(/-+$/, '');
+  const name = slug.length >= 3 ? slug.slice(0, 40).replace(/-+$/, '') : 'sandbox-agent';
+  const clock = /\b(every|each|daily|hourly|weekly|joka|aamu|päivittäin|viikoittain|cada|diario)/i.test(sentence);
+  return JSON.stringify({
+    name,
+    display_name: words.join(' '),
+    purpose: sentence,
+    does: ['Reads the work it is given.', 'Does what the sentence above says.', 'Writes the result where you can read it.'],
+    when: clock ? { kind: 'clock', cron: '0 7 * * 1-5' } : { kind: 'ask' },
+    reach: 'standard',
+    crew_def: {
+      agent_name: name, process: 'sequential', listen_for: ['tasks'],
+      agents: [{ name: 'worker', role: 'Worker', goal: sentence, backstory: 'A stand-in written by the sandbox model.', tools: [], allow_delegation: false }],
+      tasks: [{ id: 'work', description: `${sentence}\n\n{{ctx.prompt}}`, expected_output: 'The finished result in plain text.', agent: 'worker', context: [] }],
+    },
+  });
+}
+
 /** The completion model's stand-in (OpenAI chat shape): an extraction answers with the sample's known fields. */
 function chatAnswer(body: Record<string, unknown>): Record<string, unknown> {
-  const sample = sampleOfPrompt(promptText(body));
+  const text = promptText(body);
+  const sample = sampleOfPrompt(text);
   const content = sample
     ? JSON.stringify({ ...(sample.fields ?? {}), _confidence: sample.sure ?? 0.9, _note: '' })
-    : 'The sandbox model answers extraction prompts about the sample mailbox only.';
+    : text.includes(AGENT_DRAFT_MARK) ? agentDraft(body)
+      : 'The sandbox model answers extraction prompts about the sample mailbox and agent drafts only.';
   return {
     id: 'chatcmpl-sandbox', object: 'chat.completion', model: body.model ?? 'sandbox-model',
     choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],

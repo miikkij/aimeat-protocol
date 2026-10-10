@@ -70,6 +70,9 @@ logs/**
 # source. The database itself is already covered by *.db above.
 aimeat/.sandbox.json
 aimeat/.sandbox.log
+# `pnpm sandbox:machines` — the stand-in machine's own key and its output, the same kind of file.
+aimeat/.sandbox-machines.json
+aimeat/.sandbox-machines.log
 # `pnpm ui:compare` — screenshots and the report of one comparison, evidence for a session.
 aimeat/.ui-compare/
 

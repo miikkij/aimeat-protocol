@@ -8,6 +8,9 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-10-10 — .poster-named-row-body--stack (NamedRow `stack`): the content one part
+ *     under another at the row's full width, for a row that holds a form field or a list with a
+ *     way on under it (the home's agents band); additive.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
 
@@ -16,6 +19,8 @@
 .poster-named-row-body { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; flex: 1 1 auto; min-width: 0; align-items: baseline; }
 .poster-named-row { display: flex; align-items: flex-start; gap: 0.6rem 1rem; padding-top: 0.9rem; }
 .poster-named-row-label { flex: 0 0 11rem; padding-top: 0.35rem; }
+/* Stack: each part on its own line at the row's width (a field, a list with a way on under it). */
+.poster-named-row-body--stack { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
 @media (max-width: 640px) {
   .poster-named-row { flex-direction: column; gap: 0.35rem; }
   .poster-named-row-label { flex: none; padding-top: 0; }
