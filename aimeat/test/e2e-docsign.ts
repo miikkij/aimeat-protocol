@@ -32,6 +32,7 @@
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Signing with an EU Digital Identity Wallet, the suite playing the wallet
  *     (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.2.0 — 2026-10-10 — A wallet answering at the node's own address, the session found by state.
  */
 import * as ed from '@noble/ed25519';
 import { createHash, X509Certificate } from 'node:crypto';
@@ -438,6 +439,26 @@ async function main() {
         assert(status.status === 'signed', `status tool: ${JSON.stringify(status)}`);
         const got = await json(`/v1/docsign/requests/${walletRequestId}`, { headers: auth(alice.token) });
         assert(got.body.data.request.state === 'complete' && got.body.data.request.walletDocument.sha256 === createHash('sha256').update(twice).digest('hex'), `complete: ${got.body.data.request.state}`);
+    });
+
+    await test('a wallet answering at the node\'s own address (an x509_san_uri certificate) is matched by its state', async () => {
+        const pdf = plainPdf(`Valtakirja ${stamp}`);
+        const psha = createHash('sha256').update(pdf).digest('hex');
+        const r = await post('/v1/docsign/requests', alice.token, { title: 'Valtakirja', document: { sha256: psha, name: 'valtakirja.pdf', size: pdf.length, media_type: 'application/pdf' }, parties: [ghii(names.alice)] });
+        const id = r.body.data.request.id;
+        const started = await fetch(`${BASE}/v1/docsign/requests/${id}/wallet`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: pdf });
+        const s = (await started.json() as any).data;
+        const { claims, pdf: got } = await walletOpens(s.wallet_link);
+        const signed = appendSignature(got, walletSigner.cert, walletSigner.key, walletSigner.chain);
+        const form = (state: string) => new URLSearchParams({ state, documentWithSignature: JSON.stringify([signed.toString('base64')]) }).toString();
+        const stranger = await fetch(`${BASE}/`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form('no-such-state') });
+        assert(stranger.status === 404, `a state no session has passes through to the 404: ${stranger.status}`);
+        const fixed = await fetch(`${BASE}/v1/docsign/wallet/response`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form('no-such-state') });
+        assert(fixed.status === 404, `the fixed path refuses an unknown state: ${fixed.status}`);
+        const ok = await fetch(`${BASE}/`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form(claims.state) });
+        assert(ok.status === 200 && String((await ok.json() as any).redirect_uri).includes(id), `POST / with the session's state: ${ok.status}`);
+        const done = await json(`/v1/docsign/requests/${id}`, { headers: auth(alice.token) });
+        assert(done.body.data.request.state === 'complete' && done.body.data.request.signatures[ghii(names.alice)].statement.method === 'eudi-wallet', `complete: ${done.body.data.request.state}`);
     });
 
     // ── cancelling ──

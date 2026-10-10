@@ -7606,6 +7606,32 @@ paths:
 
   # ── Bootstrap ──────────────────────────────────────────────
   /:
+    post:
+      operationId: postDocsignWalletResponseAtOrigin
+      summary: A wallet's signed PDF at the node's own address (public, only with wallet signing on)
+      description: Taken only when wallet signing is on, the body is a form, and its state belongs to an open wallet session; then it is the same as POST /v1/docsign/wallet/response. Anything else answers as before (404). Exists because an access certificate naming the bare origin (URI:https://aimeat.io) makes the wallet answer exactly there.
+      tags: [Document signing]
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                state: { type: string }
+                documentWithSignature: { type: string }
+                error: { type: string }
+      responses:
+        '200':
+          description: Accepted; the wallet opens redirect_uri.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_uri: { type: string }
+        '404':
+          $ref: '#/components/responses/AimeatError'
     get:
       operationId: bootstrap
       summary: Bootstrap endpoint
@@ -25869,6 +25895,36 @@ paths:
                 properties:
                   redirect_uri: { type: string }
         '400':
+          $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/docsign/wallet/response:
+    post:
+      operationId: postDocsignWalletResponseByState
+      summary: A wallet's signed PDF at a fixed address, the session found by state (public)
+      description: For an access certificate naming an address (client_id_scheme x509_san_uri), the wallet must answer at exactly that address, so the form's state names the session. The same form and checks as /v1/docsign/wallet/{session}/response. POST / takes the same form for a certificate naming the bare origin, and passes anything else on.
+      tags: [Document signing]
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                state: { type: string }
+                documentWithSignature: { type: string }
+                error: { type: string }
+      responses:
+        '200':
+          description: Accepted; the wallet opens redirect_uri.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirect_uri: { type: string }
+        '404':
           $ref: '#/components/responses/AimeatError'
         '422':
           $ref: '#/components/responses/AimeatError'

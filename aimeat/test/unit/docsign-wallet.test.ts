@@ -6,10 +6,11 @@
  *   is e2e-docsign.ts.
  * @version-history
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.1.0 — 2026-10-10 — walletClient: DNS and URI access certificates.
  */
 import { describe, it, expect } from 'vitest';
 import { X509Certificate, createHash } from 'node:crypto';
-import { parseDocumentWithSignature } from '../../src/services/docsign/eudi.js';
+import { parseDocumentWithSignature, walletClient } from '../../src/services/docsign/eudi.js';
 import { isEudiTestRoot } from '../../src/services/docsign/chain.js';
 import { EUDI_TEST_ROOTS_B64 } from '../../src/data/eudi-test-roots.js';
 
@@ -26,6 +27,21 @@ describe('the signed PDF in a wallet response form', () => {
     expect(parseDocumentWithSignature({ state: 'x' })).toEqual([]);
     expect(parseDocumentWithSignature({ documentWithSignature: '' })).toEqual([]);
     expect(parseDocumentWithSignature({ documentWithSignature: '[QUJD' })).toEqual(['[QUJD']);
+  });
+});
+
+describe('how the node names itself to a wallet', () => {
+  it('a certificate naming the host gives x509_san_dns and a response address per session', () => {
+    expect(walletClient('https://aimeat.io', ['aimeat.io'], [])).toEqual({ scheme: 'x509_san_dns', clientId: 'aimeat.io', fixedResponseUri: null });
+  });
+
+  it('a certificate naming an address (what the EU test registrar issues) gives x509_san_uri, answered at exactly that address', () => {
+    expect(walletClient('https://aimeat.io', [], ['https://aimeat.io'])).toEqual({ scheme: 'x509_san_uri', clientId: 'https://aimeat.io', fixedResponseUri: 'https://aimeat.io' });
+  });
+
+  it('a certificate for another host is not ready, and says what it names', () => {
+    const r = walletClient('https://aimeat.io', ['example.org'], ['https://other.example']);
+    expect('reason' in r && r.reason).toContain('example.org');
   });
 });
 
