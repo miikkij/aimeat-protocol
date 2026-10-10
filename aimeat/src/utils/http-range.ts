@@ -46,6 +46,11 @@
  *   }, { headOnly: req.method === 'HEAD', conditionals: req.headers });
  *   if (!served) { …404… }                                         // it vanished mid-request
  * @version-history
+ *   v1.3.0 -- 2026-10-10 -- serveStoredFile() sends a body longer than STORED_FILE_SLICE_BYTES a slice
+ *     at a time, for a range and for a full download, and stops reading when the client is gone. An
+ *     open-ended range (`bytes=0-`, a video element's first request) was one read of the rest of the
+ *     file: the whole file in memory per request, and from 256 MB up on Postgres the end of the
+ *     process.
  *   v1.2.0 -- 2026-09-13 -- Revalidation. Every stored-file response carries a strong ETag built from
  *     the write time and size (storedFileVersion), If-None-Match and If-Modified-Since are answered
  *     304 before anything is read, and If-Range that no longer names the file sends the whole file.
@@ -60,6 +65,7 @@
 import type { Response } from 'express';
 import { setStoredFileHeaders } from './file-download-headers.js';
 import { needsUtf8Verdict } from './app-content-type.js';
+import { logger } from './logger.js';
 
 /** What a `Range` header means for one representation of a known size. */
 export type RangeVerdict =
@@ -267,6 +273,62 @@ export interface StoredFileReader {
 }
 
 /**
+ * The most of a stored file one response holds in memory at a time.
+ *
+ * A body longer than this is read and written a slice at a time, each slice waiting for the socket
+ * to take the one before it. Two requests made that necessary, and both are ordinary:
+ * `Range: bytes=0-`, the first thing a `<video>` element asks, which is open-ended and so names the
+ * rest of the file; and a plain download. Each was ONE read of everything asked for. On a 160 MB
+ * file that was 4.4 s before the first byte and the whole file in memory per request; at 256 MB and
+ * over, on Postgres, it ended the process (storage/providers/postgres-kysely/methods/files.ts,
+ * BYTEA_SLICE_BYTES). Measured 2026-10-10.
+ *
+ * 4 MB is a few seconds of video at any bitrate a browser plays, so a seek that abandons the
+ * response has cost one read, and it is one round trip to the database per 4 MB of a download.
+ */
+export const STORED_FILE_SLICE_BYTES = 4 * 1024 * 1024;
+
+/** Resolves when the socket has taken what was written, or has gone away. */
+function drained(res: Response): Promise<void> {
+    return new Promise((resolve) => {
+        const done = (): void => { res.off('drain', done); res.off('close', done); resolve(); };
+        res.once('drain', done);
+        res.once('close', done);
+    });
+}
+
+/**
+ * Send `length` bytes of a stored file starting at `start`, a slice at a time. The status and the
+ * headers are already set, and `first` is the slice that was read before they were.
+ *
+ * It stops reading the moment the client is gone: a video element abandons a response on every
+ * seek, and reading the rest of a film for nobody is the cost this function exists to remove.
+ * When the file disappears or a read fails mid-way, the connection is destroyed. The headers have
+ * promised `length` bytes, so ending the response normally would hand the client a short body
+ * presented as complete.
+ */
+async function sendSlices(res: Response, read: StoredFileReader, start: number, length: number, first: Buffer): Promise<void> {
+    let sent = 0;
+    let chunk: Buffer | null = first;
+    try {
+        while (chunk && chunk.length > 0) {
+            if (res.destroyed || res.writableEnded) return;
+            const piece: Buffer = chunk.length > length - sent ? chunk.subarray(0, length - sent) : chunk;
+            const taken = res.write(piece);
+            sent += piece.length;
+            if (sent >= length) { res.end(); return; }
+            if (!taken) await drained(res);
+            if (res.destroyed || res.writableEnded) return;
+            chunk = await read.range(start + sent, Math.min(STORED_FILE_SLICE_BYTES, length - sent));
+        }
+    } catch (err) {
+        // The transfer cannot be completed, and the client must see that: fall through to destroy.
+        logger.warn('serveStoredFile: a read failed after the response had started', { sent, length, error: String(err) });
+    }
+    res.destroy();
+}
+
+/**
  * Serve one stored file, honouring `Range`, from METADATA plus a reader.
  *
  * WHY THE READER IS A CALLBACK AND NOT A BUFFER. Every door here used to load the entire file and
@@ -364,13 +426,39 @@ export async function serveStoredFile(
     }
     if (verdict.kind === 'unsatisfiable') { rangeNotSatisfiable(res, file.size, verdict.reason); return true; }
     if (verdict.kind === 'partial') {
+        const length = verdict.end - verdict.start + 1;
+        // A range longer than one slice goes out a slice at a time. The first slice is read BEFORE
+        // the status line, so "the file has gone" is still the caller's 404 and not a broken 206.
+        if (!whole && length > STORED_FILE_SLICE_BYTES) {
+            const first = await read.range(verdict.start, STORED_FILE_SLICE_BYTES);
+            if (!first) return false;
+            res.status(206);
+            setStoredFileHeaders(res, described);
+            setAcceptRanges(res);
+            res.setHeader('Content-Range', `bytes ${verdict.start}-${verdict.end}/${file.size}`);
+            res.setHeader('Content-Length', length);
+            await sendSlices(res, read, verdict.start, length, first);
+            return true;
+        }
         // When the file is already in hand there is nothing to gain from asking the database for a
         // slice of it, so the second read is skipped rather than repeated.
         const chunk = whole
             ? whole.subarray(verdict.start, verdict.end + 1)
-            : await read.range(verdict.start, verdict.end - verdict.start + 1);
+            : await read.range(verdict.start, length);
         if (!chunk) return false;
         sendPartialContent(res, described, verdict, chunk);
+        return true;
+    }
+    // The whole representation, larger than one slice: the same slices, from byte 0. `whole` is null
+    // here exactly when the content type could be named from the metadata, so nothing needs the
+    // bytes before they are sent.
+    if (!whole && file.size > STORED_FILE_SLICE_BYTES) {
+        const first = await read.range(0, STORED_FILE_SLICE_BYTES);
+        if (!first) return false;
+        setStoredFileHeaders(res, described);
+        setAcceptRanges(res);
+        res.setHeader('Content-Length', file.size);
+        await sendSlices(res, read, 0, file.size, first);
         return true;
     }
     const data = whole ?? await read.all();

@@ -6,6 +6,9 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   v1.6.0 — 2026-10-10 — Tests 16j-16n: a 9 MB file, larger than one slice of the sliced read, comes
+ *     back whole through `Range: bytes=0-`, a range across slice boundaries and a plain download, and
+ *     another owner's agent is refused it.
  *   v1.5.0 — 2026-09-13 — Test 60: a re-upload hands out a new versioned_url and a new strong ETag, an
  *     unchanged file answers 304, and a stale ETag gets the new bytes.
  *   v1.4.0 — 2026-08-15 — Tests 40a-40d: the `members` visibility tier, which no suite in the corpus
@@ -467,6 +470,71 @@ await test('16i. HEAD carries Accept-Ranges, which is what a reader probes with 
     assert(res.status === 200, `status ${res.status}`);
     assert(res.headers.get('accept-ranges') === 'bytes', 'HEAD must answer the same as GET');
     assert(res.headers.get('content-length') === String(testContent.length), `Content-Length: ${res.headers.get('content-length')}`);
+});
+
+// A file LARGER THAN ONE SLICE (utils/http-range.ts STORED_FILE_SLICE_BYTES, 4 MB). Every range case
+// above reads a file of a few dozen bytes, so none of them reached the path a video takes: a body
+// the server has to read from the database in several parts. 9 MB is three slices, and still under
+// the default 10 MB per-file ceiling.
+const sliceBytes = 4 * 1024 * 1024;
+const bigSize = 9 * 1024 * 1024 + 321;
+const bigData = Buffer.alloc(bigSize);
+for (let off = 0; off + 4 <= bigSize; off += 4) bigData.writeUInt32LE((off * 2654435761) >>> 0, off);
+const bigKey = 'range-big.mp4';
+
+await test('16j. A 9 MB file uploads in chunks (the fixture for the sliced reads)', async () => {
+    const init = await json('/v1/storage/upload/init', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ key: bigKey, mime_type: 'video/mp4', visibility: 'private', chunk_size: 3 * 1024 * 1024, total_chunks: 4 }),
+    });
+    assert(init.status === 201, `init ${init.status}: ${JSON.stringify(init.body)}`);
+    const id = init.body.data.upload_id;
+    for (let i = 0, off = 0; off < bigSize; i++, off += 3 * 1024 * 1024) {
+        const res = await rawFetch(`/v1/storage/upload/${id}/${i}`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${agentAToken}`, 'Content-Type': 'application/octet-stream' },
+            body: bigData.subarray(off, Math.min(off + 3 * 1024 * 1024, bigSize)),
+        });
+        assert(res.status === 200, `chunk ${i}: ${res.status}`);
+    }
+    const done = await json(`/v1/storage/upload/${id}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` }, body: '{}' });
+    assert(done.status === 201, `complete ${done.status}: ${JSON.stringify(done.body)}`);
+    assert(done.body.data.size === bigSize, `size: ${done.body.data.size}`);
+});
+
+await test('16k. Range: bytes=0- on it (a video element\'s first request) → 206 with every byte', async () => {
+    const res = await rawFetch(`/v1/storage/${bigKey}`, { headers: { Authorization: `Bearer ${agentAToken}`, Range: 'bytes=0-' } });
+    assert(res.status === 206, `status ${res.status}`);
+    assert(res.headers.get('content-range') === `bytes 0-${bigSize - 1}/${bigSize}`, `Content-Range: ${res.headers.get('content-range')}`);
+    assert(res.headers.get('content-length') === String(bigSize), `Content-Length: ${res.headers.get('content-length')}`);
+    assert(res.headers.get('content-type') === 'video/mp4', `ct: ${res.headers.get('content-type')}`);
+    const body = Buffer.from(await res.arrayBuffer());
+    assert(body.length === bigSize, `got ${body.length} of ${bigSize} bytes`);
+    assert(body.equals(bigData), 'the bytes differ from what was uploaded');
+});
+
+await test('16l. A range across two slice boundaries → exactly those bytes', async () => {
+    const start = sliceBytes - 1000, end = sliceBytes * 2 + 999;
+    const res = await rawFetch(`/v1/storage/${bigKey}`, { headers: { Authorization: `Bearer ${agentAToken}`, Range: `bytes=${start}-${end}` } });
+    assert(res.status === 206, `status ${res.status}`);
+    assert(res.headers.get('content-range') === `bytes ${start}-${end}/${bigSize}`, `Content-Range: ${res.headers.get('content-range')}`);
+    const body = Buffer.from(await res.arrayBuffer());
+    assert(body.equals(bigData.subarray(start, end + 1)), `the range differs (${body.length} bytes)`);
+});
+
+await test('16m. A plain download of it → 200 with every byte', async () => {
+    const res = await rawFetch(`/v1/storage/${bigKey}`, { headers: { Authorization: `Bearer ${agentAToken}` } });
+    assert(res.status === 200, `status ${res.status}`);
+    assert(res.headers.get('content-length') === String(bigSize), `Content-Length: ${res.headers.get('content-length')}`);
+    assert(res.headers.get('accept-ranges') === 'bytes', 'Accept-Ranges on the full download');
+    const body = Buffer.from(await res.arrayBuffer());
+    assert(body.equals(bigData), `the download differs (${body.length} of ${bigSize} bytes)`);
+});
+
+await test('16n. Another agent is refused the sliced read as it is the short one', async () => {
+    const res = await rawFetch(`/v1/storage/${bigKey}`, { headers: { Authorization: `Bearer ${agentCToken}`, Range: 'bytes=0-' } });
+    assert(res.status === 404, `expected 404 for another owner's agent, got ${res.status}`);
+    const del = await json(`/v1/storage/${bigKey}`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentAToken}` } });
+    assert(del.status === 200, `cleanup delete: ${del.status}`);
 });
 
 // ─── Phase 5: HEAD Metadata ───
