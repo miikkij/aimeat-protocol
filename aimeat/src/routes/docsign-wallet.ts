@@ -28,6 +28,8 @@
  *     (nextPdfToSign); 409 DOCUMENT_NEEDED when it holds none.
  *   v1.3.0 — 2026-10-10 — Log lines for each step a wallet takes, and for every POST to the
  *     node address, because the first real wallet signature vanished without a trace.
+ *   v1.3.1 — 2026-10-10 — DOCUMENT_NEEDED says why in plain words, not "made from a hash"
+ *     (pnpm check:plain-language).
  */
 import { Router, raw, urlencoded, type Request, type Response } from 'express';
 import { z } from 'zod';
@@ -96,7 +98,7 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
           // No file sent: the PDF this node already holds for the request, when it holds one.
           const held = await nextPdfToSign(ctx, caller, req.params.id as string);
           if (!held) {
-            res.status(409).json(error(config.nodeId, 'DOCUMENT_NEEDED', 'This node does not hold the PDF of this request (it was made from a hash). Send the PDF.'));
+            res.status(409).json(error(config.nodeId, 'DOCUMENT_NEEDED', 'This server does not have the PDF of this request, because the request was made without the file. Send the PDF.'));
             return;
           }
           doc = { bytes: held.data, name: held.name };
