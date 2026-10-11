@@ -1,8 +1,8 @@
-# Deploy prompt — AIMEAT-boosted OpenHands (dev WSL2 or prod)
+# Deploy prompt: AIMEAT-boosted OpenHands (a development or production Docker host)
 
-Copy everything below the line into a Claude Code session **on the Docker host** (the dev WSL2
-box, or the prod server). It works on either — the only difference is where the bundle lives
-(step 0). Read the "Prod" notes near the end before deploying to prod.
+Copy everything below the line into a Claude Code session **on the Docker host** (a development
+machine or a production server). It works on either; the only difference is where the bundle lives
+(step 0). Read the "Prod" notes near the end before deploying to a production server.
 
 ---
 
@@ -16,10 +16,8 @@ Pick the case that matches this machine, then copy the bundle into `~/aimeat-ope
 secrets/config live off any shared mount:
 
 ```bash
-# CASE A — repo already checked out here. Set REPO to its path:
-#   dev WSL2:  /mnt/e/dev/GitHub/aimeat-protocol
-#   prod (Ubuntu 22.04, overscalesolutions):  /data/services/aimeat-protocol
-REPO=/data/services/aimeat-protocol           # <-- prod path; use the WSL2 one on dev
+# CASE A — repo already checked out here. Set REPO to its path on this host:
+REPO=<path-to-your-aimeat-protocol-checkout>
 git -C "$REPO" pull --ff-only 2>/dev/null || true
 
 # CASE B — repo NOT here yet (fresh prod box): clone it first, then set REPO:
@@ -147,7 +145,7 @@ The bundle is identical on prod; these are the only differences:
 
 ## Expose via nginx (browser access, no SSH tunnel)
 
-The host already runs nginx. Add a dedicated HTTPS subdomain that proxies to the localhost-bound
+This section assumes the host runs nginx. Add a dedicated HTTPS subdomain that proxies to the localhost-bound
 OpenHands, gated by Basic Auth. **The auth is mandatory** — it is the only thing between the
 internet and arbitrary code execution on this host.
 
@@ -183,8 +181,8 @@ internet and arbitrary code execution on this host.
    `/runtime-<port>/*` proxy to `172.17.0.1:<port>` (auth off — runtime enforces its own
    session_api_key), and `/mcp/mcp` proxy (auth off — session-api-key + conversation-ID validated
    upstream).
-6. **TLS cert:** use the host's existing certbot — `sudo certbot --nginx -d <subdomain>` (or
-   match however the parent domain's certs are issued). Ensure the cert paths in the config match.
+6. **TLS cert:** issue a certificate for the subdomain, for example `sudo certbot --nginx -d <subdomain>`
+   (or match however the parent domain's certs are issued). Ensure the cert paths in the config match.
 7. **Apply:** `sudo nginx -t && sudo systemctl reload nginx`, then re-run `bash scripts/postup.sh`
    (writes the LLM settings + profile + aimeat MCP config into the app now that it's proxied).
 8. **Verify:** open `https://<subdomain>` → browser prompts for Basic Auth → after login the
