@@ -6,6 +6,8 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.1.2 — 2026-10-11 — tier-1 no longer lists GET /v1/agents/me/tasks/wait: the route answered 404
+ *     from the day it was written and is removed (routes/agent-integration.ts). Developer's word.
  *   v1.1.1 — 2026-09-18 — Instruction review: a morsel is a pacer, not "the node currency" an agent
  *     "gets paid" in; cortex registers at POST /v1/cortex (the text said /v1/cortex/register).
  *   v1.1.0 — 2026-08-24 — tier-1 gains the support@operators escalation section and an honest
@@ -203,9 +205,6 @@ POST /v1/agents/me/tasks/{id}/fail
 
 GET /v1/agents/me/tasks/{id}/events?page=1&per_page=50
   List events for a task. Paginated.
-
-GET /v1/agents/me/tasks/wait
-  Long-poll for new queued tasks. Blocks up to 120 seconds.
 
 == STANDARD WORKFLOW ==
 

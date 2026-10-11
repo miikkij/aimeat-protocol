@@ -671,7 +671,7 @@ export class ConnectTunnelManager {
   /** An agent was stopped or started (services/agent-stop.ts). On a start the backlog goes out again, so what waited reaches the runtime. */
   /** Whether a connected agent is stopped, from memory; undefined when it holds no socket here, so the caller reads its record. */
   stoppedOf(gaii: string): boolean | undefined { return this.connections.get(gaii)?.stopped; }
-  setStopped(gaii: string, stopped: boolean, backlog = !stopped): void { const c = this.connections.get(gaii); if (!c) return; c.stopped = stopped; if (backlog) void sendBacklog(this.pushCtx(), c); }
+  setStopped(gaii: string, stopped: boolean): void { const c = this.connections.get(gaii); if (!c) return; c.stopped = stopped; if (!stopped) void sendBacklog(this.pushCtx(), c); }
 
   closeForGaii(gaii: string, reason: 'moved' | 'deleted' = 'deleted'): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
 

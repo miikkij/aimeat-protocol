@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 — 2026-10-11 — The list reads storage with the resolved agent identity on both branches; an
+ *     agent must be that identity (Semgrep owner-data-must-resolve-identity, code scanning 1728-1729).
  *   v1.7.0 — 2026-10-11 — A stopped agent's own task list carries no queued task and says `agent_stopped`,
  *     so a runtime that plans what it lists is handed nothing to plan (services/agent-stop-rules.ts).
  *   v1.6.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -184,9 +186,10 @@ export function registerTaskCreateReadRoutes(
       return;
     }
 
-    // Authorize + resolve the target agent.
-    const agentGaii = actAsOwner ? resolveAgentGaii(req, agentName) : req.auth!.sub;
-    if (!actAsOwner && agentGaii !== resolveAgentGaii(req, agentName)) {
+    // Authorize + resolve the target agent. An agent reads only its own list: the resolved name must
+    // be its own identity, so the storage key is the resolved value on both branches.
+    const agentGaii = resolveAgentGaii(req, agentName);
+    if (!actAsOwner && req.auth!.sub !== agentGaii) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agents can only access their own tasks'));
       return;
     }

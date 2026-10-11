@@ -11155,8 +11155,8 @@ paths:
         - **What it is given waits.** A new task stays `queued` with `waits_because: stopped`, and
           nobody can start it (409 `AGENT_STOPPED`). A message is stored and not pushed.
         - **The runtime is not woken.** Nothing is pushed down its connector socket, its webhook or
-          its push targets for new work, and its own task list, inbox and long poll hand it no
-          waiting task (`agent_stopped: true`).
+          its push targets for new work, and its own task list, inbox, pending messages and
+          handbook carry no waiting task (`agent_stopped: true`).
 
         Its key and its permissions are untouched, so POST .../start brings it back with no
         enrolment. Idempotent: a second stop answers 200 with `changed: false`.
@@ -11196,7 +11196,10 @@ paths:
         Clears the stop, then, in this order: each task that waits in `queued` goes through the
         start decision again (one that would have started on its own starts now, with the usual
         `started` event; one that needs the owner's OK for another reason goes on waiting), and the
-        agent's runtime is sent its backlog, so it learns of every waiting task and message at once.
+        agent's runtime is sent one backlog, so it learns of every waiting task and message at once.
+        A direct message that arrived during the stop is in no backlog, so each one is delivered
+        then (`dm.inbound`), oldest first; a start sends at most 100 of them, and the rest stay
+        readable in the agent's inbox.
 
         Scheduled runs that were skipped while it was stopped are not run.
 
@@ -13391,7 +13394,12 @@ paths:
     get:
       operationId: getAgentHandbook
       summary: Agent operating handbook
-      description: Returns the agent's operating handbook with directives, task queue, capabilities, and message endpoints. Replaces the former /v1/prompts/tier1 endpoint.
+      description: >
+        Returns the agent's operating handbook with directives, task queue, capabilities, and message
+        endpoints. Replaces the former /v1/prompts/tier1 endpoint. The task queue is the caller's own:
+        `queued` and `active` (id, title, status) and the task endpoints. For an agent the owner
+        stopped (POST /v1/agents/{name}/stop), `queued` is empty and `task_queue.agent_stopped` is
+        true; its active tasks are listed.
       tags:
         - Agent Integration
       security:
@@ -53656,56 +53664,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /v1/agents/{name}/tasks/wait:
-    get:
-      operationId: waitForAgentTask
-      summary: Long-poll for new tasks
-      description: |
-        Long-poll endpoint that blocks until a new task is available for the agent
-        or the timeout expires. Returns the next queued task if one exists.
-
-        For a stopped agent (POST .../stop) the wait is served in full and then answers
-        `{ task: null, agent_stopped: true }`: a waiting task is not handed out until the agent is
-        started.
-      tags: [Agent Integration]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema: { type: string }
-        - name: timeout
-          in: query
-          schema:
-            type: integer
-            default: 30
-            maximum: 120
-          description: Maximum seconds to wait before returning empty
-      responses:
-        '200':
-          description: Task available or timeout
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          task:
-                            $ref: '#/components/schemas/AgentTask'
-                            nullable: true
-                          agent_stopped:
-                            type: boolean
-                            description: Present and true when the agent is stopped, which is why there is no task.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
