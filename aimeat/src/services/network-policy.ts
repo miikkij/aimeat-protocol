@@ -17,10 +17,14 @@
  *   - evaluatePromotion(metrics, policy) — { eligible, failing[] } for visiting→member
  * @usage import { getActivePolicy, evaluatePromotion } from './network-policy.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The minimum-protocol gates compare versions (utils/protocol-version.ts),
+ *     not strings: "5.0" and "2026-11" had sorted below "v1", and a value in an unknown format is
+ *     no longer ranked lower than a known one.
  *   v1.0.0 — 2026-06-19 — Initial network-policy doc + evaluators (genesis-defined criteria).
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { DEFAULT_PROTOCOL_VERSION, isBelowProtocolVersion } from '../utils/protocol-version.js';
 
 /** System identity + key the active network policy is stored under. */
 export const NETWORK_POLICY_GAII = '__network_policy__';
@@ -181,8 +185,8 @@ export function evaluateAutoAdmit(introduce: { node_url: string; protocol_versio
   if (!aa.enabled) return { allowed: false, reason: 'Auto-admit is disabled by network policy' };
   const host = hostOf(introduce.node_url);
   if (!domainOk(host, aa.domain_allow, aa.domain_block)) return { allowed: false, reason: `Domain ${host} is not permitted to auto-join` };
-  const pv = introduce.protocol_version ?? 'v1';
-  if (aa.min_protocol_version && pv < aa.min_protocol_version) return { allowed: false, reason: `Protocol ${pv} below required ${aa.min_protocol_version}` };
+  const pv = introduce.protocol_version ?? DEFAULT_PROTOCOL_VERSION;
+  if (isBelowProtocolVersion(pv, aa.min_protocol_version)) return { allowed: false, reason: `Protocol ${pv} below required ${aa.min_protocol_version}` };
   return { allowed: true };
 }
 
@@ -192,7 +196,8 @@ export interface PromotionMetrics {
   successfulWork: number;
   activeFlags: number;
   signedIntroduce: boolean;
-  protocolVersion: string;
+  /** The protocol version the peer states; undefined when it states none, which reads as v1. */
+  protocolVersion?: string;
   nodeUrl: string;
 }
 
@@ -205,7 +210,7 @@ export function evaluatePromotion(metrics: PromotionMetrics, policy: NetworkPoli
   if (metrics.daysActive < c.min_days_active) failing.push('days_active');
   if (metrics.successfulWork < c.min_successful_work) failing.push('successful_work');
   if (metrics.activeFlags > c.max_active_flags) failing.push('active_flags');
-  if (c.min_protocol_version && metrics.protocolVersion < c.min_protocol_version) failing.push('protocol_version');
+  if (isBelowProtocolVersion(metrics.protocolVersion, c.min_protocol_version)) failing.push('protocol_version');
   if (!domainOk(hostOf(metrics.nodeUrl), c.domain_allow, c.domain_block)) failing.push('domain');
   return { eligible: failing.length === 0, failing };
 }
