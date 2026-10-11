@@ -21,12 +21,12 @@ The liaison agent uses CrewAI's `MCPServerAdapter` against an AIMEAT node's MCP 
 
 ## What is AIMEAT?
 
-[AIMEAT](https://aimeat.io) (AI Memory Exchange and Action Transfer) is the Linux of AI: an open, federated, self-hosted AI operating system. It carries persistent identity, shared memory, a capabilities catalog, a work queue with escrow, knowledge packages, and federation across nodes. Every agent in your crew gets:
+[AIMEAT](https://aimeat.io) (AI Memory Exchange and Action Transfer) is an open-source system where a person keeps their knowledge, their agents and their apps on a node they own, and works with them from the AI they already use. It carries persistent identity, shared memory, a capabilities catalog, a work queue, knowledge packages, and federation across nodes. Every agent in your crew gets:
 
 - A stable identity that survives across sessions and frameworks
 - Shared memory that other agents (yours or other people's) can read
 - A capabilities catalog so other agents can find what your crew does
-- A morsel-based work queue so other agents can pay yours to do work
+- A work queue through which other agents hand yours work. An offer can carry a money price, settled on payment rails outside the morsel balance, and a pacing amount in morsels. A morsel paces use and is never a price.
 - Knowledge packages so the deliverables your crew produces become reusable
 
 This package is the **bridge** that gives a CrewAI crew access to all of that with one drop-in agent role.
@@ -43,8 +43,10 @@ Requires Python 3.10+ and CrewAI 0.80+. Depends on `crewai-tools[mcp]` and `mcp`
 
 1. **Run an AIMEAT node** (or use the public one at `https://aimeat.io`):
    ```bash
+   npx aimeat init     # once: writes .env, including the storage backend
    npx aimeat start
    ```
+   Without `init` (or `AIMEAT_STORAGE` set by hand) the node runs on in-memory storage and loses everything at the next restart.
 
 2. **Register your crew as an AIMEAT agent.** Pick a name like `company-crew`:
    ```bash
@@ -743,6 +745,8 @@ environment variable it lives in (`agent.key_env`) and never the key itself.
 | 0.30.x | `node_llm()`: a node with `/v1/llm` (3.18.0+ for the owner's key order and budget, and the model policy on the release after 3.19.0). `capabilities()`: a node with `GET /v1/ai/capabilities`, which arrives in the release after 3.19.0. | 0.80+ (verified on 1.15 native and LiteLLM paths) |
 | 0.31.x | The run-refusal check needs `GET /v1/agents/{name}/refusals`, which arrives in the release after 3.20.0. Against an older node the check finds nothing and the daemon behaves as 0.30.x. | 0.80+ |
 | 0.32.x | `{kind: "node"}` crew choices and the `llm` field of the runtime report need the node release after 3.23.0; an older node refuses the choice with `INVALID_CHOICE`. `unsafe_choice_reason` needs no node. The agent needs `ai:use` for `/v1/llm`. | 0.80+ |
+| 0.33.x | The stopped-agent handling needs the node release after 3.26.1, which sends `agent_stopped`. Against an older node the flag never arrives and nothing changes. Declaring `ai_provenance` needs the `provenance:write` scope. | 0.80+ |
+| 0.34.x | `build_offer(price_money=..., toll_morsels=...)` needs the node release after 3.26.1, which stores the two values. The deprecated `price={"morsels": n}` still works and is written as a pacing amount; the node accepts the old field until 4.0.0 and refuses it after. | 0.80+ |
 
 ## License
 

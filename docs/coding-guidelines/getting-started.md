@@ -111,10 +111,60 @@ See [architecture](architecture.md) for the subsystem map.
 
 ## Build and operate a node
 
+A node runs without a clone of the repository. The npm package is the same server:
+
+```bash
+npx aimeat init     # interactive setup, writes .env (storage, node id, keys)
+npx aimeat start    # starts the server on port 40050
+```
+
+From a clone, build it and start it from `aimeat/`:
+
 ```bash
 pnpm build
 pnpm start
 ```
+
+Or with Docker, one compose file per storage backend, run from `aimeat/`:
+
+```bash
+docker compose up --build                                  # PostgreSQL with Kysely, the production backend
+docker compose -f docker-compose.sqlite.yml up --build     # SQLite, no external database
+```
+
+A fresh node with no owner serves its setup page (`/v1/setup/wizard`) for every page address. The
+first owner created there gets the operator role.
+
+The `aimeat` CLI carries the operator commands: `aimeat config` prints every setting and where its
+value comes from (`config export` and `config import` move it), `aimeat validate` checks the
+configuration for problems, `aimeat update` copies the installed package's asset files into the
+working folder and skips any file you changed, `aimeat backup [file]` and `aimeat restore <file>`
+export and import the node's data as one JSON file, and `aimeat maintenance on [message]`,
+`aimeat maintenance off` and `aimeat maintenance` turn maintenance mode on, off, or show it. A fresh
+node installs its bundled example packages by itself at start.
+
+### What to back up
+
+A node is three things together: the database (the SQLite file, or a `pg_dump`), the `.env` file,
+and the node's key file, `~/.aimeat/nodes/<node id>/node-key.json` (`AIMEAT_NODE_KEY_PATH` moves
+it). The `.env` holds the key every stored secret is encrypted with (`AIMEAT_ENCRYPTION_KEY`, or
+`AIMEAT_TOTP_ENCRYPTION_KEY` when the first is not set) and the passphrase of the node's identity
+key (`AIMEAT_KEY_PASSPHRASE`). Never change those values on a running node: a different data key
+leaves AI keys, vault secrets and two-step sign-in secrets unreadable, and the database alone does
+not restore the node's identity. If you set them outside `.env` (Docker, systemd), back them up from
+there.
+
+`aimeat backup` is a data export, not a full backup: it carries no credential. Passwords, private
+keys, tokens, webhook secrets and memory records that hold a credential are left out, and the
+export's `data.omitted` lists what a restore has to set again.
+
+### App thumbnails (optional)
+
+`aimeat screenshot-worker` renders each published app and stores the thumbnail the app catalogue
+and the front page show; `--watch <seconds>` keeps it running. It drives the machine's installed
+Chrome or Edge through Playwright, so a desktop needs no browser download; a headless server runs
+`npx playwright install chromium` once. It signs in with a long-lived operator token, minted with
+`POST /v1/access/tokens` and `grant_operator: true`. A node runs without it.
 
 [The deployment unit](../../aimeat/deploy/aimeat.service) records the Linux service
 settings, including memory settings and restart behaviour. Adapt it to the actual

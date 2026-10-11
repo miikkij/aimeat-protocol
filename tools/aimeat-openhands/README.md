@@ -45,8 +45,9 @@ State persists in `~/.openhands`, so restarts (`docker compose restart`) keep th
 
 ## Notes & gaps to verify on the live container
 
-- **Model slug**: confirm `openrouter/moonshotai/kimi-k2.7-code` exists at openrouter.ai/models
-  (adjust `LLM_MODEL` in `.env` if the slug differs).
+- **Model slug**: `moonshotai/kimi-k2.7-code` was listed by OpenRouter on 2026-10-11. Check
+  openrouter.ai/models again before a new deployment, and adjust `LLM_MODEL` in `.env` if the slug
+  has changed. The cost per app (~$0.4) was measured once and is not checked again.
 - **config.toml vs GUI**: the GUI reliably reads `LLM_*` env (set in compose) and its own
   `~/.openhands/settings.json`. If the mounted `config.toml` MCP block isn't picked up by the
   web app, add the MCP server **once** via the UI (Settings → MCP → Streamable HTTP,
