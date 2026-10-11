@@ -752,6 +752,7 @@
       "/views/home/agents-band.js": "/views/home/agents-band.js",
       "/views/home/agent-new.js": "/views/home/agent-new.js",
       "/views/home/agent.js": "/views/home/agent.js",
+      "/views/home/agent-work.js": "/views/home/agent-work.js",
       "/views/home/machines.js": "/views/home/machines.js",
       "/js/services/agent-draft.js": "/js/services/agent-draft.js",
       "/views/profile/agents/crew-templates.js": "/views/profile/agents/crew-templates.js",
@@ -1162,6 +1163,11 @@
       // address it had first, ?machines=1, still opens it).
       if (pathname === '/v1/home' && /[?&]new-agent=/.test(search)) {
         return () => import('/views/home/agent-new.js' + B);
+      }
+      // One piece of an agent's work and what it produced: /v1/home?agent=<name>&work=<task id>.
+      // Before the agent's own page, whose address it extends.
+      if (pathname === '/v1/home' && /[?&]agent=/.test(search) && /[?&]work=/.test(search)) {
+        return () => import('/views/home/agent-work.js' + B);
       }
       if (pathname === '/v1/home' && /[?&]agent=/.test(search)) {
         return () => import('/views/home/agent.js' + B);

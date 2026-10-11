@@ -9,6 +9,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   2026-10-11 — .og-sec--ends (PageSection `ends`): more air under the section's body and before
+ *     what follows, so a section shows where it stops; additive.
  *   2026-09-27 — The chapter number's spacing reads var(--shape-tracking-label) instead of a literal
  *     .1em (the AIMEAT value, so AIMEAT is unchanged; a theme reaches it). check:poster-shapes.
  *   2026-09-27 — .og-doors--tight (Actions `tight`): a picker's door row, 8px apart, the old detail's
@@ -52,6 +54,11 @@
    inside keep their own size. */
 .og-sec--group > .og-sec-h { --poster-section-size: .95rem; margin-bottom: 0; }
 .og-sec--group.og-sec--first { padding-top: 0; }
+/* A section that shows where it stops (PageSection `ends`): more air under its body and before
+   what follows (32px and 46px against the usual 8px and 22px), so two sections on a long page do
+   not read as one. Air only: a fading strip and corner angles were both tried and turned down
+   (Jouni, 2026-10-11). */
+.og-sec--ends { padding-bottom: 2rem; margin-bottom: 1.5rem; }
 .pf .og .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
 .og-hint { margin: .6rem 0 0; font-size: .85rem; line-height: 1.5; font-weight: 600; color: var(--text-dim); }
 .og-lead { margin: 0 0 .7rem; font-size: .95rem; line-height: 1.55; }
