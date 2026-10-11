@@ -1028,6 +1028,8 @@
         "lineUnknown": "There is not enough readable history to assess the refusal rate.",
         "lineOpenOne": "An incident is open and waits for you in section 03.",
         "lineOpenMany": "{n} incidents are open and wait for you in section 03.",
+        "lineTestMoneyRefused": "AIMEAT_TEST_MONEY_HANDLER is set on this server. The server does not use it, because this is not a test server. Remove the variable from the server's environment.",
+        "lineTestMoneyOn": "AIMEAT_TEST_MONEY_HANDLER is set, so euro and dollar payments complete without real money. This is acceptable only on a test server on this computer.",
         "lineWalledOne": "One IP address, {source}, was blocked at a sign-in endpoint {n} times in the last 24 hours.",
         "lineWalledMany": "{sources} IP addresses were blocked at sign-in endpoints {n} times in the last 24 hours.",
         "logOn": "Refusal log on · rotates at {mb} MB",

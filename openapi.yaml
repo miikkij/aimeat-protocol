@@ -62182,6 +62182,18 @@ paths:
                               counters_since: { type: string, nullable: true }
                               uptime_seconds: { type: integer, nullable: true }
                               log: { type: object, description: Whether the refusal log is on, its file, its size and its older generation's }
+                              test_money_handler:
+                                type: object
+                                description: >-
+                                  AIMEAT_TEST_MONEY_HANDLER, which registers a payment handler that completes EUR and
+                                  USD payments with no real money. Zone critical whenever it is set. In force (active)
+                                  only when the node's public URL is a loopback address; on any other node it is
+                                  refused and test.money is not registered.
+                                properties:
+                                  requested: { type: boolean }
+                                  active: { type: boolean }
+                                  zone: { type: string, enum: [healthy, critical] }
+                                  message: { type: string, nullable: true }
                           refusals:
                             type: object
                             description: Bounded sample filtered to the last 24 hours, grouped by door, source, credential kind and fingerprint; count_kind=sample, sample_limit=1000, window_total=null; the readable span and its mean per day; the newest 200 lines

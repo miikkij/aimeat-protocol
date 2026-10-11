@@ -80,7 +80,7 @@ pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci
 pnpm gate --postgres
 ```
 
-`--test=<name>` matches a suite by its file name without `test/` and `.ts`, with or without the `e2e-` prefix (`--test=owner-home` runs `test/e2e-owner-home.ts`). An exact name wins over a substring, and a substring that matches more than one suite is an error.
+`--test=<name>` matches a suite by its file name without `test/` and `.ts`, with or without the `e2e-` prefix (`--test=model-suite` runs `test/e2e-model-suite.ts`). An exact name wins over a substring, and a substring that matches more than one suite is an error.
 
 ### E2E Test Suites
 
@@ -96,17 +96,17 @@ pnpm gate --postgres
 
 ### The model suite
 
-Copy a current suite rather than a template. **`test/e2e-owner-home.ts`** is short and shows every part a suite needs:
+Copy **`test/e2e-model-suite.ts`**. It exists to be copied, and it shows every part a suite needs and nothing else:
 
-- it reads `E2E_BASE` and `E2E_NODE_ID` from the environment (the runner sets `E2E_BASE` to the node it started; the `localhost:40251` fallback is for running the file by hand against a node you started yourself);
-- it defines its own `test()`, `assert()` and `json()` helpers;
-- `setupOwner()` registers an owner with `POST /v1/ghii` (`username`, `display_name`, `password`) and gets a session token;
-- **sign in with the password in a new suite**: `POST /v1/ghii/login` with `username` and `password` returns the token in `data.token`, as `test/e2e-data-wallet-page.ts` does. `e2e-owner-home.ts` and most older suites still sign `name + NODE_ID + timestamp` with the owner's private key and call `POST /v1/auth/token`. That is the owner-key login, which is deprecated (`AIMEAT_OWNER_KEY_LOGIN`) and removed in 4.0.0, so do not copy that part;
-- it tests the happy path, the parity with the endpoints it replaces, and the refusal (`401` without a token);
-- it deletes its owner at the end with `DELETE /v1/owners/:name` and the owner's Bearer token (the route requires a local owner session; no signature header);
-- it exits non-zero when any test failed.
+- **the node**: the runner starts it and sets `E2E_BASE` to its address; the suite reads `E2E_BASE` and `E2E_NODE_ID` (the `localhost:40251` fallback is only for running the file by hand against a node you started yourself);
+- its own `test()`, `assert()` and `json()` helpers;
+- **register**: two owners with `POST /v1/ghii` (`username`, `display_name`, `password`), with a `Date.now()` suffix on each name;
+- **sign in with the password**: `POST /v1/ghii/login` with `username` and `password` returns the session token in `data.token`;
+- **act**: one write and its read-back, then the refusals: `401` without a token, and another owner cannot read a private record;
+- **clean up**: each owner deletes itself with `DELETE /v1/owners/:name` and its own Bearer token (the route needs the account holder's local session);
+- an exit code the runner reads: `process.exit(failed > 0 ? 1 : 0)`.
 
-A suite that needs two accounts calls `setupOwner()` twice (`test/e2e-memory-discover.ts` does). A suite that needs helpers beyond that takes them from `test/helpers/` (for example `wait-for-server.ts`, `node-entry.ts`, `fake-ai-provider.ts`, `fake-smtp.ts`).
+Most older suites sign in differently: they sign `name + NODE_ID + timestamp` with the owner's private key and exchange it for a token. That owner-key sign-in is deprecated (`AIMEAT_OWNER_KEY_LOGIN`) and removed in 4.0.0, so a new suite does not copy it from them. A suite that needs helpers beyond the model's takes them from `test/helpers/` (for example `wait-for-server.ts`, `node-entry.ts`, `fake-ai-provider.ts`, `fake-smtp.ts`).
 
 ### Conventions
 
@@ -119,7 +119,7 @@ A suite that needs two accounts calls `setupOwner()` twice (`test/e2e-memory-dis
 
 ### Adding a New E2E Suite
 
-1. Create `test/e2e-my-feature.ts`, starting from `test/e2e-owner-home.ts`. Give it the standard file header and a `// Run:` line with its `--test=` command.
+1. Create `test/e2e-my-feature.ts` as a copy of `test/e2e-model-suite.ts`. Give it the standard file header with its `--test=` command under `@usage`.
 2. Add `'test/e2e-my-feature.ts'` to `ALL_SUITES` in `test/run-e2e-ci.ts`, and add a version-history line to the runner's header. Do not add it to `GUARD_SUITES`; a suite earns that (Rule 1b).
 3. Run it on both backends:
    ```bash
