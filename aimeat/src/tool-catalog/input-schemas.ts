@@ -10,6 +10,7 @@
  *   questionsSchema · boardRulesInput · wsGrantShape · tokenMap
  * @usage import { flexibleBoolean } from '../input-schemas.js';  owner_scope: { …, zod: flexibleBoolean }
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A checkout item may be of kind `pacing-pack` (pacing capacity bought with money).
  *   v1.0.0 — 2026-10-05 — Moved from src/mcp/{schema-flags,agent-v2-messaging,agent-v2-tasks,contacts,
  *     commerce,agent-crew,decide,boards,organisms-name-invites,themes}.ts (secaudit 2026-10, M3).
  */
@@ -36,7 +37,7 @@ export const LinkSchema = z.object({
 
 /** The items of a checkout session (src/commerce/session-service.ts). */
 export const itemShape = z.array(z.object({
-    kind: z.enum(['offer', 'app-tool', 'ext-call', 'package']).optional(),
+    kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack']).optional(),
     agent: z.string().max(300).optional(),
     offer_id: z.string().max(100).optional(),
     org: z.string().max(200).optional(),

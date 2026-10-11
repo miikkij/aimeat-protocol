@@ -9,12 +9,18 @@
  *   surfaces can never drift on gates (public record, priced tool, dotted appIds) or on the sku
  *   grammar "app-tool:<owner>/<appId>:<tool>".
  * @structure PricedAppTool · OwnAppTool · publicManifestTools · listPublicAppTools ·
- *   listPricedAppTools · listOwnCallableAppTools
+ *   listPricedAppTools · listOwnCallableAppTools · toolPacing · paceFreeToolUse · FreeToolPacing
  * @usage
  *   const tools = await listPricedAppTools(storage, config, 100);
  *   const all = await listPublicAppTools(storage, config, { pricedOnly: false });
  *   const mine = await listOwnCallableAppTools(storage, config, req.auth.owner, 500);
  * @version-history
+ *   v1.4.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). An entry carries `toll_morsels`; `price` is a deprecated mirror of it
+ *     until 4.0.0. The catalog lists every tool offered to other owners (isToolOffered: a money price,
+ *     or a pacing amount on a free tool), so a tool that had only a morsel price stays listed as free.
+ *     paceFreeToolUse: the one pacing charge for a free tool's use, for the REST invoke route and
+ *     its MCP twin.
  *   v1.3.0 — 2026-10-07 — A tool counts as priced by isToolPriced, the invoke route's own test, and
  *     an entry carries every money price (`pricesMoney`, with `priceMoney` its first). A tool sold
  *     only in `pricesMoney` was missing from the feed, this catalog and the MCP card while its
@@ -36,8 +42,10 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { AppToolsDocSchema, appIdFromToolsKey, isToolPriced, toolMoneyPrices, type AppTool } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appIdFromToolsKey, isToolOffered, presentToolPacing, toolMoneyPrices, toolTollMorsels, type AppTool } from '../models/app-tool-schemas.js';
 import { localAccountName } from '../utils/gaii.js';
+import { chargePacing, resolvePacingToll, type PacingCharge } from '../services/metered-settlement.js';
+import { commerceFeePercent } from '../services/marketplace-fee.js';
 
 /** One sellable app-tool as every discovery surface sees it. */
 export interface PricedAppTool {
@@ -56,7 +64,10 @@ export interface PricedAppTool {
   inputSchema: Record<string, unknown>;
   /** 'call' = synchronous capability invoke on completion; 'task' = agent TASK for the seller. */
   fulfillment: 'call' | 'task';
-  price?: { morsels: number; unit: string };
+  /** The pacing amount per call, in morsels (toolTollMorsels). Not a price; 0 = unpaced. */
+  toll_morsels: number;
+  /** Deprecated mirror of `toll_morsels` for 3.x readers, present while it is above 0, gone from 4.0.0. */
+  price?: { morsels: number; unit: string; deprecated: string };
   /** Money price in 6-decimal micro-units: the first of `pricesMoney`. */
   priceMoney?: { amount: number; currency: string; scale: 6 };
   /** Every money price, one per currency, `priceMoney` first. Buy in another one with the session `currency`. */
@@ -71,9 +82,10 @@ export interface AppToolScanOptions {
   /** Stop after this many entries. */
   cap?: number;
   /**
-   * Whether a tool with no price is skipped. The commerce surfaces sell, so they want true (the
-   * default, and what they had before this option existed). The directory answers "what can I use
-   * here", where a free tool is the most usable thing on the list.
+   * Whether a tool that is not offered to other owners is skipped: one with neither a money price nor
+   * a pacing amount (isToolOffered). The commerce surfaces want true (the default). A free tool with a
+   * pacing amount is offered and stays listed, without a money price; the feeds that sell only money
+   * read `priceMoney`. The directory answers "what can I use here", where every tool counts.
    */
   pricedOnly?: boolean;
 }
@@ -83,7 +95,7 @@ export interface AppToolScanOptions {
  * `price: null` and no checkout item (there is nothing to buy: the owner's own principals invoke
  * it directly on `webmcp.invoke`), and `own: true` to say so.
  */
-export type OwnAppTool = Omit<PricedAppTool, 'price' | 'priceMoney' | 'checkout_item'> & {
+export type OwnAppTool = Omit<PricedAppTool, 'price' | 'priceMoney' | 'pricesMoney' | 'checkout_item'> & {
   price: null;
   own: true;
 };
@@ -133,11 +145,10 @@ export async function listPublicAppTools(
     const appRef = `${ownerName}/${appId}`;
     for (const tool of tools) {
       if (out.length >= cap) break;
-      // isToolPriced is the invoke route's own test, so a tool that route answers 402 for is listed
-      // here. The scan used to look at `price` and `priceMoney` only, which left out a tool sold in
-      // `pricesMoney` alone while the invoke route asked for payment.
-      if (pricedOnly && !isToolPriced(tool)) continue;
-      const morsels = tool.price?.morsels ?? 0;
+      // Offered = a money price (isToolPriced, the invoke route's own 402 test, which reads
+      // `pricesMoney` too) or a pacing amount on a free tool. A morsel is never a price, so a tool
+      // that had only `price.morsels` stays listed as free with that much pacing: nothing disappears.
+      if (pricedOnly && !isToolOffered(tool)) continue;
       const money = toolMoneyPrices(tool).map((m) => ({ amount: m.amount, currency: m.currency, scale: 6 as const }));
       out.push({
         sku: `app-tool:${appRef}:${tool.name}`,
@@ -149,7 +160,7 @@ export async function listPublicAppTools(
         description: tool.description ?? '',
         inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
         fulfillment: tool.action_id ? 'call' : 'task',
-        ...(morsels > 0 ? { price: { morsels, unit: tool.price?.unit ?? 'per-call' } } : {}),
+        ...presentToolPacing(tool),
         ...(money.length ? { priceMoney: money[0], pricesMoney: money } : {}),
         webmcp: webmcpUrls(config, ownerName, appId, tool.name),
         checkout_item: { kind: 'app-tool', app: appRef, tool: tool.name },
@@ -186,7 +197,7 @@ export async function listOwnCallableAppTools(
     const ownerName = localAccountName(rec.ownerGaii);
     for (const tool of tools) {
       if (out.length >= cap) break;
-      if (isToolPriced(tool) || !tool.action_id) continue;
+      if (isToolOffered(tool) || !tool.action_id) continue;
       out.push({
         sku: `app-tool:${ownerName}/${appId}:${tool.name}`,
         app: `${ownerName}/${appId}`,
@@ -197,6 +208,7 @@ export async function listOwnCallableAppTools(
         description: tool.description ?? '',
         inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
         fulfillment: 'call',
+        toll_morsels: 0,
         price: null,
         webmcp: webmcpUrls(config, ownerName, appId, tool.name),
         own: true,
@@ -204,6 +216,62 @@ export async function listOwnCallableAppTools(
     }
   }
   return out;
+}
+
+/**
+ * The pacing one use of a FREE tool is charged on an invoke route, in morsels: what the tool declares
+ * (toolTollMorsels, which reads a deprecated `price.morsels` as pacing) within the node's per-use
+ * ceiling. 0 when the tool declares none; the raw paywall then paces the action as it always did.
+ */
+export function toolPacing(config: AimeatConfig, tool: AppTool): number {
+  const declared = toolTollMorsels(tool);
+  return declared > 0 ? resolvePacingToll(config, declared) : 0;
+}
+
+/**
+ * True when the extension action behind a capability (`ext:{name}:{action}`) has its own money price.
+ * Once a free tool's pacing is charged, the raw paywall stands down on a `settled` pass so the action
+ * is not paced a second time for the same use; an action that sells for money keeps the `unpriced`
+ * pass, which still leaves its own price owed (routes/extensions/paywall.ts).
+ */
+async function actionSellsForMoney(storage: Storage, capRef: string | undefined): Promise<boolean> {
+  const m = /^ext:([^:]+):(.+)$/.exec(capRef ?? '');
+  if (!m) return false;
+  const ext = await storage.getExtension(m[1]!);
+  return !!ext?.actions.find(a => a.id === m[2])?.commercial?.payMoney;
+}
+
+/** What paceFreeToolUse decided: run the call (with the pass to mint, and the charge to reverse on failure), or refuse. */
+export type FreeToolPacing =
+  | { kind: 'run'; pass: 'unpriced' | 'settled'; charge: PacingCharge | null }
+  | { kind: 'anonymous'; toll: number }
+  | { kind: 'insufficient'; toll: number };
+
+/**
+ * Pace one use of a FREE tool (no money price) on an invoke route, for the REST WebMCP route and its
+ * MCP twin alike (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Another
+ * owner's use is charged the tool's pacing through chargePacing before the call: part burns, the
+ * operator keeps the marketplace share, the rest is credited to the app owner. The app owner's own
+ * principals use it free. An anonymous caller is refused (`anonymous`), a short balance too
+ * (`insufficient`, nothing moved). On `run`, mint an internal pass of `pass` for the call and call
+ * `charge.reverse()` when it fails. Whether the action sells for money is asked before the charge, so
+ * nothing between the charge and the call can throw.
+ */
+export async function paceFreeToolUse(args: {
+  config: AimeatConfig; storage: Storage; caller: string; anonymous?: boolean;
+  ownerName: string; appId: string; tool: AppTool; capRef?: string;
+}): Promise<FreeToolPacing> {
+  const { config, storage, caller, ownerName, appId, tool } = args;
+  const toll = localAccountName(caller) === ownerName ? 0 : toolPacing(config, tool);
+  if (toll <= 0) return { kind: 'run', pass: 'unpriced', charge: null };
+  if (args.anonymous) return { kind: 'anonymous', toll };
+  const pass = (await actionSellsForMoney(storage, args.capRef)) ? 'unpriced' : 'settled';
+  const charge = await chargePacing({
+    config, storage, caller, providerGhii: `${ownerName}@${config.nodeId}`, amount: toll,
+    label: `apptool:${ownerName}/${appId}:${tool.name}`, feePercent: commerceFeePercent(config),
+  });
+  if (!charge) return { kind: 'insufficient', toll };
+  return { kind: 'run', pass, charge };
 }
 
 /** The priced-only scan the commerce surfaces sell from. Positional `cap` kept for its callers. */

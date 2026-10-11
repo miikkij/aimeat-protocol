@@ -10,11 +10,25 @@
  *   - createAction/getAction: insert (with UNIQUE→ACTION_EXISTS) and fetch by provider+id
  *
  * @version-history
+ *   v1.2.0 — 2026-10-11 — readStoredActionPricing: a stored `baseMorsels` reads as `tollMorsels`, the
+ *     pacing amount (a morsel is pacing, not a price).
  *   v1.1.0 — 2026-09-09 — deleteActionsByProvider deleted: no caller.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
 import type { ActionRecord } from '../../../interface.js';
+
+/**
+ * The `pricing` JSON column as an ActionRecord reads it. A row written by 3.26.x carries
+ * `baseMorsels`, the old morsel price; it is the action's pacing amount now (ruling
+ * decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa), so it reads as `tollMorsels`.
+ * No migration: the old key is translated on every read, and the next write stores the new one.
+ */
+export function readStoredActionPricing(json: string): ActionRecord['pricing'] {
+  const raw = (JSON.parse(json) ?? {}) as { tollMorsels?: unknown; baseMorsels?: unknown; perUnit?: ActionRecord['pricing']['perUnit'] };
+  const toll = typeof raw.tollMorsels === 'number' ? raw.tollMorsels : typeof raw.baseMorsels === 'number' ? raw.baseMorsels : 0;
+  return raw.perUnit ? { tollMorsels: toll, perUnit: raw.perUnit } : { tollMorsels: toll };
+}
 
 function deserializeAction(row: Record<string, unknown>): ActionRecord {
   const record: ActionRecord = {
@@ -24,7 +38,7 @@ function deserializeAction(row: Record<string, unknown>): ActionRecord {
     description: row.description as string,
     inputSchema: JSON.parse(row.inputSchema as string),
     outputSchema: JSON.parse(row.outputSchema as string),
-    pricing: JSON.parse(row.pricing as string),
+    pricing: readStoredActionPricing(row.pricing as string),
     tags: JSON.parse(row.tags as string) as string[],
     createdAt: row.createdAt as string,
     updatedAt: row.updatedAt as string,

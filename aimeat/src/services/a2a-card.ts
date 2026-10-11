@@ -17,6 +17,9 @@
  * @structure a2aCardFor(config, agent, baseUrl, opts)
  * @usage const card = a2aCardFor(config, agent, 'https://node.example/v1/a2a/claude', { offerings });
  * @version-history
+ *   v1.2.0 — 2026-10-11 — A skill's line names the money price or "free", then "pacing N morsels per
+ *     use"; a morsel is never shown as a price, and the x402 sentence appears only when there is a
+ *     money price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.1.0 — 2026-09-01 — What a stranger may buy is on the card: a LISTED offering becomes a skill
  *     with its price, the x402 extension is declared, and the two ways in are separate security
  *     schemes (V6a foreign path).
@@ -113,13 +116,28 @@ function skillsFor(agent: AgentRecord): AgentCard['skills'] {
  * had seen it because no money-priced offering has ever been published; it was waiting.
  *
  * `basePrice` is per call or per task either way, so that is what the sentence says.
+ *
+ * A MORSEL IS NEVER THE PRICE (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa,
+ * 2026-10-11). An offering has an optional money price and a separate pacing amount in morsels per
+ * use, so the line names the money price or says "free", and then the pacing when there is any. A
+ * 3.x offering whose rail is morsels carries its pacing amount in `basePrice`; it reads as free with
+ * that much pacing. The fields are read through a loose shape, so a `tollMorsels` on the offering is
+ * found as soon as the projection carries one.
  */
 function priceLine(o: Offering): string {
-  if (o.unit === 'money') {
-    const amount = (o.basePrice / 1_000_000).toFixed(2).replace(/\.00$/, '');
-    return `${amount} ${o.currency ?? 'EUR'} per task`;
-  }
-  return `${o.basePrice} ${o.basePrice === 1 ? 'morsel' : 'morsels'} per task`;
+  const loose = o as unknown as { unit?: string; basePrice?: number; currency?: string | null; tollMorsels?: number };
+  const base = typeof loose.basePrice === 'number' && loose.basePrice > 0 ? loose.basePrice : 0;
+  const money = loose.unit === 'money' && base > 0
+    ? `${(base / 1_000_000).toFixed(2).replace(/\.00$/, '')} ${loose.currency ?? 'EUR'} per task`
+    : 'free';
+  const toll = typeof loose.tollMorsels === 'number' ? loose.tollMorsels : loose.unit === 'morsels' ? base : 0;
+  return toll > 0 ? `${money}, pacing ${toll} ${toll === 1 ? 'morsel' : 'morsels'} per use` : money;
+}
+
+/** Whether a stranger pays money for the offering, which is what the x402 extension settles. */
+function hasMoneyPrice(o: Offering): boolean {
+  const loose = o as unknown as { unit?: string; basePrice?: number };
+  return loose.unit === 'money' && typeof loose.basePrice === 'number' && loose.basePrice > 0;
 }
 
 /**
@@ -143,7 +161,7 @@ function offeringSkills(offerings: Offering[]): AgentCard['skills'] {
   return offerings.map(o => ({
     id: o.offeringId,
     name: o.title,
-    description: `${o.description || o.title} — ${priceLine(o)}. Send this offeringId in message metadata; payment is settled with the x402 extension before the work starts.`,
+    description: `${o.description || o.title} — ${priceLine(o)}. Send this offeringId in message metadata${hasMoneyPrice(o) ? '; payment is settled with the x402 extension before the work starts' : ''}.`,
     tags: ['for-hire', o.surface?.kind === 'agent-work' ? o.surface.taskType : o.action],
     examples: [],
     inputModes: ['text/plain', 'application/json'],

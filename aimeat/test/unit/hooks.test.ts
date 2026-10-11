@@ -84,7 +84,7 @@ import type { ActionRecord } from '../../src/storage/types/commerce.js';
 
 const action = (over: Partial<ActionRecord> = {}): ActionRecord => ({
   id: 'check', providerGaii: 'bot#alice@node', displayName: 'Allowlist check',
-  description: '', inputSchema: {}, outputSchema: {}, pricing: { baseMorsels: 0 }, tags: [],
+  description: '', inputSchema: {}, outputSchema: {}, pricing: { tollMorsels: 0 }, tags: [],
   webhookUrl: 'https://hooks.example/check',
   createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
   ...over,

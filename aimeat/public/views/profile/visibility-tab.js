@@ -18,6 +18,7 @@
  * @structure PARTS · PERIODS · VisibilityTab (default) · the six parts as small functions
  * @usage Registered in views/profile.js as the `visibility` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.0.1 — 2026-10-11 — A purchase total in morsels reads "pacing N morsels": a morsel is pacing, not a price.
  *   v1.0.0 — 2026-10-09 — Initial (AI visibility, the owner panel for layers A to E), approved by Jouni on the sandbox.
  */
 import { h } from 'preact';
@@ -46,9 +47,9 @@ const PERIODS = [7, 30, 90];
 
 const CHANNELS = ['ai', 'search', 'social', 'referral', 'direct', 'internal'];
 
-/** Money in 6-decimal micro-units, morsels whole. */
+/** Money in 6-decimal micro-units; a 3.x MORSEL bucket is pacing, said as such and never as money. */
 function amount(currency, n) {
-  if (currency === 'MORSEL') return `${n} ${t('profile.aivis.morsels')}`;
+  if (/^morsels?$/i.test(String(currency))) return t('pacing.amount', { n });
   return `${(Number(n) / 1e6).toFixed(2)} ${currency}`;
 }
 

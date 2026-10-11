@@ -11,7 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
- *   2026-10-06 — aimeat_app_publish and aimeat_app_draft_save register the catalog's schema: publish
+ *   2026-10-11 — aimeat_app_get carries the deprecated `priceMorsels` mirror of the pacing amount, as the
+ *     REST read does (services/app-pacing.ts presentAppManifest).
+ *   2026-10-06 —aimeat_app_publish and aimeat_app_draft_save register the catalog's schema: publish
  *     takes plain `content` too, the draft takes `content` as well as content_base64 (secaudit 2026-10
  *     follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -124,6 +126,7 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
 import { registerAppForkTool } from './apps-fork.js';
+import { presentAppManifest } from '../services/app-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAppsTools(
@@ -600,7 +603,7 @@ export function registerAppsTools(
             // build-spec state, the reviewer log), and this tool reads any owner's app. They come off
             // in one place for every door that shows a manifest to somebody else.
             const isOwn = localAccountName(getAgentGaii()) === app.ownerName;
-            const manifest = isOwn ? app.manifest : publicAppManifest(app.manifest);
+            const manifest = presentAppManifest(isOwn ? app.manifest : publicAppManifest(app.manifest));
 
             return {
                 content: [{

@@ -6,6 +6,7 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   v1.17.0 -- 2026-10-11 -- A work item's morsels read "pacing N morsels" (toll, then the 3.x base_price mirror, then toll_morsels / price_morsels), not "Cost: N ❤️": a morsel is pacing, not a price.
  *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a work description with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.16.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the page frame
@@ -49,6 +50,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { timeAgo } from '/js/utils.js';
+import { pacingOf } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
@@ -60,6 +62,9 @@ import { Stack } from '/components/Layout.js';
 import { Stars } from '/components/Stars.js';
 import { listInbox, listSent, getWorkOverview, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
 import { swallowed } from '/js/swallowed.js';
+
+/** A work item's pacing amount: `toll` (3.x `base_price` mirror), else the offer-style fields pacingOf reads. */
+const workToll = (w) => (typeof w.toll === 'number' ? w.toll : typeof w.base_price === 'number' ? w.base_price : pacingOf(w));
 
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);
@@ -188,7 +193,7 @@ export default function WorkTab({ session, showToast, onStats }) {
           <${Name}>${w.description || w.action_name || '-'}<//>
           <${Desc}>
             ${type === 'sent' ? t('profile.work.provider') + ': ' + (w.provider_gaii || '-') : t('profile.work.from') + ': ' + (w.requester_gaii || '-')}
-            ${w.price_morsels != null ? ' \u2502 ' + t('profile.work.cost') + ': ' + w.price_morsels + ' \u2764\uFE0F' : ''}
+            ${workToll(w) > 0 ? ' \u2502 ' + t('pacing.amount', { n: workToll(w) }) : ''}
             ${w.created_at ? ' \u2502 ' + timeAgo(w.created_at) : ''}
           <//>
           <${Doors}>

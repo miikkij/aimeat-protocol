@@ -14,6 +14,8 @@
  * @structure clampVisibilityDays · readVisibilityReport · VisibilityReport
  * @usage const report = await readVisibilityReport(storage, config, ownerGhii, { days: 30 });
  * @version-history
+ *   v1.3.0 — 2026-10-11 — Purchase amounts are money only; a stored MORSEL bucket is left out of the
+ *     report (a morsel is pacing, not a price).
  *   v1.2.0 — 2026-10-08 — `agents`: what AI agents met here, with one readable line per finding (layer C).
  *   v1.1.0 — 2026-10-08 — `tags`: the owner's own Clarity and GA4 on the place's pages (layer B).
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
@@ -25,7 +27,7 @@ import {
   emptyVisibilityDay, type VisibilityDay, type VisibilityMonthRecord, type VisitChannel,
 } from '../../models/visibility-schemas.js';
 import { monthOf } from '../../models/signal-schemas.js';
-import { flushVisibility, mergeDay, nodeCountsVisibility, sumOf } from './visibility-counter.js';
+import { flushVisibility, isMorselCurrency, mergeDay, nodeCountsVisibility, sumOf } from './visibility-counter.js';
 import { getVisibilitySettings } from './visibility-settings.js';
 import { visibilitySettingsView } from './analytics-tags.js';
 import { agentExperienceSection, type AgentExperience } from './agent-experience.js';
@@ -44,7 +46,10 @@ export interface PurchaseRow {
   /** `page`: a person bought on a page. `agent`: an agent bought through a checkout endpoint. */
   via: string;
   purchases: number;
-  /** Per currency, in 6-decimal micro-units for money and whole morsels for `MORSEL`. */
+  /**
+   * Per money currency, in 6-decimal micro-units. Never morsels: a morsel is pacing, not a price, so
+   * a paced use with no money price is a free purchase, counted in `purchases` with no amount.
+   */
   amounts: Record<string, number>;
 }
 
@@ -151,7 +156,9 @@ export async function readVisibilityReport(
 
   const purchases: PurchaseRow[] = Object.entries(sum.purchases).map(([key, p]) => {
     const [channel = 'direct', family = '', via = 'page'] = key.split('|');
-    return { channel, family: family || null, via, purchases: p.n, amounts: { ...p.amounts } };
+    // A month counted by 3.26.x may hold a MORSEL bucket; it is left out, the purchases stay counted.
+    const amounts = Object.fromEntries(Object.entries(p.amounts).filter(([c]) => !isMorselCurrency(c)));
+    return { channel, family: family || null, via, purchases: p.n, amounts };
   }).sort((a, b) => b.purchases - a.purchases);
 
   const topPaths = Object.entries(sum.paths)

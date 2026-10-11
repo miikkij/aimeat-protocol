@@ -7,6 +7,7 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   v1.4.0 — 2026-10-11 — 9 and 10 asserted the old model, where the tool's morsel amount was a price: the session is free with 3 morsels of pacing, and the receipt's `pacing` carries the split.
  *   v1.3.0 — 2026-10-01 — psp_set is screen-only (decision D5): test 3 asserts its refusal, and the
  *     tests that need card credentials set them through the owner's Wallet route.
  *   v1.2.0 — 2026-09-16 — Test 4b: psp_set takes webhook_secret, and both secrets are stored encrypted.
@@ -355,20 +356,22 @@ await test('9. checkout_open quotes the seller app-tool', async () => {
     });
     assert(!r.isError, `open: ${r.text}`);
     boughtSessionId = r.data.session.id;
-    assert(r.data.session.total === 3 && r.data.session.sellerOwner === sellerOwner.name, `quote: ${JSON.stringify(r.data.session)}`);
+    // The tool's old morsel price is its pacing amount (2026-10-11): free in money, 3 morsels of pacing.
+    assert(r.data.session.total === 0 && r.data.session.pacingMorsels === 3 && r.data.session.sellerOwner === sellerOwner.name, `quote: ${JSON.stringify(r.data.session)}`);
 });
 
-await test('10. checkout_complete charges the buyer owner + queues the seller task (fee arithmetic)', async () => {
+await test('10. checkout_complete charges the buyer owner the pacing + queues the seller task (pacing arithmetic)', async () => {
     const buyerBefore = await balance(buyerOwner.token);
     const sellerBefore = await balance(sellerOwner.token);
     const r = await mcp.call('aimeat_checkout_complete', { session_id: boughtSessionId });
     assert(!r.isError, `complete: ${r.text}`);
     const s = r.data.session;
-    assert(s.status === 'completed' && s.receipt.charged === 3, `receipt: ${JSON.stringify(s.receipt)}`);
-    assert(s.receipt.charged === s.receipt.earned + s.receipt.fee, 'fee arithmetic');
+    const p = s.receipt?.pacing ?? {};
+    assert(s.status === 'completed' && s.receipt.charged === 0 && p.morsels === 3, `receipt: ${JSON.stringify(s.receipt)}`);
+    assert(p.morsels === p.burned + p.fee + p.providerEarned, 'pacing arithmetic');
     assert((s.fulfillment?.taskIds || []).length === 1, `taskIds: ${JSON.stringify(s.fulfillment)}`);
-    assert(await balance(buyerOwner.token) === buyerBefore - 3, 'buyer owner debited');
-    assert(await balance(sellerOwner.token) === sellerBefore + s.receipt.earned, 'seller owner credited (minus fee)');
+    assert(await balance(buyerOwner.token) === buyerBefore - 3, 'buyer owner debited the pacing');
+    assert(await balance(sellerOwner.token) === sellerBefore + p.providerEarned, 'seller owner credited the rest of the pacing');
     const tasks = await json('/v1/agents/vendor/tasks', { headers: auth(sellerOwner.token) });
     const task = (tasks.body.data.tasks || []).find((t: any) => t.id === s.fulfillment.taskIds[0]);
     assert(!!task && String(task.description).includes('mcp purchase'), 'seller task carries the buyer input');

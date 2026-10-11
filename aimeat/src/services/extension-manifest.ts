@@ -5,6 +5,10 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). `commercial.payMorsels` is deprecated and read as pacing; accepted until
+ *     4.0.0 and refused with MORSEL_PRICE_REMOVED from it. A `commercial` block may now hold only the
+ *     listing fields when the action states a pacing amount (`tollMorsels>0`): a free, paced action.
  *   v1.12.0 — 2026-10-09 — `limits.fetch_max_mb`: the ceiling this extension's ctx.fetch reads one
  *                         answer under, stored as `limits.fetchMaxBytes` clamped to
  *                         EXTENSION_FETCH_MAX_BYTES_CEILING; a non-positive value is refused.
@@ -64,6 +68,7 @@ import { CAPABILITY_DECLARATION_KEY, NETWORK_HOSTS_KEY, parseCapabilityDeclarati
 import { NETWORK_HOST_FIELDS_KEY, hostRefusal, parseNetworkDeclaration } from './extension-network-hosts.js';
 import { localAccountName } from '../utils/gaii.js';
 import { EXTENSION_FETCH_MAX_BYTES_CEILING } from '../utils/read-capped.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import {
   AI_PROVIDER_DECLARATION_KEY, AI_OP_ACTION_PREFIX, EXTENSION_AI_OPS,
   type ExtensionAiOp, type ExtensionAiProviderDeclaration,
@@ -331,22 +336,24 @@ function validateProvides(
 }
 
 /**
- * Validate a raw action's pricing (design: notes doc-r6tyr3o). `tollMorsels` is an optional
- * anti-abuse burn (non-negative integer). `commercial` (optional) prices the call: `payMorsels`
- * must be a non-negative integer, `payMoney` (optional) is `{amount>0, currency ∈ MONEY_CURRENCIES}`,
- * and C1 requires at least one real payment channel (`payMorsels>0` OR `payMoney`). Returns an error
- * result on any violation, or `null` when valid. Enforces M1 by construction: morsels are revenue
- * only inside `commercial.payMorsels`.
+ * Validate a raw action's two values (design: notes doc-r6tyr3o; ruling decision-morseli-on-tahdistus-
+ * ei-hinta-tarjouksen-kaksi-arvoa, 2026-10-11). `tollMorsels` is the pacing amount per call
+ * (non-negative integer, within the node's per-call ceiling). `commercial` (optional) carries the money
+ * price: `payMoney` (optional) is `{amount>0, currency ∈ MONEY_CURRENCIES}`. `payMorsels` is a
+ * deprecated 3.x morsel figure: a non-negative integer, read as pacing and added to the toll where the
+ * call is charged, accepted until MORSEL_PRICE_FIELDS_REMOVED_IN and refused with MORSEL_PRICE_REMOVED
+ * from it. A morsel is never a price. C1 requires the block to say something: a money price, or a
+ * pacing amount (`payMorsels>0` while it is accepted, or `tollMorsels>0`) for a free, paced action.
+ * Returns an error result on any violation, or `null` when valid.
  */
 export function validateActionPricing(action: Record<string, unknown>, actionId: string, config: AimeatConfig): ExtBuildResult | null {
   if (action.tollMorsels !== undefined && !isNonNegInt(action.tollMorsels)) {
     return fail(`Action "${actionId}": tollMorsels must be a non-negative integer`);
   }
-  // A toll BURNS the caller's morsels and returns nothing, which is exactly what
-  // ctx.wallet.consume does, so it answers to the same ceiling. Unbounded, a manifest could name a
-  // number that empties whoever calls it once.
+  // Pacing is debited from the caller per call, so it answers to the same ceiling as
+  // ctx.wallet.consume. Unbounded, a manifest could name a number that empties whoever calls it once.
   if (isNonNegInt(action.tollMorsels) && action.tollMorsels > config.extensionMaxDebitPerCall) {
-    return fail(`Action "${actionId}": tollMorsels ${action.tollMorsels} exceeds this node's per-call burn ceiling of ${config.extensionMaxDebitPerCall}`);
+    return fail(`Action "${actionId}": tollMorsels ${action.tollMorsels} exceeds this node's per-call pacing ceiling of ${config.extensionMaxDebitPerCall}`);
   }
   const commercial = action.commercial as Record<string, unknown> | undefined;
   if (commercial === undefined) return null;
@@ -357,9 +364,12 @@ export function validateActionPricing(action: Record<string, unknown>, actionId:
   if (!isNonNegInt(payMorsels)) {
     return fail(`Action "${actionId}": commercial.payMorsels must be a non-negative integer`);
   }
-  // A price is revenue and the caller has to hold the balance, so this is a sanity bound rather
-  // than a spend control. It exists because an agent invoking a capability does not necessarily
-  // read the price first, and "non-negative integer" admitted 2^31.
+  if (payMorsels > 0 && !legacyMorselFieldsLive()) {
+    return { ok: false, status: 400, code: 'MORSEL_PRICE_REMOVED',
+      message: `Action "${actionId}": commercial.payMorsels was removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}: a morsel is pacing, not a price. Set tollMorsels (the pacing amount per call) and commercial.payMoney.` };
+  }
+  // A sanity bound on the deprecated figure. It exists because an agent invoking a capability does
+  // not necessarily read the action first, and "non-negative integer" admitted 2^31.
   if (payMorsels > config.extensionMaxPayMorsels) {
     return fail(`Action "${actionId}": commercial.payMorsels ${payMorsels} exceeds this node's ceiling of ${config.extensionMaxPayMorsels}`);
   }
@@ -375,9 +385,9 @@ export function validateActionPricing(action: Record<string, unknown>, actionId:
       return fail(`Action "${actionId}": commercial.payMoney.currency must be one of ${MONEY_CURRENCIES.join(', ')}`);
     }
   }
-  // C1: at least one real payment channel.
-  if (Number(payMorsels) <= 0 && payMoney === undefined) {
-    return fail(`Action "${actionId}": commercial must set at least one payment channel (payMorsels>0 or payMoney)`);
+  // C1: the block states a money price or a pacing amount; an empty one says nothing.
+  if (Number(payMorsels) <= 0 && payMoney === undefined && !(isNonNegInt(action.tollMorsels) && action.tollMorsels > 0)) {
+    return fail(`Action "${actionId}": commercial must set a money price (payMoney), or the action a pacing amount (tollMorsels>0) for a free, paced call`);
   }
   // Optional EXCHANGE pricing plans (bundle / subscription) — amounts in the action's unit (TARGET-045 Phase B).
   const plans = commercial.plans;
@@ -528,7 +538,7 @@ export function buildExtensionRecordFromManifest(
       return { ok: false, status: 400, code: 'MISSING_SCRIPT',
         message: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` };
     }
-    // Pricing (design: notes doc-r6tyr3o). tollMorsels = anti-abuse burn; commercial = revenue.
+    // Two values (design: notes doc-r6tyr3o). tollMorsels = pacing per call; commercial.payMoney = the money price.
     const pricingErr = validateActionPricing(action, action.id as string, config);
     if (pricingErr) return pricingErr;
   }

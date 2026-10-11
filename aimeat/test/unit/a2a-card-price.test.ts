@@ -18,6 +18,8 @@
  *   Both are pinned by value rather than by shape: a test asserting "the description mentions the
  *   price" passes on 1500000 as happily as on 1.50.
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The morsel cases assert the pacing line ("free, pacing N morsels per use"):
+ *     they asserted the old morsel price model, which the ruling on pacing replaced.
  *   v1.0.0 — 2026-09-04 — Initial, with the fix it exists to hold.
  */
 import { describe, it, expect } from 'vitest';
@@ -49,16 +51,27 @@ function priceSentence(o: unknown): string {
 }
 
 describe('the price on an agent card', () => {
-  it('says morsels per task, and never "per morsels"', () => {
+  // A morsel is pacing, never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
+  // kaksi-arvoa, 2026-10-11): a 3.x morsel offering reads as free with that much pacing.
+  it('reads a morsel offering as free with pacing, and never as a morsel price', () => {
     const text = priceSentence(offering({ unit: 'morsels', basePrice: 8, currency: null }));
-    expect(text).toContain('8 morsels per task');
-    // The defect verbatim: the rail printed where the billing unit belongs.
+    expect(text).toContain('free, pacing 8 morsels per use');
+    expect(text).not.toContain('morsels per task');
+    // The earlier defect verbatim: the rail printed where the billing unit belongs.
     expect(text).not.toContain('per morsels');
+    // No money changes hands, so the x402 sentence is not on the card.
+    expect(text).not.toContain('x402');
   });
 
-  it('says one morsel in the singular', () => {
+  it('says one morsel of pacing in the singular', () => {
     expect(priceSentence(offering({ unit: 'morsels', basePrice: 1, currency: null })))
-      .toContain('1 morsel per task');
+      .toContain('pacing 1 morsel per use');
+  });
+
+  it('names the money price and the pacing side by side', () => {
+    const text = priceSentence(offering({ unit: 'money', basePrice: 1_500_000, currency: 'EUR', tollMorsels: 2 }));
+    expect(text).toContain('1.50 EUR per task, pacing 2 morsels per use');
+    expect(text).toContain('x402');
   });
 
   it('turns money micros into money, and never advertises a million times the price', () => {

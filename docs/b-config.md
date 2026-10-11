@@ -119,7 +119,7 @@ The dot path's first segment is the group. The configuration schema lists the cu
 | `quota` | Per-owner ceilings: memory MB and keys, storage MB, file and app size, workspace rows |
 | `rate_limits` | Requests per second per endpoint family, multiplied by who is asking: operator 10x, owner 2x, agent 1x, anonymous 0.5x |
 | `seo` | Titles, descriptions, og-image, indexing posture |
-| `morsel_policy` | Welcome bonus, daily allowance and its cap, burn rate, pacing toll, operator mint ceiling |
+| `morsel_policy` | Welcome bonus, daily allowance and its cap, burn rate, pacing toll, operator mint ceiling, the pacing pack an operator sells for money |
 | `federation` | Peering policy, relay hops, heartbeats, depeering grace, Web Bot Auth signing |
 | `connections` | Outbound accounts (Google, Microsoft) an owner can attach |
 | `email` | SMTP and whether address confirmation is required |
@@ -161,8 +161,12 @@ Defaults as shipped in `.env.example`.
 | `morsel_policy.welcome_bonus` | `AIMEAT_WELCOME_BONUS` | `100` | Morsels a new owner starts with |
 | `morsel_policy.daily_allowance` | `AIMEAT_DAILY_ALLOWANCE` | `50` | Accrued per day |
 | `morsel_policy.daily_allowance_cap` | `AIMEAT_DAILY_ALLOWANCE_CAP` | `500` | Where accrual stops |
-| `morsel_policy.burn_rate` | `AIMEAT_BURN_RATE` | `0.10` | Share of a transfer that leaves circulation |
-| `morsel_policy.pacing_toll_default` | `AIMEAT_PACING_TOLL_DEFAULT` | `0` | What a write costs by default |
+| `morsel_policy.burn_rate` | `AIMEAT_BURN_RATE` | `0.10` | Share of each pacing charge that burns; the rest goes to the provider, after the flow's own operator share (`commerce.fee_percent`, `marketplace.tx_fee_percent`) where that flow has one |
+| `morsel_policy.pacing_toll_default` | `AIMEAT_PACING_TOLL_DEFAULT` | `0` | Morsels of pacing per use when an offer sets no `toll_morsels` of its own; 0 is off |
+| `morsel_policy.max_operator_mint_per_day` | `AIMEAT_MAX_OPERATOR_MINT_PER_DAY` | `10000` | New morsels per day: operator mints and sold pacing packs count together |
+| `morsel_policy.pacing_pack_morsels` | `AIMEAT_PACING_PACK_MORSELS` | `0` | Morsels in one pacing pack that users can buy with money; 0 sells no pack |
+| `morsel_policy.pacing_pack_price` | `AIMEAT_PACING_PACK_PRICE` | `0` | Money price of one pack in 6-decimal micro-units (1 EUR = 1000000); 0 sells no pack |
+| `morsel_policy.pacing_pack_currency` | `AIMEAT_PACING_PACK_CURRENCY` | `EUR` | Currency of the pack price: `EUR` or `USD` |
 | `quota.memory_mb` | `AIMEAT_MEMORY_QUOTA_MB` | `10` | Memory in MB, for each owner and for each agent separately |
 | `quota.memory_max_keys_per_agent` | `AIMEAT_MEMORY_MAX_KEYS` | `1000` | Memory keys, for each owner and for each agent separately; query the target node for its configured limit |
 | `quota.memory_max_value_size_kb` | `AIMEAT_MEMORY_MAX_VALUE_SIZE_KB` | `1024` | One memory value |
@@ -190,6 +194,21 @@ what the current posture leaves open. → `docs/coding-guidelines/security-devel
 
 Operator identity (`operator.*`) has no default on purpose. A node that has not said who runs it
 answers 503 on `/v1/privacy` rather than naming somebody else as the data controller.
+
+### Morsels pace use; they are not a price
+
+Since 11 October 2026 every offer, app, tool, action and EXCHANGE offering has two values: an
+optional money price (EUR or USD; none means free) and a pacing amount in morsels per use
+(`toll_morsels`, at most `AIMEAT_EXT_MAX_DEBIT`, 100 by default, which has no dot path). Each use takes the pacing
+amount from the user's owner. `morsel_policy.burn_rate` decides the share that burns. A flow that
+had an operator share before (`commerce.fee_percent`, `marketplace.tx_fee_percent`) keeps it, and
+the provider gets the rest. An older morsel price (`price.morsels`, `priceMorsels`, `base_morsels`
+and the like) is read as pacing until release 4.0.0 and refused after it.
+
+A user who runs out of morsels gets more from the daily allowance (`POST /v1/wallet/request`) or, when
+the operator sets `morsel_policy.pacing_pack_morsels` and `morsel_policy.pacing_pack_price` above 0,
+buys a pacing pack with money: a checkout line `{ kind: "pacing-pack", quantity }` paid through a money
+handler, sold by the operator's account. `GET /v1/wallet` shows the pack as `pacing_pack`.
 
 ### What is no longer configuration
 

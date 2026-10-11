@@ -15,6 +15,8 @@
  *                                      consumer debited) · and a STALE session token (named error, no charge)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
+ *   v1.4.1 — 2026-10-11 — The no-contract case prices its tool in money: a morsel figure is pacing
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa), and a tool with only that is free.
  *   v1.4.0 — 2026-10-08 — aiprov D1: a delivery whose declaration the provider's agent may not make
  *     is refused before the buyer is charged, the work stays open, and the same agent then delivers
  *     once without a declaration. captureTools takes the session's scopes.
@@ -268,7 +270,9 @@ await test('aimeat_app_tool_invoke — no contract for the app-tool → NO_CONTR
     // so only a priced one needs a contract, and without a price this reached the missing capability.
     const put = await json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
         key: 'apps.brief.tools', visibility: 'public',
-        value: { tools: [{ name: 'getBrief', action_id: 'cap-x', description: 'brief', price: { morsels: 5 }, inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }] },
+        // A MONEY price: a morsel figure is pacing since 2026-10-11 (decision-morseli-on-tahdistus-ei-
+        // hinta-tarjouksen-kaksi-arvoa), and a tool with only that is free and needs no contract.
+        value: { tools: [{ name: 'getBrief', action_id: 'cap-x', description: 'brief', priceMoney: { amount: 5000, currency: 'EUR' }, inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }] },
     }) });
     assert(put.status === 200 || put.status === 201, `manifest put ${put.status}`);
     const res = parse(await C()['aimeat_app_tool_invoke']({ owner: provider.name, app: 'brief', tool: 'getBrief', input: {} }));

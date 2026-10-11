@@ -3,12 +3,14 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab that lists registered catalogue actions —
- *   id, name/description, provider, category, base morsel cost, and tags.
+ *   id, name/description, provider, category, pacing amount per use (morsels), and tags.
  *
  * @structure
  *   - ActionsTab({ data }): renders data.actions.actions as a List; shows Empty state when none registered
  *
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The morsel column is the pacing amount per use (pricing.toll_morsels, 3.x
+ *     pricing.base_morsels as fallback), headed "Pacing per use"; a morsel is not a cost.
  *   v1.1.2 — 2026-09-28 — Reads the fields GET /v1/actions answers (display_name, provider_gaii,
  *     pricing.base_morsels); it read name, provider and base_cost, so the name, provider and cost were always empty.
  *   v1.1.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
@@ -26,13 +28,14 @@ import { t } from '/js/i18n.js';
 import { num, Badge, Empty } from './shared.js';
 import { List, Row, Name, Cell, Num } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
+import { pacingOf } from '/js/format.js';
 
 export default function ActionsTab({ data }) {
   const acts = data.actions?.actions || [];
   if (!acts.length) return html`<${Empty} text=${t('dashboard.noActionsRegistered')} />`;
 
   const head = ['ID', t('dashboard.name'), t('dashboard.provider'), t('dashboard.category'),
-    { label: t('dashboard.baseCost'), num: true }, t('dashboard.tags')];
+    { label: t('dashboard.pacingPerUse'), num: true }, t('dashboard.tags')];
   return html`
     <${List} cols="id-name-who-state-n-tags" head=${head} labels>
       ${acts.map(a => html`
@@ -41,7 +44,7 @@ export default function ActionsTab({ data }) {
           <${Name} desc=${a.description || null}>${a.display_name || a.id}<//>
           <${Cell} meta>${a.provider_gaii}<//>
           <${Cell}><${Badge} type=${a.category || 'info'} /><//>
-          <${Num}>${num(a.pricing?.base_morsels)} ⬥<//>
+          <${Num}>${num(pacingOf(a))}<//>
           <${Cell} line>${(a.tags || []).map(tag => html`<${Mark} key=${tag}>${tag}<//>`)}<//>
         <//>`)}
     <//>

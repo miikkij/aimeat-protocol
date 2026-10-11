@@ -25,6 +25,7 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The pacing toll is charged with chargePacing: part burns, the operator share follows the fee policy, and the rest is credited to the provider (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Under a grant the provider pays it and all of it burns.
  *   v1.1.2 — 2026-10-05 — The app's spend word is asked with scopeIsCovered (secaudit 2026-10, C3).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-07-30 — A settled outcome now also carries `accrue()`, the other half of `refund()`:
@@ -43,11 +44,11 @@ import {
   readEntitlementForCall, budgetAllows, computeCharge,
   type MeteredEntitlement,
 } from './metered-entitlements.js';
-import { resolvePacingToll } from '../routes/extensions/pacing.js';
 import {
-  settleMeteredCharge, burnPacingTollFor,
+  settleMeteredCharge, chargePacing, resolvePacingToll,
   type SettlementResult, type BeneficiaryAccrual,
 } from './metered-settlement.js';
+import { commerceFeePercent } from './marketplace-fee.js';
 import { recordUsageCall } from './usage/usage-buffer.js';
 import type { UsageActorKind, UsageOutcome, UsageSurface } from '../storage/interface.js';
 
@@ -333,11 +334,15 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
 
   // 3. Pacing, first and always. The one brake that bounds RATE rather than total spend, which is the
   //    property a money budget does not have.
+  //    Part of the pacing burns, the operator share goes where the fee policy sends it, and the rest
+  //    is credited to the provider. A grant covers both halves of a price, so the provider pays the
+  //    pacing, and with no one else to credit the whole amount burns.
   const toll = resolvePacingToll(config, ent.tollMorsels);
-  const paced = await burnPacingTollFor({
-    config, storage, caller, label: product.label, toll,
-    // A grant covers both halves of a price, so the provider burns it.
+  const paced = await chargePacing({
+    config, storage, caller, label: product.label, amount: toll,
     payer: ent.grant ? ent.providerGhii : null,
+    providerGhii: ent.grant ? null : ent.providerGhii,
+    feePercent: ent.rakePercent ?? commerceFeePercent(config),
   });
   if (!paced) return { kind: 'insufficient', entitlement: ent, needed: toll, carried: !!ent.grant };
 

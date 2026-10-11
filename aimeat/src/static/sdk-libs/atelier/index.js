@@ -57,6 +57,8 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.66.2 — 2026-10-11 — priceTable, cart and checkout show an amount in morsels as pacing, never as a
+ *     price (money-units.js pacingText, kit key pacingAmount).
  *   v0.66.1 — 2026-10-10 — schedule(): bookings that share hours stand beside each other, each
  *     at an equal share of its day (planner-lanes.js). They lay on top of each other at full
  *     width, so only the last one drawn was seen. A booking alone on its hours is unchanged.
@@ -480,7 +482,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.66.1',
+  version: '0.66.2',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's

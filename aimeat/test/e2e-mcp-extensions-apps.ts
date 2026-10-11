@@ -36,7 +36,8 @@
  *   - Phase 8: aimeat_app_delete, both refusal arms and the real delete
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-extensions-apps
  * @version-history
- *   2026-09-27 — The versions tests call aimeat_app_manage (action versions).
+ *   2026-10-11 — The `expensive` action has a money price; its 9999-morsel price asserted the old model (a morsel amount is pacing now, clamped to the per-use ceiling, and it ran).
+ *   2026-09-27 —The versions tests call aimeat_app_manage (action versions).
  *   v1.2.0 — 2026-09-13 — Test 23b: upload mode carries cortex_agents to the PUT and refuses a
  *     malformed one before handing out a URL.
  *   v1.1.0 — 2026-09-08 — Test 21 asserts the tool's own ceiling now that /v1/mcp admits it.
@@ -248,7 +249,9 @@ actions:
     output:
       type: object
     commercial:
-      payMorsels: 9999
+      payMoney:
+        amount: 1000000
+        currency: EUR
 instances:
   supported: true
   config_per_instance:
@@ -502,7 +505,8 @@ await test('17. …and a PAUSED instance is refused with the reason, not with "n
 await test('18. A priced action from another owner\'s agent meets the paywall over MCP too', async () => {
     // The owner and their own principals are free; everybody else pays or holds an entitlement. This
     // tool used to execute the script without asking, so a priced action was free through a tool call
-    // and metered over HTTP. Priced above any welcome balance, so the refusal is deterministic.
+    // and metered over HTTP. A money price with no paid token, so the refusal is deterministic (a
+    // morsel price was used until 2026-10-11; a morsel amount is pacing now and runs once paid).
     const r = await callTool(strangerSession, 'aimeat_extension_invoke', {
         extension_name: EXT, action_id: 'expensive', input: { q: 'free ride' },
     });

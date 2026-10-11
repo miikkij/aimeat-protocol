@@ -15,7 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
- *   v1.25.1 — 2026-10-10 — federationAudienceRequired comes from federationDefaults(), its default following the version (secaudit 2026-10-10 I22).
+ *   v1.26.0 — 2026-10-11 — The pacing pack (AIMEAT_PACING_PACK_MORSELS, _PRICE, _CURRENCY): pacing capacity the operator sells for money. The extensionMaxPayMorsels comment says the field it bounds is pacing now.
+ *   v1.25.1 — 2026-10-10 —federationAudienceRequired comes from federationDefaults(), its default following the version (secaudit 2026-10-10 I22).
  *   v1.25.0 — 2026-10-09 — docsignDefaults() (config-docsign.ts); the AI-label posture moved to config-ai-label.ts unchanged.
  *   v1.24.0 — 2026-10-09 — turnDefaults(): the TURN settings, with turnSecret and turnTtlSeconds (config-turn.ts).
  *   v1.23.0 — 2026-10-08 — visibilityDefaults(): one switch per visibility layer (config-visibility.ts).
@@ -628,18 +629,20 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionTimeoutMs: parseInt(process.env.AIMEAT_EXT_TIMEOUT_MS ?? '5000', 10),
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '500', 10),
     extensionMaxDebitPerCall: parseInt(process.env.AIMEAT_EXT_MAX_DEBIT ?? '100', 10),
-    // Ceiling on a PRICE an action may put on itself in its manifest (commercial.payMorsels).
-    // A price is revenue and the caller must hold the balance, so this is a sanity bound rather
-    // than a spend control: it stops a manifest asking for a number nobody meant to type, and an
-    // agent invoking a capability does not necessarily read the price before it calls. The burn
-    // side (tollMorsels) is bounded by extensionMaxDebitPerCall instead, since a burn takes the
-    // morsels and gives nothing back.
+    // Ceiling on the deprecated 3.x `commercial.payMorsels` an extension manifest may declare. That
+    // field is read as pacing since 2026-10-11 (a morsel is never a price), and the pacing charged
+    // per use is clamped by extensionMaxDebitPerCall (resolvePacingToll); this stays a sanity bound
+    // on what a manifest may write, so it refuses a number nobody meant to type.
     extensionMaxPayMorsels: parseInt(process.env.AIMEAT_EXT_MAX_PAY_MORSELS ?? '10000', 10),
     // Morsels burned per metered call when the capability declares no toll of its own. Morsels
     // replenish daily with a hard ceiling, so a non-zero value puts an absolute rate floor under
     // every capability — including money-priced ones, whose only other brake is the buyer's budget.
     // 0 (the default) keeps existing billing unchanged; raising it is an operator decision.
     pacingTollDefault: parseInt(process.env.AIMEAT_PACING_TOLL_DEFAULT ?? '0', 10),
+    // Pacing capacity an operator sells for money (commerce/pacing-pack.ts); off while either is 0.
+    pacingPackMorsels: parseInt(process.env.AIMEAT_PACING_PACK_MORSELS ?? '0', 10),
+    pacingPackPrice: parseInt(process.env.AIMEAT_PACING_PACK_PRICE ?? '0', 10),
+    pacingPackCurrency: process.env.AIMEAT_PACING_PACK_CURRENCY === 'USD' ? 'USD' : 'EUR',
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),

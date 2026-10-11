@@ -8,8 +8,8 @@
  *
  *   EVERY STEP NAMES A CAPABILITY THAT EXISTS. The marketplace one settles through the same payment
  *   handler registry the code actually runs — com.stripe.spt for cards and agentic checkout,
- *   io.aimeat.x402 for USDC/EURC (non-custodial, `exact` scheme), io.aimeat.morsels inside the node
- *   — over the same collect/payout/refund contract, with holds, capture and beneficiary splits. The
+ *   io.aimeat.x402 for USDC/EURC (non-custodial, `exact` scheme) — over the same collect/payout/refund
+ *   contract (there is no morsel handler: a morsel is pacing, never a payment), with holds, capture and beneficiary splits. The
  *   accounts one drives /v1/connections. Nothing here is a roadmap: a playbook that promises a
  *   feature this node does not have wastes the person's afternoon before it disappoints them.
  *
@@ -20,6 +20,9 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS.
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.2.0 — 2026-10-11 — playbook-marketplace: two kinds of money (the morsel handler is gone), and
+ *     each item's two values, a money price and a pacing amount (decision-morseli-on-tahdistus-ei-
+ *     hinta-tarjouksen-kaksi-arvoa).
  *   v1.1.1 — 2026-10-01 — The two card-payment lines send the person to the Wallet page; the payment secret is screen-only (decision D5).
  *   v1.1.0 — 2026-08-23 — playbook-brain (TARGET-071). A NEW id rather than a deepened existing one,
  *     because prompt-seeder re-syncs content only for the generator, builders and tiers groups:
@@ -188,15 +191,16 @@ quietly becomes "everything we know", and the weekly check names any source that
     content: `You are setting up a shop for the person you are talking to, on their AIMEAT account at {{node_url}}. Work through this with them one step at a time, and confirm before anything is published or any money is configured.
 
 ## What they are getting
-One checkout that accepts three kinds of money and pays out to them:
+One checkout that accepts two kinds of money and pays out to them:
 - **Cards and agentic checkout** through the Stripe handler (com.stripe.spt) — a person pays with a card, and an AI agent shopping on someone's behalf pays through the same door with a shared payment token.
 - **Stablecoin** through x402 (io.aimeat.x402): USDC settles a USD price, EURC a EUR price, non-custodial. The price stays in the fiat currency; the coin is the payment method.
-- **Morsels** (io.aimeat.morsels) for anything sold inside this node.
 
-All three register in the same payment-handler registry and implement the same collect/payout/refund contract, so the shop is built once and gains each method as it is switched on.
+Both register in the same payment-handler registry and implement the same collect/payout/refund contract, so the shop is built once and gains each method as it is switched on.
+
+Each thing they sell has two values: an optional money price (none means free) and a pacing amount in morsels per use, which paces how fast others use it. Each use debits the pacing from the buyer's account; part burns and the rest reaches the person. Morsels are pacing, never a price: describe them as "5 morsels of pacing per use".
 
 ## Step 1 — What is for sale
-Ask what they sell and pick the shape with them: a thing with a fixed price, a service they deliver, or work one of their agents performs on request. Write it down as a capability or an exchange offering under their account, with the price and the currency. Keep the first one small enough to finish today.
+Ask what they sell and pick the shape with them: a thing with a fixed price, a service they deliver, or work one of their agents performs on request. Write it down as a capability or an exchange offering under their account, with the money price and the currency, and the pacing amount if they want one. Keep the first one small enough to finish today.
 
 ## Step 2 — The money
 Set the payout side up before the buying side:

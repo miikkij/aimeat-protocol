@@ -25,13 +25,19 @@
  *   with its own rails. A formatter that accepted both would print "625 €" over a morsel balance
  *   inside a month, because the two are numbers of the same size sitting next to each other on the
  *   same pages. `morsels()` is the one that formats them, and it never attaches a currency symbol.
- * @structure num · dt · date · time · dateTime · relative · money · morsels · fmtUp · fmtBytes
+ * @structure num · dt · date · time · dateTime · relative · money · morsels · pacingOf ·
+ *   moneyPriceOf · priceAndPacing · fmtUp · fmtBytes
  * @usage import { num, dt, money, morsels } from '/js/format.js';
  *   num(1234)                    → "1 234"      in the reader's own format
  *   dt('2026-01-02T…')           → date and time, in the reader's own clock
  *   money(12.5, 'EUR')           → "12,50 €"
  *   morsels(625)                 → "625 morsels" — never a currency symbol
+ *   priceAndPacing(offer, t)     → "Free · pacing 5 morsels" / "1,00 € · pacing 5 morsels"
  * @version-history
+ *   v2.7.0 — 2026-10-11 — An item has two values (ruling "morseli on tahdistus, ei hinta"): an optional
+ *     money price and a pacing amount in morsels. pacingOf() reads tollMorsels / toll_morsels with
+ *     the 3.x morsel-price fields as fallback, moneyPriceOf() the money price, priceAndPacing() says
+ *     both in one line. A morsel amount is never shown as a price.
  *   v2.6.0 — 2026-09-13 — A WORD IS NOT A UNIT. `relative()` and `duration()` follow the page's
  *     LANGUAGE; everything else keeps following the regional format. They write words — "3 päivää
  *     sitten", "eilen", "1pv 23t" — and a person who sets Finnish words with British dates asked
@@ -409,6 +415,66 @@ export function money(n, currency = 'USD', opts) {
 export function morsels(n, word = 'morsels') {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
   return `${num(n)} ${word}`;
+}
+
+/** A whole, non-negative number, or null. */
+function wholeOrNull(v) {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null;
+}
+
+/**
+ * The pacing amount of an offer, app, tool, action or EXCHANGE offering: the morsels one use takes
+ * from the user's balance. It is never a price (ruling 2026-10-11, "a morsel is pacing, not a
+ * price"). Reads the current field first and falls back to the 3.x fields, which hold the same
+ * number (a converted morsel price became the pacing amount); the two are never added.
+ * @param {object} item
+ * @returns {number} whole morsels, 0 when nothing is declared
+ */
+export function pacingOf(item) {
+  if (!item || typeof item !== 'object') return 0;
+  const candidates = [
+    item.tollMorsels, item.toll_morsels, item.pricing?.toll_morsels, item.pricing?.tollMorsels,
+    item.price?.morsels, item.priceMorsels, item.price_morsels,
+    item.pricing?.base_morsels, item.pricing?.baseMorsels,
+    item.unit === 'morsels' ? item.basePrice : undefined,
+  ];
+  for (const c of candidates) {
+    const n = wholeOrNull(c);
+    if (n !== null) return n;
+  }
+  return 0;
+}
+
+/**
+ * The money price of an item in 6-decimal micro-units, or null when it is free. Reads `priceMoney`,
+ * then the first of `pricesMoney`, then `price_money`, then an EXCHANGE offering's money unit.
+ * @param {object} item
+ * @returns {{ amount: number, currency: string } | null}
+ */
+export function moneyPriceOf(item) {
+  if (!item || typeof item !== 'object') return null;
+  const list = [item.priceMoney, ...(Array.isArray(item.pricesMoney) ? item.pricesMoney : []), item.price_money];
+  if (item.unit === 'money' && item.basePrice > 0) list.push({ amount: item.basePrice, currency: item.currency });
+  for (const m of list) {
+    if (m && typeof m.amount === 'number' && m.amount > 0) return { amount: m.amount, currency: String(m.currency || 'EUR') };
+  }
+  return null;
+}
+
+/**
+ * "Free · pacing 5 morsels" or "1.00 EUR · pacing 5 morsels": an item's money price (or Free) and
+ * its pacing amount, in the page's language. `tr` is the page's t() (passed in: this module sits
+ * below i18n.js in the import graph). The pacing half is left out when the amount is 0.
+ * @param {object} item
+ * @param {(key: string, vars?: object) => string} tr
+ * @returns {string}
+ */
+export function priceAndPacing(item, tr) {
+  const m = moneyPriceOf(item);
+  const head = m ? money(m.amount / 1e6, m.currency) : tr('pacing.free');
+  const toll = pacingOf(item);
+  return toll > 0 ? `${head} · ${tr('pacing.amount', { n: num(toll) })}` : head;
 }
 
 /** Format uptime seconds as a human-readable "Nd Nh Nm" (sub-minute → "<1m"). */

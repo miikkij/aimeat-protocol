@@ -27,6 +27,8 @@
  * @structure packageSellableResolver() · carryOutSale() · parsePackageLine() · readOfferAsSeller() ·
  *   decideSaleRequest() · reviewSale()
  * @version-history
+ *   v1.3.1 — 2026-10-11 — An absent currency, or the deprecated 'morsel', means the package's own
+ *     currency, instead of a refusal; a package line carries no pacing (unitPrice, tollMorsels 0).
  *   v1.3.0 — 2026-10-06 — A purchase an agent completes with automatic renewal names that agent on the
  *     subscription (`auto_renew_by`; secaudit 2026-10 follow-up, A6).
  *   v1.2.0 — 2026-10-05 — A sale naming a node another buyer on this node holds is refused with
@@ -127,7 +129,8 @@ export function packageSellableResolver(peers: Map<string, PeerInfo>): SellableR
                 unitPrice = entry.price.amount;
                 currency = entry.price.currency;
             }
-            const asked = ref.currency ?? 'morsel';
+            // No currency, or the 'morsel' a 3.x client may still send, means the package's own currency.
+            const asked = ref.currency && ref.currency !== 'morsel' ? ref.currency : currency;
             if (asked !== currency) throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `${groupId} is sold in ${currency}; open the checkout with currency ${currency}.`);
             if (!listPaymentHandlers().some(h => h.currencies.includes(currency))) {
                 throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `No payment handler on this node settles ${currency}.`);
@@ -137,7 +140,7 @@ export function packageSellableResolver(peers: Map<string, PeerInfo>): SellableR
             return {
                 kind: 'package', agentGaii: repository, agentName: groupId, offerId: ref.offer_id ?? 'buy',
                 title: line.act === 'renew' ? `${entry.title ?? groupId}: updates renewed` : (entry.title ?? groupId),
-                sellerOwner: entry.seller_of_record, sellerGhii, priceMorsels: unitPrice, psp,
+                sellerOwner: entry.seller_of_record, sellerGhii, unitPrice, tollMorsels: 0, psp,
                 async fulfill(ctx, { session, item, payment }) {
                     const input = (item.input ?? {}) as PackageLineInput;
                     const result = await carryOutSale(deps, {

@@ -4277,13 +4277,15 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "versions.perDay": "{n} publishes",
       "versions.chartMax": "up to {n} a day",
       "mz.group.what": "What the tool is",
-      "mz.group.price": "What a call costs",
+      "mz.group.price": "Price and pacing",
       "mz.group.market": "On the marketplace",
       "mz.group.delivery": "How a bought call is delivered",
       "mz.descHint": "One or two sentences a buyer reads before paying. What goes in, what comes back.",
-      "mz.priceLede": "In morsels, in money, or both. Leave every price empty and the tool is declared but not for sale.",
-      "mz.more.price": "A second currency and the pacing burn",
-      "mz.marketLede": "Listing puts the tool on EXCHANGE with the price above. The ODPS description is what the marketplace shows beside it.",
+      "mz.priceLede": "A money price, or none, and then the tool is free. Pacing is how many morsels each call takes from the caller; it is not a price. Leave both empty and the tool is declared but not for sale.",
+      "mz.more.price": "A second currency",
+      "mz.marketLede": "Listing puts the tool on EXCHANGE with the price and pacing above. The ODPS description is what the marketplace shows beside it.",
+      "pacing.free": "Free",
+      "pacing.amount": "pacing {n} morsels",
       "mz.deliveryLede": "A capability binding runs the call at once and returns the result. Without one, a purchase becomes a task for your agent.",
       "view.communityEmpty": "No community apps on this node yet.",
       "view.communityHint": "Community apps are apps other people on this node have published. When someone publishes one, it shows up here.",
@@ -4590,8 +4592,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "monetize.addTool": "Add tool",
       "monetize.name": "Tool name",
       "monetize.desc": "Description",
-      "monetize.priceCol": "Price / call",
-      "monetize.priceMorsels": "Price (morsels)",
+      "monetize.priceCol": "Price and pacing / call",
       "monetize.priceMoney": "Money price",
       "monetize.currency": "Currency",
       "monetize.money2": "Second money price",
@@ -4670,12 +4671,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "odps.openAppDefaults": "Edit app-level defaults",
       "odps.blockedSchema": "Cannot be listed: the tool needs a non-empty input AND output schema.",
       "odps.blockedBinding": "Cannot be listed: the tool needs a capability binding (action_id).",
-      "odps.blockedPrice": "Cannot be listed: the tool needs a price.",
+      "odps.blockedPrice": "Cannot be listed: the tool needs a money price or a pacing amount.",
       "monetize.exchange": "List in EXCHANGE",
-      "monetize.toll": "Pacing burn per call (morsels)",
-      "monetize.tollHint": "Not a price: morsels burned per call to cap how fast this tool can be consumed. Nobody is credited them, and your own calls are free. Leave empty to use the node default; set 0 to switch pacing off for this tool.",
-      "monetize.tollInvalid": "Pacing burn must be a whole number between 0 and 100.",
-      "monetize.exchangeHint": "On: this tool is offered publicly on the marketplace and its listing follows the price you set here. Off: it is removed from the marketplace. Contracts already agreed are unaffected.",
+      "monetize.toll": "Pacing per call (morsels)",
+      "monetize.tollHint": "Not a price: the morsels each call takes from the caller's balance, which limits how fast the tool can be used. Part of them is burned and the rest comes to you. Your own calls take nothing. Leave empty to use the server's default; 0 turns pacing off for this tool.",
+      "monetize.tollInvalid": "Pacing must be a whole number between 0 and 100.",
+      "monetize.exchangeHint": "On: this tool is offered publicly on the marketplace and its listing follows the price and pacing you set here. Off: it is removed from the marketplace. Contracts already agreed are unaffected.",
       "monetize.exchangeOn": "in EXCHANGE",
       "monetize.exchangeNeedsSchema": "To list in EXCHANGE the tool needs an input and output schema plus a capability binding. Publish those first (MCP: aimeat_app_tools_publish).",
       "monetize.actionId": "Capability binding (action id)",
@@ -4829,10 +4830,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "cost.title": "Cost & contracts — what this app sources",
       "cost.hint": "This app’s EXCHANGE contracts: durable metered entitlements it calls, with live spend against each budget and the platform rake. The per-call price comes from the provider; you set only the budget cap.",
       "cost.empty": "No EXCHANGE contracts yet — this app sources nothing priced.",
-      "cost.summary": "{n} contract(s) · {spent} morsels spent · {calls} call(s)",
+      "cost.summary": "{n} contract(s) · {spent} morsels of pacing · {calls} call(s)",
       "cost.capabilityCol": "Capability",
       "cost.providerCol": "Provider",
-      "cost.priceCol": "Price / call",
+      "cost.priceCol": "Pacing / call",
       "cost.rakeCol": "Rake",
       "cost.budgetCol": "Budget (spent / cap)",
       "cost.stateCol": "State",
@@ -5380,13 +5381,15 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "versions.perDay": "{n} julkaisua",
       "versions.chartMax": "enimmillään {n} päivässä",
       "mz.group.what": "Mikä työkalu on",
-      "mz.group.price": "Mitä kutsu maksaa",
+      "mz.group.price": "Hinta ja tahdistus",
       "mz.group.market": "Markkinalla",
       "mz.group.delivery": "Miten ostettu kutsu toimitetaan",
       "mz.descHint": "Lause tai kaksi, jotka ostaja lukee ennen maksamista. Mitä menee sisään, mitä tulee ulos.",
-      "mz.priceLede": "Morseleina, rahana tai molempina. Jätä jokainen hinta tyhjäksi, niin työkalu on julistettu mutta ei myynnissä.",
-      "mz.more.price": "Toinen valuutta ja tahdistuspoltto",
-      "mz.marketLede": "Listaus vie työkalun EXCHANGEen yllä olevalla hinnalla. ODPS-kuvaus on se, minkä markkina näyttää sen vieressä.",
+      "mz.priceLede": "Rahahinta tai ei hintaa, jolloin työkalu on maksuton. Tahdistus kertoo, montako murusta jokainen kutsu ottaa kutsujan saldosta; se ei ole hinta. Jos jätät molemmat tyhjiksi, työkalu on julistettu mutta ei myynnissä.",
+      "mz.more.price": "Toinen valuutta",
+      "mz.marketLede": "Listaus vie työkalun EXCHANGEen yllä olevalla hinnalla ja tahdistuksella. ODPS-kuvaus on se, minkä markkina näyttää sen vieressä.",
+      "pacing.free": "Maksuton",
+      "pacing.amount": "tahdistus {n} murusta",
       "mz.deliveryLede": "Kyvykkyyssidonta ajaa kutsun heti ja palauttaa tuloksen. Ilman sitä ostosta syntyy tehtävä agentillesi.",
       "view.communityEmpty": "Tällä nodella ei ole vielä yhteisön sovelluksia.",
       "view.communityHint": "Yhteisön sovellukset ovat sovelluksia, joita muut tämän noden käyttäjät ovat julkaisseet. Kun joku julkaisee sellaisen, se näkyy täällä.",
@@ -5688,8 +5691,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "monetize.addTool": "Lisää työkalu",
       "monetize.name": "Työkalun nimi",
       "monetize.desc": "Kuvaus",
-      "monetize.priceCol": "Hinta / kutsu",
-      "monetize.priceMorsels": "Hinta (morselit)",
+      "monetize.priceCol": "Hinta ja tahdistus / kutsu",
       "monetize.priceMoney": "Rahahinta",
       "monetize.currency": "Valuutta",
       "monetize.money2": "Toinen rahahinta",
@@ -5768,12 +5770,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "odps.openAppDefaults": "Muokkaa sovellustason oletuksia",
       "odps.blockedSchema": "Ei listaudu: työkalu tarvitsee ei-tyhjän syöte- JA tulosskeeman.",
       "odps.blockedBinding": "Ei listaudu: työkalu tarvitsee kyvykkyyssidonnan (action_id).",
-      "odps.blockedPrice": "Ei listaudu: työkalu tarvitsee hinnan.",
+      "odps.blockedPrice": "Ei listaudu: työkalu tarvitsee rahahinnan tai tahdistuksen.",
       "monetize.exchange": "Listaa EXCHANGEssa",
-      "monetize.toll": "Tahdistuspoltto per kutsu (morselia)",
-      "monetize.tollHint": "Ei hinta: morselit jotka palavat jokaisella kutsulla ja rajaavat kuinka nopeasti työkalua voi kuluttaa. Niitä ei hyvitetä kenellekään, ja omat kutsusi ovat ilmaisia. Jätä tyhjäksi niin noden oletus pätee; 0 poistaa tahdistuksen tästä työkalusta.",
-      "monetize.tollInvalid": "Tahdistuspoltto on kokonaisluku väliltä 0-100.",
-      "monetize.exchangeHint": "Päällä: työkalu on julkisesti markkinalla ja listaus seuraa tässä asetettua hintaa. Pois: se poistuu markkinalta. Jo sovitut sopimukset eivät muutu.",
+      "monetize.toll": "Tahdistus kutsulta (murusia)",
+      "monetize.tollHint": "Ei hinta: muruset, jotka jokainen kutsu ottaa kutsujan saldosta. Ne rajaavat, kuinka nopeasti työkalua voi käyttää. Osa niistä poltetaan ja loput tulevat sinulle. Omat kutsusi eivät ota mitään. Jätä tyhjäksi, niin palvelimen oletus pätee; 0 poistaa tahdistuksen tästä työkalusta.",
+      "monetize.tollInvalid": "Tahdistus on kokonaisluku väliltä 0–100.",
+      "monetize.exchangeHint": "Päällä: työkalu on julkisesti markkinalla, ja listaus seuraa tässä asetettua hintaa ja tahdistusta. Pois: se poistuu markkinalta. Jo sovitut sopimukset eivät muutu.",
       "monetize.exchangeOn": "EXCHANGEssa",
       "monetize.exchangeNeedsSchema": "EXCHANGE-listaus vaatii työkalulta syöte- ja tulosskeeman sekä kyvykkyyssidonnan. Julkaise ne ensin (MCP: aimeat_app_tools_publish).",
       "monetize.actionId": "Kyvykkyyssidonta (action id)",
@@ -5927,10 +5929,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "cost.title": "Kulut & sopimukset — mitä tämä sovellus hankkii",
       "cost.hint": "Tämän sovelluksen EXCHANGE-sopimukset: pysyvät mitatut käyttöoikeudet joita se kutsuu, live-kulutus kutakin budjettia vasten ja alustan siivu. Kutsukohtainen hinta tulee tarjoajalta; sinä asetat vain budjettikaton.",
       "cost.empty": "Ei vielä EXCHANGE-sopimuksia — tämä sovellus ei hanki mitään hinnoiteltua.",
-      "cost.summary": "{n} sopimus(ta) · {spent} morselia käytetty · {calls} kutsu(a)",
+      "cost.summary": "{n} sopimus(ta) · {spent} murusta tahdistusta · {calls} kutsu(a)",
       "cost.capabilityCol": "Kyvykkyys",
       "cost.providerCol": "Tarjoaja",
-      "cost.priceCol": "Hinta / kutsu",
+      "cost.priceCol": "Tahdistus / kutsu",
       "cost.rakeCol": "Siivu",
       "cost.budgetCol": "Budjetti (käytetty / katto)",
       "cost.stateCol": "Tila",
@@ -7884,7 +7886,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var hasOut = tool.outputSchema && Object.keys(tool.outputSchema).length;
     if (!hasIn || !hasOut) return t("odps.blockedSchema");
     if (!tool.action_id) return t("odps.blockedBinding");
-    var priced = tool.price && tool.price.morsels > 0 || tool.priceMoney && tool.priceMoney.amount > 0;
+    var priced = tool.tollMorsels > 0 || tool.price && tool.price.morsels > 0 || tool.priceMoney && tool.priceMoney.amount > 0;
     if (!priced) return t("odps.blockedPrice");
     return "";
   }
@@ -8264,10 +8266,14 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     }).catch(function() {
     });
   }
+  function tollOf(tool) {
+    var toll = typeof tool.tollMorsels === "number" && tool.tollMorsels > 0 ? tool.tollMorsels : 0;
+    var legacy = tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0;
+    return Math.min(100, toll + legacy);
+  }
   function priceLabel(tool) {
     var parts = [];
     var seen = {};
-    if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + " morsels");
     var money = [tool.priceMoney].concat(tool.pricesMoney || []);
     for (var i = 0; i < money.length; i++) {
       var m = money[i];
@@ -8275,7 +8281,11 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       seen[m.currency] = true;
       parts.push(m.amount / MONEY_UNIT + " " + m.currency);
     }
-    return parts.length ? parts.join(" · ") : t("monetize.notForSale");
+    var toll = tollOf(tool);
+    if (!parts.length && !toll) return t("monetize.notForSale");
+    if (!parts.length) parts.push(t("pacing.free"));
+    if (toll) parts.push(t("pacing.amount").replace("{n}", String(toll)));
+    return parts.join(" · ");
   }
   function toolRow(tool, i) {
     var mode = tool.action_id ? t("monetize.fulfillCall") : t("monetize.fulfillTask");
@@ -8314,9 +8324,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       2,
       t("mz.group.price"),
       t("mz.priceLede"),
-      '<div class="mz-grid mz-grid--price">' + field("mz-morsels", t("monetize.priceMorsels"), '<input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" />', "") + field("mz-money", t("monetize.priceMoney"), '<input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" />', "") + field("mz-currency", t("monetize.currency"), currencySelect("mz-currency", cur), "") + '</div><details class="mz-more"><summary class="mz-more-head">' + escapeHtml(t("mz.more.price")) + '</summary><div class="mz-grid mz-grid--price">' + field("mz-money2", t("monetize.money2"), '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" />', "") + field("mz-currency2", t("monetize.currency2"), currencySelect("mz-currency2", cur2), "") + '</div><div class="mz-hint">' + escapeHtml(t("monetize.money2Hint")) + "</div>" + // Pacing, not price: this is what a call BURNS to bound how fast the tool can be consumed. It is
-      // separate from every price above precisely because it is not revenue — nobody is credited it.
-      field("mz-toll", t("monetize.toll"), '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="' + (typeof tool.tollMorsels === "number" ? tool.tollMorsels : "") + '" placeholder="0" />', t("monetize.tollHint")) + "</details>"
+      '<div class="mz-grid mz-grid--price">' + field("mz-money", t("monetize.priceMoney"), '<input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" />', "") + field("mz-currency", t("monetize.currency"), currencySelect("mz-currency", cur), "") + // The pacing amount, beside the money price and never one: the morsels a call takes from the
+      // caller (part burns, the rest goes to the tool's owner). A 3.x price.morsels shows here too.
+      field("mz-toll", t("monetize.toll"), '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="' + (typeof tool.tollMorsels === "number" || tool.price && tool.price.morsels > 0 ? tollOf(tool) : "") + '" placeholder="0" />', "") + '</div><div class="mz-hint">' + escapeHtml(t("monetize.tollHint")) + '</div><details class="mz-more"><summary class="mz-more-head">' + escapeHtml(t("mz.more.price")) + '</summary><div class="mz-grid mz-grid--price">' + field("mz-money2", t("monetize.money2"), '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" />', "") + field("mz-currency2", t("monetize.currency2"), currencySelect("mz-currency2", cur2), "") + '</div><div class="mz-hint">' + escapeHtml(t("monetize.money2Hint")) + "</div></details>"
     ) + group(
       3,
       t("mz.group.market"),
@@ -8436,9 +8446,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var desc = (document.getElementById("mz-desc").value || "").trim();
     if (desc) tool.description = desc;
     else delete tool.description;
-    var morsels = parseInt(document.getElementById("mz-morsels").value, 10);
-    if (Number.isFinite(morsels) && morsels > 0) tool.price = { morsels, unit: "per-call" };
-    else delete tool.price;
+    delete tool.price;
     var moneyRaw = (document.getElementById("mz-money").value || "").trim();
     if (moneyRaw) {
       var major = parseFloat(moneyRaw.replace(",", "."));
@@ -9913,14 +9921,12 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     return m && m.cortex && Array.isArray(m.cortex.agents) ? m.cortex.agents : [];
   }
   function fmtOfferPrice(o) {
-    var parts = [];
-    if (o.price && typeof o.price.morsels === "number") {
-      parts.push(o.price.morsels + " 🥩" + (o.price.unit ? "/" + escapeHtml(o.price.unit) : ""));
-    }
-    if (o.price_money && typeof o.price_money.amount === "number") {
-      parts.push((o.price_money.amount / 1e6).toFixed(2) + " " + escapeHtml(o.price_money.currency || "EUR"));
-    }
-    return parts.length ? parts.join(" · ") : t("agents.askPrice");
+    var money = o.priceMoney || o.price_money;
+    var hasMoney = money && typeof money.amount === "number" && money.amount > 0;
+    var toll = typeof o.tollMorsels === "number" ? o.tollMorsels : o.price && typeof o.price.morsels === "number" ? o.price.morsels : null;
+    if (!hasMoney && toll === null) return t("agents.askPrice");
+    var head = hasMoney ? (money.amount / 1e6).toFixed(2) + " " + escapeHtml(money.currency || "EUR") : t("pacing.free");
+    return toll > 0 ? head + " · " + t("pacing.amount").replace("{n}", String(toll)) : head;
   }
   function inspectorHtml(def) {
     var crew = (def.agents || []).map(function(a) {

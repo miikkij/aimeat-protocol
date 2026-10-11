@@ -10,6 +10,8 @@
  *   vat-report · exports)
  * @usage app.use(financeLedgerRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The voucher list's source filter no longer names 'morsel': a morsel is
+ *     pacing, never a booking (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 import { Router, type Request, type Response } from 'express';
@@ -31,6 +33,7 @@ import {
   resolveFinanceOwner, grantAccountant, revokeAccountant, listAccountants, listClients,
 } from '../services/finance/accountant-access.js';
 import { resolveCompanyScope } from '../services/finance/company-scope.js';
+import type { VoucherSource } from '../models/finance-schemas.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -109,8 +112,9 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
         ownerGhii: owner,
         organismId: await resolveCompanyScope(storage, owner, req.query.company),
         fiscalYearId: typeof req.query.fiscal_year_id === 'string' ? req.query.fiscal_year_id : undefined,
-        source: ['stripe', 'checkout', 'invoice', 'receipt', 'manual', 'morsel'].includes(req.query.source as string)
-          ? req.query.source as 'stripe' | 'checkout' | 'invoice' | 'receipt' | 'manual' | 'morsel' : undefined,
+        // Money sources only: a morsel is pacing, never a booking, so 'morsel' is not a source.
+        source: ['stripe', 'checkout', 'invoice', 'receipt', 'manual'].includes(req.query.source as string)
+          ? req.query.source as VoucherSource : undefined,
         direction: (['income', 'expense', 'transfer'] as const).find((d) => d === req.query.direction),
         from: typeof req.query.from === 'string' ? req.query.from : undefined,
         to: typeof req.query.to === 'string' ? req.query.to : undefined,

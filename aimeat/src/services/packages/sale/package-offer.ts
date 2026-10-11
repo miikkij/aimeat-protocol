@@ -15,7 +15,8 @@
  *   changes nothing here: a version carries no price.
  *
  *   WHAT THE TERMS SAY. How access is granted (`payment`, `approval` or `automatic`), a one-time price
- *   (required for payment, null otherwise; money only, EUR or USD micro-units: a morsel buys nothing),
+ *   (required for payment, null otherwise; money only, EUR or USD micro-units: a morsel is pacing,
+ *   never a price, per ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa),
  *   how many days of updates come with it and the renewal price and period, the release channel, the
  *   licence (one subject per purchase; `node` is the only subject today), how tax is to be read (the
  *   platform does not decide tax), and a support and a security contact, both required for a paid
@@ -30,6 +31,7 @@
  *   const offer = await readOffer(storage, groupId);
  *   const out = await setOffer(storage, { owner, isOperator }, groupId, { terms, state });
  * @version-history
+ *   v1.1.1 — 2026-10-11 — The currency refusal and the header say a morsel is pacing, never a price.
  *   v1.1.0 — 2026-10-02 — offerCapabilities(): what the version on sale can do, for a seller's review
  *     (package sale design, phase 5).
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
@@ -94,7 +96,7 @@ function money(raw: unknown, field: string): Money | Fail {
     if (!o || typeof o !== 'object') return fail(400, 'INVALID_INPUT', `${field} is { amount, currency }.`);
     const currency = typeof o.currency === 'string' ? o.currency.toUpperCase() : '';
     if (!(MONEY_CURRENCIES as readonly string[]).includes(currency)) {
-        return fail(400, 'INVALID_INPUT', `${field}.currency is one of ${MONEY_CURRENCIES.join(', ')}: an offer is priced in money; a morsel paces use and buys nothing.`);
+        return fail(400, 'INVALID_INPUT', `${field}.currency is one of ${MONEY_CURRENCIES.join(', ')}: an offer is priced in money. A morsel is pacing, never a price.`);
     }
     if (typeof o.amount !== 'number' || !Number.isFinite(o.amount) || o.amount <= 0) {
         return fail(400, 'INVALID_INPUT', `${field}.amount is a positive number of micro-units (1 EUR = 1000000).`);

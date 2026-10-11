@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-fork
  * @version-history
+ *   2026-10-11 — The self-fork reads `tollMorsels` and the MCP refusal names "50 morsels of pacing" /
+ *     "Take it first": these asserted the old morsel price model ("costs 50 morsels", "Purchase it first").
  *   v1.0.0 — 2026-07-07 — initial: forkable flag, fork authorization gates,
  *     provenance, paid paywall, input failure modes.
  *   v1.1.0 — 2026-07-07 — Phase 4: fork statistics + lineage — listing forks count,
@@ -310,7 +312,7 @@ await test('The seller (owner) can still fork their OWN paid app → 201', async
     // The fork is created free (paid terms dropped).
     const { body: listBody } = await json('/v1/apps?limit=200', aAuthed());
     const fork = (listBody.data?.apps ?? []).find((a: any) => a.filename === 'a-paid-fork.html' && a.owner === ownerAName);
-    assert(!!fork && !fork.manifest?.priceMorsels, 'the fork is free (source price dropped)');
+    assert(!!fork && !fork.manifest?.tollMorsels && !fork.manifest?.priceMorsels, 'the fork has no pacing amount (the source\'s dropped)');
 });
 
 // ── Phase 4: fork statistics + lineage ──
@@ -525,7 +527,8 @@ await test("aimeat_app_fork refuses another owner's PAID app with no license", a
         owner: ownerBName, filename: B_PAID, new_filename: 'a-took-b-paid.html',
     });
     assert(out.isError, `the tool must refuse an unlicensed paid source, got: ${out.text.slice(0, 200)}`);
-    assert(/costs 50 morsels/.test(out.text) && /Purchase it first/.test(out.text), `expected the purchase wording, got: ${out.text.slice(0, 200)}`);
+    // A morsel is pacing, not a price (2026-10-11): the refusal names the pacing amount and the take.
+    assert(/50 morsels of pacing/.test(out.text) && /Take it first/.test(out.text), `expected the take wording, got: ${out.text.slice(0, 200)}`);
     const leaked = await fetch(`${BASE}/v1/apps/${ownerAName}/a-took-b-paid.html`);
     assert(leaked.status === 404, `the refused paid fork must not exist, got ${leaked.status}`);
 });

@@ -19,6 +19,7 @@
  *   - filterOffers(items, q, needLabels) -> the items matching typed text (the map's search)
  * @usage import { classifyNeed, groupByAxis, sortOffers, buildMermaid } from '/js/services/offers-grouping.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-11 -- standingScore counts an offer's pacing amount (tollMorsels) or money price, not only a 3.x morsel price.
  *   v1.1.0 -- 2026-09-06 -- filterOffers: the map page's search, every typed word found somewhere on the item.
  *   v1.0.0 -- 2026-06-16 -- Initial: need-verb classification, facets, standing sort, axis grouping,
  *     deterministic Mermaid map. Pairs with the AI need-router (offers.js) + the richer Offerings tab.
@@ -122,7 +123,8 @@ export function standingScore(offer) {
   if (isAuto(offer)) s += 100;
   s += VERIFICATION_WEIGHT[offer?.verification] ?? 0;
   if (offer?.deliverable?.location?.key || offer?.deliverable?.location?.url) s += 1;
-  if (offer?.price?.morsels > 0) s += 1;
+  // On offer: a pacing amount (tollMorsels, 3.x price.morsels) or a money price.
+  if (offer?.tollMorsels > 0 || offer?.price?.morsels > 0 || offer?.priceMoney) s += 1;
   if ((offer?.workflows || []).length) s += 2;   // part of a real chain
   return s;
 }

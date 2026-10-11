@@ -10,6 +10,10 @@
  *   this module re-renders #detail-monetize in place after loads/saves.
  * @usage import { monetizeSectionInner, monetizeOnOpen, monetizeAddTool, ... } from './monetize.js'
  * @version-history
+ *   v1.5.0 — 2026-10-11 — Two values per tool (ruling "morseli on tahdistus, ei hinta"): the money price
+ *     and the pacing amount side by side; the morsel price field is gone. A 3.x price.morsels shows in
+ *     the pacing field (added to the toll, as the node does) and a save writes tollMorsels and drops
+ *     price. The row's label says "Free · pacing N morsels" when there is no money price.
  *   v1.4.0 — 2026-08-29 — The poster face: a tool is one row (name and description as prose, price and
  *     delivery as two labelled facts, the doors on the right), and the editor asks four questions in
  *     order — what, cost, market, delivery — with the second currency and the pacing burn folded.
@@ -119,10 +123,20 @@ function loadOfferings() {
     .catch(function () { /* no market link is a cosmetic loss, never an error */ });
 }
 
+/**
+ * The pacing amount of a tool: `tollMorsels`, plus a 3.x `price.morsels` (the node adds the two,
+ * resolvePacingToll), capped at 100. A morsel is pacing, never a price.
+ */
+function tollOf(tool) {
+  var toll = typeof tool.tollMorsels === 'number' && tool.tollMorsels > 0 ? tool.tollMorsels : 0;
+  var legacy = tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0;
+  return Math.min(100, toll + legacy);
+}
+
+/** "0.02 EUR · pacing 2 morsels", "Free · pacing 2 morsels", or "not for sale". */
 function priceLabel(tool) {
   var parts = [];
   var seen = {};
-  if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + ' morsels');
   var money = [tool.priceMoney].concat(tool.pricesMoney || []);
   for (var i = 0; i < money.length; i++) {
     var m = money[i];
@@ -130,7 +144,11 @@ function priceLabel(tool) {
     seen[m.currency] = true;
     parts.push((m.amount / MONEY_UNIT) + ' ' + m.currency);
   }
-  return parts.length ? parts.join(' · ') : t('monetize.notForSale');
+  var toll = tollOf(tool);
+  if (!parts.length && !toll) return t('monetize.notForSale');
+  if (!parts.length) parts.push(t('pacing.free'));
+  if (toll) parts.push(t('pacing.amount').replace('{n}', String(toll)));
+  return parts.join(' · ');
 }
 
 function toolRow(tool, i) {
@@ -192,20 +210,20 @@ function editorHtml(tool) {
         field('mz-desc', t('monetize.desc'), '<input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || '') + '" />', t('mz.descHint'))) +
       group(2, t('mz.group.price'), t('mz.priceLede'),
         '<div class="mz-grid mz-grid--price">' +
-          field('mz-morsels', t('monetize.priceMorsels'), '<input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + ((tool.price && tool.price.morsels) || '') + '" placeholder="0" />', '') +
           field('mz-money', t('monetize.priceMoney'), '<input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" />', '') +
           field('mz-currency', t('monetize.currency'), currencySelect('mz-currency', cur), '') +
+          // The pacing amount, beside the money price and never one: the morsels a call takes from the
+          // caller (part burns, the rest goes to the tool's owner). A 3.x price.morsels shows here too.
+          field('mz-toll', t('monetize.toll'), '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="'
+            + ((typeof tool.tollMorsels === 'number' || (tool.price && tool.price.morsels > 0)) ? tollOf(tool) : '') + '" placeholder="0" />', '') +
         '</div>' +
+        '<div class="mz-hint">' + escapeHtml(t('monetize.tollHint')) + '</div>' +
         '<details class="mz-more"><summary class="mz-more-head">' + escapeHtml(t('mz.more.price')) + '</summary>' +
           '<div class="mz-grid mz-grid--price">' +
             field('mz-money2', t('monetize.money2'), '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" />', '') +
             field('mz-currency2', t('monetize.currency2'), currencySelect('mz-currency2', cur2), '') +
           '</div>' +
           '<div class="mz-hint">' + escapeHtml(t('monetize.money2Hint')) + '</div>' +
-          // Pacing, not price: this is what a call BURNS to bound how fast the tool can be consumed. It is
-          // separate from every price above precisely because it is not revenue — nobody is credited it.
-          field('mz-toll', t('monetize.toll'), '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="'
-            + (typeof tool.tollMorsels === 'number' ? tool.tollMorsels : '') + '" placeholder="0" />', t('monetize.tollHint')) +
         '</details>') +
       group(3, t('mz.group.market'), t('mz.marketLede'),
         '<label class="mz-check"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? ' checked' : '') + ' /><span>' + escapeHtml(t('monetize.exchange')) + '</span></label>' +
@@ -326,9 +344,9 @@ function readEditor(base) {
   tool.name = name;
   var desc = (document.getElementById('mz-desc').value || '').trim();
   if (desc) tool.description = desc; else delete tool.description;
-  var morsels = parseInt(document.getElementById('mz-morsels').value, 10);
-  if (Number.isFinite(morsels) && morsels > 0) tool.price = { morsels: morsels, unit: 'per-call' };
-  else delete tool.price;
+  // A morsel is never a price: a 3.x price.morsels was shown in the pacing field and is written back
+  // as tollMorsels only.
+  delete tool.price;
   var moneyRaw = (document.getElementById('mz-money').value || '').trim();
   if (moneyRaw) {
     var major = parseFloat(moneyRaw.replace(',', '.'));

@@ -14,6 +14,9 @@
  *   The refusals are measured: a second owner sees none of the first owner's counts, an agent
  *   holding the wrong scope is refused on REST and has no such tool on MCP, and no token is 401.
  * @version-history
+ *   v1.4.0 — 2026-10-11 — A morsel price is pacing now (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa):
+ *     the native checkout of tests 9 and 10 is in money and names its handler; the agent of phase 7 buys
+ *     a free paced offer, and its failed checkout is a money purchase with no agent limit (PURCHASE_LIMIT_NOT_SET).
  *   v1.3.0 — 2026-10-11 — The banner's link to a privacy policy, and the page that link reaches
  *     while the operator fields are not filled in (18e).
  *   v1.2.0 — 2026-10-11 — The cookie banner: it names the owner's analytics in three languages and
@@ -316,7 +319,11 @@ await test('8. the seller offers a priced job', async () => {
   const pub = await json('/v1/agents/vendor/offers', {
     method: 'PUT', headers: authed(S.token),
     // A money price as well: the UCP checkout in test 11 sells in money only (ruling D4, 2026-10-11).
-    body: JSON.stringify({ offers: [{ id: 'proofread', title: 'Proofread', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, price: { morsels: PRICE, unit: 'per-call' }, priceMoney: { amount: 1_000_000, currency: 'EUR' }, visibility: 'public' }] }),
+    // `proofread-paced` is free with pacing only: the agent of phase 7 buys it without a money limit.
+    body: JSON.stringify({ offers: [
+      { id: 'proofread', title: 'Proofread', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, price: { morsels: PRICE, unit: 'per-call' }, priceMoney: { amount: 1_000_000, currency: 'EUR' }, visibility: 'public' },
+      { id: 'proofread-paced', title: 'Proofread, free', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, tollMorsels: 2, visibility: 'public' },
+    ] }),
   });
   assert(pub.status === 200, `offers ${pub.status} ${JSON.stringify(pub.body)}`);
 });
@@ -329,8 +336,9 @@ async function buy(headers: Record<string, string>, body: Record<string, unknown
   });
   assert(create.status === 201, `create ${create.status} ${JSON.stringify(create.body)}`);
   const id = ucp ? create.body.checkout_session.id : create.body.data.session.id;
-  // The UCP session is in money, so it names its handler: the invoice rail needs no seller credential.
-  const done = await json(`${route}/${id}/complete`, { method: 'POST', headers: authed(B.token), body: JSON.stringify(ucp ? { payment: { handler: 'io.aimeat.invoice' } } : {}) });
+  // The session is in money on both routes (the offer's old morsel price is pacing now, 2026-10-11),
+  // so it names its handler: the invoice rail needs no seller credential.
+  const done = await json(`${route}/${id}/complete`, { method: 'POST', headers: authed(B.token), body: JSON.stringify({ payment: { handler: 'io.aimeat.invoice' } }) });
   assert(done.status === 200, `complete ${done.status} ${JSON.stringify(done.body)}`);
 }
 
@@ -339,7 +347,8 @@ await test('9. a person from ChatGPT buys on the page: ai / chatgpt / page', asy
   const r = await report(S.token);
   const row = r.purchases.find((p: any) => p.channel === 'ai' && p.family === 'chatgpt' && p.via === 'page');
   assert(row && row.purchases === 1, `the purchase is under ai/chatgpt, got ${JSON.stringify(r.purchases)}`);
-  assert(row.amounts.MORSEL === PRICE, `with its amount, got ${JSON.stringify(row.amounts)}`);
+  // Money only: a morsel is pacing, not a price, so the morsels the use was paced with are no amount.
+  assert(row.amounts.EUR === 1_000_000 && row.amounts.MORSEL === undefined, `with its money amount, got ${JSON.stringify(row.amounts)}`);
   assert(r.totals.ai_referred_purchases === 1, 'and counts as AI-referred');
 });
 
@@ -623,10 +632,10 @@ console.log('\nPhase 7 — what AI agents meet at the checkout (layer C)');
 
 /** A buying agent whose own name says which AI it is, as an AIMEAT agent's usually does. */
 let shopper = '';
-const agentCheckout = async (): Promise<string> => {
+const agentCheckout = async (offer = 'proofread-paced'): Promise<string> => {
   const create = await json('/v1/commerce/checkout-sessions', {
     method: 'POST', headers: authed(shopper),
-    body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'proofread' }] }),
+    body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: offer }] }),
   });
   assert(create.status === 201, `agent create ${create.status} ${JSON.stringify(create.body)}`);
   return create.body.data.session.id as string;
@@ -640,11 +649,12 @@ await test('20. a Claude agent of the buyer completes one checkout, abandons one
   const left = await agentCheckout();
   const cancel = await json(`/v1/commerce/checkout-sessions/${left}`, { method: 'PATCH', headers: authed(shopper), body: JSON.stringify({ cancel: true }) });
   assert(cancel.status === 200, `cancel ${cancel.status} ${JSON.stringify(cancel.body)}`);
-  const bad = await agentCheckout();
+  // The money offer: an agent with no daily purchase limit on its card cannot pay money.
+  const bad = await agentCheckout('proofread');
   const fail = await json(`/v1/commerce/checkout-sessions/${bad}/complete`, {
-    method: 'POST', headers: authed(shopper), body: JSON.stringify({ payment: { handler: 'com.example.none' } }),
+    method: 'POST', headers: authed(shopper), body: JSON.stringify({ payment: { handler: 'io.aimeat.invoice' } }),
   });
-  assert(fail.status === 422, `an unknown payment handler fails the checkout, got ${fail.status} ${JSON.stringify(fail.body)}`);
+  assert(fail.status === 403 && fail.body.error?.code === 'PURCHASE_LIMIT_NOT_SET', `a money purchase with no agent limit fails the checkout, got ${fail.status} ${JSON.stringify(fail.body)}`);
 });
 
 await test('21. the seller\'s report shows the three under claude by stage, the failure by its code, and one readable line', async () => {
@@ -654,10 +664,10 @@ await test('21. the seller\'s report shows the three under claude by stage, the 
   assert(claude.started === 3 && claude.completed === 1 && claude.canceled === 1 && claude.failed === 1,
     `started 3, completed 1, canceled 1, failed 1; got ${JSON.stringify(claude)}`);
   const err = r.agents.checkout_errors.find((e: any) => e.family === 'claude');
-  assert(err && err.code === 'UNKNOWN_PAYMENT_HANDLER' && err.stage === 'at payment' && err.count === 1,
+  assert(err && err.code === 'PURCHASE_LIMIT_NOT_SET' && err.stage === "at the agent's spending permission" && err.count === 1,
     `the failure is kept as its code and its stage, got ${JSON.stringify(r.agents.checkout_errors)}`);
   const line = r.agents.findings.find((f: any) => f.family === 'claude' && f.kind === 'checkout');
-  assert(line && /tried to buy 3 times/.test(line.text) && /UNKNOWN_PAYMENT_HANDLER/.test(line.text)
+  assert(line && /tried to buy 3 times/.test(line.text) && /PURCHASE_LIMIT_NOT_SET/.test(line.text)
     && /1 was abandoned/.test(line.text) && /1 completed/.test(line.text), `one readable line, got ${JSON.stringify(line)}`);
   assert(!JSON.stringify(r.agents).includes('claude-shopper'), 'the agent is counted by its AI, never by its name');
   // The control: a person's checkouts (tests 9 and 10) are purchases, not agents' checkouts. Only the

@@ -6,6 +6,8 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-10-11 — A cortex action declares `pricing.tollMorsels: 0` (the field was
+ *     `baseMorsels`; a morsel is pacing, not a price).
  *   v1.6.0 — 2026-09-26 — A record stored without `actionProvider` has each action deleted under
  *     every principal of the account that installed the cortex (its bare name, GHII, agents and
  *     ecosystem apps) and under the deactivator's own two. The prompts and ontologies an activation
@@ -202,7 +204,8 @@ export async function activateExtension(
             description: comp.description,
             inputSchema: comp.input_schema,
             outputSchema: {},
-            pricing: { baseMorsels: 0 },
+            // No pacing amount: a cortex action is unpaced (ActionRecord.pricing.tollMorsels).
+            pricing: { tollMorsels: 0 },
             tags: ['cortex', ext.name],
             createdAt: now,
             updatedAt: now,

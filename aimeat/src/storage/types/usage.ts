@@ -22,6 +22,7 @@
  * @usage
  *   import type { UsageCallInput } from '../storage/interface.js';
  * @version-history
+ *   v1.3.0 — 2026-10-11 — Comment only: `chargedUnits` in morsels is pacing, never a price.
  *   v1.2.0 — 2026-09-25 — The visit-retention fold: the marker a folded row carries instead of the
  *     account, the cuts it folds, and what one sweep reports.
  *   v1.1.0 — 2026-09-16 — UsageSurface gains 'mcp-remote': a call the node proxied OUT to a remote
@@ -85,7 +86,12 @@ export interface UsageCallRecord {
   /** Refusal kind or error code. '' on a clean call. */
   reason: string;
   durationMs: number;
-  /** 0 for a free call. Denominated by `unit` — morsels and money minor units never mix. */
+  /**
+   * 0 for a call that moved nothing. Denominated by `unit`, and morsels and money minor units never
+   * mix: `money` is what the call was paid, `morsels` the PACING the caller's owner was debited, which
+   * is never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). A call
+   * with only morsels on it is a free call that was paced.
+   */
   chargedUnits: number;
   unit: 'morsels' | 'money' | '';
   currency: string;

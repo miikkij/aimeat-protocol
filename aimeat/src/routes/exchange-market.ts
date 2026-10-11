@@ -13,6 +13,12 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). Every offering in a response carries `toll_morsels` (presentOffering);
+ *     a morsel-rail offering is free, with `unit`/`basePrice` as deprecated mirrors until 4.0.0. An
+ *     agent-work listing takes `toll_morsels`; its `price_morsels` and a need's `budget_unit: 'morsels'`
+ *     are accepted as pacing until 4.0.0 and refused with MORSEL_PRICE_REMOVED from it. An app-tool
+ *     listing reads a free tool's pacing amount. /v1/exchange/info lists money units and a pacing block.
  *   v1.5.1 — 2026-10-07 — Offering an app tool reads its money price with toolMoneyPrices, so a tool
  *     sold only in `pricesMoney` lists at that price instead of being refused as unpriced.
  *   v1.5.0 — 2026-07-25 — ODPS v4.1 (TARGET-045 §4): GET /v1/exchange/offerings/{id}/odps(.yaml) projects the
@@ -36,15 +42,17 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { resolvePacingToll } from './extensions/pacing.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import {
   type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type OfferingPlan,
   resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings, filterOfferings,
   putNeed, getNeed, parseNeedSpec, listNeeds, putBid, listBids, getBid, acceptBid,
-  offeringStats, offeringConsumers, enrichNeeds,
+  offeringStats, offeringConsumers, enrichNeeds, presentOffering, offeringTollMorsels,
 } from '../services/exchange-market.js';
+import { listingTerms } from '../services/exchange-source-terms.js';
+import { TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
 import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-odps.js';
 import { AppToolsDocSchema, appToolsKey, toolMoneyPrices } from '../models/app-tool-schemas.js';
@@ -91,6 +99,29 @@ function parseOdpsExtras(v: unknown): { ok: true; value: OdpsExtras | null } | {
   return { ok: true, value: Object.keys(parsed.data).length ? parsed.data : null };
 }
 
+/**
+ * The pacing amount a listing write states (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+ * arvoa): `toll_morsels`, plus a 3.x `price_morsels`, which is pacing and is accepted until
+ * MORSEL_PRICE_FIELDS_REMOVED_IN and refused with MORSEL_PRICE_REMOVED from it. The sum is capped at
+ * TOLL_MORSELS_MAX; the node's per-use ceiling still applies when it is charged. `amount` is null when
+ * the write states neither.
+ */
+function writtenPacing(b: Record<string, unknown>):
+  { ok: true; amount: number | null } | { ok: false; code: string; message: string } {
+  const legacy = typeof b.price_morsels === 'number' && b.price_morsels > 0 ? Math.floor(b.price_morsels) : 0;
+  if (legacy > 0 && !legacyMorselFieldsLive()) {
+    return { ok: false, code: 'MORSEL_PRICE_REMOVED',
+      message: `price_morsels was removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}: a morsel is pacing, not a price. Send toll_morsels (the pacing amount per use) and price_money.` };
+  }
+  const raw = b.toll_morsels;
+  if (raw !== undefined && raw !== null && !(typeof raw === 'number' && Number.isInteger(raw) && raw >= 0)) {
+    return { ok: false, code: 'INVALID_TOLL', message: 'toll_morsels must be a whole number of morsels, 0 or more' };
+  }
+  const declared = typeof raw === 'number' ? raw : null;
+  if (declared === null && legacy === 0) return { ok: true, amount: null };
+  return { ok: true, amount: Math.min((declared ?? 0) + legacy, TOLL_MORSELS_MAX) };
+}
+
 export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -100,8 +131,15 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     return res.json(success(config.nodeId, {
       rake_percent: commerceFeePercent(config),
       rake_note: 'Platform fee applied to each metered call (provider keeps the rest). Set by the node operator.',
-      units: ['morsels', 'EUR', 'USD'],
-      morsel_note: 'Morsels are the node’s throttle unit (plain integers); real money settles in EUR/USD.',
+      // Money is the only price; morsels are pacing (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+      units: ['EUR', 'USD'],
+      pacing: {
+        unit: 'morsels',
+        burn_rate: config.burnRate,
+        note: 'Every offering states toll_morsels: morsels of pacing per call, which bound how fast it can be used. '
+          + 'A share burns, the operator keeps its share, and the rest goes to the provider. Morsels are never a price; '
+          + 'an offering with no money price is free.',
+      },
     }));
   });
 
@@ -175,12 +213,14 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       const usageTerms = parseUsageTerms(b.usage_terms);
       if (!usageTerms) return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
         'Say how buyers may use what they get before listing this: whether they can build on it, resell it, and whether they must credit you.'));
-      // Authoritative pricing from the tool's own price/plans.
+      // Authoritative terms from the tool's own manifest: the first money price from `priceMoney` or
+      // `pricesMoney` (a tool sold only in `pricesMoney` has a price), and the pacing amount, which reads
+      // a 3.x `price.morsels` as pacing. With no money the tool is free and lists on the morsel rail.
+      const sold = listingTerms(tool.tollMorsels, tool.price?.morsels ?? 0, toolMoneyPrices(tool));
+      const row = sold?.rows[0];
       const commercial: ActionCommercial = {
-        payMorsels: tool.price && tool.price.morsels > 0 ? tool.price.morsels : undefined,
-        // The first money price from `priceMoney` or `pricesMoney`: a tool sold only in `pricesMoney`
-        // has a price, and reading `priceMoney` alone refused it as unpriced.
-        payMoney: toolMoneyPrices(tool)[0],
+        tollMorsels: row?.unit === 'morsels' ? row.basePrice : undefined,
+        payMoney: row?.unit === 'money' ? { amount: row.basePrice, currency: row.currency ?? 'EUR' } : undefined,
         plans: tool.plans as OfferingPlan[] | undefined,
       };
       const priced = resolveActionPricing(commercial, null);
@@ -202,13 +242,14 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         description: str(b.description) || tool.description || '',
         unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
         plans: commercial.plans ?? [],
+        tollMorsels: sold?.tollMorsels ?? null,
         provenance: prov.value, odps: odps.value,
         usageTerms,
         tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
         state: 'listed', createdAt: now, updatedAt: now,
       };
       await putOffering(storage, offering);
-      return res.status(201).json(success(config.nodeId, { offering }));
+      return res.status(201).json(success(config.nodeId, { offering: presentOffering(config, offering) }));
     }
 
     // ── kind: agent-work — a provider AGENT sells a task type it performs (metered per delivered task, Gap 2) ──
@@ -228,10 +269,16 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       const usageTerms = parseUsageTerms(b.usage_terms);
       if (!usageTerms) return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
         'usage_terms is required to list an offering — state { derivatives, resale, attribution, note? }'));
-      // Pricing is authoritative from the provider (set on the listing): per-task morsels or money + optional plans.
+      // Terms are authoritative from the provider (set on the listing): an optional per-task money price,
+      // the pacing amount per task (`toll_morsels`, plus a 3.x `price_morsels` while it is accepted), and
+      // optional plans. With no money the work is free and lists on the morsel rail at its pacing amount.
+      const pacing = writtenPacing(b);
+      if (!pacing.ok) return res.status(400).json(error(config.nodeId, pacing.code, pacing.message));
+      const payMoney = (b.price_money && typeof b.price_money === 'object') ? b.price_money as ActionCommercial['payMoney'] : undefined;
+      const hasMoney = !!payMoney && Number.isInteger(payMoney.amount) && payMoney.amount > 0;
       const commercial: ActionCommercial = {
-        payMorsels: typeof b.price_morsels === 'number' && b.price_morsels > 0 ? Math.floor(b.price_morsels) : undefined,
-        payMoney: (b.price_money && typeof b.price_money === 'object') ? b.price_money as ActionCommercial['payMoney'] : undefined,
+        tollMorsels: hasMoney ? undefined : (pacing.amount ?? undefined),
+        payMoney,
         plans: Array.isArray(b.plans) ? b.plans as OfferingPlan[] : undefined,
       };
       const priced = resolveActionPricing(commercial, null);
@@ -247,6 +294,8 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         description: str(b.description) || agent.description || '',
         unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
         plans: commercial.plans ?? [],
+        // On the morsel rail the pacing amount IS the per-task amount, so the toll beside it is 0.
+        tollMorsels: priced.unit === 'money' ? pacing.amount : 0,
         taskSpec: { inputSchema: inSchema, outputSchema: outSchema },
         provenance: prov.value, odps: odps.value,
         usageTerms,
@@ -254,7 +303,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         state: 'listed', createdAt: now, updatedAt: now,
       };
       await putOffering(storage, offering);
-      return res.status(201).json(success(config.nodeId, { offering }));
+      return res.status(201).json(success(config.nodeId, { offering: presentOffering(config, offering) }));
     }
 
     // ── kind: ext-action (default) — the raw data-service surface ──
@@ -293,13 +342,15 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       description: str(b.description),
       unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
       plans: (act.commercial as ActionCommercial | undefined)?.plans ?? [],
+      // The action's own toll, so the listing states the pacing a contract on it will carry.
+      tollMorsels: act.tollMorsels ?? null,
       provenance: prov.value, odps: odps.value,
       usageTerms,
       tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
       state: 'listed', createdAt: now, updatedAt: now,
     };
     await putOffering(storage, offering);
-    return res.status(201).json(success(config.nodeId, { offering }));
+    return res.status(201).json(success(config.nodeId, { offering: presentOffering(config, offering) }));
   });
 
   /**
@@ -390,14 +441,17 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     if (!o) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering'));
     const ctx = await offeringContext(o);
     return res.json(success(config.nodeId, {
-      offering: o, capability: ctx.capability, call_recipe: ctx.callRecipe, stats: ctx.stats,
-      // Stated before the contract is signed, because it changes what a call costs the CONSUMER even
-      // though it moves nothing to the provider. `source` says who set it: the seller, or the node.
+      offering: presentOffering(config, o, { declaredToll: ctx.tollMorsels }),
+      capability: ctx.capability, call_recipe: ctx.callRecipe, stats: ctx.stats,
+      // Stated before the contract is signed, because every call is charged it. `source` says who set
+      // it: the seller (a toll or a morsel-rail amount they declared), or the node's default.
       pacing: {
-        toll_morsels: resolvePacingToll(config, ctx.tollMorsels),
-        source: typeof ctx.tollMorsels === 'number' && ctx.tollMorsels >= 0 ? 'capability' : 'node',
-        note: 'Morsels burned per call to bound consumption rate. A burn, not revenue: nobody is credited it, '
-          + 'and calling your own capability is free.',
+        toll_morsels: offeringTollMorsels(config, o, ctx.tollMorsels),
+        source: o.unit === 'morsels' || (typeof ctx.tollMorsels === 'number' && ctx.tollMorsels >= 0) ? 'capability' : 'node',
+        burn_rate: config.burnRate,
+        note: 'Morsels of pacing per call, which bound how fast this can be used. A share burns, the operator '
+          + 'keeps its share, and the rest goes to the provider. Pacing is not a price, and calling your own '
+          + 'capability is free.',
       },
       odps: { version: ODPS_VERSION, url: `/v1/exchange/offerings/${o.offeringId}/odps.yaml` },
     }));
@@ -419,6 +473,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const doc = offeringToOdps({
       offering: o, iface: ctx.iface, callRecipe: ctx.callRecipe, stats: ctx.stats,
       rakePercent: commerceFeePercent(config), baseUrl: config.baseUrl, nodeId: config.nodeId,
+      tollMorsels: offeringTollMorsels(config, o, ctx.tollMorsels),
     });
     if (format === 'json') return res.json(success(config.nodeId, { odps_version: ODPS_VERSION, odps: doc }));
     res.type('text/yaml; charset=utf-8');
@@ -456,10 +511,10 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       ? await filterOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
       : await listOfferings(storage);
     if (str(req.query.stats) === '1') {
-      const withStats = await Promise.all(offerings.map(async o => ({ ...o, stats: await offeringStats(storage, o) })));
+      const withStats = await Promise.all(offerings.map(async o => ({ ...presentOffering(config, o), stats: await offeringStats(storage, o) })));
       return res.json(success(config.nodeId, { offerings: withStats, count: withStats.length }));
     }
-    return res.json(success(config.nodeId, { offerings, count: offerings.length }));
+    return res.json(success(config.nodeId, { offerings: offerings.map(o => presentOffering(config, o)), count: offerings.length }));
   });
 
   /**
@@ -515,6 +570,13 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const appId = str(b.app_id);
     if (!appId) return res.status(400).json(error(config.nodeId, 'NEED_APP_REQUIRED',
       'app_id is required — a need is posted on behalf of the specific app that needs the data (owner/filename)'));
+    // A morsel budget caps the pacing a morsel-rail contract may take. It is a 3.x unit name, accepted
+    // until MORSEL_PRICE_FIELDS_REMOVED_IN (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+    if (b.budget_unit === 'morsels' && !legacyMorselFieldsLive()) {
+      return res.status(400).json(error(config.nodeId, 'MORSEL_PRICE_REMOVED',
+        'A budget in morsels is no longer accepted. Morsels set the pace of use and are not a price: set the budget in money. Each offering states its own pacing amount.',
+        400, { field: 'budget_unit', value: 'morsels', removed_in: MORSEL_PRICE_FIELDS_REMOVED_IN }));
+    }
     const budgetUnit = b.budget_unit === 'money' || b.budget_unit === 'morsels' ? b.budget_unit : null;
     const now = new Date().toISOString();
     const need: Need = {
@@ -533,7 +595,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     await putNeed(storage, need);
     // Surface offerings that already satisfy it (so the requester can accept directly, no bid needed).
     const matches = await matchOfferings(storage, { ext: need.ext, action: need.action, text: need.description });
-    return res.status(201).json(success(config.nodeId, { need, matches: matches.slice(0, 10) }));
+    return res.status(201).json(success(config.nodeId, { need, matches: matches.slice(0, 10).map(o => presentOffering(config, o)) }));
   });
 
   /** Browse needs. `?open=1` for open only; `?mine=1` for the caller's own (auth then). */

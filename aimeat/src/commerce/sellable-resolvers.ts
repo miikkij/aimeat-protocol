@@ -16,6 +16,10 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.7.0 — 2026-10-11 — Two values per item (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+ *     arvoa): `unitPrice` is the money price (0 = free) and `tollMorsels` the pacing amount, which reads
+ *     an old morsel price as pacing. There is no morsel currency: 'morsel' or none means the default
+ *     money currency (sessionCurrency). An item with neither value stays its owner's, as before.
  *   v1.6.0 — 2026-10-09 — The ext-call fulfilment gives the seller's order `{ call_paid, expiresAt }` in
  *     place of the buyer's one-time pay token (secrets audit 2026-10-09, S-3).
  *   v1.5.1 — 2026-10-07 — An app tool is bought in money at any price it declares (toolMoneyPrices),
@@ -38,7 +42,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { Offer } from '../models/offer-schemas.js';
+import { normalizeOfferPacing, type Offer } from '../models/offer-schemas.js';
+import { resolvePacingToll } from '../services/metered-settlement.js';
 import { AppToolsDocSchema, appToolsKey, applyLockedInput, toolMoneyPrices, type AppTool } from '../models/app-tool-schemas.js';
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
@@ -46,9 +51,21 @@ import { listPaymentHandlers } from './payment-handlers.js';
 import { integerMicros } from './money.js';
 import { membersOnlyRefusal, membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 
+/** Core 'pacing-pack' kind (pacing-pack.ts), re-exported so the route loader registers every core kind from one module. */
+export { pacingPackSellableResolver } from './pacing-pack.js';
+
 /** The buyer as an identity: a checkout opens under a bare owner name of this node, or a full one. */
 function buyerIdentityOf(buyerOwner: string, config: AimeatConfig): string {
   return buyerOwner.includes('@') ? buyerOwner : `${buyerOwner}@${config.nodeId}`;
+}
+
+/**
+ * The money currency a line is priced in. 'morsel', which 3.x clients may still send (deprecated until
+ * 4.0.0, config-pacing.ts), and an absent currency both mean the node's default: a free item is priced
+ * at 0 in it, and a morsel is never a currency.
+ */
+export function sessionCurrency(requested: string | undefined): string {
+  return requested && requested.toLowerCase() !== 'morsel' ? requested : 'EUR';
 }
 
 /** A raw line-item reference before resolution. `kind` defaults to 'offer'. */
@@ -89,9 +106,9 @@ export function resetSellableResolvers(): void {
 }
 
 /**
- * The core resolver: an agent offer priced in morsels. Same rules the offer-invoke settlement
- * enforces — private offers are owner-only, cross-owner purchase requires an explicit price,
- * self-purchase is free.
+ * The core resolver: an agent offer, with its money price and its pacing amount. Same rules the
+ * offer-invoke route enforces — private offers are owner-only, cross-owner purchase needs a money
+ * price or a pacing amount, self-purchase is free.
  */
 export function offerSellableResolver(): SellableResolver {
   return {
@@ -116,21 +133,19 @@ export function offerSellableResolver(): SellableResolver {
         throw new CommerceError('OFFER_PRIVATE', 403, 'This offer is private to its owner');
       }
       const sellerGhii = `${agent.owner}@${config.nodeId}`;
-      const currency = ref.currency ?? 'morsel';
+      const currency = sessionCurrency(ref.currency);
+      // Two values (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): an optional
+      // money price, and the pacing amount, which reads an old morsel price as pacing.
+      const toll = isSelf ? 0 : resolvePacingToll(config, normalizeOfferPacing(offer).tollMorsels);
       let unitPrice = 0;
       let psp: unknown;
-      if (currency === 'morsel') {
-        if (!isSelf) {
-          if (!offer.price) throw new CommerceError('OFFER_NOT_FOR_SALE', 422, 'This offer declares no price and cannot be purchased cross-owner');
-          unitPrice = Number(offer.price.morsels);
-        }
-      } else {
+      if (!isSelf && offer.priceMoney) {
         // Money: the offer must carry a matching money price, and SOME registered handler must
-        // settle this currency (Community has only morsels → blocks money at creation). The
-        // seller's own PSP credentials (commerce.psp) are attached if present; the handler decides
-        // whether it needs them (Stripe does; invoice/manual does not). Funds land on the seller.
-        if (!offer.priceMoney || offer.priceMoney.currency !== currency) {
-          throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This offer has no ${currency} price`);
+        // settle this currency. The seller's own PSP credentials (commerce.psp) are attached if
+        // present; the handler decides whether it needs them (Stripe does; invoice does not). Funds
+        // land on the seller.
+        if (offer.priceMoney.currency !== currency) {
+          throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This offer has no ${currency} price; it is sold in ${offer.priceMoney.currency}`);
         }
         if (!listPaymentHandlers().some((h) => h.currencies.includes(currency))) {
           throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `No payment handler on this node settles ${currency}`);
@@ -138,11 +153,14 @@ export function offerSellableResolver(): SellableResolver {
         const pspRec = await storage.getMemory(sellerGhii, 'commerce.psp');
         psp = pspRec?.value ?? undefined;
         unitPrice = integerMicros(offer.priceMoney.amount);
+      } else if (!isSelf && toll <= 0 && !(normalizeOfferPacing(offer).tollMorsels)) {
+        // Neither a money price nor a pacing amount: the offer is for its owner, as before.
+        throw new CommerceError('OFFER_NOT_FOR_SALE', 422, 'This offer declares neither a money price nor a pacing amount, so it is not offered to other owners');
       }
       return {
         kind: 'offer', agentGaii, agentName, offerId: ref.offer_id,
         title: offer.title, sellerOwner: agent.owner,
-        sellerGhii, priceMorsels: unitPrice, psp,
+        sellerGhii, unitPrice, tollMorsels: toll, psp,
       };
     },
   };
@@ -202,21 +220,21 @@ export function appToolSellableResolver(): SellableResolver {
       const carriedByProvider = granted?.state === 'active';
 
       const isSelf = sellerOwner === buyerOwner || carriedByProvider;
-      const currency = ref.currency ?? 'morsel';
+      const currency = sessionCurrency(ref.currency);
+      // The pacing amount reads an old morsel price (`price.morsels`) as pacing.
+      const toll = isSelf ? 0 : resolvePacingToll(config, tool.tollMorsels, tool.price?.morsels);
+      const moneyPrices = toolMoneyPrices(tool);
       let unitPrice = 0;
       let psp: unknown;
-      if (currency === 'morsel') {
-        if (!isSelf) {
-          if (!tool.price || tool.price.morsels <= 0) {
-            throw new CommerceError('TOOL_NOT_FOR_SALE', 422, 'This tool declares no morsel price and cannot be purchased cross-owner');
-          }
-          unitPrice = Number(tool.price.morsels);
+      if (!isSelf && moneyPrices.length === 0) {
+        if (!(tool.tollMorsels && tool.tollMorsels > 0) && !(tool.price && tool.price.morsels > 0)) {
+          throw new CommerceError('TOOL_NOT_FOR_SALE', 422, 'This tool declares neither a money price nor a pacing amount, so it is not offered to other owners');
         }
-      } else if (!carriedByProvider) {
+      } else if (!isSelf) {
         // Every money price the tool declares, from `priceMoney` and `pricesMoney` both. Reading
         // `priceMoney` alone refused a tool sold only in `pricesMoney`, and the second currency of a
         // tool sold in two, while the catalog and the 402 named those prices.
-        const moneyPrice = toolMoneyPrices(tool).find((m) => m.currency === currency);
+        const moneyPrice = moneyPrices.find((m) => m.currency === currency);
         if (!moneyPrice) {
           throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This tool has no ${currency} price`);
         }
@@ -237,7 +255,7 @@ export function appToolSellableResolver(): SellableResolver {
         // The "agent" slots carry the app reference — skus render as app-tool:<owner>/<appId>:<tool>.
         agentGaii: appRef, agentName: appId, offerId: tool.name,
         title: `${appId} · ${tool.name}`, sellerOwner, sellerGhii,
-        priceMorsels: unitPrice, psp,
+        unitPrice, tollMorsels: toll, psp,
         // Fulfillment — a throw refunds the collect and leaves the session open (session-service
         // contract). Callable tools invoke the backing capability with the buyer's persisted input;
         // unbound tools become an agent TASK on the shared commerce task path (phase B).
@@ -302,7 +320,7 @@ export function extCallSellableResolver(): SellableResolver {
       }
       const payMoney = action.commercial?.payMoney;
       if (!payMoney) throw new CommerceError('TOOL_NOT_FOR_SALE', 422, `Action "${actionId}" declares no money price`);
-      const currency = ref.currency ?? 'morsel';
+      const currency = ref.currency && ref.currency !== 'morsel' ? ref.currency : payMoney.currency;
       if (currency !== payMoney.currency) {
         throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This call is priced in ${payMoney.currency}, not ${currency}`);
       }
@@ -316,7 +334,8 @@ export function extCallSellableResolver(): SellableResolver {
       return {
         kind: 'ext-call', agentGaii: extName, agentName: extName, offerId: actionId,
         title: `${extName} · ${actionId}`, sellerOwner, sellerGhii,
-        priceMorsels: unitPrice, psp: pspRec?.value ?? undefined,
+        // The pacing of the call is charged where the call runs (the paywall), not here, or it would be charged twice.
+        unitPrice, tollMorsels: 0, psp: pspRec?.value ?? undefined,
         // Payment already settled by the time fulfill runs (collect → fulfill). Mint the one-time
         // token bound to this buyer + ext + action; the buyer replays it to the raw endpoint.
         async fulfill(ctx, { session }) {

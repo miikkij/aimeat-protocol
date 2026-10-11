@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-11 — A comment calls a morsel amount pacing, not a price (no prompt text changed).
  *   2026-10-11 — Events first, a timer last: the section "Live updates without a firehose" moved to build-events-first.ts and opens with that rule; the real-time section's last line points a simple app at AIMEAT.live, where it said "on a timer".
  *   2026-10-02 — The agent-face part names aimeat-format-md: the app's own extension action answers ?format=md. The AI line: when a capability is off, show its `fix` with a link to `settingsUrl`.
  *   2026-10-01 — Public Intake: the link to share is the app page with ?form=<form id>. The code
@@ -479,7 +480,7 @@ function composeAppPrompt(
   // The app answers for what it does, not the node. An app that takes money or handles personal
   // data has duties the node cannot carry for it, and the builder is the one who knows which
   // category the app falls in. Money means a currency — morsels pace what agents push into the
-  // store and buy nothing, so a morsel price never makes an app a shop.
+  // store and buy nothing, so a pacing amount in morsels never makes an app a shop.
   body += '### If the app sells something, or handles personal data — its own legal pages\n';
   body += 'The app answers for what it does; the node it runs on does not. A shop answers for its sales, an app that handles personal data answers for that data. The node gives every published app its own legal pages, written by the owner and served at `/terms`, `/privacy`, `/imprint`, `/refunds`, `/accessibility`, `/cookies` and `/support` under the app\'s address, linked from its head and named in its llms.txt. They are set with `aimeat_app_manage` action `legal` (or PATCH `/v1/apps/{filename}` with `legal`), as markdown, HTML or a link, and every change lands in the app\'s audit log.\n\n';
   body += '**Ask the person which of these the app is, and say what follows.** Every published app: terms of use and a privacy notice (GDPR Art. 13: who the controller is and how to reach them, what is handled and why, on what basis, for how long, who else sees it, the person\'s rights, where to complain — the data map is where those answers come from, so write the map first). An app that takes MONEY in a currency (priced tools, a shop, a subscription): also an imprint (who is selling: name, address, contact, trade register — e-commerce directive Art. 5, DSA Art. 30(7)), refunds and withdrawal (the 14-day right, consumer rights directive), an accessibility statement (the European Accessibility Act asks it of e-commerce services since June 2025, in written and spoken form), and a support page. Morsels are not money: a morsel price paces agents and creates none of these duties.\n\n';

@@ -13,6 +13,7 @@
  *   - genesis-memory-read (POST/GET): forwards reads to peers or answers peer reads under federation consent
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  * @version-history
+ *   v1.11.0 — 2026-10-11 — Cross-catalogue action pricing is the pacing amount, toll_morsels, with base_morsels as a deprecated mirror until 4.0.0; a 3.x genesis entry's base_morsels reads as toll_morsels (a morsel is pacing, not a price).
  *   v1.10.0 — 2026-10-10 — A genesis peer that has once sent a verified delivery proof is held to it: an ingest without one is refused whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal, deliveryProofAt; secaudit 2026-10-10 I21).
  *   v1.9.0 — 2026-10-06 — genesis-catalogue-ingest checks a delivery proof: this node named, sent inside five minutes, heard once (deliveryRefusal; secaudit 2026-10 last items, D3).
  *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -57,6 +58,7 @@ import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLoc
 import { cacheGenesisResults, findCachedGenesis } from '../services/genesis-memory-cache.js';
 import { leaveMemoriesToPeer } from '../services/classification-exits.js';
 import { logger } from '../utils/logger.js';
+import { actionPricingFromPeer, presentActionPricing } from '../services/action-pacing.js';
 
 export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
     const router = Router();
@@ -187,10 +189,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                         category: action.category,
                         source_node: federatedTag.replace('federated:', ''),
                         source_type: 'federated',
-                        pricing: {
-                            base_morsels: action.pricing.baseMorsels,
-                            per_unit: action.pricing.perUnit,
-                        },
+                        pricing: presentActionPricing(action.pricing),
                         tags: action.tags,
                         semantic: action.semantic,
                     });
@@ -216,6 +215,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                         // (e2e-genesis-federation). The remote id survives as remote_id.
                         entries.push({
                             ...val,
+                            ...(val.pricing ? { pricing: presentActionPricing(actionPricingFromPeer(val.pricing)) } : {}),
                             type: val.type ?? 'genesis_entry',
                             id: mem.key,
                             remote_id: val.id,

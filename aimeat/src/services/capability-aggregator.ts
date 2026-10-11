@@ -5,6 +5,9 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.5.0 - 2026-10-11 - A capability's `cost.morsels` is the pacing amount per use: an action's
+ *     tollMorsels, an app tool's tollMorsels plus its old price.morsels, an offer's normalized
+ *     tollMorsels. A morsel is pacing, not a price.
  *   v1.4.0 - 2026-09-03 - An extension's or cortex's capability is owned by the installer's GHII
  *     (`alice@node-id`), not the bare name the extension record carries: every route compares
  *     ownerGhii against resolveIdentity(), so the bare name made "hide from agents" a 403 for the
@@ -28,7 +31,18 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord, CortexLibComponent, CortexPromptComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
-import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
+import { OffersDocSchema, normalizeOfferPacing, TOLL_MORSELS_MAX, type Offer } from '../models/offer-schemas.js';
+
+/**
+ * An app tool's pacing amount per use: `tollMorsels`, plus a 3.26.x `price.morsels`, which is pacing
+ * now (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Read through a loose
+ * shape so the old field is found whether or not the tool schema still declares it.
+ */
+function toolPacing(tool: object): number {
+  const t = tool as { tollMorsels?: number; price?: { morsels?: number } | null };
+  const toll = (t.tollMorsels ?? 0) + (t.price?.morsels && t.price.morsels > 0 ? t.price.morsels : 0);
+  return Math.min(toll, TOLL_MORSELS_MAX);
+}
 
 function makeSchemaHash(input: unknown, output: unknown): string {
   return createHash('sha256')
@@ -147,7 +161,8 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           whenToUse: '', whenNotToUse: '',
           examples: [], dependencies: [], schemaHash,
           webhookUrl: null,
-          cost: action.pricing ? { morsels: action.pricing.baseMorsels || 0 } : null,
+          // `cost.morsels` holds the action's PACING amount per use, not a price.
+          cost: action.pricing ? { morsels: action.pricing.tollMorsels || 0 } : null,
           trustRequired: null,
           trust: makeDefaultTrust(), redactedFields: [],
           operatorOverride: null, stats: makeDefaultStats(),
@@ -285,7 +300,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           seenRefs.add(ref);
           const existing = await storage.getCapabilityBySourceRef(ref);
           const schemaHash = makeSchemaHash(tool.inputSchema, tool.outputSchema);
-          const morsels = tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0;
+          const morsels = toolPacing(tool);
           const version = String(parsed.data.version ?? parsed.data.updatedAt ?? '1');
           const fields = {
             name: `${appId}: ${tool.name}`,
@@ -335,7 +350,8 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         seenRefs.add(ref);
         const existing = await storage.getCapabilityBySourceRef(ref);
         const schemaHash = makeSchemaHash(offer.inputSchema, offer.outputSchema);
-        const morsels = offer.price && offer.price.morsels > 0 ? offer.price.morsels : 0;
+        // The offer's pacing amount; an old `price.morsels` adds to it (normalizeOfferPacing).
+        const morsels = normalizeOfferPacing(offer).tollMorsels ?? 0;
         const version = String(parsed.data.version ?? parsed.data.updatedAt ?? '1');
         const fields = {
           name: offer.title || `${agent.name}: ${offer.id}`,

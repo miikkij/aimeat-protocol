@@ -6,6 +6,8 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.1 — 2026-10-11 — `free_only` means no pacing amount (`tollMorsels`), and every listed manifest
+ *     carries the deprecated `priceMorsels` mirror until 4.0.0 (services/app-pacing.ts).
  *   v1.15.0 — 2026-10-09 — The access code of a protected app goes to a caller who could set it: the
  *     owner in person, or a principal of the owner holding app:write. It went to every token acting in
  *     the owner's name, an agent with no scopes and another person's app the owner signed into among
@@ -58,6 +60,7 @@ import { peerFetch } from '../../utils/peer-fetch.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import { publicAppManifest } from '../../services/app-public-manifest.js';
+import { appToll, presentAppManifest } from '../../services/app-pacing.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app-seo.js';
@@ -136,7 +139,7 @@ export function registerCatalogueAdminRoutes(
             const q = (opts.q ?? '').toLowerCase();
             apps = apps.filter(app => (!opts.category || app.manifest.category === opts.category)
                 && (!opts.tag || app.manifest.tags?.includes(opts.tag))
-                && (!opts.freeOnly || !app.manifest.priceMorsels)
+                && (!opts.freeOnly || !appToll(app.manifest))
                 && (!q || `${app.manifest.name} ${app.manifest.description}`.toLowerCase().includes(q)));
             total = apps.length;
             apps = apps.slice(Math.max(0, opts.offset), Math.max(0, opts.offset) + Math.max(1, opts.limit));
@@ -201,7 +204,7 @@ export function registerCatalogueAdminRoutes(
                     : {}),
                 filename: app.filename,
                 version_number: app.versionNumber,
-                manifest: shownManifest,
+                manifest: presentAppManifest(shownManifest),
                 ai_posture: shownPosture ?? null,
                 data_map: shownDataMap ?? null,
                 ...(isOwn && app.manifest.specCheck ? { spec_check: app.manifest.specCheck } : {}),
@@ -314,7 +317,7 @@ export function registerCatalogueAdminRoutes(
                 owner: app.ownerName,
                 filename: app.filename,
                 version_number: app.versionNumber,
-                manifest: app.manifest,
+                manifest: presentAppManifest(app.manifest),
                 size: app.size,
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,

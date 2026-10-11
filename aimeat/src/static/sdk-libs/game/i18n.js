@@ -16,6 +16,8 @@
  * @usage  AIMEAT.game.i18n.use({ fi: { play: 'Pelaa' }, en: { play: 'Play' } });
  *         AIMEAT.game.i18n.t('play');
  * @version-history
+ *   v1.3.0 — 2026-10-11 — pacingAmount (en/fi/es) for morsels(n, { pacing: true }): "pacing {amount}",
+ *     "tahdistus {amount}", "{amount} de ritmo".
  *   v1.2.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.2.0 — 2026-10-01 — Finnish says murunen for morsel ("12 murusta"), the word the locales use
  *     (Jouni, 2026-10-01); it said morselia.
@@ -53,6 +55,7 @@ const BASE = {
     inARow: '{n} in a row',
     sortBy: 'Sort by',
     morsels: 'morsels',
+    pacingAmount: 'pacing {amount}',
     target: 'Target {n}',
     fix: 'Fix this',
   },
@@ -83,6 +86,7 @@ const BASE = {
     inARow: '{n} peräkkäin',
     sortBy: 'Järjestys',
     morsels: 'murusta',
+    pacingAmount: 'tahdistus {amount}',
     target: 'Tavoite {n}',
     fix: 'Korjaa tämä',
   },
@@ -113,6 +117,7 @@ const BASE = {
     inARow: '{n} seguidos',
     sortBy: 'Ordenar por',
     morsels: 'morsels',
+    pacingAmount: '{amount} de ritmo',
     target: 'Objetivo {n}',
     fix: 'Corrige esto',
   },

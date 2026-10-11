@@ -8,6 +8,10 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.10.0 -- 2026-10-11 -- `toll_morsels` sets the app's pacing amount (a morsel is pacing, not a
+ *     price). The 3.x `price_morsels` / `priceMorsels` are read as pacing until 4.0.0, then refused with
+ *     400 MORSEL_PRICE_REMOVED; a delegate is refused all three. The response manifest carries the
+ *     deprecated `priceMorsels` mirror (services/app-pacing.ts).
  *   v2.9.0 -- 2026-10-02 -- design_spec_hint in the answer (services/app-design-spec.ts).
  *   v2.8.2 -- 2026-09-24 -- A GIF or AVIF screenshot is a picture too, and is accepted.
  *   v2.8.1 -- 2026-09-24 -- The optional screenshot is checked before the publish rather than after
@@ -76,6 +80,7 @@ import { decodeStrictBase64 } from '../../utils/base64.js';
 import { imageUploadType } from '../../utils/raster-image.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
+import { readAppTollInput, presentAppManifest } from '../../services/app-pacing.js';
 
 export function registerPublishRoutes(
     router: Router,
@@ -97,19 +102,27 @@ export function registerPublishRoutes(
         const t = await appTargetOr(appTarget, config, req, res, 'publish');
         if (!t) return;
         const { owner, ownerGhii, delegated } = t;
-        // What an app COSTS is the owner's business relationship with a buyer, and no rung carries
-        // it. Refused rather than ignored: a publish that silently dropped the price would leave the
-        // caller believing they had set one.
-        if (delegated && (req.body?.price_morsels !== undefined || req.body?.license_type !== undefined)) {
+        // The app's pacing amount and licence are the owner's terms with whoever takes the app, and
+        // no rung carries them. Refused rather than ignored: a publish that silently dropped the
+        // amount would leave the caller believing they had set one.
+        if (delegated && (req.body?.toll_morsels !== undefined || req.body?.price_morsels !== undefined
+            || req.body?.priceMorsels !== undefined || req.body?.license_type !== undefined)) {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-                `You may build ${owner}'s app, but its price and licence are theirs to set.`));
+                `You may build ${owner}'s app, but its pacing amount and licence are theirs to set.`));
+            return;
+        }
+        // `toll_morsels`, plus the 3.x `price_morsels` / `priceMorsels` read as pacing while they are
+        // live (services/app-pacing.ts); from 4.0.0 an old field is 400 MORSEL_PRICE_REMOVED.
+        const tollIn = readAppTollInput(req.body);
+        if (!tollIn.ok) {
+            res.status(400).json(error(config.nodeId, tollIn.code, tollIn.message));
             return;
         }
         const {
             filename, content, mime_type, access_code,
             screenshot, screenshot_mime_type,
             name, description, descriptions, version: semver, category, tags, icon,
-            uses_cortex, cortex, price_morsels, license_type, protection,
+            uses_cortex, cortex, license_type, protection,
             ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
         } = req.body ?? {};
 
@@ -274,7 +287,7 @@ export function registerPublishRoutes(
                 usesCortex: Array.isArray(uses_cortex)
                     ? uses_cortex.filter((c: unknown): c is string => typeof c === 'string') : undefined,
                 cortexAgents,
-                priceMorsels: typeof price_morsels === 'number' ? price_morsels : undefined,
+                tollMorsels: tollIn.toll,
                 licenseType: license_type === 'single' || license_type === 'lifetime'
                     ? license_type as AppManifest['licenseType'] : undefined,
                 protection: sanitizeProtection(protection),
@@ -316,7 +329,7 @@ export function registerPublishRoutes(
             ...('warning' in road ? { roadmap_hint: road.warning } : {}),
             ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
             version_number: out.versionNumber,
-            manifest: out.manifest,
+            manifest: presentAppManifest(out.manifest),
             size: out.size,
             mime_type: out.mimeType,
             protected: !!out.accessCode,

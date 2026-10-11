@@ -10,18 +10,21 @@
  *   shows two decimals, and up to six when it is sub-cent, which is what `commerce.fmtMoney` does,
  *   so a page that loads both agrees with itself.
  *
- *   MORSELS. A currency of 'morsel' or 'morsels', in any case, is the write pacer and never money:
- *   an integer count followed by the kit's own word, never a currency figure. A morsel count is an
- *   integer at the source, so `unit: 'micros'` and a `...Micros` field never divide it.
+ *   MORSELS. A currency of 'morsel' or 'morsels', in any case, is the pacer and never money: where
+ *   a price would stand it reads as pacing ("pacing 5 morsels", pacingText), never a currency figure
+ *   and never a price. A morsel count is an integer at the source, so `unit: 'micros'` and a
+ *   `...Micros` field never divide it.
  *
  *   Data with neither is read exactly as before: whole currency units, formatted by each part's own
  *   code, so an app that passes `price: 19` sees the same text it saw before this module existed.
  * @structure MONEY_UNIT · isMorsels · speaksMicros · hasAmount · readAmount · fractionDigits ·
- *   roundMicros · morselText
- * @usage import { readAmount, speaksMicros, isMorsels, morselText } from './money-units.js';
+ *   roundMicros · morselText · pacingText
+ * @usage import { readAmount, speaksMicros, isMorsels, pacingText } from './money-units.js';
  *   const micros = speaksMicros(data, data.lines, ['price']);
  *   const each = readAmount(line, 'price', data);   // 1500000 with unit 'micros' → 1.5
  * @version-history
+ *   v0.66.2 — 2026-10-11 — pacingText: a morsel amount where a price would stand reads as pacing
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa); the three price parts use it.
  *   v0.62.0 — 2026-10-01 — Initial: priceTable, checkout and cart take commerce amounts directly.
  */
 import { num } from '../_core/format.js';
@@ -116,4 +119,17 @@ export function morselText(n) {
   const v = Math.round(Number(n) || 0);
   if (v === 1) return t('morsel1');
   return t('morsels', { n: num(v, { maximumFractionDigits: 0 }) });
+}
+
+/**
+ * A morsel amount where a price would stand: it is pacing, never a price, so it reads "pacing 5
+ * morsels" (the kit word `pacingAmount`, with the count in `{amount}`). Until a dictionary carries
+ * `pacingAmount`, the English word goes in front of the count.
+ * @param {number} n
+ * @returns {string}
+ */
+export function pacingText(n) {
+  const amount = morselText(n);
+  const text = t('pacingAmount', { amount: amount });
+  return text === 'pacingAmount' ? 'pacing ' + amount : text;
 }

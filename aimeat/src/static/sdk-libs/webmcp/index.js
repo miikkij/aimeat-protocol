@@ -13,6 +13,9 @@
  * @usage <script src="/v1/libs/aimeat-webmcp.js"></script>
  *   await AIMEAT.webmcp.exposeAppTools({ owner: 'alice', appId: 'shop.html' });
  * @version-history
+ *   v1.2.0 — 2026-10-11 — A tool's description tags its money price ([PAID], every currency) and its
+ *     pacing ([PACING: N morsels per call], toll_morsels first, the old price.morsels after) apart:
+ *     a morsel is never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.1.1 — 2026-10-11 — The feed tool's description says money prices: the feed no longer lists
  *     morsel prices (ruling D4).
  *   v1.1.0 — 2026-07-28 — `?expose=app` auto-activation (owner/app from the script tag's data-*, else
@@ -155,7 +158,8 @@ const webmcp = {
 
   /**
    * Expose an app's declared tools (apps.{appId}.tools manifest) to the in-browser agent.
-   * Descriptions of priced tools carry the price tag so the agent can tell the user the cost.
+   * A tool's description carries its money price ([PAID: …]) and its pacing in morsels per call
+   * ([PACING: …]), so the agent can tell the user both; the pacing is never a price.
    *
    * Every app also gets `about-this-app`, built from the listing's `app_surface`: the SKILL.md
    * packs bound to the app, the crew-defs it ships, its declared scopes and its live EXCHANGE
@@ -167,13 +171,23 @@ const webmcp = {
     const surface = listing.app_surface || null;
     const tools = (listing.tools || []).map(function (entry) {
       let desc = entry.description || entry.name;
-      if (entry.payment && entry.payment.required) {
-        const p = entry.payment;
-        const tags = [];
-        if (p.price) tags.push(p.price.morsels + ' morsels/call');
-        if (p.priceMoney) tags.push((p.priceMoney.amount / 1000000) + ' ' + p.priceMoney.currency + '/call');
-        desc = '[PAID: ' + tags.join(' or ') + '] ' + desc;
+      const p = entry.payment || {};
+      // Two values, two tags: the money price, and the pacing in morsels, which is never a price.
+      // The pacing reads toll_morsels first and the deprecated 3.x morsel price (price.morsels) after.
+      const tags = [];
+      if (p.priceMoney) tags.push((p.priceMoney.amount / 1000000) + ' ' + p.priceMoney.currency + '/call');
+      if (Array.isArray(p.pricesMoney)) {
+        for (const m of p.pricesMoney) {
+          if (m && m.amount > 0 && !(p.priceMoney && p.priceMoney.currency === m.currency)) {
+            tags.push((m.amount / 1000000) + ' ' + m.currency + '/call');
+          }
+        }
       }
+      const pacingRaw = [p.tollMorsels, p.toll_morsels, entry.tollMorsels, entry.toll_morsels, p.price && p.price.morsels]
+        .find(function (v) { return typeof v === 'number'; });
+      const pacing = Math.max(0, Math.trunc(Number(pacingRaw) || 0));
+      if (pacing > 0) desc = '[PACING: ' + pacing + (pacing === 1 ? ' morsel' : ' morsels') + ' per call] ' + desc;
+      if (tags.length) desc = '[PAID: ' + tags.join(' or ') + '] ' + desc;
       return {
         name: entry.name,
         description: desc,

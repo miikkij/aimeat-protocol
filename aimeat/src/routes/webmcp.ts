@@ -7,15 +7,22 @@
  *   HTTP. WebMCP itself (W3C Web Machine Learning CG draft, 2026) is an IN-PAGE JS API
  *   (document.modelContext.registerTool) — the in-page half is the served library
  *   /v1/libs/aimeat-webmcp.js (lib-webmcp.ts); THIS router serves the machine-readable listing
- *   scanners and non-browser agents read, and the HTTP invoke path. A PRICED tool always answers
- *   402 + the x402-style `accepts` block with a ready-made checkout line item — payment IS the
+ *   scanners and non-browser agents read, and the HTTP invoke path. A tool with a MONEY price always
+ *   answers 402 + the x402-style `accepts` block with a ready-made checkout line item — payment IS the
  *   invocation (complete the checkout; a callable tool's result rides back on
- *   session.fulfillment.results). Unpriced callable tools invoke directly for authenticated
- *   principals (identity via resolveIdentity, capability run through invokeCapability/safeFetch).
+ *   session.fulfillment.results). A free callable tool invokes directly for authenticated principals
+ *   (identity via resolveIdentity, capability run through invokeCapability/safeFetch), and another
+ *   owner's use is charged the tool's pacing amount first. A morsel is pacing, never a price.
  * @structure
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
- *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
+ *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   v1.9.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). Only a money price answers 402. A tool entry carries `toll_morsels`
+ *     (and `payment.price` as a deprecated mirror until 4.0.0). A free tool with a pacing amount runs
+ *     for a signed-in caller, charged through chargePacing before the call and given back if it fails;
+ *     the receipt rides on the answer as `pacing`. Signed out it answers 401, short of morsels 402
+ *     INSUFFICIENT_MORSELS.
  *   v1.8.1 — 2026-10-09 — isRestricted reads appHiddenFromPublicSurfaces (services/app-ai-use.ts), moved unchanged.
  *   v1.8.0 — 2026-10-08 — The listing's ai_provenance is the tool manifest record's own when it
  *     carries one, the app's only otherwise (aiprov D18).
@@ -56,9 +63,11 @@ import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
-import { appToolsKey, isToolPriced, toolMoneyPrices, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
+import { appToolsKey, isToolPriced, toolMoneyPrices, presentToolPacing, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
-import { publicManifestTools } from '../commerce/app-tool-catalog.js';
+import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
+import { pacingReceipt } from '../services/metered-settlement.js';
+import { publicManifestTools, toolPacing, paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
@@ -109,19 +118,24 @@ function toolEntry(config: AimeatConfig, ownerName: string, filename: string, to
   const appRef = `${ownerName}/${filename}`;
   const priced = isToolPriced(tool);
   const money = toolMoneyPrices(tool).map((m) => ({ amount: m.amount, currency: m.currency, scale: 6 }));
+  // The pacing amount (toll_morsels) and, until 4.0.0, its deprecated `price` mirror. Never a price.
+  const pacing = presentToolPacing(tool);
+  const toll = toolPacing(config, tool);
   return {
     // WebMCP descriptor fields (document.modelContext.registerTool) — execute lives in the page.
     name: tool.name,
     description: tool.description ?? '',
     inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
-    // AIMEAT extensions: how this tool fulfills and what it costs.
+    // AIMEAT extensions: how this tool fulfills, its money price and the pacing each use carries.
     fulfillment: tool.action_id ? 'call' : 'task',
+    toll_morsels: toll,
     payment: priced
       ? {
           required: true,
-          ...(tool.price && tool.price.morsels > 0 ? { price: { morsels: tool.price.morsels, unit: tool.price.unit ?? 'per-call' } } : {}),
           // Every money price, so a tool sold only in `pricesMoney` does not answer 402 with no price.
           ...(money.length ? { priceMoney: money[0], pricesMoney: money } : {}),
+          toll_morsels: toll,
+          ...(pacing.price ? { price: pacing.price } : {}),
           note: 'Payment IS the invocation: open + complete a checkout session with the item below. A callable tool returns its result on session.fulfillment.results; a task tool queues the order for the seller. Self-purchase by the app owner is free.',
           checkout: {
             create: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions` },
@@ -129,7 +143,14 @@ function toolEntry(config: AimeatConfig, ownerName: string, filename: string, to
             complete: { method: 'POST', url: `${b}/v1/commerce/checkout-sessions/{id}/complete` },
           },
         }
-      : { required: false },
+      : {
+          required: false,
+          toll_morsels: toll,
+          ...(pacing.price ? { price: pacing.price } : {}),
+          ...(toll > 0 ? {
+            note: `Free: no money price. POST your input to invoke with your own token. Each use carries ${toll} morsels of pacing, which bound how fast it can be used; the app owner's own use is free.`,
+          } : {}),
+        },
     invoke: { method: 'POST', url: `${b}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}/webmcp/tools/${encodeURIComponent(tool.name)}` },
   };
 }
@@ -287,7 +308,10 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
               subject: toolSubject, link: `/v1/profile?tab=usage`,
               data: {
                 app: `${ownerName}/${filename}`, tool: toolName,
-                amount: `${outcome.charged} ${outcome.entitlement.unit || 'morsels'}`,
+                // A money contract charged micro-units; a morsel-rail contract charged pacing, not a price.
+                amount: outcome.entitlement.unit === 'money'
+                  ? `${outcome.charged} ${outcome.entitlement.currency ?? 'EUR'} micro-units`
+                  : `${outcome.charged} morsels of pacing`,
               },
             }, config);
           } else {
@@ -345,6 +369,23 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       }
       const callerGhii = resolveIdentity(req.auth!, config.nodeId);
       const jwt = (req.headers.authorization || '').replace('Bearer ', '');
+      // A free tool with a pacing amount (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
+      // kaksi-arvoa): each use by another owner is charged that pacing before the call, through
+      // chargePacing (part burns, the operator keeps its share, the rest goes to the app owner), and
+      // given back when the call fails. The app owner's own principals use it free.
+      const paced = await paceFreeToolUse({
+        config, storage, caller: callerPrincipal(req.auth!, config.nodeId), anonymous: !!req.auth!.anonymous,
+        ownerName, appId: filename, tool, capRef: cap.source?.ref,
+      });
+      if (paced.kind === 'anonymous') {
+        res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', `Sign in to use "${toolName}": each use carries ${paced.toll} morsels of pacing.`));
+        return;
+      }
+      if (paced.kind === 'insufficient') {
+        res.status(402).json({ ...error(config.nodeId, 'INSUFFICIENT_MORSELS', insufficientMorselsMessage(config, paced.toll)), ...paymentChallenge(config) });
+        return;
+      }
+      const { charge, pass: passKind } = paced;
       try {
         const { invokeCapability } = await import('../services/capability-invoke.js');
         // This route just read the manifest and found no price on THIS tool. The backing action may
@@ -352,10 +393,14 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         // would then bill this free call at that neighbour's price. Say what was decided instead of
         // letting it be re-decided by the one place with less information.
         const invoked = await invokeCapability(config, storage, cap, toolInput,
-          callerGhii, jwt, 'normal', mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, 'unpriced'),
+          callerGhii, jwt, 'normal', mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, passKind),
           callAuthority(req.auth!));
-        res.json(success(config.nodeId, { app: appRef, tool: toolName, result: invoked.result }));
+        res.json(success(config.nodeId, {
+          app: appRef, tool: toolName, result: invoked.result,
+          ...(charge && charge.morsels > 0 ? { pacing: pacingReceipt(charge) } : {}),
+        }));
       } catch (err) {
+        await charge?.reverse();   // the use failed: the pacing comes back
         const e = err as { statusCode?: number; code?: string; message?: string };
         res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'TOOL_INVOKE_FAILED', e.message || 'Tool invocation failed'));
       }

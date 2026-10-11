@@ -31,9 +31,11 @@
  * @usage const sold = await pricedAppToolsFor(storage, `${owner}@${config.nodeId}`, ext.name, action.id);
  * @version-history
  *   v1.0.0 — 2026-07-27 — Initial: close the free raw door onto every priced app-tool on the node.
+ *   v1.1.0 — 2026-10-11 — A tool counts when it is offered (a money price or a pacing amount), not only
+ *     when it has a money price: a free tool with pacing is paced on the raw route too.
  */
 import type { Storage } from '../../storage/interface.js';
-import { AppToolsDocSchema, isToolPriced } from '../../models/app-tool-schemas.js';
+import { AppToolsDocSchema, isToolOffered } from '../../models/app-tool-schemas.js';
 import { cached, TTL } from '../../services/cache.js';
 import { logger } from '../../utils/logger.js';
 
@@ -73,7 +75,9 @@ export async function pricedAppToolsFor(
         if (!parsed.success) continue;
         const appId = rec.key.slice(APP_TOOLS_PREFIX.length, -APP_TOOLS_SUFFIX.length);
         for (const t of parsed.data.tools) {
-          if (t.action_id === binding && isToolPriced(t)) out.push({ appId, tool: t.name });
+          // Offered = a money price or a pacing amount: a free tool with pacing is still a product, so
+          // its action is not free through the raw route either.
+          if (t.action_id === binding && isToolOffered(t)) out.push({ appId, tool: t.name });
         }
       }
       // Stable order, so an ambiguous binding resolves the same way on every node and every call

@@ -5,9 +5,10 @@
  * @description THE money chokepoint for the commerce core (TARGET-033). Money currencies (EUR/USD)
  *   are stored as INTEGER MICRO-UNITS — 6 decimal places, 1 unit = 1_000_000 micros — never cents
  *   and never floats. Six decimals matches USDC/x402 exactly and covers sub-cent agent
- *   micropayments (a $0.002 per-call price = 2000 micros, no rounding). Morsels are integers
- *   (scale 0) and are NOT money — the session `currency` field decides which representation an
- *   amount uses, and morsel balances and money amounts never mix. Conversion to a payment rail's
+ *   micropayments (a $0.002 per-call price = 2000 micros, no rounding). Morsels are NOT money and
+ *   never a currency: they are pacing, whole numbers per use (ruling decision-morseli-on-tahdistus-ei-
+ *   hinta-tarjouksen-kaksi-arvoa), so a price is always money and morsel balances and money amounts
+ *   never mix. Conversion to a payment rail's
  *   own precision (Stripe cents, USDC raw) happens ONLY at settlement, never at storage. Every
  *   money operation in core AND the EE module (via `EnterpriseContext.money`) goes through this
  *   file — no inline ÷10000 / ×1e6 anywhere else. The percent-fee/cut helpers are the single
@@ -22,6 +23,8 @@
  *   if (isMoneyCurrency(session.currency)) stripeAmount = microsToStripeMinor(micros); // → cents
  *   const fee = percentFee(gross, commerceFeePercent(config));
  * @version-history
+ *   Comment only — 2026-10-11 — A morsel is pacing, never a currency or a price
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa); isMoneyCurrency unchanged.
  *   v1.3.0 — 2026-10-07 — moneyPricesOf moved here unchanged from services/exchange-source-terms.ts,
  *     so the checkout, the tool catalog and the WebMCP route read a tool's money prices with the
  *     function the EXCHANGE listing reads them with. They read `priceMoney` only, and a tool priced
@@ -42,7 +45,11 @@ export const MONEY_UNIT = 1_000_000;
 export const MONEY_CURRENCIES = ['EUR', 'USD'] as const;
 export type MoneyCurrency = (typeof MONEY_CURRENCIES)[number];
 
-/** A session/currency is money (not morsels) when it is anything other than 'morsel'. */
+/**
+ * A session/currency is money unless it is 'morsel'. No new session is ever in morsels (a morsel is
+ * pacing, never a currency); the check stays so a record a 3.x node stored with `currency: 'morsel'`
+ * is never read as money.
+ */
 export function isMoneyCurrency(currency: string): boolean {
   return currency !== 'morsel';
 }
@@ -114,7 +121,7 @@ export function integerMicros(value: number): number {
 /**
  * The platform-fee rounding policy: percent of an integer amount, rounded UP — a positive fee on a
  * positive amount never rounds to zero, so even a 2000-micro (0.002 EUR) sale carries its fee.
- * Unit-agnostic integer math: applied to morsel prices and money micros alike (one policy).
+ * Unit-agnostic integer math: applied to pacing amounts in morsels and money micros alike (one policy).
  */
 export function percentFee(amount: number, percent: number): number {
   return Math.ceil(amount * percent / 100);

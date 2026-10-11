@@ -31,6 +31,8 @@
  *     listAppPurchasesByBuyer, listAppPurchasesBySeller, hasValidLicense, deserializeAppPurchase moved to
  *     app-purchases.ts; supportsConfigPersistence, setConfigValue, deleteConfigValue, getAllConfigValues
  *     moved to system.ts so the file mirrors postgres-kysely/methods/apps.ts (secaudit 2026-10, M8).
+ *   v1.11.0 — 2026-10-11 — A manifest read from a row goes through normalizeAppManifestPacing, so a
+ *     3.26.1 record's `priceMorsels` reads as its pacing amount `tollMorsels`, as on postgres-kysely.
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
@@ -40,6 +42,7 @@ import type {
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { SUMMARY_COLUMNS, runAppListing } from './apps-listing.js';
+import { normalizeAppManifestPacing } from '../../../app-manifest-pacing.js';
 
 export const appMethods = {
 
@@ -418,7 +421,7 @@ export const appMethods = {
       ownerName: row.ownerName as string,
       filename: row.filename as string,
       versionNumber: row.versionNumber as number,
-      manifest: JSON.parse((row.manifest as string) || '{}'),
+      manifest: normalizeAppManifestPacing(JSON.parse((row.manifest as string) || '{}')),
       mimeType: row.mimeType as string,
       size: row.size as number,
       createdAt: row.createdAt as string,
@@ -448,7 +451,7 @@ export const appMethods = {
       ownerName: row.ownerName as string,
       filename: row.filename as string,
       versionNumber: row.versionNumber as number,
-      manifest: JSON.parse((row.manifest as string) || '{}'),
+      manifest: normalizeAppManifestPacing(JSON.parse((row.manifest as string) || '{}')),
       mimeType: row.mimeType as string,
       size: row.size as number,
       data: row.data as Buffer,
@@ -499,7 +502,7 @@ export const appMethods = {
       ownerGaii: row.ownerGaii as string,
       ownerName: row.ownerName as string,
       filename: row.filename as string,
-      manifest: JSON.parse((row.manifest as string) || '{}'),
+      manifest: normalizeAppManifestPacing(JSON.parse((row.manifest as string) || '{}')),
       mimeType: row.mimeType as string,
       size: row.size as number,
       data: row.data as Buffer,

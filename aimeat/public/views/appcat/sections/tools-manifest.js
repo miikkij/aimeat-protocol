@@ -18,6 +18,8 @@
  *   blockedReason(tool) · priceLabel(tool) · ownerGhiiOf(m) · MONEY_UNIT · CURRENCIES
  * @usage const m = useToolsManifest(d); m.state === 'ready' && m.doc.tools.map(…)
  * @version-history
+ *   v1.1.0 — 2026-10-11 — priceLabel says the money price (or Free) and the pacing amount; a tool
+ *     with a pacing amount and no money price can be listed (ruling "morseli on tahdistus, ei hinta").
  *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder C), from the old catalogue's monetize.js and
  *     odps.js module state.
  */
@@ -25,6 +27,8 @@ import { useEffect, useState } from 'preact/hooks';
 import { apiGet, apiPost } from '/js/api.js';
 import { getSession, getNodeId } from '/js/services/auth.js';
 import { x } from '/views/appcat/i18n.js';
+import { t } from '/js/i18n.js';
+import { pacingOf } from '/js/format.js';
 
 /** 6-decimal micro-units, the node-wide money convention. */
 export const MONEY_UNIT = 1000000;
@@ -147,23 +151,30 @@ export function blockedReason(tool) {
   const hasOut = tool.outputSchema && Object.keys(tool.outputSchema).length;
   if (!hasIn || !hasOut) return x('odps.blockedSchema');
   if (!tool.action_id) return x('odps.blockedBinding');
-  const priced = (tool.price && tool.price.morsels > 0) || (tool.priceMoney && tool.priceMoney.amount > 0);
+  // A tool goes on the market with a money price, a pacing amount, or both (ruling 2026-10-11).
+  const priced = pacingOf(tool) > 0 || (tool.priceMoney && tool.priceMoney.amount > 0);
   if (!priced) return x('odps.blockedPrice');
   return '';
 }
 
-/** "2 morsels · 0.02 EUR", or "not for sale". */
+/**
+ * "0.02 EUR · pacing 2 morsels", "Free · pacing 2 morsels", or "not for sale" when the tool declares
+ * neither. The pacing amount is `tollMorsels`, plus a 3.x `price.morsels` (the node adds the two).
+ */
 export function priceLabel(tool) {
   const parts = [];
   const seen = {};
-  if (tool.price && tool.price.morsels > 0) parts.push(x('monetize.morselsN', { n: tool.price.morsels }));
   const money = [tool.priceMoney].concat(tool.pricesMoney || []);
   for (const m of money) {
     if (!m || !(m.amount > 0) || seen[m.currency]) continue;
     seen[m.currency] = true;
     parts.push((m.amount / MONEY_UNIT) + ' ' + m.currency);
   }
-  return parts.length ? parts.join(' · ') : x('monetize.notForSale');
+  const toll = Math.min(100, (tool.tollMorsels > 0 ? tool.tollMorsels : 0) + (tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0));
+  if (!parts.length && !toll) return x('monetize.notForSale');
+  if (!parts.length) parts.push(t('pacing.free'));
+  if (toll) parts.push(t('pacing.amount', { n: toll }));
+  return parts.join(' · ');
 }
 
 /** The owner's full identity, which the public file address /v1/pub/{GHII}/{key} needs. */

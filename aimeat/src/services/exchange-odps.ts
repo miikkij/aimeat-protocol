@@ -31,6 +31,10 @@
  *   res.type('text/yaml').send(odpsToYaml(doc));
  *   const tooLong = odpsLengthOverruns(doc);   // listing warnings; the write refusal is exchange-odps-write.ts
  * @version-history
+ *   v1.4.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa): a morsel-rail offering is free at price "0" with its pacing in the note,
+ *     the payment gateway says no money moves, and `x-aimeat.economics` carries `toll_morsels` (the
+ *     morsel `unit`/`base_price` stay as deprecated mirrors until 4.0.0).
  *   v1.3.0 — 2026-09-13 — The developer decided that a write which makes a generated document break a
  *     cap is refused, so ODPS_TEXT_LIMITS names the authoring fields behind each cap (`fields`) and
  *     odpsCappedTexts() hands the texts to services/exchange-odps-write.ts. The listing warning stays
@@ -52,6 +56,7 @@ import { formatMoneyMajor } from '../commerce/money.js';
 import type { Offering, OfferingStats } from './exchange-market.js';
 import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension, Provenance } from '../models/odps-schemas.js';
 import { AiProvenanceSchema } from '../models/ai-provenance-schemas.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 
 /** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
 export const ODPS_VERSION = '4.1';
@@ -87,6 +92,8 @@ export interface OdpsProjectionInput {
   stats?: OfferingStats | null;
   /** The node's platform fee on each metered call, in percent. */
   rakePercent: number;
+  /** The pacing per call in morsels, as the node charges it (offeringTollMorsels). Absent: read from the listing. */
+  tollMorsels?: number;
   baseUrl: string;
   nodeId: string;
 }
@@ -146,13 +153,25 @@ function defaultProductType(o: Offering): string {
   return 'data-driven service';
 }
 
-/** A price as ODPS wants it: a decimal STRING plus a currency, or morsels with the unit spelled out. */
+/**
+ * A price as ODPS wants it: a decimal STRING plus a currency. A morsel-rail offering has no money price
+ * (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa: a morsel is pacing, never a
+ * price), so it is free at "0" and the note states the morsels of pacing the call or block carries.
+ */
 function priceFields(o: Offering, amount: number): { price: string; priceCurrency?: string; note?: string } {
   if (o.unit === 'money') return { price: formatMoneyMajor(amount), priceCurrency: o.currency ?? 'EUR' };
   return {
-    price: String(amount),
-    note: 'Priced in morsels — the AIMEAT node’s internal throttle unit (plain integers), not a fiat currency.',
+    price: '0',
+    note: `Free: no money price. Carries ${amount} morsels of pacing, the AIMEAT node’s rate limit (plain integers), which is not a currency.`,
   };
+}
+
+/** The pacing per call the document states: the input's resolved figure, else what the listing itself says. */
+function tollOf(input: OdpsProjectionInput): number {
+  if (typeof input.tollMorsels === 'number') return input.tollMorsels;
+  const o = input.offering;
+  const toll = typeof o.tollMorsels === 'number' && o.tollMorsels > 0 ? o.tollMorsels : 0;
+  return o.unit === 'morsels' ? Math.max(0, o.basePrice) + toll : toll;
 }
 
 /** ODPS billing durations are calendar words; a subscription plan carries exact seconds. Pick the closest. */
@@ -319,7 +338,7 @@ function paymentGateways(o: Offering, rakePercent: number, baseUrl: string, lang
   return {
     default: {
       type: 'Custom',
-      description: localized(lang, `Morsel meter — the AIMEAT node’s internal throttle unit. Each metered call debits the consumer’s morsel balance and credits the provider; the platform retains ${rakePercent}%. No external payment rail is involved.`),
+      description: localized(lang, `Free: no money moves. Each metered call carries morsels of pacing, the AIMEAT node’s rate limit: a share burns, the platform keeps ${rakePercent}%, and the rest goes to the provider. Morsels are not a currency, and no external payment rail is involved.`),
       reference: `${baseUrl}/v1/exchange/info`,
     },
   };
@@ -398,10 +417,20 @@ function aimeatExtension(input: OdpsProjectionInput): Json {
         'x-note': 'Stated by the provider about this capability\'s OUTPUT. Absence of this block means unstated, not human-written.',
       },
     } : {}),
-    economics: {
-      unit: o.unit, base_price: o.basePrice, currency: o.currency, rake_percent: rakePercent,
-      note: 'base_price is in the offering unit: 6-decimal micro-units for money, whole morsels otherwise.',
-    },
+    economics: o.unit === 'money'
+      ? {
+          unit: o.unit, base_price: o.basePrice, currency: o.currency, toll_morsels: tollOf(input), rake_percent: rakePercent,
+          note: 'base_price is the money price per call in 6-decimal micro-units; toll_morsels is the pacing each call also carries.',
+        }
+      : {
+          toll_morsels: tollOf(input), rake_percent: rakePercent,
+          // 3.x readers find the figure where they read it, marked; gone from MORSEL_PRICE_FIELDS_REMOVED_IN.
+          ...(legacyMorselFieldsLive() ? {
+            unit: 'morsels', base_price: tollOf(input), currency: null,
+            deprecated: { unit: MORSEL_PRICE_DEPRECATION, base_price: MORSEL_PRICE_DEPRECATION },
+          } : {}),
+          note: 'Free: no money price. toll_morsels is the pacing each call carries, which is not a price.',
+        },
     ...(stats ? {
       observed: {
         active_contracts: stats.activeContracts, total_contracts: stats.totalContracts,

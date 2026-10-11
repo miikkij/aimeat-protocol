@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.2 — 2026-10-11 — The fork gate reads the app's pacing amount (`tollMorsels`, services/app-pacing.ts):
+ *     a morsel is pacing, not a price, and the 402 says so.
  *   v1.9.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.8.0 — 2026-09-28 — PATCH refuses `cortex` (the bundled crew-defs) on an app a managed package
@@ -70,6 +72,7 @@ import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { operatorOverride } from '../../services/operator-override.js';
+import { appIsPaced, appToll } from '../../services/app-pacing.js';
 
 /** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
 interface PatchRefusal { status: number; code: string; message: string; }
@@ -180,7 +183,7 @@ export function registerForkManageRoutes(
         const sameOwner = callerOwner === source.ownerName;
         // The operator check is asked only where one of the gates below would refuse a caller who is
         // not the owner, so the operator trail is written only for a fork that needed the override.
-        const paidSource = !!(config.marketplaceEnabled && source.manifest.priceMorsels && source.manifest.priceMorsels > 0);
+        const paidSource = appIsPaced(config, source.manifest);
         const isOperator = !sameOwner && (!!source.operatorHidden || !source.forkable || paidSource)
             && await operatorOverride(storage, config, req.auth, {
                 ownerOf: source.ownerName, area: 'app', action: 'fork', subject: sourceFilename,
@@ -199,14 +202,14 @@ export function registerForkManageRoutes(
             return;
         }
 
-        // Gate 2 — a paid source's bytes must not bypass the paywall. The licence keys on the buyer's
+        // Gate 2 — a paced source's bytes are not copied before the app is taken. The licence keys on the buyer's
         // OWNER GHII, the same coordinate the purchase receipt stored (app-store.ts) and the wallet
         // debited — not the raw `sub`, which on an owner session is a bare name that no receipt holds
         // (audit AI-triage 2026-08-23, invariant 1).
         if (paidSource && !sameOwner && !isOperator) {
             const hasLicense = await storage.hasValidLicense(ownerGhiiOf(callerGaii), source.ownerGaii, sourceFilename);
             if (!hasLicense) {
-                res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app costs ${source.manifest.priceMorsels} morsels. Purchase it first via POST /v1/app-store/purchase before forking.`));
+                res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app has ${appToll(source.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase, then fork it.`));
                 return;
             }
         }
