@@ -50,7 +50,7 @@ JSDoc you write. It emits nothing.
 - **`tsconfig.frontend.json`**: the `checkJs` config. Its `paths` map `preact`, `preact/hooks` and
   `htm` to the stubs in `public/types/vendored-libs.d.ts`, and `/*` to `public/*`, so `tsc`
   resolves the same absolute specifiers the importmap does. It excludes `public/lib/`,
-  `public/cortex-bundled/`, `public/samples/` and `public/sw.js`.
+  `public/cortex-bundled/` and `public/sw.js`.
 - **`public/types/aimeat-globals.d.ts`**: ambient declarations for browser and SDK globals loaded
   outside ES modules (`window.AIMEAT`, `Chart`, `mermaid`, the build-time `__APP_VERSION__`) and
   the `code`, `status` and `response` fields `api.js` attaches to thrown errors.
