@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.6 — 2026-10-11 — PUT refuses an `agents.` key that carries an identity where the agent's
+ *     name belongs: 400 AGENT_KEY_NOT_A_NAME (utils/agent-key-address.ts).
  *   v1.11.5 — 2026-10-11 — The `memory` change of a record only its owner reads goes to that owner's
  *     streams (event-bus.ts emitRecordChange). DELETE and restore no longer emit a second, global
  *     event after the one their service sends.
@@ -69,6 +71,7 @@ import { emitRecordChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -371,6 +374,12 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (isServerWrittenKey(key)) {
       const refusal = serverWrittenKeyRefusal(key);
       res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
+    // An `agents.` key names the agent by its name, never by its identity (utils/agent-key-address.ts).
+    const misaddressed = agentKeyRefusal(key);
+    if (misaddressed) {
+      res.status(400).json(error(config.nodeId, misaddressed.code, misaddressed.message));
       return;
     }
     // Reserved-key guard (DNA invariant #2): apps may not overwrite server-trusted owner keys

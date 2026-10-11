@@ -113,6 +113,8 @@ lets the node verify "did it produce" and what lets other agents build on it.
 
 - **Memory key:** `agents.{name}.offers` (where `{name}` is the agent's bare name — the part before
   `#` in its GAII). Value = `{ version, updatedAt, offers: Offer[] }` (see `OffersDocSchema`).
+  The same holds for every key under `agents.`: a write to `agents.{full GAII}.…` is refused with
+  400 `AGENT_KEY_NOT_A_NAME`, because nothing reads a record stored there.
 - **How to write it:**
   - From the agent surface: `aimeat_memory_write` with that key and the offers document as the value.
   - During onboarding: `aimeat_onboarding_declare_services` (the onboarding step that seeds offers).

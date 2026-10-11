@@ -4,15 +4,20 @@
  * SPDX-License-Identifier: MIT
  * @description Identical entry guards used by both memory batch routes.
  * @structure batchKeyRefusal; storageReferenceRefusal
- * @version-history 1.0.0 2026-09-27 Extract the shared rules and apply file-reference checks on restore.
+ * @version-history
+ *   1.1.0 2026-10-11 An `agents.` key that carries an identity where the name belongs is refused.
+ *   1.0.0 2026-09-27 Extract the shared rules and apply file-reference checks on restore.
  */
 import type { Storage } from '../../storage/interface.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
 import { isAnonymousGaii } from './shared.js';
 
 export function batchKeyRefusal(roles: string[], gaii: string, key: string): string | null {
   if (isServerWrittenKey(key)) return serverWrittenKeyRefusal(key).message;
+  const misaddressed = agentKeyRefusal(key);
+  if (misaddressed) return misaddressed.message;
   if (!appMayWriteKey(roles, key)) return 'reserved key — managed by the account owner';
   if (isSecretRecordKey(key)) return secretRecordWriteRefusal(key).message;
   if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) return 'anonymous agents can only write anonymous.* keys';

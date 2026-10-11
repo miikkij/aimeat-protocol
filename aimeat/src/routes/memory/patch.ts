@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.5.4 — 2026-10-11 — An `agents.` key that carries an identity where the agent's name belongs
+ *     is refused with 400 AGENT_KEY_NOT_A_NAME (utils/agent-key-address.ts).
  *   v1.5.3 — 2026-10-11 — The `memory` change goes to the owner's streams when the record is one
  *     only its owner reads, before and after the patch (event-bus.ts emitRecordChange).
  *   v1.5.2 — 2026-10-08 — The provenance stamp names the caller (resolveIdentity), not the namespace
@@ -67,6 +69,7 @@ import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -133,6 +136,12 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (isServerWrittenKey(key)) {
       const refusal = serverWrittenKeyRefusal(key);
       res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
+    // An `agents.` key names the agent by its name, never by its identity (utils/agent-key-address.ts).
+    const misaddressed = agentKeyRefusal(key);
+    if (misaddressed) {
+      res.status(400).json(error(config.nodeId, misaddressed.code, misaddressed.message));
       return;
     }
     if (!appMayWriteKey(req.auth!.roles, key, target.delegatedOwnerWrite, target.reservedAllowed)) {

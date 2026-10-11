@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.6 — 2026-10-11 — Copy refuses an `agents.` key that carries an identity where the agent's name belongs (400 AGENT_KEY_NOT_A_NAME); bulk and import refuse it through batchKeyRefusal.
  *   v1.11.5 — 2026-10-11 — The four `memory` changes are scoped to the owner when every record written or deleted is one only its owner reads (event-bus.ts emitRecordChange).
  *   v1.11.4 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.11.3 — 2026-10-05 — The bundle passes a file's workspace binding to fileTarget (secaudit 2026-10, DATA-4).
@@ -55,6 +56,7 @@ import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
 import { isServerWrittenKey, isServiceOwnedKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { fileTarget, memoryTarget } from '../../services/classification/labels.js';
@@ -587,6 +589,12 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (isServerWrittenKey(key)) {
       const refusal = serverWrittenKeyRefusal(key);
       res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
+      return;
+    }
+    // An `agents.` key names the agent by its name, never by its identity (utils/agent-key-address.ts).
+    const misaddressed = agentKeyRefusal(key);
+    if (misaddressed) {
+      res.status(400).json(error(config.nodeId, misaddressed.code, misaddressed.message));
       return;
     }
     // The copy lands under the caller's own name with the source's key, so an organism key is a
