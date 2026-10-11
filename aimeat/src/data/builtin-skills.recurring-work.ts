@@ -34,8 +34,8 @@
  *   v1.8.0 — 2026-10-11 — Section 5, putting the work on a clock: the schedule kinds and fields, the
  *     REST routes for an agent with no model, steps joined by memory keys, who starts a task a fire
  *     gives (the agent's task-start answer, not its mode alone) and the edge cases. Folded in from
- *     aimeat/docs/agent-scheduler-guide.md, a Finnish repository file the node never served, which
- *     is deleted (docs audit 2026-10-11, D7).
+ *     the Finnish scheduler guide of the package docs, a file the node never served, now deleted
+ *     (docs audit 2026-10-11, D7).
  *   v1.7.2 — 2026-10-11 — Section 4: one `offers` entry in the definition puts the agent on the
  *     person's offers page; the node adds one when there is none.
  *   v1.7.1 — 2026-10-11 — Section 4: the approval gives the new agent its work once, as a task with

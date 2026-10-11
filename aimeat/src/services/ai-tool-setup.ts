@@ -41,7 +41,8 @@
  *   (aliases, resolveAiClient, decideBranch, the question options) is in ai-tool-branch.ts.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
- *   v1.8.0 — 2026-10-11 — One table: docs/aiplatforms/ is gone, and its checked facts are here.
+ *   v1.8.0 — 2026-10-11 — One table: the repository's fifteen platform reports are gone, and their
+ *     checked facts are here.
  *     New tools: Mistral (Le Chat, now Vibe), LM Studio, Gemini CLI, Perplexity, OpenClaw and Copilot
  *     Studio. Corrected against each vendor's own documentation on 2026-10-11: claude.ai and Claude
  *     Desktop add a connector under Customize > Connectors, and the dialog may ask for an OAuth client
