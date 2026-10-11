@@ -10,6 +10,8 @@
  *   - GET /v1/agents/:name/integration-kit  -- Full integration kit JSON
  *   - GET /v1/agents/:name/tasks/wait       -- Long poll for new tasks
  * @version-history
+ *   v1.2.0 -- 2026-10-11 -- A stopped agent: /tasks/wait hands it no task and says `agent_stopped`, and its own
+ *     /inbox carries only active tasks (services/agent-stop-rules.ts).
  *   v1.1.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-23 -- Add cursor-based ?since= and ?limit= to inbox endpoint
@@ -21,8 +23,9 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { isStopped } from '../services/agent-stop-rules.js';
 
 /* ── Cursor helpers for inbox pagination ── */
 
@@ -106,11 +109,14 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
       }
     }
 
-    // Fetch queued and active tasks + pending messages
+    // Fetch queued and active tasks + pending messages. A stopped agent reading its OWN inbox gets
+    // only the work it is already doing: queued tasks and unread messages wait until it is started
+    // (services/agent-stop-rules.ts). The owner, or a sibling agent, reading the same inbox sees all of it.
+    const held = isStopped(agent) && resolveIdentity(req.auth!, config.nodeId) === agentGaii;
     const [queuedResult, activeResult, pendingMessages] = await Promise.all([
-      storage.listAgentTasks(agentGaii, { status: 'queued', perPage: limit }),
+      held ? { tasks: [] as Awaited<ReturnType<typeof storage.listAgentTasks>>['tasks'] } : storage.listAgentTasks(agentGaii, { status: 'queued', perPage: limit }),
       storage.listAgentTasks(agentGaii, { status: 'active', perPage: limit }),
-      storage.listPendingMessages(agentGaii),
+      held ? [] : storage.listPendingMessages(agentGaii),
     ]);
 
     // Build unified inbox items with a common timestamp and id for cursor logic
@@ -220,6 +226,9 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
       next_cursor: nextCursor,
       cursor_status: cursorStatus,
       has_more: hasMore,
+      // Why a stopped agent's own inbox has no waiting task and no message. A runtime that lists
+      // neither tasks nor messages reads its state from this one field.
+      ...(held ? { agent_stopped: true } : {}),
     }, [
       { description: 'View integration kit', method: 'GET', url: `/v1/agents/${agentName}/integration-kit` },
       { description: 'Wait for new tasks', method: 'GET', url: `/v1/agents/${agentName}/tasks/wait` },
@@ -294,6 +303,15 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
     const timeoutSec = Math.min(120, Math.max(1, parseInt(req.query.timeout as string || '60', 10)));
     const pollIntervalMs = 2000; // Check every 2 seconds
     const deadline = Date.now() + timeoutSec * 1000;
+
+    // A STOPPED AGENT IS HANDED NO TASK HERE (services/agent-stop-rules.ts). This long poll is a wake
+    // channel: it answers with the first queued task. The wait is still served in full, because a
+    // runtime that got an answer at once would ask again at once; then it says why it has nothing.
+    if (isStopped(agent) && resolveIdentity(req.auth!, config.nodeId) === agentGaii) {
+      await new Promise<void>(done => setTimeout(done, Math.max(0, deadline - Date.now())));
+      res.json(success(config.nodeId, { task: null, agent_stopped: true }));
+      return;
+    }
 
     // Initial check
     const initial = await storage.listAgentTasks(agentGaii, { status: 'queued', perPage: 1 });

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-11 — AgentRecord.stoppedAt and stoppedBy: an agent the owner stopped (migration 0101).
  *   v1.7.0 — 2026-10-10 — EnrolmentGrantKind, with 'move': a grant that pins a new key over an
  *     enrolled agent's old one, for an agent the owner moves to another connector.
  *   v1.6.0 — 2026-10-02 — AgentRuntimeSource.llm: where the crew's model calls go ('node' | 'machine').
@@ -205,6 +206,23 @@ export interface AgentRecord {
    * Set by the owner, or by a same-owner agent holding `agent:write`, and never by the agent itself.
    */
   taskStart?: 'automatic' | 'confirm' | null;
+  /**
+   * WHEN THE AGENT WAS STOPPED, as an ISO time; null or absent while it runs.
+   *
+   * A stopped agent starts no new work: a task given to it stays queued, a scheduled run is
+   * skipped, a message is stored and does not wake it, and work it is already doing finishes. Its
+   * key and its permissions are untouched, so starting it again is one write and no enrolment
+   * (services/agent-stop.ts says where each of those is enforced).
+   *
+   * Not `taskStart: 'confirm'`: that one makes each task wait for an OK and still wakes the agent to
+   * plan it, which is a model call per task. Stopped wakes nothing.
+   *
+   * Set and cleared by the owner, or by a same-owner agent holding `agent:write`, never by the agent
+   * itself. Null is how it is cleared, for the two-provider reason given at `runMode`.
+   */
+  stoppedAt?: string | null;
+  /** Who stopped it: the owner's name, or the GAII of the same-owner agent that did. */
+  stoppedBy?: string | null;
   /**
    * WHAT WAS RUNNING WHEN THIS AGENT RAN — the runtime's own answer, in its own words.
    *

@@ -17,6 +17,7 @@
  *   res.json(success(nodeId, { task, start: startAnswer(decision, task.status) }));
  *   void notifyTaskWaiting(storage, task, decision);
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The sentence for a task that waits because its agent is stopped.
  *   v1.1.0 — 2026-10-02 — The reason for an agent held by `*` alone names the narrowing.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
@@ -52,6 +53,7 @@ export function waitReason(agentName: string, decision: Pick<TaskStartDecision, 
             ? `${agentName} may do anything, including spend money and send or delete things as you, so its tasks wait for your OK until you narrow it to what it uses.`
             : `${agentName} can ${joinWords(kindsOf(decision))}, so its tasks always wait for your OK.`;
         case 'effects': return `The plan says it will ${joinWords(kindsOf(decision))}, so it waits for your OK.`;
+        case 'stopped': return `${agentName} is stopped, so this waits. It starts when you start the agent.`;
         case 'setting': return 'It waits for your OK before it starts.';
         default: return 'It starts on its own. You see the plan, the progress and the result in Tasks.';
     }
@@ -80,7 +82,8 @@ export function startAnswer(agentName: string, decision: TaskStartDecision, stat
         starts,
         waits_because: starts === 'now' ? null : decision.waitsBecause,
         reason: starts === 'now' ? waitReason(agentName, { ...decision, waitsBecause: null }) : waitReason(agentName, decision),
-        who_can_start: starts === 'now' ? null : held ? 'owner_in_person' : 'owner_or_their_ai',
+        // A task of a stopped agent is started by nobody: the agent is started, and the task follows.
+        who_can_start: starts === 'now' || decision.waitsBecause === 'stopped' ? null : held ? 'owner_in_person' : 'owner_or_their_ai',
     };
 }
 

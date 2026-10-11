@@ -8,6 +8,7 @@
  * @structure JobTrigger · JobRunResult · JobOutcome
  * @usage import type { JobRunResult } from './scheduler.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — Outcome `stopped` and `skipCode`, for a run skipped because the agent is stopped.
  *   v1.0.0 — 2026-10-02 — Extracted from scheduler.ts (max-file-lines), bodies verbatim.
  */
 
@@ -22,6 +23,8 @@ export interface JobRunResult {
   skipped?: boolean;
   /** Human-readable explanation for a skip, surfaced to manual-trigger callers. */
   skipReason?: string;
+  /** Why it was skipped, when the reason is not "a previous run is still going": the agent is stopped. */
+  skipCode?: 'stopped';
 }
 
 /**
@@ -32,11 +35,13 @@ export interface JobRunResult {
  *   ran      — a non-task job (ai/extension/core) executed successfully
  *   busy     — skipped: a previous occurrence is still running, or the job was
  *              already executing
+ *   stopped  — skipped: the agent the schedule gives work to is stopped (services/agent-stop.ts).
+ *              Nothing is queued for later; the next run happens at its time once it is started
  *   limited  — skipped by a constraint (daily_limit / max_runs / budget)
  *   error    — the job ran but failed (detail = error message)
  */
 export interface JobOutcome {
-  code: 'created' | 'ran' | 'busy' | 'limited' | 'error';
+  code: 'created' | 'ran' | 'busy' | 'stopped' | 'limited' | 'error';
   taskId?: string;
   detail?: string;
 }

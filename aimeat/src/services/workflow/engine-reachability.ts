@@ -6,6 +6,7 @@
  *   isAgentReachable / isAgentStep / anyAgentReachable + the reachability constants. Extracted from
  *   engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-10-11 — A stopped agent is not reachable for a workflow step (agent-stop-rules.ts).
  *   v1.1.0 — 2026-09-06 — A live connector socket is a third door into reachability, and it is the
  *     one a SPAWN agent answers on. lastSeen dates an agent's last WORK, not whether a wake would
  *     arrive, and a spawn agent has no runtime between jobs by design — so the check that decided
@@ -46,6 +47,9 @@ export const AGENT_OFFLINE_GRACE_MS = 5 * 60_000;
  */
 export function isAgentReachable(agent: AgentRecord | null | undefined, nowMs: number, connected = false): boolean {
   if (!agent) return false;
+  // A stopped agent starts no work (services/agent-stop-rules.ts), so a step given to it would sit
+  // until the step timed out. Not reachable is the answer the run can act on at once.
+  if (agent.stoppedAt) return false;
   const webhookOk = !!(agent.webhookEnabled && agent.webhookUrl) && (agent.webhookFailCount ?? 0) < AGENT_WEBHOOK_DOWN_THRESHOLD;
   if (webhookOk) return true;
   if (connected) return true;

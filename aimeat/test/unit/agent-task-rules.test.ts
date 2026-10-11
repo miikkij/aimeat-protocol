@@ -7,6 +7,7 @@
  *   per-transition wake id; and the basic agents a brand-new place gets.
  * @usage pnpm test -- agent-task-rules
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A stopped agent: no task starts, `stopped` is the first reason, nobody may start one.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, expect, it } from 'vitest';
@@ -97,6 +98,41 @@ describe('what a plan does to the status', () => {
     it('a revision always returns to the owner', async () => {
         expect(await statusAfterProposal(get({ mode: 'task-runner' }), { status: 'revision_requested', agentGaii: A, startPolicy: 'automatic' }, [pending()]))
             .toMatchObject({ nextStatus: 'queued', waits: true });
+    });
+});
+
+describe('a stopped agent', () => {
+    const STOPPED = '2026-10-11T08:00:00.000Z';
+
+    it('no task of a stopped agent starts, whatever the setting, the mode or the task says', () => {
+        for (const agent of [
+            { mode: 'task-runner' as const },
+            { mode: 'interactive' as const, taskStart: 'automatic' as const },
+        ]) {
+            expect(decideTaskStart(agent, { policy: 'automatic' }).startsNow).toBe(true);
+            expect(decideTaskStart({ ...agent, stoppedAt: STOPPED }, { policy: 'automatic' }))
+                .toMatchObject({ startsNow: false, waitsBecause: 'stopped' });
+        }
+    });
+
+    it('stopped is the reason named first, ahead of the floor and a declared effect', () => {
+        expect(decideTaskStart({ mode: 'task-runner', defaultScopes: ['commerce:buy'], stoppedAt: STOPPED }, { todos: [pending(['spend'])] }).waitsBecause)
+            .toBe('stopped');
+    });
+
+    it('nobody may start a task that waits because its agent is stopped, the owner in person included', () => {
+        const d = decideTaskStart({ mode: 'task-runner', stoppedAt: STOPPED }, {});
+        const callers: StartCaller[] = [
+            { ownerInPerson: true, app: false, principal: 'alice@n', scopes: ['*'] },
+            { ownerInPerson: false, app: true, principal: 'alice@n', scopes: ['task:write'] },
+            { ownerInPerson: false, app: false, principal: 'chat#alice@n', scopes: ['task:write'] },
+        ];
+        for (const c of callers) expect(mayStartWaitingTask(c, A, d)).toBe(false);
+    });
+
+    it('a cleared stop is no stop: null and undefined both read as running', () => {
+        expect(decideTaskStart({ mode: 'task-runner', stoppedAt: null }, {}).startsNow).toBe(true);
+        expect(decideTaskStart({ mode: 'task-runner' }, {}).startsNow).toBe(true);
     });
 });
 

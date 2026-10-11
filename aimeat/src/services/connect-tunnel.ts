@@ -25,6 +25,7 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.6.0 -- 2026-10-11 -- A stopped agent: wake deliveries are held, setStopped() and stoppedOf() (agent-stop-rules.ts).
  *   v2.5.0 -- 2026-10-10 -- A connection carries the name its connector reported (X-AIMEAT-Install-Name),
  *     and a socket closing is announced to connect-tunnel-hooks.ts listeners.
  *   v2.4.0 -- 2026-10-08 -- A socket opened by an upgrade is announced to connect-tunnel-hooks.ts listeners.
@@ -52,6 +53,7 @@
  *     is a per-identity in-flight cap and response-size cap, because a private socket per agent
  *     was isolation and a shared one is not. Same change removes the daemon restart a new agent
  *     used to need. -> connect-tunnel-multiplex.ts, and wish-tunnel-one-socket-many-agents.
+ *   v1.15.0 -- 2026-10-11 -- setStopped(): a stopped agent's identity takes no wake delivery, and a start sends its backlog again (./agent-stop-rules.ts).
  *   v1.14.0 -- 2026-09-02 -- closeForGaii(): the node stopped honouring ONE principal's
  *     credential, so its socket goes. Deleting an agent revoked its sessions and told the tunnel
  *     nothing, leaving a live socket that read `online` for a dead credential until some call
@@ -107,6 +109,7 @@ import { setTokenRevokedHook, type VerifiedToken } from '../auth/jwt.js';
 import { SocketIndex, Fairness } from './connect-tunnel-multiplex.js';
 import { forwardRequest } from './connect-tunnel-forward.js';
 import { sendBacklog, pushTaskCancellations, onMemoryWrite, notifyScopesChanged } from './connect-tunnel-push.js';
+import { isWakeDelivery } from './agent-stop-rules.js';
 import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
@@ -225,6 +228,7 @@ export class ConnectTunnelManager {
     const conn = this.connections.get(evt.target);
     if (!conn || conn.ws.readyState !== WebSocket.OPEN) return;          // offline → backlog handles it
     if (this.ackedDeliveries.get(evt.target)?.has(evt.id)) return;       // already acked — skip
+    if (conn.stopped && isWakeDelivery(evt.kind)) return;                // stopped: the work stays in the store until a start
     this.stats.deliveriesTotal++;
     this.sendTo(conn, { type: 'deliver', id: evt.id, kind: evt.kind, payload: evt.payload });
   }
@@ -664,6 +668,11 @@ export class ConnectTunnelManager {
   onTokenRevoked(rawToken: string): void { revokeByToken(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), rawToken); }
 
   /** Deleting ONE agent: its socket goes, and nothing else on that daemon is touched. */
+  /** An agent was stopped or started (services/agent-stop.ts). On a start the backlog goes out again, so what waited reaches the runtime. */
+  /** Whether a connected agent is stopped, from memory; undefined when it holds no socket here, so the caller reads its record. */
+  stoppedOf(gaii: string): boolean | undefined { return this.connections.get(gaii)?.stopped; }
+  setStopped(gaii: string, stopped: boolean, backlog = !stopped): void { const c = this.connections.get(gaii); if (!c) return; c.stopped = stopped; if (backlog) void sendBacklog(this.pushCtx(), c); }
+
   closeForGaii(gaii: string, reason: 'moved' | 'deleted' = 'deleted'): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
 
   /** Deactivating an account: every principal acting for that owner. */

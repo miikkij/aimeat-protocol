@@ -8,6 +8,7 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-10-11 — stoppedAt and stoppedBy on create, update and read (migration 0101).
  *   v1.1.0 — 2026-10-10 — deleteOwner also deletes the OTK rows stored under the bare account name
  *     (secaudit 2026-10-10 C0).
  *   v1.0.0 — 2026-10-05 — createOwner, getOwner, listOwners, updateOwner, deleteOwner, deserializeOwner moved
@@ -231,8 +232,8 @@ export const identityMethods = {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
          webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy,
-         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen, taskStart)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen, taskStart, stoppedAt, stoppedBy)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -261,6 +262,8 @@ export const identityMethods = {
         agent.mcpClient ?? null,
         agent.mcpLastSeen ?? null,
         agent.taskStart ?? null,
+        agent.stoppedAt ?? null,
+        agent.stoppedBy ?? null,
       );
       return agent;
     } catch (err: unknown) {
@@ -305,7 +308,7 @@ export const identityMethods = {
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
        dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?,
        runMode = ?, runtimeSource = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?,
-       mcpClient = ?, mcpLastSeen = ?, taskStart = ?
+       mcpClient = ?, mcpLastSeen = ?, taskStart = ?, stoppedAt = ?, stoppedBy = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -347,6 +350,8 @@ export const identityMethods = {
       updated.mcpClient ?? null,
       updated.mcpLastSeen ?? null,
       updated.taskStart ?? null,
+      updated.stoppedAt ?? null,
+      updated.stoppedBy ?? null,
       gaii,
     );
     return updated;
@@ -437,6 +442,7 @@ export const identityMethods = {
     if (row.mcpClient) record.mcpClient = row.mcpClient as string;
     if (row.mcpLastSeen) record.mcpLastSeen = row.mcpLastSeen as string;
     if (row.taskStart === 'automatic' || row.taskStart === 'confirm') record.taskStart = row.taskStart;
+    if (row.stoppedAt) { record.stoppedAt = row.stoppedAt as string; record.stoppedBy = (row.stoppedBy as string | null) ?? null; }
     return record;
   },
 

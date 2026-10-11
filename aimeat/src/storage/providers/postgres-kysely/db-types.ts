@@ -77,6 +77,9 @@ export interface Agent {
   runMode: string | null;
   /** 'automatic' | 'confirm' | null: whether this agent's tasks start on their own (migration 0092). */
   taskStart: string | null;
+  /** ISO time the agent was stopped, and who stopped it; both null while it runs (migration 0101). */
+  stoppedAt: string | null;
+  stoppedBy: string | null;
   /** What code backs this agent, as its runtime reports it (AgentRuntimeSource). */
   runtimeSource: unknown | null;
   identityVersion: number | null;

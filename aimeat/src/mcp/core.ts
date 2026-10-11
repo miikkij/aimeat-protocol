@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-11 — aimeat_agents_list rows carry `stopped`, `stopped_at` and `stopped_by`.
  *   2026-10-08 — The storage tools receive the session's scopes, for a declared ai_provenance.
  *   2026-10-08 — aimeat_work_deliver answers with the output's provenance record (aiprov D8).
  *   2026-10-08 — aimeat_memory_list names each item's ai_provenance_id (aiprov E14).
@@ -175,6 +176,7 @@ import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
 import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
 import { taskStartView, scopeUseLookup } from '../services/agent-task-start-write.js';
+import { stoppedView } from '../services/agent-stop-rules.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
@@ -387,6 +389,9 @@ export function registerCoreTools(
                     run_mode: a.runMode ?? null,
                     // Whether its tasks start on their own, and what holds them for the owner.
                     ...taskStartView(a, useOf(a)),
+                    // Whether the owner stopped it: a stopped agent starts no new work until it is
+                    // started again, and a runtime reads that here (services/agent-stop-rules.ts).
+                    ...stoppedView(a),
                     default_scopes: a.defaultScopes ?? ['*'],
                     ...agentAccessView(a.defaultScopes ?? ['*'], access.get(a.name)),
                 })),

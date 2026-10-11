@@ -1,0 +1,24 @@
+-- 0101_agent_stopped.sql
+--
+-- An agent can be stopped, and started again.
+--
+-- Until now an owner who wanted an agent to do nothing for a while had two choices: delete it, or
+-- set it to wait for an OK on every task, which still wakes the agent to plan each one. Neither is
+-- "this agent does nothing until I say so". The home page's agent page shows a "Stop the agent"
+-- control on the approved design, and the node had no state behind it (2026-10-10).
+--
+--   "Agent"."stoppedAt"   ISO time the agent was stopped, or NULL. NULL = the agent runs, which is
+--                         every existing agent, so nothing changes for them.
+--   "Agent"."stoppedBy"   who stopped it: the owner's name, or the GAII of the same-owner agent
+--                         that did. NULL while the agent runs.
+--
+-- TEXT, like "taskStart", so both providers store and read the same string and an update to NULL
+-- clears it on both (docs/coding-guidelines/storage-sync.md).
+--
+-- What a stopped agent means is decided in code, not here (services/agent-stop.ts): no new task
+-- starts, a scheduled run is skipped, a message is stored and does not wake it, and work it is
+-- already doing finishes. Its key stays valid: a stopped agent is not a revoked one.
+--
+-- Mirrors the SQLite columns added in schema.ts.
+ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "stoppedAt" TEXT;
+ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "stoppedBy" TEXT;

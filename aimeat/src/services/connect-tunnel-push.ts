@@ -17,6 +17,8 @@
  * @structure PushContext · sendBacklog() · pushTaskCancellations() · onMemoryWrite()
  * @usage import { sendBacklog, pushTaskCancellations } from './connect-tunnel-push.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A stopped agent (./agent-stop-rules.ts): the backlog carries only its active
+ *     tasks, and a record of a space it watches does not wake it.
  *   v1.0.0 — 2026-09-03 — Extracted from connect-tunnel.ts (max-file-lines).
  */
 import { WebSocket } from 'ws';
@@ -26,9 +28,14 @@ import type { ConnectFrame, ConnectTunnelStats } from './connect-tunnel-wire.js'
 import { logger } from '../utils/logger.js';
 import type { MemoryWriteEvent } from './event-bus.js';
 import { parseWorkspaceRecordKey, spaceKeyOf } from './connect-tunnel-wire.js';
+import { isStopped } from './agent-stop-rules.js';
 
-/** Just enough of a connection for a push: whose it is and whether its socket is still open. */
-export interface PushConn { principal: string; ws: WebSocket }
+/**
+ * Just enough of a connection for a push: whose it is, whether its socket is still open, and whether
+ * the agent is stopped (./agent-stop-rules.ts). `stopped` is read from the agent's record whenever
+ * the backlog is sent (connect and attach) and written by the stop and start writes after that.
+ */
+export interface PushConn { principal: string; ws: WebSocket; stopped?: boolean }
 
 /** What the manager lends these two. Neither owns state of its own. */
 export interface PushContext {
@@ -81,10 +88,19 @@ export function notifyScopesChanged(ctx: PushContext, gaii: string): void {
 export async function sendBacklog(ctx: PushContext, conn: PushConn): Promise<void> {
   try {
     const principal = conn.principal;
+    // A STOPPED AGENT IS TOLD ONLY ABOUT WORK IT IS ALREADY DOING. Its queued tasks and its unread
+    // messages stay in the store and go out with the backlog that follows a start. Read from the
+    // record here, on every connect and attach, so a connector that reconnects while its agent is
+    // stopped is not handed the waiting work. An ecosystem app has no agent record and is never stopped.
+    const agent = principal.includes('#') && !principal.startsWith('eco:')
+      ? await ctx.storage.getAgent(principal).catch(err => { logger.warn('connect tunnel backlog: agent record not read', { principal, error: String(err) }); return null; })
+      : null;
+    conn.stopped = isStopped(agent);
+    const nothing = { tasks: [] as Awaited<ReturnType<Storage['listAgentTasks']>>['tasks'] };
     const [queued, active, pendingMessages] = await Promise.all([
-      ctx.storage.listAgentTasks(principal, { status: 'queued' }),
+      conn.stopped ? nothing : ctx.storage.listAgentTasks(principal, { status: 'queued' }),
       ctx.storage.listAgentTasks(principal, { status: 'active' }),
-      ctx.storage.listPendingMessages(principal).catch(err => { logger.warn('resolve: continuing after a suppressed failure', { error: String(err) }); return []; }),
+      conn.stopped ? [] : ctx.storage.listPendingMessages(principal).catch(err => { logger.warn('resolve: continuing after a suppressed failure', { error: String(err) }); return []; }),
     ]);
     // Dedup tasks by id (a task can't be both queued and active, but guard).
     const taskById = new Map<string, unknown>();
@@ -176,6 +192,7 @@ export async function onMemoryWrite(ctx: RecordPushContext, evt: MemoryWriteEven
     for (const principal of [...subs]) {
       const conn = ctx.connections.get(principal);
       if (!conn || conn.ws.readyState !== WebSocket.OPEN) continue;
+      if (conn.stopped) continue;  // a stopped agent is not woken by a record; it re-reads the space when it is started
       const allowed = await ctx.canPrincipalReadSpace(conn, parsed.organismId, parsed.ws);
       if (!allowed) { ctx.clearSubscriptionFor(principal, sk); continue; }
       ctx.stats.deliveriesTotal++;

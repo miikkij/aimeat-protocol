@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-11 — A stopped agent's own task list carries no queued task and says `agent_stopped`,
+ *     so a runtime that plans what it lists is handed nothing to plan (services/agent-stop-rules.ts).
  *   v1.6.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 — 2026-10-04 — The task list gives a declined task its `outcome`, so the agent's reason shows
  *     without opening the task.
@@ -41,6 +43,7 @@ import { taskWithFileHandles } from '../../services/task-files.js';
 import { taskOutcome } from '../../services/task-outcome.js';
 import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
 import { respondDeduplicated } from './dedupe.js';
+import { agentIsStopped } from '../../services/agent-stop.js';
 
 export function registerTaskCreateReadRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -194,7 +197,19 @@ export function registerTaskCreateReadRoutes(
     // dashboard concern; a plain status poll (no bucket/q/date filter) skips them. Turns the per-call
     // cost from O(all the agent's tasks) into O(one page) — the load 40 polling agents were paying
     // every cycle.
+    const stoppedSelf = !actAsOwner && await agentIsStopped(storage, agentGaii);
     if (status && !bucket && !q && !updatedAfter && !updatedBefore) {
+      // A STOPPED AGENT'S OWN POLL FOR QUEUED WORK ANSWERS EMPTY, AND SAYS WHY (`agent_stopped`). A
+      // runtime plans every queued task it lists, and a plan is a model call, so a runtime that does
+      // not know the word "stopped" is kept from spending by being handed nothing to plan. The owner's
+      // read of the same list is untouched. The flag comes from the agent's live socket when it has
+      // one, so this poll, the hottest read on the node, costs no second query for a connected agent.
+      if (stoppedSelf) {
+        const held = status === 'queued';
+        const r = held ? { tasks: [], total: 0 } : await storage.listAgentTasks(agentGaii, { status, page, perPage });
+        res.json(success(config.nodeId, { tasks: r.tasks, total: r.total, counts: { recent: 0, keep: 0, archive: 0 }, page, per_page: perPage, agent_stopped: true }));
+        return;
+      }
       const r = actAsOwner
         ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, status, page, perPage })
         : await storage.listAgentTasks(agentGaii, { status, page, perPage });
@@ -209,8 +224,9 @@ export function registerTaskCreateReadRoutes(
       const r = actAsOwner
         ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, page: p, perPage: 200 })
         : await storage.listAgentTasks(agentGaii, { page: p, perPage: 200 });
-      all.push(...r.tasks);
-      if (all.length >= r.total || r.tasks.length === 0) break;
+      // The same rule as the status poll above: a stopped agent's own list carries no waiting task.
+      all.push(...(stoppedSelf ? r.tasks.filter(t => t.status !== 'queued') : r.tasks));
+      if (r.tasks.length === 0 || p * 200 >= r.total) break;
     }
 
     const now = Date.now();
@@ -239,7 +255,7 @@ export function registerTaskCreateReadRoutes(
     const withReasons = await Promise.all(paged.map(async t =>
       t.status === 'declined' ? { ...t, outcome: await taskOutcome(storage, t) } : t));
 
-    res.json(success(config.nodeId, { tasks: withReasons, total, counts, page, per_page: perPage }));
+    res.json(success(config.nodeId, { tasks: withReasons, total, counts, page, per_page: perPage, ...(stoppedSelf ? { agent_stopped: true } : {}) }));
   });
 
   /* ── GET /v1/agents/:name/tasks/:id -- Get task detail ── */

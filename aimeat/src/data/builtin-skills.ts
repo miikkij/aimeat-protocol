@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.25.0 -- 2026-10-11 -- diagnose-a-workflow: an agent the owner stopped is not reachable for a
+ *     step and its scheduled run is skipped with outcome `stopped`; start it with aimeat_agent_start.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.24.0 -- 2026-10-10 -- add-a-crew-agent: which machine. aimeat_connector_list names the owner's
  *     connectors, the proposal's `connector` orders the agent to one, and it waits for that one.
@@ -656,6 +658,10 @@ metadata:
 4. **Check the worker:** \`aimeat_agents_list\` for the agent a step dispatches to — is it
    connected and seen recently (\`last_seen\`, \`mode\`)? \`aimeat_agent_activity\` and
    \`aimeat_task_list\` report on the CALLING agent only, so neither reads the worker's queue.
+   Read \`stopped\` on the same row: an agent the owner stopped counts as not reachable for a
+   step, and a schedule's run for it is logged as skipped with outcome \`stopped\`. Nothing is
+   broken then. Tell the owner the agent is stopped, and when they say so, start it with
+   \`aimeat_agent_start\`; a skipped run is not made up, the next one happens at its time.
 5. **Retry semantics:** both are flags on the definition and both are off unless the workflow
    sets them — \`resume: true\` re-evaluates steps against reality instead of restart-and-skip,
    and \`skip_done: true\` leaves a step whose output already exists alone. Safe to suggest a

@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.11.0 — 2026-10-11 — manage-my-agents: stop an agent and start it again (aimeat_agent_stop,
+ *     aimeat_agent_start), and what a stop does, in the words to say to the owner.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.10.0 — 2026-10-10 — manage-my-agents: with more than one connector, aimeat_connector_list names
  *     the machines and the proposal's `connector` says which one runs the worker.
@@ -162,6 +164,14 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   owner's OK. Say that in those words before you set it. An agent that can spend money, send mail
   or delete things in the owner's name always waits, whatever this says. When a task waits and the
   owner says "go ahead", start it with \`aimeat_task_start\`.
+- **Stop an agent** with \`aimeat_agent_stop\` when the owner says so ("stop the news agent",
+  "pause it while I am away"), and bring it back with \`aimeat_agent_start\`. Tell them what a stop
+  does in these words: the work it is doing finishes, its scheduled runs are skipped, and the tasks
+  and messages it is given wait until it is started. Its key and permissions stay, so a start is
+  one call. \`aimeat_agents_list\` shows \`stopped\` for each agent, and a task created for a stopped
+  agent answers \`waits_because: stopped\`: say that the agent is stopped and offer to start it. To
+  end one task that is running, the owner cancels that task on the agent's Tasks tab. To remove an
+  agent for good, that is a different act: the owner deletes it on the Agents page.
 - **All permissions (\`*\`)** counts as able to do anything: two weeks after the node starts noting
   what such an agent uses, its tasks wait for the owner. \`aimeat_agents_list\` shows the permissions
   it used (\`task_start_wildcard.proposal\`); read them to the owner, and when they agree, narrow the

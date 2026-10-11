@@ -4635,6 +4635,25 @@ components:
           description: Who pays when the node is used, as a call planned now would find it.
         why: { type: string, description: One sentence on which case applied. }
 
+    AgentStoppedState:
+      type: object
+      description: Whether an agent is stopped, as POST /v1/agents/{name}/stop and .../start answer.
+      properties:
+        gaii: { type: string }
+        name: { type: string }
+        stopped: { type: boolean }
+        stopped_at: { type: string, format: date-time, nullable: true }
+        stopped_by:
+          type: string
+          nullable: true
+          description: The identity that stopped it. Null while it is not stopped.
+        changed:
+          type: boolean
+          description: False when the agent was already in the state asked for.
+        released:
+          type: integer
+          description: On a start, how many waiting tasks started with it. 0 on a stop.
+
     TaskStartAnswer:
       type: object
       description: |
@@ -4647,10 +4666,14 @@ components:
         `messages:delete-as-owner`, `memory:purge`), or holds `*` once its usage record is ready: `floor`; a step of its plan declares such an effect:
         `effects`; the task's own `start` or the agent's `task_start` is `confirm`: `setting`.
         Otherwise it starts on its own.
+
+        Ahead of all of those: the agent is stopped (POST /v1/agents/{name}/stop): `stopped`. Such
+        a task cannot be started by anyone (409 `AGENT_STOPPED`); it goes through this decision
+        again when the agent is started.
       properties:
         policy: { type: string, enum: [automatic, confirm] }
         starts: { type: string, enum: [now, after_your_ok, draft] }
-        waits_because: { type: string, nullable: true, enum: [setting, floor, effects, null] }
+        waits_because: { type: string, nullable: true, enum: [stopped, setting, floor, effects, null] }
         reason: { type: string }
         who_can_start:
           type: string
@@ -4659,6 +4682,8 @@ components:
           description: >
             `owner_or_their_ai`: another of the owner's agents holding task:write may start it on the
             owner's word (POST .../start, aimeat_task_start). `owner_in_person`: only the owner.
+            Null when the task runs, and when it waits because its agent is stopped: nobody starts
+            that task, the agent is started (POST /v1/agents/{name}/start) and the task follows.
 
     AgentTaskRating:
       type: object
@@ -11116,6 +11141,92 @@ paths:
         '404':
           description: No such agent
 
+  /v1/agents/{name}/stop:
+    post:
+      operationId: stopAgent
+      summary: Stop an agent
+      description: |
+        A stopped agent starts no new work. What that means, place by place:
+
+        - **Work it is doing finishes.** An active task is not touched. To end one task, cancel
+          that task.
+        - **Scheduled runs are skipped.** A schedule's run for a stopped agent is recorded with
+          outcome `stopped` and is not run later; the next run happens at its time.
+        - **What it is given waits.** A new task stays `queued` with `waits_because: stopped`, and
+          nobody can start it (409 `AGENT_STOPPED`). A message is stored and not pushed.
+        - **The runtime is not woken.** Nothing is pushed down its connector socket, its webhook or
+          its push targets for new work, and its own task list, inbox and long poll hand it no
+          waiting task (`agent_stopped: true`).
+
+        Its key and its permissions are untouched, so POST .../start brings it back with no
+        enrolment. Idempotent: a second stop answers 200 with `changed: false`.
+
+        `agent:write` and same-owner, like `task-start`, and never the agent itself.
+        Also `aimeat_agent_stop`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      responses:
+        '200':
+          description: The agent's state now
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AgentStoppedState' }
+        '403':
+          description: Not your agent, or the agent itself asked
+        '404':
+          description: No such agent
+
+  /v1/agents/{name}/start:
+    post:
+      operationId: startAgent
+      summary: Start a stopped agent
+      description: |
+        Clears the stop, then, in this order: each task that waits in `queued` goes through the
+        start decision again (one that would have started on its own starts now, with the usual
+        `started` event; one that needs the owner's OK for another reason goes on waiting), and the
+        agent's runtime is sent its backlog, so it learns of every waiting task and message at once.
+
+        Scheduled runs that were skipped while it was stopped are not run.
+
+        Idempotent: starting an agent that is not stopped answers 200 with `changed: false`.
+        `agent:write` and same-owner, and never the agent itself. Also `aimeat_agent_start`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      responses:
+        '200':
+          description: The agent's state now, and how many waiting tasks started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/AgentStoppedState' }
+        '403':
+          description: Not your agent, or the agent itself asked
+        '404':
+          description: No such agent
+
   /v1/agents/{name}/run-mode:
     patch:
       operationId: setAgentRunMode
@@ -11729,6 +11840,14 @@ paths:
                                       type: array
                                       items: { type: string }
                                       description: The permissions that make every task of this agent wait for the owner, whatever the setting. `*` is among them once the agent's all-permissions record is ready.
+                                    stopped:
+                                      type: boolean
+                                      description: True while the owner has stopped the agent (POST .../stop). It starts no new work; what it is given waits until POST .../start.
+                                    stopped_at: { type: string, format: date-time, nullable: true }
+                                    stopped_by:
+                                      type: string
+                                      nullable: true
+                                      description: The identity that stopped it, the owner or another of the owner's agents. Null while it is not stopped.
                                     task_start_wildcard:
                                       type: object
                                       nullable: true
@@ -14290,6 +14409,8 @@ paths:
                                     name: { type: string, nullable: true }
                                     online: { type: boolean }
                                 has_key: { type: boolean }
+                                stopped: { type: boolean, description: True while the owner has stopped the agent. }
+                                stopped_at: { type: string, format: date-time, nullable: true }
                                 queued: { type: integer }
                                 active: { type: integer }
                                 last_at: { type: string, format: date-time, nullable: true }
@@ -51539,7 +51660,9 @@ paths:
         what happened: `created` (an agent_task occurrence was queued/activated —
         `data.task_id` is set), `ran` (a non-task ai/extension job executed),
         `busy` (skipped — a previous occurrence is still running; `data.reason`
-        explains), `limited` (skipped — a run limit such as daily/max was
+        explains), `stopped` (skipped — the schedule's agent is stopped, POST
+        /v1/agents/{name}/stop; the run is not made up later, and the next run
+        happens at its time), `limited` (skipped — a run limit such as daily/max was
         reached), or `error` (the job ran but failed; `data.reason` has the
         message). A manual run only defers to a genuinely running (active/stalled)
         occurrence — a paused/queued/archived one no longer blocks it.
@@ -51554,9 +51677,9 @@ paths:
       responses:
         '200':
           description: >
-            Triggered. `data.outcome` is one of created | ran | busy | limited |
-            error; `data.task_id` is present when a task was created;
-            `data.reason` is present on busy/limited/error.
+            Triggered. `data.outcome` is one of created | ran | busy | stopped |
+            limited | error; `data.task_id` is present when a task was created;
+            `data.reason` is present on busy/stopped/limited/error.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -52458,6 +52581,12 @@ paths:
         `bucket` to scope to one; omit it to get all. `q` searches title +
         description; `updated_after`/`updated_before` filter by time. The response
         always includes `counts` (per-bucket totals) for the tab badges.
+
+
+        **A stopped agent reading its own list** (POST .../stop) gets no `queued` task and
+        `agent_stopped: true`: a runtime plans what it lists, so a stopped agent is given nothing to
+        plan. Its active tasks are listed, because work it is doing finishes. The owner's read of the
+        same list is unchanged.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -52512,6 +52641,9 @@ paths:
                               recent: { type: integer }
                               keep: { type: integer }
                               archive: { type: integer }
+                          agent_stopped:
+                            type: boolean
+                            description: Present and true only when the agent itself reads the list while it is stopped. Waiting tasks are left out until it is started.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -53432,6 +53564,10 @@ paths:
         Returns pending tasks, directives, and notifications for the agent.
         Designed for agents to poll on startup or periodically.
         Supports cursor-based delta polling via the `since` parameter.
+
+        A stopped agent (POST .../stop) reading its own inbox gets only its active tasks, and
+        `agent_stopped: true`: waiting tasks and unread messages are held until it is started. The
+        owner's read is unchanged.
       tags: [Agent Integration]
       security:
         - BearerAuth: []
@@ -53481,6 +53617,9 @@ paths:
                           has_more:
                             type: boolean
                             description: Whether more items exist beyond the current page
+                          agent_stopped:
+                            type: boolean
+                            description: Present and true only when the agent itself reads its inbox while it is stopped.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -53521,6 +53660,10 @@ paths:
       description: |
         Long-poll endpoint that blocks until a new task is available for the agent
         or the timeout expires. Returns the next queued task if one exists.
+
+        For a stopped agent (POST .../stop) the wait is served in full and then answers
+        `{ task: null, agent_stopped: true }`: a waiting task is not handed out until the agent is
+        started.
       tags: [Agent Integration]
       security:
         - BearerAuth: []
@@ -53552,6 +53695,9 @@ paths:
                           task:
                             $ref: '#/components/schemas/AgentTask'
                             nullable: true
+                          agent_stopped:
+                            type: boolean
+                            description: Present and true when the agent is stopped, which is why there is no task.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -53784,7 +53930,10 @@ paths:
     get:
       operationId: getAgentMessagesInbox
       summary: Get pending inbound messages
-      description: Returns messages with status 'pending' and direction 'inbound' (agent polling endpoint)
+      description: >
+        Returns messages with status 'pending' and direction 'inbound' (agent polling endpoint).
+        A stopped agent (POST .../stop) reading its own list gets no message and
+        `agent_stopped: true`; the messages wait until it is started.
       tags: [Agent Messages]
       security:
         - BearerAuth: []

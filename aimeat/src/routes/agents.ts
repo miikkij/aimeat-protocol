@@ -28,6 +28,7 @@
  *     (device-auth, registration, profile-metadata, management, offers) to satisfy max-file-lines;
  *     registration order preserved. Pure mechanical split, no behavior change.
  *   v1.5.0 -- 2026-10-02 -- GET/PUT /v1/agents/:name/purchase-limit (./agents/purchase-limit.ts).
+ *   v1.6.0 -- 2026-10-11 -- POST /v1/agents/:name/stop and /start (./agents/stop-start.ts).
  */
 import { Router } from 'express';
 import { dirname } from 'node:path';
@@ -42,6 +43,7 @@ import { registerProfileMetadataRoutes } from './agents/profile-metadata.js';
 import { registerManagementRoutes } from './agents/management.js';
 import { registerOffersRoutes } from './agents/offers.js';
 import { registerPurchaseLimitRoutes } from './agents/purchase-limit.js';
+import { registerStopStartRoutes } from './agents/stop-start.js';
 
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -54,6 +56,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   registerManagementRoutes(router, config, storage);
   registerOffersRoutes(router, config, storage);
   registerPurchaseLimitRoutes(router, config, storage);
+  registerStopStartRoutes(router, config, storage);
 
   return router;
 }

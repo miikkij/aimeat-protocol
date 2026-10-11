@@ -27,6 +27,8 @@
  *   import { computeAgentHealthMany } from '../services/agent-health.js';
  *   const health = computeAgentHealthMany(agents, onboardingByGaii);
  * @version-history
+ *   v1.3.0 — 2026-10-11 — A stopped agent is not a problem for being quiet: `stoppedAt` blocks the
+ *     never-seen and stale-24h verdicts, so it reads `idle` and the row's `stopped` field says why.
  *   v1.2.0 — 2026-09-06 — A LIVE CONNECTOR SOCKET IS LIVENESS, and it is how a spawn agent proves
  *     it. `lastSeen` is written when the agent's own credential touches the node, so an agent whose
  *     runtime exists only while a worker runs ages out of every window between jobs while being
@@ -118,7 +120,7 @@ export interface AgentHealth {
 
 type HealthAgent = Pick<AgentRecord,
     'lastSeen' | 'tags' | 'mode' | 'webhookUrl' | 'webhookEnabled' | 'webhookFailCount'
-    | 'webhookLastSuccess' | 'webhookLastFailure'>;
+    | 'webhookLastSuccess' | 'webhookLastFailure' | 'stoppedAt'>;
 
 /**
  * An agent the OWNER marked as node machinery (`system`, or `system:secretary` and the like).
@@ -157,8 +159,14 @@ export function computeAgentHealth(
     // holding this agent's credential right now, so the agent has been seen this second and work
     // pushed at it arrives; an agent that only WORKS occasionally is a different thing from one
     // nobody can reach, and the field cannot tell them apart on its own.
-    const neverSeen = !connected && sinceMs === null;
-    const stale = !connected && (sinceMs === null || sinceMs > AGENT_STALE_MS);
+    //
+    // A STOPPED AGENT IS NOT A PROBLEM FOR BEING QUIET. The owner stopped it, so "not seen in 24 h"
+    // is what was asked for and nothing to repair; it reads as `idle`, and the row's own `stopped`
+    // field says why. A failed onboarding and a failing webhook are still reported: stopping the
+    // agent did not repair either.
+    const quietOnPurpose = !!agent.stoppedAt;
+    const neverSeen = !connected && !quietOnPurpose && sinceMs === null;
+    const stale = !connected && !quietOnPurpose && (sinceMs === null || sinceMs > AGENT_STALE_MS);
     const seenRecently = connected || (sinceMs !== null && sinceMs <= AGENT_ONLINE_WINDOW_MS);
 
     const channel: AgentDeliveryChannel = webhookEnabled

@@ -1157,6 +1157,15 @@
      "plain": "A task starts by itself, or waits for your OK You decide per agent whether its tasks start on their own (it proposes its plan and goes on, and you see what was done) or wait for your OK, and you can say it differently for one task when you give it. Your basic agents start on their own from the first day. When a task waits, the answer to whoever gave it says so and why, you get a notification with a Start button once the plan is in, and the task says it in Tasks; your own AI can start it when you say \"go ahead\". Start wakes the agent at once. Whatever the setting, a task waits for you in person when its agent can spend money, send mail or messages in your name, delete messages as you, or delete shared workspace records, rows or a whole workspace for good (its own permission, which those deletes now ask), or when its plan says a step will spend, send or delete. An agent with all permissions counts as able to do all of that: your AIMEAT notes which permissions it actually uses, and after two weeks its tasks wait for you until you narrow it to those, with one press on its card or by telling your AI. Limits: the record of what an agent uses starts the day this ships and sees the permission checks most routes make, not every one; a permission it needs later is offered back on its card the first time it is refused. A plan's own word about what it will do is the agent's word, not checked. Agents > the agent's card, Tasks, PATCH /v1/agents/:name/task-start, start on POST /v1/agents/:name/tasks, POST /v1/agents/:name/tasks/:id/start, POST /v1/agents/:name/scope-narrowing, aimeat_agent_task_start_set, aimeat_task_start, aimeat_agent_scope_narrow"
     },
     {
+     "slug": "g-7-stop-an-agent-and-start-it-again",
+     "cells": [
+      "<strong>Stop an agent, and start it again</strong>",
+      "You can stop one of your agents for a time without removing it, by telling your AI &quot;stop the news agent&quot;. A stopped agent finishes the work it has and starts nothing new. Tasks and messages you give it are stored and wait, a scheduled run is skipped (the schedule's next run happens at its time), and its computer is not woken for new work. Its key and permissions stay, so starting it is one press and nothing is set up again. When you start it, the tasks and messages that waited go to it: a task that starts by itself starts then, and one that needs your OK goes on waiting for it. Only you, or another of your agents that may change agents, can stop or start an agent; an agent cannot do it to itself. Limits: a scheduled run that was skipped is not made up; a single task that is already running is ended by cancelling that task, not by the stop; an agent built outside AIMEAT that starts work by its own timer has to read the stopped state itself, and the CrewAI package does so from 0.33.0.",
+      "<code>POST /v1/agents/{name}/stop</code>, <code>POST /v1/agents/{name}/start</code>, <code>aimeat_agent_stop</code>, <code>aimeat_agent_start</code>; <code>stopped</code> on <code>GET /v1/agents</code>"
+     ],
+     "plain": "Stop an agent, and start it again You can stop one of your agents for a time without removing it, by telling your AI \"stop the news agent\". A stopped agent finishes the work it has and starts nothing new. Tasks and messages you give it are stored and wait, a scheduled run is skipped (the schedule's next run happens at its time), and its computer is not woken for new work. Its key and permissions stay, so starting it is one press and nothing is set up again. When you start it, the tasks and messages that waited go to it: a task that starts by itself starts then, and one that needs your OK goes on waiting for it. Only you, or another of your agents that may change agents, can stop or start an agent; an agent cannot do it to itself. Limits: a scheduled run that was skipped is not made up; a single task that is already running is ended by cancelling that task, not by the stop; an agent built outside AIMEAT that starts work by its own timer has to read the stopped state itself, and the CrewAI package does so from 0.33.0. POST /v1/agents/{name}/stop, POST /v1/agents/{name}/start, aimeat_agent_stop, aimeat_agent_start; stopped on GET /v1/agents"
+    },
+    {
      "slug": "g-7-reachability",
      "cells": [
       "<strong>Reachability</strong>",
@@ -3925,6 +3934,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 393
+  "rows": 394
  }
 }

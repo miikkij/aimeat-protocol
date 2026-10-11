@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start, beside aimeat_agent_task_start_set.
  *   2026-10-06 — aimeat_memory_write carries the bounds the node's MCP wrote by hand (value, tags,
  *     owner_scope, expected_version) and aimeat_workflow_save the node's fuller definition text, so
  *     every surface registers one schema (secaudit 2026-10 follow-up, Part B).
@@ -337,6 +338,27 @@ export const schedulesTasksMemoryTools = [
             target_agent_name: { type: 'string', required: true, description: 'The agent this is about (same owner as you, never yourself).' },
             task_start: { type: 'string', required: true, enum: ['automatic', 'confirm'], description: "'automatic' or 'confirm'; null = leave it to the agent's mode.", zod: z.enum(['automatic', 'confirm']).nullable() },
         },
+    },
+    {
+        name: 'aimeat_agent_stop',
+        description: "Stop one of the owner's agents. Use it when the person says so (\"stop the concierge\", \"pause it over the weekend\"). A stopped agent starts no new work: the work it is doing finishes, its scheduled runs are skipped, and the tasks and messages it is given wait and are handled when it is started again. Its key and its permissions stay as they are, so aimeat_agent_start brings it back in one call. Never for yourself. The answer's stopped, stopped_at and stopped_by say what the state is now; a second stop answers ok with changed false.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Stop an Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Changes whether an agent works at all: the agent:write word, like its mode and its task start.
+        scope: 'agent:write',
+        surfaces: ['agent'],
+        input: { target_agent_name: { type: 'string', required: true, description: 'The agent to stop (same owner as you, never yourself).' } },
+    },
+    {
+        name: 'aimeat_agent_start',
+        description: "Start one of the owner's agents that was stopped with aimeat_agent_stop. The tasks that waited go through the usual start decision: one that would have started on its own starts now, and one that needs the owner's OK goes on waiting for it. Messages that waited reach the agent. Scheduled runs that were skipped stay skipped, and the schedule's next run happens at its time. Never for yourself. The answer's released says how many waiting tasks started.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Start a Stopped Agent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'agent:write',
+        surfaces: ['agent'],
+        input: { target_agent_name: { type: 'string', required: true, description: 'The agent to start (same owner as you, never yourself).' } },
     },
     {
         name: 'aimeat_task_request_changes',
