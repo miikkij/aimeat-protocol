@@ -10,7 +10,7 @@
  *   v1.0.0 — 2026-08-02 — Initial: the four freshness states + the slack boundary.
  */
 import { describe, it, expect } from 'vitest';
-import { compareFreshness, MTIME_SLACK_MS, type BuildStamp } from '../../src/utils/build-stamp.js';
+import { compareFreshness, describeRunningBuild, MTIME_SLACK_MS, type BuildStamp } from '../../src/utils/build-stamp.js';
 
 const BUILT_FROM = Date.UTC(2026, 7, 2, 2, 57, 22);
 
@@ -66,5 +66,35 @@ describe('mtime slack', () => {
 
   it('does not flag source OLDER than the build', () => {
     expect(compareFreshness(stamp(), BUILT_FROM - 60_000).state).toBe('fresh');
+  });
+});
+
+describe('which commit a process says it runs', () => {
+  const HEAD = 'f'.repeat(40);
+  const neverAsked = (): string | null => { throw new Error('the checkout was asked although the stamp names a commit'); };
+
+  it('a built dist reports the commit it was BUILT from, and never asks the checkout', () => {
+    const r = describeRunningBuild(compareFreshness(stamp({ dirty: true }), BUILT_FROM), neverAsked);
+    expect(r).toEqual({
+      commit: '45d95840aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', commit_source: 'stamp', dirty: true,
+      built_at: new Date(BUILT_FROM).toISOString(), state: 'fresh',
+    });
+  });
+
+  it('a pull without a rebuild shows the OLD commit and `stale`, which is the honest answer', () => {
+    const r = describeRunningBuild(compareFreshness(stamp(), BUILT_FROM + 60_000), () => HEAD);
+    expect(r.commit).toBe('45d95840aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(r.state).toBe('stale');
+  });
+
+  it('from source it reports the checkout\'s HEAD, and says it cannot know about uncommitted changes', () => {
+    expect(describeRunningBuild(compareFreshness(null, 0), () => HEAD))
+      .toEqual({ commit: HEAD, commit_source: 'git', dirty: null, built_at: null, state: 'source' });
+  });
+
+  it('a stamp made outside git falls back to the checkout, and with neither answers null', () => {
+    const noCommit = compareFreshness(stamp({ commit: null, dirty: null }), 0);
+    expect(describeRunningBuild(noCommit, () => HEAD)).toMatchObject({ commit: HEAD, commit_source: 'git', state: 'unknown' });
+    expect(describeRunningBuild(noCommit, () => null)).toMatchObject({ commit: null, commit_source: null });
   });
 });

@@ -11,9 +11,12 @@
  *   dist/ to read the live package.json, which is right for advertising a version and precisely
  *   why it can never detect staleness: it always reports the source. This one resolves a single
  *   path inside dist/ and nowhere else, so "no stamp" unambiguously means "not running from dist".
- * @structure readBuildStamp(): BuildStamp | null; checkBuildFreshness(): BuildFreshness
+ * @structure readBuildStamp(): BuildStamp | null; checkBuildFreshness(): BuildFreshness;
+ *   runningBuild(): RunningBuild
  * @usage import { checkBuildFreshness } from '../utils/build-stamp.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — runningBuild(): the commit this process runs, from the stamp or, from
+ *     source, from the checkout's HEAD. Served by GET /v1/build and GET /v1/health.
  *   v1.1.0 — 2026-08-02 — Detect a published install by the absence of `src/` rather than by all
  *     source dirs scanning to zero. `scripts/vendor-libs.mjs` ships as a postinstall hook, so a
  *     tarball has a `scripts/` dir whose mtimes are extraction time — which made every published
@@ -23,6 +26,7 @@
 import { readFileSync, readdirSync, statSync, existsSync, type Dirent } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readGitHead } from './git-head.js';
 
 export interface BuildStamp {
   schema_version: number;
@@ -153,6 +157,48 @@ export function buildIdentity(freshness: BuildFreshness): Record<string, unknown
     dirty: freshness.stamp?.dirty ?? null,
     built_at: freshness.stamp?.built_at ?? null,
   };
+}
+
+/**
+ * Which code this process runs, for GET /v1/build and GET /v1/health.
+ *
+ * `commit` is the commit the artifact was BUILT from when the process runs from a stamped dist/
+ * (`commit_source: 'stamp'`), and the commit the checkout is ON when it runs from source
+ * (`'git'`, read by utils/git-head.ts; `dirty` is then null, because only git can say). Null with
+ * `commit_source: null` on an install that is neither.
+ *
+ * `state` is the freshness answer above. It matters next to the commit: `stale` means the source
+ * on disk is newer than the build, so a `git pull` without `pnpm build` shows as an OLD commit and
+ * `stale`, which is the case "the fix is on the machine and the node does not run it yet".
+ */
+export interface RunningBuild {
+  commit: string | null;
+  commit_source: 'stamp' | 'git' | null;
+  dirty: boolean | null;
+  built_at: string | null;
+  state: BuildFreshness['state'];
+}
+
+/**
+ * The decision, with the filesystem already read: a stamp that names a commit wins, because it is
+ * the code that runs; the checkout's HEAD is asked only when there is none. Pure, so the rule is
+ * tested without a dist/ or a repository.
+ */
+export function describeRunningBuild(freshness: BuildFreshness, checkoutHead: () => string | null): RunningBuild {
+  const stamp = freshness.stamp;
+  if (stamp?.commit) {
+    return { commit: stamp.commit, commit_source: 'stamp', dirty: stamp.dirty, built_at: stamp.built_at, state: freshness.state };
+  }
+  const head = checkoutHead();
+  return { commit: head, commit_source: head ? 'git' : null, dirty: null, built_at: stamp?.built_at ?? null, state: freshness.state };
+}
+
+let running: RunningBuild | undefined;
+
+/** Read once per process: neither the stamp nor the checkout changes in a way a running node could act on. */
+export function runningBuild(): RunningBuild {
+  running ??= describeRunningBuild(checkBuildFreshness(), () => readGitHead(dirname(fileURLToPath(import.meta.url))));
+  return running;
 }
 
 /** Compare the stamped source state against what is on disk now. */
