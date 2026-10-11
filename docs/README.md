@@ -16,7 +16,8 @@ purpose and maintenance status. [Maintenance](maintenance.md) explains the check
 | Build a hosted app | The target node's `/v1/prompts/build-app`, then [app development](portal-developer-guide.md) |
 | Configure a node | [Configuration](b-config.md), [environment examples](coding-guidelines/environment-configs.md) |
 | Develop the platform | [Development guides](coding-guidelines/README.md), [CLAUDE.md](../CLAUDE.md) |
-| Operate a node | [Deployment checks](security/deployment-checklist.md), [observability](../aimeat/docs/observability-guide.md), [incident response](security/incident-response.md) |
+| Operate a node | [Operations guides](operations/README.md): [production deployment](operations/production-deployment.md), [backup and restore](operations/backup-and-restore.md), [upgrading](operations/upgrading.md), [federation](operations/federation.md), [bookkeeping settings](operations/bookkeeping.md); [deployment checks](security/deployment-checklist.md), [observability](../aimeat/docs/observability-guide.md), [incident response](security/incident-response.md) |
+| Know what the node promises about people's data | [Data ownership](data-ownership.md), [data classification, compliance register and cookie banner](data-classification.md) |
 | Work with shared data | [Workspace contracts](agent-workspace-contracts.md), [memory contracts](coding-guidelines/memory-contracts.md) |
 | Build services | [Service owner manual](manuals/service-owner-manual.md), [CSM](csm-spec.md), [extensions](manuals/service-extensions-manual.md) |
 | Review identity-wallet support | [Current EUDIW status](aimeat-eudiw-integration.md), [credential format](aimeat-vc-spec.md) |
