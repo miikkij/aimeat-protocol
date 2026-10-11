@@ -19,6 +19,9 @@
  *     6. the same over MCP, as the person's chat AI.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-stop
  * @version-history
+ *   v1.2.0 — 2026-10-11 — 4b and 5a hold what a live fleet found the day this shipped: a direct
+ *     message that arrives during the stop is delivered at the start (once, and one from before the
+ *     stop is not), and the released tasks arrive in the one backlog with no frame of their own.
  *   v1.1.0 — 2026-10-11 — 3f: the agent's handbook lists no waiting task, names no wait endpoint, and
  *     GET .../tasks/wait is gone (the long poll was removed).
  *   v1.0.0 — 2026-10-11 — Initial.
@@ -101,6 +104,8 @@ const other = await newOwner('astranger');
 const ownerGhii = `${owner.name}@${NODE_ID}`;
 let worker!: Agent, chat!: Agent, plain!: Agent, stranger!: Agent;
 let runningId = '';
+let dmBeforeStopId = '';
+let dmWhileStoppedId = '';
 
 console.log('Setup');
 await test('Agents: a worker that starts its tasks on its own, the owner\'s chat AI, a plain agent, and a stranger', async () => {
@@ -117,6 +122,12 @@ await test('Before the stop a task starts on its own: this one is the work in fl
   runningId = r.body.data.task.id;
   const a = await listed(owner.token, 'worker');
   assert(a.stopped === false && a.stopped_at === null && a.stopped_by === null, `row before: ${JSON.stringify({ s: a.stopped, at: a.stopped_at, by: a.stopped_by })}`);
+  // A direct message from before the stop. It was the agent's to hear when it arrived, so a start
+  // must not send it again (test 5a).
+  const dm = await json('/v1/messages', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ to: worker.gaii, body: 'Said before the stop', subject: 'Before' }) });
+  assert(dm.status === 201, `dm before the stop ${dm.status}: ${JSON.stringify(dm.body)}`);
+  dmBeforeStopId = dm.body.data.message.id;
+  await sleep(15);
 });
 
 console.log('\n1. The state');
@@ -293,37 +304,59 @@ await test('4a. On connect a stopped agent\'s backlog carries the work it is doi
   assert(messages.length === 0, `messages in the backlog: ${messages.length}`);
 });
 
-await test('4b. A new task and a new message push nothing down the socket', async () => {
+await test('4b. A new task, a new message and a direct message push nothing down the socket', async () => {
   const r = await createTask(owner.token, 'worker', 'Second while stopped');
   assert(r.status === 201 && r.body.data.task.status === 'queued', `create ${r.status}: ${r.body?.data?.task?.status}`);
   pushedWhileStoppedId = r.body.data.task.id;
   const sent = await json('/v1/agents/worker/messages', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ direction: 'inbound', content: 'Second message while stopped' }) });
   assert(sent.status === 201, `send ${sent.status}`);
+  const dm = await json('/v1/messages', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ to: worker.gaii, body: 'Said in a direct message while stopped', subject: 'Stopped' }) });
+  assert(dm.status === 201, `dm ${dm.status}: ${JSON.stringify(dm.body)}`);
+  dmWhileStoppedId = dm.body.data.message.id;
   const d = await tunnel.waitForDeliver(700);
   assert(d === null, `a delivery reached a stopped agent: ${d?.kind}`);
 });
 
 console.log('\n5. Start');
-await test('5a. The chat AI starts it on the owner\'s word: both waiting tasks start, and the runtime hears at once', async () => {
+await test('5a. The chat AI starts it: the direct message that waited is delivered, and the tasks cause no wake of their own', async () => {
   const r = await start(chat.token, 'worker');
   assert(r.status === 200, `start ${r.status}: ${JSON.stringify(r.body)}`);
   const d = r.body.data;
   assert(d.stopped === false && d.stopped_at === null && d.stopped_by === null && d.changed === true, `answer ${JSON.stringify(d)}`);
   assert(d.released === 2, `released ${d.released}`);
-  const got = new Set<string>();
-  for (let i = 0; i < 4 && got.size < 2; i++) {
-    const f = await tunnel.waitForDeliver(1000);
-    if (f?.kind === 'task_assigned') got.add((f.payload as any)?.id);
+  // Every delivery frame the start causes. A direct message is never part of a backlog, so the one
+  // that arrived while the agent was stopped is sent now, once, with the payload a live one has.
+  // The released tasks arrive in the backlog (5b) and in no frame of their own: one start, one wake
+  // for the tasks. On 2026-10-11 a live fleet measured a second wake that started a worker for nothing.
+  const frames: any[] = [];
+  for (let i = 0; i < 6; i++) {
+    const f = await tunnel.waitForDeliver(500);
+    if (!f) break;
+    frames.push(f);
   }
-  assert(got.has(waitingId) && got.has(pushedWhileStoppedId), `pushed on start: ${JSON.stringify([...got])}`);
+  const dms = frames.filter(f => f.kind === 'dm.inbound');
+  assert(dms.length === 1, `direct messages delivered on start: ${JSON.stringify(dms.map(f => f.payload?.id))}`);
+  const p = dms[0].payload as any;
+  assert(p.id === dmWhileStoppedId && dms[0].id === dmWhileStoppedId, `which message: ${p.id}`);
+  assert(p.id !== dmBeforeStopId, 'the message from before the stop is not sent again');
+  assert(p.senderGhii === ownerGhii && p.subject === 'Stopped' && typeof p.conversationId === 'string', `payload ${JSON.stringify(p)}`);
+  assert(typeof p.preview === 'string' && p.preview.includes('while stopped') && typeof p.createdAt === 'string', `payload ${JSON.stringify(p)}`);
+  const taskFrames = frames.filter(f => f.kind === 'task_assigned');
+  assert(taskFrames.length === 0, `task frames beside the backlog: ${taskFrames.length}`);
 });
 
-await test('5b. The backlog that follows a start carries the messages that waited', async () => {
+await test('5b. One backlog follows the start: the released tasks as running, and the messages that waited', async () => {
   const bl = await tunnel.waitForBacklog(1500);
   assert(bl !== null, 'a backlog follows the start');
+  const tasks = ((bl!.payload as any).tasks ?? []) as any[];
+  for (const id of [waitingId, pushedWhileStoppedId]) {
+    assert(tasks.find(t => t.id === id)?.status === 'active', `task ${id} in the backlog as active: ${tasks.find(t => t.id === id)?.status}`);
+  }
   const messages = ((bl!.payload as any).messages ?? []) as any[];
   assert(messages.some(m => m.id === messageId), `the first waiting message is in it (${messages.length} messages)`);
   assert(messages.length === 2, `both waiting messages: ${messages.length}`);
+  const second = await tunnel.waitForBacklog(600);
+  assert(second === null, 'a second backlog arrived');
 });
 
 await test('5c. The released tasks are active, and the event says why they started', async () => {

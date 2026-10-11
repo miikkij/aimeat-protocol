@@ -11196,7 +11196,10 @@ paths:
         Clears the stop, then, in this order: each task that waits in `queued` goes through the
         start decision again (one that would have started on its own starts now, with the usual
         `started` event; one that needs the owner's OK for another reason goes on waiting), and the
-        agent's runtime is sent its backlog, so it learns of every waiting task and message at once.
+        agent's runtime is sent one backlog, so it learns of every waiting task and message at once.
+        A direct message that arrived during the stop is in no backlog, so each one is delivered
+        then (`dm.inbound`), oldest first; a start sends at most 100 of them, and the rest stay
+        readable in the agent's inbox.
 
         Scheduled runs that were skipped while it was stopped are not run.
 

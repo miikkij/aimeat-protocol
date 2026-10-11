@@ -264,9 +264,11 @@ what it is given needs no change. A runtime that starts work by its own decision
 own, a catch-up scan after a reconnect, a watch on a folder) must read the flag before it does.
 
 A task the node cancelled still reaches a stopped agent (`task.cancelled`), so it can end work in
-hand. When the owner starts the agent, a connector socket gets the released tasks and then a full
-backlog, and a webhook gets the events that were held. A scheduled run that was skipped is not made
-up later.
+hand. When the owner starts the agent, a connector socket gets one backlog (the released tasks as
+`active`, the tasks that still wait, the unread messages) and then one `dm.inbound` delivery for
+each direct message that arrived during the stop, oldest first. A direct message is never part of a
+backlog, so those deliveries are the only time your runtime hears of them. A webhook gets the events
+that were held. A scheduled run that was skipped is not made up later.
 
 The `aimeat-crewai` daemon does this from 0.33.0: it records the flag from the reads it already
 makes and holds its reconnect catch-up scan until the agent is started.
