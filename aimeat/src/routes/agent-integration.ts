@@ -2,16 +2,24 @@
  * @file agent-integration.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Agent inbox, integration kit, and long poll endpoints.
+ * @description Agent inbox and integration kit endpoints.
  *   Provides a consolidated view of pending work for agents and a machine-readable
  *   integration kit describing how to interact with the task system.
+ *
+ *   THERE IS NO LONG POLL HERE ANY MORE. GET /v1/agents/:name/tasks/wait was written on 2026-05-21
+ *   and answered 404 from that day: GET /v1/agents/:name/tasks/:id is registered first and read
+ *   `wait` as a task id. Nobody reported it in five months, because new work reaches a runtime over
+ *   the connector socket or a webhook, and a runtime with neither reads this inbox. It was removed
+ *   on 2026-10-11 on the developer's word rather than repaired: a third way to wake an agent would
+ *   need every rule about waking one written into it as well (services/agent-stop-rules.ts).
  * @structure
  *   - GET /v1/agents/:name/inbox            -- Consolidated inbox
  *   - GET /v1/agents/:name/integration-kit  -- Full integration kit JSON
- *   - GET /v1/agents/:name/tasks/wait       -- Long poll for new tasks
  * @version-history
- *   v1.2.0 -- 2026-10-11 -- A stopped agent: /tasks/wait hands it no task and says `agent_stopped`, and its own
- *     /inbox carries only active tasks (services/agent-stop-rules.ts).
+ *   v1.3.0 -- 2026-10-11 -- GET /v1/agents/:name/tasks/wait removed: unreachable since it was added, and
+ *     the inbox answer no longer points at it.
+ *   v1.2.0 -- 2026-10-11 -- A stopped agent's own /inbox carries only active tasks and says
+ *     `agent_stopped` (services/agent-stop-rules.ts).
  *   v1.1.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-23 -- Add cursor-based ?since= and ?limit= to inbox endpoint
@@ -24,7 +32,6 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
 import { isStopped } from '../services/agent-stop-rules.js';
 
 /* ── Cursor helpers for inbox pagination ── */
@@ -231,7 +238,6 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
       ...(held ? { agent_stopped: true } : {}),
     }, [
       { description: 'View integration kit', method: 'GET', url: `/v1/agents/${agentName}/integration-kit` },
-      { description: 'Wait for new tasks', method: 'GET', url: `/v1/agents/${agentName}/tasks/wait` },
     ]));
   });
 
@@ -279,87 +285,6 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
     };
 
     res.json(success(config.nodeId, { kit }));
-  });
-
-  /* ── GET /v1/agents/:name/tasks/wait -- Long poll for new tasks ── */
-  router.get('/v1/agents/:name/tasks/wait', requireAuth(), async (req, res) => {
-    const agentName = req.params.name as string;
-
-    if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
-      return;
-    }
-
-    const agentGaii = resolveAgentGaii(req, agentName);
-
-    // Verify agent exists
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
-      return;
-    }
-
-    // Parse timeout (default 60s, max 120s)
-    const timeoutSec = Math.min(120, Math.max(1, parseInt(req.query.timeout as string || '60', 10)));
-    const pollIntervalMs = 2000; // Check every 2 seconds
-    const deadline = Date.now() + timeoutSec * 1000;
-
-    // A STOPPED AGENT IS HANDED NO TASK HERE (services/agent-stop-rules.ts). This long poll is a wake
-    // channel: it answers with the first queued task. The wait is still served in full, because a
-    // runtime that got an answer at once would ask again at once; then it says why it has nothing.
-    if (isStopped(agent) && resolveIdentity(req.auth!, config.nodeId) === agentGaii) {
-      await new Promise<void>(done => setTimeout(done, Math.max(0, deadline - Date.now())));
-      res.json(success(config.nodeId, { task: null, agent_stopped: true }));
-      return;
-    }
-
-    // Initial check
-    const initial = await storage.listAgentTasks(agentGaii, { status: 'queued', perPage: 1 });
-    if (initial.tasks.length > 0) {
-      res.json(success(config.nodeId, { task: initial.tasks[0] }));
-      return;
-    }
-
-    // Poll loop using a promise
-    const waitForTask = new Promise<void>((resolvePromise) => {
-      let settled = false;
-
-      const timer = setInterval(async () => {
-        if (settled) return;
-
-        try {
-          if (Date.now() >= deadline) {
-            settled = true;
-            clearInterval(timer);
-            res.json(success(config.nodeId, { task: null }));
-            resolvePromise();
-            return;
-          }
-
-          const result = await storage.listAgentTasks(agentGaii, { status: 'queued', perPage: 1 });
-          if (result.tasks.length > 0) {
-            settled = true;
-            clearInterval(timer);
-            res.json(success(config.nodeId, { task: result.tasks[0] }));
-            resolvePromise();
-          }
-        } catch (err) {
-          // Ignore poll errors, will retry on next interval
-          logger.warn('GET /v1/agents/:name/tasks/wait: continuing after a suppressed failure', { error: String(err) });
-        }
-      }, pollIntervalMs);
-
-      // Cleanup on client disconnect
-      req.on('close', () => {
-        if (!settled) {
-          settled = true;
-          clearInterval(timer);
-          resolvePromise();
-        }
-      });
-    });
-
-    await waitForTask;
   });
 
   return router;
