@@ -16,6 +16,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-namespaces
  * @version-history
+ *   v1.2.0 — 2026-10-11 — An `agents.` key that carries an identity where the agent's name belongs
+ *     is refused on POST, PUT, PATCH, bulk and the node MCP tool, for the agent and for the owner,
+ *     and the name alone is accepted (utils/agent-key-address.ts).
  *   v1.1.0 — 2026-09-13 — SHADOWED_BY_OWNER_COPY on every agent write the owner's copy hides: over
  *     POST /v1/memory, which never warned, and over the node MCP tool on a key the agent already
  *     held, where it went quiet after the first write. Includes the create, app-save, write-again
@@ -545,6 +548,91 @@ async function main() {
         });
         assert(w.status === 201, `write: ${w.status}`);
         assert(w.body.data.owner_gaii === agentGaii, `got ${w.body.data.owner_gaii}`);
+    });
+
+    // ── An `agents.` key names the agent by its NAME ─────────────────────────
+    // A crew runtime built its keys from the agent's identity on 2026-10-11, the node stored them and
+    // answered 201, and nothing read them: the offer it "published" never reached the offers page.
+    console.log('\nPhase: an agents.* key that carries an identity where the name belongs is refused');
+
+    const identityKey = (leaf: string) => `agents.${agentGaii}.${leaf}`;
+    const nothingStored = async (label: string) => {
+        const l = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent('agents.nsbot#')}`, {
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(l.status === 200, `list: ${l.status}`);
+        assert(l.body.data.items.length === 0, `${label}: nothing may be stored, got ${JSON.stringify(l.body.data.items.map((i: any) => i.key))}`);
+    };
+
+    await test('POST by the agent itself: 400, the right address in the message, nothing stored', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: identityKey('offers'), value: { offers: [] }, visibility: 'owner' }),
+        });
+        assert(w.status === 400, `expected 400, got ${w.status} ${JSON.stringify(w.body)}`);
+        assert(w.body.error?.code === 'AGENT_KEY_NOT_A_NAME', `code: ${w.body.error?.code}`);
+        assert(String(w.body.error?.message).includes('agents.nsbot.'), `the message names the right address: ${w.body.error?.message}`);
+        await nothingStored('POST');
+    });
+
+    await test('the owner in person is refused the same key (the rule is the address, not the caller)', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key: identityKey('readme'), value: 'x' }),
+        });
+        assert(w.status === 400 && w.body.error?.code === 'AGENT_KEY_NOT_A_NAME', `got ${w.status} ${w.body.error?.code}`);
+    });
+
+    await test('the node MCP tool refuses it with the same code', async () => {
+        const w = await mcpWrite({ key: identityKey('readme'), value: 'x' });
+        assert(w.isError, `the tool call must be an error, got ${JSON.stringify(w.data)}`);
+        assert(JSON.stringify(w.data).includes('AGENT_KEY_NOT_A_NAME'), `code in the answer: ${JSON.stringify(w.data)}`);
+        await nothingStored('MCP');
+    });
+
+    await test('PATCH, which creates an absent key, refuses it', async () => {
+        const w = await json(`/v1/memory/${encodeURIComponent(identityKey('tasks.t1.live'))}`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ patch: { step: 1 } }),
+        });
+        assert(w.status === 400 && w.body.error?.code === 'AGENT_KEY_NOT_A_NAME', `got ${w.status} ${JSON.stringify(w.body.error)}`);
+    });
+
+    await test('PUT refuses it', async () => {
+        const w = await json(`/v1/memory/${encodeURIComponent(identityKey('readme'))}`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ value: 'x', version: 1 }),
+        });
+        assert(w.status === 400 && w.body.error?.code === 'AGENT_KEY_NOT_A_NAME', `got ${w.status} ${JSON.stringify(w.body.error)}`);
+    });
+
+    await test('a bulk write drops that entry with the reason and stores the entry beside it', async () => {
+        const w = await json('/v1/memory/bulk', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ entries: [
+                { key: identityKey('statistics.custom.eval_context'), value: { n: 1 } },
+                { key: 'agents.nsbot.statistics.custom.eval_context', value: { n: 1 } },
+            ] }),
+        });
+        assert(JSON.stringify(w.body).includes('agents.nsbot.'), `the refused entry carries the reason: ${JSON.stringify(w.body)}`);
+        await nothingStored('bulk');
+        const ok = await json(`/v1/memory/${encodeURIComponent('agents.nsbot.statistics.custom.eval_context')}`, {
+            headers: { Authorization: `Bearer ${agentToken}` },
+        });
+        assert(ok.status === 200, `the correctly addressed entry is stored: ${ok.status}`);
+    });
+
+    await test('the name alone is accepted, and so is an "@" outside the agents. prefix', async () => {
+        const byName = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: 'agents.nsbot.readme', value: 'hello', visibility: 'owner' }),
+        });
+        assert(byName.status === 201, `agents.<name>.readme: ${byName.status} ${JSON.stringify(byName.body)}`);
+        const email = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: 'nstest.contacts.alice@example.com', value: { name: 'Alice' } }),
+        });
+        assert(email.status === 201, `an email address in another key: ${email.status} ${JSON.stringify(email.body)}`);
     });
 
 

@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.12.0 — 2026-10-11 — AGENT_KEY_NOT_A_NAME (400): an `agents.` key whose name segment holds an
+ *     identity is refused, because nothing reads a record stored there (utils/agent-key-address.ts).
  *   v1.11.4 — 2026-10-11 — The `memory` change of a record only its owner reads goes to that
  *     owner's streams. It was a global event, and one owner's private write woke every open page.
  *   v1.11.3 — 2026-10-08 — A declaration the caller may not make is answered as a refusal (403
@@ -108,6 +110,7 @@ import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { agentKeyRefusal } from '../utils/agent-key-address.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { canonicalAppToolsKey } from './app-tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
@@ -227,6 +230,8 @@ export type MemoryWriteResult =
             | 'SECRET_RECORD'
             // A key only the node itself writes (utils/reserved-keys.ts SERVER_WRITTEN_KEYS).
             | 'RESERVED_KEY'
+            // An `agents.` key that carries an identity where the agent's name belongs.
+            | 'AGENT_KEY_NOT_A_NAME'
             // An EXCHANGE listing source whose changed text would break an ODPS length cap.
             | 'ODPS_FIELD_TOO_LONG';
         message: string;
@@ -290,6 +295,10 @@ export async function writeMemoryRecord(
         const refusal = serverWrittenKeyRefusal(input.key);
         return { ok: false, status: 403, code: refusal.code, message: refusal.message };
     }
+    // A key under `agents.` names the agent by its name. One that carries the identity there is
+    // stored where nothing reads it (utils/agent-key-address.ts), so it is refused before it lands.
+    const misaddressed = agentKeyRefusal(input.key);
+    if (misaddressed) return { ok: false, status: 400, code: misaddressed.code, message: misaddressed.message };
 
     // 1b. An anonymous identity writes under anonymous.* and nowhere else. The HTTP route has said
     //     so since the anonymous mode existed; the MCP path had no such fence.

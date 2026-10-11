@@ -16220,7 +16220,12 @@ paths:
         (a notification, whose buttons the owner's browser runs with the owner's session; POST
         /v1/notifications sends one). An app grant, or an agent writing into the owner's namespace, is
         also refused with 403 RESERVED_KEY for a key the node reads to decide what it does (its AI
-        settings, the spend cap, a payout record).
+        settings, the spend cap, a payout record). A key under `agents.` names the agent by its name:
+        `agents.joker.offers`. One that carries the identity there (`agents.joker#alice@node.offers`)
+        is refused with 400 AGENT_KEY_NOT_A_NAME for every principal, because nothing reads a record
+        stored under that address; the message gives the address to use. PUT and PATCH
+        /v1/memory/{key}, the bulk write, the import, the copy and the `aimeat_memory_write` MCP tool
+        answer the same.
       tags: [Memory]
       security:
         - BearerAuth: []
