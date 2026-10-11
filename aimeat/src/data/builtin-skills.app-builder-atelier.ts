@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.32.0 — 2026-10-11 — Step 8 has a check for an app that shows work happening on the node:
+ *     start the work and watch the screen follow it. An app passed every other check while its
+ *     state ran 37 seconds behind the agent, because it read by a timer (build-events-first.ts).
  *   v1.31.0 — 2026-10-05 — Kit 0.66.0: a form checks what is typed through one JSON Schema (field
  *     rules, schema, gate, handle.gate), and the same schema locks the workspace. Read against
  *     describe-data.js after form gained the alert and gate parts.
@@ -394,6 +397,10 @@ moved under you says so.
    console errors. A LIVING DOCUMENT is accepted the same way, beside \`genre-living\`, and it
    carries one more measured check: move the control the sheet is built around and watch the
    figure, the printed maths, the sentence and the state all follow it in the same paint.
+   AN APP THAT SHOWS WORK HAPPENING ON THE NODE (a task one of the owner's agents runs, a record
+   another device writes) carries one more as well: start that work and watch the screen follow
+   each stage within a few seconds. The specification's EVENTS FIRST, A TIMER LAST, in the mosaic
+   section, says how; a state that waits for a timer to come round has not met it.
 9. **Publish** — \`aimeat_app_publish\` with \`spec_token\`; report the live URL in the owner's
    words. Read \`next_steps\` in the answer: it is the node's list of what this app still owes.
    Read the WHOLE answer and keep it whole. Four of its lines are owed by every app, and the app

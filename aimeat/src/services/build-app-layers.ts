@@ -34,6 +34,9 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   2026-10-11 — The live-updates part says when to read it in the builder's terms: before a timer
+ *     around a read. Its old line described what the part does, and a builder about to poll did
+ *     not recognise their case in it.
  *   2026-09-19 — Part `start` opens by saying this is the CLASSIC specification and that a new app
  *     is built on Atelier. Nothing in it said another track existed.
  *   v1.1.0 — 2026-09-19 — The decision model's section is on demand (TARGET-080).
@@ -156,7 +159,7 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
   },
   'Live updates without a firehose (aimeat-live.js)': {
     id: 'live-updates', layer: 'on-demand',
-    when: 'The screen refreshes on its own when data changes on the node.',
+    when: 'The screen shows data that changes on the node (a record, a file, work an agent does). Read it before you write a timer around a read.',
   },
   'Agent face (markdown read-surface for agents)': {
     id: 'agent-face', layer: 'on-demand',

@@ -24,6 +24,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.10.0 — 2026-10-11 — Do / Don't: the node tells the screen when its data changed, and a timer
+ *     is kept for data that has no event (build-events-first.ts says what happened without it).
  *   v1.9.0 — 2026-10-10 — The finish has a fifth step, the data map, and names when an app is
  *     finished: the four things next_steps shows present (face, bound skill, data map, design spec).
  *     An app reached version 4 with the first two and without the last two (Jouni, 2026-10-10).
@@ -376,6 +378,9 @@ Three things that are easy to get wrong:
 - **Do** research existing apps/packs/pitfalls first; start from a template.
 - **Do** verify locally, publish over MCP (presigned for >1 KB), hand back the live URL.
 - **Do** call \`AIMEAT.ai.disclose()\` and declare \`aimeat-ai\` in any app that generates content.
+- **Do** let the node tell the screen when its data changed (\`AIMEAT.live\`, and
+  \`AIMEAT.agents.watch\` for one task), and keep a timer for data that has no event. Read the
+  specification's part \`live-updates\` before you write \`setInterval\` around a read.
 - **Do** propose and report in words the person can judge without knowing how the node works.
 - **Do** send it to \`support@operators\` when the node itself misbehaves, then tell the person
   what still works.
