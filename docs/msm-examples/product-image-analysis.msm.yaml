@@ -20,7 +20,7 @@ actions:
       Send 1-5 product photos and receive: identified product name, brand, model,
       condition score (1-10), detailed condition notes, suggested marketplace
       description in Finnish and English, and estimated category tags.
-      Uses GPT-4o vision for accurate multi-image analysis.
+      Uses a vision model for multi-image analysis.
 
     endpoint:
       method: POST
