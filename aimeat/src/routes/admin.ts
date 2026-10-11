@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.12.1 — 2026-10-12 — The economy figures count the burned share of pacing (`pacing_burn`) as burned
+ *     and pacing packs bought with money as created; the page said "0 burned" while pacing burned.
  *   v1.12.0 — 2026-10-11 — The dashboard's commerce block names the morsel volume pacing_volume_*,
  *     counting the pacing ledger legs too; sales_volume_* mirror it, marked deprecated, until 4.0.0
  *     (a morsel is pacing, not a price).
@@ -385,11 +387,13 @@ export function adminRouter(
             const txDate = new Date(tx.timestamp);
             const isToday = txDate >= dayStart;
 
-            if (tx.type === 'mint' || tx.type === 'welcome_bonus' || tx.type === 'daily_allowance') {
+            // Supply in: mints, grants and pacing capacity bought with money. Supply out: every burn,
+            // the work network fee's (`burn`) and the burned share of a pacing charge (`pacing_burn`).
+            if (tx.type === 'mint' || tx.type === 'welcome_bonus' || tx.type === 'daily_allowance' || tx.type === 'pacing_pack') {
                 totalMinted += tx.amount;
                 if (txDate >= thirtyDaysAgo) minted30d += tx.amount;
             }
-            if (tx.type === 'burn') {
+            if (tx.type === 'burn' || tx.type === 'pacing_burn') {
                 totalBurned += Math.abs(tx.amount);
                 if (txDate >= thirtyDaysAgo) burned30d += Math.abs(tx.amount);
             }
@@ -407,7 +411,7 @@ export function adminRouter(
                 transactionsToday++;
                 morselsTransactedToday += Math.abs(tx.amount);
                 if (tx.type === 'network_fee') networkFeesToday += Math.abs(tx.amount);
-                if (tx.type === 'burn') burnedToday += Math.abs(tx.amount);
+                if (tx.type === 'burn' || tx.type === 'pacing_burn') burnedToday += Math.abs(tx.amount);
                 if (tx.type === 'daily_allowance') dailyAllowancesIssuedToday++;
             }
         }

@@ -151,6 +151,10 @@ await test('(a) a free offer with a pacing amount: the buyer pays 10 morsels, 2 
   assert(sumOf(sel, 'pacing_earn') === 7, `provider rows: ${JSON.stringify(sel)}`);
   const o = await rows(op.token, track);
   assert(sumOf(o, 'marketplace_fee') === 1, `operator rows: ${JSON.stringify(o)}`);
+  // The operator's economy figures count what pacing burned.
+  const dash = await json('/v1/admin/dashboard', { headers: auth(op.token) });
+  const eco = dash.body?.data?.economy ?? {};
+  assert(dash.status === 200 && eco.total_burned_all_time >= 2 + 1 && eco.burned_today >= 3, `burned on the economy page: ${JSON.stringify({ all: eco.total_burned_all_time, today: eco.burned_today })}`);
 });
 
 await test('(b) a money price and a pacing amount: 1 EUR through a money handler, 5 morsels of pacing as in (a)', async () => {
