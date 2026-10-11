@@ -11,6 +11,8 @@
  *   `config.testMoneyHandler` (env AIMEAT_TEST_MONEY_HANDLER='true'); NEVER in production, where
  *   the Stripe handler (`com.stripe.spt`) is the real money rail.
  * @version-history
+ *   v1.3.0 — 2026-10-11 — Registered only when testMoneyHandlerActive() says so: the flag AND a
+ *     loopback public URL (utils/test-money-guard.ts). aimeat.io had run with the flag on.
  *   v1.2.0 — 2026-10-02 — saveForLater and chargeSaved: a saved method named after the instrument, and
  *     the instrument "decline" fails a later charge (automatic renewal in E2E).
  *   v1.1.0 — 2026-08-06 — Hold rail double (TINKI phase 1): stateful authorize/capture/release
@@ -19,6 +21,8 @@
 import { randomUUID } from 'node:crypto';
 import type { PaymentHandler } from './types.js';
 import { PaymentError } from './payment-handlers.js';
+
+export { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 
 export const TEST_MONEY_HANDLER_ID = 'test.money';
 

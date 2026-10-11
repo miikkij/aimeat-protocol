@@ -14,11 +14,14 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   v1.2.0 — 2026-10-11 — AIMEAT_TEST_MONEY_HANDLER is reported as refused on any node whose public
+ *     URL is not a loopback address, whatever its profile (utils/test-money-guard.ts).
  *   v1.1.0 — 2026-09-28 — AIMEAT_AI_FIXED_BASEURL_OVERRIDES is reported as refused on a public node
  *     (System 2 plan, V3).
  *   v1.0.0 — 2026-08-10 — Extracted from config.ts (max-file-lines), no behaviour change.
  */
 import type { AimeatConfig } from './config-types.js';
+import { testMoneyHandlerRefused } from './utils/test-money-guard.js';
 
 /**
  * Startup posture self-check. When the resolved security profile is `public`, return a list of
@@ -28,6 +31,10 @@ import type { AimeatConfig } from './config-types.js';
  */
 export function securityPostureWarnings(config: AimeatConfig): string[] {
   const w: string[] = [];
+  // Before the profile check: a node with a private LAN address is `local` and still serves people.
+  if (testMoneyHandlerRefused(config)) {
+    w.push(`AIMEAT_TEST_MONEY_HANDLER=true was REFUSED — the test-only money handler settles EUR and USD with no real payment, and ${config.baseUrl} is not a loopback address. test.money is not registered. Remove the variable from this node's environment.`);
+  }
   if (config.securityProfile !== 'public') return w;
   if (config.anonymousMode) w.push('AIMEAT_ANONYMOUS=true — anyone can act as the shared anonymous identity.');
   if (config.allowPrivateEgress) w.push('AIMEAT_ALLOW_PRIVATE_EGRESS=true — server-side fetches can reach loopback/internal services (SSRF).');

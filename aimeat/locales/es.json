@@ -126,6 +126,8 @@
         "lineUnknown": "No hay suficiente historial legible para evaluar la frecuencia de los rechazos.",
         "lineOpenOne": "Hay un incidente abierto que te espera en la sección 03.",
         "lineOpenMany": "Hay {n} incidentes abiertos que te esperan en la sección 03.",
+        "lineTestMoneyRefused": "Este servidor tiene definida AIMEAT_TEST_MONEY_HANDLER. El servidor no la usa, porque no es un servidor de prueba. Elimina la variable del entorno del servidor.",
+        "lineTestMoneyOn": "AIMEAT_TEST_MONEY_HANDLER está definida, así que los pagos en euros y dólares se completan sin dinero real. Solo es aceptable en un servidor de prueba en este ordenador.",
         "lineWalledOne": "Una dirección IP, {source}, fue bloqueada en un endpoint de inicio de sesión {n} veces en las últimas 24 horas.",
         "lineWalledMany": "{sources} direcciones IP fueron bloqueadas en endpoints de inicio de sesión {n} veces en las últimas 24 horas.",
         "logOn": "Registro de rechazos activo · rota a los {mb} MB",
