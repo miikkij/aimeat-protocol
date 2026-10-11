@@ -31,6 +31,8 @@
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.5.1 -- 2026-10-11 -- The quota section sits under limits, beside the rate limits: the list
+ *     named it `quotas`, its settings are `quota.*`, so it had been landing in Other (Jouni).
  *   v3.5.0 -- 2026-10-11 -- A refused save says which setting and why, where the operator is: on the
  *     setting's own line (the field marked, the reason under the description) and in the pinned row.
  *     It said "No valid changes applied" in a box at the top of the page, out of sight, and a save
@@ -121,7 +123,7 @@ const DOMAINS = [
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'economy', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'totp', 'eudiw', 'docsign', 'consent', 'classification', 'security', 'moderation'] },
   { id: 'node', groups: ['node', 'storage', 'database_url', 'sqlite_path', 'admin_password', 'setup', 'consul', 'stats', 'metrics'] },
-  { id: 'limits', groups: ['quotas', 'rate_limits', 'extensions', 'realtime'] },
+  { id: 'limits', groups: ['quota', 'rate_limits', 'extensions', 'realtime'] },
   { id: 'federation', groups: ['federation', 'sync', 'personal_nodes', 'genesis', 'tunnel', 'msm'] },
   { id: 'integrations', groups: ['email', 'push', 'indexing', 'cors', 'site', 'portal', 'cookies', 'connections', 'visibility'] },
 ];
