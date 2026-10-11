@@ -123,6 +123,13 @@ function startJs(runConfig: string): string {
     + `try{var m=d.cookie.match(/(?:^|;\\s*)aimeat-lang=([a-z]{2})/);a.push(m&&m[1]);}catch(e){}`
     + `a.push(navigator.language);a.push(d.documentElement.lang);`
     + `for(var i=0;i<a.length;i++){var x=String(a[i]||'').slice(0,2).toLowerCase();if(c.language.translations[x])return x;}return 'en';}`
+    // The library draws each category closed, a title with nothing under it until it is pressed,
+    // which reads as an empty list. Each one is opened when the dialog is built, so the visitor
+    // sees what a category is for before choosing; the title still folds it.
+    + `window.addEventListener('cc:onModalReady',function(e){try{var q=e.detail||{};if(q.modalName!=='preferencesModal'||!q.modal)return;`
+    + `var s=q.modal.querySelectorAll('.pm__section--expandable');for(var i=0;i<s.length;i++){s[i].classList.add('is-expanded');`
+    + `var b=s[i].querySelector('.pm__section-title');if(b)b.setAttribute('aria-expanded','true');`
+    + `var k=s[i].querySelector('.pm__section-desc-wrapper');if(k)k.setAttribute('aria-hidden','false');}}catch(x){}});`
     + `function run(){if(!document.body){setTimeout(run,30);return;}if(!window.CookieConsent)return;c.language.default=pick();CookieConsent.run(c);}`
     + `if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}})();`;
 }

@@ -127,8 +127,11 @@ against its shape before it is stored and again before it is written into a page
 The banner such a page gets names the services the owner uses, in English, Finnish or Spanish, and
 says that Clarity records the visit and where the data goes. When the visitor takes the consent
 back, the cookies the two services set on that page's host (`_clck`, `_clsk`, `_ga`, `_ga_<id>`,
-`_gid`) are removed and the page reloads without the tags. Google's cookie is kept on the page's
-own host (`cookie_domain: 'none'`), so it is not shared with other owners' apps.
+`_gid`) are removed, on that host and on every parent domain, and the page reloads without the
+tags. Both services' cookies are kept on the page's own host, so one owner's visitor id is not
+shared with other owners' apps: Google's by `cookie_domain: 'none'`, and Clarity's by taking the
+Domain attribute off its cookie writes while the tag runs, because Clarity picks the widest domain
+itself (measured on aimeat.io: `_clck` on `.aimeat.io` from an app on `prh.apps.aimeat.io`).
 
 ## On-page behaviour (layer D)
 
