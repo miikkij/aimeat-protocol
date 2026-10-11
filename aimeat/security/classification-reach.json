@@ -734,6 +734,20 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The statistics record, read to update it."
     },
+    "src/services/agent-ties.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 2
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: the owner's apps' data map documents (public by definition, apps.<id>.datamap), from which only the rows that name an agent are taken, and the owner's workplace records (agent-workplace.<name>, a reserved prefix only services/agent-workplace.ts writes). Shown to that owner on their home. No content anybody classified."
+    },
+    "src/services/agent-workplace.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: the workplace record (reserved prefix) to update it, and a completed task's result records to change their visibility from private to the workspace the owner named. The value is written back untouched and shown to nobody here; who may read it afterwards is still decided per reader by the record's own classification label at read time."
+    },
     "src/services/agent-task-fanout.ts": {
       "reads": {
         "getMemory": 1
@@ -2053,6 +2067,20 @@
         "listMemoryHistory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the node's layout records and their earlier versions."
+    },
+    "src/services/build-app-agent-context.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-11: the latest finished result of the caller's own agent, read to describe its STRUCTURE in the build instructions. The record goes through presentMemory with the caller's classification reader before anything is derived from it, so a result the caller may not read is not described; what is derived is field names and value types only, with no text of the value."
+    },
+    "src/services/task-outcome.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: a finished task's result record, of which only `visibility` and `workspaceRef` are used, to say which workspaces the result is shared with. The value is never returned from here; the deliverable itself is read through the memory routes."
     },
     "src/services/task-start-migrations.ts": {
       "reads": {

@@ -26,12 +26,15 @@
  *   import { taskOutcome } from '../services/task-outcome.js';
  *   const outcome = await taskOutcome(storage, task);   // null unless done/failed/declined
  * @version-history
+ *   v1.2.0 — 2026-10-11 — `shared_with` on the read of one task (`withPlace`): the workspaces the
+ *     result is shared with, by name.
  *   v1.1.0 — 2026-10-04 — A declined task has an outcome too: state 'declined', and the agent's
  *     reason from the 'declined' event as the message.
  *   v1.0.0 — 2026-08-16 — Initial. Reported by crewaimeat-dev against aimeat-crewai 0.20.0: a
  *     completed task-runner leaves its output where the caller cannot read it.
  */
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
+import { placeNames } from './agent-ties.js';
 
 /** What a finished task produced. Null while it is still running — an unfinished task has no
  *  outcome, and reporting an empty one would read as "finished with nothing". */
@@ -47,6 +50,38 @@ export interface TaskOutcome {
     deliverable_key?: string;
     /** A ready-to-follow address for that key, so a caller does not have to assemble one. */
     deliverable_url?: string;
+    /**
+     * The workspaces the result is shared with, when it is (services/agent-workplace.ts shares a
+     * finished task's result with the workspace the owner named). Only on a read that asked for
+     * it with `withPlace`, because it costs a memory read and a name lookup per task; absent when
+     * the result is private, public, or was not found.
+     */
+    shared_with?: Array<{ organism_id: string; organism_name: string; workspace_id: string; workspace_name: string }>;
+}
+
+/** The result record of a finished task: the key it named, else the first record tagged with it. */
+async function resultRecord(storage: Storage, task: AgentTaskRecord) {
+    if (task.deliverableKey) {
+        const named = await storage.getMemory(task.agentGaii, task.deliverableKey);
+        if (named) return named;
+    }
+    return (await storage.listMemory(task.agentGaii, { tags: [`task:${task.id}`] }))[0] ?? null;
+}
+
+/** Where a finished task's result is shared, with names; empty when it is not shared with a workspace. */
+async function sharedWith(storage: Storage, task: AgentTaskRecord): Promise<NonNullable<TaskOutcome['shared_with']>> {
+    const rec = await resultRecord(storage, task);
+    if (!rec || rec.visibility !== 'workspace' || !rec.workspaceRef) return [];
+    const refs = rec.workspaceRef.split(/\s+/).filter(Boolean).map(ref => {
+        const slash = ref.indexOf('/');
+        return { organism_id: ref.slice(0, slash), workspace_id: ref.slice(slash + 1) };
+    }).filter(r => r.organism_id && r.workspace_id);
+    const names = await placeNames(storage, refs);
+    return refs.map(r => ({
+        ...r,
+        organism_name: names.org.get(r.organism_id) ?? r.organism_id,
+        workspace_name: names.ws.get(`${r.organism_id}::${r.workspace_id}`) ?? r.workspace_id,
+    }));
 }
 
 const TERMINAL = new Set(['completed', 'failed', 'declined']);
@@ -58,8 +93,13 @@ const TERMINAL = new Set(['completed', 'failed', 'declined']);
  * reopened and completed again reports the LATEST completion rather than the first — which is what
  * "what happened" means to whoever is asking.
  */
-export async function taskOutcome(storage: Storage, task: AgentTaskRecord): Promise<TaskOutcome | null> {
+export async function taskOutcome(
+    storage: Storage, task: AgentTaskRecord,
+    /** `withPlace`: also say which workspaces the result is shared with. For the read of ONE task. */
+    opts: { withPlace?: boolean } = {},
+): Promise<TaskOutcome | null> {
     if (task.status !== 'done' && task.status !== 'failed' && task.status !== 'declined') return null;
+    const shared = opts.withPlace && task.status === 'done' ? await sharedWith(storage, task) : [];
 
     const { events } = await storage.listTaskEvents(task.id, { page: 1, perPage: 50 });
     // listTaskEvents orders oldest-first; the terminal one is at the end.
@@ -76,5 +116,6 @@ export async function taskOutcome(storage: Storage, task: AgentTaskRecord): Prom
             deliverable_key: task.deliverableKey,
             deliverable_url: `/v1/memory/${encodeURIComponent(task.agentGaii)}/${encodeURIComponent(task.deliverableKey)}`,
         } : {}),
+        ...(shared.length > 0 ? { shared_with: shared } : {}),
     };
 }

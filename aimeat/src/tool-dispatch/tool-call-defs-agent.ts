@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-11 -- aimeat_agent_stop and aimeat_agent_start move unchanged to
+ *     tool-call-defs-agent-standing.ts (max-file-lines), where aimeat_agent_workplace_set joins them.
  *   2026-10-11 -- aimeat_agent_stop and aimeat_agent_start.
  *   2026-10-08 -- aimeat_message_send, aimeat_dm_send, aimeat_dm_broadcast, aimeat_dm_ask,
  *     aimeat_dm_send_as_owner and aimeat_task_complete send ai_provenance and ai_provenance_id to
@@ -55,6 +57,7 @@
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import type { ApiResponse } from './api-client.js';
 import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
+import { agentStandingCliTools } from './tool-call-defs-agent-standing.js';
 import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
 import { query, optionalString, requiredString, optionalArray, requiredArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload, withProvenanceFields } from './tool-call-helpers.js';
 import { organizePatchBody } from './tool-call-helpers-organize.js';
@@ -608,18 +611,8 @@ export const agentTools: ConnectCliToolDefinition[] = [
             { task_start: input.task_start === null ? null : requiredString(input, 'task_start') },
         ),
     },
-    {
-        name: 'aimeat_agent_stop',
-        description: "Stop one of the owner's agents: it starts no new work, the work it is doing finishes, scheduled runs are skipped, and what it is given waits until aimeat_agent_start. Its key and permissions stay. Never for yourself.",
-        input: { target_agent_name: { type: 'string', required: true, description: 'The agent to stop.' } },
-        handler: ({ client }, input) => client.post(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/stop`, {}),
-    },
-    {
-        name: 'aimeat_agent_start',
-        description: "Start one of the owner's agents that was stopped. Waiting tasks go through the usual start decision and waiting messages reach it; skipped scheduled runs stay skipped. Never for yourself.",
-        input: { target_agent_name: { type: 'string', required: true, description: 'The agent to start.' } },
-        handler: ({ client }, input) => client.post(`/v1/agents/${encodeURIComponent(requiredString(input, 'target_agent_name'))}/start`, {}),
-    },
+    // Stop, start and where its work goes: tool-call-defs-agent-standing.ts (max-file-lines).
+    ...agentStandingCliTools,
     {
         name: 'aimeat_task_request_changes',
         description: "Owner-only: ask an agent to revise its proposed TODO plan. Marks the existing todos as outdated, flips the task status to 'revision_requested', and pushes a linked message carrying the owner's free-text change request.",

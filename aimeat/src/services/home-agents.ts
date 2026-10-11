@@ -24,6 +24,8 @@
  * @structure HomeWorker · HomeAgentsView · readHomeAgents(deps, owner, limit, only?)
  * @usage const view = await readHomeAgents({ config, storage }, owner, 5);
  * @version-history
+ *   v1.3.0 — 2026-10-11 — `apps` and `work_goes_to` on a worker: the apps that show its work and
+ *     the workspace the work is shared with, read for all workers at once (services/agent-ties.ts).
  *   v1.2.0 — 2026-10-11 — `stopped` and `stopped_at` on a worker.
  *   v1.1.0 — 2026-10-10 — `hears_messages` on a worker, for the agent page's conversation.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
@@ -35,6 +37,7 @@ import { listConnectors, wantedInstalls } from './connector-registry.js';
 import { readCrewState } from './crew-def-store.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { nodeTimeZone } from './display-prefs.js';
+import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent-ties.js';
 
 export type WorksWhen = 'ask' | 'clock' | 'talk' | 'always';
 
@@ -63,6 +66,10 @@ export interface HomeWorker {
   /** When one of its tasks last changed, and when one last failed. */
   last_at: string | null;
   last_failed_at: string | null;
+  /** The apps whose data map names this agent: the ones that show its work (services/agent-ties.ts). */
+  apps: AgentApp[];
+  /** The workspace its finished work is shared with; null while the work stays in its own memory. */
+  work_goes_to: AgentWorkplace | null;
 }
 
 export interface HomeAgentsView {
@@ -97,13 +104,14 @@ export async function readHomeAgents(
 ): Promise<HomeAgentsView> {
   const { config, storage } = deps;
   const ownerGhii = `${owner}@${config.nodeId}`;
-  const [agents, proposals, connectors, wanted, counts, jobs] = await Promise.all([
+  const [agents, proposals, connectors, wanted, counts, jobs, ties] = await Promise.all([
     storage.getAgentsByOwner(owner),
     listProposals(deps, owner),
     listConnectors(deps, owner),
     wantedInstalls(deps, owner),
     storage.countTasksByOwner(ownerGhii),
     storage.listScheduledJobs({ ownerScope: ownerGhii }),
+    readAgentTies(deps, owner),
   ]);
 
   const homeOf = new Map<string, string>();
@@ -153,6 +161,8 @@ export async function readHomeAgents(
       active: c?.active ?? 0,
       last_at: c?.lastTaskUpdateAt ?? null,
       last_failed_at: c?.lastFailedAt ?? null,
+      apps: ties.apps[a.name] ?? [],
+      work_goes_to: ties.workplaces[a.name] ?? null,
     });
   }
 

@@ -9,6 +9,8 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-11 — aimeat_agent_workplace_set (services/agent-workplace.ts); aimeat_task_get's outcome
+ *     says which workspaces the result is shared with.
  *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start (services/agent-stop.ts).
  *   2026-10-08 — aimeat_task_complete hands the session's scopes to completeTask(), so a declaration
  *     needs provenance:write in the session as well as on the grant (aiprov D5).
@@ -98,6 +100,8 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGAII, buildGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
 import { taskOutcome } from '../services/task-outcome.js';
+import { setWorkplace, clearWorkplace, workplaceView } from '../services/agent-workplace.js';
+import type { CallerContext } from '../services/caller-context.js';
 import { completeTask, failTask, declineTask } from '../services/agent-task-fanout.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -111,6 +115,8 @@ export function registerAgentTaskTools(
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts), for a tool whose service takes one. */
+    caller?: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
     /** This session as the start rules read it: always an agent over MCP, never the owner in person. */
@@ -316,7 +322,7 @@ export function registerAgentTaskTools(
                         // WHAT IT PRODUCED. Absent until now, which made a finished task
                         // indistinguishable from one that produced nothing: the caller saw
                         // status 'done' and fifteen fields, none of them the answer.
-                        outcome: await taskOutcome(storage, task),
+                        outcome: await taskOutcome(storage, task, { withPlace: true }),
                         last_event_at: task.lastEventAt,
                         created_at: task.createdAt,
                         updated_at: task.updatedAt,
@@ -438,6 +444,30 @@ export function registerAgentTaskTools(
             },
         );
     }
+
+    // ── Tool 3b-4: aimeat_agent_workplace_set ──
+    // Where the finished work of one of the owner's agents goes: a workspace, or with no ids the
+    // agent's own memory. Same implementation as PUT and DELETE /v1/agents/:name/workplace
+    // (services/agent-workplace.ts).
+    mcp.tool(
+        'aimeat_agent_workplace_set',
+        descriptionFor('aimeat_agent_workplace_set'),
+        zodShapeFor('aimeat_agent_workplace_set'),
+        annotationsFor('aimeat_agent_workplace_set'),
+        async ({ target_agent_name, organism_id, workspace_id }) => {
+            // Who is asking is the session's caller (services/caller-context.ts), in the service's terms.
+            const session = caller?.();
+            if (!session) return { ...toolError('INTERNAL', 'This session has no caller to act as.') };
+            const who = { principal: session.principal, ownerName: session.owner, roles: [...session.roles], scopes: [...session.scopes] };
+            const out = !organism_id && !workspace_id
+                ? await clearWorkplace({ storage, config }, who, target_agent_name)
+                : await setWorkplace({ storage, config }, who, target_agent_name, { organismId: organism_id, workspaceId: workspace_id });
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({
+                agent: target_agent_name, workplace: workplaceView(out.workplace),
+            }, null, 2) }] };
+        },
+    );
 
     // ── Tool 3c: aimeat_agent_scope_narrow ──
     // The owner's AI accepting, on the person's word, the narrowing of a `*` agent to the permissions

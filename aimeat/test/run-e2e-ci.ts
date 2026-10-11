@@ -491,6 +491,9 @@ const ALL_SUITES = [
     // The owner's connectors as named, remembered machines: listed, renamed and forgotten, a proposal
     // that names one, and an agent that waits for the machine it was ordered to. Opens real tunnels.
     'test/e2e-agent-connectors.ts',
+    // What an agent's work is tied to: the apps whose data map names it, the workspace its finished
+    // work is shared with, the first run a new agent gets, and the build instructions about one agent.
+    'test/e2e-agent-ties.ts',
     // Agent v2 V2: the two primitives (discover + invoke) and, as much of the suite as the feature
     // itself, the proof that the old door is unchanged — the same call refused by scope directly is
     // refused through invoke, and nothing reachable before stopped being reachable.

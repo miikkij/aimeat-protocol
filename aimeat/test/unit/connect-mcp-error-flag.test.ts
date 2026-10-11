@@ -79,6 +79,8 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   // A document's SHA-256 is 64 hex characters on the catalog schema; the generic 'probe' is not one.
   aimeat_docsign_lookup: { sha256: 'a'.repeat(64) },
   aimeat_datamap_get: { app: 'someone/thing.html' },
+  aimeat_app_agent_tie: { app: 'someone/thing.html', target_agent_name: 'some-agent' },
+  aimeat_app_agent_untie: { app: 'someone/thing.html', target_agent_name: 'some-agent' },
   aimeat_datamap_set: { app: 'someone/thing.html', data_map: { spec: 'aimeat.datamap/1' } },
   aimeat_skill_get: { name: 'probe' },
   // One tool, an action per job: the first action in its enum needs fields the probe does not send.

@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.25.1 -- 2026-10-11 -- add-a-crew-agent, step 4: the approval gives the new agent its work
+ *     once, as a task with its name and its purpose, so the purpose is written to read as that task.
  *   v1.25.0 -- 2026-10-11 -- diagnose-a-workflow: an agent the owner stopped is not reachable for a
  *     step and its scheduled run is skipped with outcome `stopped`; start it with aimeat_agent_start.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -419,7 +421,9 @@ not a product they do not use.
    gives it its key and the connector starts it, with nothing to press. An agent proposed or
    approved for one named connector waits for that connector (the answer's \`connector\` names it),
    and another computer of the owner's connecting is not given it. If a connector was reached
-   and did not take it on, the owner updates the connector and presses Attach.
+   and did not take it on, the owner updates the connector and presses Attach. The approval also
+   gives the new agent its work once, as a task that carries its name and its purpose, so the owner
+   sees that it works and has a first result; write the \`purpose\` so that it reads as that task.
 5. **Work on a clock comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
    agent (\`aimeat_schedule_create\`), made once the agent exists. Say so when you propose it.
 
