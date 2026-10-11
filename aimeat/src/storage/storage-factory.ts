@@ -15,6 +15,8 @@
  *   - StorageProvider / StorageOptions: provider union and factory input types
  *
  * @version-history
+ *   v2.1.1 — 2026-10-11 — The schema-failure message names docs/pitfalls.md by its GitHub address,
+ *     which an installed package's operator can open.
  *   v2.1.0 — 2026-08-13 — A schema failure no longer reports itself as broken native bindings. One
  *     try wrapped the import AND the constructor and printed only the first line of the message, so
  *     a node that could not boot was told to rebuild better-sqlite3. The constructor path now prints
@@ -57,7 +59,7 @@ function sqliteOpenFailed(err: unknown): never {
   console.error(err instanceof Error ? (err.stack ?? err.message) : String(err));
   console.error('\n\x1b[33mThe native bindings loaded, so this is the database file or its schema.\x1b[0m');
   console.error('  The stack above names the failing statement. Schema-upgrade traps are catalogued');
-  console.error('  in docs/pitfalls.md.\n');
+  console.error('  in https://github.com/miikkij/aimeat-protocol/blob/main/docs/pitfalls.md.\n');
   process.exit(1);
 }
 

@@ -12,6 +12,7 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.0.1 -- 2026-10-11 -- The agent guide is named by its GitHub address; a bare repository path does not open from a node.
  *   v1.0.0 -- 2026-10-11 -- Moved from builtin-skills.ts (max-file-lines).
  */
 /**
@@ -126,7 +127,7 @@ with the other keys the runtime reads (\`cost\`, \`latency\`, \`repeatability\`,
 \`consequences\`), and a definition with no entry gets one made from the agent's name and purpose.
 The entry carries no price and no visibility, so the offer is the owner's own: it is not on the
 Exchange until the owner prices and lists it, and it is a workflow step only once it declares its
-signals (docs/building-an-aimeat-compatible-agent.md).
+signals (https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md).
 
 ## 2. A runtime of your own: device authorization
 

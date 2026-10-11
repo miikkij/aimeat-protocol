@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.10 — 2026-10-11 — The task-runner paragraph names the runner block's fields instead of
+ *     docs/integrations/crewai.md, a repository file an installed CLI cannot open and which never
+ *     described the block.
  *   v1.1.9 — 2026-10-10 — The serve help names the install id, AIMEAT_INSTALL_NAME and AIMEAT_RUN_MODES.
  *   v1.1.8 — 2026-10-09 — `aimeat config export --format consul --include-secrets`.
  *   v1.1.7 — 2026-09-30 — `--scopes` on the plain `aimeat connect` usage too, and what it does on a
@@ -280,5 +283,8 @@ NOTES
   into a subprocess runner. When a task arrives for it, the connector launches
   the configured executable with the task prompt provided via env vars and
   posts whatever the subprocess prints (or writes to a file) as the task
-  completion summary. See docs/integrations/crewai.md for the full pattern.
+  completion summary. The block takes command (required), args, cwd and
+  timeout_seconds (default 3600); the prompt arrives in AIMEAT_TASK_PROMPT and
+  the task id in AIMEAT_TASK_ID. A CrewAI crew is better run with the
+  aimeat-crewai package's own daemon: see the node skill add-a-crew-agent.
 `;

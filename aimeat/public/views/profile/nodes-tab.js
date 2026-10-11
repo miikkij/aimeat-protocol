@@ -5,6 +5,7 @@
  * @description Profile tab for managing personal node registrations, visibility,
  *   agent assignments, tunnel URLs, and mailbox status.
  * @version-history
+ *   v1.21.2 -- 2026-10-11 -- The setup guide link opens the guide on GitHub; /docs/personal-node-setup-guide.md is not a path the node serves.
  *   v1.21.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so a node id or agent GAII with an ampersand showed as &amp;.
  *   v1.21.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with the Tabs bar, Section, List with its opened Panel, Facts, Card, Fields, TextField, Check, Tab, Split, Mark, Note, Action): the page passes data and writes no class. The setup steps name their keys again as main did (page group G8).
  *   v1.20.0 -- 2026-09-26 -- Private and Public beside their radio dots are the Check line (css/components/check-line.css), no longer the row label (a unification: Jouni's decision "Check line").
@@ -198,7 +199,7 @@ function NodesList({ session, showToast, onStats }) {
                         <${IndexList} steps>
                           ${steps.map((key) => html`<${IndexStep} key=${key}>${stepWords(t(key))}<//>`)}
                         <//>
-                        <${Action} tone="more" href="/docs/personal-node-setup-guide.md" newTab>${t('profile.nodes.setupDocs')} \u2192<//>
+                        <${Action} tone="more" href="https://github.com/miikkij/aimeat-protocol/blob/main/docs/personal-node-setup-guide.md" newTab>${t('profile.nodes.setupDocs')} \u2192<//>
                       <//>
                     `}
                   <//>

@@ -24,6 +24,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-10-11 — The missing-annotations error names the four hints instead of a plan file that is no
+ *     longer in the repository.
  *   2026-10-05 — TOOL_ANNOTATIONS is the catalog's: the hand-kept table is gone, and its notes sit beside
  *     the definitions they explain (secaudit 2026-10, M3).
  *   2026-10-05 — TOOL_ANNOTATIONS is each catalog entry's `annotations` plus the list here, which only
@@ -123,8 +125,8 @@ export function annotationsFor(name: string): ToolAnnotations {
     if (!annotations) {
         throw new Error(
             `Missing tool annotations for "${name}". Give its catalog entry \`annotations\` ` +
-            `(src/tool-catalog/definitions/) before registering the tool. ` +
-            `See docs/plans/2026-05-29-connectors-directory-submission.md section A.`,
+            `(src/tool-catalog/definitions/) before registering the tool: readOnlyHint, ` +
+            `destructiveHint, idempotentHint and openWorldHint, as the MCP specification defines them.`,
         );
     }
     return annotations;

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description .env / .json / .ini config-file generators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.1 — 2026-10-11 — The app-origin comment says what DNS and TLS it needs instead of naming a
+ *     file in the gitignored docs/internal folder, which no operator has.
  *   v1.3.0 — 2026-10-09 — A string value is written through utils/env-file.ts envLine, which refuses a
  *     quote or a line break instead of letting it start another variable (secrets audit 2026-10-09).
  *   v1.2.0 — 2026-09-28 — The "Install Set" .env section (AIMEAT_INSTALL_SET, AIMEAT_INSTALL_SET_SECRETS),
@@ -204,7 +206,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
     {
       title: 'App Origin Isolation (H-2)',
       vars: [
-        { key: 'AIMEAT_APP_ORIGIN_ENABLED', comment: 'Serve user apps from *.apps.<domain> to isolate them from your session. Requires DNS + wildcard TLS (see docs/internal/app-origin-deployment.md)' },
+        { key: 'AIMEAT_APP_ORIGIN_ENABLED', comment: 'Serve user apps from *.apps.<domain> to isolate them from your session. Requires a wildcard DNS record and a wildcard TLS certificate for *.apps.<domain>' },
         { key: 'AIMEAT_APP_HOST', comment: 'App origin host, e.g. apps.example.com (required when AIMEAT_APP_ORIGIN_ENABLED=true)' },
         { key: 'AIMEAT_PORTFOLIO_ORIGIN_ENABLED', comment: 'Serve published portfolios standalone at <username>.portfolio.<domain>. Requires DNS + wildcard TLS' },
         { key: 'AIMEAT_PORTFOLIO_HOST', comment: 'Portfolio origin host, e.g. portfolio.example.com (required when AIMEAT_PORTFOLIO_ORIGIN_ENABLED=true)' },

@@ -446,8 +446,8 @@ for completeness but are NOT needed for typical app building:
   (schedule / manual / event) drives the chain; each step names an agent + an offer and inherits
   that offer's signals + deliverable location. Connected agents use aimeat_workflow_save / _get /
   _run (signals-only = check vs memory, no dispatch; full = execute). Stored in owner memory
-  (workflows.def.* / workflows.run.*); API under /v1/workflows. Plan:
-  docs/plans/2026-06-13-agent-workflows-node-plan.md.
+  (workflows.def.* / workflows.run.*); API under /v1/workflows. Guide: the skills
+  set-up-content-pipeline and diagnose-a-workflow (aimeat_skill_get).
 - Skills registry: SKILL.md packs (Claude/CrewAI-compatible) in scoped registries — node
   (system library incl. seeded operator/user runbooks), user, workspace (rides workspace
   exports/templates), plus app-bound skills (frontmatter metadata.binding: app:{owner}/{file}).
@@ -455,21 +455,21 @@ for completeness but are NOT needed for typical app building:
   @{semver}) at agents.{name}.skills — resolved fresh at load. MCP: aimeat_skill_publish /
   _list (library|linked|mine|workspace|binding=) / _get / _link / _unlink. REST: /v1/skills,
   /v1/agents/{name}/skills, /v1/apps/{owner}/{file}/skills. Before driving a published app,
-  list its bound skills and apply them. Guide: docs/skills-registry.md.
+  list its bound skills and apply them. Guide: the skill use-app-bound-skills.
 - Organism workspaces: an organism can hold manifest-driven workspaces of markdown documents
   (a wiki) and schema-locked record lists, with a draft -> publish -> version flow. Connected
   agents use the aimeat_workspace_* MCP tools (list / read / write / publish / object_delete /
   access / transfer / update / create); the manifest lives at organism.{id}.w.{ws}.meta.manifest.
   Access is creator-managed: viewer (read) | contributor (read+write). Reading a workspace shows
   ALL its content. To build an agent that PROCESSES a workspace (reads requests -> writes results),
-  it carries a "contract" (inputs/outputs/lifecycle) — see the guide at
-  GET /v1/agents/me/handbook/appdev (Workspace contracts section), full text in
-  docs/agent-workspace-contracts.md. An organism can also state WHY it exists and HOW success is
+  it carries a "contract" (inputs/outputs/lifecycle) and is woken by the workspace.record
+  event — the full guide is the skill aimeat-workspace-contracts (aimeat_skill_get, or
+  GET /v1/skills/aimeat-workspace-contracts?scope=node). An organism can also state WHY it exists and HOW success is
   measured via an optional, domain-agnostic measurability convention — a manifest-level objectives[]
   with KPIs (kind value/cost/roi/outcome/quality; source can sum/count the organism's own records),
   objectType servesObjective, and a per-record _meta update note. Units are the domain's (€, viable
-  plots, confirmed hypotheses, closed deals); all optional. See "Recording purpose & value" in
-  docs/agent-workspace-contracts.md.
+  plots, confirmed hypotheses, closed deals); all optional. See section 11 of the skill
+  aimeat-workspace-contracts.
 - App store, Push notifications
 - Ask the operators: if you hit a platform bug, a blocker, or odd behaviour while working against
   this node (broken endpoint, silent failure, docs that lie), REPORT IT to `support@operators`.
@@ -1228,11 +1228,12 @@ When building apps, prefer the SDK libraries over raw `session.fetch()` calls.
 For AI-assisted features in your app (suggest tags, polish summaries, translate,
 quality checks, etc.) read the full guide before wiring anything up:
 
-- **App Developer AI Guide:** `docs/app-developer-ai-guide.md` — patterns, prompt
-  composition, error codes, spend safety, cookbook examples. The capability uses
-  the user's own OpenRouter key (configured once in their AIMEAT profile) so apps
-  never bundle their own; spend is bounded by a per-user daily USD budget and
-  optional per-app quota.
+- **The skill aimeat-ai-capabilities** (`aimeat_skill_get`, or
+  `GET /v1/skills/aimeat-ai-capabilities?scope=node`) — checking what is on,
+  every call of `AIMEAT.ai`, prompt composition, error codes, spend safety and
+  recipes. Calls run on the owner's own AI providers, so apps never bundle a
+  key; spend is bounded by the owner's daily USD budget and an optional per-app
+  quota.
 Load each library via `<script src="..."></script>`. All require `aimeat-auth.js` first.
 
 **AIMEAT.auth** (`/v1/libs/aimeat-auth.js`):
