@@ -20,7 +20,7 @@ build-app spec, built single-file AIMEAT apps, and **published them live over MC
 | `scripts/render-config.sh` | Fills the config template with your secrets and installs the skill into `~/.openhands/skills/`. |
 | `scripts/setup.sh` | One-shot: `.env` → connect → render → `up`. Idempotent. |
 
-## Quick start (on the Docker host — WSL2 in our setup)
+## Quick start (on the Docker host: any Linux machine, or WSL2 on Windows)
 
 ```bash
 cd tools/aimeat-openhands
