@@ -175,6 +175,54 @@ console.log('\n=== Agent ties: apps, the workplace, the first run, the build ins
         assert((list.body?.data?.tasks ?? []).length === 0, `tasks: ${(list.body?.data?.tasks ?? []).length}`);
     });
 
+    // ── 1b. The offer a new agent's definition carries ─────────────────────────
+    // The crew runtime publishes a definition's first offer when the agent starts, so the
+    // definition has to carry one. What is asserted here is the definition; the publish is the
+    // runtime's.
+    /** The definition inside a crew read, wherever the answer keeps it. */
+    const definitionOf = (data: any): any => {
+        const seen = new Set<any>();
+        const walk = (v: any): any => {
+            if (!v || typeof v !== 'object' || seen.has(v)) return null;
+            seen.add(v);
+            if (Array.isArray(v.agents) && Array.isArray(v.tasks)) return v;
+            for (const child of Object.values(v)) { const hit = walk(child); if (hit) return hit; }
+            return null;
+        };
+        return walk(data);
+    };
+    const RUNTIME_KEYS = ['id', 'title', 'ask', 'example', 'cost', 'latency', 'repeatability', 'verification', 'consequences'];
+
+    await test('a definition proposed with no offer is seeded with one made from the agent\'s name and purpose', async () => {
+        const crew = await json('/v1/agents/news/crew', { headers: authA });
+        assert(crew.status === 200, `crew ${crew.status}: ${JSON.stringify(crew.body?.error)}`);
+        const def = definitionOf(crew.body.data);
+        assert(def, `no definition in the answer: ${JSON.stringify(crew.body.data).slice(0, 300)}`);
+        assert(Array.isArray(def.offers) && def.offers.length === 1, `offers: ${JSON.stringify(def.offers)}`);
+        const offer = def.offers[0];
+        assert(offer.id === 'news' && offer.title === 'Morning news' && offer.ask === PURPOSE, JSON.stringify(offer));
+        for (const key of RUNTIME_KEYS) assert(key in offer, `the offer lacks ${key}, which the runtime reads`);
+        assert(offer.price === undefined && offer.visibility === undefined, `the offer carries a price or a visibility: ${JSON.stringify(offer)}`);
+    });
+
+    await test('an offer the proposer wrote is kept, and only its missing keys are added', async () => {
+        const p = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({
+                name: 'digester', display_name: 'Digester', purpose: PURPOSE, scopes: ['memory:read'],
+                crew_def: { ...DEF, offers: [{ id: 'daily-digest', title: 'A daily digest', ask: 'Give me a topic and I return what is new on it.' }] },
+            }),
+        });
+        assert(p.status === 201 || p.status === 200, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+        const ok = await approve(p.body.data.proposal.id, { first_run: false });
+        assert(ok.status === 200, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+        const crew = await json('/v1/agents/digester/crew', { headers: authA });
+        const offer = definitionOf(crew.body.data)?.offers?.[0];
+        assert(offer && offer.id === 'daily-digest' && offer.title === 'A daily digest', JSON.stringify(offer));
+        assert(offer.ask === 'Give me a topic and I return what is new on it.', `ask: ${offer.ask}`);
+        for (const key of RUNTIME_KEYS) assert(key in offer, `the offer lacks ${key}, which the runtime reads`);
+    });
+
     // ── 2. The tie between an app and an agent ─────────────────────────────────
     await publish(a, 'shows.html', 'Shows the news');
     await publish(a, 'digest.html', 'Digest');

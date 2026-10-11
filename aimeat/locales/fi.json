@@ -12888,7 +12888,9 @@
       "starting": "Käynnistetään…",
       "decline": "Hylkää",
       "cancel": "Peru",
-      "after": "Voit muuttaa agenttia tai poistaa sen milloin tahansa."
+      "after": "Voit muuttaa agenttia tai poistaa sen milloin tahansa.",
+      "offer": "Mitä se tarjoaa",
+      "offerHint": "Tämä näkyy sivullasi Pyydä agenteilta, kun agentti on käynnistynyt. Siinä ei ole hintaa, eikä se ole Exchangessa."
     },
     "agentPage": {
       "signInTitle": "Agenttisi",

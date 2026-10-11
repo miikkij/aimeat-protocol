@@ -23,6 +23,9 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.8.0 — 2026-10-11 — Approval seeds the definition with one offer in it
+ *     (services/agent-default-offer.ts): the proposer's own, completed, or one made from the
+ *     agent's name and purpose. The crew runtime publishes it when the agent starts.
  *   v1.7.0 — 2026-10-11 — Approval gives the new agent its work once (services/agent-first-run.ts)
  *     and answers with `first_run`; a body `first_run: false` asks for none.
  *   v1.6.0 — 2026-10-10 — Approval takes `install_id` (else the proposal's own), offers the agent to
@@ -59,6 +62,7 @@ import { findConnector, setWanted, clearWanted, type ConnectorView } from '../..
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { giveFirstRun } from '../../services/agent-first-run.js';
+import { withDefaultOffer } from '../../services/agent-default-offer.js';
 import { readerFor } from '../../services/classification/reader.js';
 import {
   proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
@@ -239,8 +243,14 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
         pipeline: 'rest.agent-proposal.seed',
       };
       const record = (await storage.getAgentsByOwner(owner)).find(a => a.name === proposal.name);
+      // The definition is seeded with one offer in it (services/agent-default-offer.ts): the crew
+      // runtime publishes a definition's first offer when the agent starts, which is what puts the
+      // agent on the owner's Offerings page. What the proposer wrote is kept and completed.
+      const definition = withDefaultOffer(proposal.crew_def as unknown as Record<string, unknown>, {
+        name: proposal.name, displayName: proposal.display_name, purpose: proposal.purpose,
+      });
       const seeded = record
-        ? await crewSeedAuthored({ storage, config }, seedCaller, record, proposal.crew_def as unknown as Record<string, unknown>)
+        ? await crewSeedAuthored({ storage, config }, seedCaller, record, definition)
         : { ok: false as const, code: 'RECORD_MISSING', message: 'the agent record could not be read back' };
 
       if (!seeded.ok && seeded.code !== 'ALREADY_DEFINED') {
