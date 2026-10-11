@@ -645,6 +645,24 @@ async function run() {
             `moving back changes nothing more: nobody asked for resident again, got ${JSON.stringify(back.body?.data)}`);
     });
 
+    await test('a definition that listens for direct messages with no reply tool is proposed with a warning, and one that can answer is not', async () => {
+        // Measured on aimeat.io on 2026-10-11: such an agent read its first message and sent nothing.
+        const deaf = await propose('hears-only', { crew_def: { ...DEF, listen_for: ['tasks', 'dms'] } });
+        assert(deaf.status === 201, `a warning refuses nothing: got ${deaf.status} ${JSON.stringify(deaf.body?.error)}`);
+        const codes = (deaf.body.data.proposal.warnings as any[]).map(w => w.code);
+        assert(codes.includes('DM_WITHOUT_REPLY_TOOL'), `the proposal says it cannot answer, got ${JSON.stringify(deaf.body.data.proposal.warnings)}`);
+        const able = await propose('hears-and-answers', {
+            crew_def: { ...DEF, listen_for: ['tasks', 'dms'], agents: [{ ...DEF.agents[0], tools: ['memory', 'dm'] }] },
+        });
+        assert(able.status === 201 && (able.body.data.proposal.warnings as any[]).length === 0,
+            `a member with the dm tool leaves nothing to warn about, got ${JSON.stringify(able.body?.data?.proposal?.warnings)}`);
+        const quiet = await propose('tasks-only', {});
+        assert((quiet.body.data.proposal.warnings as any[]).length === 0, 'a definition that listens for tasks only has no warning');
+        for (const p of [deaf, able, quiet]) {
+            await json(`/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/decline`, { method: 'POST', headers: authA, body: '{}' });
+        }
+    });
+
     await test('the agent list names the connector each agent is on, for the owner and the owner\'s agents only', async () => {
         const rows = (await json('/v1/agents?owner=' + a.owner, { headers: authA })).body.data.agents as any[];
         const at = (name: string) => rows.find(x => x.name === name)?.install_id;

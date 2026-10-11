@@ -9127,7 +9127,11 @@ paths:
             `scopes` carry the crew runtime's words (memory:read, memory:write) and `ai:use` when the
             owner's crews think through this node; its `run_mode_corrected` is set when the run mode
             asked for was changed to one the connector can run. `install_id` and `connector_name`
-            are set when the proposal named a connector.
+            are set when the proposal named a connector. Its `warnings` (each `{ code, message }`)
+            say what the definition would do that its author very likely did not intend; today one
+            code, `DM_WITHOUT_REPLY_TOOL`: the definition listens for `dms` and no member has the
+            `dm` tool, so the agent reads a direct message and cannot answer. A warning refuses
+            nothing.
           content:
             application/json:
               schema:
@@ -56663,6 +56667,9 @@ paths:
         the only way a crew definition should be written: a plain memory write of
         `crews.registry.<agent>` from any other principal is refused, because it would land in that
         principal's namespace where the tab and the runtime do not look.
+        The answer carries `warnings` (each `{ code, message }`, empty when there is nothing to
+        say), as the proposal does: `DM_WITHOUT_REPLY_TOOL` when the definition listens for `dms`
+        and no member has the `dm` tool. The seed and restore answers carry the same field.
       tags: [Agent Crew]
       security:
         - BearerAuth: []
