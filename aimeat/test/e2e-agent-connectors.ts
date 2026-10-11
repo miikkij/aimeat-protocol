@@ -489,6 +489,7 @@ async function run() {
         assert(late.connector?.id === LAPTOP && late.connector?.name === 'Kotikone' && late.connector?.online === false,
             `and with the machine it waits for, got ${JSON.stringify(late.connector)}`);
         assert(late.when === 'ask', `a task runner with no schedule works when asked, got ${late.when}`);
+        assert(late.hears_messages === false, `its definition wakes on tasks only, got ${JSON.stringify(late.hears_messages)}`);
         const settled = workers.find(w => w.name === 'laptop-watcher');
         assert(!!settled && settled.has_key === true && settled.connector?.id === LAPTOP,
             `laptop-watcher holds a key on the laptop, got ${JSON.stringify(settled)}`);
@@ -508,6 +509,16 @@ async function run() {
         assert(names.length === 1 && names[0] === 'late-watcher', `exactly that agent, got ${JSON.stringify(names)}`);
         const none = await homeAgents(authA, '?agent=no-such-agent');
         assert(none.status === 200 && (none.body.data.workers as any[]).length === 0, 'an unknown name answers with no worker');
+    });
+
+    await test('an agent whose definition wakes on messages reads as one a person can talk to', async () => {
+        const p = await propose('chat-watcher', { connector: SERVER, crew_def: { ...DEF, listen_for: ['tasks', 'messages'] } });
+        assert(p.status === 201 || p.status === 200, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+        const r = await approve(p.body.data.proposal.id);
+        assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const one = await homeAgents(authA, '?agent=chat-watcher');
+        const w = (one.body.data.workers as any[])[0];
+        assert(w?.hears_messages === true && w?.when === 'talk', `it hears messages and works when written to, got ${JSON.stringify({ hears: w?.hears_messages, when: w?.when })}`);
     });
 
     await test('the home\'s agents are the owner\'s in person, and never another account\'s', async () => {
@@ -643,6 +654,24 @@ async function run() {
         const back = await move(authA, 'stay-up', ALWAYS);
         assert(back.status === 200 && back.body.data.run_mode === 'spawn' && back.body.data.run_mode_corrected === null,
             `moving back changes nothing more: nobody asked for resident again, got ${JSON.stringify(back.body?.data)}`);
+    });
+
+    await test('a definition that listens for direct messages with no reply tool is proposed with a warning, and one that can answer is not', async () => {
+        // Measured on aimeat.io on 2026-10-11: such an agent read its first message and sent nothing.
+        const deaf = await propose('hears-only', { crew_def: { ...DEF, listen_for: ['tasks', 'dms'] } });
+        assert(deaf.status === 201, `a warning refuses nothing: got ${deaf.status} ${JSON.stringify(deaf.body?.error)}`);
+        const codes = (deaf.body.data.proposal.warnings as any[]).map(w => w.code);
+        assert(codes.includes('DM_WITHOUT_REPLY_TOOL'), `the proposal says it cannot answer, got ${JSON.stringify(deaf.body.data.proposal.warnings)}`);
+        const able = await propose('hears-and-answers', {
+            crew_def: { ...DEF, listen_for: ['tasks', 'dms'], agents: [{ ...DEF.agents[0], tools: ['memory', 'dm'] }] },
+        });
+        assert(able.status === 201 && (able.body.data.proposal.warnings as any[]).length === 0,
+            `a member with the dm tool leaves nothing to warn about, got ${JSON.stringify(able.body?.data?.proposal?.warnings)}`);
+        const quiet = await propose('tasks-only', {});
+        assert((quiet.body.data.proposal.warnings as any[]).length === 0, 'a definition that listens for tasks only has no warning');
+        for (const p of [deaf, able, quiet]) {
+            await json(`/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/decline`, { method: 'POST', headers: authA, body: '{}' });
+        }
     });
 
     await test('the agent list names the connector each agent is on, for the owner and the owner\'s agents only', async () => {

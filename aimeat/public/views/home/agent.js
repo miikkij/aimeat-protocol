@@ -13,10 +13,18 @@
  *   machine is away and the work waits. The move itself is POST /v1/agents/v2/agents/:name/move,
  *   which the owner makes in person.
  *
+ *   TALKING TO IT is the conversation the agent's Messages tab in Settings & Controls holds
+ *   (views/profile/agents/tab-messages.js), drawn here as it is there: one conversation, two
+ *   places to reach it. It is shown unless the agent's definition says it does not wake on a
+ *   message, because a message nobody reads is a promise the page cannot keep; then the page says
+ *   so and the task field is the way to give it work.
+ *
  *   Composed from library components only; it has no sheet of its own.
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
+ *   v1.1.0 — 2026-10-10 — "Talk to it": the agent's conversation, from its Messages tab.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import { h } from 'preact';
@@ -46,6 +54,7 @@ import { LineList } from '/components/LineList.js';
 import { listTasks, createTask } from '/js/services/agent-tasks.js';
 import { readHomeAgents, moveAgent } from '/js/services/agent-draft.js';
 import { machineName, whenWords, stateWords } from '/views/home/agents-band.js';
+import TabMessages from '/views/profile/agents/tab-messages.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const p = (key, fallback) => tr('home.agentPage.' + key, fallback);
@@ -154,27 +163,27 @@ export default function AgentView({ navigate }) {
       setMoving(false);
       setTarget('');
       const where = out?.waiting_for_connector
-        ? p('movedWaiting', 'It now waits for that machine, and starts when the machine connects.')
-        : p('moved', 'It runs on that machine now.');
+        ? p('movedWaiting', 'It now waits for that computer, and starts when the computer connects.')
+        : p('moved', 'It runs on that computer now.');
       // The node changes an always-on agent to one started per job when its new machine keeps none running.
       setSaid({ ok: true, at: 'move', text: out?.run_mode_corrected
-        ? `${where} ${p('movedSpawn', 'That machine starts an agent when work arrives, so this agent is no longer always on.')}`
+        ? `${where} ${p('movedSpawn', 'That computer starts an agent when work arrives, so this agent is no longer always on.')}`
         : where });
       await load();
     } catch (err) { setSaid({ ok: false, at: 'move', text: err?.message || String(err) }); }
     finally { setBusy(false); }
   };
 
-  const startedNote = startedAs === 'running' ? p('startedRunning', 'Started. It has its instructions and its machine has taken it on.')
-    : startedAs === 'waiting' ? p('startedWaiting', 'Made. It starts when its machine connects, with nothing for you to press.')
-    : startedAs === 'made' ? p('startedMade', 'Made, but its machine did not take it on. Open all its settings to see why.')
+  const startedNote = startedAs === 'running' ? p('startedRunning', 'Started. It has its instructions and its computer has taken it on.')
+    : startedAs === 'waiting' ? p('startedWaiting', 'Made. It starts when its computer connects, with nothing for you to press.')
+    : startedAs === 'made' ? p('startedMade', 'Made, but its computer did not take it on. Open all its settings to see why.')
     : '';
 
   const where = worker.connector
     ? html`${machineName(worker.connector)} <${Mark} kind="status" tone=${worker.connector.online ? 'fine' : 'attention'}>
         ${worker.connector.online ? tr('home.agents.connected', 'Connected') : p('notConnected', 'Not connected')}
       <//>`
-    : p('noMachineYet', 'No machine has taken it on yet.');
+    : p('noMachineYet', 'No computer has taken it on yet.');
 
   return html`
     <${PageFrame} width="narrow">
@@ -190,7 +199,7 @@ export default function AgentView({ navigate }) {
         { k: p('when', 'When it works'), v: whenWords(worker) },
         { k: p('where', 'Where it runs'), v: where,
           action: others.length > 0 && !moving
-            ? html`<${Action} small onClick=${() => { setMoving(true); setTarget(others[0].id); }}>${p('move', 'Move to another machine')}<//>`
+            ? html`<${Action} small onClick=${() => { setMoving(true); setTarget(others[0].id); }}>${p('move', 'Move to another computer')}<//>`
             : undefined },
         { k: p('reach', 'What it reaches'), v: areaLine(record.default_scopes ?? [], t) },
       ]} />
@@ -204,7 +213,7 @@ export default function AgentView({ navigate }) {
               value: c.id, label: machineName(c),
               hint: c.online ? tr('home.agentNew.machineOn', 'Connected.') : p('moveOff', 'Not connected. Only an agent that still waits can be sent here.'),
             }))} />
-          <${Note} kind="quiet">${p('moveNote', 'The agent gets a new key on the new machine, and the old machine can no longer act as it. Its instructions, permissions and schedules stay as they are.')}<//>
+          <${Note} kind="quiet">${p('moveNote', 'The agent gets a new key on the new computer, and the old computer can no longer act as it. Its instructions, permissions and schedules stay as they are.')}<//>
           <${FormActions}>
             <${Loud} control disabled=${busy || !target} onClick=${move}>${busy ? p('movingNow', 'Moving…') : p('moveDo', 'Move the agent')}<//>
             <${Action} disabled=${busy} onClick=${() => setMoving(false)}>${tr('home.agentNew.cancel', 'Cancel')}<//>
@@ -220,6 +229,15 @@ export default function AgentView({ navigate }) {
           <${Loud} control disabled=${busy || !ask.trim()} onClick=${give}>${busy ? p('giving', 'Sending…') : p('give', 'Give the task')}<//>
         <//>
       <//>
+
+      <${SubHeading} level=${2}>${p('talkTitle', 'Talk to it')}<//>
+      ${worker.hears_messages === false
+        ? html`<${Note} kind="quiet">${p('talkDeaf', 'This agent does not read messages. It starts work from a task: give it one above.')}<//>`
+        : html`
+          ${!worker.has_key && html`<${Note} kind="quiet">${p('talkWaits', 'It reads your message when its computer has taken it on.')}<//>`}
+          ${said?.at === 'talk' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+          <${TabMessages} agent=${record} agentName=${name}
+            showToast=${(text, isError) => setSaid({ ok: !isError, at: 'talk', text })} />`}
 
       <${SubHeading} level=${2}>${p('latestTitle', 'Latest work')}<//>
       ${(tasks ?? []).length === 0

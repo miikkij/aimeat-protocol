@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.24.0 -- 2026-10-10 -- add-a-crew-agent: which machine. aimeat_connector_list names the owner's
  *     connectors, the proposal's `connector` orders the agent to one, and it waits for that one.
  *   v1.23.8 -- 2026-10-08 -- set-up-content-pipeline names an extension step's input_from (and the
@@ -400,20 +401,22 @@ not a product they do not use.
    workspace each morning and lists what to act on"), \`scopes\`, \`mode\`, \`run_mode\` and the
    \`crew_def\`. The definition is checked before the proposal is written, so a broken one is
    refused now. Nothing is created. One line appears on the owner's open items.
-   **Which machine.** A person can have more than one connector: their own computer, a server, the
-   one that comes with a hosted AIMEAT. When they say where the agent is to run, or they have more
-   than one, \`aimeat_connector_list\` gives each machine's name and whether it is connected; pass
-   the name or the id as \`connector\`. The agent is then offered to that machine only. With one
-   connector there is nothing to choose, and \`connector\` is left out.
+   **Which computer.** A person can have more than one connector: their own laptop or computer, a
+   server, a computer in the cloud, the one that comes with an AIMEAT instance from the store. To
+   the person each one is a computer: say that word and its name, never "machine" or "connector".
+   When they say where the agent is to run, or they have more than one,
+   \`aimeat_connector_list\` gives each computer's name and whether it is connected; pass the name
+   or the id as \`connector\`. The agent is then offered to that computer only. With one connector
+   there is nothing to choose, and \`connector\` is left out.
 4. **Tell the owner where to approve.** The answer carries \`approval_url\`, the page where the
    proposal waits, and \`next_step\`, a sentence written for them. Give them both in their own
    words. Their one press there creates the agent, gives it the definition and hands it to their
-   connector, which runs it on their own machine (\`aimeat connect serve\`). The approval's answer
+   connector, which runs it on their own computer (\`aimeat connect serve\`). The approval's answer
    says which state it ended in. If no connector was connected (\`waiting_for_connector\` true), the
    agent exists with its instructions and waits: when the owner's connector next connects, the node
    gives it its key and the connector starts it, with nothing to press. An agent proposed or
    approved for one named connector waits for that connector (the answer's \`connector\` names it),
-   and another machine of the owner's connecting is not given it. If a connector was reached
+   and another computer of the owner's connecting is not given it. If a connector was reached
    and did not take it on, the owner updates the connector and presses Attach.
 5. **Work on a clock comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
    agent (\`aimeat_schedule_create\`), made once the agent exists. Say so when you propose it.

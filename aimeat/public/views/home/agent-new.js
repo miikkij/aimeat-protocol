@@ -22,6 +22,7 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import { h } from 'preact';
@@ -277,7 +278,7 @@ export default function AgentNewView({ navigate }) {
       value: 'always', label: tr('home.agents.when.always', 'Always on'), disabled: !residentHere,
       hint: residentHere
         ? n('whenAlwaysHint', 'It stays running the whole time. For an agent that follows something without a break.')
-        : n('whenAlwaysOff', 'This machine starts an agent when work arrives and does not keep one running.'),
+        : n('whenAlwaysOff', 'This computer starts an agent when work arrives and does not keep one running.'),
     },
   ];
   // A proposal's schedule is not part of the proposal, so its time cannot be read; every other
@@ -319,21 +320,21 @@ export default function AgentNewView({ navigate }) {
               options=${[['readonly', n('reachRead', 'Reads only')], ['standard', n('reachWrite', 'Reads and writes')]]} />`}
 
         ${machines.length > 1 && html`
-          <${Choice} boxed cols=${2} label=${n('machine', 'On which machine')} value=${machine} onChange=${setMachine}
+          <${Choice} boxed cols=${2} label=${n('machine', 'On which computer')} value=${machine} onChange=${setMachine}
             options=${machines.map((c) => ({
               value: c.id, label: machineName(c),
-              hint: c.online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this machine comes back.'),
+              hint: c.online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this computer comes back.'),
             }))} />`}
         ${machines.length === 1 && html`
           <${Facts} wide rows=${[{
-            k: n('machine', 'On which machine'), v: machineName(machines[0]),
-            sub: machines[0].online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this machine comes back.'),
+            k: n('machine', 'On which computer'), v: machineName(machines[0]),
+            sub: machines[0].online ? n('machineOn', 'Connected.') : n('machineOff', 'Not connected. The agent is made now and starts when this computer comes back.'),
           }]} />`}
         ${machines.length === 0 && html`
           <${Note} kind="aside" size="small">
-            <b>${tr('home.agents.noMachineTitle', 'An agent needs a machine to run on. You have no machine yet.')}</b>
-            ${' '}${n('noMachine', 'You can start it now: it is made, and it begins working when a machine is connected.')}
-            ${' '}<${Action} tone="more" href="/v1/home?machines=1">${tr('home.agents.noMachineDoor', 'Add a machine →')}<//>
+            <b>${tr('home.agents.noMachineTitle', 'An agent needs a computer to run on. You have none yet.')}</b>
+            ${' '}${n('noMachine', 'You can start it now: it is made, and it begins working when a computer is connected.')}
+            ${' '}<${Action} tone="more" href="/v1/home?computers=1">${tr('home.agents.noMachineDoor', 'Add a computer →')}<//>
           <//>`}
 
         ${problem && html`<${Note} kind="message" error>${problem}<//>`}

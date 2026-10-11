@@ -21,6 +21,7 @@
  * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · stateWords(worker)
  * @usage html`<${AgentsBand} data=${homeAgents} navigate=${ctx.navigate} />`
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import { h } from 'preact';
@@ -42,7 +43,7 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 
 /** A machine's name as a person reads it; one nobody named says so. */
 export function machineName(connector) {
-  return connector?.name || tr('home.agents.unnamedMachine', 'Unnamed machine');
+  return connector?.name || tr('home.agents.unnamedMachine', 'Unnamed computer');
 }
 
 /** When an agent works, in the words the proposal page offers. */
@@ -62,7 +63,7 @@ export function stateWords(worker) {
   if (!worker.has_key) {
     const waits = worker.connector
       ? tr('home.agents.state.waitsFor', 'waits for {machine}').replace('{machine}', machineName(worker.connector))
-      : tr('home.agents.state.waits', 'waits for a machine');
+      : tr('home.agents.state.waits', 'waits for a computer');
     return worker.queued > 0
       ? `${waits}, ${tr('home.agents.state.queued', '{n} tasks queued').replace('{n}', String(worker.queued))}`
       : waits;
@@ -147,7 +148,7 @@ export function AgentsBand({ data, navigate }) {
         <//>`}
 
       ${machines.length > 0 && html`
-        <${NamedRow} label=${tr('home.agents.machinesLabel', 'Machines')}>
+        <${NamedRow} label=${tr('home.agents.machinesLabel', 'Computers')}>
           <${Marks}>
             ${machines.map((c) => html`
               <${Mark} key=${c.id} live=${c.online} tone=${c.online ? undefined : 'dim'}
@@ -155,16 +156,16 @@ export function AgentsBand({ data, navigate }) {
                 ${machineName(c)}
               <//>`)}
           <//>
-          <${Action} tone="more" href="/v1/home?machines=1">
-            ${tr('home.agents.machinesDoor', 'Machines and what they can do →')}
+          <${Action} tone="more" href="/v1/home?computers=1">
+            ${tr('home.agents.machinesDoor', 'Computers and what they can do →')}
           <//>
         <//>`}
 
       ${machines.length === 0 && html`
         <${Note} kind="aside" size="small">
-          <b>${tr('home.agents.noMachineTitle', 'An agent needs a machine to run on. You have no machine yet.')}</b>
-          ${' '}${tr('home.agents.noMachineText', 'You can describe the agent now. It starts as soon as a machine is connected.')}
-          ${' '}<${Action} tone="more" href="/v1/home?machines=1">${tr('home.agents.noMachineDoor', 'Add a machine →')}<//>
+          <b>${tr('home.agents.noMachineTitle', 'An agent needs a computer to run on. You have none yet.')}</b>
+          ${' '}${tr('home.agents.noMachineText', 'You can describe the agent now. It starts as soon as a computer is connected.')}
+          ${' '}<${Action} tone="more" href="/v1/home?computers=1">${tr('home.agents.noMachineDoor', 'Add a computer →')}<//>
         <//>`}
     <//>`;
 }

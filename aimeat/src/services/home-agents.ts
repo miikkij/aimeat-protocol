@@ -24,6 +24,7 @@
  * @structure HomeWorker · HomeAgentsView · readHomeAgents(deps, owner, limit, only?)
  * @usage const view = await readHomeAgents({ config, storage }, owner, 5);
  * @version-history
+ *   v1.1.0 — 2026-10-10 — `hears_messages` on a worker, for the agent page's conversation.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import type { AimeatConfig } from '../config.js';
@@ -41,6 +42,12 @@ export interface HomeWorker {
   display_name: string;
   description: string;
   when: WorksWhen;
+  /**
+   * Whether its crew definition wakes on a message or a DM: true or false when the definition was
+   * read, null when it was not read (the list skips it for a clock or resident agent) or the agent
+   * has no definition on this node.
+   */
+  hears_messages: boolean | null;
   /** The schedule that makes it `clock`: its cron and the zone the cron's hour belongs to. */
   schedule: { id: string; cron: string; timezone: string; next_run_at: string | null } | null;
   /** The machine it lives on, or the one it waits for; null when the node does not know. */
@@ -116,15 +123,23 @@ export async function readHomeAgents(
   for (const a of shown) {
     const job = jobs.find(j => j.enabled && j.type === 'agent_task' && (j.agentGaii === a.gaii || j.agentName === a.name));
     let when: WorksWhen = 'ask';
+    // The definition is one memory read per agent, so the list reads it only where `when` turns
+    // on it; the page of one agent reads it always, to know whether a message would be heard.
+    let hears: boolean | null = null;
+    if (only || (a.runMode !== 'resident' && !job)) {
+      const doc = (await readCrewState(storage, a)).published?.doc;
+      hears = doc ? listensToPeople(doc) : null;
+    }
     if (a.runMode === 'resident') when = 'always';
     else if (job) when = 'clock';
-    else if (listensToPeople((await readCrewState(storage, a)).published?.doc)) when = 'talk';
+    else if (hears) when = 'talk';
     const c = counts[a.gaii];
     workers.push({
       name: a.name,
       display_name: a.displayName ?? a.name,
       description: a.description ?? '',
       when,
+      hears_messages: hears,
       schedule: job ? { id: job.id, cron: job.cron, timezone: job.timezone || zone, next_run_at: job.nextRunAt ?? null } : null,
       connector: connectorOf(a.name),
       has_key: !waits(a),
