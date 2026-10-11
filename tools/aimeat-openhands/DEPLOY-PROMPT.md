@@ -16,7 +16,7 @@ Pick the case that matches this machine, then copy the bundle into `~/aimeat-ope
 secrets/config live off any shared mount:
 
 ```bash
-# CASE A — repo already checked out here. Set REPO to its path on this host:
+# CASE A: repo already checked out here. Set REPO to its path on this host:
 REPO=<path-to-your-aimeat-protocol-checkout>
 git -C "$REPO" pull --ff-only 2>/dev/null || true
 
