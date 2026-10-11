@@ -97,6 +97,8 @@ await test('default node: a 10-morsel use burns at least 1, the operator takes i
   assert(await balance(buyer.token) === before - 10, 'the buyer pays the 10 morsels');
   const b = await rows(buyer.token, p.trackingCode);
   assert(sumOf(b, 'pacing_charge') + sumOf(b, 'pacing_burn') === -10 && sumOf(b, 'pacing_burn') <= -1, `buyer rows: ${JSON.stringify(b)}`);
+  // The buyer paid in person: no row names an initiator, which a wallet would show as "your agent …".
+  assert(b.every(x => !x.initiator_gaii && !x.initiatorGaii), `no initiator on an in-person use: ${JSON.stringify(b)}`);
   assert(sumOf(await rows(seller.token, p.trackingCode), 'pacing_earn') === p.providerEarned, 'the provider row');
 });
 
