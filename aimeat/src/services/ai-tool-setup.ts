@@ -17,21 +17,39 @@
  *   a reader can check rather than trust, and so the page degrades honestly when a vendor moves
  *   their UI.
  *
- *   Sources, all verified 2026-07-31 (MODEL_RECOMMENDATION.reviewedOn is this date; move both together):
- *   - Claude connectors https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp
+ *   Sources. The menu paths and plans marked 2026-10-11 were checked on that day against the vendor's
+ *   own pages; the rest were verified 2026-07-31 (MODEL_RECOMMENDATION.reviewedOn is the date the
+ *   model names were checked, and moves only when they are):
+ *   - Claude connectors (2026-10-11) https://claude.com/docs/connectors/custom/add-unlisted and
+ *     https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp
  *   - Claude personalization https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features
  *   - Claude Code MCP https://code.claude.com/docs/en/mcp
- *   - ChatGPT developer mode https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
- *   - Codex MCP https://developers.openai.com/codex/mcp
- *   - Cursor MCP https://cursor.com/docs/mcp
+ *   - ChatGPT (2026-10-11) https://developers.openai.com/api/docs/guides/custom-mcp-server and
+ *     https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt
+ *   - Codex MCP (2026-10-11) https://developers.openai.com/codex/mcp
+ *   - Cursor MCP (2026-10-11) https://cursor.com/docs/mcp and https://cursor.com/pricing
  *   - VS Code MCP https://code.visualstudio.com/docs/agent-customization/mcp-servers
  *   - Grok connectors https://docs.x.ai/grok/connectors
+ *   - Mistral (2026-10-11) https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors
+ *   - LM Studio (2026-10-11) https://lmstudio.ai/docs/app/mcp and https://lmstudio.ai/changelog/lmstudio-v0.4.10
+ *   - Gemini CLI (2026-10-11) https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md
+ *   - Perplexity (2026-10-11) https://www.perplexity.ai/help-center/en/articles/13915507-adding-custom-remote-connectors
+ *   - OpenClaw (2026-10-11) https://docs.openclaw.ai/cli/mcp/transports
+ *   - Copilot Studio (2026-10-11) https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent
  * @structure buildAiToolSetup(config, { lang }) -> AiTool[] (strings already localized, URLs
- *   already resolved against this node's base URL)
- *   AI_CLIENT_ALIASES / resolveAiClient() / decideBranch() / aiClientQuestionOptions() — the
- *   remake's branch decision, kept beside the list it reads rather than in the calling code.
+ *   already resolved against this node's base URL). The branch decision that reads this list
+ *   (aliases, resolveAiClient, decideBranch, the question options) is in ai-tool-branch.ts.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.8.0 — 2026-10-11 — One table: docs/aiplatforms/ is gone, and its checked facts are here.
+ *     New tools: Mistral (Le Chat, now Vibe), LM Studio, Gemini CLI, Perplexity, OpenClaw and Copilot
+ *     Studio. Corrected against each vendor's own documentation on 2026-10-11: claude.ai and Claude
+ *     Desktop add a connector under Customize > Connectors, and the dialog may ask for an OAuth client
+ *     choice; ChatGPT adds a custom MCP server from chatgpt.com/plugins (or Settings > Apps > Advanced
+ *     settings > Developer mode on Business, Enterprise and Edu), with read and write tools on
+ *     Business, Enterprise and Edu and read-only tools on Pro; Cursor's MCP is on its paid plans and
+ *     it takes SSE as well; Codex signs in with `codex mcp login`. The vendor addresses are listed
+ *     above. The branch decision moved unchanged to ai-tool-branch.ts (max-file-lines).
  *   v1.7.0 — 2026-09-29 — `mcp.install.app` on Claude Code, Cursor and VS Code: the desktop app,
  *     which attaches those three in one click with no terminal and no file. The offer and its
  *     fixed download addresses live in services/desktop-app-offer.ts.
@@ -143,10 +161,10 @@ export interface AiTool {
     };
 }
 
-type Lang = 'en' | 'fi';
-const lang = (v?: string): Lang => (v === 'fi' ? 'fi' : 'en');
+export type Lang = 'en' | 'fi';
+export const lang = (v?: string): Lang => (v === 'fi' ? 'fi' : 'en');
 /** Pick one of the two languages. Written as a helper so every string below reads as a pair. */
-const s = (l: Lang, en: string, fi: string) => (l === 'fi' ? fi : en);
+export const s = (l: Lang, en: string, fi: string) => (l === 'fi' ? fi : en);
 
 export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } = {}): AiTool[] {
     const l = lang(opts.lang);
@@ -211,8 +229,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
     const oauthParam = (): AiToolParam => ({
         label: 'Advanced settings: OAuth Client ID / Client Secret',
         value: '',
-        note: s(l, 'Leave both empty. This node registers the client automatically (RFC 7591), so there is nothing to paste.',
-            'Jätä molemmat tyhjiksi. Tämä node rekisteröi asiakkaan automaattisesti (RFC 7591), joten liitettävää ei ole.'),
+        note: s(l, 'Leave both empty. This node registers the client automatically (RFC 7591), so there is nothing to paste. If the dialog asks instead which OAuth client to use, keep the default (Use Claude’s published identity) or choose Register automatically: both work here.',
+            'Jätä molemmat tyhjiksi. Tämä node rekisteröi asiakkaan automaattisesti (RFC 7591), joten liitettävää ei ole. Jos ikkuna kysyy sen sijaan, mitä OAuth-asiakasta käytetään, pidä oletus (Use Claude’s published identity) tai valitse Register automatically: kumpikin toimii tässä.'),
     });
 
     return [
@@ -226,9 +244,9 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
             mcp: {
                 docs: 'https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp',
                 steps: [
-                    s(l, 'Open claude.ai and go to Settings, then Connectors. On Pro and Max the path is Customize > Connectors.',
-                        'Avaa claude.ai, mene kohtaan Settings ja sieltä Connectors. Pro- ja Max-tasoilla polku on Customize > Connectors.'),
-                    s(l, 'Click + and then Add custom connector.', 'Klikkaa + ja sitten Add custom connector.'),
+                    s(l, 'Open claude.ai and go to Customize, then Connectors.',
+                        'Avaa claude.ai ja mene kohtaan Customize ja sieltä Connectors.'),
+                    s(l, 'Click Add custom connector.', 'Klikkaa Add custom connector.'),
                     s(l, 'Fill the fields with the values below and click Add.',
                         'Täytä kentät alla olevilla arvoilla ja klikkaa Add.'),
                     s(l, 'Sign in to this node in the tab that opens, with your own account.',
@@ -236,8 +254,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     s(l, 'Start a NEW conversation.', 'Aloita UUSI keskustelu.'),
                 ],
                 params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
-                plans: s(l, 'Free, Pro, Max, Team and Enterprise. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot.',
-                    'Free, Pro, Max, Team ja Enterprise. Team- ja Enterprise-tileillä omistaja lisää sen kohdassa Organization settings > Connectors > Add > Custom > Web, ja ennen sitä sinä et voi.'),
+                plans: s(l, 'Free, Pro, Max, Team and Enterprise. A free account can hold one custom connector, which is enough for this. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot. This server must be reachable from the public internet.',
+                    'Free, Pro, Max, Team ja Enterprise. Ilmaisella tilillä voi olla yksi oma konnektori, mikä riittää tähän. Team- ja Enterprise-tileillä omistaja lisää sen kohdassa Organization settings > Connectors > Add > Custom > Web, ja ennen sitä sinä et voi. Tämän palvelimen pitää olla saavutettavissa julkisesta internetistä.'),
                 note: s(l, `Pick ${MODEL.claude} or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.`,
                     `Valitse mallivalikosta ${MODEL.claude} tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.`),
             },
@@ -253,9 +271,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
             mcp: {
                 docs: 'https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp',
                 steps: [
-                    s(l, 'Open Claude Desktop, click your initials in the bottom left, and choose Settings.',
-                        'Avaa Claude Desktop, klikkaa nimikirjaimiasi vasemmasta alakulmasta ja valitse Settings.'),
-                    s(l, 'Open Connectors.', 'Avaa Connectors.'),
+                    s(l, 'Open Claude Desktop and go to Customize, then Connectors.',
+                        'Avaa Claude Desktop ja mene kohtaan Customize ja sieltä Connectors.'),
                     s(l, 'Click Add custom connector.', 'Klikkaa Add custom connector.'),
                     s(l, 'Fill the fields with the values below and click Add.',
                         'Täytä kentät alla olevilla arvoilla ja klikkaa Add.'),
@@ -322,29 +339,33 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
             id: 'chatgpt',
             label: 'ChatGPT',
             mcp: {
-                docs: 'https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt',
+                docs: 'https://developers.openai.com/api/docs/guides/custom-mcp-server',
                 steps: [
                     s(l, 'Open ChatGPT in a browser. The desktop and mobile apps cannot do this.',
                         'Avaa ChatGPT selaimessa. Työpöytä- ja mobiilisovellukset eivät tähän pysty.'),
-                    s(l, 'Settings > Security and login: turn Developer mode on. In a workspace the switch is under Workspace settings > Permissions & Roles.',
-                        'Settings > Security and login: kytke Developer mode päälle. Työtilassa kytkin on kohdassa Workspace settings > Permissions & Roles.'),
-                    s(l, 'Open the connector list and create a new developer-mode app.',
-                        'Avaa konnektorilista ja luo uusi developer-mode-sovellus.'),
-                    s(l, 'Fill the fields with the values below. The URL must end in /v1/mcp; without the path it will not connect.',
-                        'Täytä kentät alla olevilla arvoilla. Osoitteen pitää päättyä /v1/mcp; ilman polkua se ei yhdistä.'),
-                    s(l, 'Complete the sign-in, then start a new conversation and enable the connector in it.',
-                        'Vie kirjautuminen loppuun, aloita sitten uusi keskustelu ja ota konnektori siinä käyttöön.'),
+                    s(l, 'Go to chatgpt.com/plugins, click + and choose Add custom MCP server. On Business, Enterprise and Edu the way in can also be Settings > Apps > Advanced settings: turn Developer mode on, then Apps > Create.',
+                        'Mene osoitteeseen chatgpt.com/plugins, klikkaa + ja valitse Add custom MCP server. Business-, Enterprise- ja Edu-tileillä reitti voi olla myös Settings > Apps > Advanced settings: kytke Developer mode päälle ja valitse sitten Apps > Create.'),
+                    s(l, 'Fill the fields with the values below and choose OAuth as the authentication. The URL must end in /v1/mcp; without the path it will not connect.',
+                        'Täytä kentät alla olevilla arvoilla ja valitse tunnistautumiseksi OAuth. Osoitteen pitää päättyä /v1/mcp; ilman polkua se ei yhdistä.'),
+                    s(l, 'Confirm with I understand and want to continue, then Create as a plugin, and complete the sign-in.',
+                        'Vahvista valinnalla I understand and want to continue, valitse sitten Create as a plugin ja vie kirjautuminen loppuun.'),
+                    s(l, 'Start a new conversation and call it with @AIMEAT.',
+                        'Aloita uusi keskustelu ja kutsu se kirjoittamalla @AIMEAT.'),
                 ],
                 params: [
                     { label: 'Name', value: 'AIMEAT' },
-                    { label: 'Description', value: s(l, 'My AIMEAT node: memory, organisms, tasks', 'Oma AIMEAT-node: muisti, organismit, tehtävät') },
-                    { label: 'MCP server URL', value: mcpUrl },
+                    { label: 'Server URL', value: mcpUrl },
+                    {
+                        label: 'Authentication', value: 'OAuth',
+                        note: s(l, 'This node registers the client itself (RFC 7591), so there is no client ID or secret to paste.',
+                            'Tämä node rekisteröi asiakkaan itse (RFC 7591), joten asiakastunnusta tai salaisuutta ei tarvitse liittää.'),
+                    },
                 ],
                 capability: 'plan-dependent',
-                plans: s(l, 'Plus, Pro, Business, Enterprise and Education. Not on the free tier, and not in the apps: browser only.',
-                    'Plus, Pro, Business, Enterprise ja Education. Ei ilmaisella tasolla eikä sovelluksissa: vain selaimessa.'),
-                warn: s(l, 'OpenAI marks developer mode as being for people who understand the risk: it grants both read and write tools. Their own warning is worth reading before you switch it on.',
-                    'OpenAI merkitsee developer moden niille jotka ymmärtävät riskin: se antaa sekä luku- että kirjoitustyökalut. Heidän oma varoituksensa kannattaa lukea ennen kuin kytket sen päälle.'),
+                plans: s(l, 'Business, Enterprise and Edu: read and write tools (OpenAI calls it a beta). Pro: tools that only read. OpenAI’s pages do not say whether Plus or the free tier can add one. Browser only, not in the apps.',
+                    'Business, Enterprise ja Edu: luku- ja kirjoitustyökalut (OpenAI kutsuu sitä betaksi). Pro: vain lukevat työkalut. OpenAI:n sivut eivät kerro, voiko Plus- tai ilmaisella tasolla lisätä palvelimen. Vain selaimessa, ei sovelluksissa.'),
+                warn: s(l, 'OpenAI marks a custom MCP server as being for people who understand the risk: a server can carry tools that write as well as read. Their own warning is worth reading before you confirm it.',
+                    'OpenAI merkitsee oman MCP-palvelimen niille, jotka ymmärtävät riskin: palvelimella voi olla myös kirjoittavia työkaluja. Heidän oma varoituksensa kannattaa lukea ennen kuin vahvistat sen.'),
                 note: s(l, `Use ${MODEL.chatgpt} with thinking enabled. A strong model makes the setup and the first conversations go right the first time.`,
                     `Käytä mallia ${MODEL.chatgpt} ajattelu päällä. Vahva malli vie kytkennän ja ensimmäiset keskustelut kerralla oikein.`),
             },
@@ -361,6 +382,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 steps: [
                     s(l, 'Run the command below in a terminal. It writes the server into ~/.codex/config.toml.',
                         'Aja alla oleva komento terminaalissa. Se kirjoittaa palvelimen tiedostoon ~/.codex/config.toml.'),
+                    s(l, 'Run codex mcp login aimeat and complete the sign-in in the browser.',
+                        'Aja codex mcp login aimeat ja vie kirjautuminen loppuun selaimessa.'),
                     s(l, 'Run codex mcp list and check that the node is listed.',
                         'Aja codex mcp list ja tarkista että node on listalla.'),
                 ],
@@ -374,8 +397,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                             'Vain yhteen projektiin: .codex/config.toml projektissa (vain luotetut projektit).'),
                     },
                 ],
-                note: s(l, 'Codex versions differ in how remote servers are given on the command line. If the command is rejected, run codex mcp --help and check the flag name, or write the server straight into config.toml.',
-                    'Codexin versiot eroavat siinä miten etäpalvelin annetaan komentorivillä. Jos komento ei kelpaa, aja codex mcp --help ja tarkista lipun nimi, tai kirjoita palvelin suoraan config.toml-tiedostoon.'),
+                note: s(l, 'Codex CLI, the Codex extension in your editor and the ChatGPT desktop app share this configuration, so the server is added once for all three.',
+                    'Codex CLI, editorin Codex-laajennus ja ChatGPT:n työpöytäsovellus käyttävät samaa konfiguraatiota, joten palvelin lisätään kerran kaikille kolmelle.'),
             },
             instructions: {
                 where: s(l, 'AGENTS.md at the root of the project. Codex reads it before it starts working, and it travels with the repository.',
@@ -393,8 +416,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                         'Käytä tämän noden connect-sivun yhden klikkauksen asennusnappia: se avaa Cursorin ja täyttää kaiken valmiiksi.'),
                     s(l, 'Cursor asks for confirmation. Accept it, and complete the sign-in in the browser.',
                         'Cursor pyytää vahvistuksen. Hyväksy se ja vie kirjautuminen loppuun selaimessa.'),
-                    s(l, 'By hand instead: Settings > MCP > Add new MCP server, transport HTTP, with the values below.',
-                        'Käsin sen sijaan: Settings > MCP > Add new MCP server, kuljetus HTTP, alla olevilla arvoilla.'),
+                    s(l, 'By hand instead: open the Customize page in the sidebar and add an MCP server with the values below, or save the file below as mcp.json.',
+                        'Käsin sen sijaan: avaa sivupalkista Customize-sivu ja lisää MCP-palvelin alla olevilla arvoilla, tai tallenna alla oleva tiedosto nimellä mcp.json.'),
                 ],
                 install: install('cursor',
                     s(l, 'Save it as mcp.json in the .cursor folder of your home directory, or in .cursor inside a project to keep it to that project.',
@@ -404,11 +427,14 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     { label: s(l, 'Server name', 'Palvelimen nimi'), value: 'aimeat' },
                     {
                         label: s(l, 'Transport', 'Kuljetus'), value: 'HTTP',
-                        note: s(l, 'Cursor supports HTTP and stdio. SSE and mcp-remote do not work.',
-                            'Cursor tukee HTTP:tä ja stdiota. SSE ja mcp-remote eivät toimi.'),
+                        note: s(l, 'Streamable HTTP. Cursor also takes SSE and stdio; this node speaks HTTP.',
+                            'Streamable HTTP. Cursor tukee myös SSE:tä ja stdiota; tämä node puhuu HTTP:tä.'),
                     },
                     { label: 'URL', value: mcpUrl },
                 ],
+                capability: 'plan-dependent',
+                plans: s(l, 'Paid plans (Individual and up). Cursor’s free Hobby plan does not list MCP.',
+                    'Maksulliset tasot (Individual ja ylemmät). Cursorin ilmainen Hobby-taso ei sisällä MCP:tä.'),
             },
             instructions: {
                 where: s(l, 'AGENTS.md at the root of the project, or Cursor Settings > Rules for a rule that applies to every project.',
@@ -513,267 +539,187 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     'Avaa chat-kentän vieressä oleva tilavalikko, etsi Custom Instructions ja klikkaa Customize. Koskee kaikkia keskustelujasi.'),
             },
         },
+        {
+            id: 'mistral',
+            label: 'Mistral Le Chat (Vibe)',
+            mcp: {
+                docs: 'https://docs.mistral.ai/vibe/work/connectors',
+                steps: [
+                    s(l, 'Open Le Chat, now called Vibe, in a browser and open Connectors in the sidebar.',
+                        'Avaa Le Chat, jonka nimi on nyt Vibe, selaimessa ja avaa sivupalkista Connectors.'),
+                    s(l, 'Click + Add Connector and open the Custom MCP Connector tab.',
+                        'Klikkaa + Add Connector ja avaa välilehti Custom MCP Connector.'),
+                    s(l, 'Fill the fields with the values below and click Connect. Le Chat finds the sign-in by itself: complete it in the window that opens.',
+                        'Täytä kentät alla olevilla arvoilla ja klikkaa Connect. Le Chat löytää kirjautumisen itse: vie se loppuun avautuvassa ikkunassa.'),
+                    s(l, 'In a conversation, open Tools (+ or /) and turn the connector on.',
+                        'Avaa keskustelussa Tools (+ tai /) ja kytke konnektori päälle.'),
+                ],
+                params: [
+                    {
+                        label: 'Connector name', value: 'aimeat',
+                        note: s(l, 'No spaces or special characters.', 'Ei välilyöntejä eikä erikoismerkkejä.'),
+                    },
+                    { label: 'Server URL', value: mcpUrl },
+                    { label: 'Description', value: '', note: s(l, 'Optional.', 'Vapaaehtoinen.') },
+                ],
+                plans: s(l, 'Free, Pro and Student: the account owner adds it. On a team plan an administrator adds it. This server must answer over HTTPS with a valid certificate.',
+                    'Free, Pro ja Student: tilin omistaja lisää sen. Tiimitasolla sen lisää ylläpitäjä. Tämän palvelimen pitää vastata HTTPS:llä ja voimassa olevalla varmenteella.'),
+            },
+            instructions: {
+                where: s(l, 'Context > Instructions in the sidebar. Applies to every new conversation; a Project has instructions of its own under Instructions > Customize.',
+                    'Sivupalkista Context > Instructions. Koskee jokaista uutta keskustelua; projektilla on omat ohjeensa kohdassa Instructions > Customize.'),
+                docs: 'https://docs.mistral.ai/vibe/work/custom-instructions',
+            },
+        },
+        {
+            id: 'lmstudio',
+            label: 'LM Studio',
+            mcp: {
+                docs: 'https://lmstudio.ai/docs/app/mcp',
+                steps: [
+                    s(l, 'Open LM Studio 0.4.10 or later (earlier versions connect but cannot sign in).',
+                        'Avaa LM Studio 0.4.10 tai uudempi (vanhemmat yhdistävät mutta eivät osaa kirjautua).'),
+                    s(l, 'In the Program tab of the right-hand sidebar, click Install, then Edit mcp.json.',
+                        'Klikkaa oikean sivupalkin Program-välilehdellä Install ja sitten Edit mcp.json.'),
+                    s(l, 'Add the server below under mcpServers and save. LM Studio loads it when the file is saved.',
+                        'Lisää alla oleva palvelin kohtaan mcpServers ja tallenna. LM Studio lataa sen, kun tiedosto tallennetaan.'),
+                    s(l, 'Complete the sign-in in the browser that opens, then chat with a model that can call tools.',
+                        'Vie kirjautuminen loppuun avautuvassa selaimessa ja keskustele sitten mallin kanssa, joka osaa kutsua työkaluja.'),
+                ],
+                params: [
+                    { label: s(l, 'The entry in mcp.json', 'Merkintä tiedostossa mcp.json'), value: `"aimeat": { "url": "${mcpUrl}" }` },
+                    { label: s(l, 'Server name', 'Palvelimen nimi'), value: 'aimeat' },
+                    { label: 'url', value: mcpUrl },
+                    {
+                        label: s(l, 'Config file', 'Konfiguraatiotiedosto'), value: '~/.lmstudio/mcp.json',
+                        note: s(l, 'On Windows, %USERPROFILE%\\.lmstudio\\mcp.json.', 'Windowsissa %USERPROFILE%\\.lmstudio\\mcp.json.'),
+                    },
+                ],
+                note: s(l, 'LM Studio runs the model on your own computer, so the answers are only as good as that model. Pick the largest model that runs well and calls tools.',
+                    'LM Studio ajaa mallia omalla tietokoneellasi, joten vastaukset ovat niin hyviä kuin se malli. Valitse suurin malli, joka toimii sujuvasti ja osaa kutsua työkaluja.'),
+            },
+            instructions: {
+                where: s(l, 'The System Prompt of a chat (Ctrl+E, on a Mac Cmd+E). Save it as a preset to use it again in other chats.',
+                    'Keskustelun System Prompt (Ctrl+E, Macissa Cmd+E). Tallenna se esiasetukseksi (preset), niin voit käyttää sitä muissakin keskusteluissa.'),
+                docs: 'https://lmstudio.ai/docs/app/presets',
+            },
+        },
+        {
+            id: 'gemini-cli',
+            label: 'Gemini CLI',
+            mcp: {
+                docs: 'https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md',
+                steps: [
+                    s(l, 'Run the command below in a terminal. -s user makes it available in all your projects; without it the server is added to the current project only.',
+                        'Aja alla oleva komento terminaalissa. -s user tuo sen kaikkiin projekteihisi; ilman sitä palvelin lisätään vain nykyiseen projektiin.'),
+                    s(l, 'Start gemini and type /mcp auth aimeat, then complete the sign-in in the browser.',
+                        'Käynnistä gemini ja kirjoita /mcp auth aimeat, ja vie sitten kirjautuminen loppuun selaimessa.'),
+                    s(l, 'Run gemini mcp list and check that the node is listed.',
+                        'Aja gemini mcp list ja tarkista että node on listalla.'),
+                ],
+                command: `gemini mcp add -s user --transport http aimeat ${mcpUrl}`,
+                params: [
+                    { label: s(l, 'Server name', 'Palvelimen nimi'), value: 'aimeat' },
+                    {
+                        label: 'httpUrl', value: mcpUrl,
+                        note: s(l, 'In ~/.gemini/settings.json the field is httpUrl. The field url means SSE, which this node does not speak.',
+                            'Tiedostossa ~/.gemini/settings.json kentän nimi on httpUrl. Kenttä url tarkoittaa SSE:tä, jota tämä node ei puhu.'),
+                    },
+                ],
+            },
+            instructions: {
+                where: s(l, 'GEMINI.md at the root of the project, which Gemini CLI reads with every prompt. For all your projects at once, ~/.gemini/GEMINI.md.',
+                    'GEMINI.md projektin juuressa, jonka Gemini CLI lukee jokaisen kehotteen mukana. Kaikkiin projekteihin kerralla: ~/.gemini/GEMINI.md.'),
+                docs: 'https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/gemini-md.md',
+            },
+        },
+        {
+            id: 'perplexity',
+            label: 'Perplexity',
+            mcp: {
+                docs: 'https://www.perplexity.ai/help-center/en/articles/13915507-adding-custom-remote-connectors',
+                steps: [
+                    s(l, 'Open Account settings > Connectors.', 'Avaa Account settings > Connectors.'),
+                    s(l, 'Click + Custom connector and choose Remote.', 'Klikkaa + Custom connector ja valitse Remote.'),
+                    s(l, 'Fill the fields with the values below and complete the sign-in.',
+                        'Täytä kentät alla olevilla arvoilla ja vie kirjautuminen loppuun.'),
+                ],
+                params: [
+                    nameParam(),
+                    { label: 'MCP Server URL', value: mcpUrl },
+                    {
+                        label: 'Client ID / Client Secret', value: '',
+                        note: s(l, 'Leave both empty. This node registers the client itself (RFC 7591).',
+                            'Jätä molemmat tyhjiksi. Tämä node rekisteröi asiakkaan itse (RFC 7591).'),
+                    },
+                ],
+                capability: 'plan-dependent',
+                plans: s(l, 'Perplexity files custom connectors under its Enterprise features, and its page does not say whether Pro or Free can add one. This server must be reachable from the public internet.',
+                    'Perplexity luettelee omat konnektorit Enterprise-ominaisuuksiinsa, eikä sen sivu kerro, voiko Pro- tai ilmaisella tasolla lisätä sellaisen. Tämän palvelimen pitää olla saavutettavissa julkisesta internetistä.'),
+            },
+            instructions: {
+                where: s(l, 'Settings > Personalization > Custom instructions for your account; a Project has its own instructions in its settings (the gear beside its title).',
+                    'Settings > Personalization > Custom instructions koko tilillesi; projektilla on omat ohjeensa sen asetuksissa (ratas otsikon vieressä).'),
+                docs: 'https://www.perplexity.ai/help-center/en/articles/10352993-account-settings',
+            },
+        },
+        {
+            id: 'openclaw',
+            label: 'OpenClaw',
+            mcp: {
+                docs: 'https://docs.openclaw.ai/cli/mcp/transports',
+                steps: [
+                    s(l, 'Run the command below where OpenClaw runs.', 'Aja alla oleva komento siellä, missä OpenClaw toimii.'),
+                    s(l, 'Run openclaw mcp login aimeat and complete the sign-in in the browser.',
+                        'Aja openclaw mcp login aimeat ja vie kirjautuminen loppuun selaimessa.'),
+                ],
+                command: `openclaw mcp set aimeat '{"url":"${mcpUrl}","transport":"streamable-http","auth":"oauth"}'`,
+                params: [
+                    { label: s(l, 'Server name', 'Palvelimen nimi'), value: 'aimeat' },
+                    { label: 'url', value: mcpUrl },
+                    { label: 'transport', value: 'streamable-http' },
+                    { label: 'auth', value: 'oauth' },
+                ],
+                note: s(l, 'OpenClaw runs on your own computer or server and brings its own model; use a strong one that calls tools well.',
+                    'OpenClaw toimii omalla tietokoneellasi tai palvelimellasi ja tuo oman mallinsa; käytä vahvaa mallia, joka kutsuu työkaluja hyvin.'),
+            },
+            instructions: {
+                where: s(l, 'AGENTS.md in the agent’s workspace (by default ~/.openclaw/workspace), which OpenClaw loads at the start of every session.',
+                    'AGENTS.md agentin työtilassa (oletuksena ~/.openclaw/workspace), jonka OpenClaw lataa jokaisen istunnon alussa.'),
+                docs: 'https://docs.openclaw.ai/concepts/agent-workspace',
+            },
+        },
+        {
+            id: 'copilot-studio',
+            label: 'Microsoft Copilot Studio',
+            mcp: {
+                docs: 'https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent',
+                steps: [
+                    s(l, 'Open the agent in Copilot Studio and go to Tools > Add a tool > New tool > Model Context Protocol.',
+                        'Avaa agentti Copilot Studiossa ja valitse Tools > Add a tool > New tool > Model Context Protocol.'),
+                    s(l, 'Give the server URL below, choose OAuth 2.0 and Dynamic discovery, and create the tool.',
+                        'Anna alla oleva palvelimen osoite, valitse OAuth 2.0 ja Dynamic discovery ja luo työkalu.'),
+                    s(l, 'Sign in to this node when the connection asks, then publish the agent again.',
+                        'Kirjaudu tähän nodeen, kun yhteys sitä pyytää, ja julkaise agentti sitten uudelleen.'),
+                ],
+                params: [
+                    { label: 'Server name', value: 'AIMEAT' },
+                    { label: 'Server URL', value: mcpUrl },
+                    {
+                        label: 'Authentication', value: 'OAuth 2.0: Dynamic discovery',
+                        note: s(l, 'This node registers the client itself (RFC 7591).', 'Tämä node rekisteröi asiakkaan itse (RFC 7591).'),
+                    },
+                ],
+                capability: 'plan-dependent',
+                plans: s(l, 'Access to Copilot Studio through your organization. This connects an agent you build there, not the Copilot app itself. This server must be reachable from the public internet.',
+                    'Pääsy Copilot Studioon organisaatiosi kautta. Tämä liittää siellä rakentamasi agentin, ei itse Copilot-sovellusta. Tämän palvelimen pitää olla saavutettavissa julkisesta internetistä.'),
+            },
+            instructions: {
+                where: s(l, 'The agent’s Overview page > Instructions > Edit. Publish the agent again for the change to apply.',
+                    'Agentin Overview-sivu > Instructions > Edit. Julkaise agentti uudelleen, jotta muutos tulee voimaan.'),
+                docs: 'https://learn.microsoft.com/en-us/microsoft-copilot-studio/authoring-instructions',
+            },
+        },
     ];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The branch decision (aimeat_remake/04-mcp-kyvykkyys.md)
-//
-// MCP capability belongs to the CLIENT APP, not the model. The same model is capable in Claude
-// Desktop and incapable behind a web UI with no connectors, because the model does not open
-// connections — the app it runs in does. So the deciding field is `ai-client`, and the eight ids
-// above ARE the list of apps that can. Nothing here is a second table: this maps what a model may
-// call its own app onto one of those eight.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** All ids in this table, for callers that need the set without building the localized list. */
-export const AI_TOOL_IDS = [
-    'claude-web', 'claude-desktop', 'claude-code', 'chatgpt', 'codex', 'cursor', 'vscode', 'grok',
-    'goose',
-] as const;
-export type AiToolId = typeof AI_TOOL_IDS[number];
-
-/** Which tools need a paid tier. Everything else in the table works on its free one. */
-const PLAN_DEPENDENT: ReadonlySet<string> = new Set<string>(['chatgpt', 'grok']);
-
-/**
- * What a model may claim about the app it is running in → which of the eight it is.
- *
- * Keys are NORMALIZED (lowercased, every non-alphanumeric removed), so one entry covers a family
- * of spellings: `claudeai` matches "claude.ai", "Claude AI" and "CLAUDE-AI" alike. Vendor names
- * are here too ("anthropic", "openai", "xai") because a model asked which app it is in commonly
- * answers with who made it.
- *
- * This map grows from the unknown names the funnel collects (onboarding.ai_model_detected), never
- * from guesses — the same rule as the table above.
- */
-export const AI_CLIENT_ALIASES: Readonly<Record<string, AiToolId>> = {
-    // claude.ai — the recommended first path, so bare "claude" resolves here.
-    claude: 'claude-web',
-    claudeai: 'claude-web',
-    claudeweb: 'claude-web',
-    claudecom: 'claude-web',
-    anthropic: 'claude-web',
-    anthropicclaude: 'claude-web',
-    claudeaiweb: 'claude-web',
-    // Claude Desktop
-    claudedesktop: 'claude-desktop',
-    claudedesktopapp: 'claude-desktop',
-    claudeapp: 'claude-desktop',
-    claudeformac: 'claude-desktop',
-    claudeforwindows: 'claude-desktop',
-    // Claude Code
-    claudecode: 'claude-code',
-    claudecodecli: 'claude-code',
-    claudecli: 'claude-code',
-    // ChatGPT
-    chatgpt: 'chatgpt',
-    chatgptweb: 'chatgpt',
-    chatgptplus: 'chatgpt',
-    chatgptpro: 'chatgpt',
-    openai: 'chatgpt',
-    openaichatgpt: 'chatgpt',
-    gpt: 'chatgpt',
-    gpt4: 'chatgpt',
-    gpt4o: 'chatgpt',
-    gpt5: 'chatgpt',
-    gpt51: 'chatgpt',
-    // goose — open source, Apache-2.0, now under the Linux Foundation's Agentic AI Foundation.
-    goose: 'goose',
-    blockgoose: 'goose',
-    codenamegoose: 'goose',
-    goosecli: 'goose',
-    goosedesktop: 'goose',
-    // Codex CLI
-    codex: 'codex',
-    codexcli: 'codex',
-    openaicodex: 'codex',
-    // Cursor
-    cursor: 'cursor',
-    cursorai: 'cursor',
-    cursoride: 'cursor',
-    cursoreditor: 'cursor',
-    // VS Code / Copilot
-    vscode: 'vscode',
-    visualstudiocode: 'vscode',
-    copilot: 'vscode',
-    githubcopilot: 'vscode',
-    vscodecopilot: 'vscode',
-    copilotchat: 'vscode',
-    // Grok
-    grok: 'grok',
-    grokcom: 'grok',
-    xai: 'grok',
-    xaigrok: 'grok',
-} as const;
-
-import { AI_CLIENT_FAMILIES, AI_FAMILY_ALIASES, VARIANT_BY_ID, normalizeAiClientClaim, type AiClientFamily, type AiClientVariant } from './ai-client-families.js';
-
-export { AI_CLIENT_FAMILIES, normalizeAiClientClaim, type AiClientFamily, type AiClientVariant } from './ai-client-families.js';
-
-/** Aliases longest-first, so "claudecode" wins over "claude" in a containment match. */
-const ALIASES_BY_LENGTH: ReadonlyArray<readonly [string, AiToolId]> =
-    Object.entries(AI_CLIENT_ALIASES)
-        .sort((a, b) => b[0].length - a[0].length) as ReadonlyArray<readonly [string, AiToolId]>;
-
-export type AiClientResolution =
-    | { kind: 'known'; id: AiToolId; capability: McpCapability; matched: string }
-    /** A name two apps share, one of which cannot connect. Raises a question, never a refusal. */
-    | { kind: 'family'; family: AiClientFamily; claim: string }
-    /** One named variant of a family. Whether it counts depends on WHO named it — see decideBranch. */
-    | { kind: 'variant'; family: AiClientFamily; variant: AiClientVariant }
-    /** Nothing matched, or nothing was claimed. NOT the same as "incapable" — see decideBranch. */
-    | { kind: 'unknown'; claim: string | null };
-
-/**
- * Resolve a model's claim about its own app to one of the eight ids.
- *
- * Two passes: an exact match on the normalized claim, then the longest alias CONTAINED in it —
- * models rarely answer with a bare app name ("Claude Sonnet 4.5 via claude.ai"), and refusing to
- * read those would push perfectly capable people into the "unknown" path for a phrasing habit.
- * Longest-first ordering is what keeps "…via claude code" from resolving as claude.ai.
- */
-export function resolveAiClient(claim: string | null | undefined): AiClientResolution {
-    const raw = typeof claim === 'string' ? claim.trim() : '';
-    if (!raw) return { kind: 'unknown', claim: null };
-    const norm = normalizeAiClientClaim(raw);
-    if (!norm) return { kind: 'unknown', claim: raw };
-
-    // A variant id is only ever an ANSWER to the which-variant question, so it is matched whole.
-    const variant = VARIANT_BY_ID.get(norm);
-    if (variant) return { kind: 'variant', family: variant.family, variant: variant.variant };
-
-    const exact = AI_CLIENT_ALIASES[norm];
-    if (exact) return { kind: 'known', id: exact, capability: capabilityOf(exact), matched: norm };
-
-    // Families before the containment pass, longest name first: "microsoftcopilot" contains
-    // "copilot", which would otherwise resolve as GitHub Copilot in VS Code.
-    const familyAlias = Object.keys(AI_FAMILY_ALIASES).sort((a, b) => b.length - a.length).find(a => norm.includes(a));
-    const longestTool = ALIASES_BY_LENGTH.find(([alias]) => norm.includes(alias));
-    if (familyAlias && (!longestTool || familyAlias.length >= longestTool[0].length)) {
-        const family = AI_CLIENT_FAMILIES.find(f => f.id === AI_FAMILY_ALIASES[familyAlias]);
-        if (family) return { kind: 'family', family, claim: raw };
-    }
-    if (longestTool) return { kind: 'known', id: longestTool[1], capability: capabilityOf(longestTool[1]), matched: longestTool[0] };
-    return { kind: 'unknown', claim: raw };
-}
-
-/** A tool's capability. Everything in the table can speak MCP; only the tier varies. */
-export function capabilityOf(id: string): McpCapability {
-    return PLAN_DEPENDENT.has(id) ? 'plan-dependent' : 'yes';
-}
-
-/** What the person still has to be asked, if anything. */
-export type BranchQuestion = 'which-client' | 'paid-plan' | 'which-variant';
-
-export type BranchDecision =
-    | { branch: 'A'; reason: 'known-capable' | 'plan-confirmed' | 'unknown-defaults-to-a' | 'variant-capable'; toolId?: AiToolId }
-    /**
-     * The two routes to B, and both are the PERSON's own answer: they do not have the tier their
-     * app requires, or they said which of two same-named apps they use and that one cannot connect.
-     */
-    | { branch: 'B'; reason: 'plan-missing'; toolId: AiToolId }
-    | { branch: 'B'; reason: 'variant-has-no-mcp'; family: string; variant: string }
-    | { branch: 'ask'; question: BranchQuestion; toolId?: AiToolId; family?: string };
-
-/**
- * The branch, from what we know so far.
- *
- * The rule that shapes every line of this: **an app NAME can never send anyone to branch B.**
- * A wrong A costs one attempt. A wrong B tells someone whose tools were fine that their tools are
- * not good enough, and they have no way to argue. So:
- *   - a known app that needs no paid tier      → A
- *   - a known app that does                    → ask about the tier (not a refusal, a question)
- *   - an app we have never heard of, or none   → ask which app; if they cannot say, A anyway
- *
- * @param resolution  what resolveAiClient made of the model's claim
- * @param answers.hasPaidPlan  the person's answer to the tier question, once they have given one
- * @param answers.clientAnswer the person's answer to "which app did you talk in", once given.
- *   `other` and `dont-know` both mean: try A. If the connection then fails, B is where they land,
- *   having lost one attempt rather than being turned away on a guess.
- */
-export function decideBranch(
-    resolution: AiClientResolution,
-    answers: { hasPaidPlan?: boolean; clientAnswer?: string } = {},
-): BranchDecision {
-    if (resolution.kind === 'unknown') {
-        const ans = answers.clientAnswer?.trim();
-        if (ans && ans !== 'other' && ans !== 'dont-know') {
-            // They named an app. Read it through the same map — the answer is not privileged.
-            const again = resolveAiClient(ans);
-            if (again.kind === 'known') return decideBranch(again, { hasPaidPlan: answers.hasPaidPlan });
-            // A family or one of its variants keeps the answer with it: whether a variant that
-            // cannot connect means B depends on the person having said it themselves.
-            if (again.kind !== 'unknown') return decideBranch(again, answers);
-        }
-        if (ans) return { branch: 'A', reason: 'unknown-defaults-to-a' };
-        return { branch: 'ask', question: 'which-client' };
-    }
-
-    if (resolution.kind === 'family') {
-        // The person may have answered the variant question already; their answer is read through
-        // the same resolver, and only a variant of THIS family counts.
-        const again = answers.clientAnswer ? resolveAiClient(answers.clientAnswer) : null;
-        if (again?.kind === 'variant' && again.family.id === resolution.family.id) return decideBranch(again, answers);
-        if (again && again.kind !== 'family') return decideBranch(again, answers);
-        return { branch: 'ask', question: 'which-variant', family: resolution.family.id };
-    }
-
-    if (resolution.kind === 'variant') {
-        if (resolution.variant.mcp) return { branch: 'A', reason: 'variant-capable' };
-        // A variant that cannot connect sends the person to B only when THEY named it. A model that
-        // says "I am the Gemini app" is still a name, and a name raises the question instead.
-        const theySaidSo = !!answers.clientAnswer
-            && normalizeAiClientClaim(answers.clientAnswer) === normalizeAiClientClaim(resolution.variant.id);
-        return theySaidSo
-            ? { branch: 'B', reason: 'variant-has-no-mcp', family: resolution.family.id, variant: resolution.variant.id }
-            : { branch: 'ask', question: 'which-variant', family: resolution.family.id };
-    }
-
-    if (resolution.capability === 'yes') {
-        return { branch: 'A', reason: 'known-capable', toolId: resolution.id };
-    }
-    // plan-dependent
-    if (answers.hasPaidPlan === true) return { branch: 'A', reason: 'plan-confirmed', toolId: resolution.id };
-    if (answers.hasPaidPlan === false) return { branch: 'B', reason: 'plan-missing', toolId: resolution.id };
-    return { branch: 'ask', question: 'paid-plan', toolId: resolution.id };
-}
-
-/**
- * The options for the which-variant question: the two apps one name covers, in the person's words.
- * The answer is the option's `id`, sent back in the same `client` field.
- */
-export function aiClientVariantOptions(familyId: string, opts: { lang?: string } = {}): AiClientOption[] {
-    const l = lang(opts.lang);
-    const family = AI_CLIENT_FAMILIES.find(f => f.id === familyId);
-    return (family?.variants ?? []).map(v => ({ id: v.id, label: s(l, v.label.en, v.label.fi) }));
-}
-
-/** One option in the "which app did you talk in?" question. */
-export interface AiClientOption {
-    id: string;
-    label: string;
-    recommended?: boolean;
-    /** Present for real tools; absent for the two escape options. */
-    plans?: string;
-}
-
-/**
- * The options for "Which app did you talk to the AI in?", built from the SAME table the branch
- * reads — a hardcoded second list here would be the exact drift the alias map exists to avoid.
- * The two trailing options are escapes, and both lead to branch A.
- */
-export function aiClientQuestionOptions(config: AimeatConfig, opts: { lang?: string } = {}): AiClientOption[] {
-    const l = lang(opts.lang);
-    const tools = buildAiToolSetup(config, opts).map(tool => ({
-        id: tool.id,
-        label: tool.label,
-        ...(tool.recommended ? { recommended: true } : {}),
-        ...(tool.mcp.plans ? { plans: tool.mcp.plans } : {}),
-    }));
-    return [
-        ...tools,
-        { id: 'other', label: s(l, 'Something else', 'Jokin muu') },
-        { id: 'dont-know', label: s(l, 'I am not sure', 'En ole varma') },
-    ];
-}

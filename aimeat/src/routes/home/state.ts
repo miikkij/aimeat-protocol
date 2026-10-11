@@ -26,7 +26,7 @@ import type { Router } from 'express';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success } from '../../middleware/envelope.js';
 import { readHomeState, HOME_STEPS } from '../../services/home-state.js';
-import { aiClientQuestionOptions, aiClientVariantOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-setup.js';
+import { aiClientQuestionOptions, aiClientVariantOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-branch.js';
 import { openRooms } from '../../services/home-rooms.js';
 import { openPlaybooks } from '../../services/home-playbooks.js';
 import { readJourney } from '../../services/journey-state.js';
