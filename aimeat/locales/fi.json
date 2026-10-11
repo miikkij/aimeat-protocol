@@ -12999,6 +12999,8 @@
       "untied": "Irrotettu. Sovellus ja agentti ovat ennallaan.",
       "tieNone": "Kaikki sovelluksesi ovat jo tässä luettelossa, tai sinulla ei ole vielä yhtään sovellusta.",
       "tieLabel": "Mikä sovellus näyttää sen työtä?",
+      "tiePick": "Kirjoita osa sovelluksen nimestä",
+      "tieNoMatch": "Yhdenkään sovelluksesi nimessä ei ole tätä.",
       "tieNote": "Liitos on merkintä sovelluksen datakartassa. Se ei anna sovellukselle uusia oikeuksia.",
       "tieDo": "Liitä sovellus",
       "untieLabel": "Mikä sovellus ei enää näytä sen työtä?",

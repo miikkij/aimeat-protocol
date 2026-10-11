@@ -26,6 +26,8 @@
  *   v1.8.0 — 2026-10-11 — Approval seeds the definition with one offer in it
  *     (services/agent-default-offer.ts): the proposer's own, completed, or one made from the
  *     agent's name and purpose. The crew runtime publishes it when the agent starts.
+ *   v1.8.1 — 2026-10-11 — The first run's task text is the example of the definition's first offer
+ *     when it has one, and the purpose otherwise.
  *   v1.7.0 — 2026-10-11 — Approval gives the new agent its work once (services/agent-first-run.ts)
  *     and answers with `first_run`; a body `first_run: false` asks for none.
  *   v1.6.0 — 2026-10-10 — Approval takes `install_id` (else the proposal's own), offers the agent to
@@ -62,7 +64,7 @@ import { findConnector, setWanted, clearWanted, type ConnectorView } from '../..
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { giveFirstRun } from '../../services/agent-first-run.js';
-import { withDefaultOffer } from '../../services/agent-default-offer.js';
+import { withDefaultOffer, firstRequestOf } from '../../services/agent-default-offer.js';
 import { readerFor } from '../../services/classification/reader.js';
 import {
   proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
@@ -308,6 +310,9 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
           agentGaii: gaii,
           displayName: proposal.display_name,
           purpose: proposal.purpose,
+          // One real request, when the definition's offer carries one: an agent that needs an input
+          // has none in its purpose (services/agent-default-offer.ts firstRequestOf).
+          request: firstRequestOf(proposal.crew_def),
           // The resolved identity of the person approving, which on this route is always the owner.
           creator: { gaii: resolveIdentity(req.auth!, config.nodeId), sub: req.auth!.sub, owner, reader: readerFor({ storage, config }, req.auth) },
           actor: resolveIdentity(req.auth!, config.nodeId),

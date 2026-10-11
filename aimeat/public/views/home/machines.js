@@ -28,6 +28,8 @@
  *   every sentence on the page says computer.
  * @usage routed at /v1/home?computers=1 by spa.html (the older /v1/home?machines=1 opens it too)
  * @version-history
+ *   v1.1.1 — 2026-10-11 — The page opens the live stream itself (lib/live-updates.js
+ *     relayLiveUpdates), so a computer that connects or goes away shows without a reload.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.1.0 — 2026-10-10 — The way to the store for a machine the operator runs.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
@@ -39,6 +41,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { api, apiGet, apiPatch, apiDelete } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
+import { getSession } from '/js/services/auth.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { ago } from '/js/format.js';
 import { PageFrame } from '/components/PageFrame.js';
 import { PageIntro } from '/components/PageIntro.js';
@@ -224,6 +228,8 @@ export default function MachinesView({ navigate }) {
   loadRef.current = load;
   useEffect(() => { if (session) loadRef.current(); }, [session]);
   // A machine connecting or going away is an `agents` change, and this page shows exactly that.
+  // The page is a route of its own, so it opens the stream itself.
+  useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session]);
   useEffect(() => {
     const handler = () => { if (session) loadRef.current(); };
     window.addEventListener('aimeat-live-update', handler);

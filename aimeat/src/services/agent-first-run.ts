@@ -12,16 +12,19 @@
  *   nothing that reads the agent's results (the app offer on the home, an app built on its work)
  *   has a result to read.
  *
- *   WHAT THE TASK SAYS. The agent's display name as the title and its purpose as the description,
- *   which is word for word what a clock agent's schedule gives it (public/js/services/agent-draft.js
- *   scheduleFor). So the first run is the agent's ordinary work done once now, never a separate
- *   test prompt whose result would look different from every later one.
+ *   WHAT THE TASK SAYS. The agent's display name as the title. The description is one real request:
+ *   the `example` of the definition's first offer when it has one (`request`), which is written as a
+ *   person would send it, with a sample of what they would give the agent. Without one it is the
+ *   agent's purpose, which is word for word what a clock agent's schedule gives it
+ *   (public/js/services/agent-draft.js scheduleFor). Until 2026-10-11 it was always the purpose, and
+ *   an agent that needs an input got none: a slogan agent made a slogan for its own description.
  *
  *   It is created through the task service, so it starts, waits or is refused by the same rules as
  *   any task: an agent whose computer is away gets it when the computer connects.
  * @structure FIRST_RUN_KIND · giveFirstRun
  * @usage const run = await giveFirstRun({ storage, config }, { agentGaii, displayName, purpose, creator, actor });
  * @version-history
+ *   v1.1.0 — 2026-10-11 — `request`: the first offer's example is the task text when there is one.
  *   v1.0.0 — 2026-10-11 — Initial (decision "From an agent to an app", ruling 2).
  */
 import type { AimeatConfig } from '../config.js';
@@ -43,7 +46,7 @@ export type FirstRunResult =
  */
 export async function giveFirstRun(
   deps: { storage: Storage; config: AimeatConfig },
-  args: { agentGaii: string; displayName: string; purpose: string; creator: FileRefAccessor; actor: string },
+  args: { agentGaii: string; displayName: string; purpose: string; request?: string; creator: FileRefAccessor; actor: string },
 ): Promise<FirstRunResult> {
   try {
     const agent = await deps.storage.getAgent(args.agentGaii);
@@ -56,7 +59,7 @@ export async function giveFirstRun(
       actor: args.actor,
       body: {
         title: args.displayName.slice(0, 256) || agent.name,
-        description: args.purpose,
+        description: args.request?.trim() || args.purpose,
         scope: [{
           name: 'kind', value: FIRST_RUN_KIND, type: 'text',
           description: 'The run a new agent makes once, so its owner sees that it works.',

@@ -17,6 +17,8 @@
  * @structure default HomeHistoryView; internal: Day
  * @usage routed at /v1/home?history=1 by spa.html
  * @version-history
+ *   2026-10-11: The page opens the live stream itself (lib/live-updates.js relayLiveUpdates); it
+ *     listened for a change and nothing sent one.
  *   2026-09-27: "Sign in" is the Loud component, the same button (page group G9, a move).
  *   2026-09-23: Composed from library components (PageFrame, PageIntro, ErrorNote, ActionRow,
  *     BackLink, DayList, DayGroup, DayEmpty, ArchiveSection, ArchiveMore, ArchiveError), which emit
@@ -31,6 +33,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
+import { getSession } from '/js/services/auth.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { Spinner } from '/components/Spinner.js';
 import { swallowed } from '/js/swallowed.js';
 import { FeedRow, line } from '/views/home/feed.js';
@@ -133,6 +137,8 @@ export default function HomeHistoryView({ navigate }) {
 
   // The same live-update contract every server-data surface keeps: something happening in another
   // tab moves this page too, and a record of what happened that needs a reload is a stale record.
+  // The page is a route of its own, so it opens the stream itself.
+  useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session]);
   useEffect(() => {
     const handler = () => { if (session) load(); };
     window.addEventListener('aimeat-live-update', handler);

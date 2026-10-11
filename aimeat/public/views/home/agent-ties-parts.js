@@ -21,9 +21,14 @@
  *
  *   Composed from library components only; it has no sheet of its own.
  * @structure AppOffer({ name, navigate }) · AgentApps({ name, owner, worker, navigate, onChanged }) ·
- *   WorkplaceEditor({ name, current, onDone, onCancel }) · placeWords(place)
+ *   WorkplaceChoice({ places, value, onChange }) · WorkplaceEditor({ name, current, onDone, onCancel }) ·
+ *   placeWords(place)
  * @usage html`<${AgentApps} name=${name} owner=${owner} worker=${worker} navigate=${navigate} onChanged=${load} />`
  * @version-history
+ *   v1.1.0 — 2026-10-11 — At production size: WorkplaceChoice, the one place that draws the choice of
+ *     a workspace, is a grouped drop-down past eight workspaces (an account had 85), and the app to
+ *     tie is found by typing past eight apps (the same account had 183). Workspace and organism names
+ *     are decoded for display ("STT &amp; Voice" read as written in the registry).
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
 import { h } from 'preact';
@@ -38,6 +43,9 @@ import { Note } from '/components/Note.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextArea } from '/components/TextField.js';
 import { Choice } from '/components/Choice.js';
+import { Select } from '/components/Select.js';
+import { PickField } from '/components/PickField.js';
+import { decodeEntities } from '/js/utils.js';
 import { Action, Loud } from '/components/Action.js';
 import { LineList } from '/components/LineList.js';
 import { PageSection } from '/components/PageSection.js';
@@ -55,7 +63,41 @@ const appPage = (name, say) => `${HOME}?agent=${encodeURIComponent(name)}&new-ap
 /** A workplace as the words a person reads: the workspace, and the organism it is in. */
 export function placeWords(place) {
   return p('place', 'Workspace {workspace}, in the organism {organism}')
-    .replace('{workspace}', place.workspace_name).replace('{organism}', place.organism_name);
+    .replace('{workspace}', decodeEntities(place.workspace_name)).replace('{organism}', decodeEntities(place.organism_name));
+}
+
+const OWN = 'own';
+// Up to this many workspaces are shown as boxes side by side; past it they are one drop-down,
+// grouped by organism. An account on production had 85 workspaces in 34 organisms (2026-10-11),
+// and 85 boxes one under the other is a page nobody reads to its end.
+const BOXES_UP_TO = 8;
+const placeValue = (pl) => `${pl.organism_id}/${pl.workspace_id}`;
+
+/**
+ * The one choice of where an agent's finished work goes: its own memory, or one workspace.
+ * `value` is 'own' or '<organism id>/<workspace id>'. Names are decoded for display, because the
+ * workspace registry holds some of them with their entities written out ("STT &amp; Voice").
+ */
+export function WorkplaceChoice({ places, value, onChange }) {
+  const label = p('placeLabel', 'Where does its work go?');
+  const own = { value: OWN, label: p('placeOwn', 'The agent\'s own memory'), hint: p('placeOwnHint', 'Only you see it.') };
+  const hintFor = (pl) => p('placeHint', 'Organism {organism}. Its members see the finished work.')
+    .replace('{organism}', decodeEntities(pl.organism_name));
+  if (places.length <= BOXES_UP_TO) {
+    return html`<${Choice} boxed cols=${2} label=${label} value=${value} onChange=${onChange}
+      options=${[own, ...places.map((pl) => ({ value: placeValue(pl), label: decodeEntities(pl.workspace_name), hint: hintFor(pl) }))]} />`;
+  }
+  const groups = [];
+  for (const pl of places) {
+    const name = decodeEntities(pl.organism_name);
+    let group = groups.find((g) => g.group === name);
+    if (!group) { group = { group: name, options: [] }; groups.push(group); }
+    group.options.push({ value: placeValue(pl), label: decodeEntities(pl.workspace_name) });
+  }
+  const chosen = places.find((pl) => placeValue(pl) === value);
+  return html`<${Select} label=${label} value=${value} onChange=${onChange}
+    hint=${chosen ? hintFor(chosen) : own.hint}
+    options=${[{ value: OWN, label: own.label }, ...groups]} />`;
 }
 
 const laterKey = (name) => `aimeat.home.appOffer.${name}`;
@@ -150,8 +192,15 @@ export function AgentApps({ name, owner, worker, navigate, onChanged }) {
         <${FormActions}><${Action} onClick=${() => setMode(null)}>${tr('home.agentNew.cancel', 'Cancel')}<//><//>`}
       ${mode === 'tie' && choices && free.length > 0 && html`
         <${Fields}>
-          <${Choice} boxed cols=${2} label=${p('tieLabel', 'Which app shows its work?')} value=${picked} onChange=${setPicked}
-            options=${free.map((a) => ({ value: a.filename, label: a.name, hint: a.filename }))} />
+          ${free.length <= BOXES_UP_TO
+            ? html`<${Choice} boxed cols=${2} label=${p('tieLabel', 'Which app shows its work?')} value=${picked} onChange=${setPicked}
+                options=${free.map((a) => ({ value: a.filename, label: a.name, hint: a.filename }))} />`
+            // An account with many apps (183 on production, 2026-10-11) types a few letters instead.
+            : html`<${PickField} keep label=${p('tieLabel', 'Which app shows its work?')}
+                items=${free.map((a) => ({ id: a.filename, name: a.name, sub: a.filename }))}
+                placeholder=${p('tiePick', 'Type a part of the app\'s name')}
+                onPick=${(item) => setPicked(item?.id ?? '')} onType=${() => setPicked('')}
+                noMatchLabel=${p('tieNoMatch', 'No app of yours has that in its name.')} />`}
           <${Note} kind="quiet">${p('tieNote', 'The tie is a statement on the app\'s data map. It gives the app no new permission.')}<//>
           <${FormActions}>
             <${Loud} control disabled=${busy || !picked} onClick=${act}>${p('tieDo', 'Tie the app')}<//>
@@ -170,8 +219,6 @@ export function AgentApps({ name, owner, worker, navigate, onChanged }) {
         <//>`}
     <//>`;
 }
-
-const OWN = 'own';
 
 /** The one choice of where an agent's finished work goes. `current` is the worker's `work_goes_to`. */
 export function WorkplaceEditor({ name, current, onDone, onCancel }) {
@@ -206,15 +253,7 @@ export function WorkplaceEditor({ name, current, onDone, onCancel }) {
   if (!places) return html`<${Spinner} />`;
   return html`
     <${Fields}>
-      <${Choice} boxed cols=${2} label=${p('placeLabel', 'Where does its work go?')} value=${value} onChange=${setValue}
-        options=${[
-          { value: OWN, label: p('placeOwn', 'The agent\'s own memory'), hint: p('placeOwnHint', 'Only you see it.') },
-          ...places.map((pl) => ({
-            value: `${pl.organism_id}/${pl.workspace_id}`,
-            label: pl.workspace_name,
-            hint: p('placeHint', 'Organism {organism}. Its members see the finished work.').replace('{organism}', pl.organism_name),
-          })),
-        ]} />
+      <${WorkplaceChoice} places=${places} value=${value} onChange=${setValue} />
       ${places.length === 0 && html`<${Note} kind="quiet">${p('placeNone', 'You are not in an organism that has a workspace yet, so the agent\'s own memory is the one place.')}<//>`}
       <${Note} kind="quiet">${p('placeNote', 'Nothing is moved. From the next finished task on, the result is shared with that workspace. Work that is already finished stays where it is.')}<//>
       ${problem && html`<${Note} kind="message" error>${problem}<//>`}

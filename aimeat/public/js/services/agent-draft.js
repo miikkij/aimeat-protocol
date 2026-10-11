@@ -24,6 +24,9 @@
  *   const draft = await draftAgent('Gather the industry news every weekday morning', { tools });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.3.1 — 2026-10-11 — The offer's `example` is one real request and not an input with its
+ *     result: the node gives it to the new agent as its first work. The offer's id follows the short
+ *     name when the person changes it on the form.
  *   v1.3.0 — 2026-10-11 — The draft carries one offer (title, ask, example), which goes into the
  *     definition's `offers`: the crew runtime publishes it when the agent starts, so the agent
  *     shows on the Offerings page. offerShown(crewDef) reads it back for the proposal page.
@@ -62,7 +65,7 @@ Answer with one JSON object and nothing else, in this shape:
   "does": ["two to four short sentences: what the agent does, step by step, in plain words"],
   "when": { "kind": "ask or clock or talk", "cron": "a five-field cron expression, for clock only" },
   "reach": "readonly or standard",
-  "offer": { "title": "what the agent offers, at most eight words", "ask": "one or two sentences: what to give it, what it returns, and what it does not do", "example": "one short example: an input and what comes back" },
+  "offer": { "title": "what the agent offers, at most eight words", "ask": "one or two sentences: what to give it, what it returns, and what it does not do", "example": "one real request, written as the person would send it to the agent, with a sample of what they would give it. The request only, not the result" },
   "crew_def": {
     "agent_name": "the same id as name",
     "process": "sequential",
@@ -181,9 +184,23 @@ export function cronFor(days, hhmm) {
   return `${min} ${h} * * ${days === 'weekdays' ? '1-5' : '*'}`;
 }
 
+/**
+ * A draft's offers under the name the agent is made with. The offer was written with the name the
+ * model proposed as its id; when the person changed the short name on the form, the id follows it,
+ * so the offer is not published under a name no agent has. An id the model did not derive from the
+ * drafted name is left as written.
+ */
+function offersUnder(crewDef, name) {
+  const drafted = crewDef?.agent_name;
+  if (!Array.isArray(crewDef?.offers) || !drafted || drafted === name) return {};
+  return { offers: crewDef.offers.map((o) => (o && typeof o === 'object' && o.id === drafted ? { ...o, id: name } : o)) };
+}
+
 /** The definition a draft starts with, shaped by when it works. */
 function definitionFor(draft, when) {
-  const def = draft.crewDef ? { ...draft.crewDef, agent_name: draft.name } : buildTemplate(draft.template || 'researcher', draft.name);
+  const def = draft.crewDef
+    ? { ...draft.crewDef, agent_name: draft.name, ...offersUnder(draft.crewDef, draft.name) }
+    : buildTemplate(draft.template || 'researcher', draft.name);
   const hears = new Set(Array.isArray(def.listen_for) && def.listen_for.length ? def.listen_for : ['tasks']);
   if (when === 'talk' || when === 'always') { hears.add('messages'); hears.add('dms'); }
   // AN AGENT THAT HEARS A MESSAGE MUST BE ABLE TO ANSWER IT. The `dm` tool is what sends a reply, and

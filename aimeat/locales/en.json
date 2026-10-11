@@ -13000,6 +13000,8 @@
       "untied": "Untied. The app and the agent are as they were.",
       "tieNone": "Every app of yours is already on this list, or you have no app yet.",
       "tieLabel": "Which app shows its work?",
+      "tiePick": "Type a part of the app's name",
+      "tieNoMatch": "No app of yours has that in its name.",
       "tieNote": "The tie is a statement on the app's data map. It gives the app no new permission.",
       "tieDo": "Tie the app",
       "untieLabel": "Which app no longer shows its work?",
