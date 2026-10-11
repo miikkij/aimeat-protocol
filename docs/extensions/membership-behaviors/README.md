@@ -1,32 +1,34 @@
 # membership-behaviors
 
-Group membership management extension for AIMEAT organisms. Provides join policies (open, approval-required, invite-only), role-based access control, and membership lifecycle actions.
+Group membership management extension for AIMEAT nodes. Provides join policies (open, approval-required, invite-only), roles, and membership lifecycle actions.
+
+A group here is a record in this extension's own memory. The field names say `organism`, but it is not a platform organism (those have their own membership, at `/v1/organisms`); this extension is an example of how an extension keeps a membership list of its own.
 
 ## Prerequisites
 
-- AIMEAT node running v1.5 or later
-- An organism must exist in memory before membership actions can be used
-- The organism record should include a `join_policy` field (`open`, `approval_required`, or `invite_only`) and a `creator_ghii` field
+- An AIMEAT node at 3.26 or later. The node ships this extension in `docs/extensions/`.
 
 ## Installation
 
-Register the extension on your AIMEAT node:
+The operator installs it with one call, and it is active at once:
 
 ```bash
-curl -X POST https://your-node/v1/extensions \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{ "url": "https://extensions.aimeat.org/membership-behaviors/extension.yaml" }'
-```
-
-Then activate it:
-
-```bash
-curl -X POST https://your-node/v1/extensions/membership-behaviors/activate \
-  -H "Authorization: Bearer $TOKEN"
+curl -X POST https://your-node/v1/admin/extensions/available/membership-behaviors/install \
+  -H "Authorization: Bearer $OPERATOR_TOKEN"
 ```
 
 ## Actions
+
+### create
+
+Create a group. The caller becomes its creator and first admin. The other actions need the group to exist.
+
+```
+POST /v1/ext/membership-behaviors/create
+{ "organismKey": "org.hiking-club", "name": "Hiking club", "join_policy": "approval_required", "max_members": 200 }
+```
+
+`join_policy` is `open` when left out and `max_members` is 10,000. A second `create` with the same key is refused.
 
 ### join
 
@@ -47,7 +49,7 @@ Invite a user to join an organism. Only the organism creator or members with the
 
 ```
 POST /v1/ext/membership-behaviors/invite
-{ "organismKey": "org.hiking-club", "inviteeGhii": "ghii-abc123" }
+{ "organismKey": "org.hiking-club", "inviteeGhii": "alice@your-node" }
 ```
 
 ### leave
@@ -65,7 +67,7 @@ Change a member's role between `member` and `admin`. Only the organism creator o
 
 ```
 POST /v1/ext/membership-behaviors/promote
-{ "organismKey": "org.hiking-club", "memberGhii": "ghii-abc123", "role": "admin" }
+{ "organismKey": "org.hiking-club", "memberGhii": "alice@your-node", "role": "admin" }
 ```
 
 ### review-request
@@ -101,10 +103,11 @@ Invitee -> join(organismKey) -> joined (role: member)
 
 ## Data Stored in Memory
 
-The extension stores membership data under the following memory keys:
+The extension stores its data in its own namespace, `ext:membership-behaviors`. The group record is public; who belongs to a group, and who asked to join, is personal data and is written private.
 
 | Key pattern | Contents |
 |---|---|
+| `{organismKey}` | The group: `name`, `join_policy`, `max_members`, `creator_ghii`, `createdAt`. Public. |
 | `{organismKey}.members` | Object with `members` array. Each entry has `ghii`, `role`, `status`, `joinedAt`, and optionally `invitedBy`, `invitedAt`, `promotedBy`, `promotedAt`, `approvedBy`. |
 | `{organismKey}.join-requests` | Object with `requests` array. Each entry has `id`, `ghii`, `message`, `status` (`pending`, `approved`, `rejected`), `createdAt`, and optionally `reviewedBy`, `reviewedAt`. |
 

@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-11 -- e2e-bundled-extensions.ts joins the list (not the guard tier): the four extensions
+ *     in docs/extensions installed and run action by action; the marketplace paces, never prices.
  *   2026-10-11 -- e2e-pacing-two-values.ts joins the list (not the guard tier): an offer has a money
  *     price and a pacing amount, and a morsel is never a price.
  *   2026-10-11 -- e2e-model-suite.ts joins the list (not the guard tier): the suite
@@ -333,6 +335,8 @@ const ALL_SUITES = [
     // knowledge admin. e2e-admin-features keeps the refusals and reads.
     'test/e2e-admin-doors.ts',
     'test/e2e-admin-doors-2.ts',
+    // The four bundled extensions (docs/extensions) installed and RUN, action by action.
+    'test/e2e-bundled-extensions.ts',
     // The admin password creates the first operator only (secrets audit 2026-10-09, 1.4). Runs with
     // AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=false (ADMIN_SETUP_CLOSED_SUITES).
     'test/e2e-admin-setup-closed.ts',

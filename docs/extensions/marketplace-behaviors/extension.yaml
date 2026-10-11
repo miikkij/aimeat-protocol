@@ -2,17 +2,21 @@ extension: "1.0"
 
 metadata:
   name: "marketplace-behaviors"
-  version: "2.0.0"
-  description: "Multi-instance marketplace with purchase workflow, delivery confirmation, and ratings"
+  version: "3.0.0"
+  description: "Multi-instance marketplace: listings with a money price, an agreement to buy, delivery confirmation and ratings. Payment is settled outside the extension"
   author: "aimeat-core"
   license: "MIT"
-  aimeat: ">=1.5"
+  aimeat: ">=3.26"
+
+# A morsel paces use and is never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
+# kaksi-arvoa). Two actions declare a pacing amount, `tollMorsels`, which the NODE charges per call
+# before the script runs and credits to whoever installed the extension; the installer calls free.
+# The scripts never touch the caller's wallet. A listing's price is money, stored as data: the buyer
+# pays the seller outside this extension, or through the node's checkout when the seller sells the
+# item as an offer or app tool with a money price.
 
 required_apis:
-  - wallet
   - memory
-  - consent
-  - trust
 
 instances:
   supported: true
@@ -32,19 +36,17 @@ instances:
         type: array
         items: { type: string }
         default: ["general"]
-      listing_fee_morsels:
-        type: integer
-        default: 2
-      transaction_fee_percent:
-        type: integer
-        default: 5
+      currency:
+        type: string
+        default: "EUR"
 
 actions:
   - id: create-listing
-    description: "Create a new marketplace listing"
+    description: "Create a new marketplace listing with a money price"
     method: POST
     path: "/v1/ext/marketplace-behaviors/:instanceId/create-listing"
     auth: required
+    tollMorsels: 2
     input:
       title:
         type: string
@@ -55,6 +57,10 @@ actions:
       price:
         type: number
         required: true
+        description: "The money price, in units of the currency (12.5 is 12.50)"
+      currency:
+        type: string
+        description: "ISO 4217 code; the instance's currency when left out"
       category:
         type: string
     output:
@@ -117,10 +123,11 @@ actions:
     script: "actions/browse.js"
 
   - id: purchase
-    description: "Purchase a listing"
+    description: "Agree to buy a listing at its money price; the listing is reserved for the buyer. Payment is settled between buyer and seller, not by this action"
     method: POST
     path: "/v1/ext/marketplace-behaviors/:instanceId/purchase"
     auth: required
+    tollMorsels: 1
     input:
       listingId:
         type: string
@@ -128,15 +135,17 @@ actions:
     output:
       purchaseId:
         type: string
-      total:
+      price:
         type: number
+      currency:
+        type: string
       status:
         type: string
-        enum: [purchased]
+        enum: [agreed]
     script: "actions/purchase.js"
 
   - id: deliver
-    description: "Confirm delivery of a purchased item"
+    description: "Confirm delivery of an item the buyer agreed to buy"
     method: POST
     path: "/v1/ext/marketplace-behaviors/:instanceId/deliver"
     auth: required
@@ -192,14 +201,10 @@ limits:
   max_api_calls: 50
 
 config:
-  listing_fee_morsels:
-    type: integer
-    default: 2
-    description: "Global default fee charged to create a listing"
-  transaction_fee_percent:
-    type: integer
-    default: 5
-    description: "Global default percentage fee on each transaction"
+  currency:
+    type: string
+    default: "EUR"
+    description: "Default currency of a listing's money price when the instance names none"
 
 federation:
   advertise: true

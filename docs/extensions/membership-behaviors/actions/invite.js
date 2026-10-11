@@ -31,7 +31,7 @@ export default async function(ctx, input) {
     invitedBy: ctx.caller.gaii,
     invitedAt: new Date().toISOString(),
   });
-  await ctx.memory.set(membersKey, membersData);
+  await ctx.memory.set(membersKey, membersData, { visibility: 'private' });
 
   ctx.log.info('Member invited', {
     organism: input.organismKey,

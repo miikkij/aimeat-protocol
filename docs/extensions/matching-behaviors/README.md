@@ -1,10 +1,23 @@
 # matching-behaviors
 
-QuickJS-WASM sandbox extension for interest-based matching with geographic proximity scoring. Migrated from the built-in matching service (`src/services/matching.ts`).
+QuickJS-WASM sandbox extension for interest-based matching with geographic proximity scoring. It replaced the node's earlier built-in matching service.
 
 ## Overview
 
 This extension pairs users based on shared interests, geographic proximity, recent activity, and compatibility preferences. It supports multiple instances, allowing operators to run separate matching pools (e.g., by community, topic, or region).
+
+## Installation
+
+The node (3.26 or later) ships this extension in `docs/extensions/`. The operator installs it with one call, and it is active at once:
+
+```
+POST /v1/admin/extensions/available/matching-behaviors/install
+Authorization: Bearer <operator-token>
+```
+
+Then create an instance: `POST /v1/extensions/matching-behaviors/instances` with `{ "id": "hobbies", "config": { ... } }`, and call the actions at `POST /v1/ext/matching-behaviors/<instanceId>/<action>`.
+
+**Consent first.** `create-profile` refuses with `CONSENT_REQUIRED: matching` until the person holds an active consent whose purpose is `matching` (`POST /v1/consent` with `"purpose": "matching"`, or `aimeat_consent_grant` over MCP).
 
 ## Multi-Instance Support
 

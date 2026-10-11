@@ -21,7 +21,7 @@ export default async function(ctx, input) {
 
   // Remove the member
   membersData.members.splice(memberIndex, 1);
-  await ctx.memory.set(membersKey, membersData);
+  await ctx.memory.set(membersKey, membersData, { visibility: 'private' });
 
   ctx.log.info('Member left', { organism: input.organismKey, member: callerGhii });
   return { status: 'left' };

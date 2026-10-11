@@ -34,7 +34,7 @@ export default async function(ctx, input) {
     // Accept the invite
     pendingInvite.status = 'active';
     pendingInvite.joinedAt = new Date().toISOString();
-    await ctx.memory.set(membersKey, membersData);
+    await ctx.memory.set(membersKey, membersData, { visibility: 'private' });
 
     ctx.log.info('Invite accepted', { organism: input.organismKey, member: callerGhii });
     return { status: 'joined', role: pendingInvite.role || 'member' };
@@ -61,7 +61,7 @@ export default async function(ctx, input) {
       status: 'pending',
       createdAt: new Date().toISOString(),
     });
-    await ctx.memory.set(requestsKey, requestsData);
+    await ctx.memory.set(requestsKey, requestsData, { visibility: 'private' });
 
     ctx.log.info('Join request submitted', { organism: input.organismKey, requester: callerGhii });
     return { status: 'pending', requestId };
@@ -74,7 +74,7 @@ export default async function(ctx, input) {
     status: 'active',
     joinedAt: new Date().toISOString(),
   });
-  await ctx.memory.set(membersKey, membersData);
+  await ctx.memory.set(membersKey, membersData, { visibility: 'private' });
 
   ctx.log.info('Member joined', { organism: input.organismKey, member: callerGhii });
   return { status: 'joined', role: 'member' };

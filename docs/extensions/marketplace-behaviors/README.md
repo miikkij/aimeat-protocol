@@ -1,50 +1,47 @@
 # marketplace-behaviors Extension
 
-Multi-instance marketplace extension for AIMEAT nodes. Supports access-controlled marketplaces with listing management, purchase workflow, delivery confirmation, and buyer ratings.
+Multi-instance marketplace extension for AIMEAT nodes: access-controlled marketplaces with listings that carry a money price, an agreement to buy, delivery confirmation and buyer ratings.
+
+**This extension does not move money.** A listing's price is money, stored as data. The buyer pays the seller outside the extension (cash at pickup, a bank transfer), or through the node's checkout when the seller sells the item as an offer or app tool with a money price. The extension records who agreed to buy what, and tracks delivery and the rating.
 
 ## Prerequisites
 
-- AIMEAT node running v1.5 or later
-- Wallet API enabled with morsel balances for buyers
-- Trust API enabled for seller reputation scoring
+- An AIMEAT node at 3.26 or later. The node ships this extension in `docs/extensions/`.
 
 ## Installation
 
-Upload the extension bundle to your node:
+The operator installs it with one call, and it is active at once:
 
 ```
-POST /v1/extensions
-Content-Type: application/json
-Authorization: Bearer <operator-token>
-
-{
-  "name": "marketplace-behaviors",
-  "source": "https://extensions.aimeat.io/marketplace-behaviors-2.0.0.tar.gz"
-}
-```
-
-Then activate it:
-
-```
-POST /v1/extensions/marketplace-behaviors/activate
+POST /v1/admin/extensions/available/marketplace-behaviors/install
 Authorization: Bearer <operator-token>
 ```
+
+## Pacing
+
+Two actions declare a pacing amount in morsels per call, which the node charges before the script runs:
+
+| Action | `tollMorsels` |
+|---|---|
+| `create-listing` | 2 |
+| `purchase` | 1 |
+
+A morsel paces how much a person's agents do; it is never a price, a fee or a currency. The node takes the amount from the caller's morsels, burns the operator's burn-rate share and credits the rest to whoever installed the extension. The installer's own calls are free. The scripts never touch the caller's wallet. When the caller has too few morsels, the node answers 402 and names the daily allowance and, when the operator sells one, a pacing pack.
 
 ## Multi-Instance Support
 
-A single node can host multiple independent marketplaces. Each instance has its own configuration for visibility, categories, and fees. Create an instance:
+A single node can host multiple independent marketplaces. Each instance has its own visibility, categories and currency. Create an instance (the installer or the operator):
 
 ```
 POST /v1/extensions/marketplace-behaviors/instances
-Authorization: Bearer <operator-token>
+Authorization: Bearer <token>
 
 {
   "id": "vintage-books",
   "config": {
     "visibility": "public",
     "categories": ["fiction", "non-fiction", "rare"],
-    "listing_fee_morsels": 3,
-    "transaction_fee_percent": 8
+    "currency": "EUR"
   }
 }
 ```
@@ -57,27 +54,26 @@ Authorization: Bearer <operator-token>
 | `password` | string | - | Required password when visibility is `password` |
 | `allowed_users` | array | `[]` | List of GAIIs allowed when visibility is `invite` |
 | `categories` | array | `["general"]` | Allowed listing categories |
-| `listing_fee_morsels` | integer | `2` | Morsel fee charged to create a listing |
-| `transaction_fee_percent` | integer | `5` | Percentage fee added to each purchase |
+| `currency` | string | `EUR` | Currency of a listing's money price when the listing names none |
 
 ### Visibility Modes
 
-- **public** -- Anyone can browse and create listings.
+- **public** -- Anyone signed in can browse and create listings.
 - **password** -- Users must include `_password` in their request body to access the marketplace.
 - **invite** -- Only GAIIs listed in `allowed_users` (and operators) can access the marketplace.
 
 ## Actions
 
-All action endpoints are instance-scoped: `/v1/ext/marketplace-behaviors/:instanceId/<action>`
+All action endpoints are instance-scoped: `POST /v1/ext/marketplace-behaviors/:instanceId/<action>`
 
 ### create-listing
 
 Create a new listing in the marketplace.
 
 - Checks instance access (visibility/password/invite)
-- Validates title, description, and price (must be > 0)
+- Validates title, description, and price (a positive money amount, such as `12.5`)
+- Takes `currency` (ISO 4217, such as `EUR`), or the instance's currency
 - Validates category against instance-configured categories
-- Charges listing fee from caller's wallet
 - Returns `{ listingId }`
 
 ### update-listing
@@ -96,18 +92,17 @@ Browse listings with filters and pagination.
 
 ### purchase
 
-Purchase a listing.
+Agree to buy a listing at its money price.
 
 - Checks instance access
 - Verifies listing is active and buyer is not the seller
-- Calculates total: price + transaction fee percentage
-- Debits buyer's wallet via `ctx.wallet.consume`
-- Creates purchase record and sets listing status to `reserved`
-- Returns `{ purchaseId, total, status: 'purchased' }`
+- Creates a purchase record, private to the extension, and sets the listing to `reserved`
+- Takes no payment
+- Returns `{ purchaseId, price, currency, status: 'agreed' }`
 
 ### deliver
 
-Confirm delivery. Only the seller can call this on a `purchased` order.
+Confirm delivery. Only the seller can call this on an `agreed` purchase.
 
 - Updates purchase status to `delivered` with timestamp
 - Returns `{ status: 'delivered' }`
@@ -130,34 +125,30 @@ Remove a listing. The seller or any operator can delist.
 ## Purchase Lifecycle
 
 ```
-active  -->  reserved  -->  purchased  -->  delivered  -->  completed
-                                                  \
-                                                   --> delisted
+listing:   active  -->  reserved                      (or delisted at any point)
+purchase:              agreed  -->  delivered  -->  completed
 ```
 
-1. Seller creates a listing (status: `active`)
-2. Buyer purchases (listing: `reserved`, purchase: `purchased`)
+1. Seller creates a listing (listing: `active`)
+2. Buyer agrees to buy (listing: `reserved`, purchase: `agreed`); the buyer pays the seller
 3. Seller confirms delivery (purchase: `delivered`)
 4. Buyer rates (purchase: `completed`)
 
 At any point, the seller or an operator can delist a listing.
 
-## Global Configuration
+## Memory
 
-These values serve as defaults when instance config does not override them:
+Listings (`listing.<id>`) and ratings (`rating.<purchaseId>`) are public in the instance's namespace `ext:marketplace-behaviors.<instanceId>`, so anyone can browse them. Purchase records (`purchase.<id>`), which say who bought what, are written private.
+
+## Global Configuration
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `listing_fee_morsels` | integer | 2 | Default fee charged to create a listing |
-| `transaction_fee_percent` | integer | 5 | Default percentage fee on each transaction |
+| `currency` | string | `EUR` | Currency when neither the listing nor the instance names one |
 
 ## Federation
 
-When `federation.advertise` is enabled (the default), the node advertises these capabilities to peers:
-
-- `multi-instance` -- supports multiple independent marketplace instances
-- `purchase-workflow` -- the full create/purchase/deliver/rate lifecycle
-- `ratings` -- buyer rating system
+The manifest declares `federation.advertise: true` with the capabilities `multi-instance`, `purchase-workflow` and `ratings`. The node stores the declaration with the extension; nothing on the node reads it yet.
 
 ## Resource Limits
 

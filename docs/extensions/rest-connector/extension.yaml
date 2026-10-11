@@ -1,8 +1,8 @@
 extension: "1.0"
 
 # ── REST Connector (reference) ──────────────────────────────────────────────
-# A minimal, generic third-party data connector that demonstrates the Secretary
-# P5 / §18 "secret config" pattern: a per-instance API key (bring-your-own-key
+# A minimal, generic third-party data connector that demonstrates the
+# "secret config" pattern: a per-instance API key (bring-your-own-key
 # per tenant) marked `type: secret`, encrypted at rest with AES-256-GCM (the node
 # master key) and decrypted only just before the sandbox VM. The same `pull`
 # action works as a live action call AND as a scheduled (cron) sync.

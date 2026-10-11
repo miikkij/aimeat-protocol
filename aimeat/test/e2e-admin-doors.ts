@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-doors
  * @version-history
+ *   v1.2.1 — 2026-10-11 — membership-behaviors ships six actions: `create` makes the group record the
+ *     other five read, which nothing could write before (docs audit phase 2).
  *   v1.2.0 — 2026-10-09 — A reinstall from disk stores the manifest's capabilities and network hosts
  *     (the operator routes use the shared builder now). Failed on the code before: both were absent.
  *   v1.1.0 — 2026-09-26 — A6-7: the bundled install and the reinstall keep the version they deploy,
@@ -151,12 +153,12 @@ await test('POST .../available/membership-behaviors/install → 201, and the ext
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.extension.name === 'membership-behaviors', 'name in the answer');
     assert(body.data.extension.status === 'active', 'a bundled install activates immediately');
-    assert(body.data.extension.actionsCount === 5, `5 actions, got ${body.data.extension.actionsCount}`);
+    assert(body.data.extension.actionsCount === 6, `6 actions, got ${body.data.extension.actionsCount}`);
 
     const read = await json('/v1/extensions/membership-behaviors');
     assert(read.status === 200, `the installed extension must be readable: ${read.status}`);
     assert(read.body.data.extension.status === 'active', 'stored status is active');
-    assert(read.body.data.extension.actions.length === 5, 'stored actions were written');
+    assert(read.body.data.extension.actions.length === 6, 'stored actions were written');
 });
 
 await test('...and the catalogue now says so', async () => {
@@ -343,7 +345,7 @@ try {
             op({ method: 'POST' }));
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
         assert(body.data.reinstalled === true, 'it was already installed, so this is an update');
-        assert(body.data.extension.actionsCount === 5, 'the actions came back from disk');
+        assert(body.data.extension.actionsCount === 6, 'the actions came back from disk');
         const read = await json('/v1/extensions/membership-behaviors');
         assert(read.body.data.extension.status === 'active', 'still active after the update');
     });

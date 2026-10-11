@@ -1,7 +1,7 @@
 # rest-connector (reference connector)
 
 A minimal, generic third-party REST connector that demonstrates the **encrypted secret config**
-pattern (Secretary P5 / §18, sub-feature S-C).
+pattern.
 
 ## What it shows
 
@@ -18,7 +18,8 @@ pattern (Secretary P5 / §18, sub-feature S-C).
 
 ## Use
 
-1. Install + activate this extension (operator).
+1. Install it (operator, one call; it is active at once):
+   `POST /v1/admin/extensions/available/rest-connector/install`.
 2. Create an instance with your `apiKey` (+ optional `baseUrl`):
    `POST /v1/extensions/rest-connector/instances` → `{ "id": "acme", "config": { "apiKey": "…", "baseUrl": "https://api.example.com/v1/data" } }`
 3. Run a sync: `POST /v1/ext/rest-connector/acme/pull` (optionally `{ "url": "https://…" }` to
