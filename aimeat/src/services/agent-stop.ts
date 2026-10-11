@@ -18,10 +18,12 @@
  *        (agent-task-rules.ts decideTaskStart). One that would have started on its own, had the
  *        agent not been stopped, starts now, with the same 'started' event. One that waits for the
  *        owner's OK for another reason goes on waiting;
- *     3. sends the backlog down the agent's connector socket, so the runtime hears about every
- *        waiting task and message at once. The socket takes live deliveries again from step 2 on,
- *        which is how a released task reaches a connected runtime the moment it starts;
- *     4. for an agent that is reached by webhook, which has no backlog, sends the events that were
+ *     3. sends ONE backlog down the agent's connector socket: the released tasks as running, the
+ *        tasks that still wait, and the unread messages. One frame, so the runtime is woken once.
+ *        A released task gets no delivery frame of its own;
+ *     4. sends the direct messages that arrived during the stop, one `dm.inbound` each, because a
+ *        direct message is in no backlog (sendHeldDirectMessages says why);
+ *     5. for an agent that is reached by webhook, which has no backlog, sends the events that were
  *        held: the released tasks, the tasks that still wait, and the unread messages.
  *   Scheduled runs that were skipped are NOT run: a week of hourly runs must not arrive in one
  *   minute. The schedule's next run happens at its time.
@@ -33,16 +35,22 @@
  *   IDEMPOTENT. Stopping a stopped agent and starting a running one answer ok and change nothing,
  *   so a person or an AI that presses twice is not told it failed.
  * @structure setAgentStopped(deps, callerOwner, callerPrincipal, identifier, stop) · releaseWaitingTasks() ·
- *   sendHeldWebhookEvents() · agentIsStopped()
+ *   sendHeldDirectMessages() · sendHeldWebhookEvents() · agentIsStopped()
  * @usage
  *   const out = await setAgentStopped({ storage, config }, req.auth!.owner, principal, name, true);
  * @version-history
+ *   v1.1.0 — 2026-10-11 — Two defects a live fleet measured the day this shipped. A direct message
+ *     that arrived during the stop was never delivered after the start: it is sent now. A start
+ *     woke a runtime twice, by a frame per released task and then by the backlog: the backlog alone
+ *     carries the released tasks now.
  *   v1.0.0 — 2026-10-11 — Initial (wish-pys-yt-agentti-agentille-pys-ytetty-tila-ja-k-ynnistys-uudel).
  */
 import { randomUUID } from 'node:crypto';
 import type { AgentRecord, AgentTaskRecord } from '../storage/interface.js';
 import { resolveAgentTarget, type AgentWriteDeps, type AgentWriteRefusal } from './agent-profile-write.js';
-import { decideTaskStart, autoStartEvent, taskWakeId } from './agent-task-rules.js';
+import { decideTaskStart, autoStartEvent } from './agent-task-rules.js';
+import { readAgentDmInbox } from './agent-dm-reads.js';
+import { messagePreview } from '../utils/messaging.js';
 import { withWildcardFacts } from './scope-use.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
@@ -87,8 +95,8 @@ export async function releaseWaitingTasks(deps: AgentWriteDeps, agent: AgentReco
         ...autoStartEvent(decision, ' when the agent was started'),
       });
       await recordTaskStarted(storage, agent.gaii);
-      // Reaches a connected runtime at once; the backlog that follows a start carries it as well.
-      emitDelivery({ target: agent.gaii, kind: 'task_assigned', id: taskWakeId(task.id, 'active', now), payload: updated });
+      // No delivery of its own: the one backlog that follows the release lists it as running. A
+      // frame per task beside that backlog woke a runtime twice for one start.
       started.push(updated);
     } catch (err) {
       logger.warn('agent-stop: a waiting task could not be started', { gaii: agent.gaii, taskId: task.id, error: String(err) });
@@ -132,6 +140,41 @@ async function sendHeldWebhookEvents(deps: AgentWriteDeps, agent: AgentRecord, s
   }
 }
 
+/** The most direct messages one start sends again. More than this have piled up only on an agent stopped for a long time; the rest stay readable with aimeat_dm_inbox. */
+const HELD_DM_LIMIT = 100;
+
+/**
+ * The direct messages that arrived while the agent was stopped, sent down its connector socket now.
+ *
+ * A DIRECT MESSAGE IS NOT PART OF A BACKLOG. It wakes an agent with one `dm.inbound` delivery when
+ * it arrives, and nothing lists it again; an agent that was offline reads `aimeat_dm_inbox` when it
+ * wants to. So a stop that held that one delivery has to send it at the start, or the message is
+ * never heard. Measured on a live fleet on 2026-10-11: an always-on agent answered a new message in
+ * 9.8 s after its start and never answered the one that had waited.
+ *
+ * "While it was stopped" is `createdAt` at or after the stop, read from the agent's own inbox
+ * (agent-dm-reads.ts), oldest first, with the payload a live delivery carries (message-send.ts).
+ * A message from before the stop was delivered when it arrived and is not sent again.
+ */
+async function sendHeldDirectMessages(deps: AgentWriteDeps, agent: AgentRecord, stoppedAt: string): Promise<number> {
+  const { messages } = await readAgentDmInbox(deps.storage, agent.gaii, { page: 1, perPage: HELD_DM_LIMIT });
+  const held = messages.filter(m => m.createdAt >= stoppedAt).reverse();
+  const sent = new Set<string>();
+  for (const m of held) {
+    if (sent.has(m.id)) continue;
+    sent.add(m.id);
+    emitDelivery({
+      target: agent.gaii, kind: 'dm.inbound', id: m.id,
+      payload: {
+        id: m.id, conversationId: m.conversationId, subject: m.subject ?? null, senderGhii: m.senderGhii,
+        preview: messagePreview(m.body), attachments: m.attachments?.length ?? 0, createdAt: m.createdAt,
+        interactive: m.interactive?.role ?? null,
+      },
+    });
+  }
+  return sent.size;
+}
+
 export async function setAgentStopped(
   deps: AgentWriteDeps, callerOwner: string, callerPrincipal: string, identifier: string, stop: boolean,
 ): Promise<AgentStopOutcome> {
@@ -158,12 +201,16 @@ export async function setAgentStopped(
   if (stop) {
     tunnels?.setStopped(gaii, true);
   } else {
-    // The socket takes live deliveries first, so a released task reaches a connected runtime as it
-    // starts; the backlog follows the release, so it lists those tasks as running.
-    tunnels?.setStopped(gaii, false, false);
+    // Release first, then ONE backlog: it lists the released tasks as running, the tasks that still
+    // wait and the unread messages, so the runtime is woken once for all of them.
     const started = await releaseWaitingTasks(deps, updated);
     released = started.length;
     tunnels?.setStopped(gaii, false);
+    // Direct messages are in no backlog; the ones that arrived during the stop go out one by one.
+    if (agent.stoppedAt) {
+      await sendHeldDirectMessages(deps, updated, agent.stoppedAt).catch(err =>
+        logger.warn('agent-stop: the held direct messages could not be sent', { gaii, error: String(err) }));
+    }
     void sendHeldWebhookEvents(deps, updated, started).catch(err =>
       logger.warn('agent-stop: the held webhook events could not be sent', { gaii, error: String(err) }));
   }
