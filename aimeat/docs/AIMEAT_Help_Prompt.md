@@ -22,7 +22,7 @@ It returns an up-to-date JSON map of this node: identity, capabilities, the gett
 - Endpoint: `{{node_url}}/v1/mcp` · Auth: OAuth 2.1 (no API keys, no stdio proxy).
 - Add the node as an MCP connector; the AIMEAT tools become available immediately.
 - Claude Code, one line: `claude mcp add aimeat --transport http {{node_url}}/v1/mcp`
-- Available in ChatGPT via Developer mode. For the Gemini consumer app and Microsoft Copilot, use the copy-prompt path below.
+- Available in ChatGPT via Developer mode. The Gemini consumer app connects a custom MCP server on its web app in the United States (Settings > Connected Apps > Add a custom app); outside the United States, and for Microsoft Copilot, use the copy-prompt path below.
 
 ### B) Agent via Device Authorization (RFC 8628) — for a real agent/fleet
 The human owner approves every agent, so the flow below waits on them:

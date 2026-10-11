@@ -225,7 +225,8 @@ command ran in (or `AIMEAT_HOME`), which keeps itself out of git. You never hand
   `<NODE_URL>/v1/mcp` (or a narrower `<NODE_URL>/v2/mcp/<surface>`). For Dify, see
   [aimeat/tools/dify-bridge/README.md](aimeat/tools/dify-bridge/README.md).
 
-**An AI that cannot connect at all** (a consumer Gemini app, Copilot without Copilot Studio) still
+**An AI that cannot connect at all** (a consumer Gemini app outside the United States, Copilot
+without Copilot Studio) still
 works through prompts: the node's pages compose a ready prompt, the person runs it in their own chat
 and pastes the answer back.
 

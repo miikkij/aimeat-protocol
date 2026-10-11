@@ -41,7 +41,7 @@ Sign in when your AI asks, and choose what it may do: read only, standard, full,
   ```
 
   The options, the guarantees and the other clients: [Connecting an AI client](https://github.com/miikkij/aimeat-protocol/blob/main/docs/c-platform-notes.md).
-- **An AI that cannot connect over MCP** (a consumer Gemini app, Copilot without Copilot Studio) still works. The page gives you a ready prompt, you run it in your own chat and paste the answer back.
+- **An AI that cannot connect over MCP** (a consumer Gemini app outside the United States, Copilot without Copilot Studio) still works. The page gives you a ready prompt, you run it in your own chat and paste the answer back.
 - **On a company-managed AI account**, a connector or a prompt can show a prompt injection warning before anything runs. [What it means and what to do](https://github.com/miikkij/aimeat-protocol/blob/main/docs/c-platform-notes.md#prompt-injection-warnings-on-company-managed-accounts).
 
 aimeat.io is the demonstration node. It is free to try and it runs for real. To keep your knowledge on a machine of your own, take the second way in.
