@@ -144,7 +144,7 @@ export function templateDraft(id) {
 
 /** What a person says to their own AI to have it propose the same agent. English: an AI reads it. */
 export function ownAiRequest(sentence, connectorName) {
-  const where = connectorName ? ` It runs on my machine called "${connectorName}": read my machines with aimeat_connector_list and pass that one as connector.` : '';
+  const where = connectorName ? ` It runs on my computer called "${connectorName}": read my computers with aimeat_connector_list and pass that one as connector.` : '';
   return `Make me an agent on my AIMEAT: ${sentence}\n\nRead what I keep there that it will work on (aimeat_organism_list, aimeat_workspace_list), then propose the agent with aimeat_agent_propose and its crew_def.${where} Give me the address where I approve it.`;
 }
 

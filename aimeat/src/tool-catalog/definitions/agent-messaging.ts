@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   2026-10-10 — aimeat_connector_list and aimeat_connector_rename, and `connector` on
  *     aimeat_agent_propose: an agent is ordered to one of the owner's machines by name.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -336,12 +337,12 @@ export const agentMessagingTools = [
             mode: { type: 'string', description: "How the node treats its tasks: 'task-runner' activates a queued task without asking the owner each time; also autonomous, interactive, coordinator, workstation." },
             run_mode: { type: 'string', description: "'spawn' starts a worker per piece of work (right for bursty jobs); 'resident' stays up (right for an agent that answers people as they write, at a few seconds of cold start saved)." },
             crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape — the same document aimeat_crew_publish takes. Strongly recommended.' },
-            connector: { type: 'string', description: "Which of the account's connectors (machines) runs it, by name or id from aimeat_connector_list. Send it when the person said where the agent is to run. Leave it out otherwise: the person chooses when approving, and an account with one connector has nothing to choose.", zod: z.string().max(80) },
+            connector: { type: 'string', description: "Which of the account's connectors (computers) runs it, by name or id from aimeat_connector_list. Send it when the person said where the agent is to run. Leave it out otherwise: the person chooses when approving, and an account with one connector has nothing to choose.", zod: z.string().max(80) },
         },
     },
     {
         name: 'aimeat_connector_list',
-        description: "The machines this account's agents run on. A connector is the program (`aimeat connect serve`) that holds a person's agents on one machine: their own computer, a server, or the one that comes with a hosted AIMEAT. Returns each connector with its id, its name (the person's own name for it, else the name the machine reported), whether it is connected right now, when it was last seen, the run modes it presented, the agents that live on it, and the agents that wait for it. Call this before aimeat_agent_propose when the person says where an agent is to run (\"on my home machine\"), and pass that connector's name or id as `connector`. When the person asks why an agent does nothing, look here: an agent on a connector that is not connected starts when that machine comes back. Say the machine's name to the person, never its id.",
+        description: "The computers this account's agents run on. A connector is the program (`aimeat connect serve`) that holds a person's agents on one computer: their own laptop or computer, a server, a computer in the cloud, or the one that comes with an AIMEAT instance bought from the store. Returns each connector with its id, its name (the person's own name for it, else the name the computer reported), whether it is connected right now, when it was last seen, the run modes it presented, the agents that live on it, and the agents that wait for it. Call this before aimeat_agent_propose when the person says where an agent is to run (\"on my home computer\"), and pass that connector's name or id as `connector`. When the person asks why an agent does nothing, look here: an agent on a connector that is not connected starts when that computer comes back. To the person, say \"computer\" and its name; never say \"machine\" or \"connector\", and never its id.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List the Account\'s Connectors', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -355,7 +356,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_connector_rename',
-        description: "Give one of the account's connectors a name the person recognises, such as \"Home machine\" or \"Office server\". The name is what the person sees on their pages and what `connector` in aimeat_agent_propose accepts. 1 to 60 characters, and two connectors cannot share one. Use it when the person names a machine, or when aimeat_connector_list shows one with no name and the person tells you which machine it is.",
+        description: "Give one of the account's connectors a name the person recognises, such as \"Home computer\" or \"Office server\". The name is what the person sees on their pages and what `connector` in aimeat_agent_propose accepts. 1 to 60 characters, and two connectors cannot share one. Use it when the person names a computer, or when aimeat_connector_list shows one with no name and the person tells you which computer it is.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Name a Connector', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

@@ -23,8 +23,12 @@
  *
  *   Composed from library components only; it has no sheet of its own.
  * @structure default MachinesView({ navigate }); internal: Machine
- * @usage routed at /v1/home?machines=1 by spa.html
+ *   THE WORD A PERSON READS IS "COMPUTER" (Jouni, 2026-10-11): computer, laptop, server, cloud,
+ *   AIMEAT instance, never "machine". The file, its locale keys and the code keep the older name;
+ *   every sentence on the page says computer.
+ * @usage routed at /v1/home?computers=1 by spa.html (the older /v1/home?machines=1 opens it too)
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.1.0 — 2026-10-10 — The way to the store for a machine the operator runs.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
@@ -93,12 +97,12 @@ function Machine({ c, others, onChanged, confirm }) {
   };
 
   const forget = () => confirm(
-    m('forgetAsk', 'Forget {name}? Its agents stay. An agent that was waiting for it goes to the next machine that connects.').replace('{name}', machineName(c)),
+    m('forgetAsk', 'Forget {name}? Its agents stay. An agent that was waiting for it goes to the next computer that connects.').replace('{name}', machineName(c)),
     async () => {
       try { await apiDelete(path); onChanged(); }
       catch (err) { setSaid({ ok: false, text: err?.message || String(err) }); }
     },
-    { danger: true, confirmLabel: m('forget', 'Forget this machine') },
+    { danger: true, confirmLabel: m('forget', 'Forget this computer') },
   );
 
   const ask = async () => {
@@ -149,7 +153,7 @@ function Machine({ c, others, onChanged, confirm }) {
     const models = (menu.models ?? []).length;
     rows.push({ k: m('can', 'What it can do'), missing: silent, v: tools.length
       ? html`<${Marks}>${tools.map((id) => html`<${Mark} key=${id}>${id}<//>`)}<//>`
-      : silent ? m('canSilent', 'The machine did not answer. The program that runs agents on it may be stopped.')
+      : silent ? m('canSilent', 'The computer did not answer. The program that runs agents on it may be stopped.')
         : m('canNone', 'Its runtime named no tools.'),
       sub: models > 0 ? m('models', '{n} AI models are within its reach.').replace('{n}', String(models)) : undefined });
   }
@@ -165,7 +169,7 @@ function Machine({ c, others, onChanged, confirm }) {
 
         ${naming && html`
           <${Fields}>
-            <${TextField} label=${m('nameLabel', 'Your name for this machine')} value=${name} onInput=${setName} onEnter=${rename}
+            <${TextField} label=${m('nameLabel', 'Your name for this computer')} value=${name} onInput=${setName} onEnter=${rename}
               maxLength=${60} placeholder=${m('namePlaceholder', 'Home computer')} />
             <${FormActions}>
               <${Loud} control disabled=${busy || !name.trim()} onClick=${rename}>${m('save', 'Save the name')}<//>
@@ -193,10 +197,10 @@ function Machine({ c, others, onChanged, confirm }) {
         <${Actions}>
           ${!naming && html`<${Action} small onClick=${() => { setName(c.name || ''); setNaming(true); }}>${m('rename', 'Rename')}<//>`}
           ${c.online && c.agents.length > 0 && !menu && html`
-            <${Action} small disabled=${asking} onClick=${ask}>${asking ? m('asking', 'Asking the machine…') : m('ask', 'Show what it can do')}<//>`}
+            <${Action} small disabled=${asking} onClick=${ask}>${asking ? m('asking', 'Asking the computer…') : m('ask', 'Show what it can do')}<//>`}
           ${everyone.length > 0 && others.length > 0 && !moving && html`
-            <${Action} small onClick=${() => setMoving(true)}>${m('move', 'Move its agents to another machine')}<//>`}
-          ${!c.online && html`<${Action} small tone="danger" onClick=${forget}>${m('forget', 'Forget this machine')}<//>`}
+            <${Action} small onClick=${() => setMoving(true)}>${m('move', 'Move its agents to another computer')}<//>`}
+          ${!c.online && html`<${Action} small tone="danger" onClick=${forget}>${m('forget', 'Forget this computer')}<//>`}
         <//>
       <//>
     <//>`;
@@ -232,7 +236,7 @@ export default function MachinesView({ navigate }) {
   if (!session) {
     return html`
       <${PageFrame} width="narrow">
-        <${PageIntro} title=${m('title', 'Your machines')} sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
+        <${PageIntro} title=${m('title', 'Your computers')} sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
         <${FormActions}><${Loud} onClick=${() => navigate('/v1/portal')}>${tr('home.signIn', 'Sign in')}<//><//>
       <//>`;
   }
@@ -242,12 +246,12 @@ export default function MachinesView({ navigate }) {
   return html`
     <${PageFrame} width="narrow">
       ${back}
-      <${PageIntro} title=${m('title', 'Your machines')}
-        sub=${m('sub', 'A machine is a place where your agents run. An agent can use only what its machine can do and what you allowed it.')} />
+      <${PageIntro} title=${m('title', 'Your computers')}
+        sub=${m('sub', 'A computer is where your agents run: your laptop, a server, a computer in the cloud, or an AIMEAT instance from the store. An agent can use only what its computer can do and what you allowed it.')} />
 
       ${machines.length === 0
         ? html`<${Note} kind="aside">
-            <b>${tr('home.agents.noMachineTitle', 'An agent needs a machine to run on. You have no machine yet.')}</b>
+            <b>${tr('home.agents.noMachineTitle', 'An agent needs a computer to run on. You have none yet.')}</b>
             ${' '}${m('noneText', 'Add one below. An agent you already made starts on it by itself.')}
           <//>`
         : html`<${Stack} gap="medium">
@@ -255,19 +259,19 @@ export default function MachinesView({ navigate }) {
               <${Machine} key=${c.id} c=${c} others=${machines.filter((o) => o.id !== c.id)} onChanged=${load} confirm=${confirm} />`)}
           <//>`}
 
-      <${SubHeading} level=${2} desc=${m('addDesc', 'Your own computer or server. Agents run on it and can use the models it reaches. Run these two commands on it, approve the code it shows, and the machine appears on this page, where you give it a name.')}>
-        ${m('addTitle', 'Add a machine')}
+      <${SubHeading} level=${2} desc=${m('addDesc', 'Your own laptop, computer or server. Agents run on it and can use the models it reaches. Run these two commands on it, approve the code it shows, and the computer appears on this page, where you give it a name.')}>
+        ${m('addTitle', 'Add a computer')}
       <//>
       <${ConnectorSteps} session=${session} />
-      <${Note} kind="quiet">${m('addNote', 'The machine does work only while it is switched on.')}<//>
+      <${Note} kind="quiet">${m('addNote', 'The computer does work only while it is switched on.')}<//>
 
       ${storeHref() && html`
-        <${SubHeading} level=${2} desc=${m('hostedDesc', 'We keep it switched on, and you install nothing. You order it in the store.')}>
-          ${m('hostedTitle', 'A machine we run for you')}
+        <${SubHeading} level=${2} desc=${m('hostedDesc', 'Your own AIMEAT in the cloud. We keep it switched on, it runs your agents, and you install nothing. You buy it in the store.')}>
+          ${m('hostedTitle', 'An AIMEAT instance')}
         <//>
         ${storeOpensSoon()
           ? html`<${Note} kind="quiet">${m('orderSoon', 'The store opens soon.')}<//>`
-          : html`<${FormActions}><${Action} href=${storeHref()} newTab>${m('order', 'Order a machine →')}<//><//>`}`}
+          : html`<${FormActions}><${Action} href=${storeHref()} newTab>${m('order', 'Go to the store →')}<//><//>`}`}
 
       <${ConfirmUI} />
     <//>`;

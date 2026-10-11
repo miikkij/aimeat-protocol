@@ -31,6 +31,7 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.7.0 — 2026-10-10 — Section 4: a person with more than one connector names the machine, with
  *     aimeat_connector_list and the proposal's `connector`.
  *   v1.6.2 — 2026-10-08 — Section 4: an agent approved without a connector waits and gets its key
@@ -160,12 +161,12 @@ proposal: an agent approved without one exists and cannot start.
 Once it runs, section 2 applies: a schedule of \`kind: "agent_task"\` gives it the work on a
 clock. How to write the definition and how to check it is in the skill \`node:add-a-crew-agent\`.
 
-Say what this needs before you propose it: a connector of theirs running on a machine of theirs,
-and a model that machine can reach. Without the connector the agent is created and waits, and the
+Say what this needs before you propose it: a connector of theirs running on a computer of theirs,
+and a model that computer can reach. Without the connector the agent is created and waits, and the
 answer to the approval says so; when their connector next connects, the node gives the agent its
 key and the connector starts it, with nothing for them to press. A person with more than one
-connector says which machine: \`aimeat_connector_list\` names them, and the proposal's
-\`connector\` carries the choice, so the agent waits for that machine and no other.
+connector says which computer: \`aimeat_connector_list\` names them, and the proposal's
+\`connector\` carries the choice, so the agent waits for that computer and no other.
 
 ## The rule underneath all of this
 

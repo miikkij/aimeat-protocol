@@ -28,6 +28,7 @@
  * @usage
  *   import { HOME_BLOCKS } from './blocks-home.js';
  * @version-history
+ *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.4.0 — 2026-10-10 — home.agents: a new agent from one sentence, the proposals that wait, the
  *     agents at work and their machines.
  *   v1.3.0 — 2026-09-15 — home.own-aimeat: a demo site's card pointing at the store, added by the
@@ -147,7 +148,7 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
             },
         },
         maxPerSurface: 1,
-        summary: 'One field that makes a new agent from a sentence, the proposals waiting for them, their agents at work and the machines those run on.',
+        summary: 'One field that makes a new agent from a sentence, the proposals waiting for them, their agents at work and the computers those run on.',
     },
     {
         id: 'home.things',
