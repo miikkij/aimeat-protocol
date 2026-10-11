@@ -137,6 +137,24 @@ and clients got routed to the wrong daemon — "pid alive but does not answer".)
 The Python liaison pins `AIMEAT_HOME` into the serve daemon it auto-spawns, so the
 Node daemon and the Python side always agree on the same home.
 
+## Why a liaison agent, and when a task-runner still fits
+
+An earlier way to connect a crew was to register it as a `task-runner` agent and let the
+connector start the crew as a subprocess for each task (`runner.command` in the agent's
+`config.yaml`). That still works, and it fits a job with no model in it: a Python script that
+takes a prompt and prints a string, an ETL step on a clock. For a crew with an LLM inside, the
+liaison fits better:
+
+| | Task-runner subprocess | Liaison agent |
+|---|---|---|
+| Hello Integration | The connector does it without a model | The liaison's LLM calls the onboarding tools itself |
+| Deliverable | Whatever the script prints, as one string | Structured: memory, knowledge, `aimeat_task_complete` |
+| Events and telemetry during a task | The script has to report back through a token in its environment | The liaison calls `aimeat_task_event` and `aimeat_agent_telemetry_report` |
+| Working with the rest of the crew | None: the subprocess is opaque | The liaison is one more `Agent` in the same `Crew` |
+
+The task-runner pattern is described in
+[agent-tags.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/coding-guidelines/agent-tags.md).
+
 ## Customising the persona
 
 The default `role` / `goal` / `backstory` tell the LLM to keep AIMEAT in sync but **not** to do the crew's domain work. Override any field if your use case is different:

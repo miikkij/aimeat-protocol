@@ -1,6 +1,6 @@
 # AIMEAT Observability Guide
 
-Operator guide for monitoring and observability features (REQ-008).
+Operator guide for monitoring a node: the JSON statistics, the Prometheus metrics and the built-in pages.
 
 ## Configuration
 
@@ -44,28 +44,36 @@ GET /v1/metrics
 Authorization: Bearer <token>   # if access != public
 ```
 
-Exposed metrics (all with `aimeat_` prefix):
+The node's own metrics, as registered in `src/services/prometheus.ts` (all with the `aimeat_` prefix):
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aimeat_uptime_seconds` | Gauge | Seconds since node start |
-| `aimeat_requests_total` | Counter | Total HTTP requests (labels: method, status) |
-| `aimeat_memory_operations_total` | Counter | Memory reads/writes (label: operation) |
-| `aimeat_consent_operations_total` | Counter | Consent grants/revocations (label: operation) |
-| `aimeat_schema_validations_total` | Counter | Schema validations (label: result) |
-| `aimeat_tunnel_connections_active` | Gauge | Current WebSocket tunnels |
-| `aimeat_tunnel_connections_total` | Counter | Total tunnel connections |
-| `aimeat_tunnel_messages_total` | Counter | Tunnel messages (label: direction) |
+| `aimeat_http_requests_total` | Counter | HTTP requests (labels: method, route, status) |
+| `aimeat_http_request_duration_ms` | Histogram | HTTP request duration in ms (labels: method, route; buckets 5 to 5000) |
+| `aimeat_tunnel_connections_active` | Gauge | WebSocket tunnels open now |
+| `aimeat_tunnel_connections_total` | Counter | Tunnel connections established |
+| `aimeat_tunnel_disconnections_total` | Counter | Tunnel disconnections (label: reason) |
+| `aimeat_tunnel_reconnects_total` | Counter | Tunnel reconnection attempts |
+| `aimeat_tunnel_messages_sent_total` | Counter | Tunnel messages sent (label: type) |
+| `aimeat_tunnel_messages_received_total` | Counter | Tunnel messages received (label: type) |
 | `aimeat_tunnel_delivery_failures_total` | Counter | Failed message deliveries |
-| `aimeat_tunnel_delivery_latency_ms` | Summary | Delivery latency (avg, p95) |
-| `aimeat_mailbox_items` | Gauge | Current queued items |
-| `aimeat_mailbox_bytes` | Gauge | Current queue size in bytes |
-| `aimeat_mailbox_operations_total` | Counter | Enqueued/delivered/expired (label: operation) |
+| `aimeat_tunnel_delivery_latency_ms` | Histogram | Delivery latency in ms (buckets 50 to 60000) |
+| `aimeat_tunnel_heartbeat_misses_total` | Counter | Missed tunnel heartbeats |
+| `aimeat_tunnel_mailbox_fallbacks_total` | Counter | Messages that fell back to mailbox delivery |
+| `aimeat_mailbox_items_total` | Gauge | Items queued in all mailboxes now |
+| `aimeat_mailbox_bytes_total` | Gauge | Bytes queued in all mailboxes now |
+| `aimeat_mailbox_oldest_item_age_seconds` | Gauge | Age of the oldest queued item |
+| `aimeat_mailbox_enqueued_total` | Counter | Items enqueued (label: type) |
+| `aimeat_mailbox_delivered_total` | Counter | Items delivered from mailboxes |
+| `aimeat_mailbox_expired_total` | Counter | Items that expired unread |
+| `aimeat_mailbox_quota_rejections_total` | Counter | Enqueues refused because a mailbox was full |
 | `aimeat_auth_failures_total` | Counter | Failed authentication attempts |
-| `aimeat_rate_limit_hits_total` | Counter | Rate limit triggers |
+| `aimeat_rate_limit_hits_total` | Counter | Rate limit triggers (label: tier) |
 | `aimeat_scope_denials_total` | Counter | Scope/permission denials |
-| `aimeat_active_owners` | Gauge | Registered owners |
-| `aimeat_active_agents` | Gauge | Registered agents |
+
+The endpoint also carries the Node.js process metrics of `prom-client` (`collectDefaultMetrics`): `process_*` and `nodejs_*` (CPU, resident memory, heap, event-loop lag, garbage collection), without the `aimeat_` prefix.
+
+Uptime, the number of owners and agents, memory reads and writes, consent operations and schema validations are not Prometheus metrics. They are in the JSON from `GET /v1/stats` (`uptime_seconds`, `active_owners`, `active_agents`, `memory_writes`, and the rest listed above).
 
 ### Prometheus scrape config example
 
