@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.18.0 (2026-10-11): lint, the pre-commit hook's cached ESLint, so the 800-line file limit refuses the gate and not only the commit after it.
  *  - 1.17.0 (2026-10-11): check:package-scripts, every package.json script points at a tracked file and an existing script.
  *  - 1.16.0 (2026-10-11): check:config-tab, the admin Config tab against the schema, the English locale and the code that reads the settings.
  *  - 1.15.0 (2026-10-05): check:storage-file-parity, the SQLite methods files mirror the Postgres ones (secaudit 2026-10, M8).
@@ -89,6 +90,9 @@ export const FAST_CHECKS = [
     { script: 'check:sse-parity', label: 'An agent writes, and the open page hears about it' },
     { script: 'check:imports-tracked', label: 'Every relative import points at a tracked file' },
     { script: 'check:package-scripts', label: 'Every package.json script points at a tracked file and an existing script' },
+    // The pre-commit hook's own lint, cached. Without it a file past the 800-line limit passed the
+    // gate and was refused at the commit that followed, twice on 2026-10-11.
+    { script: 'lint', label: 'ESLint as the pre-commit hook runs it: the 800-line file limit and every other lint error' },
     { script: 'check:copied-logic', label: 'No decision is written out on two sides' },
     { script: 'check:doc-counts -- --strict', label: 'The counts this project states about itself' },
     { script: 'check:instructions', label: 'What every session loads stays small, and every path rule names real files' },
