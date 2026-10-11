@@ -19,7 +19,7 @@
  *     one an agent of theirs set, may be replaced as before. Another person's lock that already is
  *     the same strict structure is shared: the registration leaves it and does not record it.
  *
- *   docs/specs/package-sale-design.md, T3 and T4.
+ *   https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, T3 and T4.
  * @structure PACKAGE_TAG_PREFIX · packageTag() · cortexComponentsOf() · componentCollision()
  * @usage
  *   const refusal = await componentCollision(storage, { type, content, registeredAs, owner, ownerGaii, groupId });

@@ -24,7 +24,7 @@
  *     their values. The flat payload here shows twelve fields and none of the sealed classes, so
  *     an operator asking their AI what their limits are got an answer that did not contain them.
  *     The connector tool and the CLI dispatch entry proxy GET /v1/admin/config and inherit it.
- *     docs/plans/sealed-config-plan.md
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *   v1.2.0 — 2026-08-15 — Two organism-ownership tools: the operator's read of who holds an
  *     organism, and the break-glass that installs an owner on one whose creator account is
  *     unreachable. Both call services/organism-ownership.ts, the same function the HTTP door calls.

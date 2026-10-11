@@ -75,7 +75,7 @@
  *   v2.0.0 -- 2026-08-31 -- The poster face: search over name/key/description, the only-changed
  *     filter, the description visible under the name, the chip-cloud contents replaced by a
  *     sticky left index, sections under ink rules. The pending bar is unchanged by design.
- *   v1.5.0 -- 2026-08-18 -- Sealed settings read as sealed (docs/plans/sealed-config-plan.md).
+ *   v1.5.0 -- 2026-08-18 -- Sealed settings read as sealed (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm).
  *   v1.4.0 -- 2026-08-16 -- A grouped table of contents, and a sticky pending-changes bar that
  *     names each change as old → new.
  *   v1.2.0 -- 2026-05-31 -- Inputs reflect pending[path] (edits no longer snap back).

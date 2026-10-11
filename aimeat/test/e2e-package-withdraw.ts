@@ -2,7 +2,7 @@
  * @file e2e-package-withdraw.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Withdrawing a bad version (T6 of docs/specs/package-sale-design.md; phase 5). An author
+ * @description Withdrawing a bad version (T6 of https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e; phase 5). An author
  *   publishes a package with an extension and an app; another owner installs it; the author withdraws
  *   the version with a reason. The installed copy's extension is switched off, its owner is told once,
  *   and nothing serves the version again. The customer-node path (a copy on another node, acted on by

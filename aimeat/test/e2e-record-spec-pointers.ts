@@ -10,11 +10,14 @@
  *   /docs/specs/ addresses that records written before 2026-10-11 still carry.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=record-spec-pointers
  * @version-history
+ *   v1.1.0 -- 2026-10-11 -- The served list is PUBLIC_CONTRACTS itself (package-sale.md joined it), and the
+ *     names that must stay unserved are ones docs/specs never held.
  *   v1.0.0 -- 2026-10-11 -- signals.* and visibility records named /docs/specs/…, which answered 404
  *     (wish-signals-ja-visibility-tietueiden-spec-kentt-osoittaa-osoitte).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { PUBLIC_CONTRACTS } from '../src/services/contract-docs.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const SRC = join(import.meta.dirname, '../src');
@@ -95,8 +98,8 @@ await test('every other value is a format identifier, not an address', async () 
     assert(bad.length === 0, bad.map(f => `${f.value} (${f.where})`).join('; '));
 });
 
-await test('the signals and visibility contracts are served as Markdown, open to anyone', async () => {
-    for (const name of ['signals-contract.md', 'visibility-contract.md', 'tracked-response-contract.md']) {
+await test('the public contracts are served as Markdown, open to anyone', async () => {
+    for (const name of PUBLIC_CONTRACTS) {
         const res = await fetch(`${BASE}/v1/specs/${name}`);
         assert(res.status === 200, `${name}: ${res.status}`);
         assert((res.headers.get('content-type') ?? '').startsWith('text/markdown'), `${name}: ${res.headers.get('content-type')}`);
@@ -115,7 +118,7 @@ await test('records stored with the old /docs/specs/ address resolve through a r
 });
 
 await test('a name outside the public contracts is not served', async () => {
-    for (const path of ['/v1/specs/package-sale-design.md', '/v1/specs/..%2F..%2FREADME.md', '/docs/specs/secretary-decision-contract.md']) {
+    for (const path of ['/v1/specs/not-a-contract.md', '/v1/specs/..%2F..%2FREADME.md', '/docs/specs/not-a-contract.md']) {
         const res = await fetch(`${BASE}${path}`, { redirect: 'manual' });
         assert(res.status === 404, `${path}: ${res.status}`);
     }

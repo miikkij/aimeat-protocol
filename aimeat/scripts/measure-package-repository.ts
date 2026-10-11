@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The scale measurement the package sale design asks for before a repository opens to
- *   strangers (docs/specs/package-sale-design.md, section 7 "Scale"; phase 5). Seeds a throwaway SQLite
+ *   strangers (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, section 7 "Scale"; phase 5). Seeds a throwaway SQLite
  *   repository with package groups and entitled nodes at a hosting provider's size, and measures what
  *   grows with them: the bytes of one group's entitlements record against the 1024 kB memory value rule
  *   (checked on the memory routes, not on this system-namespace write), and

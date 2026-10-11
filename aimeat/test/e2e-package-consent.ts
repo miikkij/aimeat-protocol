@@ -1,7 +1,7 @@
 /**
  * @file e2e-package-consent.ts
  * @description The owner decides what a package with code in it may do (package sale design, phase 2,
- *   docs/specs/package-sale-design.md T1, T5, T7):
+ *   https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e T1, T5, T7):
  *   - the dry run names what each part will be able to do, and where the package comes from;
  *   - an agent installing a package that carries code files a request the owner approves, unless the
  *     owner gave it packages:install-code; the request carries the summary; the approval is recorded;

@@ -52,7 +52,7 @@
  *   v2.0.0 — 2026-10-01 — The node's card is read before anything is written, and how the peer arrived
  *     is recorded (peer-origin.ts). A node that does not answer leaves a pending registration that its
  *     first signed request finishes. The peer-registration incident (finding F of
- *     docs/specs/package-sale-design.md).
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e).
  *   v1.0.1 — 2026-09-28 — The node's url loses its trailing slashes through stripTrailingSlashes, one
  *     pass, instead of `replace(/\/+$/, '')`, quadratic on a url ending in many slashes and another
  *     character (CodeQL js/polynomial-redos, alert 1678).

@@ -19,7 +19,7 @@
  *   if (card.ok && card.nodeId === nodeId && card.publicKey === key) ...
  * @version-history
  *   v1.0.0 — 2026-10-01 — Initial, for proving a packages-only peer before it is registered (the
- *     peer-registration incident, finding F of docs/specs/package-sale-design.md).
+ *     peer-registration incident, finding F of https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e).
  */
 import { safeFetch, stripTrailingSlashes, validateOutboundUrl } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
