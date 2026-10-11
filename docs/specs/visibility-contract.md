@@ -4,6 +4,7 @@
   count is decided, and what each number is worth. Named by `spec` inside every month record, so an
   agent or another system can read and honour the shape without our code.
 @version-history
+  v1.3.1 — 2026-10-11 — What the cookie banner says and removes on a page with the owner's tags.
   v1.3.0 — 2026-10-08 — On-page behaviour per app and the fixing agent's runs (layer D).
   v1.2.0 — 2026-10-08 — What AI agents met here: checkouts by stage, tool calls by outcome (layer C).
   v1.1.0 — 2026-10-08 — The settings record and the owner's own analytics tags (layer B).
@@ -122,6 +123,12 @@ owner's own account. With the node's cookie banner on, the tag waits for the vis
 always denied); without the banner it loads at once and the report's `tags.warning` says EU
 visitors need consent. A browser that sends Global Privacy Control gets no tag. Each id is checked
 against its shape before it is stored and again before it is written into a page.
+
+The banner such a page gets names the services the owner uses, in English, Finnish or Spanish, and
+says that Clarity records the visit and where the data goes. When the visitor takes the consent
+back, the cookies the two services set on that page's host (`_clck`, `_clsk`, `_ga`, `_ga_<id>`,
+`_gid`) are removed and the page reloads without the tags. Google's cookie is kept on the page's
+own host (`cookie_domain: 'none'`), so it is not shared with other owners' apps.
 
 ## On-page behaviour (layer D)
 

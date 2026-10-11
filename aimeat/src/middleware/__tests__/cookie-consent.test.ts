@@ -12,12 +12,17 @@
  *   - buildStandaloneSnippetJs suite + extractRunConfig: asserts IIFE shape and always-on "necessary" category
  *
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The switch read per request, a page that already has the banner, the
+ *     category list typed as text (one category per letter before the fix), the three languages, the
+ *     named analytics services, cookies removed on a taken-back consent, and the start script.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import { cookieConsentMiddleware, buildStandaloneSnippetJs } from '../cookie-consent.js';
+import {
+  cookieConsentMiddleware, buildStandaloneSnippetJs, consentCategories, buildCookieConsentRunConfig, cookieConsentSnippet,
+} from '../cookie-consent.js';
 
 /** Helper to create a minimal AimeatConfig with cookie consent fields */
 function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
@@ -161,17 +166,49 @@ function createMocks() {
 }
 
 describe('cookieConsentMiddleware', () => {
-  it('no-op when disabled — calls next() without modifying res.send', () => {
+  /** Send one HTML page through the middleware and answer what reached the client. */
+  function sendHtml(middleware: ReturnType<typeof cookieConsentMiddleware>, html: string): string {
+    const headers = new Map<string, string | number | readonly string[]>();
+    let captured: unknown;
+    const res = {
+      getHeader: (name: string) => headers.get(name.toLowerCase()),
+      send: vi.fn(function (this: Response, body?: unknown) { captured = body; return this; }),
+    } as unknown as Response;
+    middleware({} as Request, res, vi.fn() as unknown as NextFunction);
+    headers.set('content-type', 'text/html; charset=utf-8');
+    res.send(html);
+    return captured as string;
+  }
+
+  it('leaves the page alone while the banner is off', () => {
     const config = makeConfig({ cookieConsentEnabled: false });
     const middleware = cookieConsentMiddleware(config);
     const { req, res, next } = createMocks();
-
-    const originalSend = res.send;
     middleware(req, res, next);
-
     expect(next).toHaveBeenCalled();
-    // res.send should NOT have been replaced
-    expect(res.send).toBe(originalSend);
+    const html = '<html><body><p>Hello</p></body></html>';
+    expect(sendHtml(middleware, html)).toBe(html);
+  });
+
+  it('follows the switch on a running node: on in Config adds the banner, off removes it, with no restart', () => {
+    // The middleware is built once at start. It used to read the switch then, so the banner an
+    // operator switched on reached the apps and not the service's own pages until a restart.
+    const config = makeConfig({ cookieConsentEnabled: false });
+    const middleware = cookieConsentMiddleware(config);
+    const html = '<html><body><p>Hello</p></body></html>';
+    expect(sendHtml(middleware, html)).not.toContain('cookieconsent.umd.js');
+    config.cookieConsentEnabled = true;
+    expect(sendHtml(middleware, html)).toContain('cookieconsent.umd.js');
+    config.cookieConsentCategories = ['necessary', 'analytics'];
+    expect(sendHtml(middleware, html)).toContain('"analytics"');
+    config.cookieConsentEnabled = false;
+    expect(sendHtml(middleware, html)).toBe(html);
+  });
+
+  it('leaves a page that already carries the banner with one banner', () => {
+    const middleware = cookieConsentMiddleware(makeConfig({ cookieConsentEnabled: true }));
+    const html = '<html><head><script src="https://node.example/cookieconsent.umd.js"></script></head><body></body></html>';
+    expect(sendHtml(middleware, html)).toBe(html);
   });
 
   it('injects snippet into HTML response before </body>', () => {
@@ -296,7 +333,8 @@ describe('cookieConsentMiddleware', () => {
 
     const result = capturedBody as string;
     expect(result).toContain('https://example.com/privacy');
-    expect(result).toContain('Privacy Policy');
+    expect(result).toContain('Privacy policy');
+    expect(result).toContain('Tietosuojaseloste');
   });
 
   it('omits footer link when cookieConsentPolicyUrl is null', () => {
@@ -323,7 +361,7 @@ describe('cookieConsentMiddleware', () => {
     res.send('<html><body></body></html>');
 
     const result = capturedBody as string;
-    expect(result).not.toContain('Privacy Policy');
+    expect(result).not.toContain('Privacy policy');
     expect(result).not.toContain('footer');
   });
 
@@ -405,13 +443,13 @@ describe('cookieConsentMiddleware', () => {
 });
 
 /**
- * Extract the JSON config object from a CookieConsent.run(...) call inside a JS string.
+ * Extract the JSON config object the start script holds (`var c={...};`) from a JS string.
  * Uses a balanced-brace counter since the config is a JSON object.
  */
 function extractRunConfig(js: string): Record<string, unknown> {
-  const marker = 'CookieConsent.run(';
+  const marker = 'var c=';
   const start = js.indexOf(marker);
-  if (start === -1) throw new Error('CookieConsent.run( not found');
+  if (start === -1) throw new Error('the run config (var c=) was not found');
   const jsonStart = start + marker.length;
   let depth = 0;
   let jsonEnd = -1;
@@ -473,5 +511,124 @@ describe('buildStandaloneSnippetJs', () => {
     // Should have exactly 2 categories
     expect(Object.keys(runConfig.categories)).toHaveLength(2);
     expect(runConfig.categories.analytics).toBeDefined();
+  });
+});
+
+describe('consentCategories', () => {
+  it('reads the list the environment gives and the text an operator typed in Config', () => {
+    expect(consentCategories({ cookieConsentCategories: ['necessary', 'analytics'] })).toEqual(['necessary', 'analytics']);
+    // The Config page stored the typed text. Iterating it gave one category per letter.
+    expect(consentCategories({ cookieConsentCategories: 'necessary, Analytics ,marketing' })).toEqual(['necessary', 'analytics', 'marketing']);
+    expect(consentCategories({ cookieConsentCategories: ['analytics,marketing'] })).toEqual(['necessary', 'analytics', 'marketing']);
+  });
+
+  it('answers necessary alone for nothing, and drops what is not a word', () => {
+    expect(consentCategories({})).toEqual(['necessary']);
+    expect(consentCategories({ cookieConsentCategories: null })).toEqual(['necessary']);
+    expect(consentCategories({ cookieConsentCategories: ['<script>', '', 'analytics', 'analytics', '__proto__'] })).toEqual(['necessary', 'analytics']);
+  });
+
+  it('a list typed as text gives whole categories in the banner, never letters', () => {
+    const config = makeConfig({ cookieConsentEnabled: true, cookieConsentCategories: 'necessary,analytics,marketing' as unknown as string[] });
+    const run = JSON.parse(buildCookieConsentRunConfig(config)) as { categories: Record<string, unknown> };
+    expect(Object.keys(run.categories)).toEqual(['necessary', 'analytics', 'marketing']);
+  });
+});
+
+describe('buildCookieConsentRunConfig', () => {
+  type Run = {
+    categories: Record<string, { autoClear?: { cookies: Array<{ name: string }>; reloadPage: boolean } }>;
+    language: { translations: Record<string, { consentModal: Record<string, string>; preferencesModal: { sections: Array<{ title: string; description?: string; linkedCategory?: string }> } }> };
+  };
+  const config = makeConfig({ cookieConsentEnabled: true });
+
+  it('carries the banner in English, Finnish and Spanish', () => {
+    const run = JSON.parse(buildCookieConsentRunConfig(config)) as Run;
+    expect(Object.keys(run.language.translations)).toEqual(['en', 'fi', 'es']);
+    expect(run.language.translations.fi!.consentModal.title).toBe('Evästeet tällä sivulla');
+    expect(run.language.translations.es!.consentModal.acceptNecessaryBtn).toBe('Solo las necesarias');
+    expect(run.language.translations.en!.consentModal.description).toMatch(/asks before it uses any other/);
+  });
+
+  it('names the page owner\'s analytics, says that Clarity records the visit, and where the data goes', () => {
+    const run = JSON.parse(buildCookieConsentRunConfig(config, { ensure: ['analytics'], services: { clarity: true, ga4: true } })) as Run;
+    const en = run.language.translations.en!;
+    expect(en.consentModal.description).toContain('Microsoft Clarity and Google Analytics');
+    const analytics = en.preferencesModal.sections.find((s) => s.linkedCategory === 'analytics')!;
+    expect(analytics.description).toContain('records how you use the page');
+    expect(analytics.description).toContain('The data goes to Microsoft and Google.');
+    const fi = run.language.translations.fi!.preferencesModal.sections.find((s) => s.linkedCategory === 'analytics')!;
+    expect(fi.description).toContain('Tiedot menevät Microsoftille ja Googlelle.');
+    // Google Analytics alone: nothing is said about a recording.
+    const ga = JSON.parse(buildCookieConsentRunConfig(config, { ensure: ['analytics'], services: { clarity: false, ga4: true } })) as Run;
+    const gaText = ga.language.translations.en!.preferencesModal.sections.find((s) => s.linkedCategory === 'analytics')!.description!;
+    expect(gaText).toContain('Google Analytics');
+    expect(gaText).not.toMatch(/Clarity|records/);
+  });
+
+  it('asks about analytics for a page that needs it even when the operator\'s list has only necessary', () => {
+    const run = JSON.parse(buildCookieConsentRunConfig(config, { ensure: ['analytics'] })) as Run;
+    expect(Object.keys(run.categories)).toEqual(['necessary', 'analytics']);
+  });
+
+  it('removes the analytics cookies and reloads when the visitor takes consent back', () => {
+    const run = JSON.parse(buildCookieConsentRunConfig(config, { ensure: ['analytics'], clearOnRevoke: ['_clck', '_ga'] })) as Run;
+    expect(run.categories.analytics!.autoClear).toEqual({ cookies: [{ name: '_clck' }, { name: '_ga' }], reloadPage: true });
+  });
+
+  it('cannot close the script element it sits in, whatever the policy address holds', () => {
+    const json = buildCookieConsentRunConfig(makeConfig({ cookieConsentEnabled: true, cookieConsentPolicyUrl: 'https://example.com/"></script><script>alert(1)</script>' }));
+    expect(json).not.toContain('<');
+    const footer = (JSON.parse(json) as Run).language.translations.en!.consentModal.footer!;
+    expect(footer).toContain('&lt;/script&gt;');
+    expect(footer.match(/<a /g)).toHaveLength(1);
+  });
+
+  it('does not make a link of a policy value that is not a web address', () => {
+    const run = JSON.parse(buildCookieConsentRunConfig(makeConfig({ cookieConsentEnabled: true, cookieConsentPolicyUrl: 'javascript:alert(1)' }))) as Run;
+    expect(run.language.translations.en!.consentModal.footer).toBeUndefined();
+  });
+});
+
+describe('cookieConsentSnippet', () => {
+  it('starts the banner only when the page has a body, in the visitor\'s language', () => {
+    const snippet = cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { assetBase: 'https://node.example/' });
+    expect(snippet).toContain('<link rel="stylesheet" href="https://node.example/cookieconsent.css">');
+    expect(snippet).toContain('<script src="https://node.example/cookieconsent.umd.js"></script>');
+    expect(snippet).toContain('<script data-aimeat-cookie-banner>');
+    // The library appends itself to document.body: started without one it throws.
+    expect(snippet).toContain('if(!document.body){setTimeout(run,30);return;}');
+    // The visitor's own choice and browser come before the page's lang attribute, which the serve
+    // pass writes on an app and the service's own page fixes at "en".
+    const order = ["localStorage.getItem('aimeat-lang')", 'a.push(navigator.language)', 'a.push(d.documentElement.lang)'].map((s) => snippet.indexOf(s));
+    expect(order.every((n) => n > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(snippet.match(/<\/script>/g)).toHaveLength(2);
+  });
+
+  it('carries the page\'s CSP nonce on both scripts, and no nonce of a wrong shape', () => {
+    // The service's own pages allow an inline script only with the nonce: without it the browser
+    // blocked the start script and the banner never showed there.
+    const withNonce = cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { nonce: '5307c0b73180473689d7b7e3a842d83e' });
+    expect(withNonce).toContain('<script data-aimeat-cookie-banner nonce="5307c0b73180473689d7b7e3a842d83e">');
+    expect(withNonce).toContain('<script src="/cookieconsent.umd.js" nonce="5307c0b73180473689d7b7e3a842d83e"></script>');
+    expect(cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { nonce: '"><script>x' })).not.toContain('nonce=');
+  });
+});
+
+describe('cookieConsentMiddleware and the page nonce', () => {
+  it('gives the start script the nonce of the response it is added to', () => {
+    const middleware = cookieConsentMiddleware(makeConfig({ cookieConsentEnabled: true }));
+    const headers = new Map<string, string>();
+    let captured = '';
+    const res = {
+      locals: { cspNonce: 'abcdef0123456789abcdef0123456789' },
+      getHeader: (name: string) => headers.get(name.toLowerCase()),
+      send: vi.fn(function (this: Response, body?: unknown) { captured = String(body); return this; }),
+    } as unknown as Response;
+    middleware({} as Request, res, vi.fn() as unknown as NextFunction);
+    headers.set('content-type', 'text/html; charset=utf-8');
+    res.send('<html><body><p>Hello</p></body></html>');
+    expect(captured).toContain('<script data-aimeat-cookie-banner nonce="abcdef0123456789abcdef0123456789">');
   });
 });
