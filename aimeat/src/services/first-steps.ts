@@ -24,6 +24,8 @@
  * @usage
  *   import { buildFirstSteps, firstStepsMarkdown } from '../services/first-steps.js';
  * @version-history
+ *   v1.0.1 — 2026-10-11 — The prompt-driven entry names the Gemini app outside the United States:
+ *     it connects over MCP in the United States (Jouni's ruling, 2026-10-11).
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -57,7 +59,7 @@ export function buildFirstSteps(config: AimeatConfig): FirstStep[] {
         },
         {
             id: 'prompt-driven',
-            when: 'You are a chat that can do neither (a consumer Gemini or Copilot app, for example).',
+            when: 'You are a chat that can do neither (a consumer Copilot app, or the Gemini app outside the United States, for example).',
             how: `The person works through the node's pages, which compose a ready prompt for you; they run it with you and paste your answer back. Send them to ${b}/v1/portal to register, and read ${b}/v1/help/prompt for how to guide them.`,
             read: `${b}/v1/help/prompt`,
         },

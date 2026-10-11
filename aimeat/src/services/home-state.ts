@@ -19,6 +19,8 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.4.2 — 2026-10-11 — needsBetterApp passes the person's answer to the conditions question
+ *     (`meets_conditions`): the Gemini app connects in the United States only.
  *   v1.4.1 — 2026-09-18 — needsBetterApp passes the person's own answer to the branch decision, so
  *     "I use the Gemini app" holds them on the prompt-driven road and a model's claim does not.
  *   v1.4.0 — 2026-09-09 — Connect first; the welcome page is optional (approved home journey).
@@ -221,11 +223,12 @@ async function readHomeStateInScope(
     // moves them on by itself, with no separate "I upgraded" claim to make and nothing to reset.
     // Reading `branch === 'B'` instead would strand them: that marker is write-once.
     const paidAnswer = typeof aiMark.has_paid_plan === 'boolean' ? aiMark.has_paid_plan as boolean : undefined;
+    const conditionsAnswer = typeof aiMark.meets_conditions === 'boolean' ? aiMark.meets_conditions as boolean : undefined;
     // The app named is the person's own answer only when they gave it. A variant that cannot
-    // connect (the Gemini app, say) means B when THEY said so, and only a question otherwise.
+    // connect (the Copilot app, say) means B when THEY said so, and only a question otherwise.
     const theirAnswer = aiMark.source === 'asked' ? str(aiMark, 'client') ?? undefined : undefined;
     const needsBetterApp = matHtmlExists
-        && decideBranch(resolveAiClient(str(aiMark, 'client')), { hasPaidPlan: paidAnswer, clientAnswer: theirAnswer }).branch === 'B';
+        && decideBranch(resolveAiClient(str(aiMark, 'client')), { hasPaidPlan: paidAnswer, meetsConditions: conditionsAnswer, clientAnswer: theirAnswer }).branch === 'B';
 
     const state: HomeState = {
         owner,

@@ -24,6 +24,8 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.4.0 — 2026-10-11 — POST /v1/home/ai-client takes `meets_conditions`, the answer to the
+ *     `conditions` question the Gemini app raises (region-dependent, Jouni's ruling 2026-10-11).
  *   v1.3.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 — 2026-10-03 — The copy-prompt road keeps the interview: the pasted card's private
  *     profile block is merged into `journey.state`, and the response names the fields as `profile_saved`.
@@ -46,7 +48,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { parseWelcomeMat } from '../../services/welcome-mat-parse.js';
 import {
-    resolveAiClient, decideBranch, aiClientVariantOptions, type BranchDecision, type AiClientResolution,
+    resolveAiClient, decideBranch, capabilityOf, aiClientVariantOptions, type BranchDecision, type AiClientResolution,
 } from '../../services/ai-tool-branch.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, recordWelcomeMatPasted, recordAiModelDetected,
@@ -143,22 +145,27 @@ async function recordAiDetection(
     fields: { model: string | null; vendor: string | null; client: string | null },
     resolution: AiClientResolution,
     source: 'meta' | 'asked',
-    hasPaidPlan?: boolean,
+    answers: { hasPaidPlan?: boolean; meetsConditions?: boolean } = {},
     supersedes = false,
 ): Promise<void> {
+    const { hasPaidPlan, meetsConditions } = answers;
     await recordAiModelDetected(ctx.storage, ctx.config, owner, {
         model: fields.model,
         vendor: fields.vendor,
         client: fields.client,
         // Our reading of the app, not the model's claim about its own capability.
-        // A named variant of a two-app name (the Gemini app, Gemini CLI) is the one case we know a NO.
+        // A named variant of a two-app name (the Copilot app) is the one case we know a NO; the
+        // Gemini app depends on where the person is, so it reads as unknown.
         mcp: resolution.kind === 'known' ? (resolution.capability === 'yes' ? 'yes' : 'unknown')
-            : resolution.kind === 'variant' ? (resolution.variant.mcp ? 'yes' : 'no') : 'unknown',
+            : resolution.kind === 'variant'
+                ? (!resolution.variant.mcp ? 'no' : capabilityOf(resolution.variant.id) === 'region-dependent' ? 'unknown' : 'yes')
+                : 'unknown',
         source,
         // The unmatched name is the list from which the alias map grows.
         unknownClient: resolution.kind === 'unknown' ? resolution.claim : null,
         resolvedClient: resolution.kind === 'known' ? resolution.id : null,
         hasPaidPlan: typeof hasPaidPlan === 'boolean' ? hasPaidPlan : null,
+        meetsConditions: typeof meetsConditions === 'boolean' ? meetsConditions : null,
         supersedes,
     });
 }
@@ -231,7 +238,7 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
         const decision = decideBranch(resolution);
         // A paste is a NEW mat, so it replaces whatever was known — including a stale paid-tier
         // answer about the app they used last time.
-        await recordAiDetection(ctx, owner, parsed.meta, resolution, 'meta', undefined, true);
+        await recordAiDetection(ctx, owner, parsed.meta, resolution, 'meta', {}, true);
         await recordBranch(ctx, owner, decision);
 
         const state = await readHomeState(storage, config, owner);
@@ -257,10 +264,11 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
 
     /**
      * POST /v1/home/ai-client
-     * Body: { client?: string, has_paid_plan?: boolean }
+     * Body: { client?: string, has_paid_plan?: boolean, meets_conditions?: boolean }
      *
-     * The person's own answer to the two questions the branch can raise: which app they talked in,
-     * and whether they have the tier that app needs. An answer here is more trustworthy than the
+     * The person's own answer to the questions the branch can raise: which app they talked in,
+     * whether they have the tier that app needs, and whether they meet the vendor's conditions
+     * (the Gemini app: the United States and the rest of its row). An answer here is more trustworthy than the
      * page's metadata (a model misreports its own app), so it is recorded with source 'asked' and
      * overwrites nothing — both readings stay in the funnel.
      */
@@ -269,10 +277,11 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
         const body = req.body ?? {};
         const clientAnswer = typeof body.client === 'string' ? body.client.trim().slice(0, 200) : undefined;
         const hasPaidPlan = typeof body.has_paid_plan === 'boolean' ? body.has_paid_plan : undefined;
+        const meetsConditions = typeof body.meets_conditions === 'boolean' ? body.meets_conditions : undefined;
 
-        if (clientAnswer === undefined && hasPaidPlan === undefined) {
+        if (clientAnswer === undefined && hasPaidPlan === undefined && meetsConditions === undefined) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                'Answer with the app you talked in (client) or whether you have a paid plan (has_paid_plan).'));
+                'Answer with the app you talked in (client), whether you have a paid plan (has_paid_plan), or whether you meet the app\'s conditions (meets_conditions).'));
             return;
         }
 
@@ -280,13 +289,13 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
         // otherwise. Their answer is run through the same alias map — it is not privileged.
         const state = await readHomeState(storage, config, owner);
         const base = resolveAiClient(clientAnswer ?? state.ai?.client ?? null);
-        const decision = decideBranch(base, { clientAnswer, hasPaidPlan });
+        const decision = decideBranch(base, { clientAnswer, hasPaidPlan, meetsConditions });
 
         await recordAiDetection(ctx, owner, {
             model: state.ai?.model ?? null,
             vendor: state.ai?.vendor ?? null,
             client: clientAnswer ?? state.ai?.client ?? null,
-        }, base, 'asked', hasPaidPlan);
+        }, base, 'asked', { hasPaidPlan, meetsConditions });
         await recordBranch(ctx, owner, decision);
 
         res.json(success(config.nodeId, {

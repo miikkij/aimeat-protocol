@@ -16,6 +16,8 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   v2.0.1 — 2026-10-11 — The prompt road names the Gemini app outside the United States only: it
+ *     connects over MCP in the United States (Jouni's ruling, 2026-10-11).
  *   v2.0.0 — 2026-10-03 — Stage 1 is the person's profile: an interview of seven plain questions whose
  *     answers go into `journey.state`, made into a one-page business card with a schema.org Person
  *     block and a "For AIs" section, published as their welcome page. Later offers are chosen from
@@ -166,7 +168,8 @@ says which is theirs (write it as \`road\`):
   better on Claude ${M.claude} or newer. The other free road is their own OpenRouter credit, about
   ten dollars, used on a strong reasoning model such as DeepSeek V4 Pro; it lasts a long time at
   those prices. Free models make many mistakes here, so do not recommend them.
-- **prompt**: an AI that cannot connect (the Gemini app, Microsoft Copilot, the free ChatGPT). The
+- **prompt**: an AI that cannot connect (Microsoft Copilot, the free ChatGPT, the Gemini app outside
+  the United States). The
   home page gives them prompts to copy and a box to paste the answer back into; the profile
   interview is one of those prompts. They will not be reading this skill; if you meet such a person
   through someone else, point them to their home page.
