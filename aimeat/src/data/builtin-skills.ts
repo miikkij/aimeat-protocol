@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.27.0 -- 2026-10-11 -- aimeat-extension-builder (builtin-skills.extension-builder.ts) ships with
+ *     every node, with the AI half of the service-extensions manual (docs audit phase 2).
  *   v1.26.0 -- 2026-10-11 -- aimeat-workspace-contracts (builtin-skills.workspace-contracts.ts), from
  *     docs/agent-workspace-contracts.md, which the handbooks named and no route served (docs audit, D7).
  *   v1.25.3 -- 2026-10-11 -- add-a-crew-agent moves unchanged to builtin-skills.crew-agent.ts (max-file-lines).
@@ -179,6 +181,7 @@ import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
 import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY } from './builtin-skills.ai.js';
 import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
 import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
+import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -416,6 +419,7 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   AI_MODEL_POLICY_SKILL_ENTRY,
   AI_CAPABILITIES_SKILL_ENTRY,
   WORKSPACE_CONTRACTS_SKILL_ENTRY,
+  EXTENSION_BUILDER_SKILL_ENTRY,
   {
     name: 'use-app-bound-skills',
     skillMd: `---

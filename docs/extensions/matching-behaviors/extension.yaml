@@ -2,7 +2,7 @@ extension: "1.0"
 
 metadata:
   name: "matching-behaviors"
-  version: "1.0.0"
+  version: "1.0.1"
   description: "Interest-based matching with geographic proximity scoring"
   author: "aimeat-core"
   license: "MIT"

@@ -211,6 +211,24 @@ await test('installs; create-profile refuses without the matching consent and ru
     assert(status === 200, `create-profile ${status}: ${JSON.stringify(body.error ?? body)}`);
 });
 
+await test('a matching round pairs two profiles, and each sees the other as a suggestion', async () => {
+    const consent = await json('/v1/consent', as(buyerName, {
+        method: 'POST', body: JSON.stringify({ data_pattern: 'matching.*', recipient: `node:${NODE_ID}`, purpose: 'matching' }),
+    }));
+    assert(consent.status === 201, `consent ${consent.status}`);
+    const p = await call(buyerName, '/v1/ext/matching-behaviors/hobbies/create-profile', { displayName: 'Buyer', interests: ['chess'], city: 'Helsinki' });
+    assert(p.status === 200, `create-profile ${p.status}: ${JSON.stringify(p.body.error)}`);
+    // run-matching read search() entries as profiles and crashed on `interests` of undefined.
+    const round = await call(operatorName, '/v1/ext/matching-behaviors/hobbies/run-matching', {});
+    assert(round.status === 200, `run-matching ${round.status}: ${JSON.stringify(round.body.error ?? round.body)}`);
+    const r = round.body.data.result ?? round.body.data;
+    assert(r.profilesScanned === 2 && r.matchesCreated >= 2, `round: ${JSON.stringify(r)}`);
+    const s = await call(sellerName, '/v1/ext/matching-behaviors/hobbies/get-suggestions', {});
+    assert(s.status === 200, `get-suggestions ${s.status}`);
+    const list = (s.body.data.result ?? s.body.data).suggestions as any[];
+    assert(list.length === 1 && list[0].profile?.displayName === 'Buyer', `suggestions: ${JSON.stringify(list)}`);
+});
+
 console.log('\nmembership-behaviors');
 await test('installs; create makes a group and join adds a member to it', async () => {
     await install('membership-behaviors');
