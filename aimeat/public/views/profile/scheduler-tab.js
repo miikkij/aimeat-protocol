@@ -13,6 +13,7 @@
  *   - SchedulerTab (default) — state, the two loads, the action handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v2.3.0 -- 2026-10-11 -- "Run now" on a stopped agent's schedule says the agent is stopped.
  *   v2.2.0 -- 2026-09-26 -- The loading line is the Note's loading kind; the page writes no class (page group G5).
  *   v2.1.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
  *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Ajastimen sivu", direction A). The
@@ -135,6 +136,7 @@ export default function SchedulerTab({ showToast }) {
     const d = await triggerSchedule(s.id);
     if (d.outcome === 'created') showToast?.(t('profile.scheduler.runCreated'));
     else if (d.outcome === 'busy') showToast?.(t('profile.scheduler.runBusy'), true);
+    else if (d.outcome === 'stopped') showToast?.(t('profile.scheduler.runStopped'), true);
     else if (d.outcome === 'limited') showToast?.(t('profile.scheduler.runLimited'), true);
     else if (d.outcome === 'error') showToast?.(d.reason || t('profile.scheduler.runError'), true);
     else showToast?.(t('profile.scheduler.triggered'));
