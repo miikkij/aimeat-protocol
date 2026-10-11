@@ -4,20 +4,26 @@
  * SPDX-License-Identifier: MIT
  * @description Startup seeder for CSM (Content Structure Model) templates — reads `.csm.yaml` files
  *   from docs/csm-examples/, validates them, generates JSON Schemas, and registers both the locked
- *   schema and the CSM record in storage. Idempotent: skips any CSM already registered by name.
+ *   schema and the CSM record in storage. Idempotent: a CSM already registered by name keeps its
+ *   record, and its schema lock is refreshed only when a node seeder wrote it and the compile changed.
  *
  * @structure
  *   - seedCsmTemplates(storage, systemGaii): main entry that parses, validates, and registers each template
  *   - uses parseCsm/validateCsm/csmToJsonSchema from csm-parser for parsing and schema generation
  *
  * @version-history
+ *   v1.1.0 — 2026-10-11 — An existing template's `system@` schema lock is refreshed when this build
+ *     compiles it differently. The parser learned the JSON Schema keyword names the templates use,
+ *     and without the refresh every node seeded before that would keep the limitless schemas.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Storage } from '../storage/interface.js';
+import { isDeepStrictEqual } from 'node:util';
 import { parseCsm, validateCsm, csmToJsonSchema } from './csm-parser.js';
+import { isSystemSeeded } from './manifest-schema.js';
 import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,13 +67,22 @@ export async function seedCsmTemplates(storage: Storage, systemGaii: string): Pr
         continue;
       }
 
-      // Check if this CSM is already registered (idempotent)
-      const existing = await storage.getCsm(definition.service.name);
-      if (existing) continue;
-
       // Generate JSON Schema from CSM data_schema
       const jsonSchema = csmToJsonSchema(definition);
       const schemaKey = `csm.${definition.service.name}`;
+
+      // Already registered: the record stays as it is. Its schema lock is brought up to what this
+      // build compiles only when a node's own seeder wrote it (a `system@` lock); a lock a person
+      // set through the schema API is theirs and is left alone.
+      const existing = await storage.getCsm(definition.service.name);
+      if (existing) {
+        const lock = await storage.getSchema(schemaKey, 'prefix');
+        if (lock && isSystemSeeded(lock.lockedBy) && !isDeepStrictEqual(lock.schemaJson, jsonSchema)) {
+          await storage.setSchema({ ...lock, schemaJson: jsonSchema, schemaMode: definition.schemaMode, updatedAt: now });
+          logger.info(`Refreshed the seeded schema of CSM template ${definition.service.name} (${file})`);
+        }
+        continue;
+      }
 
       // Extract semantic annotation from CSM service.semantic (Phase 0.7)
       const serviceSemantic = definition.service.semantic && typeof definition.service.semantic === 'object'
