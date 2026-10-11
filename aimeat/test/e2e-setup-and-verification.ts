@@ -42,6 +42,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-setup-verification.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-and-verification
  * @version-history
+ *   v1.3.0 — 2026-10-11 — Test 19: the credential names https://aimeat.io/ns/credentials/v1 and the
+ *     node serves that context at /ns/credentials/v1.
  *   v1.2.0 — 2026-10-09 — Test 5b: a node setting that would add a line to .env, or is not a value
  *     the node takes, is refused before the owner is created (secrets audit 2026-10-09, S1).
  *   v1.1.0 — 2026-09-08 — Test 24 asserts that anonymous mode no longer locks a fresh node out of
@@ -598,6 +600,14 @@ try {
         assert(Array.isArray(cred.type) && cred.type.includes('VerifiableCredential'), `type: ${JSON.stringify(cred.type)}`);
         assert(cred.credentialSubject.id === `did:aimeat:${PLAIN}@${NODE_ID}`, `subject: ${cred.credentialSubject.id}`);
         assert(typeof cred.issuer === 'string' && cred.issuer.length > 0, `issuer: ${cred.issuer}`);
+        // The context is the node's own namespace, and the node serves it (wish-vc-n-context-url-…).
+        assert(JSON.stringify(cred['@context']) === JSON.stringify(['https://www.w3.org/ns/credentials/v2', 'https://aimeat.io/ns/credentials/v1']),
+            `context: ${JSON.stringify(cred['@context'])}`);
+        const ctx = await fetch(`${BASE}/ns/credentials/v1`);
+        assert(ctx.status === 200 && (ctx.headers.get('content-type') ?? '').startsWith('application/ld+json'), `context document: ${ctx.status} ${ctx.headers.get('content-type')}`);
+        const doc = await ctx.json() as any;
+        assert(doc['@context']?.AIMEATIdentityCredential === 'aimeat:IdentityCredential' && doc['@context']?.aimeat === 'https://aimeat.io/ns/',
+            `the context defines the credential's terms: ${JSON.stringify(doc)}`);
     });
 
     await test('20. ?format=jwt returns the same credential signed', async () => {

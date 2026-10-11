@@ -25718,6 +25718,23 @@ paths:
             application/json:
               schema: { type: object }
 
+  /ns/credentials/v1:
+    get:
+      operationId: credentialsContext
+      summary: The identity credential's JSON-LD context
+      description: >-
+        The context https://aimeat.io/ns/credentials/v1 that an identity credential from
+        GET /v1/ghii/{ghii}/credential names: its type names and subject fields in the aimeat:
+        namespace. Every node serves it at this path; aimeat.io answers the canonical address.
+        Public, unenveloped (application/ld+json), with CORS, so a JSON-LD processor can fetch it.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The JSON-LD context document
+          content:
+            application/ld+json:
+              schema: { type: object }
+
   /v1/ns:
     get:
       operationId: coreOntology
