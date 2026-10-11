@@ -9,6 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-11 -- Two sessions can run at once. A lane's port is computed from the runner's own
+ *     port, where it used to be the first free one from 40500 (two guard tiers took 40501 the same
+ *     afternoon), and a suite's own ports are taken under a lock every runner on the machine
+ *     honours, so a second session waits for the suite and does not collide (scripts/lib/e2e-ports.ts).
  *   2026-10-11 -- e2e-agent-stop.ts joins the list (not the guard tier): the owner stops an agent
  *     and starts it again.
  *   2026-10-10 -- e2e-agent-connectors.ts joins the list (not the guard tier): connectors as named,
@@ -302,6 +306,16 @@ import {
     stopServer,
     type RunnerTarget,
 } from './run-e2e-server.js';
+import { acquirePortLocks, holdBasePort, lanePortFor, releasePortLocks, suiteOwnPorts } from '../scripts/lib/e2e-ports.js';
+
+/** The worktree this run belongs to, and who it is for the port lock's record: the session, or the worktree's name when it has none. */
+const RUN_WORKTREE = fileURLToPath(new URL('../..', import.meta.url));
+const RUN_SESSION = process.env.AIMEAT_SESSION || basename(RUN_WORKTREE);
+
+/** A suite's source, or nothing when it cannot be read: such a suite has no port to lock. */
+function readSource(suite: string): string {
+    try { return readFileSync(suite, 'utf-8'); } catch { return ''; }
+}
 
 const ALL_SUITES = [
     'test/api-full.ts',
@@ -1560,7 +1574,8 @@ function listeningPorts(): Set<number> {
             const n = Number(m[1]);
             // Up to 42000, not 41000: the two allowlist suites put a node of their own in
             // 41000-41199, and a lane chosen blind to those is a lane that can be handed one.
-            if (n >= 40000 && n < 42000) found.add(n);
+            // 20000-27999 is where a session's own lane ports are computed (scripts/lib/e2e-ports.ts).
+            if ((n >= 40000 && n < 42000) || (n >= 20000 && n < 28000)) found.add(n);
         }
     } catch {
         // No netstat, no lsof, or it answered nothing. Say so rather than pretending to know.
@@ -1570,18 +1585,26 @@ function listeningPorts(): Set<number> {
 }
 
 /**
- * A lane's own port, from a range no suite writes down. It has to avoid three things: the port the
- * RUNNER was given (a caller who says AIMEAT_PORT=40512 to keep out of another session's way would
- * otherwise have a lane bind the same number), the ports its own other lanes took, and — since
- * 2026-09-07 — anything already listening on this machine, which is another session's run.
+ * A lane's own port, COMPUTED from the port the runner was given (scripts/lib/e2e-ports.ts).
+ *
+ * Until 2026-10-11 this took the first port from 40500 upward that nothing was listening on when
+ * the run began. A lane restarts its server between suites, so in each of those gaps the number
+ * read as free to another session's runner: two guard tiers took 40501 the same afternoon and each
+ * one's suites reached the other's server. The board already gives two live sessions different
+ * base ports, so a port computed from the base port is a session's own with no look at the
+ * machine and no gap.
+ *
+ * Something listening on it now is therefore this session's own leftover from a run that was
+ * killed, and the run stops and says how to clear it, where the old code moved to the next number.
  */
 function lanePort(lane: number, taken: Set<number>): string {
-    for (let p = 40500 + lane; p < 40600; p++) {
-        if (taken.has(p)) continue;
-        taken.add(p);
-        return String(p);
+    const p = lanePortFor(Number(TARGET.port), lane);
+    if (taken.has(p)) {
+        throw new Error(`Port ${p} is lane ${lane}'s own port for a runner on ${TARGET.port}, and something listens on it: a server an earlier run of this session left behind. `
+            + `Clear it with \`AIMEAT_PORT=${TARGET.port} pnpm exec tsx scripts/kill-test-servers.ts\`, then run again.`);
     }
-    throw new Error('No free port for a lane between 40500 and 40599. Another session is probably running the same suites; check with the claims board.');
+    taken.add(p);
+    return String(p);
 }
 
 function planLanes(suites: string[], workers: number, pinned: Map<string, number[]>): string[][] {
@@ -1653,8 +1676,18 @@ async function runLane(lane: number, target: RunnerTarget, suites: string[], str
                 console.log(`${'─'.repeat(40)}`);
             }
 
+            // The ports this suite binds for itself are taken under the machine-wide lock first
+            // (scripts/lib/e2e-ports.ts): another session that runs the same suite right now holds the
+            // same numbers, and waiting the seconds it needs is the alternative to EADDRINUSE or to
+            // a suite that talks to the other session's stub. The wait is not in the suite's time.
+            const ownPorts = suiteOwnPorts(readSource(suite), Number(target.port));
+            const held = await acquirePortLocks(ownPorts, { suite: name, session: RUN_SESSION }, {
+                onWait: (port, holder) => console.log(`${tag}${name} waits for port ${port}, which ${holder ? `${holder.session} holds for ${holder.suite}` : 'another run holds'}.`),
+            });
             const t0 = Date.now();
-            const { output, exitCode } = await runTest(suite, name, target, stream);
+            let output: string, exitCode: number;
+            try { ({ output, exitCode } = await runTest(suite, name, target, stream)); }
+            finally { releasePortLocks(held); }
             const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
             const parsed = parseResults(output);
             const red = parsed.failed > 0 || exitCode !== 0;
@@ -1745,7 +1778,20 @@ async function main() {
     console.log(`  AIMEAT E2E Test Runner`);
     console.log(`  Server: ${TARGET.external ? BASE_URL + ' (external)' : `auto-start on :${TARGET.port}`}`);
     console.log(`  Storage: ${TARGET.dbType}${TARGET.dbType === 'sqlite' ? ` (${TARGET.dbPath})` : ''}`);
-    // Before anything boots: does a suite in this run write down the port we were given? If it
+    // Before anything boots: is another run already on this port? A worktree that has not claimed a
+    // port gets a hash of its name, and two names can hash alike; so can two runs of one worktree
+    // be started at once. Either way the two would share a server and empty one database under
+    // each other. This run holds the port until it ends (scripts/lib/e2e-ports.ts).
+    if (!TARGET.external) {
+        try {
+            const release = holdBasePort(Number(TARGET.port), { session: RUN_SESSION, worktree: RUN_WORKTREE });
+            process.on('exit', release);
+        } catch (e) {
+            console.error(`\n${'='.repeat(50)}\n  STOP: ${(e as Error).message}\n${'='.repeat(50)}\n`);
+            process.exit(1);
+        }
+    }
+    // Then: does a suite in this run write down the port we were given? If it
     // does, that suite will find OUR server answering and never notice it is the wrong one.
     if (!TARGET.external) {
         const clashes = portClashes(suites, TARGET.port);
@@ -1760,7 +1806,7 @@ async function main() {
   database, and every assertion after that is noise that reads like broken code.
 
   Give the runner a port no suite writes down:  AIMEAT_PORT=<port> pnpm ...
-  40500-40599 is this runner's own lanes and 40600-40649 is pnpm sandbox. Any other port is
+  40600-40649 is pnpm sandbox, and a runner's lanes are computed into 20000-27999. Any other port is
   clear only when no test file names it: grep -lE "\\b<port>\\b" test/*.ts finds nothing.
   A suite in ANOTHER session's run cannot see your port either.
 `);

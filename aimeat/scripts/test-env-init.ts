@@ -49,8 +49,10 @@ function slugOf(): string {
 /**
  * A port this worktree can have to itself, derived from its name so it is the SAME on every run —
  * a port that moved between runs would be no better than a shared one for anybody reading a claim.
- * 40251 upward is what the claims board hands out; 40050 (the dev server) and 40500-40599 (the
- * runner's lanes) are outside it by construction.
+ * 40251 upward is what the claims board hands out; 40050 (the dev server) is outside it by
+ * construction, and the runner computes its lane ports from this port into 20000-27999
+ * (lib/e2e-ports.ts). Two names can hash to one port: the runner then stops the second run and
+ * names the first, and an explicit port is the remedy.
  *
  * An explicit AIMEAT_E2E_PORT wins, and that is the one to use: the board is the authority on who
  * holds what, and a hash cannot read it. This is the sensible default for a session that has not
