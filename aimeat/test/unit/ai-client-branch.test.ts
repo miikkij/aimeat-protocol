@@ -12,6 +12,9 @@
  *        their own app requires.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-client-branch.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The Gemini app is region-dependent (Jouni's ruling, 2026-10-11): naming
+ *     it asks about Google's conditions, and only a "no" reaches B. The test that held "the Gemini
+ *     app cannot connect" now holds the Copilot app alone.
  *   v1.1.0 — 2026-10-11 — Six more tools from the merged table (Mistral, LM Studio, Gemini CLI,
  *     Perplexity, OpenClaw, Copilot Studio), Cursor among the paid-tier apps, and the table's own
  *     capability held equal to the branch's. Imports from ai-tool-branch.ts.
@@ -92,6 +95,7 @@ describe('every one of the eight resolves, in the spellings people actually writ
         // The bare id is the variant answer of the Gemini question (ai-client-families.ts), so the
         // table entry is reached by a claim that only contains it.
         'gemini-cli': ['Gemini CLI 0.9', 'running in gemini cli'],
+        'gemini-app': ['gemini.google.com', 'Gemini on gemini.google.com'],
         perplexity: ['perplexity', 'Perplexity', 'perplexity.ai', 'Perplexity Pro'],
         openclaw: ['openclaw', 'OpenClaw', 'an OpenClaw agent'],
         'copilot-studio': ['Microsoft Copilot Studio agent', 'an agent built in copilot studio'],
@@ -238,10 +242,33 @@ describe('a name two apps share raises a question, and only the person\'s answer
     });
 
     it('the person naming the variant that cannot connect is the second entrance to B', () => {
-        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'gemini-app' }))
-            .toEqual({ branch: 'B', reason: 'variant-has-no-mcp', family: 'gemini', variant: 'gemini-app' });
         expect(decideBranch(resolveAiClient('Microsoft Copilot'), { clientAnswer: 'microsoft-copilot-app' }))
-            .toMatchObject({ branch: 'B', reason: 'variant-has-no-mcp' });
+            .toEqual({ branch: 'B', reason: 'variant-has-no-mcp', family: 'microsoft-copilot', variant: 'microsoft-copilot-app' });
+    });
+
+    // Ruling, Jouni 2026-10-11: the Gemini app connects over MCP in the United States and takes the
+    // prompt-driven path elsewhere. Until then this file held "the Gemini app cannot connect" and
+    // sent the person who named it straight to B. Google's page (support.google.com/gemini/answer/
+    // 17209137) lists the conditions; the person's own answer about them decides.
+    it('the Gemini app is region-dependent: naming it asks about Google\'s conditions, and the answer decides', () => {
+        expect(capabilityOf('gemini-app')).toBe('region-dependent');
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'gemini-app' }))
+            .toEqual({ branch: 'ask', question: 'conditions', toolId: 'gemini-app' });
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'gemini-app', meetsConditions: true }))
+            .toEqual({ branch: 'A', reason: 'conditions-confirmed', toolId: 'gemini-app' });
+        expect(decideBranch(resolveAiClient('Gemini'), { clientAnswer: 'gemini-app', meetsConditions: false }))
+            .toEqual({ branch: 'B', reason: 'conditions-missing', toolId: 'gemini-app' });
+        // gemini.google.com names the app without the family question.
+        expect(decideBranch(resolveAiClient('gemini.google.com'))).toEqual({ branch: 'ask', question: 'conditions', toolId: 'gemini-app' });
+    });
+
+    it('the Gemini app\'s row states the conditions and links Google\'s page', () => {
+        const row = buildAiToolSetup(config).find(t => t.id === 'gemini-app');
+        expect(row?.mcp.capability).toBe('region-dependent');
+        expect(row?.mcp.docs).toBe('https://support.google.com/gemini/answer/17209137');
+        for (const word of ['United States', '18', 'personal Google Account', 'English', 'Keep Activity']) {
+            expect(row?.mcp.plans, word).toContain(word);
+        }
     });
 
     it('the person naming the variant that can connect goes to A', () => {
@@ -251,8 +278,10 @@ describe('a name two apps share raises a question, and only the person\'s answer
 
     it('a MODEL saying it is the Gemini app is still a name: it asks, it does not refuse', () => {
         // The page's metadata is a model's claim about its own app. With no answer from the
-        // person, even an unambiguous "no MCP" variant raises the question.
-        expect(decideBranch(resolveAiClient('gemini-app'))).toMatchObject({ branch: 'ask', question: 'which-variant', family: 'gemini' });
+        // person, the Gemini app raises the conditions question, and the Copilot app, which cannot
+        // connect, raises the which-variant question.
+        expect(decideBranch(resolveAiClient('gemini-app'))).toEqual({ branch: 'ask', question: 'conditions', toolId: 'gemini-app' });
+        expect(decideBranch(resolveAiClient('microsoft-copilot-app'))).toMatchObject({ branch: 'ask', question: 'which-variant', family: 'microsoft-copilot' });
         expect(decideBranch(resolveAiClient('Gemini CLI'))).toEqual({ branch: 'A', reason: 'variant-capable' });
     });
 

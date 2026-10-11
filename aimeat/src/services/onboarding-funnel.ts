@@ -25,6 +25,8 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.5.1 — 2026-10-11 — The AI detection record keeps `meets_conditions`, the answer to the
+ *     conditions question the Gemini app raises.
  *   v1.5.0 — 2026-10-03 — The return email names the welcome-mat page as the person's profile, a
  *     one-page business card written from an interview, and says "your profile is up" only when the
  *     card is published (it said "your welcome mat is up" to everyone on the first-agent step).
@@ -377,6 +379,8 @@ export interface AiDetection {
      * this the recomputation would re-ask a question they already answered.
      */
     hasPaidPlan?: boolean | null;
+    /** The person's answer to the conditions question (the Gemini app: the United States), kept for the same reason. */
+    meetsConditions?: boolean | null;
     /**
      * A FRESH welcome mat, which replaces the record outright rather than deferring to whatever
      * was there. See the ordering note on recordAiModelDetected.
@@ -401,7 +405,7 @@ export async function recordAiModelDetected(
     const gaii = ownerGhii(config, owner);
     try {
         const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.aiModelDetected);
-        const prev = (existing?.value ?? null) as { source?: string; client?: string | null } | null;
+        const prev = (existing?.value ?? null) as { source?: string; client?: string | null; has_paid_plan?: boolean; meets_conditions?: boolean } | null;
         // Ordering, weakest to strongest: a page's claim < the person's answer ABOUT that page <
         // a NEW page. A fresh mat supersedes everything, because it is a new artifact made in a
         // different app — this is the whole mechanism of branch B, where someone takes up an app
@@ -415,7 +419,12 @@ export async function recordAiModelDetected(
         // in `superseded` below, as every replaced reading does.
         const refines = detection.source === 'asked' && prev?.source === 'asked'
             && !!detection.client && detection.client !== prev.client;
-        if (prev && !detection.supersedes && !refines && !(detection.source === 'asked' && prev.source !== 'asked')) return;
+        // The same holds for an answer to the follow-up question about the same app: "gemini-app"
+        // raises the conditions question, and its answer has to land or the state re-asks it.
+        const answers = detection.source === 'asked' && prev?.source === 'asked'
+            && ((typeof detection.hasPaidPlan === 'boolean' && detection.hasPaidPlan !== prev.has_paid_plan)
+                || (typeof detection.meetsConditions === 'boolean' && detection.meetsConditions !== prev.meets_conditions));
+        if (prev && !detection.supersedes && !refines && !answers && !(detection.source === 'asked' && prev.source !== 'asked')) return;
         const now = new Date().toISOString();
         await storage.setMemory({
             key: ONBOARDING_KEYS.aiModelDetected,
@@ -426,6 +435,7 @@ export async function recordAiModelDetected(
                 ...(detection.unknownClient ? { unknown_client: detection.unknownClient } : {}),
                 ...(detection.resolvedClient ? { resolved_client: detection.resolvedClient } : {}),
                 ...(typeof detection.hasPaidPlan === 'boolean' ? { has_paid_plan: detection.hasPaidPlan } : {}),
+                ...(typeof detection.meetsConditions === 'boolean' ? { meets_conditions: detection.meetsConditions } : {}),
                 // What the page said, kept when the person's answer supersedes it — the gap
                 // between the two IS the measure of how much a model's self-report is worth.
                 ...(prev ? { superseded: prev } : {}),

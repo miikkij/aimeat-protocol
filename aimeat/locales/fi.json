@@ -12749,7 +12749,7 @@
     "roadFreeOpenRouter": "Toinen tapa: lataa OpenRouteriin noin 10 dollaria ja valitse DeepSeek V4 Pro tai saman tason malli. Näillä hinnoilla saldo riittää pitkään. Ilmaiset mallit tekevät täällä paljon virheitä, joten emme suosittele niitä.",
     "openRouterKey": "Lisää OpenRouter-avain",
     "roadPrompt": "Tekoälyni ei saa yhteyttä",
-    "roadPromptHint": "Gemini-sovellus, Microsoft Copilot ja ilmainen ChatGPT eivät saa yhteyttä omaan AIMEATiisi. Kopioi kehote tekoälyllesi ja liitä sen vastaus tänne.",
+    "roadPromptHint": "Microsoft Copilot, ilmainen ChatGPT ja Gemini-sovellus muualla kuin Yhdysvalloissa eivät saa yhteyttä omaan AIMEATiisi. Kopioi kehote tekoälyllesi ja liitä sen vastaus tänne.",
     "promptIntro": "Kopioi tämä kehote tekoälyllesi. Se kysyy sinulta yhden muistamisen arvoisen asian ja kirjoittaa sen kahdelle riville. Kun tallennat muistiinpanon tänne, sen lukevat myös kaikki tekoälyt, jotka yhdistät myöhemmin.",
     "pasteLabel": "Liitä tekoälysi vastaus tähän",
     "pasteSave": "Tallenna muistiinpano",

@@ -14433,10 +14433,12 @@ paths:
         not "unknown"). Each tool carries its vendor's own documentation URL.
 
         Every tool here can speak MCP — that is why it is in the table — so `mcp.capability` says
-        only whether a paid tier is required: `yes` (the free tier is enough, the default when the
-        field is absent) or `plan-dependent` (ChatGPT, Grok). `plan-dependent` is a question to ask
-        the person, never grounds to refuse them: MCP capability belongs to the client app, not to
-        the model, so an app name alone can never establish that someone cannot connect.
+        only which condition the vendor puts on it: `yes` (the free tier is enough, the default when
+        the field is absent), `plan-dependent` (a paid tier: ChatGPT, Grok, Cursor, Perplexity,
+        Copilot Studio) or `region-dependent` (the Gemini app: the United States and the other
+        conditions its `mcp.plans` line names). Either condition is a question to ask the person,
+        never grounds to refuse them: MCP capability belongs to the client app, not to the model, so
+        an app name alone can never establish that someone cannot connect.
 
         Served rather than shipped inside each client because the clients cannot share code: the
         portal SPA and the Experience Center are separate origins, and a copy in each would
@@ -15037,13 +15039,16 @@ paths:
                             items: { type: string }
                           question:
                             type: string
-                            enum: [which-client, paid-plan, which-variant]
+                            enum: [which-client, paid-plan, which-variant, conditions]
                             nullable: true
                             description: >-
                               `which-variant` is raised by a name two apps share (Gemini, Microsoft
-                              Copilot), one of which cannot connect over MCP. Its options arrive in
-                              `client_options`, and the answer goes to POST /v1/home/ai-client as
-                              `client`.
+                              Copilot), which differ in whether and where they connect over MCP. Its
+                              options arrive in `client_options`, and the answer goes to POST
+                              /v1/home/ai-client as `client`. `conditions` is raised by the Gemini
+                              app, which connects only under the conditions its row in
+                              /v1/ai-tools names (the United States among them); the answer goes
+                              to the same route as `meets_conditions`.
                           rooms:
                             type: array
                             description: >-
@@ -15142,7 +15147,7 @@ paths:
                             description: The interview answers this paste wrote into journey.state; empty when the page had no readable profile block or nothing changed.
                             items: { type: string, enum: [work, needs, challenges, repetitive, unclear] }
                           branch: { type: string, enum: [A, B, ask] }
-                          question: { type: string, enum: [which-client, paid-plan, which-variant], nullable: true }
+                          question: { type: string, enum: [which-client, paid-plan, which-variant, conditions], nullable: true }
                           tool_id: { type: string, nullable: true }
                           family: { type: string, nullable: true, description: 'Set with `which-variant`: `gemini` or `microsoft-copilot`.' }
                           variant_options:
@@ -15754,10 +15759,12 @@ paths:
         `client` accepts one of the ids from `/v1/ai-tools`, `other`, `dont-know`, or free text. An
         unrecognised answer leads to branch A, never to B: a wrong A costs one attempt, whereas a
         wrong B tells someone whose tools were fine that their tools are not good enough. There are
-        two routes to branch B, and both are the person's own answer: `has_paid_plan: false` for an
-        app that requires a paid tier, and a `client` naming the variant of a shared name that
-        cannot connect (`gemini-app`, `microsoft-copilot-app`). A name alone, the person's or a
-        model's, never leads to B: "Gemini" raises the `which-variant` question instead.
+        three routes to branch B, and all are the person's own answer: `has_paid_plan: false` for an
+        app that requires a paid tier, `meets_conditions: false` for an app the vendor offers only
+        under conditions (the Gemini app outside the United States), and a `client` naming the
+        variant of a shared name that cannot connect (`microsoft-copilot-app`). A name alone, the
+        person's or a model's, never leads to B: "Gemini" raises the `which-variant` question, and
+        `gemini-app` the `conditions` question.
       tags:
         - Portal
       security:
@@ -15775,11 +15782,14 @@ paths:
                 has_paid_plan:
                   type: boolean
                   description: Whether the person has the tier their app requires.
+                meets_conditions:
+                  type: boolean
+                  description: Whether the person meets the conditions their app's row in /v1/ai-tools names (the Gemini app - the United States, 18 or over, a personal Google Account, English, Keep Activity on).
       responses:
         '200':
           description: The branch after the answer, plus the refreshed home state
         '400':
-          description: Neither answer was supplied
+          description: No answer was supplied
         '403':
           description: Not the account holder's own session
 

@@ -2,8 +2,8 @@
  * @file src/services/ai-client-families.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The app names that cover TWO apps, one that connects over MCP and one that cannot
- *   (Gemini, Microsoft Copilot), the spellings people write them in, and the normalizer every
+ * @description The app names that cover TWO apps, which differ in whether and where they connect
+ *   over MCP (Gemini, Microsoft Copilot), the spellings people write them in, and the normalizer every
  *   claim about an app goes through. Data and one pure function; the decision that reads them is
  *   decideBranch in services/ai-tool-setup.ts, which is also where the rule they must keep is
  *   written: an app NAME never sends anyone to branch B.
@@ -14,13 +14,17 @@
  * @usage
  *   import { AI_CLIENT_FAMILIES, VARIANT_BY_ID, normalizeAiClientClaim } from './ai-client-families.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The Gemini app connects in the United States (Jouni's ruling, 2026-10-11,
+ *     from https://support.google.com/gemini/answer/17209137): `mcp: true`, with the condition on
+ *     its table row. The Copilot app is now the only variant that cannot connect.
  *   v1.0.0 — 2026-09-18 — Initial, extracted the day it was written.
  */
 
 /**
  * A NAME THAT COVERS TWO DIFFERENT APPS, one that connects over MCP and one that cannot.
  *
- * "Gemini" is the consumer app (no connectors) and also Gemini CLI (MCP). "Microsoft Copilot" is
+ * "Gemini" is the consumer app (MCP in the United States only, since 2026-10-11) and also Gemini
+ * CLI (MCP). "Microsoft Copilot" is
  * the consumer assistant (none) and also Copilot Studio (MCP). Until 2026-09-18 neither name was
  * known here at all, so such a person was asked "which app", picked "something else", was sent
  * down the MCP road, failed, and only then reached the prompt-driven road: one lost attempt, for
@@ -39,7 +43,10 @@ export const AI_CLIENT_FAMILIES: readonly AiClientFamily[] = [
         id: 'gemini',
         label: 'Gemini',
         variants: [
-            { id: 'gemini-app', mcp: false, label: { en: 'The Gemini app or gemini.google.com', fi: 'Gemini-sovellus tai gemini.google.com' } },
+            // Connects in the United States only (Jouni's ruling, 2026-10-11). `mcp: true` and the
+            // table row of the same id (ai-tool-setup.ts) carry the condition, so naming it asks
+            // about the conditions rather than sending anyone to the prompt-driven path.
+            { id: 'gemini-app', mcp: true, label: { en: 'The Gemini app or gemini.google.com', fi: 'Gemini-sovellus tai gemini.google.com' } },
             { id: 'gemini-cli', mcp: true, label: { en: 'Gemini CLI, in a terminal', fi: 'Gemini CLI, päätteessä' } },
         ],
     },

@@ -10,6 +10,9 @@
  *   aiClientVariantOptions() · aiClientQuestionOptions()
  * @usage import { resolveAiClient, decideBranch } from '../services/ai-tool-branch.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The consumer Gemini app (`gemini-app`) is region-dependent (Jouni's ruling,
+ *     2026-10-11): naming it raises the `conditions` question, and the person's answer
+ *     (`meetsConditions`) decides A or B. The tier and the conditions share conditionalBranch().
  *   v1.1.0 — 2026-10-11 — The six tools the table gained, with their aliases; Cursor, Perplexity and
  *     Copilot Studio join the paid-tier set (Cursor's pricing page lists MCP on its paid plans only).
  *   v1.0.0 — 2026-10-11 — Moved unchanged from ai-tool-setup.ts, which the tools added to its table
@@ -32,7 +35,7 @@ import { buildAiToolSetup, lang, s, type McpCapability } from './ai-tool-setup.j
 /** All ids in this table, for callers that need the set without building the localized list. */
 export const AI_TOOL_IDS = [
     'claude-web', 'claude-desktop', 'claude-code', 'chatgpt', 'codex', 'cursor', 'vscode', 'grok',
-    'goose', 'mistral', 'lmstudio', 'gemini-cli', 'perplexity', 'openclaw', 'copilot-studio',
+    'goose', 'mistral', 'lmstudio', 'gemini-cli', 'gemini-app', 'perplexity', 'openclaw', 'copilot-studio',
 ] as const;
 export type AiToolId = typeof AI_TOOL_IDS[number];
 
@@ -41,6 +44,14 @@ export type AiToolId = typeof AI_TOOL_IDS[number];
  * `capability` says the same per tool, and test/unit/ai-client-branch.test.ts holds the two equal.
  */
 const PLAN_DEPENDENT: ReadonlySet<string> = new Set<string>(['chatgpt', 'grok', 'cursor', 'perplexity', 'copilot-studio']);
+
+/**
+ * Which tools connect only where the vendor offers it, under conditions the table's `plans` line
+ * names. The Gemini app: the United States, 18 or over, a personal account, English, Keep Activity
+ * on (Jouni's ruling, 2026-10-11; watch-gemini-kuluttajasovelluksen-mcp-euroopassa re-checks it
+ * monthly). Held equal to the table by the same test as PLAN_DEPENDENT.
+ */
+const REGION_DEPENDENT: ReadonlySet<string> = new Set<string>(['gemini-app']);
 
 /**
  * What a model may claim about the app it is running in → which of the eight it is.
@@ -123,6 +134,10 @@ export const AI_CLIENT_ALIASES: Readonly<Record<string, AiToolId>> = {
     // Gemini CLI. The bare id is also the variant answer of the Gemini question
     // (ai-client-families.ts), which is matched first; this reaches a claim that only contains it.
     geminicli: 'gemini-cli',
+    // The consumer Gemini app, the same way. "Gemini" alone stays the family question.
+    geminiapp: 'gemini-app',
+    geminiweb: 'gemini-app',
+    geminigooglecom: 'gemini-app',
     // Perplexity
     perplexity: 'perplexity',
     perplexityai: 'perplexity',
@@ -184,23 +199,47 @@ export function resolveAiClient(claim: string | null | undefined): AiClientResol
     return { kind: 'unknown', claim: raw };
 }
 
-/** A tool's capability. Everything in the table can speak MCP; only the tier varies. */
+/** A tool's capability. Everything in the table can speak MCP; only the vendor's condition varies. */
 export function capabilityOf(id: string): McpCapability {
-    return PLAN_DEPENDENT.has(id) ? 'plan-dependent' : 'yes';
+    if (PLAN_DEPENDENT.has(id)) return 'plan-dependent';
+    return REGION_DEPENDENT.has(id) ? 'region-dependent' : 'yes';
 }
 
 /** What the person still has to be asked, if anything. */
-export type BranchQuestion = 'which-client' | 'paid-plan' | 'which-variant';
+export type BranchQuestion = 'which-client' | 'paid-plan' | 'which-variant' | 'conditions';
 
 export type BranchDecision =
-    | { branch: 'A'; reason: 'known-capable' | 'plan-confirmed' | 'unknown-defaults-to-a' | 'variant-capable'; toolId?: AiToolId }
+    | { branch: 'A'; reason: 'known-capable' | 'plan-confirmed' | 'conditions-confirmed' | 'unknown-defaults-to-a' | 'variant-capable'; toolId?: AiToolId }
     /**
-     * The two routes to B, and both are the PERSON's own answer: they do not have the tier their
-     * app requires, or they said which of two same-named apps they use and that one cannot connect.
+     * The three routes to B, and all are the PERSON's own answer: they do not have the tier their
+     * app requires, they do not meet the vendor's conditions (the Gemini app outside the United
+     * States), or they said which of two same-named apps they use and that one cannot connect.
      */
-    | { branch: 'B'; reason: 'plan-missing'; toolId: AiToolId }
+    | { branch: 'B'; reason: 'plan-missing' | 'conditions-missing'; toolId: AiToolId }
     | { branch: 'B'; reason: 'variant-has-no-mcp'; family: string; variant: string }
     | { branch: 'ask'; question: BranchQuestion; toolId?: AiToolId; family?: string };
+
+/** The branch for a tool with a vendor condition: ask, and let only the person's answer decide. */
+function conditionalBranch(id: AiToolId, capability: McpCapability, answers: BranchAnswers): BranchDecision {
+    if (capability === 'region-dependent') {
+        if (answers.meetsConditions === true) return { branch: 'A', reason: 'conditions-confirmed', toolId: id };
+        if (answers.meetsConditions === false) return { branch: 'B', reason: 'conditions-missing', toolId: id };
+        return { branch: 'ask', question: 'conditions', toolId: id };
+    }
+    if (answers.hasPaidPlan === true) return { branch: 'A', reason: 'plan-confirmed', toolId: id };
+    if (answers.hasPaidPlan === false) return { branch: 'B', reason: 'plan-missing', toolId: id };
+    return { branch: 'ask', question: 'paid-plan', toolId: id };
+}
+
+/** The person's answers so far. Each is absent until they have given it. */
+export interface BranchAnswers {
+    /** Whether they have the tier their app requires. */
+    hasPaidPlan?: boolean;
+    /** Whether they meet the vendor's conditions (country, age, account, language). */
+    meetsConditions?: boolean;
+    /** Which app they talked in. */
+    clientAnswer?: string;
+}
 
 /**
  * The branch, from what we know so far.
@@ -210,24 +249,26 @@ export type BranchDecision =
  * not good enough, and they have no way to argue. So:
  *   - a known app that needs no paid tier      → A
  *   - a known app that does                    → ask about the tier (not a refusal, a question)
+ *   - a known app the vendor offers only in some countries → ask about its conditions
  *   - an app we have never heard of, or none   → ask which app; if they cannot say, A anyway
  *
  * @param resolution  what resolveAiClient made of the model's claim
  * @param answers.hasPaidPlan  the person's answer to the tier question, once they have given one
+ * @param answers.meetsConditions the person's answer to the conditions question, once given
  * @param answers.clientAnswer the person's answer to "which app did you talk in", once given.
  *   `other` and `dont-know` both mean: try A. If the connection then fails, B is where they land,
  *   having lost one attempt rather than being turned away on a guess.
  */
 export function decideBranch(
     resolution: AiClientResolution,
-    answers: { hasPaidPlan?: boolean; clientAnswer?: string } = {},
+    answers: BranchAnswers = {},
 ): BranchDecision {
     if (resolution.kind === 'unknown') {
         const ans = answers.clientAnswer?.trim();
         if (ans && ans !== 'other' && ans !== 'dont-know') {
             // They named an app. Read it through the same map — the answer is not privileged.
             const again = resolveAiClient(ans);
-            if (again.kind === 'known') return decideBranch(again, { hasPaidPlan: answers.hasPaidPlan });
+            if (again.kind === 'known') return decideBranch(again, { hasPaidPlan: answers.hasPaidPlan, meetsConditions: answers.meetsConditions });
             // A family or one of its variants keeps the answer with it: whether a variant that
             // cannot connect means B depends on the person having said it themselves.
             if (again.kind !== 'unknown') return decideBranch(again, answers);
@@ -246,7 +287,14 @@ export function decideBranch(
     }
 
     if (resolution.kind === 'variant') {
-        if (resolution.variant.mcp) return { branch: 'A', reason: 'variant-capable' };
+        if (resolution.variant.mcp) {
+            // The Gemini app carries its row's region condition with it. Copilot Studio's paid tier
+            // is not asked here: the person who names it is building an agent there already.
+            const capability = capabilityOf(resolution.variant.id);
+            return capability === 'region-dependent'
+                ? conditionalBranch(resolution.variant.id as AiToolId, capability, answers)
+                : { branch: 'A', reason: 'variant-capable' };
+        }
         // A variant that cannot connect sends the person to B only when THEY named it. A model that
         // says "I am the Gemini app" is still a name, and a name raises the question instead.
         const theySaidSo = !!answers.clientAnswer
@@ -259,10 +307,7 @@ export function decideBranch(
     if (resolution.capability === 'yes') {
         return { branch: 'A', reason: 'known-capable', toolId: resolution.id };
     }
-    // plan-dependent
-    if (answers.hasPaidPlan === true) return { branch: 'A', reason: 'plan-confirmed', toolId: resolution.id };
-    if (answers.hasPaidPlan === false) return { branch: 'B', reason: 'plan-missing', toolId: resolution.id };
-    return { branch: 'ask', question: 'paid-plan', toolId: resolution.id };
+    return conditionalBranch(resolution.id, resolution.capability, answers);
 }
 
 /**

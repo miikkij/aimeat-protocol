@@ -11057,7 +11057,7 @@
     "roadFreeOpenRouter": "La otra opción: carga unos 10 dólares en OpenRouter y elige DeepSeek V4 Pro o un modelo de ese nivel. A esos precios, el saldo dura mucho. Los modelos gratis cometen muchos errores aquí, así que no los recomendamos.",
     "openRouterKey": "Agregar una clave de OpenRouter",
     "roadPrompt": "Mi IA no se puede conectar",
-    "roadPromptHint": "La aplicación de Gemini, Microsoft Copilot y ChatGPT gratis no se pueden conectar a tu propio AIMEAT. Copia un prompt en tu IA y pega aquí su respuesta.",
+    "roadPromptHint": "Microsoft Copilot, ChatGPT gratis y la aplicación de Gemini fuera de Estados Unidos no se pueden conectar a tu propio AIMEAT. Copia un prompt en tu IA y pega aquí su respuesta.",
     "promptIntro": "Copia este prompt en tu IA. Te pide una cosa que valga la pena recordar y la escribe en dos líneas. Guardada aquí, la nota también la leen todas las IA que conectes después.",
     "pasteLabel": "Pega aquí la respuesta de tu IA",
     "pasteSave": "Guardar la nota",

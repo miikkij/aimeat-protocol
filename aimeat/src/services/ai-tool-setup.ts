@@ -33,6 +33,8 @@
  *   - Mistral (2026-10-11) https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors
  *   - LM Studio (2026-10-11) https://lmstudio.ai/docs/app/mcp and https://lmstudio.ai/changelog/lmstudio-v0.4.10
  *   - Gemini CLI (2026-10-11) https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md
+ *   - Gemini app (2026-10-11) https://support.google.com/gemini/answer/17209137 and
+ *     https://support.google.com/gemini/answer/15235603 (Gems)
  *   - Perplexity (2026-10-11) https://www.perplexity.ai/help-center/en/articles/13915507-adding-custom-remote-connectors
  *   - OpenClaw (2026-10-11) https://docs.openclaw.ai/cli/mcp/transports
  *   - Copilot Studio (2026-10-11) https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent
@@ -41,6 +43,9 @@
  *   (aliases, resolveAiClient, decideBranch, the question options) is in ai-tool-branch.ts.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.9.0 — 2026-10-11 — The consumer Gemini app joins the table as `region-dependent` (Jouni's
+ *     ruling, 2026-10-11): Google lets it add a custom MCP server in the United States only, under
+ *     the conditions its row states. Until then the app counted as one that cannot connect.
  *   v1.8.0 — 2026-10-11 — One table: the repository's fifteen platform reports are gone, and their
  *     checked facts are here.
  *     New tools: Mistral (Le Chat, now Vibe), LM Studio, Gemini CLI, Perplexity, OpenClaw and Copilot
@@ -104,10 +109,11 @@ export interface AiToolParam {
 
 /**
  * Whether this app can open an MCP connection at all. Every tool in this table can — that is why
- * it is in the table — so the only distinction is whether a paid tier is required.
- * `plan-dependent` is a question to ask the person, never a reason to refuse them.
+ * it is in the table — so the distinction is the condition the vendor puts on it: a paid tier
+ * (`plan-dependent`), or where the person is and what account they use (`region-dependent`).
+ * Either one is a question to ask the person, never a reason to refuse them.
  */
-export type McpCapability = 'yes' | 'plan-dependent';
+export type McpCapability = 'yes' | 'plan-dependent' | 'region-dependent';
 
 /**
  * The short way in, for the clients that have one: a link that installs the server in one click,
@@ -150,7 +156,10 @@ export interface AiTool {
          * a sentence written for a human.
          */
         capability?: McpCapability;
-        /** Which plans can do this at all — the most common reason setup fails. */
+        /**
+         * Which plans can do this at all — the most common reason setup fails. For a
+         * `region-dependent` tool, the vendor's conditions (country, age, account, language).
+         */
         plans?: string;
         /** A caution that belongs to the tool, not to us. */
         warn?: string;
@@ -632,6 +641,45 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 where: s(l, 'GEMINI.md at the root of the project, which Gemini CLI reads with every prompt. For all your projects at once, ~/.gemini/GEMINI.md.',
                     'GEMINI.md projektin juuressa, jonka Gemini CLI lukee jokaisen kehotteen mukana. Kaikkiin projekteihin kerralla: ~/.gemini/GEMINI.md.'),
                 docs: 'https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/gemini-md.md',
+            },
+        },
+        // The consumer Gemini app: MCP in the United States, the prompt-driven path elsewhere
+        // (Jouni's ruling, 2026-10-11). Watch `watch-gemini-kuluttajasovelluksen-mcp-euroopassa` in
+        // AIMEAT CODING CENTRAL re-reads Google's page at the start of every month; when the
+        // conditions change, this row and `REGION_DEPENDENT` in ai-tool-branch.ts change with them.
+        {
+            id: 'gemini-app',
+            label: 'Gemini app (gemini.google.com)',
+            mcp: {
+                docs: 'https://support.google.com/gemini/answer/17209137',
+                steps: [
+                    s(l, 'Open gemini.google.com on a computer. Custom apps are added in the web app only; once added, they also work in the Gemini mobile app.',
+                        'Avaa gemini.google.com tietokoneella. Omia sovelluksia lisätään vain verkkosovelluksessa, mutta lisäämisen jälkeen ne toimivat myös Geminin mobiilisovelluksessa.'),
+                    s(l, 'Open Settings at the bottom and choose Connected Apps.',
+                        'Avaa alareunasta Settings ja valitse Connected Apps.'),
+                    s(l, 'Under Custom apps, click Add a custom app and enter the address below as the MCP server URL. Click Next.',
+                        'Klikkaa Custom apps -kohdassa Add a custom app ja kirjoita alla oleva osoite kenttään MCP server URL. Klikkaa Next.'),
+                    s(l, 'Complete the sign-in as the screen asks.',
+                        'Vie kirjautuminen loppuun näytön ohjeiden mukaan.'),
+                    s(l, 'To make Gemini use this node in a prompt, type @ and choose the app.',
+                        'Kun haluat Geminin käyttävän tätä nodea, kirjoita kehotteeseen @ ja valitse sovellus.'),
+                ],
+                params: [
+                    { label: 'MCP server URL', value: mcpUrl },
+                    {
+                        label: 'Advanced features', value: '',
+                        note: s(l, 'Leave the credentials empty. This node registers the client itself (Dynamic Client Registration, RFC 7591).',
+                            'Jätä tunnukset tyhjiksi. Tämä node rekisteröi asiakkaan itse (Dynamic Client Registration, RFC 7591).'),
+                    },
+                ],
+                capability: 'region-dependent',
+                plans: s(l, 'Google offers custom apps only when you are in the United States, 18 or over, signed in with a personal Google Account (not a work or school account), using Gemini in English, with Keep Activity on. Google names no paid plan for it. Anywhere else, AIMEAT gives you a ready prompt: you paste it into Gemini and bring the answer back here.',
+                    'Google tarjoaa omat sovellukset vain, kun olet Yhdysvalloissa ja vähintään 18-vuotias, olet kirjautunut henkilökohtaisella Google-tilillä (et työ- tai koulutilillä), käytät Geminiä englanniksi ja Keep Activity on päällä. Maksullista tasoa Google ei mainitse. Muualla AIMEAT antaa sinulle valmiin kehotteen: liität sen Geminiin ja tuot vastauksen takaisin tänne.'),
+            },
+            instructions: {
+                where: s(l, 'A Gem: in the left panel click Explore Gems, then New Gem, and write the instructions in its instructions box. Click Save.',
+                    'Gem: klikkaa vasemmasta paneelista Explore Gems ja sitten New Gem, ja kirjoita ohjeet sen ohjekenttään. Klikkaa Save.'),
+                docs: 'https://support.google.com/gemini/answer/15235603',
             },
         },
         {

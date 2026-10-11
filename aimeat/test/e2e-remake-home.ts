@@ -19,6 +19,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-home
  * @version-history
+ *   v1.3.0 — 2026-10-11 — The Gemini app is region-dependent (Jouni's ruling, 2026-10-11): naming it
+ *     raises the `conditions` question, "no" reaches B and is kept, "yes" reaches A. The Copilot app
+ *     holds the "variant that cannot connect" case alone.
  *   v1.2.0 — 2026-10-03 — Phase 1b: the pasted card's private profile block fills journey.state
  *     (merged, never overwritten with an empty answer) and is removed from the published page; a
  *     paste without the block, or with a broken one, writes nothing.
@@ -519,13 +522,36 @@ await test('A page made in Gemini asks which Gemini, and the person\'s answer de
     const ids = (p.body.data.variant_options ?? []).map((o: { id: string }) => o.id);
     assert(ids.includes('gemini-app') && ids.includes('gemini-cli'), `both apps are offered, got ${ids.join(', ')}`);
 
+    // The Gemini app connects over MCP in the United States only (Jouni's ruling, 2026-10-11), so
+    // naming it asks about Google's conditions; until then this answer went straight to B.
     const a = await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ client: 'gemini-app' }) }));
     assert(a.status === 200, `answer ${a.status}: ${JSON.stringify(a.body.error)}`);
-    assert(a.body.data.branch === 'B' && a.body.data.reason === 'variant-has-no-mcp',
-        `the Gemini app → B on the person's own word, got ${JSON.stringify(a.body.data)}`);
+    assert(a.body.data.branch === 'ask' && a.body.data.question === 'conditions' && a.body.data.tool_id === 'gemini-app',
+        `the Gemini app → the conditions question, got ${JSON.stringify(a.body.data)}`);
+    const n = await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ meets_conditions: false }) }));
+    assert(n.body.data.branch === 'B' && n.body.data.reason === 'conditions-missing',
+        `outside the conditions → B on the person's own word, got ${JSON.stringify(n.body.data)}`);
     const s = await homeState(t);
     assert(s.branch === 'B', `branch recorded, got ${s.branch}`);
     assert(s.ai.source === 'asked' && s.ai.client === 'gemini-app', `their answer is what is kept, got ${JSON.stringify(s.ai)}`);
+    // The second answer (about the same app) is kept too, so the state recomputes B from it.
+    assert(s.needsBetterApp === true, `the "no" is kept and still reads as B, got ${s.needsBetterApp}`);
+});
+
+await test('The Gemini app in the United States goes to branch A', async () => {
+    const t = await registerOwner(`hmgus${stamp}`);
+    await paste(t, page('Gemini', 'gemini-2.5-pro'));
+    const a = await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ client: 'gemini-app', meets_conditions: true }) }));
+    assert(a.body.data.branch === 'A' && a.body.data.reason === 'conditions-confirmed',
+        `the conditions met → A, got ${JSON.stringify(a.body.data)}`);
+});
+
+await test('The Copilot app is still the variant that cannot connect', async () => {
+    const t = await registerOwner(`hmcop${stamp}`);
+    await paste(t, page('Microsoft Copilot', 'gpt-5'));
+    const a = await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ client: 'microsoft-copilot-app' }) }));
+    assert(a.body.data.branch === 'B' && a.body.data.reason === 'variant-has-no-mcp',
+        `the Copilot app → B on the person's own word, got ${JSON.stringify(a.body.data)}`);
 });
 
 await test('Gemini CLI is the same name and goes to branch A', async () => {
@@ -538,7 +564,7 @@ await test('Gemini CLI is the same name and goes to branch A', async () => {
 await test('FAILURE MODE: a page CLAIMING to be the Gemini app does not reach B without the person', async () => {
     const t = await registerOwner(`hmgclaim${stamp}`);
     const p = await paste(t, page('gemini-app', 'gemini-2.5-pro'));
-    assert(p.body.data.branch === 'ask' && p.body.data.question === 'which-variant',
+    assert(p.body.data.branch === 'ask' && p.body.data.question === 'conditions',
         `a model's claim is a name, and a name only asks; got ${JSON.stringify(p.body.data)}`);
     const s = await homeState(t);
     assert(s.branch !== 'B', `nobody is sent to B on a model's word, got ${s.branch}`);
