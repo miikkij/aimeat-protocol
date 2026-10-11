@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Automatic renewal of a package's update service, on the selling node
- *   (docs/specs/package-sale-design.md, section 3, "Renewal: the date is the clock"; Jouni's ruling of
+ *   (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, section 3, "Renewal: the date is the clock"; Jouni's ruling of
  *   2026-10-02 on open question 4).
  *
  *   THE DATE IS THE ONE CLOCK. The repository's `updates_until` ends the updates by itself; nothing

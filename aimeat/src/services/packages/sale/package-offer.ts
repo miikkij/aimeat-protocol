@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A package offer: the terms on which a package's author lets seller nodes sell a package
- *   group (docs/specs/package-sale-design.md, section 2).
+ *   group (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, section 2).
  *
  *   ONE RECORD PER GROUP, `offer.<groupId>`, in the system namespace of the entitlements
  *   (`package-entitlements`), beside `entitlements.<groupId>` and `sellers.<author>`. No principal can

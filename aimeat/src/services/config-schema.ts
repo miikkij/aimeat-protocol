@@ -84,7 +84,7 @@
  *   v1.3.0 — 2026-08-18 — The node.sealed_config_keys row. Its `immutable: true` is load-bearing
  *     rather than descriptive: it is what stops the seal list from being sealed or unsealed
  *     through applyConfigOverrides(), which is the door the mechanism exists to close.
- *     docs/plans/sealed-config-plan.md
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *   v1.2.0 — 2026-08-16 — The `ai.` group: whose key pays, which model answers each role, the
  *     free allowance, and the chat agent's binary/provider/model. Every one of them decides what
  *     the node spends and every one of them was .env-and-restart only, so an operator could not

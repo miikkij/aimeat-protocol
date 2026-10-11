@@ -34,7 +34,7 @@ Two kinds of setting stand outside that order:
   This is for a node one party operates on behalf of another: the operator still sees the value and
   its source is reported as `sealed`, but the admin dashboard refuses to move it and a database
   override on that path is ignored with a line in the boot log. Empty on a self-hosted node, where
-  nothing changes. → `docs/plans/sealed-config-plan.md`
+  nothing changes. → [the design, in the AIMEAT development organism](https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm)
 
 ### A number's range: recommended or allowed
 

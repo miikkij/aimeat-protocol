@@ -53,7 +53,7 @@
  *     read-only, for a node one party runs on behalf of another. Empty on a self-hosted node and
  *     behaviour there is unchanged. Pure extraction of applyConfigOverrides to config-overrides.ts
  *     at the same time (max-file-lines), re-exported from here so no importer changes.
- *     docs/plans/sealed-config-plan.md
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *   v1.0.0 -- pre-2026-05 -- Initial central config module
  *   v1.1.0 -- 2026-05-29 -- Add OperatorConfig section + helpers. Required for
  *     privacy policy template substitution per CLAUDE.md self-host architecture.
