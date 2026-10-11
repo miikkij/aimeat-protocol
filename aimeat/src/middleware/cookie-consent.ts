@@ -32,6 +32,8 @@
  *   - cookieConsentMiddleware(config): adds the snippet to text/html string bodies before </body>
  *   - buildStandaloneSnippetJs(config): self-loading IIFE for GET /v1/portal/cookie-consent.js
  * @version-history
+ *   v2.2.0 — 2026-10-11 — With no policy address set the banner links to the service's own privacy
+ *     policy, with the service's address in front on an app's page (`assetBase`).
  *   v2.1.0 — 2026-10-11 — The service's own pages get the banner only when the operator lists a
  *     category a visitor can refuse (with `necessary` alone it asked a question with one answer on
  *     every page); the cookie mark on the row of marks opens the choices again; every non-ASCII
@@ -84,6 +86,11 @@ export interface CookieBannerOptions {
    * For a served app, a portfolio or a company page, which carry that row (utils/app-badge.ts).
    */
   mark?: boolean;
+  /**
+   * The service's own address, for a page on another origin (an app); empty on its own pages. The
+   * banner's files load from it, and the link to the service's own privacy policy starts with it.
+   */
+  assetBase?: string;
 }
 
 /** Every character outside ASCII as a \u escape: a served app often declares no charset. */
@@ -135,7 +142,7 @@ export function buildCookieConsentRunConfig(config: BannerConfig, opts: CookieBa
 
   const translations: Record<string, unknown> = {};
   for (const lang of CONSENT_LANGS) {
-    translations[lang] = consentTexts(lang, names, { services: opts.services, policyUrl: config.cookieConsentPolicyUrl });
+    translations[lang] = consentTexts(lang, names, { services: opts.services, policyUrl: config.cookieConsentPolicyUrl, base: opts.assetBase });
   }
 
   const runConfig = {
@@ -193,7 +200,7 @@ function startJs(runConfig: string, mark = false): string {
  * pages. `nonce` is the page's CSP nonce: the service's own pages allow an inline script only with
  * it, and without it the start script was blocked and the banner never showed there.
  */
-export function cookieConsentSnippet(config: BannerConfig, opts: CookieBannerOptions & { assetBase?: string; nonce?: string } = {}): string {
+export function cookieConsentSnippet(config: BannerConfig, opts: CookieBannerOptions & { nonce?: string } = {}): string {
   const base = (opts.assetBase ?? '').replace(/\/+$/, '');
   const nonce = opts.nonce && /^[A-Za-z0-9+/=_-]{8,200}$/.test(opts.nonce) ? ` nonce="${opts.nonce}"` : '';
   return `<link rel="stylesheet" href="${base}/cookieconsent.css">`
