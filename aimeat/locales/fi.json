@@ -10783,7 +10783,7 @@
     "cfgDesc_portfolio_max_images": "Kuvien katto portfoliota kohden.",
     "cfgDesc_cookies_consent_enabled": "Näyttää evästebannerin jokaisessa sovelluksessa, portfoliossa ja yrityssivulla, jonka omistaja käyttää omaa Claritya tai Google Analyticsia. Palvelun omat sivut näyttävät sen vain, kun evästeluokissa on muutakin kuin necessary. Muutos tulee voimaan heti.",
     "cfgDesc_cookies_consent_categories": "Mitä banneri kysyy palvelun omilla sivuilla, yksi sana rivillään: necessary, analytics, marketing. Sivu, jolla on omistajansa analytiikka, kysyy analytiikasta aina.",
-    "cfgDesc_cookies_consent_policy_url": "Tietosuojaselosteen osoite, johon banneri linkittää.",
+    "cfgDesc_cookies_consent_policy_url": "Tietosuojaselosteen osoite, johon banneri linkittää. Tyhjä: banneri linkittää tämän palvelun omaan tietosuojaselosteeseen kävijän kielellä.",
     "cfgDesc_cors_allowed_origins": "CORS:n sallimat alkuperät pilkuin eroteltuina (* = kaikki).",
     "cfgDesc_realtime_enabled": "Reaaliaikainen P2P-signalointi käytössä.",
     "cfgDesc_realtime_max_rooms": "P2P-huoneiden katto.",
