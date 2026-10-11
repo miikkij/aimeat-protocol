@@ -431,9 +431,7 @@ a schema.
   peers pick it up.
 - **An extension** exports as a manifest plus scripts and installs on any node with one call.
 - **Everything together** goes into a package: apps, extensions, cortex, translations and manifests
-  in one installable unit, published to the template gallery. See
-  **[local-first-package-workflow.md](../guides/local-first-package-workflow.md)** for the
-  local-directory-as-source-of-truth pattern.
+  in one installable unit, published to the template gallery.
 
 ---
 

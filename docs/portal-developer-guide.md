@@ -25,7 +25,6 @@ See:
 
 - [AI-assisted apps](app-developer-ai-guide.md)
 - [Extension, cortex and app stack](guides/building-extension-cortex-app-stack.md)
-- [Local package workflow](guides/local-first-package-workflow.md)
 - [Ecosystem applications](building-an-aimeat-compatible-ecosystem-app.md), for
   independently hosted applications with a GEAI identity
 

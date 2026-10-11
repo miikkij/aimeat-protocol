@@ -6,6 +6,9 @@
  * @structure Git file inventory, catalog validation, links and data syntax, duplicate check.
  * @usage pnpm check:docs
  * @version-history
+ *   v1.2.0 - 2026-10-11 - docs/archive/ is gone (ruling D6): a file under docs/archive/ or docs/plans/
+ *     is refused, and the history notice is required of every file the catalog marks historical,
+ *     wherever it is, instead of every file in the archive.
  *   v1.1.0 - 2026-10-03 - The person help prompt's two copies must agree too.
  *   v1.0.0 - 2026-09-16 - Track both documentation trees and distinguish history from guidance.
  */
@@ -60,8 +63,15 @@ for (const path of files) {
     for (const error of parseDocument(content).errors) errors.push(`${path}: ${error.message}`);
   }
   if (!path.endsWith('.md')) continue;
-  if (path.startsWith('docs/archive/') && path !== 'docs/archive/README.md' &&
-      !content.includes('> Historical document.')) errors.push(`Archive notice missing: ${path}`);
+  // Plans, design specs and build notes live on the node (CLAUDE.md, "Two ways of working"); the
+  // repository's archive and plans folders were removed on 2026-10-11 and do not come back.
+  if (/^docs\/(archive|plans)\//.test(path)) {
+    errors.push(`${path}: plans and build notes live in the development organism on the node, not in docs/`);
+  }
+  // A file the catalog keeps as history says so at its top, so nobody follows it as current guidance.
+  if (catalog.get(path) === 'historical' && !content.includes('> Historical document.')) {
+    errors.push(`History notice missing: ${path} (the catalog marks it historical)`);
+  }
   // Historical links are part of the evidence and may refer to removed source files.
   if (catalog.get(path) === 'historical') continue;
   for (const match of withoutFences(content).matchAll(/!?\[[^\]\n]*\]\(([^)\n]+)\)/g)) {

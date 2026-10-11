@@ -46,4 +46,4 @@ The actual checks are defined in
 [OpenAPI](../../openapi.yaml) is the API contract. The conceptual specifications
 are [Core](../AIMEAT-RFC-v4.0-Core-full.md) and
 [Platform](../AIMEAT-RFC-v4.0-Platform-full.md).
-[The archive](../archive/README.md) holds historical plans.
+Plans and build notes live on the node, in the AIMEAT development organism.
