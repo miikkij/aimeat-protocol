@@ -14,6 +14,8 @@
  * @usage
  *   import { applyConfigOverrides } from './config.js';   // re-exported
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The copy of the rate-limit settings into the limiter tiers moved to
+ *     services/config-rate-limit-sync.ts, which the live write paths call too.
  *   v1.1.0 — 2026-10-09 — A secret row stored sealed is opened with the node key before it is applied,
  *     and skipped when it does not open (services/config-at-rest.ts; secrets audit 2026-10-09, S4b).
  *   (2026-08-28) Applies a stored value through writeConfigField, so a site-link row
@@ -24,8 +26,9 @@
  *     the host set could be overridden permanently from inside the node.
  *     docs/plans/sealed-config-plan.md
  */
-import type { AimeatConfig, RateLimitsConfig, RateLimitTier } from './config-types.js';
+import type { AimeatConfig } from './config-types.js';
 import { MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable, writeConfigField } from './services/config-schema.js';
+import { syncRateLimitTiers } from './services/config-rate-limit-sync.js';
 import { isSealed } from './services/config-sealing.js';
 import { openStoredSetting } from './services/config-at-rest.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
@@ -87,28 +90,9 @@ export async function applyConfigOverrides(
     }
   }
 
-  // Sync rl* individual keys back to rateLimits tiers
-  const rlKeys: Array<{ key: keyof AimeatConfig; tier: keyof Omit<RateLimitsConfig, 'roleMultipliers'> }> = [
-    { key: 'rlGlobal', tier: 'global' },
-    { key: 'rlAuth', tier: 'auth' },
-    { key: 'rlWork', tier: 'work' },
-    { key: 'rlMemory', tier: 'memory' },
-    { key: 'rlBoards', tier: 'boards' },
-    { key: 'rlOwners', tier: 'owners' },
-    { key: 'rlGhii', tier: 'ghii' },
-    { key: 'rlFlags', tier: 'flags' },
-    { key: 'rlAppeals', tier: 'appeals' },
-    { key: 'rlAdminSetup', tier: 'adminSetup' },
-    { key: 'rlFederation', tier: 'federation' },
-    { key: 'rlCatalogue', tier: 'catalogue' },
-    { key: 'rlAuthChallenge', tier: 'authChallenge' },
-  ];
-  for (const { key, tier } of rlKeys) {
-    const val = config[key] as number;
-    if (typeof val === 'number' && val >= 1) {
-      (config.rateLimits[tier] as RateLimitTier).max = val;
-    }
-  }
+  // Copy the rl* settings into the limiter tiers (services/config-rate-limit-sync.ts, shared with
+  // the live write paths).
+  syncRateLimitTiers(config);
 
   if (applied.length > 0) provenance.markDatabase(applied);
   return { applied, skipped, sealed };

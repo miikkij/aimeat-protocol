@@ -340,7 +340,7 @@ export function registerRegisterLoginRoutes(
     // Mints a fresh owner keypair only when the client has none locally
     // (request_owner_key) or the owner has no key yet; otherwise reuses the
     // existing key so other devices keep their refresh capability.
-    router.post('/v1/ghii/login', loginTarpit(config), rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), validateBody(GhiiLoginSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/ghii/login', loginTarpit(config), rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs })), validateBody(GhiiLoginSchema, config.nodeId), async (req, res) => {
         const { username, password, totp_code, backup_code } = req.body ?? {};
         // Only mint a fresh owner signing key when the client has none locally.
         const wantsOwnerKey = req.body?.request_owner_key === true;

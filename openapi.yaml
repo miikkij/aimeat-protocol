@@ -28482,11 +28482,22 @@ paths:
 
     put:
       operationId: updateConfig
-      summary: Update config (atomic)
+      summary: Change settings
       description: |
-        Atomic configuration update. Send complete config object.
-        AI-driven configuration is supported — an operator-level AI agent can
+        Operator only. Send the settings to change, each as a dot-path and its new value, not the
+        whole configuration. AI-driven configuration is supported: an operator-level AI agent can
         tune the node via this endpoint.
+
+        Each change is checked, stored in the node's database and then applied to the running node;
+        it takes effect on the next request, the rate limits included. The request is NOT atomic
+        across changes: a change that passes is applied even when another one in the same request is
+        refused. The answer carries `applied` (path, old_value, new_value; a secret as
+        `{ configured }`) and `errors` (path and reason) for the refused ones. When nothing passed
+        the answer is 400 `INVALID_INPUT` with the same `errors` in `details`.
+
+        A setting whose value is a list of strings (for example `cors.allowed_origins`,
+        `scopes.max_agent_scopes`) takes a JSON array, or the same list as one comma-separated text.
+        It is stored and applied as a list either way.
 
         Refuses the WHOLE request with 403 `SEALED_CONFIG` when any path in it was sealed by the
         node's host, applying none of the other changes in the same request. The error `details`
@@ -28500,10 +28511,33 @@ paths:
           application/json:
             schema:
               type: object
-              description: Full node configuration (see Appendix B)
+              required: [changes]
+              properties:
+                changes:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [path, value]
+                    properties:
+                      path:
+                        type: string
+                        description: The setting's dot-path, as GET /v1/admin/config names it.
+                        example: quota.memory_mb
+                      value:
+                        description: The new value, of the type GET reports for the setting.
+            example:
+              changes:
+                - { path: quota.memory_mb, value: 300 }
+                - { path: cors.allowed_origins, value: ['https://app.example.com'] }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: >-
+            No change in the request was applied (`INVALID_INPUT`): `details.errors` names each
+            refused path with its reason.
+          $ref: '#/components/responses/BadRequest'
         '403':
           description: >-
             Config persistence unavailable (`READONLY_CONFIG`), or a path in the request was sealed

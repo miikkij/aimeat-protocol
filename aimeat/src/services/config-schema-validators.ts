@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description The value checks that several config-schema.ts rows share. A pure move out of
  *   config-schema.ts (max-file-lines); the rows import them from here and behave as before.
- * @structure isJsonObject · isEmptyOrHttpUrl · oneOf · numericRangeOf · withinStatedRange · rangeKindOf · isContactList
+ * @structure isJsonObject · isEmptyOrHttpUrl · oneOf · numericRangeOf · withinStatedRange · rangeKindOf ·
+ *   listFromText · isStringList · asList · isContactList
  * @version-history
+ *   v1.4.0 — 2026-10-11 — listFromText(), isStringList(), asList(): the value of a `list` row, as a
+ *     list wherever it arrives as text.
  *   v1.3.0 — 2026-10-11 — rangeKindOf(): a number row's range is a limit or a recommendation, read
  *     from what the write path accepts.
  *   v1.2.0 — 2026-10-02 — numericRangeOf() / withinStatedRange(): a number row's `range` hint read as
@@ -97,6 +100,32 @@ export function rangeKindOf(
   if (!r) return null;
   if (RANGE_ENFORCED.has(field.dotPath)) return 'limit';
   return field.validate(r.max + 1) ? 'recommended' : 'limit';
+}
+
+/** A comma-separated text as a list: each part trimmed, empty parts dropped. */
+export function listFromText(raw: string): string[] {
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+/** The check of a `list` row: at least one entry, every entry a non-empty string with no comma in it. */
+export function isStringList(v: unknown): boolean {
+  return Array.isArray(v) && v.length > 0 && v.every(s => typeof s === 'string' && s.trim() !== '' && !s.includes(','));
+}
+
+/**
+ * A `list` row's value as a list, whatever arrived: a list stays, a text is split at its commas (a
+ * JSON array text is read as the array it is). Anything else is returned unchanged, for the row's
+ * check to refuse. The write path normalizes with this BEFORE the check, so the check and the
+ * running config see the same value.
+ */
+export function asList(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const text = value.trim();
+  if (text.startsWith('[')) {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the text is not a JSON array, so it is read as comma-separated
+    try { const parsed: unknown = JSON.parse(text); if (Array.isArray(parsed)) return parsed; } catch { /* comma-separated below */ }
+  }
+  return listFromText(text);
 }
 
 /** The contact list: an array of objects with a string name and email; the other fields are optional strings. */

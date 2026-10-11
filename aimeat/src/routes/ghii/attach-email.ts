@@ -35,7 +35,7 @@ export function registerAttachEmailRoute(
     storage: Storage,
     emailService: EmailService | undefined,
 ): void {
-    router.post('/v1/ghii/login/attach-email', loginTarpit(config), rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), async (req, res) => {
+    router.post('/v1/ghii/login/attach-email', loginTarpit(config), rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs })), async (req, res) => {
         const { username, password, email } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {

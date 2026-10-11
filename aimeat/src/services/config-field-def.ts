@@ -9,6 +9,7 @@
  * @structure ConfigFieldShape<K>
  * @usage import type { ConfigFieldDef } from './config-schema.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — `list`: a setting whose running value is a list of strings.
  *   v1.1.0 — 2026-09-29 — `choices`: the fixed values of a string setting, for the Config tab's pick.
  *   v1.0.0 — 2026-09-24 — Moved from config-schema.ts; the key's type became a parameter.
  */
@@ -36,6 +37,15 @@ export interface ConfigFieldShape<K extends string> {
    * The stored value stays the raw string; `validate` still decides what is accepted.
    */
   choices?: readonly string[];
+  /**
+   * The setting is a list of strings (CORS origins, scopes, STUN servers). Its running value is
+   * string[] and its `type` is 'object'. Wherever the value is raw text (an environment variable, a
+   * config file, Consul, a stored row, a request that sends text) it is comma-separated, and
+   * parseConfigValue / serializeFieldValue convert in both directions. Until 2026-10-11 such a row
+   * was typed 'string', so a save wrote the text into a field the code reads as an array, and every
+   * `.includes(x)` on it became a substring test.
+   */
+  list?: boolean;
   /**
    * Admin API display mode:
    * - undefined / 'visible': shown with actual value

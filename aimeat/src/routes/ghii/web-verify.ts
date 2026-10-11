@@ -280,7 +280,7 @@ export function registerWebVerifyRoutes(
     // A short emailed CODE is the most guessable credential on the node, and this door stood
     // behind nothing at all: no limiter, no delay. Both now, tarpit first so a guesser pays
     // before the node looks anything up.
-    router.post('/v1/ghii/verify-email', loginTarpit(config), rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), async (req, res) => {
+    router.post('/v1/ghii/verify-email', loginTarpit(config), rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs })), async (req, res) => {
         const { verification_id, code } = req.body ?? {};
 
         if (!verification_id || typeof verification_id !== 'string') {

@@ -434,7 +434,6 @@ Operators control personal node behavior through environment variables:
 | `AIMEAT_PERSONAL_NODES_ENABLED` | `true` | Enable/disable personal node support |
 | `AIMEAT_PERSONAL_NODE_MAX_SLOTS` | `100` | Maximum number of personal nodes this operator will host |
 | `AIMEAT_PERSONAL_MAILBOX_QUOTA_MB` | `50` | Mailbox storage quota per personal node (MB) |
-| `AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS` | `7` | How long mailbox items are kept before expiry |
 | `AIMEAT_PERSONAL_HEARTBEAT_MS` | `30000` | Heartbeat check interval (ms) |
 | `AIMEAT_PERSONAL_OFFLINE_MS` | `300000` | Time without heartbeat before marking node offline (ms) |
 

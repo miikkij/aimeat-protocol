@@ -61,7 +61,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
      * Returns: signed attestation on success
      */
     router.post('/v1/federation/auth/verify',
-        rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }),
+        rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs })),
         async (req, res) => {
             const { username, password, requesting_node, timestamp, signature, totp_code, backup_code } = req.body ?? {};
 

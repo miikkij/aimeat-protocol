@@ -48,7 +48,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     // registration takes no credential, and the default key (the bearer's sub when one is
     // present) handed any token holder a private bucket on the public sign-up door until
     // 2026-09-09 (e2e-account-doors).
-    const registrationLimit = rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs, keyBy: 'ip' });
+    const registrationLimit = rateLimit(() => ({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs, keyBy: 'ip' }));
 
     registerRegisterLoginRoutes(router, config, storage, emailService, peers, registrationLimit);
     registerAttachEmailRoute(router, config, storage, emailService);

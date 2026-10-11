@@ -126,7 +126,7 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
   // (signature, Audience, InResponseTo, NotBefore/NotOnOrAfter — all node-saml's), account
   // reads and writes only after it holds.
   router.post('/v1/ghii/login/saml/:id/acs',
-    rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs, keyBy: 'ip' }),
+    rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs, keyBy: 'ip' })),
     async (req, res) => {
       const fail = (code: string) => res.redirect(`${config.baseUrl}/?auth_error=${encodeURIComponent(code)}`);
       const conn = await connectionFor(req, res);
@@ -209,7 +209,7 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
   // shared body with the OIDC providers. JIT accounts are `via: 'oauth'` (R9): the registration
   // mode decides, exactly as it does for a first Entra sign-in.
   router.post('/v1/ghii/login/saml/:id/finalize',
-    rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs }),
+    rateLimit(() => ({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs })),
     async (req, res) => {
       const conn = await connectionFor(req, res);
       if (!conn) return;

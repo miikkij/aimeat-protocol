@@ -171,7 +171,7 @@ export function accessTokensRouter(config: AimeatConfig, storage: Storage): Rout
 
   // POST /v1/auth/token/exchange — exchange a PAT (the token is the auth) for a short access JWT
   router.post('/v1/auth/token/exchange',
-    rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }),
+    rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs })),
     async (req, res) => {
       const authHeader = req.headers.authorization;
       const raw = (authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null)

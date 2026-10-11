@@ -26,7 +26,7 @@
  */
 
 import ini from 'ini';
-import { CONFIG_FIELDS, serializeConfigValue, readConfigField } from '../services/config-schema.js';
+import { CONFIG_FIELDS, serializeFieldValue, readConfigField } from '../services/config-schema.js';
 import type { AimeatConfig } from '../config.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 import { planConsulExport } from '../services/consul-export.js';
@@ -62,7 +62,7 @@ function exportToEnv(config: AimeatConfig): string {
     }
     const value = readConfigField(config, field);
     if (value !== undefined && value !== null && value !== '') {
-      lines.push(`${field.envVar}=${serializeConfigValue(value)}`);
+      lines.push(`${field.envVar}=${serializeFieldValue(field, value)}`);
     }
   }
 
@@ -80,7 +80,7 @@ function exportToIni(config: AimeatConfig): string {
     if (!sections[section]) sections[section] = {};
     const value = readConfigField(config, field);
     if (value !== undefined && value !== null && value !== '') {
-      sections[section][key] = serializeConfigValue(value);
+      sections[section][key] = serializeFieldValue(field, value);
     }
   }
 

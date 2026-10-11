@@ -116,16 +116,19 @@ const SOURCE_BADGE = {
  * Sections of sections. A dot-path's first segment is its section (`ai`, `rate_limits`, `email`);
  * this puts those fifty sections under eight headings so the index can be read at a glance.
  * A section nobody has classified lands in `other` and still appears — a missing entry here must
- * never make a field unreachable.
+ * never make a field unreachable. `pnpm check:config-coverage` holds this list to the schema in both
+ * directions: every section of the schema is named here, and every name here is a section. Until
+ * 2026-10-11 nothing did, and twenty sections (87 settings) stood under Other while ten names here
+ * matched nothing (`quotas` for `quota`, `sync` for `federation_sync`, `tunnel` for `connect_tunnel`).
  */
 const DOMAINS = [
-  { id: 'ai', groups: ['ai', 'decide', 'agent', 'tasks', 'mcp', 'cortex', 'calibrator'] },
-  { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'economy', 'portfolio'] },
-  { id: 'identity', groups: ['auth', 'totp', 'eudiw', 'docsign', 'consent', 'classification', 'security', 'moderation'] },
-  { id: 'node', groups: ['node', 'storage', 'database_url', 'sqlite_path', 'admin_password', 'setup', 'consul', 'stats', 'metrics'] },
-  { id: 'limits', groups: ['quota', 'rate_limits', 'extensions', 'realtime'] },
-  { id: 'federation', groups: ['federation', 'sync', 'personal_nodes', 'genesis', 'tunnel', 'msm'] },
-  { id: 'integrations', groups: ['email', 'push', 'indexing', 'cors', 'site', 'portal', 'cookies', 'connections', 'visibility'] },
+  { id: 'ai', groups: ['ai', 'decide', 'agent', 'agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
+  { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
+  { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
+  { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'features', 'packages'] },
+  { id: 'limits', groups: ['quota', 'rate_limits', 'boards', 'extensions', 'realtime'] },
+  { id: 'federation', groups: ['federation', 'federation_sync', 'cross_federation', 'personal_nodes', 'connect_tunnel', 'msm'] },
+  { id: 'integrations', groups: ['email', 'push', 'indexing', 'seo', 'cors', 'site', 'themes', 'apps', 'cookies', 'connections', 'visibility', 'geo'] },
 ];
 
 /**

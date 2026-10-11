@@ -480,7 +480,6 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         AIMEAT_EXT_MAX_MEMORY_MB: process.env.AIMEAT_EXT_MAX_MEMORY_MB ?? '192',
         AIMEAT_EXT_TIMEOUT_MS: process.env.AIMEAT_EXT_TIMEOUT_MS ?? '60000',
         AIMEAT_JWT_TTL: process.env.AIMEAT_JWT_TTL ?? '3600',
-        AIMEAT_OTK_TTL_MS: process.env.AIMEAT_OTK_TTL_MS ?? '300000',
         AIMEAT_OTK_GRACE_MS: process.env.AIMEAT_OTK_GRACE_MS ?? '60000',
     };
 }

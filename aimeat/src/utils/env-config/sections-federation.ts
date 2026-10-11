@@ -89,12 +89,6 @@ export function federationSections(config: AimeatConfig): ConfigSection[] {
           defaultVal: '5000',
         },
         {
-          envVar: 'AIMEAT_REPLICATION_QUEUE_MAX',
-          description: 'Maximum replication queue entries',
-          value: String(config.replicationQueueMax),
-          defaultVal: '10000',
-        },
-        {
           envVar: 'AIMEAT_REPLICATION_QUEUE_TTL_HOURS',
           description: 'Max age of replication queue entries (hours)',
           value: String(config.replicationQueueTtlHours),

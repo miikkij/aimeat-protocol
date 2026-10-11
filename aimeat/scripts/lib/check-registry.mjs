@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.16.0 (2026-10-11): check:config-tab, the admin Config tab against the schema, the English locale and the code that reads the settings.
  *  - 1.15.0 (2026-10-05): check:storage-file-parity, the SQLite methods files mirror the Postgres ones (secaudit 2026-10, M8).
  *  - 1.14.0 (2026-10-05): check:single-entry, a password check, an account deletion and an operator check each through their one function.
  *  - 1.13.0 (2026-10-01): check:peer-paths, every federation peer writer and reader says on what proof.
@@ -28,6 +29,7 @@ export const FAST_CHECKS = [
     { script: 'check:profile-tabs', label: 'Every profile tab reachable from the menu' },
     { script: 'check:crew-defs', label: 'Shipped crew definitions match the runtime\'s rules' },
     { script: 'check:config-coverage', label: 'Every setting reachable in the admin Config tab' },
+    { script: 'check:config-tab', label: 'The Config tab: every section indexed, every setting named and read, lists and numbers consistent' },
     { script: 'check:no-max-tokens', label: 'No max_tokens caps on AI calls' },
     { script: 'check:openapi', label: 'openapi.yaml parses + refs resolve' },
     { script: 'check:openapi-routes', label: 'The contract and the code name the same routes' },
