@@ -11,6 +11,11 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.28.0 -- 2026-10-12 -- Four skills ship with every node (docs audit phase 5a): aimeat-data-ownership,
+ *     aimeat-mcp-servers, aimeat-workflow-decisions and aimeat-bookkeeping, each in its own file.
+ *     manage-my-profile-data points to aimeat-data-ownership for export, delete and leaving;
+ *     diagnose-a-workflow says a run waiting for a person is not stalled and points to
+ *     aimeat-workflow-decisions.
  *   v1.27.0 -- 2026-10-11 -- aimeat-extension-builder (builtin-skills.extension-builder.ts) ships with
  *     every node, with the AI half of the service-extensions manual (docs audit phase 2).
  *   v1.26.0 -- 2026-10-11 -- aimeat-workspace-contracts (builtin-skills.workspace-contracts.ts), from
@@ -182,6 +187,10 @@ import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_PO
 import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
 import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
 import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
+import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
+import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
+import { WORKFLOW_DECISIONS_SKILL_ENTRY } from './builtin-skills.workflow-decisions.js';
+import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -362,6 +371,8 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
 ## Principles
 - Data is the owner's: propose, show the exact key + visibility change, then act on confirmation.
 - Prefer consent grants over visibility increases when sharing with a specific party.
+- Taking data out, deleting and taking it back, who wrote a record, letting it expire, and leaving
+  the node: skill \`aimeat-data-ownership\`.
 `,
   },
   CREW_AGENT_SKILL_ENTRY,
@@ -420,6 +431,10 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   AI_CAPABILITIES_SKILL_ENTRY,
   WORKSPACE_CONTRACTS_SKILL_ENTRY,
   EXTENSION_BUILDER_SKILL_ENTRY,
+  DATA_OWNERSHIP_SKILL_ENTRY,
+  MCP_SERVERS_SKILL_ENTRY,
+  WORKFLOW_DECISIONS_SKILL_ENTRY,
+  BOOKKEEPING_SKILL_ENTRY,
   {
     name: 'use-app-bound-skills',
     skillMd: `---
@@ -577,6 +592,11 @@ metadata:
    list, wrote a different key, or ran in a sandbox run under the run's key prefix; a classification
    label that keeps the record from the node's own work hides it too. Read the key with
    \`aimeat_memory_read\` and compare it with the writing step's \`result_to_key\` or \`answer_to_key\`.
+
+9. **A run that waits for a person:** status \`waiting-step\` with a step in \`waiting-human\` is a
+   decision step waiting for an answer, not a stall. \`aimeat_workflow_pending_inputs\` shows the
+   question and its deadline; tell the owner, and leave the answer to them (skill
+   \`aimeat-workflow-decisions\`).
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.
