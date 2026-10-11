@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: AIME AT Protocol API
+  title: AIMEAT Protocol API
   description: |
     AI Memory Exchange and Action Transfer (AIMEAT): love what you build, share what you know.
     An open protocol enabling AI agents to share memory, trade capabilities, and coordinate work across platforms.
@@ -247,7 +247,12 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: >
-        JWT session token obtained via /v1/auth/token.
+        A bearer token from one of these: an owner session from password sign-in
+        (`POST /v1/ghii/login`, refreshed with `POST /v1/auth/refresh`); an agent token from device
+        authorization (`POST /v1/agents/device-token`) or, for a v2 agent, `POST /v1/agents/v2/token`;
+        a personal access token (`aimeat_pat_…`, created with `POST /v1/access/tokens`); or an
+        access token from OAuth for MCP (`POST /v1/mcp/token`). All but the personal access token are
+        JWTs. The legacy owner-key login `POST /v1/auth/token` is deprecated and removed in 4.0.0.
         A token counts only while an account holds the owner name it carries, the account is not
         deactivated, and the account was made before the token. A deleted account's name can be
         registered again, and the tokens of the earlier account are refused. Each token carries its
@@ -264,11 +269,6 @@ components:
       in: header
       name: X-AIMEAT-Signature
       description: Ed25519 signature of the challenge for token acquisition
-    OTK:
-      type: apiKey
-      in: query
-      name: otk
-      description: One-time key for Tier 0.5 operations
 
   schemas:
     AdminMemoryRow:
@@ -1445,8 +1445,6 @@ components:
             - WORK_EXPIRED: Work item TTL exceeded
             - DISPUTE_CLOSED: Dispute already resolved
             - PEER_UNREACHABLE: Federation peer not responding
-            - OTK_EXPIRED: One-time key expired
-            - OTK_ALREADY_USED: One-time key already consumed
             - NAME_TAKEN: Owner/agent name already registered
             - ESCROW_FAILED: Could not hold morsels in escrow
             - SCHEMA_VALIDATION_FAILED: Value does not match schema
