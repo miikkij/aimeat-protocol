@@ -25,6 +25,7 @@
  *   - GET    /v1/agents/:name/crew/llm        the model choice that applies now, for the runtime
  * @usage app.use(agentCrewRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-10-11 — The publish, restore and seed answers carry `warnings`.
  *   v1.3.1 — 2026-10-10 — `:name` is read as Express 5 decoded it; the second decode threw a URIError
  *     (500) on `%25zz` (secaudit 2026-10-10 I0).
  *   2026-10-05 — The crew caller is the request's CallerContext (middleware/caller.ts; secaudit 2026-10, C9).
@@ -130,7 +131,7 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
   router.post('/v1/agents/:name/crew/publish', requireAuth(), requireScope('memory:write'), validateBody(PublishBody, config.nodeId), async (req, res) => {
     const out = await crewPublish(deps, callerOf(req, 'rest.agent-crew.publish'), name(req), req.body.doc);
     if (!out.ok) return refuse(res, out);
-    res.json(success(config.nodeId, { published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key }));
+    res.json(success(config.nodeId, { published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, warnings: out.warnings }));
   });
 
   // POST /v1/agents/:name/crew/seed — the FIRST definition for an agent that has none, validated
@@ -139,14 +140,14 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
   router.post('/v1/agents/:name/crew/seed', requireAuth(), requireScope('memory:write'), validateBody(SeedBody, config.nodeId), async (req, res) => {
     const out = await crewSeed(deps, callerOf(req, 'rest.agent-crew.seed'), name(req), req.body.doc, req.body.validate_with);
     if (!out.ok) return refuse(res, out);
-    res.json(success(config.nodeId, { seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validated_by: out.validatedBy }));
+    res.json(success(config.nodeId, { seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validated_by: out.validatedBy, warnings: out.warnings }));
   });
 
   // POST /v1/agents/:name/crew/restore — a kept revision goes back through the same gate.
   router.post('/v1/agents/:name/crew/restore', requireAuth(), requireScope('memory:write'), validateBody(RestoreBody, config.nodeId), async (req, res) => {
     const out = await crewRestore(deps, callerOf(req, 'rest.agent-crew.restore'), name(req), req.body.revision);
     if (!out.ok) return refuse(res, out);
-    res.json(success(config.nodeId, { published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key }));
+    res.json(success(config.nodeId, { published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, warnings: out.warnings }));
   });
 
   // GET /v1/agents/:name/crew/menu — what this agent's RUNTIME offers (tool names, model profiles

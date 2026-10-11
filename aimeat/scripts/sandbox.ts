@@ -48,6 +48,8 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.5.0 — 2026-10-10 — A stand-in store address (https://store.example/), so the controls that
+ *     lead to the store are drawn in the sandbox.
  *   v1.4.0 — 2026-10-10 — The connector tunnel is on, so `pnpm sandbox:machines` can stand machines
  *     up on the sandbox and the home's agent pages have something to show. A second run refreshes
  *     an owner's token with the password when the stored key is refused: a browser sign-in replaces
@@ -177,6 +179,9 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         // The connector tunnel, which the agent pages need: a machine exists on a node only through
         // it. `pnpm sandbox:machines` stands two stand-in machines up on it.
         AIMEAT_CONNECT_TUNNEL_ENABLED: 'true',
+        // A store address, so every control that leads to the store is drawn. It is a stand-in and
+        // sells nothing: a node without one hides those controls, and a hidden control cannot be looked at.
+        AIMEAT_SITE_STORE_URL: 'https://store.example/',
 
         // Ceilings high, so a look at a feature is not a look at a limit.
         AIMEAT_MEMORY_MAX_VALUE_SIZE_KB: '1024',

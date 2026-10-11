@@ -31,6 +31,8 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.7.0 — 2026-10-11 — A proposal carries `warnings` for its definition (crew-def-warnings.ts): a
+ *     definition that listens for direct messages and gives no member the dm tool is said at once.
  *   v1.6.0 — 2026-10-10 — A proposal may name one of the owner's connectors (`connector`, by id or
  *     by name); it is stored as `install_id` with `connector_name`, and the run mode is then
  *     corrected against that connector alone.
@@ -61,6 +63,7 @@ import { basicAgentsApprovalUrl, residentRunnable } from './basic-agents.js';
 import { ownerDefaultIsNode } from './crew-menu.js';
 import { findConnector, listConnectors } from './connector-registry.js';
 import { logger } from '../utils/logger.js';
+import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
@@ -152,6 +155,12 @@ export interface AgentProposal {
   connector_name?: string | null;
   /** What it would BE. Optional: an owner may approve a proposal and seed it later. */
   crew_def: CrewDefDoc | null;
+  /**
+   * What the definition would do that its author very likely did not intend
+   * (services/crew-def-warnings.ts). Empty when there is nothing to say; absent on a proposal
+   * stored before 2026-10-11.
+   */
+  warnings?: CrewDefWarning[];
   /** Who asked. A GAII, or the owner's own name when a person drafted it in their session. */
   proposed_by: string;
   proposed_at: string;
@@ -342,6 +351,7 @@ export async function proposeAgent(
     install_id: installId,
     connector_name: connectorName,
     crew_def: input.crew_def ?? null,
+    warnings: crewDefWarnings(input.crew_def),
     proposed_by: principal.sub,
     proposed_at: now,
     state: 'proposed',

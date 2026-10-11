@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-11",
+      "kind": "feature",
+      "title": {
+        "en": "Make an agent from your home page, and choose the computer that runs it",
+        "fi": "Tee agentti kotisivultasi ja valitse tietokone, joka ajaa sitä"
+      },
+      "body": {
+        "en": "Your home now has a block for your agents. Write one sentence about what you want done, and a page shows the agent before anything is made: what it does, when it works, what it can reach and which computer runs it. You change what you want and start it. An agent can work when you ask, by the clock or when someone writes to it. It can also stay on all the time on a computer that keeps agents running. A computer is your own laptop, a server, a computer in the cloud or an AIMEAT instance from the store, and you give each one a name. On an agent's own page you can talk to it, give it a task and move it to another computer. Your own AI can do the same from a chat: it proposes the agent, names the computer, and you approve.",
+        "fi": "Kotisivullasi on nyt lohko agenteillesi. Kirjoita yhdellä lauseella, mitä haluat saada tehdyksi, niin näet agentin ennen kuin mitään tehdään: mitä se tekee, milloin se tekee työtä, mihin se pääsee ja mikä tietokone ajaa sitä. Muutat mitä haluat ja käynnistät agentin. Agentti voi tehdä työtä silloin, kun pyydät, kellon mukaan tai silloin, kun joku kirjoittaa sille. Se voi myös olla koko ajan päällä tietokoneella, joka pitää agentteja käynnissä. Tietokone on oma kannettavasi, palvelin, pilvessä oleva tietokone tai kaupasta hankittu oma AIMEAT, ja annat jokaiselle nimen. Agentin omalla sivulla voit puhua sille, antaa sille tehtävän ja siirtää sen toiselle tietokoneelle. Oma tekoälysi voi tehdä saman keskustelusta: se ehdottaa agenttia, nimeää tietokoneen, ja sinä hyväksyt."
+      }
+    },
+    {
       "date": "2026-10-10",
       "kind": "feature",
       "title": {
