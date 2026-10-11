@@ -29,6 +29,10 @@
  *   const jws = await signCompact(card, key.privateKey, key.kid);
  *   const token = await resolveToken(agent, owner, nodeUrl);
  * @version-history
+ *   v1.3.0 — 2026-10-11 — A key the node refuses as not pinned (`key_not_pinned`) is `KeyRefusedError`,
+ *     resolveToken answers null for it, and the refusal is remembered for the life of the process:
+ *     one request and one log line, however many calls name the agent. It was read as a failed
+ *     attempt and minted again every 30 seconds.
  *   v1.2.0 — 2026-10-09 — storeAgentKey leaves the key file at 0600 and the home and keys/ at 0700 on
  *     every write, not only when it creates them, and the home holds a .gitignore of `*` (secrets
  *     audit 2026-10-09, S4).
@@ -140,6 +144,7 @@ export async function deleteAgentKey(agent: string, owner: string): Promise<bool
   if (!existsSync(p)) return false;
   unlinkSync(p);
   tokenCache.delete(`${agent}@${owner}`);
+  refusedKeys.delete(`${agent}@${owner}`);
   return true;
 }
 
@@ -175,6 +180,17 @@ export async function listAllAgentKeys(): Promise<StoredAgentKey[]> {
 
 interface CachedToken { token: string; expiresAtMs: number }
 const tokenCache = new Map<string, CachedToken>();
+
+/**
+ * Keys the node refused as not pinned, for the life of this process: `agent@owner` → that key's id.
+ *
+ * A VERDICT IS REMEMBERED. Every loopback call that names an agent resolves its token, so without
+ * this a refused key cost one request and one log line per call: a runtime reading its roster as
+ * that agent sent one every 30 seconds, and the start logged the refusal twice 6 ms apart (the
+ * shared-socket attempt, then the private one). Measured by a two-connector run on 2026-10-11.
+ * In memory only: a restart asks the node once more, which is the right time to ask again.
+ */
+const refusedKeys = new Map<string, string>();
 
 /**
  * Exchange the agent's key for a short-lived credential. One signed assertion, one POST, one token.
@@ -261,6 +277,9 @@ export async function resolveToken(agent: string, owner: string, nodeUrl: string
   if (!key) return getToken(agent, owner);
 
   const cacheKey = `${agent}@${owner}`;
+  // A key the node already refused as not pinned is not presented again: no request, no log line.
+  // Matched on the key's own id, so a new key for the same agent (a later enrolment) is tried.
+  if (refusedKeys.get(cacheKey) === key.kid) return null;
   const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAtMs - Date.now() > REFRESH_MARGIN_SECONDS * 1000) return cached.token;
 
@@ -272,6 +291,7 @@ export async function resolveToken(agent: string, owner: string, nodeUrl: string
     // THE ONE REFUSAL THAT IS NULL: the node said this key is not the agent's any more. That is "no
     // credential, and waiting will not produce one", which is what null means to every caller.
     if (err instanceof KeyRefusedError) {
+      refusedKeys.set(cacheKey, key.kid);
       logger.warn('agent-key: the node no longer accepts this agent\'s key; it moved to another connector or was enrolled again', { agent, owner });
       return null;
     }
