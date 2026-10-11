@@ -30,6 +30,8 @@
  * @usage
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.4.3 — 2026-10-11 — The JSON-LD lists only money-priced tools as Offers; a morsel-priced tool
+ *     had been published as priceCurrency "MORSEL", a currency that does not exist (ruling D4).
  *   v1.4.2 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.4.1 — 2026-08-31 — The three places that located a tag in the author's document by regex
  *     (`<meta name="robots">`, `<title>`, `<html>`) do it by index instead. Each of those patterns
@@ -282,16 +284,17 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
     add.push(`<link rel="${esc(l.rel)}" href="${esc(l.href)}" title="${esc(l.title)}">`);
   }
   if (!has(text, /application\/ld\+json/i)) {
+    // A schema.org Offer is a money price. A tool priced only in morsels is not one: a morsel paces
+    // writes and is not a currency (commerce/protocol-money.ts).
     const offers = (spec.tools ?? [])
-      .filter((t) => (t.morsels ?? 0) > 0 || (t.amount ?? 0) > 0)
+      .filter((t) => (t.amount ?? 0) > 0 && !!t.currency)
       .map((t) => ({
         '@type': 'Offer',
         name: t.name,
         description: t.description ?? undefined,
-        ...(t.amount && t.currency
-          // Money prices are carried in micro-units; schema.org wants the human amount.
-          ? { price: (t.amount / 1_000_000).toFixed(2), priceCurrency: t.currency }
-          : { price: String(t.morsels ?? 0), priceCurrency: 'MORSEL' }),
+        // Money prices are carried in micro-units; schema.org wants the human amount.
+        price: ((t.amount as number) / 1_000_000).toFixed(2),
+        priceCurrency: t.currency,
       }));
     const ld = {
       '@context': 'https://schema.org',

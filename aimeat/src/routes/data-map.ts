@@ -17,6 +17,8 @@
  * @structure dataMapRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v2.1.0 — 2026-10-11 — PUT and DELETE …/agents/:agent: tie an app to one of the owner's agents,
+ *     or take the tie away, by one row of the map.
  *   v2.0.0 — 2026-08-25 — spec/2. The coverage route and the family-naming route went with the Data
  *     Wallet list they served: it inventoried the owner's whole keyspace, which answers nothing for
  *     somebody about to work on one app, and the store is readable directly for anything else.
@@ -30,6 +32,7 @@ import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { readProgramMap, stateProgramMap, type DataMapCaller } from '../services/data-map/data-map-access.js';
+import { tieAgent, untieAgent } from '../services/data-map/data-map-agent-tie.js';
 import type { DataMap } from '../services/data-map/data-map-types.js';
 
 export function dataMapRouter(config: AimeatConfig, storage: Storage): Router {
@@ -73,6 +76,37 @@ export function dataMapRouter(config: AimeatConfig, storage: Storage): Router {
       res.json(success(config.nodeId, {
         app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings,
       }));
+    });
+
+  // PUT /v1/datamap/apps/:owner/:filename/agents/:agent — state that this app shows that agent's
+  // work, by one row of its map (services/data-map/data-map-agent-tie.ts). Body: { made_for?, holds? }.
+  // The agent's page and the app's page both list the tie from the map.
+  router.put('/v1/datamap/apps/:owner/:filename/agents/:agent',
+    requireAuth(), requireScope('memory:write'), async (req, res) => {
+      const ref = `${req.params.owner}/${req.params.filename}`;
+      const out = await tieAgent(storage, config, callerOf(req), ref, req.params.agent as string, {
+        madeFor: req.body?.made_for === true,
+        holds: typeof req.body?.holds === 'string' ? req.body.holds : undefined,
+      }, new Date().toISOString());
+      if ('refusal' in out) {
+        res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
+        return;
+      }
+      res.json(success(config.nodeId, { app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings }));
+    });
+
+  // DELETE /v1/datamap/apps/:owner/:filename/agents/:agent — take the tie away. The agent, its work
+  // and the app stay as they are.
+  router.delete('/v1/datamap/apps/:owner/:filename/agents/:agent',
+    requireAuth(), requireScope('memory:write'), async (req, res) => {
+      const ref = `${req.params.owner}/${req.params.filename}`;
+      const out = await untieAgent(storage, config, callerOf(req), ref, req.params.agent as string,
+        new Date().toISOString());
+      if ('refusal' in out) {
+        res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
+        return;
+      }
+      res.json(success(config.nodeId, { app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings }));
     });
 
   return router;

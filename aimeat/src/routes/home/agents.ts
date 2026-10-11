@@ -17,12 +17,18 @@
  * @structure registerHomeAgentsRoutes(router, ctx)
  * @usage registerHomeAgentsRoutes(router, ctx);
  * @version-history
+ *   v1.1.0 — 2026-10-11 — PUT and DELETE /v1/agents/:name/workplace: where an agent's finished
+ *     work goes (services/agent-workplace.ts).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
-import type { Router } from 'express';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
-import { success } from '../../middleware/envelope.js';
+import type { Router, Request } from 'express';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { success, error } from '../../middleware/envelope.js';
+import { callerOf } from '../../middleware/caller.js';
+import { emitChange } from '../../services/event-bus.js';
 import { readHomeAgents } from '../../services/home-agents.js';
+import { setWorkplace, clearWorkplace, workplaceView, type WorkplaceCaller } from '../../services/agent-workplace.js';
+import { readTieChoices } from '../../services/agent-ties.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
 /** How many workers one read lists unless the page asks, and the most it may ask for. */
@@ -41,5 +47,38 @@ export function registerHomeAgentsRoutes(router: Router, ctx: HomeRouteCtx): voi
             { description: 'Every agent', method: 'GET', url: '/v1/agents?include=stats' },
             { description: 'The machines', method: 'GET', url: '/v1/agents/v2/connectors' },
         ]));
+    });
+
+    // GET /v1/home/agents/choices — what the person can pick for an agent's ties: the workspaces of
+    // the organisms they are in (where its work may go) and their own apps (which may show it).
+    router.get('/v1/home/agents/choices', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
+        res.json(success(config.nodeId, await readTieChoices({ config, storage }, req.auth!.owner)));
+    });
+
+    /** Who is asking, in the terms services/agent-workplace.ts takes. */
+    const workplaceCaller = (req: Request): WorkplaceCaller => {
+        const caller = callerOf(req, config.nodeId, storage);
+        return { principal: caller.principal, ownerName: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] };
+    };
+
+    // PUT /v1/agents/:name/workplace — name the workspace this agent's finished work is shared with.
+    // Body: { organism_id, workspace_id }. The owner in person, or a session of theirs that may
+    // change the agent. The answer is the stored place; GET /v1/home/agents reads it with names.
+    router.put('/v1/agents/:name/workplace', requireAuth(), requireScope('agent:write'), async (req, res) => {
+        const out = await setWorkplace({ config, storage }, workplaceCaller(req), req.params.name as string, {
+            organismId: req.body?.organism_id, workspaceId: req.body?.workspace_id,
+        });
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        emitChange('agents');
+        res.json(success(config.nodeId, { agent: req.params.name, workplace: workplaceView(out.workplace) }));
+    });
+
+    // DELETE /v1/agents/:name/workplace — back to the default: the work stays in the agent's own
+    // memory. What was already shared stays shared.
+    router.delete('/v1/agents/:name/workplace', requireAuth(), requireScope('agent:write'), async (req, res) => {
+        const out = await clearWorkplace({ config, storage }, workplaceCaller(req), req.params.name as string);
+        if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+        emitChange('agents');
+        res.json(success(config.nodeId, { agent: req.params.name, workplace: null }));
     });
 }

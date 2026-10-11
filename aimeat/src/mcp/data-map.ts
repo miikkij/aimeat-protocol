@@ -18,6 +18,8 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-10-11 — aimeat_app_agent_tie and aimeat_app_agent_untie: one row of an app's map that names
+ *     an agent, added or removed.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -34,6 +36,8 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import {
   readProgramMap, stateProgramMap, handsOnKey, type DataMapCaller,
 } from '../services/data-map/data-map-access.js';
+import { tieAgent, untieAgent } from '../services/data-map/data-map-agent-tie.js';
+import { toolError } from './tool-error.js';
 import type { DataMap } from '../services/data-map/data-map-types.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -85,6 +89,33 @@ export function registerDataMapTools(
       const out = await stateProgramMap(storage, config, mapCaller(), app,
         data_map as Partial<DataMap>, new Date().toISOString());
       if ('refusal' in out) return fail(out.refusal.message);
+      return text({ app: out.app, data_map: out.dataMap, findings: out.findings });
+    },
+  );
+
+  // One row of an app's map that names an agent, added or removed. Same implementation as
+  // PUT and DELETE /v1/datamap/apps/:owner/:filename/agents/:agent (data-map-agent-tie.ts).
+  mcp.tool(
+    'aimeat_app_agent_tie',
+    descriptionFor('aimeat_app_agent_tie'),
+    zodShapeFor('aimeat_app_agent_tie'),
+    annotationsFor('aimeat_app_agent_tie'),
+    async ({ app, target_agent_name, made_for, holds }) => {
+      const out = await tieAgent(storage, config, mapCaller(), app, target_agent_name,
+        { madeFor: made_for === true, holds }, new Date().toISOString());
+      if ('refusal' in out) return toolError(out.refusal.code, out.refusal.message);
+      return text({ app: out.app, data_map: out.dataMap, findings: out.findings });
+    },
+  );
+
+  mcp.tool(
+    'aimeat_app_agent_untie',
+    descriptionFor('aimeat_app_agent_untie'),
+    zodShapeFor('aimeat_app_agent_untie'),
+    annotationsFor('aimeat_app_agent_untie'),
+    async ({ app, target_agent_name }) => {
+      const out = await untieAgent(storage, config, mapCaller(), app, target_agent_name, new Date().toISOString());
+      if ('refusal' in out) return toolError(out.refusal.code, out.refusal.message);
       return text({ app: out.app, data_map: out.dataMap, findings: out.findings });
     },
   );

@@ -106,6 +106,8 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // app is split on its one slash into owner and filename; a bare word is refused.
     aimeat_datamap_get: { shaped: { app: 'zqxappzqx/zqxappzqx.html' } },
     aimeat_datamap_set: { shaped: { app: 'zqxappzqx/zqxappzqx.html' } },
+    aimeat_app_agent_tie: { shaped: { app: 'zqxappzqx/zqxappzqx.html' } },
+    aimeat_app_agent_untie: { shaped: { app: 'zqxappzqx/zqxappzqx.html' } },
     // The manifest must be an object with an objectTypes ARRAY, which is what makes a workspace a
     // workspace; without it the handler answers INVALID_MANIFEST and writes nothing.
     aimeat_workspace_create: { shaped: { manifest: { name: 'zqxmanifestzqx', objectTypes: [{ name: 'zqxmanifestzqx' }] } } },

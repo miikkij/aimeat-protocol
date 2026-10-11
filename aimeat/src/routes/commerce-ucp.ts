@@ -7,7 +7,8 @@
  *   basics — `ucp.version` + `ucp.capabilities` echoed in every response, capability intersection
  *   against the calling platform's profile from the `UCP-Agent` header (fetched via safeFetch,
  *   best-effort) — and the three checkout endpoints. Settlement uses the node's registered
- *   payment handlers (morsels, cards on the seller's own Stripe account, invoice, stablecoin).
+ *   payment handlers that settle money (cards on the seller's own Stripe account, invoice,
+ *   stablecoin); a session here is always in money (commerce/protocol-money.ts).
  *   Item ids: "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>".
  * @structure
  *   - POST  /ucp/v1/checkout-sessions            create ({ line_items: [{ item:{id}|ref, quantity }] })
@@ -15,6 +16,10 @@
  *   - PATCH /ucp/v1/checkout-sessions/:id        update line_items OR { cancel: true }
  *   - POST  /ucp/v1/checkout-sessions/:id/complete  ({ payment: { handler?, instrument? } })
  * @version-history
+ *   v1.4.0 — 2026-10-11 — Money only (ruling D4): a session opens in the request's money currency,
+ *     else the first one its items are priced in, or is refused MONEY_PRICE_REQUIRED; a morsel
+ *     session opened elsewhere is not shown here; completion names its handler; the session's
+ *     handler list and the 402 block leave the morsel ledger out.
  *   v1.3.0 — 2026-10-08 — Mounts the UCP 2026-08-25 guest checkout (routes/ucp-checkout.ts).
  *   v1.2.0 — 2026-10-08 — A checkout opened here is attributed to the platform named in UCP-Agent, or
  *     the User-Agent (services/visibility/attribution.ts), for the seller's AI visibility report.
@@ -34,11 +39,12 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import {
-  createSession, getSession, updateSessionItems, cancelSession, completeSession, CommerceError,
+  getSession, updateSessionItems, cancelSession, completeSession, CommerceError,
 } from '../commerce/session-service.js';
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import type { SellableRef } from '../commerce/sellable-resolvers.js';
-import { PaymentError, listPaymentHandlers } from '../commerce/payment-handlers.js';
+import { PaymentError } from '../commerce/payment-handlers.js';
+import { assertMoneySession, createMoneySession, moneyHandlerFor, moneyPaymentHandlers } from '../commerce/protocol-money.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import { ucpCheckoutRouter } from './ucp-checkout.js';
@@ -117,7 +123,7 @@ function toUcpSession(s: CheckoutSessionRecord) {
     })),
     totals: { grand_total: s.total },
     payment: {
-      handlers: listPaymentHandlers().map((h) => ({ id: h.id, currencies: h.currencies })),
+      handlers: moneyPaymentHandlers().map((h) => ({ id: h.id, currencies: h.currencies })),
       ...(s.receipt ? { receipt: s.receipt } : {}),
     },
     ...(s.fulfillment ? { fulfillment: s.fulfillment } : {}),
@@ -166,7 +172,7 @@ function sendUcpError(res: Response, config: AimeatConfig, err: unknown): void {
     : new CommerceError('COMMERCE_ERROR', 500, (err as { message?: string }).message ?? 'Unexpected commerce error');
   res.status(e.statusCode).json(ucpEnvelope(UCP_CAPABILITIES, {
     ...error(config.nodeId, e.code, e.message),
-    ...(e.statusCode === 402 ? paymentChallenge(config) : {}),
+    ...(e.statusCode === 402 ? paymentChallenge(config, [], { moneyOnly: true }) : {}),
   }));
 }
 
@@ -186,6 +192,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     const id = decodeURIComponent(req.params.id as string);
     const session = await getSession(storage, buyerGhii, id, config);
     if (!session) throw new CommerceError('SESSION_NOT_FOUND', 404, `Checkout session not found: ${id}`);
+    assertMoneySession(session);
     return session;
   }
 
@@ -194,14 +201,13 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     if (!parsed.success) { res.status(400).json(ucpEnvelope(UCP_CAPABILITIES, error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message))); return; }
     try {
       const capabilities = await negotiate(req);
-      const session = await createSession(storage, config, {
+      const session = await createMoneySession(storage, config, {
         buyerOwner: req.auth!.owner as string,
         buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
         items: toRefs(parsed.data.line_items),
         note: parsed.data.note,
-        currency: parsed.data.currency,
         attribution: agentAttribution({ ucpAgent: req.get('ucp-agent'), userAgent: req.get('user-agent'), gaii: resolveIdentity(req.auth!, config.nodeId) }),
-      });
+      }, parsed.data.currency);
       res.status(201).json(ucpEnvelope(capabilities, { checkout_session: toUcpSession(session) }));
     } catch (err) { sendUcpError(res, config, err); }
   });
@@ -231,7 +237,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     try {
       const session = await loadOwnSession(req);
       const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
-      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt, req.auth ? { sub: req.auth.sub, roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
+      const completed = await completeSession(storage, config, session, moneyHandlerFor(session, parsed.data.payment?.handler), parsed.data.payment?.instrument, callerJwt, req.auth ? { sub: req.auth.sub, roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
       res.json(ucpEnvelope(UCP_CAPABILITIES, { checkout_session: toUcpSession(completed) }));
     } catch (err) { sendUcpError(res, config, err); }
   });

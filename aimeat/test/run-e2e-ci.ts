@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-11 -- e2e-record-spec-pointers.ts joins the list (not the guard tier): every `spec` a
+ *     self-describing record carries opens from the node.
  *   2026-10-11 -- Two sessions can run at once. A lane's port is computed from the runner's own
  *     port, where it used to be the first free one from 40500 (two guard tiers took 40501 the same
  *     afternoon), and a suite's own ports are taken under a lock every runner on the machine
@@ -491,6 +493,9 @@ const ALL_SUITES = [
     // The owner's connectors as named, remembered machines: listed, renamed and forgotten, a proposal
     // that names one, and an agent that waits for the machine it was ordered to. Opens real tunnels.
     'test/e2e-agent-connectors.ts',
+    // What an agent's work is tied to: the apps whose data map names it, the workspace its finished
+    // work is shared with, the first run a new agent gets, and the build instructions about one agent.
+    'test/e2e-agent-ties.ts',
     // Agent v2 V2: the two primitives (discover + invoke) and, as much of the suite as the feature
     // itself, the proof that the old door is unchanged — the same call refused by scope directly is
     // refused through invoke, and nothing reachable before stopped being reachable.
@@ -886,6 +891,7 @@ const ALL_SUITES = [
     'test/e2e-workspace-export-import.ts',
     'test/e2e-zip-security.ts',
     'test/e2e-static-hardening.ts',
+    'test/e2e-record-spec-pointers.ts',
     'test/e2e-surface-layout.ts',
     'test/e2e-workspace-activity.ts',
     'test/e2e-workspace-update.ts',
