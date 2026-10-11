@@ -30,6 +30,11 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- Reads the runtime examples (docs/msm-examples, docs/extensions,
+ *     aimeat/docs/csm-examples), YAML included, with a manifest's `path:`/`url:` field read as a
+ *     route; and the aimeat-extension-builder skill. Docs audit phase 2: the examples carried a
+ *     morsel price, a recommended model written out and an install URL nothing served, and no gate
+ *     read them. "Never a price, a fee or a currency" is pacing wording, not morsel-as-money.
  *   v1.1.1 -- 2026-10-11 -- Reads builtin-skills.crew-agent.ts, where add-a-crew-agent moved from
  *     builtin-skills.ts, so the skill's text stays checked.
  *   v1.1.0 -- 2026-10-03 -- Reads the guided-journey skill and the person help prompt too. The
@@ -97,6 +102,7 @@ const SOURCES: string[] = [
     'aimeat/src/data/builtin-skills.app-builder-atelier.ts',
     'aimeat/src/data/builtin-skills.ai-capabilities.ts',
     'aimeat/src/data/builtin-skills.workspace-contracts.ts',
+    'aimeat/src/data/builtin-skills.extension-builder.ts',
     'aimeat/src/data/builtin-skills-games.ts',
     'aimeat/src/data/builtin-skills-games.boot-assets.ts',
     'aimeat/src/data/builtin-skills-games.menus-audio.ts',
@@ -111,6 +117,12 @@ const SOURCES: string[] = [
     'docs/building-an-aimeat-compatible-agent.md',
     'docs/building-an-aimeat-compatible-ecosystem-app.md',
     'python/aimeat-crewai/README.md',
+    // The runtime examples a node serves or installs: GET /v1/msm/templates and /v1/csm/templates
+    // return their raw YAML, and the operator's one-click install deploys docs/extensions. An AI
+    // copies them, so a route, a tool or a morsel price named there is copied too.
+    'docs/msm-examples',
+    'docs/extensions',
+    'aimeat/docs/csm-examples',
 ];
 
 /** A phrase that describes something this node removed or reframed. `unless` rescues a sentence. */
@@ -123,7 +135,7 @@ const BANNED: Banned[] = [
     { id: 'boards-deprecated', pattern: /Boards?\b[^.\n]{0,80}\bDEPRECATED|DEPRECATED[^.\n]{0,80}\bBoards?\b/i, why: 'Boards were reinstated on 2026-08-30 and are current' },
     { id: 'morsel-as-money', pattern: /morsel[^.\n]{0,120}\b(currency|micro-currency|micro-transactions?|economy)\b|\b(currency|micro-currency|economy)\b[^.\n]{0,120}morsel/i, // `currency` as an SDK field or parameter (`{ amount, currency }`, `session.currency`) is the
     // commerce API's own name for morsel-or-money, and stays.
-    unless: /\bnot (a |an )?(internal )?(currency|money)\b|not money|never morsels|never a currency|money-currency|pacing meter|\bcurrency\??\s*[:}\]]|\.currency\b|,\s*currency\b|currency\??\)\s*(\/\/|→|$)/i, why: 'a morsel is a pacer, not money: it buys nothing and is never called a currency or an economy' },
+    unless: /\bnot (a |an )?(internal )?(currency|money)\b|not money|never morsels|never a currency|never a price[^.\n]{0,30}\bcurrency\b|money-currency|pacing meter|\bcurrency\??\s*[:}\]]|\.currency\b|,\s*currency\b|currency\??\)\s*(\/\/|→|$)/i, why: 'a morsel is a pacer, not money: it buys nothing and is never called a currency or an economy' },
     { id: 'oauth-routes', pattern: /\/v1\/oauth\//, why: 'the OAuth routes are /v1/mcp/register, /v1/mcp/authorize and /v1/mcp/token' },
     // A recommended model written out by hand. `anthropic/claude-opus-5` as an EXAMPLE of a model
     // id (provenance, compliance) is a different thing and does not match: no "Opus 5", no "GPT-".
@@ -138,6 +150,7 @@ const ALLOWED: Record<string, string> = {
     'route|aimeat/src/data/bootstrap-endpoints.ts|/v1/profile': 'A page of the SPA, served by the static handler and not by a router declaration; the bootstrap lists it as where a person manages their data.',
     'contract-gap|aimeat/src/routes/bootstrap.ts|/v1/portal': 'A page a person opens in a browser. The contract describes the API, and an HTML page is not part of it.',
     'contract-gap|aimeat/src/services/markdown-negotiation.ts|/v1/portal': 'The same page, named in the landing markdown as where a person registers.',
+    'tool|docs/msm-examples/stripe-marketplace.msm.yaml|aimeat_tc': 'A Stripe metadata key (`metadata[aimeat_tc]`, the tracking code) in the example request body, not an MCP tool.',
 };
 
 interface Finding { file: string; line: number; kind: string; token: string; why: string }
@@ -147,7 +160,7 @@ function filesUnder(path: string): string[] {
     if (!existsSync(abs)) return [];
     if (statSync(abs).isFile()) return [abs];
     return readdirSync(abs).flatMap(name => filesUnder(join(path, name)))
-        .filter(f => /\.(ts|js|mjs|md|txt)$/.test(f));
+        .filter(f => /\.(ts|js|mjs|md|txt|ya?ml)$/.test(f));
 }
 
 /** Every tool name the catalogue defines, plus the two the Python package registers locally. */
@@ -215,6 +228,8 @@ const TOOL_TOKEN = /\baimeat_[a-z0-9]+(?:_[a-z0-9]+)*\b(?!_)/g;
 const NOT_A_TOOL = /^aimeat_(rt|ref|session|sid|csrf|token|jwt|theme|lang|locale|consent|device|app|node|id|key|db|test|e2e|dev|local|crewai|version|build|spec_token|remake|node_id|node_url|agent_gaii|runtime|identity_types|knowledge_package)$/;
 const ROUTE_TOKEN = /\b(GET|POST|PUT|PATCH|DELETE)\s+(?:https?:\/\/[^\s/`'"]+|\$\{[^}]+\}|\{\{[^}]+\}\}|<[^>]+>)?(\/v1\/[^\s`'"<>|)]*)/g;
 const URL_FIELD = /\burl:\s*['"`](\/v1\/[^'"`\s]*)['"`]/g;
+/** A manifest field that names a node route, quoted or not: an extension action's `path`, a URL. */
+const YAML_ROUTE_FIELD = /^\s*-?\s*(?:path|url|endpoint):\s*['"]?(\/v1\/[^\s'"#]*)/g;
 
 function scan(tools: Set<string>, routes: { contract: Set<string>; code: Set<string> }): Finding[] {
     const findings: Finding[] = [];
@@ -243,6 +258,7 @@ function scan(tools: Set<string>, routes: { contract: Set<string>; code: Set<str
                 else if (surface && !surface.has(name)) push({ file, line, kind: 'off-surface', token: name, why: `the ${handbookRole} handbook names a tool the ${handbookRole} surface does not carry` });
             }
             const paths = [...text.matchAll(ROUTE_TOKEN)].map(m => m[2]).concat([...text.matchAll(URL_FIELD)].map(m => m[1]));
+            if (/\.ya?ml$/.test(file)) paths.push(...[...text.matchAll(YAML_ROUTE_FIELD)].map(m => m[1]));
             for (const raw of paths) {
                 const path = normalise(raw);
                 if (path === '/v1' || path.endsWith('/{}') && path.split('/').length <= 3) continue;
