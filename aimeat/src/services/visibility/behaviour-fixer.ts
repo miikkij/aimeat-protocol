@@ -19,6 +19,7 @@
  *   BehaviourFixError
  * @usage const run = await runBehaviourFix(storage, config, ownerGhii, 'shop.html', 'owner');
  * @version-history
+ *   v1.0.1 — 2026-10-11 — The runs record's `spec` is the served contract address (VISIBILITY_MONTH_SPEC).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -27,6 +28,7 @@ import {
   BEHAVIOUR_RUNS_KEY, BEHAVIOUR_SETTINGS_KEY, MAX_RUNS,
   type BehaviourRun, type BehaviourFinding,
 } from '../../models/behaviour-schemas.js';
+import { VISIBILITY_MONTH_SPEC } from '../../models/visibility-schemas.js';
 import { readBehaviour } from './behaviour-report.js';
 import { getBehaviourSettings, nodeWatchesBehaviour } from './behaviour-settings.js';
 import { completeForOwner } from '../ai/completion.js';
@@ -93,7 +95,7 @@ async function keepRun(storage: Storage, ownerGhii: string, run: BehaviourRun): 
     const now = new Date().toISOString();
     await storage.setMemory({
       key: BEHAVIOUR_RUNS_KEY, ownerGaii: ownerGhii,
-      value: { type: 'aimeat.behaviour.runs', spec: '/docs/specs/visibility-contract.md', runs: [run, ...runs].slice(0, MAX_RUNS) },
+      value: { type: 'aimeat.behaviour.runs', spec: VISIBILITY_MONTH_SPEC, runs: [run, ...runs].slice(0, MAX_RUNS) },
       visibility: 'owner', tags: ['signal-visibility'], ttlHours: null,
       version: (row?.version ?? 0) + 1, createdAt: row?.createdAt ?? now, updatedAt: now,
     } as MemoryRecord);

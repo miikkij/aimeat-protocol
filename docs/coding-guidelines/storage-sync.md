@@ -218,8 +218,6 @@ Until a formal migration framework is adopted, validation comes from E2E tests:
 - `pnpm test:e2e:postgres-kysely` — validates PostgreSQL via Kysely (**primary / prod backend**)
 - `pnpm test:e2e:all-backends` — both of the above in one go
 
-> `pnpm test:e2e:memory` (pure in-memory) is **deprecated** — not a supported backend.
-
 **Both backends (PostgreSQL+Kysely and SQLite) must pass.** If either fails after a schema change, the change is incomplete.
 
 ---

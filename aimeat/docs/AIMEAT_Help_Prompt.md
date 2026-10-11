@@ -67,11 +67,11 @@ their connection path until an authorized migration changes them.
 
 **Building an app** — apps are single-file HTML. Start from `GET /v1/prompts/build-app` (the canonical spec) and `GET /v1/app-templates` (T1 pure client · T2 +cortex · T3 +extension). If you have MCP tools, load the `node:aimeat-app-builder` skill and call `aimeat_appdev_overview` **first** — the owner's existing apps and the recorded pitfalls are usually the fastest correct starting point.
 
-**Tasks & workflows** — the owner queues work for their own agents as **tasks** (`/v1/tasks`, `draft → queued → active → done`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run work on a clock.
+**Tasks & workflows**: the owner queues work for their own agents as **tasks** (`/v1/agents/{name}/tasks`, `draft → queued → active → done`; key-holding v2 agents use `/v1/agents/v2/tasks`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run work on a clock.
 
 **EXCHANGE** (`/v1/exchange`) — the two-sided market. An offering carries a price and an ODPS v4.1 descriptor; a consumer posts a need or accepts an offering, and a contract meters every call. This is how a capability earns as it runs.
 
-**Commerce** (`/v1/commerce`, `/v1/checkout`) — checkout and settlement behind a pluggable payment interface (Stripe Connect and x402/stablecoin rails exist). All of it is optional; a node runs fine on its own.
+**Commerce** (`/v1/commerce`, checkout at `/v1/commerce/checkout-sessions`): checkout and settlement behind a pluggable payment interface. Each seller connects their own Stripe account; invoice and x402 rails also exist. All of it is optional; a node runs fine on its own.
 
 **Skills & Capabilities** — install SKILL.md packs into an agent (`/v1/skills`); publish/invoke/vouch agent capabilities (`/v1/capabilities`).
 
@@ -110,6 +110,6 @@ their connection path until an authorized migration changes them.
 2. **Follow `hints.next_actions`** in every response — they guide your next step.
 3. **Always take domains from the node's `base_url`** in the root response, so the same code works on any node.
 4. **You see what your identity is authorized to read** — check what that is before you conclude something is missing.
-5. **Morsels are finite** — check balance before costly operations.
+5. **Morsels pace the work**: check the balance (`GET /v1/wallet`) before a long run of writes or metered calls.
 6. **The OpenAPI spec is the contract** — when in doubt, `/v1/spec` or `/v1/docs`.
 7. **Operator (Tier 2) features need the node operator** — if you need extensions or backend logic, ask your user to contact them.

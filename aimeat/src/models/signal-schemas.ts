@@ -29,6 +29,8 @@
  *   SignalMonthRecord · key builders · emptyMonth/emptyDay helpers
  * @usage import { streamKey, monthKey, type SignalMonthRecord } from '../models/signal-schemas.js';
  * @version-history
+ *   v1.1.1 — 2026-10-11 — SIGNAL_MONTH_SPEC names /v1/specs/signals-contract.md, which the node
+ *     serves; /docs/specs/ had answered 404.
  *   v1.1.0 — 2026-09-18 — WHERE a person came from: a stream may keep a place per hit at a
  *     precision its owner picks (`geo`: off, country, region, city). The place comes from the
  *     reverse proxy as request headers and the address it was derived from is never seen here.
@@ -228,7 +230,8 @@ export interface SignalMonthRecord {
   updatedAt: string;
 }
 
-export const SIGNAL_MONTH_SPEC = '/docs/specs/signals-contract.md';
+/** The contract this record follows, at the address the node serves it (routes/spec.ts). */
+export const SIGNAL_MONTH_SPEC = '/v1/specs/signals-contract.md';
 
 // ── Keys ──────────────────────────────────────────────────────────────────────────────────────
 

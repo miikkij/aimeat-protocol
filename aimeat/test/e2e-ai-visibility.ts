@@ -315,7 +315,8 @@ await test('8. the seller offers a priced job', async () => {
   vendorGaii = `vendor#${S.owner}@${NODE_ID}`;
   const pub = await json('/v1/agents/vendor/offers', {
     method: 'PUT', headers: authed(S.token),
-    body: JSON.stringify({ offers: [{ id: 'proofread', title: 'Proofread', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, price: { morsels: PRICE, unit: 'per-call' }, visibility: 'public' }] }),
+    // A money price as well: the UCP checkout in test 11 sells in money only (ruling D4, 2026-10-11).
+    body: JSON.stringify({ offers: [{ id: 'proofread', title: 'Proofread', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, price: { morsels: PRICE, unit: 'per-call' }, priceMoney: { amount: 1_000_000, currency: 'EUR' }, visibility: 'public' }] }),
   });
   assert(pub.status === 200, `offers ${pub.status} ${JSON.stringify(pub.body)}`);
 });
@@ -328,7 +329,8 @@ async function buy(headers: Record<string, string>, body: Record<string, unknown
   });
   assert(create.status === 201, `create ${create.status} ${JSON.stringify(create.body)}`);
   const id = ucp ? create.body.checkout_session.id : create.body.data.session.id;
-  const done = await json(`${route}/${id}/complete`, { method: 'POST', headers: authed(B.token), body: JSON.stringify({}) });
+  // The UCP session is in money, so it names its handler: the invoice rail needs no seller credential.
+  const done = await json(`${route}/${id}/complete`, { method: 'POST', headers: authed(B.token), body: JSON.stringify(ucp ? { payment: { handler: 'io.aimeat.invoice' } } : {}) });
   assert(done.status === 200, `complete ${done.status} ${JSON.stringify(done.body)}`);
 }
 

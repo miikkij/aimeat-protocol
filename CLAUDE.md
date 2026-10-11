@@ -209,7 +209,7 @@ A single suite during iteration (relative paths, so `cd` first):
 cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
 ```
 
-Memory-backend test commands are deprecated. There is no Prisma and no MongoDB in this codebase; do not re-add either.
+The memory-backend test commands are gone (2026-10-11). There is no Prisma and no MongoDB in this codebase; do not re-add either.
 
 ## MCP file transfer
 

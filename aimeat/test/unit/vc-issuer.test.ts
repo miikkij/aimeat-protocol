@@ -37,7 +37,7 @@ describe('VC Issuer Service', () => {
             const vc = service.issueIdentityCredential(makeGHIIRecord());
             expect(vc['@context']).toEqual([
                 'https://www.w3.org/ns/credentials/v2',
-                'https://aimeat.spechops.com/ns/credentials/v1',
+                'https://aimeat.io/ns/credentials/v1',
             ]);
         });
 

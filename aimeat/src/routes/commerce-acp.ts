@@ -6,8 +6,8 @@
  *   product feed + checkout endpoints over the same session service the native and UCP adapters
  *   use. The feed lists every PUBLIC, priced agent offer on the node as an ACP-ish product entry
  *   (sku = "offer:<agentGaii>:<offerId>"). Checkout completion settles through the node's
- *   registered payment handlers — real-money delegated payment (Stripe SPT) arrives with the EE
- *   phase-6 handler; until then Community callers settle in morsels. The ChatGPT Instant Checkout
+ *   registered payment handlers that settle money: every price here is money, and an item priced
+ *   only in morsels is neither listed nor sold here (commerce/protocol-money.ts). The ChatGPT Instant Checkout
  *   program itself is gated on OpenAI's side — this is the merchant-side implementation kept
  *   ready, discoverable at /.well-known/acp.json.
  * @structure
@@ -19,6 +19,10 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.7.0 — 2026-10-11 — Money only (ruling D4): the feed lists money prices and never the currency
+ *     "MORSEL"; a checkout opens in a money currency (the request's `currency`, else the first one
+ *     the items are priced in) or is refused MONEY_PRICE_REQUIRED; completion names its handler; the
+ *     402 block leaves the morsel ledger out.
  *   v1.6.0 — 2026-10-08 — A checkout opened here is attributed to the agent that opened it
  *     (services/visibility/attribution.ts), so the seller's report counts it as an AI purchase.
  *   v1.5.1 — 2026-10-08 — GET /v1/commerce/tools?include=own treats the anonymous identity as no
@@ -53,8 +57,9 @@ import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import {
-  createSession, getSession, completeSession, CommerceError,
+  getSession, completeSession, CommerceError,
 } from '../commerce/session-service.js';
+import { assertMoneySession, createMoneySession, moneyHandlerFor } from '../commerce/protocol-money.js';
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
 import { paymentChallenge } from '../commerce/x402.js';
@@ -67,6 +72,8 @@ const CreateSchema = z.object({
     quantity: z.number().int().positive().max(1000).optional(),
   })).min(1).max(20),
   note: z.string().max(2000).optional(),
+  /** A money currency; without it, the first one every item is priced in. */
+  currency: z.string().min(3).max(10).optional(),
 });
 const CompleteSchema = z.object({
   payment_data: z.object({
@@ -76,11 +83,11 @@ const CompleteSchema = z.object({
   }).optional(),
 });
 
-/** ACP payment providers map onto our handler registry ids. */
+/** ACP payment providers map onto our handler registry ids; with neither, the session names the choices. */
 function handlerFor(paymentData?: { provider?: string; handler?: string }): string | undefined {
   if (paymentData?.handler) return paymentData.handler;
   if (paymentData?.provider === 'stripe') return 'com.stripe.spt';
-  return undefined; // default handler (morsels)
+  return undefined;
 }
 
 function parseSku(id: string):
@@ -138,7 +145,7 @@ function sendAcpError(res: Response, config: AimeatConfig, err: unknown): void {
     : new CommerceError('COMMERCE_ERROR', 500, (err as { message?: string }).message ?? 'Unexpected commerce error');
   res.status(e.statusCode).json({
     ...error(config.nodeId, e.code, e.message),
-    ...(e.statusCode === 402 ? paymentChallenge(config) : {}),
+    ...(e.statusCode === 402 ? paymentChallenge(config, [], { moneyOnly: true }) : {}),
   });
 }
 
@@ -175,7 +182,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
       checkout: { base_url: `${b}/acp/v1/checkout_sessions` },
       // App-tool products also surface IN-PAGE via the WebMCP bridge (TARGET-034 phase C).
       webmcp: { library: `${b}/v1/libs/aimeat-webmcp.js`, app_listing: `${b}/v1/apps/{owner}/{filename}/webmcp` },
-      note: 'ACP merchant surface over the AIMEAT commerce core. Real-money payment settles on the SELLER\'s own Stripe account, or offline by invoice; morsel sales settle on this node\'s ledger with AIMEAT authentication.',
+      note: 'ACP merchant surface over the AIMEAT commerce core. Every price is money, and payment settles on the SELLER\'s own Stripe account, by stablecoin to the seller\'s own address, or offline by invoice.',
     });
   });
 
@@ -191,12 +198,10 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
       const offers = ((rec.value as { offers?: Offer[] } | undefined)?.offers) ?? [];
       for (const offer of offers) {
         if ((offer.visibility ?? 'private') !== 'public') continue;
-        // Listable when priced in morsels OR money (a money-only offer belongs in the feed too).
-        const hasMorsel = !!offer.price && offer.price.morsels > 0;
-        if (!hasMorsel && !offer.priceMoney) continue;
-        const price = hasMorsel
-          ? { amount: offer.price!.morsels, currency: 'MORSEL', unit: offer.price!.unit ?? 'per-call' }
-          : { amount: offer.priceMoney!.amount, currency: offer.priceMoney!.currency, unit: 'per-call', scale: 6 };
+        // A product here has a money price. An offer priced only in morsels is not listed: a morsel
+        // paces writes and is not a currency (commerce/protocol-money.ts).
+        if (!offer.priceMoney) continue;
+        const price = { amount: offer.priceMoney.amount, currency: offer.priceMoney.currency, unit: 'per-call', scale: 6 };
         products.push({
           id: `offer:${rec.ownerGaii}:${offer.id}`,
           title: offer.title,
@@ -217,14 +222,14 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     // One shared scanner (app-tool-catalog.ts) feeds this, /v1/commerce/tools, and the MCP card.
     if (products.length < FEED_CAP) {
       for (const t of await listPricedAppTools(storage, config, FEED_CAP - products.length)) {
+        // Money-priced tools only, for the same reason as the offers above.
+        if (!t.priceMoney) continue;
         const appId = t.app.split('/').slice(1).join('/');
         products.push({
           id: t.sku,
           title: `${appId} · ${t.name}`,
           description: t.description,
-          price: t.price
-            ? { amount: t.price.morsels, currency: 'MORSEL', unit: t.price.unit }
-            : { amount: t.priceMoney!.amount, currency: t.priceMoney!.currency, unit: 'per-call', scale: 6 },
+          price: { amount: t.priceMoney.amount, currency: t.priceMoney.currency, unit: 'per-call', scale: 6 },
           availability: 'in_stock',
           fulfillment: t.fulfillment,
           seller: { app: t.app },
@@ -267,7 +272,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     });
   });
 
-  // ── Checkout (authenticated — morsel settlement needs an AIMEAT principal) ──
+  // ── Checkout (authenticated; every session here is in money, commerce/protocol-money.ts) ──
 
   router.use('/acp/v1', (_req, res, next) => {
     if (!config.commerceEnabled) {
@@ -281,6 +286,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     const id = decodeURIComponent(req.params.id as string);
     const session = await getSession(storage, buyerGhii, id, config);
     if (!session) throw new CommerceError('SESSION_NOT_FOUND', 404, `Checkout session not found: ${id}`);
+    assertMoneySession(session);
     return session;
   }
 
@@ -288,13 +294,13 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     try {
-      const session = await createSession(storage, config, {
+      const session = await createMoneySession(storage, config, {
         buyerOwner: req.auth!.owner as string,
         buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
         items: parsed.data.items.map((i) => ({ ...parseSku(i.id), quantity: i.quantity ?? 1 })),
         note: parsed.data.note,
         attribution: agentAttribution({ userAgent: req.get('user-agent'), gaii: resolveIdentity(req.auth!, config.nodeId) }),
-      });
+      }, parsed.data.currency);
       res.status(201).json(toAcpSession(session));
     } catch (err) { sendAcpError(res, config, err); }
   });
@@ -312,7 +318,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
       const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
       const completed = await completeSession(
         storage, config, session,
-        handlerFor(parsed.data.payment_data),
+        moneyHandlerFor(session, handlerFor(parsed.data.payment_data)),
         parsed.data.payment_data?.token,
         callerJwt,
         req.auth ? { sub: req.auth.sub, roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null,
