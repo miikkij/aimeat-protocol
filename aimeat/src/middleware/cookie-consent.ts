@@ -32,6 +32,10 @@
  *   - cookieConsentMiddleware(config): adds the snippet to text/html string bodies before </body>
  *   - buildStandaloneSnippetJs(config): self-loading IIFE for GET /v1/portal/cookie-consent.js
  * @version-history
+ *   v2.1.0 — 2026-10-11 — The service's own pages get the banner only when the operator lists a
+ *     category a visitor can refuse (with `necessary` alone it asked a question with one answer on
+ *     every page); the cookie mark on the row of marks opens the choices again; every non-ASCII
+ *     character of the run configuration is an escape, for an app that declares no charset.
  *   v2.0.0 — 2026-10-11 — The switch and the categories are read per request; the category list is
  *     read through consentCategories() (a list typed in Config became one category per letter); the
  *     texts are in en, fi and es and name the page owner's analytics (cookie-consent-texts.ts); the
@@ -44,7 +48,7 @@
  */
 import type { RequestHandler, Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
-import { CONSENT_LANGS, consentTexts, type ConsentServices } from './cookie-consent-texts.js';
+import { CONSENT_LANGS, consentTexts, consentSettingsLabels, type ConsentServices } from './cookie-consent-texts.js';
 
 type BannerConfig = Pick<AimeatConfig, 'cookieConsentCategories' | 'cookieConsentPolicyUrl'>;
 
@@ -75,7 +79,45 @@ export interface CookieBannerOptions {
   services?: ConsentServices;
   /** Cookies to remove, and the page to reload, when the visitor takes analytics consent back. */
   clearOnRevoke?: readonly string[];
+  /**
+   * Add the cookie mark to the page's row of marks: a round button that opens the choices again.
+   * For a served app, a portfolio or a company page, which carry that row (utils/app-badge.ts).
+   */
+  mark?: boolean;
 }
+
+/** Every character outside ASCII as a \u escape: a served app often declares no charset. */
+const asciiJson = (value: unknown): string => JSON.stringify(value)
+  .replace(/</g, '\\u003c')
+  .replace(/[\u0080-￿]/g, (ch) => `\\u${ch.charCodeAt(0).toString(16).padStart(4, '0')}`);
+
+/**
+ * A cookie with a bite out of it and three chips, drawn. Sized in ems like the other marks' icons;
+ * an inline SVG and not an emoji, which the interface does not use.
+ */
+const COOKIE_ICON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" '
+  + 'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'
+  + '<path d="M12 3a9 9 0 1 0 9 9 3.6 3.6 0 0 1-4.6-4.4A3.6 3.6 0 0 1 12 3z"/>'
+  + '<path d="M9 9.6v.01M14.4 14.2v.01M9.8 15.2v.01"/></svg>';
+
+/**
+ * The cookie mark's style: a 34px round button on the node's row of marks, after the AI label, the
+ * attribution bolt and the "Use with your AI" mark, by the widths they declare; it declares its own
+ * room as --aimeat-mark-cookie-w for the install button after it (public/js/install-chip.js). Drawn
+ * like the others (utils/app-ai-use-badge.ts): an opaque surface and every declaration `!important`,
+ * so app CSS cannot restyle it. One step under the banner's own layer, so the open dialog covers it.
+ */
+const COOKIE_MARK_CSS = ':root{--aimeat-mark-cookie-w:42px}'
+  + '#aimeat-cookie-mark{display:contents!important}'
+  + '#aimeat-cookie-mark button{display:flex!important;position:fixed!important;'
+  + 'left:calc(12px + var(--aimeat-mark-ai-w,0px) + var(--aimeat-mark-badge-w,0px) + var(--aimeat-mark-aiuse-w,0px))!important;'
+  + 'right:auto!important;bottom:12px!important;top:auto!important;z-index:2147483646!important;width:34px!important;'
+  + 'height:34px!important;box-sizing:border-box!important;margin:0!important;padding:0!important;align-items:center!important;'
+  + 'justify-content:center!important;border-radius:50%!important;color:#FFB52E!important;background:#14141c!important;'
+  + 'box-shadow:0 4px 16px rgba(0,0,0,.28)!important;border:1px solid rgba(255,255,255,.14)!important;'
+  + 'font:600 17px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;cursor:pointer!important}'
+  + '#aimeat-cookie-mark svg{width:1em!important;height:1em!important;display:block!important;flex:none!important}'
+  + '#aimeat-cookie-mark button:focus-visible{outline:2px solid #FFB52E!important;outline-offset:2px!important}';
 
 /**
  * The CookieConsent.run() configuration as JSON, with the texts of every language. `<` is written
@@ -105,7 +147,7 @@ export function buildCookieConsentRunConfig(config: BannerConfig, opts: CookieBa
     // The start script sets `default` to the visitor's language before the banner runs.
     language: { default: 'en', translations },
   };
-  return JSON.stringify(runConfig).replace(/</g, '\\u003c');
+  return asciiJson(runConfig);
 }
 
 /**
@@ -115,8 +157,19 @@ export function buildCookieConsentRunConfig(config: BannerConfig, opts: CookieBa
  * it does not say what the visitor reads: the service's own page carries a fixed `lang="en"` until
  * its scripts load, and the serve pass writes one on an app whose author gave none.
  */
-function startJs(runConfig: string): string {
-  return `(function(){var c=${runConfig};`
+function startJs(runConfig: string, mark = false): string {
+  // THE WAY BACK TO THE CHOICES. Taking consent back has to be as easy as giving it, and after a
+  // choice the banner is gone. The cookie mark stays on the page's row of marks and opens the
+  // choices again (Jouni, 2026-10-11: a cookie beside the AI badge, where a newspaper has its
+  // "cookie settings" link at the bottom of the page).
+  const markJs = mark
+    ? `function mark(){try{var d=document;if(d.getElementById('aimeat-cookie-mark'))return;`
+      + `var L=${asciiJson(consentSettingsLabels())},t=L[c.language.default]||L.en,w=d.createElement('div');w.id='aimeat-cookie-mark';`
+      + `w.innerHTML=${asciiJson(`<style>${COOKIE_MARK_CSS}</style><button type="button">${COOKIE_ICON}</button>`)};`
+      + `var b=w.querySelector('button');b.setAttribute('aria-label',t);b.title=t;`
+      + `b.addEventListener('click',function(){window.CookieConsent.showPreferences();});d.body.appendChild(w);}catch(x){}}`
+    : '';
+  return `(function(){var c=${runConfig};${markJs}`
     + `function pick(){var a=[],d=document;`
     + `try{a.push(new URLSearchParams(location.search).get('lang'));}catch(e){}`
     + `try{a.push(localStorage.getItem('aimeat-lang'));}catch(e){}`
@@ -130,7 +183,7 @@ function startJs(runConfig: string): string {
     + `var s=q.modal.querySelectorAll('.pm__section--expandable');for(var i=0;i<s.length;i++){s[i].classList.add('is-expanded');`
     + `var b=s[i].querySelector('.pm__section-title');if(b)b.setAttribute('aria-expanded','true');`
     + `var k=s[i].querySelector('.pm__section-desc-wrapper');if(k)k.setAttribute('aria-hidden','false');}}catch(x){}});`
-    + `function run(){if(!document.body){setTimeout(run,30);return;}if(!window.CookieConsent)return;c.language.default=pick();CookieConsent.run(c);}`
+    + `function run(){if(!document.body){setTimeout(run,30);return;}if(!window.CookieConsent)return;c.language.default=pick();CookieConsent.run(c);${mark ? 'mark();' : ''}}`
     + `if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}})();`;
 }
 
@@ -145,20 +198,26 @@ export function cookieConsentSnippet(config: BannerConfig, opts: CookieBannerOpt
   const nonce = opts.nonce && /^[A-Za-z0-9+/=_-]{8,200}$/.test(opts.nonce) ? ` nonce="${opts.nonce}"` : '';
   return `<link rel="stylesheet" href="${base}/cookieconsent.css">`
     + `<script src="${base}/cookieconsent.umd.js"${nonce}></script>`
-    + `<script ${COOKIE_BANNER_MARK}${nonce}>${startJs(buildCookieConsentRunConfig(config, opts))}</script>`;
+    + `<script ${COOKIE_BANNER_MARK}${nonce}>${startJs(buildCookieConsentRunConfig(config, opts), opts.mark === true)}</script>`;
 }
 
 /**
  * Express middleware that adds the banner to the service's own HTML responses before </body>.
  * The switch and the categories are read on every response, so a change in Config applies at once.
  * A page that already carries the banner (an app or a portfolio with its owner's tags) is left alone.
+ *
+ * ONLY WHEN THERE IS SOMETHING TO ASK. The service's own pages (home, settings, admin, chat) set
+ * the cookies they need to work and nothing else, and those need no consent. With the operator's
+ * list at `necessary` alone, which is the default, they get no banner: it asked a question with one
+ * possible answer on every page (Jouni, 2026-10-11: "it asked there too, what it should not ask").
+ * The banner shows there only when the operator lists a category a visitor can refuse.
  */
 export function cookieConsentMiddleware(config: AimeatConfig): RequestHandler {
   return (_req: Request, res: Response, next: NextFunction) => {
     const originalSend = res.send.bind(res);
 
     res.send = function (body?: unknown): Response {
-      if (config.cookieConsentEnabled === true && typeof body === 'string') {
+      if (config.cookieConsentEnabled === true && typeof body === 'string' && consentCategories(config).length > 1) {
         const contentType = res.getHeader('Content-Type');
         const ctString = typeof contentType === 'string' ? contentType : '';
         if (ctString.includes('text/html') && !body.includes('cookieconsent.umd.js')) {

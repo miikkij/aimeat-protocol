@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-11 — The privacy page's {{ownerAnalyticsNotice}}: the paragraph about account holders'
+ *     own analytics, written only while one of them uses Clarity or Google Analytics.
  *   2026-10-09 — /v1/oauth-round joins the SPA routes: the owner confirms a sign-in round an agent
  *     started (secrets audit 2026-10-09, chapter 2).
  *   v1.0.0 — 2026-03-03 — Initial portal with SSR removal
@@ -100,6 +102,8 @@ import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '.
 export { serveSpa, resolvePublicFile } from './portal-spa.js';
 import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
+import { tagsInUseOnNode } from '../services/visibility/visibility-settings.js';
+import { ownerAnalyticsNotice } from '../services/visibility/privacy-notice.js';
 
 /**
  * Returns a Record<placeholder, value> for the templated static pages
@@ -169,6 +173,9 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
     // The sign-in cookie's real lifetime, so the cookie section states THIS node's numbers rather
     // than the defaults. Both are operator-tunable, and a policy that hardcoded 30/90 would be
     // wrong on any node that shortened them.
+    // Section 8's paragraph about account holders' own analytics: written only while one of them
+    // uses Clarity or Google Analytics on the pages they publish (services/visibility/privacy-notice.ts).
+    ownerAnalyticsNotice: ownerAnalyticsNotice(locale, nodeName, tagsInUseOnNode()),
     refreshIdleDays: String(config.refreshIdleDays),
     refreshAbsoluteDays: String(config.refreshAbsoluteDays),
     // What this node tells the AI-training crawlers in robots.txt, as a whole sentence rather than

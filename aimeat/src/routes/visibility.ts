@@ -13,6 +13,7 @@
  * @structure visibilityRouter (GET /v1/visibility/report, GET|PUT /v1/visibility/settings) · countApexDocs
  * @usage app.use(visibilityRouter(config, storage)); router.use(countApexDocs(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-10-11 — Reads at start which analytics services account holders use, for the privacy page.
  *   v1.3.0 — 2026-10-08 — Starts counting outside agents' calls to each owner's tools (layer C).
  *   v1.2.0 — 2026-10-08 — Mounts the product feed routes (routes/visibility-feed.ts, layer E).
  *   v1.1.0 — 2026-10-08 — The settings take the owner's Clarity project id and GA4 measurement id
@@ -30,7 +31,7 @@ import { logger } from '../utils/logger.js';
 import { visitSignals } from '../utils/visit-signals.js';
 import type { VisibilityDoc } from '../models/visibility-schemas.js';
 import { countVisit, nodeCountsVisibility, resolvePlaceOwner } from '../services/visibility/visibility-counter.js';
-import { getVisibilitySettings, setVisibilitySettings, VisibilitySettingsError } from '../services/visibility/visibility-settings.js';
+import { getVisibilitySettings, setVisibilitySettings, refreshTagsInUse, VisibilitySettingsError } from '../services/visibility/visibility-settings.js';
 import { visibilitySettingsView } from '../services/visibility/analytics-tags.js';
 import { readVisibilityReport } from '../services/visibility/visibility-report.js';
 import { visibilityFeedRouter } from './visibility-feed.js';
@@ -82,6 +83,9 @@ export function visibilityRouter(config: AimeatConfig, storage: Storage): Router
   // Outside agents' calls to the owner's tools, counted from the usage stream (layer C). Here because
   // this router is built once per node with its storage and config.
   watchAgentCalls(storage, config);
+  // Which analytics services account holders use, read once at start for the privacy page; a
+  // settings change reads it again (services/visibility/visibility-settings.ts).
+  void refreshTagsInUse(storage);
 
   /** The account whose report this is. A visitor from another node has none here. */
   function ownerOf(req: Request, res: Response): string | null {

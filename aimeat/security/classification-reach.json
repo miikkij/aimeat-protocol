@@ -2161,9 +2161,10 @@
     },
     "src/services/visibility/visibility-settings.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 2,
+        "listMemoryKeysByPrefix": 1
       },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer B), the node's own read: the owner's visibility settings record (signals.visibility.settings, reserved prefix): the counting switch and the analytics tag ids. No content."
+      "why": "Reviewed 2026-10-11 (AI visibility, layer B), the node's own read: the owner's visibility settings record (signals.visibility.settings, reserved prefix): the counting switch and the analytics tag ids; and the key listing of that one record across owners, to say on the privacy page whether any account holder uses an analytics service (a yes or no per service, no owner named). No content."
     },
     "src/services/workflow/engine-ai-step.ts": {
       "reads": {

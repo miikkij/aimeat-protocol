@@ -475,11 +475,20 @@ await test('18b. the banner switched on in Config reaches the service\'s own pag
     const res = await fetch(`${BASE}/`, { headers: { Accept: 'text/html' } });
     return { html: await res.text(), csp: res.headers.get('content-security-policy') ?? '' };
   };
+  const setList = (value: string[]) => json('/v1/admin/config', {
+    method: 'PUT', headers: authed(OP.token), body: JSON.stringify({ changes: [{ path: 'cookies.consent_categories', value }] }),
+  });
   const before = await front();
   assert(!before.html.includes('data-aimeat-cookie-banner'), 'no banner while the switch is off');
   const on = await setBanner(true);
   assert(on.status === 200, `banner on: ${on.status}`);
   try {
+    // With `necessary` alone there is nothing to ask on the service's own pages (home, settings,
+    // admin, chat), so they get no banner; an app with its owner's tags still gets one.
+    const quiet = await front();
+    assert(!quiet.html.includes('cookieconsent'), 'the front page has no banner when necessary is the only category');
+    assert((await page(appPath)).includes('data-aimeat-cookie-banner'), 'the app with its owner\'s tags has the banner');
+    assert((await setList(['necessary', 'analytics'])).status === 200, 'the operator lists a category a visitor can refuse');
     // No restart between the switch and this request: the switch used to be read once at start.
     const after = await front();
     const m = /<script data-aimeat-cookie-banner nonce="([^"]+)">/.exec(after.html);
@@ -487,12 +496,48 @@ await test('18b. the banner switched on in Config reaches the service\'s own pag
     // Without the page's own nonce the browser blocks the inline script and no banner shows.
     assert(after.csp.includes(`'nonce-${m[1]}'`), `the nonce is the one this response's CSP allows: ${after.csp.slice(0, 160)}`);
     const run = bannerConfig(after.html);
-    assert(run && Object.keys(run.categories).join(',') === 'necessary', `the operator's list, got ${run && Object.keys(run.categories)}`);
+    assert(run && Object.keys(run.categories).join(',') === 'necessary,analytics', `the operator's list, got ${run && Object.keys(run.categories)}`);
     assert((after.html.match(/cookieconsent\.umd\.js/g) ?? []).length === 1, 'one banner, not two');
+    assert(!after.html.includes('aimeat-cookie-mark'), 'the cookie mark is for a page with the row of marks, not for the service\'s own pages');
   } finally {
+    assert((await setList(['necessary'])).status === 200, 'the list is back to necessary');
     const off = await setBanner(false);
     assert(off.status === 200, 'banner back off');
   }
+});
+
+await test('18d. an app with its owner\'s tags carries the cookie mark, and the privacy page names the service while it is in use', async () => {
+  await setBanner(true);
+  try {
+    const html = await page(appPath);
+    // The button that opens the choices again, on the app's row of marks.
+    assert(html.includes("w.id='aimeat-cookie-mark'") && html.includes('window.CookieConsent.showPreferences()'), 'the app carries the cookie mark');
+    // No raw character outside ASCII in the banner's script: an app may declare no charset.
+    const at = html.indexOf('<script data-aimeat-cookie-banner');
+    const script = html.slice(at, html.indexOf('</script>', at));
+    // eslint-disable-next-line no-control-regex -- the assertion is that nothing outside ASCII is there
+    assert(!/[^\x00-\x7f]/.test(script), 'the banner script is ASCII');
+  } finally {
+    await setBanner(false);
+  }
+  // The privacy page: its paragraph about account holders' analytics shows while one of them has a tag.
+  const privacy = async (want: boolean): Promise<string> => {
+    for (let i = 0; i < 20; i++) {
+      const text = await (await fetch(`${BASE}/v1/privacy`, { headers: { Accept: 'text/html' } })).text();
+      if (text.includes('Apps and pages that account holders publish.') === want) return text;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    return await (await fetch(`${BASE}/v1/privacy`, { headers: { Accept: 'text/html' } })).text();
+  };
+  const withTag = await privacy(true);
+  assert(withTag.includes('At least one account holder uses Microsoft Clarity'), 'the policy names the service in use');
+  assert(withTag.includes('own pages use no third-party analytics'), 'and still says the service\'s own pages use none');
+  assert(!withTag.includes('{{ownerAnalyticsNotice}}'), 'the placeholder is filled');
+  const cleared = await setTags(S.token, { clarity_project_id: null, ga4_measurement_id: null });
+  assert(cleared.status === 200, 'tags removed');
+  const without = await privacy(false);
+  assert(!without.includes('Apps and pages that account holders publish.') && !without.includes('{{ownerAnalyticsNotice}}'), 'with no tag on the node the paragraph is not there');
+  await setTags(S.token, { clarity_project_id: 'k7x2m9qp1a' });
 });
 
 await test('18c. the category list is a list: text is refused, and a list gives whole categories', async () => {

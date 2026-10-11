@@ -140,6 +140,8 @@ export function ownerTagsSnippet(config: AimeatConfig, settings: VisibilitySetti
     services: { clarity: !!clarity, ga4: !!ga4 },
     clearOnRevoke: cookieNames,
     assetBase: config.baseUrl,
+    // The way back to the choices, on the page's row of marks.
+    mark: true,
   });
 }
 
