@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-11 -- e2e-record-spec-pointers.ts joins the list (not the guard tier): every `spec` a
+ *     self-describing record carries opens from the node.
  *   2026-10-11 -- Two sessions can run at once. A lane's port is computed from the runner's own
  *     port, where it used to be the first free one from 40500 (two guard tiers took 40501 the same
  *     afternoon), and a suite's own ports are taken under a lock every runner on the machine
@@ -886,6 +888,7 @@ const ALL_SUITES = [
     'test/e2e-workspace-export-import.ts',
     'test/e2e-zip-security.ts',
     'test/e2e-static-hardening.ts',
+    'test/e2e-record-spec-pointers.ts',
     'test/e2e-surface-layout.ts',
     'test/e2e-workspace-activity.ts',
     'test/e2e-workspace-update.ts',

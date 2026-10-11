@@ -37,7 +37,7 @@ reads its own saved link map. The node counts; it does not forward.
 ```jsonc
 {
   "type": "aimeat.signals.month",
-  "spec": "/docs/specs/signals-contract.md",
+  "spec": "/v1/specs/signals-contract.md",   // this document, as the node serves it
   "streamId": "campaign-spring",
   "month": "2026-08",
   "days": {
