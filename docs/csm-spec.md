@@ -22,8 +22,7 @@ The parser reads only the keys this document lists. A key it does not read
 (for example `pattern`, or a whole `economy` block) parses without an error
 and has no effect.
 
-The package set `aimeat/docs/csm-examples` is the one the node loads at boot.
-The root `docs/csm-examples` set is not loaded by anything.
+The seven templates in `aimeat/docs/csm-examples` are the ones the node loads at boot.
 
 ## 1. Overview
 

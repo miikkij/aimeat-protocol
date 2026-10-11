@@ -153,7 +153,7 @@ actions:
         from: "shipments[0].estimatedDelivery"
 
     pricing:
-      base_morsels: 3
+      toll_morsels: 3
 
     estimated_time_seconds: 5
 
@@ -209,7 +209,7 @@ actions:
         from: "shipments[0].delivered"
 
     pricing:
-      base_morsels: 0
+      toll_morsels: 0
 
     estimated_time_seconds: 2
 

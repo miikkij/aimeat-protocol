@@ -2,7 +2,7 @@ csm: "1.0"
 service:
   name: "marketplace"
   type: "marketplace"
-  description: "Buy and sell items with listing fees and escrow protection"
+  description: "Buy and sell items: listings with a money price, a condition and shipping options"
   locale: "en"
 
 schema_mode: "open"
@@ -46,11 +46,6 @@ moderation:
   flags_enabled: true
   auto_hide_threshold: 3
   appeals_enabled: true
-
-economy:
-  listing_fee_morsels: 5
-  escrow_enabled: true
-  escrow_release_on: "buyer_confirmation"
 
 ui_hints:
   list_view: ["title", "price.amount", "price.currency", "category", "condition"]

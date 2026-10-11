@@ -71,7 +71,7 @@ actions:
               from: "snow.3h"
 
     pricing:
-      base_morsels: 1
+      toll_morsels: 1
 
     estimated_time_seconds: 2
 
@@ -169,7 +169,7 @@ actions:
         description: "Confidence in the recommendation (0-1)"
 
     pricing:
-      base_morsels: 2
+      toll_morsels: 2
 
     estimated_time_seconds: 5
 

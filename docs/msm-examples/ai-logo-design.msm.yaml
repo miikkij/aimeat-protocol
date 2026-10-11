@@ -78,9 +78,7 @@ actions:
         from: "model"
 
     pricing:
-      base_morsels: 15
-      per_unit: 5
-      unit: "variant"
+      toll_morsels: 15
 
     estimated_time_seconds: 30
 
@@ -142,7 +140,7 @@ actions:
         from: "data"
 
     pricing:
-      base_morsels: 10
+      toll_morsels: 10
 
     estimated_time_seconds: 20
 
