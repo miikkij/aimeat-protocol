@@ -25,6 +25,8 @@
  *   const out = await crewPublish({ storage, config }, caller, 'json-demo', doc);
  *   if (!out.ok) return renderRefusal(out);
  * @version-history
+ *   v1.1.0 — 2026-10-11 — Publish, restore and seed answer with `warnings` for the definition
+ *     (crew-def-warnings.ts).
  *   v1.0.0 — 2026-08-28 — Extracted from routes/agent-crew.ts so the MCP tools call the same code.
  */
 import { randomUUID } from 'node:crypto';
@@ -37,6 +39,7 @@ import {
   CREW_VERSION_WINDOW, type CrewState,
 } from './crew-def-store.js';
 import { logger } from '../utils/logger.js';
+import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
 
 export interface CrewDeps { storage: Storage; config: AimeatConfig }
 
@@ -284,7 +287,7 @@ export async function crewDraftDiscard(deps: CrewDeps, caller: CrewCaller, ident
 
 /** The shared publish gate: the runtime validates first, and only a clean verdict is written. */
 async function validateThenPublish(deps: CrewDeps, caller: CrewCaller, agent: AgentRecord, doc: Doc): Promise<
-  { ok: true; published: true; revision: number; publishedAt: string; key: string } | CrewRefusal
+  { ok: true; published: true; revision: number; publishedAt: string; key: string; warnings: CrewDefWarning[] } | CrewRefusal
 > {
   const asked = await askCrew(deps.config, agent, 'crew.validate', { doc }, caller.principal, deps.config.connectTunnelRequestTimeoutMs);
   if (!asked.ok) return asked;
@@ -299,7 +302,7 @@ async function validateThenPublish(deps: CrewDeps, caller: CrewCaller, agent: Ag
   }
   const out = await publishCrewDef(deps, caller, agent, doc);
   if (!out.ok) return out;
-  return { ok: true, published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key };
+  return { ok: true, published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, warnings: crewDefWarnings(doc) };
 }
 
 /** Becomes the live definition the runtime reloads — after the runtime itself has accepted it. */
@@ -334,7 +337,7 @@ export async function crewPublish(deps: CrewDeps, caller: CrewCaller, identifier
  */
 export async function crewSeed(
   deps: CrewDeps, caller: CrewCaller, identifier: string, doc: Doc, validateWith?: string,
-): Promise<{ ok: true; seeded: true; revision: number; publishedAt: string; key: string; validatedBy: string } | CrewRefusal> {
+): Promise<{ ok: true; seeded: true; revision: number; publishedAt: string; key: string; validatedBy: string; warnings: CrewDefWarning[] } | CrewRefusal> {
   const target = await resolveCrewAgent(deps, caller, identifier);
   if (!target.ok) return target;
   const app = refuseAppGrant(caller);
@@ -369,7 +372,7 @@ export async function crewSeed(
   const validatedBy = chosen.validator.gaii === agent.gaii ? undefined : chosen.validator.gaii;
   const out = await publishCrewDef(deps, caller, agent, doc, validatedBy);
   if (!out.ok) return out;
-  return { ok: true, seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validatedBy: chosen.validator.gaii };
+  return { ok: true, seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validatedBy: chosen.validator.gaii, warnings: crewDefWarnings(doc) };
 }
 
 /**

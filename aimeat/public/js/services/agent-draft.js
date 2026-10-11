@@ -24,6 +24,9 @@
  *   const draft = await draftAgent('Gather the industry news every weekday morning', { tools });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A definition that listens for direct messages gets the `dm` tool on its
+ *     first member when no member has it. An agent made as "when someone writes to it" or "always
+ *     on" from a ready definition read a message and could not answer.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import { api, apiGet, apiPost } from '/js/api.js';
@@ -159,7 +162,16 @@ function definitionFor(draft, when) {
   const def = draft.crewDef ? { ...draft.crewDef, agent_name: draft.name } : buildTemplate(draft.template || 'researcher', draft.name);
   const hears = new Set(Array.isArray(def.listen_for) && def.listen_for.length ? def.listen_for : ['tasks']);
   if (when === 'talk' || when === 'always') { hears.add('messages'); hears.add('dms'); }
-  return { ...def, listen_for: [...hears] };
+  // AN AGENT THAT HEARS A MESSAGE MUST BE ABLE TO ANSWER IT. The `dm` tool is what sends a reply, and
+  // a definition that listens for direct messages without it reads the message and says nothing
+  // (measured on aimeat.io, 2026-10-11). A ready definition and a draft whose "when" the person
+  // changed on the form have no such tool, so the first member gets it.
+  const members = Array.isArray(def.agents) ? def.agents : [];
+  const canReply = members.some((m) => Array.isArray(m?.tools) && m.tools.includes('dm'));
+  const agents = hears.has('dms') && !canReply && members.length
+    ? members.map((m, i) => (i === 0 ? { ...m, tools: [...(Array.isArray(m.tools) ? m.tools : []), 'dm'] } : m))
+    : members;
+  return { ...def, agents, listen_for: [...hears] };
 }
 
 /**

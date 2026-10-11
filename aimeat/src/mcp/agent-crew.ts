@@ -15,6 +15,7 @@
  *     aimeat_crew_draft, aimeat_crew_publish
  * @usage registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-11 — aimeat_crew_publish and aimeat_crew_seed answer with `warnings`.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-08-28 -- Initial: the five tools over services/crew-ops.ts.
  *   v1.0.2 -- 2026-10-02 -- aimeat_crew_llm_set's choice names the {kind:'node', role?} shape.
@@ -150,7 +151,7 @@ export function registerAgentCrewTools(
                 ? await crewPublish(deps, caller, target_agent_name, doc)
                 : await crewRestore(deps, caller, target_agent_name, revision as number);
             if (!out.ok) return refused(out);
-            return ok({ published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key });
+            return ok({ published: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, warnings: out.warnings });
         },
     );
 
@@ -162,7 +163,7 @@ export function registerAgentCrewTools(
         async ({ target_agent_name, doc, validate_with }) => {
             const out = await crewSeed(deps, callerOf('mcp.crew_seed'), target_agent_name, doc, validate_with);
             if (!out.ok) return refused(out);
-            return ok({ seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validated_by: out.validatedBy });
+            return ok({ seeded: true, revision: out.revision, publishedAt: out.publishedAt, key: out.key, validated_by: out.validatedBy, warnings: out.warnings });
         },
     );
 
