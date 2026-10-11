@@ -1,18 +1,25 @@
-# Upgrade prompt — move a CrewAI crew to the loopback serve daemon (aimeat-crewai ≥ 0.4.0)
+# Upgrade prompt — move a CrewAI crew to the loopback serve daemon (aimeat-crewai ≥ 0.29.0)
 
 > Copy everything below the divider into your AI coding assistant (or follow it
-> by hand) to migrate an existing CrewAI + AIMEAT project onto the new
+> by hand) to migrate an existing CrewAI + AIMEAT project onto the
 > `serve_params()` loopback transport. It is safe and incremental — `stdio_params`
 > still works, so you can roll back by reverting one line.
+>
+> **Which version.** The serve daemon arrived in `aimeat-crewai` 0.4.0. The daemon
+> itself is `aimeat connect serve`, from the same `aimeat` package as the node, and
+> from aimeat 3.20.0 on it refuses a call without the secret in its `serve.json`
+> (401). The Python package sends that secret from **0.29.0** on, so with aimeat
+> 3.20.0 or later the floor is 0.29.0. The current package is 0.34.0
+> (`python/aimeat-crewai/pyproject.toml`).
 
 ---
 
 You are upgrading a CrewAI project that integrates with AIMEAT via the
 `aimeat-crewai` package. Move it from the per-crew **stdio subprocess** transport
-to the new **loopback serve daemon** (`aimeat-crewai >= 0.4.0`). Goal: one
-persistent WebSocket per agent to the node, realtime task delivery instead of
-polling, and zero per-worker subprocess churn — without changing the crew's
-domain logic.
+to the **loopback serve daemon** (`aimeat-crewai >= 0.29.0`; a daemon from aimeat
+3.20.0 or later refuses older packages). Goal: one persistent WebSocket per
+agent to the node, realtime task delivery instead of polling, and zero per-worker
+subprocess churn — without changing the crew's domain logic.
 
 ## What changed in 0.4.0 (context)
 
@@ -28,9 +35,11 @@ domain logic.
 
 ## Steps
 
-1. **Bump the dependency** to `aimeat-crewai>=0.4.0` (in `requirements.txt` /
+1. **Bump the dependency** to `aimeat-crewai>=0.29.0` (in `requirements.txt` /
    `pyproject.toml` / `pip install -U aimeat-crewai`). Confirm
-   `python -c "import aimeat_crewai; print(aimeat_crewai.__version__)"` is ≥ 0.4.0.
+   `python -c "import aimeat_crewai; print(aimeat_crewai.__version__)"` is ≥ 0.29.0.
+   Below it, a serve daemon from aimeat 3.20.0 or later answers 401, because only
+   0.29.0 and later send the secret from `serve.json`.
 
 2. **Swap the transport** at every `create_liaison_agent` / `liaison_tools` /
    `run_crew_daemon` call site. Change `stdio_params(...)` → `serve_params(...)`,
@@ -89,5 +98,5 @@ domain logic.
 - Don't hardcode the loopback port — always discover it via `serve_params` /
   `serve.json`.
 
-Reference: `docs/integrations/crewai.md` ("Transports") and
-`docs/connector-forward-tunnel.md` (architecture + diagrams).
+Reference: the package README, `python/aimeat-crewai/README.md` ("Three
+transports"), and `docs/connector-forward-tunnel.md` (architecture + diagrams).
