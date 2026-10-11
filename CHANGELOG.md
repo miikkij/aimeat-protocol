@@ -2,8 +2,8 @@
 
 > **This file ends at node 3.15.0 (2026-09-14) and aimeat-crewai 0.27.1 (2026-09-20).** Later changes
 > to the node are in [`aimeat/public/changelog.json`](aimeat/public/changelog.json), which every node serves at
-> `/changelog.json` and as a page at `/v1/changelog`, and in the
-> [GitHub releases](https://github.com/miikkij/aimeat-protocol/releases).
+> `/changelog.json` and as a page at `/v1/changelog`. Later changes to aimeat-crewai are in
+> [`python/aimeat-crewai/CHANGELOG.md`](python/aimeat-crewai/CHANGELOG.md).
 
 All notable changes to AIMEAT up to those versions are documented in this file.
 
