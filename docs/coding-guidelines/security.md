@@ -4,7 +4,14 @@
 
 This page is the lookup reference: library names, function signatures, environment variables and their defaults, and the headers the node sends. The rules come from [security-development-dna.md](security-development-dna.md): the trust model, the invariants every change must keep, the security posture and the per-change checklist. Read that file before you change a route, auth, storage, federation, an extension or an AI path.
 
-Every value on this page was read from the code. If the code and this page disagree, the code is right and this page needs a fix. Paths are relative to `aimeat/`.
+Every fact on this page was read from the code. If the code and this page disagree, the code is right and this page needs a fix. Paths are relative to `aimeat/`.
+
+**This page names settings, not their values.** For each one it says what the setting controls and which `src/config*.ts` field reads it. To see a value:
+
+- The admin **Config** tab (`GET /v1/admin/config`, operator role) shows every setting in `CONFIG_FIELDS` (`src/services/config-schema*.ts`) with its value on this node and where that value came from. A setting nobody changed shows the source `default`, so the value shown is the shipped default.
+- `aimeat config` prints a separate list (`src/utils/env-config/sections-*.ts`) with each value and its source, the same way. It covers most settings below, but not all of them.
+- `aimeat/.env.example` lists each variable with its shipped default, and [b-config.md](../b-config.md) explains the layers a value comes from.
+- A setting that is not in `CONFIG_FIELDS` is marked "not on the Config tab" below. Read its default in the named file or in `.env.example`.
 
 ---
 
@@ -24,8 +31,8 @@ Every value on this page was read from the code. If the code and this page disag
   ```
 
 - **Owner keys are generated on the server.** `POST /v1/owners` (`src/routes/owners.ts`) and `POST /v1/ghii` (`src/routes/ghii/register-login.ts`) call `generateKeyPair()`, store the public key on the owner record and return the private key once in the response. The node keeps no copy of the private key. `POST /v1/owners/:name/recover` (operator only) issues a new pair.
-- **Owner-key sign-in is deprecated.** `POST /v1/auth/token` with an owner name and a signature made with that key still signs the owner in (`src/routes/auth.ts`). RFC v4.0 deprecates it. `AIMEAT_OWNER_KEY_LOGIN` (`ownerKeyLogin` in `src/config-security.ts`) defaults to `true`; `false` turns it off, and the route then answers `410 OWNER_KEY_LOGIN_OFF` and points to `POST /v1/ghii/login`. Removal is planned for 4.0.0. An account with two-step sign-in armed is refused on this route even when it is on. New code signs owners in with a password session, never with the account key.
-- The node's own key pair signs JWTs and federation messages. `AIMEAT_KEY_PASSPHRASE` encrypts the node key on disk.
+- **Owner-key sign-in is deprecated.** `POST /v1/auth/token` with an owner name and a signature made with that key still signs the owner in (`src/routes/auth.ts`). RFC v4.0 deprecates it. `AIMEAT_OWNER_KEY_LOGIN` (`ownerKeyLogin` in `src/config-security.ts`) switches it on or off; when it is off, the route answers `410 OWNER_KEY_LOGIN_OFF` and points to `POST /v1/ghii/login`. Removal is planned for 4.0.0. An account with two-step sign-in armed is refused on this route even when it is on. New code signs owners in with a password session, never with the account key.
+- The node's own key pair signs JWTs and federation messages. `AIMEAT_KEY_PASSPHRASE` encrypts the node key on disk. It is read in `src/auth/node-keys.ts`, not in a config file, so it is not on the Config tab.
 
 ### JWT Tokens
 
@@ -44,22 +51,23 @@ Every value on this page was read from the code. If the code and this page disag
 - A missing `scopes` claim is written and read as `[]`, so an agent token that names no scopes can do nothing.
 - `issueJWT` throws `AccountDisabledError` (403 `ACCOUNT_DISABLED`) for a deactivated local owner.
 - `verifyJWT` reads every federated token as a visitor: role `federated` only, with its home GHII as `sub` and `owner`. See [identity-model.md](identity-model.md#a-visitor-from-another-node).
-- Lifetime: `AIMEAT_JWT_TTL`, in seconds, default `3600`.
+- Lifetime: `AIMEAT_JWT_TTL`, in seconds (`jwtTtlSeconds` in `src/config.ts`).
 - Revocation is stored per node and keyed by a hash of the token's signed header and claims (`tokenIdOf`), so every spelling of a revoked token is refused.
 
 ### TOTP 2FA
 
-Library: `otpauth`. Settings in `src/config-types-account-security.ts`:
+Library: `otpauth`. Each setting is read in `src/config-types-account-security.ts` (`accountSecurityDefaults`):
 
-| Env var | Default |
-|---|---|
-| `AIMEAT_TOTP_ENABLED` | `true` |
-| `AIMEAT_TOTP_ISSUER` | `AIMEAT` |
-| `AIMEAT_TOTP_PERIOD` | `30` (seconds) |
-| `AIMEAT_TOTP_WINDOW` | `1` |
-| `AIMEAT_TOTP_BACKUP_CODE_COUNT` | `10` |
-| `AIMEAT_TOTP_MAX_FAILED` | `5` |
-| `AIMEAT_TOTP_LOCKOUT_SECONDS` | `300` |
+| Env var | What it controls | Field |
+|---|---|---|
+| `AIMEAT_TOTP_ENABLED` | Whether people can turn on two-step sign-in | `totpEnabled` |
+| `AIMEAT_TOTP_ISSUER` | The issuer name an authenticator app shows | `totpIssuer` |
+| `AIMEAT_TOTP_PERIOD` | How long one code is valid, in seconds | `totpPeriod` |
+| `AIMEAT_TOTP_WINDOW` | How many periods before and after the current one are still accepted | `totpWindow` |
+| `AIMEAT_TOTP_BACKUP_CODE_COUNT` | How many single-use backup codes a person gets | `totpBackupCodeCount` |
+| `AIMEAT_TOTP_MAX_FAILED` | How many wrong codes pause the account's sign-in (`429 TOTP_LOCKED`, `src/services/password-check.ts`) | `totpMaxFailedAttempts` |
+| `AIMEAT_TOTP_LOCKOUT_SECONDS` | How long that pause lasts, in seconds | `totpLockoutSeconds` |
+| `AIMEAT_TOTP_ENCRYPTION_KEY` | The older name of the at-rest key; see below | `totpSecretEncryptionKey` |
 
 TOTP secrets are encrypted with the key described under [Encryption at rest](#encryption-at-rest).
 
@@ -96,20 +104,20 @@ The first real owner on a node gets the `operator` role (`POST /v1/owners` in `s
 
 ### SSRF Protection
 
-All outbound HTTP to a URL that is not a compile-time constant goes through `safeFetch` (invariant 3). Reference values, from `src/utils/url-validator.ts`:
+All outbound HTTP to a URL that is not a compile-time constant goes through `safeFetch` (invariant 3). The rules it applies, from `src/utils/url-validator.ts`:
 
 - Only `http:` and `https:` are allowed.
 - Blocked always: `localhost` names other than the loopback case below, private and reserved addresses (RFC 1918, link-local including cloud metadata at `169.254.169.254`, CGNAT), checked on the literal host and on every DNS record it resolves to.
 - Loopback (`localhost`, `::1`, `127.x`) is allowed only when `AIMEAT_ALLOW_PRIVATE_EGRESS=true`. `AIMEAT_DEV_MODE=true` is a back-compat alias.
 - `safeFetch` follows redirects by hand and validates every hop. On a redirect to another origin it drops credential headers.
 
-The egress default comes from the security posture (`src/config.ts`):
+The security posture decides the egress setting when nobody sets it. All three are read in `src/config.ts`, and none of them is on the Config tab:
 
-| Env var | Default |
-|---|---|
-| `AIMEAT_SECURITY_PROFILE` | `local` when the host of `AIMEAT_BASE_URL` is private or `AIMEAT_NODE_TYPE=personal`; `public` otherwise |
-| `AIMEAT_ALLOW_PRIVATE_EGRESS` | `true` on a `local` profile, `false` on `public` |
-| `AIMEAT_AI_PROVIDER_ALLOWLIST` | empty (any host) on both profiles |
+| Env var | What it controls | Field |
+|---|---|---|
+| `AIMEAT_SECURITY_PROFILE` | Whether the node runs as `local` or `public`. When unset, the node derives it from `AIMEAT_BASE_URL` and `AIMEAT_NODE_TYPE` | `securityProfile` |
+| `AIMEAT_ALLOW_PRIVATE_EGRESS` | Whether `safeFetch` may reach loopback addresses. When unset, the profile decides | `allowPrivateEgress` |
+| `AIMEAT_AI_PROVIDER_ALLOWLIST` | Which provider hosts a person's stored AI key may be sent to (`src/services/ai/call-guards.ts`). Empty means any host | `aiProviderAllowlist` |
 
 An explicit value always wins over the profile. What each knob is for, and what a public node should set: [security-development-dna.md §3](security-development-dna.md#3-security-posture-one-codebase-localhost-flexible--public-strict). The full config list: [b-config.md](../b-config.md).
 
@@ -136,7 +144,7 @@ Set in `src/server-bootstrap/static-files.ts` on every response, API and static:
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `SAMEORIGIN` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`, only when `AIMEAT_BASE_URL` starts with `https://` |
+| `Strict-Transport-Security` | A `max-age` with `includeSubDomains`, only when `AIMEAT_BASE_URL` starts with `https://` |
 
 ### CSP Policy
 
@@ -195,31 +203,26 @@ Helpers in `public/js/utils.js`, for the cases Preact does not cover:
 
 ### Configuration
 
-Middleware: `rateLimit()` in `src/middleware/rate-limit.ts`. The window is one second unless noted. The bucket key is the caller's `sub` when the request is authenticated, otherwise the client IP (IPv6 grouped by /64). Defaults from `src/config.ts`:
+Middleware: `rateLimit()` in `src/middleware/rate-limit.ts`. The bucket key is the caller's `sub` when the request is authenticated, otherwise the client IP (IPv6 grouped by /64). Each setting is the number of requests allowed per window, read in `src/config.ts` into `config.rateLimits`:
 
-| Env var | Default (requests per window) |
-|---|---|
-| `AIMEAT_RL_GLOBAL` | `300` |
-| `AIMEAT_RL_AUTH` | `20` |
-| `AIMEAT_RL_WORK` | `60` |
-| `AIMEAT_RL_MEMORY` | `120` |
-| `AIMEAT_RL_BOARDS` | `60` |
-| `AIMEAT_RL_OWNERS`, `_GHII`, `_FLAGS`, `_APPEALS`, `_ADMIN_SETUP`, `_FEDERATION`, `_CATALOGUE`, `_AUTH_CHALLENGE` | the value of `AIMEAT_RL_GLOBAL` |
-| `AIMEAT_RL_REGISTRATION_INVITES` | `5` per hour |
-| `AIMEAT_RL_OPENROUTER` | `30` per minute |
+| Env var | What it limits | Window | Field |
+|---|---|---|---|
+| `AIMEAT_RL_GLOBAL` | Every request, and the fallback for the per-area limits below that are not set | one second | `rlGlobal` |
+| `AIMEAT_RL_AUTH` | Token and sign-in routes | one second | `rlAuth` |
+| `AIMEAT_RL_WORK` | Work and task routes | one second | `rlWork` |
+| `AIMEAT_RL_MEMORY` | Memory routes | one second | `rlMemory` |
+| `AIMEAT_RL_BOARDS` | Board routes | one second | `rlBoards` |
+| `AIMEAT_RL_OWNERS` | Owner account routes | one second | `rlOwners` |
+| `AIMEAT_RL_REGISTRATION_INVITES` | Registration invitations sent. Not on the Config tab | one hour | `rateLimits.registrationInvites` |
+| `AIMEAT_RL_OPENROUTER` | Calls to the OpenRouter proxy. Not on the Config tab | one minute | `rateLimits.openrouter` |
 
-Sign-in attempts and password lockout have their own settings (`AIMEAT_LOGIN_RATE_LIMIT_MAX`, `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS`): see [b-config.md](../b-config.md).
+The other per-area limits (GHII, flags, appeals, admin setup, federation, catalogue, auth challenge) are `rate_limits.*` rows in `src/services/config-schema-rate-limits.ts`, each with its own environment variable.
+
+Sign-in attempts and password lockout have their own settings: `AIMEAT_LOGIN_RATE_LIMIT_MAX` (`loginRateLimitMax`) and `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (`passwordLockoutAttempts`), both in `src/config.ts`.
 
 ### Role Multipliers
 
-The limit is multiplied by the caller's role. The values are fixed in `src/config.ts` (`roleMultipliers`) and have no env var:
-
-```
-operator: 10
-owner: 2
-any other authenticated caller: 1
-no auth: 0.5
-```
+The limit is multiplied by a factor for the caller's role: operator, owner, any other authenticated caller, and no authentication each have their own. The factors are fixed in code (`roleMultipliers` in `src/config.ts`) and have no environment variable, so the source is the only place to read them.
 
 ---
 
@@ -229,7 +232,7 @@ no auth: 0.5
 
 - `encrypt(plaintext, key)` / `decrypt(data, key)`.
 - `encryptBound(plaintext, key, context)` / `decryptBound(data, key, context)` bind the ciphertext to a context string (AES-GCM additional data), so the value opens only where that context is named.
-- `getEncryptionKey(config)` reads `AIMEAT_ENCRYPTION_KEY`, then falls back to `AIMEAT_TOTP_ENCRYPTION_KEY`. The key is 64 hex characters (32 bytes); any other length gives `null`.
+- `getEncryptionKey(config)` reads `AIMEAT_ENCRYPTION_KEY` (`encryptionKey` in `src/config-types-account-security.ts`, not on the Config tab), then falls back to `AIMEAT_TOTP_ENCRYPTION_KEY` (`totpSecretEncryptionKey`). The key is 64 hex characters (32 bytes); any other length gives `null`.
 
 The rules for secrets (never returned, never logged, destination allowlisted) are invariant 7.
 
@@ -253,19 +256,19 @@ The rules for secrets (never returned, never logged, destination allowlisted) ar
 
 ## Extension Security
 
-Extensions run in a QuickJS sandbox compiled to WASM (`quickjs-emscripten`, `src/services/extension-runtime.ts`). The script has no file system and no Node.js APIs. Limits, from `src/config.ts`:
+Extensions run in a QuickJS sandbox compiled to WASM (`quickjs-emscripten`, `src/services/extension-runtime.ts`). The script has no file system and no Node.js APIs. Each limit is read in `src/config.ts`:
 
-| Setting | Env var | Default |
-|---------|---------|---------|
-| Extensions on | `AIMEAT_EXTENSIONS_ENABLED` | `true` |
-| Memory per action | `AIMEAT_EXT_MAX_MEMORY_MB` | `64` MB (a manifest may ask for less, not below 16) |
-| CPU timeout per action | `AIMEAT_EXT_TIMEOUT_MS` | `5000` ms (a manifest may ask for less, not below 1000) |
-| API calls per invocation | `AIMEAT_EXT_MAX_API_CALLS` | `500` |
-| Script size | `AIMEAT_EXT_MAX_CODE_SIZE_KB` | `256` KB |
-| Morsel debit per call | `AIMEAT_EXT_MAX_DEBIT` | `100` |
-| Installed on the node | `AIMEAT_EXT_MAX_INSTALLED` | `20` |
-| Installed per owner | `AIMEAT_MAX_EXTENSIONS_PER_OWNER` | `10` |
-| Who may install | `AIMEAT_EXT_INSTALL_ROLE` | `owner` (`operator` is the stricter choice) |
+| Env var | What it controls | Field |
+|---|---|---|
+| `AIMEAT_EXTENSIONS_ENABLED` | Whether extensions run on this node at all | `extensionsEnabled` |
+| `AIMEAT_EXT_MAX_MEMORY_MB` | Memory one action may use. A manifest may ask for less, down to a floor fixed in code | `extensionMaxMemoryMb` |
+| `AIMEAT_EXT_TIMEOUT_MS` | CPU time one action may use. A manifest may ask for less, down to a floor fixed in code | `extensionTimeoutMs` |
+| `AIMEAT_EXT_MAX_API_CALLS` | `ctx` API calls one invocation may make | `extensionMaxApiCalls` |
+| `AIMEAT_EXT_MAX_CODE_SIZE_KB` | The largest script an action may have | `extensionMaxCodeSizeKb` |
+| `AIMEAT_EXT_MAX_DEBIT` | The most morsels one call may debit. Not on the Config tab | `extensionMaxDebitPerCall` |
+| `AIMEAT_EXT_MAX_INSTALLED` | Extensions installed on the node | `extensionMaxInstalled` |
+| `AIMEAT_MAX_EXTENSIONS_PER_OWNER` | Extensions one owner may install | `maxExtensionsPerOwner` |
+| `AIMEAT_EXT_INSTALL_ROLE` | Who may install: `owner` or the stricter `operator` | `extInstallRole` |
 
 Network access goes through `ctx.fetch` only (`src/services/extension-ctx.ts`). It refuses unless the manifest declares the `network` capability, reaches only the hosts the manifest lists when it lists any, and sends every request through `safeFetch`, so the SSRF rules above apply.
 
