@@ -20,6 +20,8 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   v1.5.0 — 2026-10-11 — Delete and restore tell a private record's change to its owner's streams
+ *     only; both were global events.
  *   v1.4.0 — 2026-10-09 — Delete and restore refuse a credential record (secret-records.ts) for every
  *     caller, the owner in person included: 403 SECRET_RECORD naming the record's own route (secrets
  *     audit 2026-10-09, item 10).
@@ -35,7 +37,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
+import { emitRecordChange } from './event-bus.js';
 import { checkDeleteGuard } from './write-guards.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { isServiceOwnedKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
@@ -164,7 +166,13 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
   const refused = await binRefusal(deps, req, 'delete');
   if (refused) return refused;
 
-  const found = await locate(deps, req, async gaii => !!(await deps.storage.getMemory(gaii, req.key)));
+  // Its visibility is read on the way, because it decides who is told the record is gone.
+  let visibility: string | undefined;
+  const found = await locate(deps, req, async gaii => {
+    const record = await deps.storage.getMemory(gaii, req.key);
+    if (record) visibility = record.visibility;
+    return !!record;
+  });
   if (!found) {
     return { ok: false, code: 'NOT_FOUND', message: `Memory key not found: ${req.key}` };
   }
@@ -174,8 +182,9 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
   }
   // THE VIEW LEARNS FROM HERE, not from each door. The REST route emitted and the MCP tools did
   // not, which is the drift the SSE parity gate exists to catch: the same capability, and only one
-  // of its doors told the screen anything.
-  emitChange('memory');
+  // of its doors told the screen anything. A record only its owner read is told to that owner's
+  // streams alone (event-bus.ts emitRecordChange).
+  emitRecordChange('memory', found, visibility);
   const graceDays = deps.config.memoryDeleteGraceDays;
   return {
     ok: true, key: req.key, ownerGaii: found, graceDays,
@@ -197,7 +206,12 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
   if (refused) return refused;
 
   // The bin is invisible to getMemory by design, so "is it in there" is a bin read, not a key read.
-  const inBin = async (gaii: string) => (await deps.storage.listDeletedMemory(gaii)).some(r => r.key === req.key);
+  let visibility: string | undefined;
+  const inBin = async (gaii: string) => {
+    const record = (await deps.storage.listDeletedMemory(gaii)).find(r => r.key === req.key);
+    if (record) visibility = record.visibility;
+    return !!record;
+  };
   const found = await locate(deps, req, inBin);
   if (!found || !(await deps.storage.restoreMemory(found, req.key))) {
     return {
@@ -205,6 +219,6 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
       message: 'There is nothing of that name waiting to be put back. Either it was never deleted, or it has already been removed for good.',
     };
   }
-  emitChange('memory');
+  emitRecordChange('memory', found, visibility);
   return { ok: true, key: req.key, ownerGaii: found, restorableUntil: null, graceDays: deps.config.memoryDeleteGraceDays };
 }

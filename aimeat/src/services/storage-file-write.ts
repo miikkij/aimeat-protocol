@@ -36,6 +36,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The `files` and `memory` changes of a file only its owner reads go to
+ *     that owner's streams (event-bus.ts emitRecordChange). Both were global events.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8, unit storage-files). Collapses
  *     POST /v1/storage and aimeat_storage_upload onto one write.
  *   v1.1.0 — 2026-08-15 — removeStorageFile(): the delete, which had one door (DELETE /v1/storage)
@@ -58,7 +60,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { checkStorageQuota, chargeOverage } from './quota.js';
 import { generateUploadToken, buildUploadMeta } from './upload-token.js';
-import { emitChange } from './event-bus.js';
+import { emitRecordChange } from './event-bus.js';
 import { isAnonymousGaii } from '../routes/memory/shared.js';
 import {
     provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, contentHashOf,
@@ -349,8 +351,11 @@ export async function writeStorageFile(
     // Both views: a stored file appears in the files list and counts against the byte budget the
     // memory view renders. The tool emitted both and POST /v1/storage emitted only 'files', so an
     // upload by an agent moved the memory view and the identical upload from the browser did not.
-    emitChange('files');
-    emitChange('memory');
+    // A file only its owner reads is told to that owner's streams (event-bus.ts emitRecordChange).
+    // The write does not read what the key held before, so a file it replaced as private is not
+    // announced to those who could read the earlier one.
+    emitRecordChange('files', ownerGaii, visibility);
+    emitRecordChange('memory', ownerGaii, visibility);
 
     return { ok: true, file, overageMorsels: quota.overageMorsels };
 }
@@ -413,8 +418,8 @@ export async function removeStorageFile(
 
     // Both views, for the same reason the write emits both: the file leaves the files list AND frees
     // bytes in the budget the memory view renders. The route emitted only 'files'.
-    emitChange('files');
-    emitChange('memory');
+    emitRecordChange('files', ownerGaii, existing.visibility);
+    emitRecordChange('memory', ownerGaii, existing.visibility);
 
     return {
         ok: true, key, size: existing.size, mimeType: existing.mimeType, visibility: existing.visibility,

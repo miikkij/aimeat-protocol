@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.5 — 2026-10-11 — The four `memory` changes are scoped to the owner when every record written or deleted is one only its owner reads (event-bus.ts emitRecordChange).
  *   v1.11.4 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.11.3 — 2026-10-05 — The bundle passes a file's workspace binding to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.11.2 — 2026-10-05 — discover passes the config, so the listing leaves out an organism record
@@ -52,7 +53,7 @@ import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js
 import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
-import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
+import { emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
 import { isServerWrittenKey, isServiceOwnedKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -178,7 +179,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
     }
     if (result.created > 0) emitResourceListChanged(gaii);
-    if (result.created + result.updated > 0) emitChange('memory');
+    // Scoped by what was WRITTEN (event-bus.ts emitRecordChange): a batch of records only their owner
+    // reads is told to that owner's streams. A batch does not read what each key held before, so a
+    // record it moved from public to private is not announced to those who could read it until now.
+    if (result.created + result.updated > 0) emitRecordChange('memory', gaii, ...items.map(i => i.visibility));
     stats?.increment('memory_writes');
 
     const failed = [...preFailed.map(f => ({ key: f.key, reason: f.reason })),
@@ -366,7 +370,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     emitResourceListChanged(gaii);
-    emitChange('memory');
+    emitRecordChange('memory', gaii, ...items.map(i => i.visibility));
     res.json(success(config.nodeId, {
       created: result.created,
       updated: result.updated,
@@ -419,15 +423,17 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       : await storage.listMemory(gaii, { prefix });
 
     let deleted = 0;
+    const deletedVisibility: string[] = [];
     for (const r of records) {
       if (keys && !keys.has(r.key)) continue;
       if (isServiceOwnedKey(r.key)) continue;
       if (await storage.deleteMemory(r.ownerGaii, r.key)) {
         deleted++;
+        deletedVisibility.push(r.visibility);
         emitResourceUpdated(r.ownerGaii, `aimeat://memory/${encodeURIComponent(r.key)}`);
       }
     }
-    if (deleted > 0) { emitResourceListChanged(gaii); emitChange('memory'); }
+    if (deleted > 0) { emitResourceListChanged(gaii); emitRecordChange('memory', gaii, ...deletedVisibility); }
     res.json(success(config.nodeId, { deleted }));
   });
 
@@ -651,6 +657,6 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       version: newVersion,
       ...(carried ? { classification: carried } : {}),
     }));
-    emitChange('memory');
+    emitRecordChange('memory', callerGaii, (targetVis as string) || 'private', ...(existing ? [existing.visibility] : []));
   });
 }
