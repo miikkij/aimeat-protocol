@@ -55,16 +55,16 @@ An ephemeral SQLite node uses `AIMEAT_STORAGE=sqlite` and
 `AIMEAT_SQLITE_PATH=:memory:`. The old `AIMEAT_DB_PATH` examples did not
 configure SQLite. The CLI equivalent is `--db-path`.
 
-Claim a free port and initialize the worktree's test environments from `aimeat/`:
+Initialize the checkout's test environments from `aimeat/`:
 
-```powershell
-$env:AIMEAT_E2E_PORT = '<port from your claim>'
+```bash
 pnpm test:env:init
 ```
 
-This creates `.env.test.sqlite` and `.env.test.postgres-kysely`.
-Each session uses its own database and port. Test runners empty their database;
-copying another session's configuration can erase its test data.
+This creates `.env.test.sqlite` and `.env.test.postgres-kysely` with a port derived from the
+checkout's folder name and a Postgres database of its own. Test runners empty their database, so
+copying another checkout's configuration can erase its test data. A maintainer session passes the
+port from its Lifecycle Central claim instead: `AIMEAT_E2E_PORT=<port> pnpm test:env:init`.
 
 ## Personal-node hosting settings
 

@@ -1,14 +1,15 @@
 # Development guides
 
-Start with [CLAUDE.md](../../CLAUDE.md) and the applicable
-[path rules](../../.claude/rules). They define coordination, worktrees, approval
-boundaries and completion requirements.
+Start with [CONTRIBUTING.md](../../CONTRIBUTING.md) for the path from a fresh clone to a pull
+request. [CLAUDE.md](../../CLAUDE.md) and the applicable [path rules](../../.claude/rules) are
+the rules the maintainers work by: approval boundaries and completion requirements, and the
+coordination their own sessions follow.
 
 ## Find a guide
 
 | Task | Guide |
 |---|---|
-| Set up an isolated session | [Getting started](getting-started.md) |
+| Set up a checkout | [Getting started](getting-started.md) |
 | Find a subsystem | [Architecture](architecture.md) |
 | Resolve the caller and owner | [Identity model](identity-model.md) |
 | Preserve access boundaries | [Security development](security-development-dna.md), [security practices](security.md) |
@@ -26,12 +27,13 @@ boundaries and completion requirements.
 
 ## Verification
 
-Use a private `pnpm sandbox` for interactive checks. Initialize isolated test
-environments with `pnpm test:env:init` and the port in your Lifecycle Central claim.
+Use a private `pnpm sandbox` for interactive checks. Initialize the checkout's own
+test environment with `pnpm test:env:init` (a maintainer session passes the port
+from its claim as `AIMEAT_E2E_PORT`).
 
 Run the targeted suites the change requires and `pnpm gate` once on the finished
-change. The full E2E sweep requires the developer's approval. Follow CLAUDE.md for
-integration to main and check CI on the pushed commit.
+change. A green gate is what "done" needs; do not wait for GitHub CI. The full E2E
+sweep requires the developer's approval.
 
 The actual checks are defined in
 [check-registry.mjs](../../aimeat/scripts/lib/check-registry.mjs),
