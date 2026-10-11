@@ -33,7 +33,7 @@ Defaults below come from [config.ts](../aimeat/src/config.ts). See the
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AIMEAT_CROSS_FEDERATION_ENABLED` | `false` | Cross-federation feature flag |
+| `AIMEAT_CROSS_FEDERATION_ENABLED` | `true` | Cross-federation feature flag. On unless set to `false`. |
 | `AIMEAT_MAX_GENESIS_PEERS` | `10` | Genesis peer limit |
 | `AIMEAT_GENESIS_SYNC_INTERVAL_HOURS` | `6` | Catalogue sync interval |
 | `AIMEAT_FEDERATION_TIMEOUT_MS` | `10000` | Peer request timeout |

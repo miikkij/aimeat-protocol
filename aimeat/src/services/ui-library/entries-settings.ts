@@ -8,6 +8,7 @@
  * @structure SETTINGS_ENTRIES
  * @usage import { SETTINGS_ENTRIES } from './entries-settings.js';
  * @version-history
+ *   v1.90.0 — 2026-10-11 — PageSection ends: a section that shows where it stops (the home's agent pages).
  *   v1.89.0 — 2026-09-27 — What appcat added: the Rail's ink tone; the crumb sheet's dashed, inline and file
  *     Action tones; PageHead line, low, thing and picture; PageSection list, chapter and part, and its sheet's
  *     Actions chapter, apart and tight and Note lead chapter and record.
@@ -273,13 +274,14 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'An open section of a page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body. A list\'s headline is the dark slab across the column with the count in the slab\'s letters and can fold the list; a chapter of a long page of one thing has its coral "03 / 19" over the slab, its doors on the slab and much air above; a part of a dialog\'s body has a smaller slab title.',
         module: '/components/PageSection.js', sheet: '/css/components/page-section.css',
         data: {
-            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, group, chapter, list, onFold, folded, foldLabel, foot, spaced, part, children })',
+            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, children })',
             fields: {
                 id: 'the section\'s anchor, which the rail scrolls to', num: 'the small number beside the title', title: 'the section\'s name',
                 count: 'a count instead of the number; on a list, the count on the slab', doors: 'the section\'s actions at the right of its head (Action links); on a chapter, on the slab in the slab\'s own colour',
                 first: 'the first section under the page head: no rule on top; on a chapter or a list, less air above', plain: 'no head at all: the rule on top (none with first) and the body; with list, the list\'s air and no rule (the place of a list before its headline shows)',
                 band: 'the title\'s dark band spans the whole column, as the classic pages drew it (P&L, Nodes, Organisms, Notebook, Federation, Chat sessions)',
                 group: 'a section that holds a group of sections: a smaller band across the column',
+                ends: 'with the default, band and group cuts: the section shows where it stops, with more air under its body and before what follows (32px and 46px)',
                 chapter: 'a chapter of a long page of one thing: the words over its slab in coral typewriter ("03 / 19"), the slab across the column, 112px of air above it',
                 list: 'the headline over a list of things: the slab across the column with the count in the slab\'s own letters, 48px of air above it',
                 'onFold, folded, foldLabel': 'with list: a press on the headline or its arrow folds the list; folded hides it (the arrow turns and says aria-expanded); foldLabel names the arrow',
@@ -294,6 +296,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'plain', prop: 'plain', when: 'a box that stands as a section of its own without a title (a member\'s "Leave" on an organism\'s settings)' },
             { name: 'band', class: 'og-sec-h--band', prop: 'band', when: 'the title\'s band across the whole column (the classic pages)' },
             { name: 'group', class: 'og-sec--group', prop: 'group', when: 'a section that holds a group of sections, its band smaller and across the column (the admin Config domains)' },
+            { name: 'ends', class: 'og-sec--ends', prop: 'ends', when: 'several sections follow each other on one long page and each must show where it stops (the home\'s agent page: "Give it a task", "Talk to it", "Latest work")' },
             { name: 'split', class: 'og-split', prop: 'Split (Layout.js)', when: 'a part of a section set off by a hairline: its last actions, a group inside it' },
             { name: 'side split', class: 'og-split--side', prop: 'Split side (Layout.js)', when: 'the line at the part\'s start and the part indented: a quieter side door' },
             { name: 'list', class: 'og-sec--list', prop: 'list', when: 'the headline over a list of things with its count on the slab (the app catalogue\'s "Your apps · 12")' },

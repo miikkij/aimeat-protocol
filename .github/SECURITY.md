@@ -28,5 +28,7 @@ This policy covers the AIMEAT reference implementation (`aimeat/` directory) and
 
 | Version | Supported |
 |---------|-----------|
-| 1.2.x   | Yes       |
-| < 1.2   | No        |
+| 3.26.x (latest) | Yes |
+| < 3.26  | No        |
+
+Security fixes go into the latest release line only. Update to the newest 3.26.x release before you report, if you can.

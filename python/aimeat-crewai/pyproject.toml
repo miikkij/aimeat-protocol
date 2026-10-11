@@ -65,7 +65,7 @@ Homepage = "https://aimeat.io"
 Repository = "https://github.com/miikkij/aimeat-protocol"
 Documentation = "https://github.com/miikkij/aimeat-protocol/tree/main/python/aimeat-crewai"
 Issues = "https://github.com/miikkij/aimeat-protocol/issues"
-Changelog = "https://github.com/miikkij/aimeat-protocol/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/miikkij/aimeat-protocol/blob/main/python/aimeat-crewai/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aimeat_crewai"]

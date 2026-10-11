@@ -5,10 +5,13 @@
  * @description A section of a Settings & Controls tab page: the section title (poster.css
  *   .poster-section-title) with a small mono count or number beside it, the doors on the right, and
  *   the body. Its look is css/components/page-section.css; the catalogue entry is `page-section`.
- * @structure PageSection({ id, num, title, count, doors, first, plain, children })
+ * @structure PageSection({ id, num, title, count, doors, first, plain, band, group, ends, children })
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-10-11 — `ends` (with the default, `band` and `group` cuts): the section shows where it
+ *     stops, more air under its body and before what follows (Jouni, 2026-10-11: sections on a
+ *     long page ran into each other); additive, first used by the home's agent pages.
  *   2026-09-27 — `foot` and `spaced` (list only): the grey line under a list and 6px under its
  *     headline, the old app catalogue's own list; additive, appcat parity.
  *   2026-09-27 — `part`: a part of a dialog's body (section.poster-section with its slab title, which
@@ -34,10 +37,10 @@ const html = htm.bind(h);
 /**
  * `count` wins over `num` beside the title; `first` drops the rule on top.
  * @param {{ id?: string, num?: any, title: any, count?: any, doors?: any, first?: boolean, plain?: boolean,
- *   band?: boolean, group?: boolean, chapter?: any, list?: boolean, onFold?: (e: Event) => void, folded?: boolean,
+ *   band?: boolean, group?: boolean, ends?: boolean, chapter?: any, list?: boolean, onFold?: (e: Event) => void, folded?: boolean,
  *   foldLabel?: string, foot?: any, spaced?: boolean, part?: boolean, children?: any }} props
  */
-export function PageSection({ id, num, title, count, doors, first, plain, band, group, chapter, list, onFold, folded, foldLabel, foot, spaced, part, children }) {
+export function PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, children }) {
   // part (added by appcat's dialogs, parity): a part of a dialog's body, the old app catalogue's
   // section.poster-section with its slab title, which the dialog's own sheet sizes and spaces
   // (dialog.css: the slab a size smaller, 1rem under it, 2rem between parts).
@@ -84,8 +87,10 @@ export function PageSection({ id, num, title, count, doors, first, plain, band, 
   }
   // band: the headline's dark band spans the whole column, as the classic pages drew it on main
   // (P&L, Nodes, Organisms, Notebook, Living documents, Federation, Chat sessions).
+  // ends (added for the home's agent pages): the section shows where it stops. There is more air
+  // under its body and before what follows, so two sections on a long page do not read as one.
   return html`
-    <section class=${`og-sec${first ? ' og-sec--first' : ''}${group ? ' og-sec--group' : ''}`} id=${id}>
+    <section class=${`og-sec${first ? ' og-sec--first' : ''}${group ? ' og-sec--group' : ''}${ends ? ' og-sec--ends' : ''}`} id=${id}>
       <div class=${band || group ? 'og-sec-h og-sec-h--band' : 'og-sec-h'}>
         <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${count}</small>` : html`<small>${num}</small>`}</h2>
         ${doors ? html`<div class="og-doors">${doors}</div>` : null}
