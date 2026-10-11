@@ -627,6 +627,35 @@ await test('Provider lineage reflects the app-tool consumer (calls + spend)', as
   assert(r.body.data.consumers.some((c: any) => c.calls >= 2), `app-tool consumer lineage: ${JSON.stringify(r.body.data.consumers)}`);
 });
 
+await test('A contract holder who runs out of morsels hears 402 INSUFFICIENT_MORSELS naming the daily allowance and the pacing pack on sale', async () => {
+  const set = (morsels: number, price: number) => json('/v1/admin/config', { method: 'PUT', headers: auth(operator.token),
+    body: JSON.stringify({ changes: [
+      { path: 'morsel_policy.pacing_pack_morsels', value: morsels },
+      { path: 'morsel_policy.pacing_pack_price', value: price },
+      { path: 'morsel_policy.pacing_pack_currency', value: 'EUR' },
+    ] }) });
+  const on = await set(50, 2_000_000);
+  assert(on.status === 200 && !on.body?.data?.errors, `pack on sale: ${on.status} ${JSON.stringify(on.body?.error ?? on.body?.data?.errors)}`);
+  try {
+    const broke = await setupOwner('broke');
+    const c = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(broke.token),
+      body: JSON.stringify({ offering_id: appToolOfferingId, cap_units: 100_000 }) });
+    assert(c.status === 201, `contract ${c.status}: ${JSON.stringify(c.body?.error)}`);
+    let last: any = null;
+    for (let i = 0; i < 40; i++) {
+      last = await callTool(broke.token);
+      if (last.status !== 200) break;
+    }
+    assert(last.status === 402 && last.body?.error?.code === 'INSUFFICIENT_MORSELS', `ran out: ${last.status} ${JSON.stringify(last.body?.error)}`);
+    const msg = String(last.body.error.message);
+    assert(/daily allowance/i.test(msg) && /50 morsels/.test(msg) && /2\.00 EUR/.test(msg), `the sentence names the allowance and the pack: ${msg}`);
+    const topup = (last.body.accepts ?? []).find((a: any) => a.scheme === 'aimeat-morsel-topup');
+    assert(topup?.checkout_item?.kind === 'pacing-pack' && topup.price?.amount === 2_000_000, `accepts[] carries the pack: ${JSON.stringify(topup)}`);
+  } finally {
+    await set(0, 0);
+  }
+});
+
 await test('FREEZE: re-list with an UNCHANGED interface is idempotent (still v1)', async () => {
   const r = await listAppTool(provider.token, { tool: 'getbrief', usage_terms: validTerms });
   assert(r.status === 201 && r.body.data.offering.surface.ifaceVersion === 1, `unchanged relist should stay v1, got ${r.body.data.offering.surface?.ifaceVersion}`);

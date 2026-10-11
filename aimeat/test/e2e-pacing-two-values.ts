@@ -16,6 +16,8 @@
  *   (f) ACP, UCP and the feed show money only
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=pacing-two-values
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The default node: before any setting changes, a 10-morsel use burns at least
+ *     1 (AIMEAT_BURN_RATE, 0.10), and an ordinary buyer's tracking code does not say "granted".
  *   v1.0.0 — 2026-10-11 — Initial (wish-tarjouksella-rahahinta-ja-tahdistus-morselhinnat-tahdistukse).
  */
 import * as ed from '@noble/ed25519';
@@ -73,6 +75,30 @@ const op = await setupOwner('op');
 const seller = await setupOwner('sel');
 const buyer = await setupOwner('buy');
 let vendorGaii = '';
+
+// Before any setting is changed: the node's own default burn rate (AIMEAT_BURN_RATE, 0.10) burns part
+// of every pacing charge, as the ruling says. Part burns, the operator share stays, the rest is earned.
+await test('default node: a 10-morsel use burns at least 1, the operator takes its share, the provider earns the rest', async () => {
+  const ag = await json('/v1/agents', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ name: 'deflt', owner: seller.name, capabilities: ['social'] }) });
+  assert(ag.status === 201, `agent ${ag.status}`);
+  const pub = await json('/v1/agents/deflt/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ offers: [
+    { id: 'ten', title: 'Paced ten', ask: 'Send text.', deliverable, tollMorsels: 10, visibility: 'public' },
+  ] }) });
+  assert(pub.status === 200, `offers ${pub.status}`);
+  const before = await balance(buyer.token);
+  const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ agent: `deflt#${seller.name}@${NODE_ID}`, offer_id: 'ten' }] }) });
+  assert(open.status === 201, `open ${open.status}`);
+  const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+  assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
+  const p = done.body.data.session.receipt.pacing;
+  assert(p.morsels === 10 && p.burned >= 1 && p.burned + p.fee + p.providerEarned === 10, `the default burns part: ${JSON.stringify(p)}`);
+  // An ordinary buyer pays for themselves: the tracking code does not say "granted".
+  assert(String(p.trackingCode).startsWith('pacing:checkout:'), `tracking code: ${p.trackingCode}`);
+  assert(await balance(buyer.token) === before - 10, 'the buyer pays the 10 morsels');
+  const b = await rows(buyer.token, p.trackingCode);
+  assert(sumOf(b, 'pacing_charge') + sumOf(b, 'pacing_burn') === -10 && sumOf(b, 'pacing_burn') <= -1, `buyer rows: ${JSON.stringify(b)}`);
+  assert(sumOf(await rows(seller.token, p.trackingCode), 'pacing_earn') === p.providerEarned, 'the provider row');
+});
 
 await test('setup: the operator sets the burn rate, the fee and a pacing pack (50 morsels for 2 EUR)', async () => {
   assert(op.roles.includes('operator'), `the first owner is the operator: ${JSON.stringify(op.roles)}`);

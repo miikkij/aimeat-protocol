@@ -5,6 +5,42 @@
       "date": "2026-10-11",
       "kind": "feature",
       "title": {
+        "en": "Every offer has a money price and a pacing amount",
+        "fi": "Jokaisella tarjouksella on rahahinta ja tahdistus"
+      },
+      "body": {
+        "en": "Offers, app tools, apps and agent work now carry two values. The money price is optional: an item without one is free, and it stays free. The pacing amount is the number of morsels one use takes from your balance, so nobody can use a service faster than their morsels allow. Part of those morsels burns, the operator keeps the share it had before, and the rest goes to the person who offers the item. A morsel is never a price and pays for nothing. When your morsels run out, the daily allowance gives you more, and when the operator sells a pacing pack, you can buy more morsels with money. Items that had a price in morsels kept that number as their pacing amount, so nothing disappeared.",
+        "fi": "Tarjouksilla, sovellusten työkaluilla, sovelluksilla ja agenttien töillä on nyt kaksi arvoa. Rahahinta on vapaaehtoinen: tuote, jolla sitä ei ole, on maksuton ja pysyy maksuttomana. Tahdistus kertoo, montako murusta yksi käyttökerta ottaa saldostasi. Siksi kukaan ei voi käyttää palvelua nopeammin kuin hänen murusensa riittävät. Osa murusista poltetaan, palvelun ylläpitäjä saa saman osuuden kuin ennenkin, ja loput saa se, joka tarjoaa tuotteen. Murunen ei ole koskaan hinta, eikä sillä makseta mitään. Kun murusesi loppuvat, saat lisää päiväkiintiöstä. Jos ylläpitäjä myy tahdistuspaketteja, voit myös ostaa murusia rahalla. Tuotteet, joilla oli hinta murusina, saivat saman luvun tahdistuksekseen, joten mitään ei kadonnut."
+      }
+    },
+    {
+      "date": "2026-10-11",
+      "kind": "feature",
+      "title": {
+        "en": "Your AI finds this service's guidance as built-in skills, and the connect guide covers 15 tools",
+        "fi": "Tekoälysi löytää palvelun ohjeet valmiina taitoina, ja yhdistämisohje kattaa 15 työkalua"
+      },
+      "body": {
+        "en": "Every AIMEAT now ships its guidance for AIs as built-in skills, so your AI can read them as soon as it connects: how to build an agent that works inside a workspace, how an app uses AI, and how to put recurring work on a schedule. The guide to connecting your AI covers 15 tools, each checked against its maker's own pages, among them Mistral, LM Studio, Gemini CLI, Perplexity, OpenClaw and Copilot Studio.",
+        "fi": "Jokaisessa AIMEATissa on nyt tekoälyille tarkoitetut ohjeet valmiina taitoina, joten tekoälysi voi lukea ne heti, kun se on yhdistetty. Ohjeet kertovat, miten tehdään työtilassa työskentelevä agentti, miten sovellus käyttää tekoälyä ja miten toistuva työ ajastetaan. Ohje tekoälyn yhdistämisestä kattaa 15 työkalua, ja jokainen on tarkistettu valmistajan omilta sivuilta. Mukana ovat esimerkiksi Mistral, LM Studio, Gemini CLI, Perplexity, OpenClaw ja Copilot Studio."
+      }
+    },
+    {
+      "date": "2026-10-11",
+      "kind": "fix",
+      "title": {
+        "en": "Shopping AIs see money prices only, and service templates keep the limits they state",
+        "fi": "Ostoksia tekevät tekoälyt näkevät vain rahahinnat, ja palvelumallit pitävät lupaamansa rajat"
+      },
+      "body": {
+        "en": "Shopping AIs that read this service's product list, or buy through its ACP and UCP checkouts, now see money prices only, and an item without a money price is not offered to them. The service templates now enforce the limits they state, such as the shortest title. Records that describe themselves point at a description you can open, and your identity credential names this service's own vocabulary.",
+        "fi": "Ostoksia tekevät tekoälyt, jotka lukevat palvelun tuotelistaa tai ostavat sen ACP- ja UCP-kassoilla, näkevät nyt vain rahahinnat. Tuotetta, jolla ei ole rahahintaa, ei tarjota niille. Palvelumallit valvovat nyt rajat, jotka ne lupaavat, esimerkiksi otsikon vähimmäispituuden. Itsensä kuvaavat tietueet osoittavat kuvaukseen, jonka voit avata, ja henkilöllisyystodisteesi käyttää tämän palvelun omaa sanastoa."
+      }
+    },
+    {
+      "date": "2026-10-11",
+      "kind": "feature",
+      "title": {
         "en": "Make an agent from your home page, and choose the computer that runs it",
         "fi": "Tee agentti kotisivultasi ja valitse tietokone, joka ajaa sitä"
       },
