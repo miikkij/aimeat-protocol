@@ -4,6 +4,8 @@
  *   sending, the directory and matching runs, push templates, CSM and MSM, genesis peers, and the
  *   node config doors mounted alongside them.
  * @version-history
+ *   v1.7.0 — 2026-10-11 — A number above a recommended range is accepted and applied, and the schema
+ *     says which ranges are recommendations and which are limits (rangeKind).
  *   v1.6.0 — 2026-10-06 — site.store_soon_code reaches the page's site links with "soon" and leaves with
  *     the restore; a code with a space, over 40 characters or with markup is refused.
  *   v1.5.0 — 2026-10-06 — The store status: site.store_status=soon and a store note reach the page's
@@ -546,6 +548,7 @@ await test('PUT /v1/admin/config \u2192 a number above its stated range is refus
     const { body: getBody } = await json('/v1/admin/config', authed());
     const entry = getBody.data.schema[path];
     assert(entry && entry.range === '1-100', `schema range for ${path}: ${JSON.stringify(entry)}`);
+    assert(entry.rangeKind === 'limit', `an enforced range says it is a limit: ${JSON.stringify(entry)}`);
     const original = entry.value;
     const put = (value: unknown) => json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }) }));
     try {
@@ -560,6 +563,37 @@ await test('PUT /v1/admin/config \u2192 a number above its stated range is refus
         assert(atMax.body.data.applied?.[0]?.new_value === 100, `applied ${JSON.stringify(atMax.body.data)}`);
     } finally {
         await put(original);
+    }
+});
+
+await test('PUT /v1/admin/config \u2192 a number above a recommended range is accepted and applied, below the minimum is refused', async () => {
+    // Jouni, 2026-10-11: a range is a recommended range, and a larger number is accepted. One quota
+    // whose check never had a maximum, and one that refused above 100 until this change.
+    const { body: getBody } = await json('/v1/admin/config', authed());
+    const cases: Array<[string, string, number]> = [
+        ['quota.memory_max_keys_per_agent', '1-100000', 10_000_000],
+        ['extensions.max_installed', '1-100', 5000],
+    ];
+    for (const [path, range, big] of cases) {
+        const entry = getBody.data.schema[path];
+        assert(entry && entry.range === range, `schema range for ${path}: ${JSON.stringify(entry)}`);
+        assert(entry.rangeKind === 'recommended', `${path} says its range is a recommendation: ${JSON.stringify(entry)}`);
+        const original = entry.value;
+        const put = (value: unknown) => json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }) }));
+        try {
+            const above = await put(big);
+            assert(above.status === 200, `${path}=${big} must be accepted, got ${above.status}: ${JSON.stringify(above.body)}`);
+            assert(above.body.data.applied?.[0]?.new_value === big, `applied ${JSON.stringify(above.body.data)}`);
+            const after = (await json('/v1/admin/config', authed())).body.data.schema[path].value;
+            assert(after === big, `the node runs with the larger value: ${after}`);
+            const below = await put(0);
+            assert(below.status === 400, `${path}=0 is below the minimum and must be refused, got ${below.status}: ${JSON.stringify(below.body)}`);
+            assert(JSON.stringify(below.body).includes(`Invalid value for ${path} (the minimum is 1; ${range} is the recommended range)`), `the refusal names the minimum: ${JSON.stringify(below.body)}`);
+            const kept = (await json('/v1/admin/config', authed())).body.data.schema[path].value;
+            assert(kept === big, `a refused value must not be applied: ${kept}`);
+        } finally {
+            await put(original);
+        }
     }
 });
 

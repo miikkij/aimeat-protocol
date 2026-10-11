@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description The value checks that several config-schema.ts rows share. A pure move out of
  *   config-schema.ts (max-file-lines); the rows import them from here and behave as before.
- * @structure isJsonObject · isEmptyOrHttpUrl · oneOf · numericRangeOf · withinStatedRange · isContactList
+ * @structure isJsonObject · isEmptyOrHttpUrl · oneOf · numericRangeOf · withinStatedRange · rangeKindOf · isContactList
  * @version-history
+ *   v1.3.0 — 2026-10-11 — rangeKindOf(): a number row's range is a limit or a recommendation, read
+ *     from what the write path accepts.
  *   v1.2.0 — 2026-10-02 — numericRangeOf() / withinStatedRange(): a number row's `range` hint read as
  *     bounds, and RANGE_ENFORCED: the four settings whose range the config write path enforces.
  *   v1.1.0 — 2026-09-29 — oneOf(): a fixed-set string row's check and its `choices` from one list.
@@ -55,10 +57,9 @@ export function numericRangeOf(field: { type: string; range?: string }): { min: 
 
 /**
  * The settings whose stated maximum the write path enforces. Jouni approved these four on
- * 2026-10-02 (their help texts give the range as a limit). Enforcing every row's range would make
- * 76 more settings refuse a value above a maximum that may be only a display hint (quota.memory_mb
- * 1-10000, every rate_limits.* 1-10000), and production's stored values were not probed; that wider
- * step is the developer's decision, recorded in Platform Development Notes doc-mur7mzog0dzg.
+ * 2026-10-02 (their help texts give the range as a limit). The wider step, enforcing every row's
+ * range, was decided the other way on 2026-10-11: a range is a recommendation unless the row's own
+ * `validate` or this set makes it a limit, and the schema says which (rangeKindOf).
  */
 export const RANGE_ENFORCED: ReadonlySet<string> = new Set([
   'morsel_policy.daily_allowance_cap',
@@ -78,6 +79,24 @@ export function withinStatedRange(field: { type: string; range?: string }, value
   const r = numericRangeOf(field);
   if (!r) return true;
   return typeof value === 'number' && value >= r.min && value <= r.max;
+}
+
+/**
+ * Whether a number row's `range` is a limit or a recommendation, or null when the row states no
+ * numeric range. A limit: the write path refuses a value above the maximum (the row's `validate`
+ * does, or the path is in RANGE_ENFORCED). A recommendation: a larger value is accepted and applied.
+ * The answer comes from asking `validate` about the first value above the maximum, so it cannot
+ * drift from what the node accepts. Served with the schema (GET /v1/admin/config) as `rangeKind`,
+ * and the Config tab words the range by it. Jouni, 2026-10-11: a range is a recommended range, and
+ * the operator may set a larger number.
+ */
+export function rangeKindOf(
+  field: { dotPath: string; type: string; range?: string; validate: (v: unknown) => boolean },
+): 'limit' | 'recommended' | null {
+  const r = numericRangeOf(field);
+  if (!r) return null;
+  if (RANGE_ENFORCED.has(field.dotPath)) return 'limit';
+  return field.validate(r.max + 1) ? 'recommended' : 'limit';
 }
 
 /** The contact list: an array of objects with a string name and email; the other fields are optional strings. */

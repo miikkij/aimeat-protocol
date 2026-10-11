@@ -10007,6 +10007,8 @@
     "savedChanges": "Muutokset tallennettu",
     "cfgReadOnlyBanner": "Tämä instanssi käyttää muistinsisäistä tallennusta. Asetusten muokkaus on poistettu käytöstä.",
     "cfgSealed": "(asettanut se, joka ylläpitää tätä sinulle)",
+    "cfgRangeRecommended": "suositus {range}",
+    "cfgRangeLimit": "sallittu {range}",
     "cfgSealedBanner": "Osan täällä olevista asetuksista on asettanut se, joka ylläpitää tätä sinulle. Näet mitä ne ovat; muuttaminen käy puhumalla heidän kanssaan.",
     "cfgReadOnlyHelpTitle": "Miksi asetukset ovat vain luku -tilassa?",
     "cfgReadOnlyHelpDetail": "Asetusten tallennus vaatii tietokannan (PostgreSQL tai SQLite). Muistinsisäinen instanssi menettää kaikki muutokset uudelleenkäynnistyksessä. Määritä tämä instanssi .env-tiedoston, aimeat.ini:n, aimeat.json:n tai CLI-argumenttien kautta.",

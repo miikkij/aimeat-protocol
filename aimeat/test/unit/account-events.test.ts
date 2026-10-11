@@ -175,10 +175,11 @@ describe('the window is the operator decision', () => {
   });
 
   it('clamps a nonsense number rather than trusting it', async () => {
-    // The config schema validates 10..10000, but a caller can hand this function anything, and a
-    // window of 0 would archive every event the moment it was written.
+    // The config schema validates 10 or more, but a caller can hand this function anything, and a
+    // window of 0 would archive every event the moment it was written. There is no maximum: the
+    // schema's range 10-10000 is a recommendation.
     expect(windowSize({ accountEventWindow: 0 })).toBe(10);
-    expect(windowSize({ accountEventWindow: 999_999 })).toBe(10_000);
+    expect(windowSize({ accountEventWindow: 999_999 })).toBe(999_999);
     expect(windowSize(undefined)).toBe(KEEP_HOT);
   });
 });

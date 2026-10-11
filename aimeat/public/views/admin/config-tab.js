@@ -26,9 +26,13 @@
  * @structure
  *   - DOMAINS / domainOf — the grouping behind the index
  *   - choiceLabel / shownIn — a fixed value in words
+ *   - rangeWords — a number's range as "recommended …" or "allowed …"
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.4.0 -- 2026-10-11 -- The range beside a number says what the node does with a larger value:
+ *     "recommended 1-10000" when it accepts one, "allowed 1-100" when it refuses one (the API's
+ *     `rangeKind`). It showed the bare range for both (Jouni, 2026-10-11).
  *   v3.3.3 -- 2026-10-11 -- A boolean's box says what a tick means ("Enabled") in both states; it
  *     said the current state, so an empty box beside "Disabled" read as "tick to disable". The
  *     cookie consent section sits under integrations: the list named it `cookie_consent`, its
@@ -185,9 +189,19 @@ function jsonPreview(v) {
 /** The mark that a field is edited and not saved. */
 const editedMark = (words) => html`<${Tinted} tone="warn">${words}<//>`;
 
+/**
+ * A number's range in words, by what the node does with a larger value (the API's `rangeKind`):
+ * "recommended 1-10000" when it accepts one, "allowed 1-100" when it refuses one.
+ */
+function rangeWords(e) {
+  if (e.rangeKind === 'recommended') return tr('dashboard.cfgRangeRecommended', 'recommended {range}').replace('{range}', e.range);
+  if (e.rangeKind === 'limit') return tr('dashboard.cfgRangeLimit', 'allowed {range}').replace('{range}', e.range);
+  return e.range;
+}
+
 /** One field's editor, by its type; a field the node does not let this page change says why. */
 function fieldEditor(p, e, val, editable, pending, onChange) {
-  const range = e.range ? html`<${Note} kind="meta" inline mono>${e.range}<//>` : null;
+  const range = e.range ? html`<${Note} kind="meta" inline mono>${rangeWords(e)}<//>` : null;
   if (!e.mutable) {
     if (typeof e.value === 'boolean') {
       return html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}${e.sealed ? html` <${Note} kind="meta" inline>${t('dashboard.cfgSealed')}<//>` : null}`;

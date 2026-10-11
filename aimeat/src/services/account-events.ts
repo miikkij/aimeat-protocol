@@ -29,6 +29,8 @@
  * @usage
  *   void recordAccountEvent(storage, { ownerGhii, kind: 'app_published', data: { name } });
  * @version-history
+ *   v1.1.0 — 2026-10-11 — windowSize() keeps the minimum of 10 and drops the maximum of 10000: the
+ *     setting's range is a recommendation (Jouni, 2026-10-11).
  *   v1.0.0 — 2026-08-17 — Initial: account events as their own system.
  */
 import { randomUUID } from 'node:crypto';
@@ -52,10 +54,13 @@ import { logger } from '../utils/logger.js';
  */
 export const KEEP_HOT = 100;
 
-/** The configured window, clamped to the same range the config schema validates. */
+/**
+ * The configured window, held to the minimum the config schema validates. No maximum: the schema's
+ * range is a recommendation, and an operator may keep a larger window.
+ */
 export function windowSize(config?: Pick<AimeatConfig, 'accountEventWindow'>): number {
   const n = config?.accountEventWindow;
-  return typeof n === 'number' && Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 10), 10_000) : KEEP_HOT;
+  return typeof n === 'number' && Number.isFinite(n) ? Math.max(Math.trunc(n), 10) : KEEP_HOT;
 }
 
 /**
