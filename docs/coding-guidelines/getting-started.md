@@ -139,7 +139,7 @@ The `aimeat` CLI carries the operator commands: `aimeat config` prints every set
 value comes from (`config export` and `config import` move it), `aimeat validate` checks the
 configuration for problems, `aimeat update` copies the installed package's asset files into the
 working folder and skips any file you changed, `aimeat backup [file]` and `aimeat restore <file>`
-export and import the node's data as one JSON file, and `aimeat maintenance on [message]`,
+export and import accounts and agents as one JSON file (see below: not a backup), and `aimeat maintenance on [message]`,
 `aimeat maintenance off` and `aimeat maintenance` turn maintenance mode on, off, or show it. A fresh
 node installs its bundled example packages by itself at start.
 
@@ -154,9 +154,10 @@ leaves AI keys, vault secrets and two-step sign-in secrets unreadable, and the d
 not restore the node's identity. If you set them outside `.env` (Docker, systemd), back them up from
 there.
 
-`aimeat backup` is a data export, not a full backup: it carries no credential. Passwords, private
-keys, tokens, webhook secrets and memory records that hold a credential are left out, and the
-export's `data.omitted` lists what a restore has to set again.
+`aimeat backup` is a partial export, not a backup: it carries accounts, agents and agents' memory but
+not the records people keep under their own accounts, organisms, apps or files, and no credential.
+In the current release the command is refused with 401 and writes the error to its file. The
+procedure, the restore and its test: [backup and restore](../operations/backup-and-restore.md).
 
 ### App thumbnails (optional)
 
