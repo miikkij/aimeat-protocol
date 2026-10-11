@@ -2,10 +2,16 @@
  * @file scripts/check-docs.mjs
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Check documentation coverage, local links, asset syntax and package help parity.
- * @structure Git file inventory, catalog validation, links and data syntax, duplicate check.
+ * @description Check documentation coverage, local links, backtick repository paths, asset syntax
+ *   and package help parity, and report catalog rows checked before their source last changed.
+ * @structure Git file inventory, catalog validation, links, backtick paths and data syntax,
+ *   duplicate check, catalog staleness report (a warning, never a failure).
  * @usage pnpm check:docs
  * @version-history
+ *   v1.3.0 - 2026-10-12 - A repository path quoted in backticks outside a fenced block must exist,
+ *     as a link must (the docs audit of 2026-10-11 found five dead ones the link check never read).
+ *     A catalog row whose "checked YYYY-MM-DD" is older than its source file's last commit is listed
+ *     as a warning with a count; it does not fail. Rules in scripts/lib/doc-rules.mjs.
  *   v1.2.0 - 2026-10-11 - docs/archive/ is gone (ruling D6): a file under docs/archive/ or docs/plans/
  *     is refused, and the history notice is required of every file the catalog marks historical,
  *     wherever it is, instead of every file in the archive.
@@ -17,10 +23,41 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDocument } from 'yaml';
+import { backtickPathProblems, catalogRows, staleCatalogRows } from './lib/doc-rules.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = path => readFileSync(resolve(ROOT, path), 'utf8').replace(/\r\n/g, '\n');
 const errors = [];
+const warnings = [];
+const pendingSeen = new Set();
+/**
+ * Dead backtick references in files another live session owns, fixed in that session's change.
+ * Each entry says whose; an entry whose reference is gone is reported, so the list only shrinks.
+ */
+const PENDING_ELSEWHERE = {
+  'docs/guides/building-extension-cortex-app-stack.md': {
+    'docs/app-developer-libraries-research.md': 'docs audit phase 2 (cc-joumii-docs-v2) rewrites this guide; the file was deleted before 2026-10-11',
+    'docs/plans/2026-05-29-comicland-ai-session-audit.md': 'docs audit phase 2 (cc-joumii-docs-v2) rewrites this guide; docs/plans/ was removed (ruling D6)',
+  },
+  'docs/extensions/matching-behaviors/README.md': {
+    'src/services/matching.ts': 'docs audit phase 2 (cc-joumii-docs-v2) holds docs/extensions/; the built-in matching service was removed',
+  },
+};
+let tracked = null;
+/** Every file git tracks, read once: a backtick path must name one, or a directory above one. */
+function trackedFiles() {
+  tracked ??= new Set(execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8' }).split('\0').filter(Boolean));
+  return tracked;
+}
+/** Whether git ignores a path: a local file a reader makes (aimeat/.env, node_modules), not a dead one. */
+function isIgnored(path) {
+  try {
+    execFileSync('git', ['check-ignore', '-q', '--no-index', '--', path], { cwd: ROOT, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false; // exit status 1: not ignored
+  }
+}
 const statuses = new Set(['maintained', 'runtime', 'reference', 'historical', 'entry']);
 const files = [...new Set(execFileSync('git', [
   'ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'docs', 'aimeat/docs',
@@ -86,6 +123,17 @@ for (const path of files) {
     const rel = relative(ROOT, destination);
     if (rel.startsWith('..') || isAbsolute(rel) || !existsSync(destination)) errors.push(`${path}: missing local link ${target}`);
   }
+  // A path in backticks is a reference too, and a reader follows it the same way.
+  const waiting = PENDING_ELSEWHERE[path] ?? {};
+  for (const problem of backtickPathProblems({ path, content, tracked: trackedFiles(), ignored: isIgnored })) {
+    if (waiting[problem.ref]) { pendingSeen.add(`${path} ${problem.ref}`); continue; }
+    errors.push(`${path}:${problem.line}: \`${problem.ref}\` ${problem.reason}`);
+  }
+}
+for (const [path, refs] of Object.entries(PENDING_ELSEWHERE)) {
+  for (const ref of Object.keys(refs)) {
+    if (!pendingSeen.has(`${path} ${ref}`)) warnings.push(`PENDING_ELSEWHERE names a reference that is gone, remove it: ${path} \`${ref}\``);
+  }
 }
 
 // The node reads its help prompts from docs/ in the repository and from aimeat/docs/ in the package.
@@ -94,6 +142,16 @@ for (const file of ['AIMEAT_Help_Prompt.md', 'AIMEAT_Help_Prompt_Person.md']) {
     errors.push(`${file} differs between docs/ and aimeat/docs/. Update both copies together.`);
   }
 }
+// A row that says when it was checked, against a source file that changed after that day, is a guide
+// someone should read again. Reported and counted; a changed source often leaves its guide true.
+const lastChange = path => execFileSync('git', ['log', '-1', '--format=%cs', '--', path], { cwd: ROOT, encoding: 'utf8' }).trim() || null;
+const rows = catalogRows(read('docs/catalog.md'));
+const stale = staleCatalogRows(rows, { isFile: path => trackedFiles().has(path), lastChange });
+const dated = rows.filter(row => row.checked).length;
+for (const row of stale) warnings.push(`Catalog row checked ${row.checked}, source changed ${row.changed}: ${row.path} (${row.source})`);
+if (warnings.length) console.warn(warnings.join('\n'));
+console.log(`Catalog: ${dated} of ${rows.length} rows say when they were checked; ${stale.length} of them predate their source's last commit (warning only).`);
+
 if (errors.length) {
   console.error(errors.join('\n'));
   console.error(`Documentation check failed: ${errors.length} problem(s).`);

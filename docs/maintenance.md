@@ -46,6 +46,18 @@ file links outside fenced code, JSON/YAML syntax and the two help-prompt copies.
 It also requires a history notice on every file the catalog marks historical, and refuses
 a file under `docs/archive/` or `docs/plans/`.
 
+A repository path quoted in backticks outside fenced code is checked like a link: it must name
+a tracked file or folder, at the root or under `aimeat/`, or a local file git ignores (such as
+`aimeat/.env`). A path to a private note under `docs/internal/` fails, because a public reader
+cannot open it. A path is left alone when it is clearly a placeholder: it holds `<`, `{`, `*`
+or `...`, one of its names starts with `my-`, `your-` or `example-`, or it has no file extension.
+The rules are in `aimeat/scripts/lib/doc-rules.mjs`.
+
+A catalog row that says "checked YYYY-MM-DD" and names a source file is listed as a warning when
+that file's last commit is newer than the date, with a count at the end of the output. The
+warning does not fail the check: a source changes for many reasons that leave its guide true.
+Read the guide against the change, then move the date.
+
 `pnpm check:doc-links` refuses a string the node serves (in `aimeat/src` and
 `aimeat/public`) that links a repository `docs/` file the node does not serve. A source
 comment may cite one; a string an AI or a person receives may not.

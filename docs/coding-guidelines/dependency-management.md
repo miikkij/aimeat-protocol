@@ -97,7 +97,7 @@ Each is a decision with a date, not a suppression. The full reasoning is in `EXC
 dependency: the Node runtime, staged as a Tauri sidecar from the build machine's own installation,
 whose 146 kB `LICENSE` carries the notices for OpenSSL, V8, ICU and the rest; and
 `WebView2Loader.dll`, a Microsoft redistributable under Microsoft's terms rather than the MIT of the
-crate it came from. `scripts/stage-licenses.mjs` stages both, plus AIMEAT's own licence and the
+crate it came from. `aimeat-desktop/scripts/stage-licenses.mjs` stages both, plus AIMEAT's own licence and the
 generated notices, into the installer. It fails the build rather than shipping without them.
 
 ---

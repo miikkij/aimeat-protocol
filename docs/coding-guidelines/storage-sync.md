@@ -46,7 +46,7 @@ Three checks hold the two providers together. All three run in `pnpm check:fast`
 
 ### Step 1: Update the record type
 
-File: the `src/storage/types/<domain>.ts` that declares the record (for example `AgentRecord` in `types/identity.ts`).
+File: the `src/storage/types/<domain>.ts` that declares the record (for example `AgentRecord` in `src/storage/types/identity.ts`).
 
 ```typescript
 export interface AgentRecord {
