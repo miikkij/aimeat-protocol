@@ -7,6 +7,7 @@
  *   _core/format.js calls the parts make, so the test holds in any default locale.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-money-units.test.ts
  * @version-history
+ *   v1.1.0 - 2026-10-11 - A morsel amount reads as pacing ("pacing 40 morsels"); the three morsel cases asserted the old price wording.
  *   v1.0.1 - 2026-10-01 - cart is read from atelier/cart.js, where it moved out of flow-parts.js.
  *   v1.0.0 - 2026-10-01 - Initial (atelier 0.62.0, commerce amounts in the price parts).
  */
@@ -97,10 +98,10 @@ describe('priceTable', () => {
     expect(all(h2).filter((n) => n.className === 'ak-price__period').length).toBe(2);
   });
 
-  it('morsels: an integer and the word, never money', () => {
+  it('morsels: an integer and the word, shown as pacing, never money', () => {
     const h = host();
     anime.priceTable({ target: h, data: { currency: 'morsels', plans: [{ id: 'a', price: 40 }] } });
-    expect(texts(h, 'ak-price__amount')).toEqual(['40 morsels']);
+    expect(texts(h, 'ak-price__amount')).toEqual(['pacing 40 morsels']);
   });
 });
 
@@ -136,7 +137,7 @@ describe('checkout', () => {
   it('morsels: integer counts with the word', () => {
     const h = host();
     lenis.checkout({ target: h, data: { currency: 'MORSEL', lines: [{ id: 'l1', title: 'Post', price: 1, qty: 1 }] } });
-    expect(texts(h, 'ak-checkout__figure')).toContain('1 morsel');
+    expect(texts(h, 'ak-checkout__figure')).toContain('pacing 1 morsel');
   });
 });
 
@@ -160,6 +161,6 @@ describe('cart', () => {
   it('morsels: the total is a count with the word', () => {
     const h = host();
     shop.cart({ target: h, data: { currency: 'morsels', lines: [{ id: 'a', title: 'Post', price: 5, qty: 3 }] } });
-    expect(texts(h, 'ak-cart__totalvalue')).toEqual(['15 morsels']);
+    expect(texts(h, 'ak-cart__totalvalue')).toEqual(['pacing 15 morsels']);
   });
 });

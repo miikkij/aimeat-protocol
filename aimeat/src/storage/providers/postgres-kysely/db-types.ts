@@ -35,6 +35,7 @@ export interface Action {
   inputSchema: Json;
   maxInputSizeBytes: number | null;
   outputSchema: Json;
+  /** The action's PACING amount per use (ActionRecord.pricing.tollMorsels), not a price. Old column name kept, no migration. */
   pricingBaseMorsels: number;
   pricingPerUnit: Json | null;
   providerGaii: string;
@@ -887,6 +888,7 @@ export interface App {
   filename: string;
   forkable: Generated<boolean>;
   id: Generated<string>;
+  /** The app manifest. A `price.morsels` stored in it by 3.26.x is the app's pacing amount per use, not a price. */
   manifest: Json;
   mimeType: string;
   operatorHidden: Generated<boolean>;
@@ -980,11 +982,13 @@ export interface AppPurchase {
   licenseType: string;
   nodeId: string;
   nodePublicKey: string;
+  /** The PACING amount charged on this acquisition (morsels), not a price. Old column name kept, no migration. */
   priceMorsels: number;
   purchasedAt: Generated<Timestamp>;
   sellerGaii: string;
   sellerOwner: string;
   signature: string;
+  /** The operator's share of that pacing amount (morsels), not a fee paid for a purchase. Old column name kept. */
   transactionFeeMorsels: number;
   transactionId: string;
 }
@@ -2300,6 +2304,7 @@ export interface WebhookDeliveryLog {
 export interface Work {
   actionId: string;
   callbackUrl: string | null;
+  /** The escrowed PACING amount of the work item (WorkRecord.cost.toll), not a price. Old column name kept, no migration. */
   costBasePrice: number;
   costInEscrow: number;
   costNetworkFee: number;

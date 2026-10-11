@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description The x402 stablecoin PaymentHandler (TARGET-042): settles a MONEY checkout session
  *   with the stablecoin that matches its currency — USD with USDC, EUR with EURC — via the x402
- *   `exact` scheme, NON-CUSTODIAL. It registers in the same registry as io.aimeat.morsels and
- *   com.stripe.spt and implements the same collect/payout/refund contract, so the commerce core
+ *   `exact` scheme, NON-CUSTODIAL. It registers in the same registry as com.stripe.spt and
+ *   implements the same collect/payout/refund contract, so the commerce core
  *   orchestrates it unchanged. The stablecoin is a payment METHOD for a fiat price (model 2): the
  *   session currency stays USD or EUR and never becomes USDC/EURC.
  *
@@ -25,6 +25,8 @@
  * @structure X402_HANDLER_ID · x402PaymentHandler
  * @usage registerPaymentHandler(x402PaymentHandler(config, facilitator));
  * @version-history
+ *   Comment only — 2026-10-11 — The removed io.aimeat.morsels handler is no longer named: a morsel is
+ *     pacing, never a payment (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.2.0 — 2026-09-01 — collect() takes an optional resource + description, so a caller that
  *     quoted its own address (the A2A foreign door) settles against the string the buyer actually
  *     signed instead of a checkout-session URL it never had (Agent v2, V6a).

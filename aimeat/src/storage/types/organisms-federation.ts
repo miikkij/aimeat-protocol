@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-11 — Comments only: an extension action's tollMorsels is pacing (burn share plus
+ *     provider credit), commercial.payMorsels and KnowledgeSharing.morsel_price are deprecated morsel
+ *     prices read as pacing (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.9.0 — 2026-10-10 — FederationPeerRecord.deliveryProofAt and GenesisPeerRecord.deliveryProofAt:
  *     the first verified delivery proof pins the peer to sending one (migration 0100; secaudit 2026-10-10 I21).
  *   v1.8.0 — 2026-10-09 — ExtensionRecord.limits.fetchMaxBytes: the manifest's `limits.fetch_max_mb`,
@@ -375,24 +378,30 @@ export interface ExtensionRecord {
     outputSchema: Record<string, unknown>;
     scriptContent: string;
     /**
-     * Anti-abuse toll in morsels, per non-owner call — ALWAYS a burn (debit caller, never credit
-     * owner). Worthless friction that caps runaway/accidental use. Independent of `commercial`;
-     * may sit on top of any payment mode. Absent/0 = no toll. (Design: notes doc-r6tyr3o, M1.)
+     * The PACING amount in morsels per non-owner call, never a price (ruling
+     * decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa, 2026-10-11). The caller's owner
+     * is debited it; the burn rate's share burns and the rest goes to the provider's owner
+     * (metered-settlement.ts chargePacing). Independent of `commercial`; sits on top of any money
+     * price. Absent = the node default (config.pacingTollDefault); 0 = no pacing. (Design: notes
+     * doc-r6tyr3o, M1.)
      */
     tollMorsels?: number;
     /**
-     * Priced raw call. Present => a non-owner caller must pay the owner per call (owner is always
-     * free). Absent => free (the script's `public_access` decides who may call). Invariant C1:
-     * `payMorsels > 0` OR `payMoney` set. `payMorsels` is the ONLY place morsels count as REVENUE
-     * (credited to the owner); everywhere else morsels are burned (M1).
+     * Priced raw call. Present => a non-owner caller pays the owner money per call (owner is always
+     * free). Absent => free (the script's `public_access` decides who may call).
      */
     commercial?: {
-      payMorsels: number;                                    // morsels credited to owner (0 = money-only)
+      /**
+       * DEPRECATED: the 3.x morsel price. It is pacing: read as an addition to `tollMorsels` until
+       * MORSEL_PRICE_FIELDS_REMOVED_IN (config-pacing.ts). Never a payment; 0 = money-only.
+       */
+      payMorsels: number;
       payMoney?: { amount: number; currency: string };       // 6-decimal micro-units, PSP-settled to owner
       /**
        * Optional EXCHANGE pricing PLANS the provider offers beyond the base per-call price (TARGET-045
-       * Phase B). A consumer accepts one by `plan_id`; amounts are in the action's unit (morsels when
-       * payMorsels>0, else payMoney micros). Absent => only the base per-call plan is available.
+       * Phase B). A consumer accepts one by `plan_id`; amounts are in the action's unit (payMoney
+       * micros; a 3.x plan stored against payMorsels counts morsels, which are pacing, not a price).
+       * Absent => only the base per-call plan is available.
        *   - bundle:       { id, model:'bundle', blockSize, blockPrice }               — N calls for a price
        *   - subscription: { id, model:'subscription', periodSeconds, periodPrice,     — flat fee per period,
        *                     callsPerWindow, windowSeconds }                             rate-limited N/window
@@ -709,7 +718,12 @@ export interface KnowledgeSharing {
   catalog_listed: boolean;
   allow_clone: boolean;
   license?: string;
-  morsel_price: number;       // 0 = free
+  /**
+   * DEPRECATED, always 0 and never charged: a morsel is pacing, not a price (ruling
+   * decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Kept because the package schema
+   * (schemas/knowledge-package.ts) requires it; removed with MORSEL_PRICE_FIELDS_REMOVED_IN.
+   */
+  morsel_price: number;
 }
 
 export interface KnowledgeManifest {

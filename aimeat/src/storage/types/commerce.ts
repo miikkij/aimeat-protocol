@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-11 — ActionRecord.pricing.baseMorsels is tollMorsels and WorkRecord.cost.basePrice
+ *     is toll: a morsel is pacing, not a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.4.0 — 2026-10-08 — StorageFileRecord.aiProvenanceId: a stored file names its AI-provenance record.
  *   v1.4.0 — 2026-10-08 — WorkRecord.aiProvenanceId: the record of a work item's delivered output
  *     (migration 0098, aiprov D8).
@@ -109,7 +111,13 @@ export interface ActionRecord {
   category?: string;
   inputSchema: Record<string, unknown>;
   outputSchema: Record<string, unknown>;
-  pricing: { baseMorsels: number; perUnit?: { unit: string; morselsPer1000: number } };
+  /**
+   * `tollMorsels` is the action's PACING amount per use, never a price (ruling
+   * decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa, 2026-10-11). It was `baseMorsels`
+   * until 3.26.x; both providers read a stored `baseMorsels` as `tollMorsels` (the postgres column is
+   * still `pricingBaseMorsels`). `perUnit` is pacing per 1000 units, declared and not charged anywhere.
+   */
+  pricing: { tollMorsels: number; perUnit?: { unit: string; morselsPer1000: number } };
   estimatedTimeSeconds?: number;
   maxInputSizeBytes?: number;
   tags: string[];
@@ -128,7 +136,12 @@ export interface WorkRecord {
   requesterGaii: string;
   input: Record<string, unknown>;
   output?: Record<string, unknown>;
-  cost: { basePrice: number; networkFee: number; total: number; inEscrow: number };
+  /**
+   * What the requester's escrow holds: the action's pacing amount (`toll`, doubled for high priority)
+   * plus the network fee. Pacing, not a price. `toll` was `basePrice` until 3.26.x; both providers read
+   * the old key (postgres column `costBasePrice`).
+   */
+  cost: { toll: number; networkFee: number; total: number; inEscrow: number };
   ttlExpiresAt: string;
   callbackUrl?: string;
   rating?: { score: number; comment?: string };

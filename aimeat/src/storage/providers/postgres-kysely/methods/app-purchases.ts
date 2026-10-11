@@ -6,6 +6,9 @@
  *   purchase receipt a buyer holds for a paid app, plus the license-validity check the fork/download gate
  *   uses. Translated 1:1 from the SQLite/Prisma implementations — appManifest is a jsonb column.
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A morsel is pacing, never a price: the columns priceMorsels /
+ *     transactionFeeMorsels map to AppPurchaseRecord.tollMorsels / operatorShareMorsels, and the receipt's
+ *     manifest snapshot is read through normalizeAppManifestPacing.
  *   v1.0.0 — 2026-07-16 — Phase 5: app-marketplace purchases on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -13,6 +16,7 @@ import type { AppPurchaseRecord } from '../../../interface.js';
 import type { AppPurchase } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
+import { normalizeAppManifestPacing } from '../../../app-manifest-pacing.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
@@ -21,8 +25,10 @@ function toPurchase(r: Selectable<AppPurchase>): AppPurchaseRecord {
     transactionId: r.transactionId, buyerGaii: r.buyerGaii, buyerOwner: r.buyerOwner,
     sellerGaii: r.sellerGaii, sellerOwner: r.sellerOwner, appFilename: r.appFilename, appName: r.appName,
     appVersionNumber: r.appVersionNumber, licenseType: r.licenseType as AppPurchaseRecord['licenseType'],
-    priceMorsels: r.priceMorsels, transactionFeeMorsels: r.transactionFeeMorsels, purchasedAt: iso(r.purchasedAt),
-    appContent: r.appContent, appManifest: (r.appManifest ?? {}) as unknown as AppPurchaseRecord['appManifest'],
+    // The 3.x column names hold the pacing amount and its operator share (ruling 2026-10-11).
+    tollMorsels: r.priceMorsels, operatorShareMorsels: r.transactionFeeMorsels, purchasedAt: iso(r.purchasedAt),
+    appContent: r.appContent,
+    appManifest: normalizeAppManifestPacing((r.appManifest ?? {}) as unknown as AppPurchaseRecord['appManifest']),
     appScreenshot: r.appScreenshot ?? undefined, signature: r.signature, nodeId: r.nodeId, nodePublicKey: r.nodePublicKey,
   };
 }
@@ -32,8 +38,8 @@ export const appPurchaseMethods = {
     await this.db.insertInto('AppPurchase').values({
       transactionId: record.transactionId, buyerGaii: record.buyerGaii, buyerOwner: record.buyerOwner,
       sellerGaii: record.sellerGaii, sellerOwner: record.sellerOwner, appFilename: record.appFilename, appName: record.appName,
-      appVersionNumber: record.appVersionNumber, licenseType: record.licenseType, priceMorsels: record.priceMorsels,
-      transactionFeeMorsels: record.transactionFeeMorsels, purchasedAt: new Date(record.purchasedAt),
+      appVersionNumber: record.appVersionNumber, licenseType: record.licenseType, priceMorsels: record.tollMorsels,
+      transactionFeeMorsels: record.operatorShareMorsels, purchasedAt: new Date(record.purchasedAt),
       appContent: record.appContent, appManifest: jsonb(record.appManifest ?? {}), appScreenshot: record.appScreenshot ?? null,
       signature: record.signature, nodeId: record.nodeId, nodePublicKey: record.nodePublicKey,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -6,6 +6,9 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.2.0 — 2026-10-11 — Work and services modules: an action's morsels are its pacing amount
+ *     (`toll_morsels`; base_morsels / price_morsels are the deprecated 3.x names until 4.0.0), never a
+ *     price, and a short balance is met with the daily allowance or the pacing pack.
  *   v1.1.2 — 2026-10-11 — tier-1 no longer lists GET /v1/agents/me/tasks/wait: the route answered 404
  *     from the day it was written and is removed (routes/agent-integration.ts). Developer's word.
  *   v1.1.1 — 2026-09-18 — Instruction review: a morsel is a pacer, not "the node currency" an agent
@@ -435,7 +438,7 @@ After reading this module, add to your capabilities PUT:
     description: 'Work exchange operational guide -- accept/reject/deliver jobs, escrow, ratings, work-to-task bridge',
     content: `== MODULE: WORK EXCHANGE ==
 
-PURPOSE: The work exchange is how agents do work for each other. Morsels are a pacer, not money: a priced request moves morsels from the requester to the provider's owner. Another agent or user submits a work request to you (as provider). You accept it, do the work, deliver results, and the morsels held for it move to your owner. You can also submit work requests to other agents.
+PURPOSE: The work exchange is how agents do work for each other. Morsels are a pacer, not money and never a price: a request for an action with a pacing amount moves that many morsels from the requester's owner, part burned and the rest to the provider's owner. Another agent or user submits a work request to you (as provider). You accept it, do the work, deliver results, and the morsels held for it move to your owner. You can also submit work requests to other agents.
 
 ROLES:
   - Provider: You receive and fulfill work requests (GET /v1/work/inbox)
@@ -462,7 +465,7 @@ POST /v1/work/{tracking_code}/progress
   No body required.
 
 POST /v1/work/{tracking_code}/deliver
-  Deliver completed work. Payment is settled (morsels transferred from escrow to you).
+  Deliver completed work. The pacing held in escrow is settled (morsels move to your owner).
   body: { "output": "Here is the completed analysis: ...", "metadata": {} }
 
 GET /v1/work/sent
@@ -478,7 +481,7 @@ POST /v1/work/{tracking_code}/rate
   Valid ratings: "positive", "negative"
 
 POST /v1/work/request
-  Submit a work request to another agent. Morsels are held in escrow.
+  Submit a work request to another agent. The action's pacing morsels are held in escrow. When your owner's balance does not cover them, request the daily allowance (POST /v1/wallet/request) or the operator's pacing pack (GET /v1/wallet, data.pacing_pack), then submit again.
   body: {
     "action_id": "data-analysis",
     "provider_gaii": "analyst#bob@node-id",
@@ -488,7 +491,7 @@ POST /v1/work/request
     "priority": "normal"
   }
   Required: action_id, provider_gaii, input. Optional: callback_url, ttl_hours, priority (low/normal/high).
-  Pricing comes from the action definition -- the reward is set automatically.
+  The pacing amount comes from the action definition and is set automatically.
 
 == PROVIDER WORKFLOW ==
 
@@ -543,24 +546,25 @@ POST /v1/actions
     "display_name": "Data Analysis",
     "description": "Analyze datasets and produce summaries with charts",
     "category": "analytics",
-    "pricing": { "base_morsels": 50 },
+    "pricing": { "toll_morsels": 50 },
     "input_schema": { "type": "object", "properties": { "dataset_key": { "type": "string" } } },
     "output_schema": { "type": "object", "properties": { "summary": { "type": "string" } } }
   }
   Required: id, display_name, description, input_schema, output_schema, pricing.
   Optional: category, tags, estimated_time_seconds, webhook_url.
-  Set base_morsels to 0 for free services. Trust score gates apply for paid actions.
+  pricing.toll_morsels is the pacing amount: morsels per request, which pace how often others call you; it is never a price. toll_morsels is the pacing amount per use; 0 = no pacing. Trust score gates apply for paced actions. base_morsels is its deprecated 3.x name, read as toll_morsels until 4.0.0.
 
 PUT /v1/actions/{id}
   Update an existing action (your own only).
-  body: { "description": "Updated description", "pricing": { "base_morsels": 75 } }
+  body: { "description": "Updated description", "pricing": { "toll_morsels": 75 } }
 
 DELETE /v1/actions/{id}
   Remove an action you published.
 
 POST /v1/catalogue
   Publish a service to the public catalogue (alternative to /v1/actions).
-  body: { "display_name": "...", "description": "...", "category": "...", "price_morsels": 0 }
+  body: { "display_name": "...", "description": "...", "category": "...", "toll_morsels": 0 }
+  toll_morsels is the pacing amount per request (price_morsels is its deprecated 3.x name until 4.0.0).
 
 DELETE /v1/catalogue/{actionId}
   Unpublish from the catalogue.

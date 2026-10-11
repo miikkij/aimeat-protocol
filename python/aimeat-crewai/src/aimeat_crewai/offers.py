@@ -10,6 +10,8 @@ This module is the generalised, reusable version of what a crew did by hand:
   - build_offer() / build_offers_doc(): assemble a valid document.
   - validate_offers_doc(): assess each offer's levels (offering / workflow-
     compatible / priced) using workflow_spec; raise on a level you require.
+    "priced" means offered to other owners: a money price (priceMoney) and/or a
+    pacing amount (tollMorsels, morsels per use, never a price).
   - publish_offers(): write the document to the node over REST.
 
 Canonical shape: aimeat/src/models/offer-schemas.ts (the node wins on any
@@ -19,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
 from typing import Any
 
 from .credentials import (
@@ -39,6 +42,10 @@ __all__ = [
     "resolve_agent_token",
     "validate_offers_doc",
 ]
+
+
+TOLL_MORSELS_MAX = 100
+"""The highest pacing amount an offer may declare (the node's TOLL_MORSELS_MAX; its own ceiling applies too)."""
 
 
 class OfferValidationError(ValueError):
@@ -63,6 +70,8 @@ def build_offer(
     deliverable: dict[str, Any] | None = None,
     success_signal: dict[str, Any] | None = None,
     required_to_function: dict[str, Any] | str | None = None,
+    price_money: dict[str, Any] | None = None,
+    toll_morsels: int | None = None,
     price: dict[str, Any] | None = None,
     visibility: str | None = None,
     callable: dict[str, Any] | None = None,
@@ -70,7 +79,30 @@ def build_offer(
 ) -> dict[str, Any]:
     """Assemble one offer dict, dropping keys left as None so the result stays
     minimal and validates against the node's optional-friendly schema. Pass
-    ``required_to_function=NONE`` for a source offer with no memory input."""
+    ``required_to_function=NONE`` for a source offer with no memory input.
+
+    An offer has two values. ``price_money`` is the money price,
+    ``{"amount": <6-decimal micro-units>, "currency": "EUR" | "USD"}``; without
+    one the offer is free. ``toll_morsels`` is the pacing amount: whole morsels
+    per use (0-100) that each use by another owner debits from that owner, part
+    burned and the rest credited to yours. A morsel paces use and is never a
+    price.
+
+    ``price`` is the deprecated 3.x morsel price (``{"morsels": n}``). The node
+    reads it as pacing until 4.0.0 and refuses it after; here it is turned into
+    ``tollMorsels`` (added to ``toll_morsels``) with a DeprecationWarning, so the
+    document never carries it."""
+    if price is not None:
+        warnings.warn(
+            "build_offer(price={'morsels': n}) is deprecated: a morsel is pacing, not a price. "
+            "Pass toll_morsels=n (the pacing amount per use) and price_money for a money price. "
+            "The old field is removed from the node in 4.0.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        legacy = price.get("morsels") if isinstance(price, dict) else None
+        if isinstance(legacy, (int, float)) and legacy > 0:
+            toll_morsels = min(int(toll_morsels or 0) + int(legacy), TOLL_MORSELS_MAX)
     offer: dict[str, Any] = {"id": id, "title": title, "ask": ask}
     optional = {
         "example": example,
@@ -82,7 +114,8 @@ def build_offer(
         "deliverable": deliverable,
         "success_signal": success_signal,
         "required_to_function": required_to_function,
-        "price": price,
+        "priceMoney": price_money,
+        "tollMorsels": toll_morsels,
         "visibility": visibility,
         "callable": callable,
     }

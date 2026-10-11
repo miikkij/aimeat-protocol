@@ -7,7 +7,8 @@
  *   across provider/requester/relay/registry nodes per RFC §10.11/§16.2.
  *
  * @structure
- *   - calculateWorkCost: base price + 10% network fee → escrow total
+ *   - calculateWorkCost: pacing amount (toll) + 10% network fee → escrow total
+ *   - presentWorkCost: the escrow as a response shows it, with the deprecated base_price mirror
  *   - holdEscrow/returnEscrow: atomically debit/credit escrow with transaction logs
  *   - routingFee: the 1-morsel fee of one route to another node, taken when the call goes out and
  *     given back when no route was made
@@ -17,6 +18,10 @@
  *   - mintMorsels: operator mint against the daily cap, for every door that mints
  *
  * @version-history
+ *   v1.3.0 — 2026-10-11 — calculateWorkCost names the escrowed amount `toll`, the action's pacing
+ *     amount (was `basePrice`); the arithmetic is unchanged. presentWorkCost: the response shape, with
+ *     the old field as a deprecated mirror until MORSEL_PRICE_FIELDS_REMOVED_IN (ruling
+ *     decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.2.0 — 2026-09-26 — routingFee(): the routing fee of one route to another node, for every
  *     endpoint that routes a call. The endpoint takes it when the call goes out, after its checks; a
  *     balance that cannot cover it stops the route; it goes back, with a `<type>_return` line, when the
@@ -33,6 +38,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 
 export interface SettlementResult {
     providerEarnings: number;
@@ -46,12 +52,33 @@ export interface SettlementResult {
 }
 
 /**
- * Calculate morsel costs for a work request.
+ * What a work request holds in escrow. `toll` is the action's PACING amount (ruling
+ * decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): a morsel paces the request and is
+ * never its price. The escrow holds the pacing amount plus a 10% network fee; on acceptance the
+ * pacing amount goes to the provider and the network fee is burned or split per the burn rate
+ * (settlePayment). The field was `basePrice` until 3.26.x.
  */
-export function calculateWorkCost(baseMorsels: number, _burnRate: number) {
-    const networkFee = Math.ceil(baseMorsels * 0.1);
-    const total = baseMorsels + networkFee;
-    return { basePrice: baseMorsels, networkFee, total, inEscrow: total };
+export function calculateWorkCost(tollMorsels: number, _burnRate: number): WorkRecord['cost'] {
+    const networkFee = Math.ceil(tollMorsels * 0.1);
+    const total = tollMorsels + networkFee;
+    return { toll: tollMorsels, networkFee, total, inEscrow: total };
+}
+
+/**
+ * A work item's escrow as a response shows it. `toll` is the pacing amount; until
+ * MORSEL_PRICE_FIELDS_REMOVED_IN the old `base_price` (snake) or `basePrice` (camel) field mirrors it,
+ * with a `deprecated` note on the same level, so a 3.x client keeps reading the number it read before.
+ */
+export function presentWorkCost(cost: WorkRecord['cost'], style: 'snake' | 'camel'): Record<string, unknown> {
+    const mirror = legacyMorselFieldsLive();
+    if (style === 'camel') {
+        const out: Record<string, unknown> = { toll: cost.toll, networkFee: cost.networkFee, total: cost.total, inEscrow: cost.inEscrow };
+        if (mirror) { out.basePrice = cost.toll; out.deprecated = { basePrice: MORSEL_PRICE_DEPRECATION }; }
+        return out;
+    }
+    const out: Record<string, unknown> = { toll: cost.toll, network_fee: cost.networkFee, total: cost.total, in_escrow: cost.inEscrow };
+    if (mirror) { out.base_price = cost.toll; out.deprecated = { base_price: MORSEL_PRICE_DEPRECATION }; }
+    return out;
 }
 
 /**
@@ -94,7 +121,8 @@ export async function settlePayment(
     work: WorkRecord,
     relayPath: string[] = [],
 ): Promise<SettlementResult> {
-    const { basePrice, networkFee } = work.cost;
+    // `toll` is the pacing amount held in escrow, not a price; it is released to the provider here.
+    const { toll, networkFee } = work.cost;
 
     // Burn portion of network fee (applied first)
     const burned = Math.floor(networkFee * config.burnRate);
@@ -106,14 +134,14 @@ export async function settlePayment(
     const relayShare = Math.floor(remainingFee * 0.2);
     const registryShare = remainingFee - providerNodeShare - requesterNodeShare - relayShare; // ~20%, absorbs rounding
 
-    // Pay provider the base price (atomic credit prevents race conditions)
-    const credited = await storage.creditBalance(work.providerGaii, basePrice);
+    // Release the escrowed pacing amount to the provider (atomic credit prevents race conditions)
+    const credited = await storage.creditBalance(work.providerGaii, toll);
     if (credited) {
         await storage.addTransaction({
             id: `tx-${randomUUID()}`,
             gaii: work.providerGaii,
             type: 'earned',
-            amount: basePrice,
+            amount: toll,
             counterpartyGaii: work.requesterGaii,
             trackingCode: work.trackingCode,
             timestamp: new Date().toISOString(),
@@ -185,7 +213,7 @@ export async function settlePayment(
     }
 
     return {
-        providerEarnings: basePrice, networkFee, burned,
+        providerEarnings: toll, networkFee, burned,
         providerNodeShare, requesterNodeShare, relayShare, registryShare,
         relayNodes: relayPath,
     };

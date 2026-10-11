@@ -23,11 +23,15 @@
  *   v1.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so an offer title, ask, example, requirement or deliverable with a quote or an
  *     ampersand showed as &quot; / &amp;.
+ *   v1.3.0 — 2026-10-11 — The price chip says the money price (or Free) and the pacing amount
+ *     ("Free · pacing 5 morsels"), from tollMorsels with price.morsels as the 3.x fallback; a morsel
+ *     amount is no longer shown as a price.
  */
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
+import { priceAndPacing, pacingOf, moneyPriceOf } from '/js/format.js';
 
 const html = htm.bind(h);
 
@@ -35,7 +39,8 @@ const html = htm.bind(h);
 export function OfferBadges({ offer }) {
   const chips = [];
   if (offer.visibility && offer.visibility !== 'private') chips.push(['vis', t('profile.offers.visibility.' + offer.visibility) || offer.visibility]);
-  if (offer.price && offer.price.morsels > 0) chips.push(['price', offer.price.morsels + ' ' + (t('profile.offers.morsels') || 'morsels')]);
+  // The money price (or Free) and the pacing amount, one chip: a morsel amount is never a price.
+  if (moneyPriceOf(offer) || pacingOf(offer) > 0) chips.push(['price', priceAndPacing(offer, t)]);
   if (offer.verification) chips.push(['ver', t('profile.offers.verification.' + offer.verification) || offer.verification]);
   if (offer.dataHandling) chips.push(['data', t('profile.offers.dataHandling.' + offer.dataHandling) || offer.dataHandling]);
   if (offer.cost) chips.push(['cost', t('profile.offers.cost.' + offer.cost) || offer.cost]);

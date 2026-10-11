@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.32.1 — 2026-10-11 — The price parts show a 'morsels' amount as pacing, never as a price
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa, kit 0.66.2 money-units.js).
  *   v1.32.0 — 2026-10-11 — Step 8 has a check for an app that shows work happening on the node:
  *     start the work and watch the screen follow it. An app passed every other check while its
  *     state ran 37 seconds behind the agent, because it read by a timer (build-events-first.ts).
@@ -305,8 +307,8 @@ moved under you says so.
    markdown document (\`doc\`, over \`aimeat-markdown.js\`), one decision rule with its review
    (\`decision\`, over \`aimeat-decide.js\`), uploads (\`dropzone({ upload })\`, over
    \`aimeat-storage.js\`), copying text (\`AIMEAT.atelier.copy(text)\`), and prices from
-   \`AIMEAT.commerce\` (\`unit: 'micros'\` or \`currency: 'morsels'\` on priceTable, cart and
-   checkout). A follow-up conversation about one document is \`aiChat({ target, appId, context,
+   \`AIMEAT.commerce\` (\`unit: 'micros'\` on priceTable, cart and checkout; an amount with
+   \`currency: 'morsels'\` shows as pacing, "pacing 5 morsels", because a morsel is never a price). A follow-up conversation about one document is \`aiChat({ target, appId, context,
    history, onTurn })\`; an AI answer you kept is drawn again with \`aiTask(...).show(result)\`.
    A spatial surface, frames a person arranges on an infinite plane, is the board family:
    \`board({ target, frames, rings, actions, render, onMove, onAction, tow, onDrop })\` draws keyed

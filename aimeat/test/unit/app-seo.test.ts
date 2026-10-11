@@ -62,7 +62,8 @@ describe('appSeoState', () => {
     // An operator reading a list needs to know WHICH reason applies: "off" invites them to ask the
     // owner to switch it on, and no switch would help here.
     expect(appSeoState(app({ accessCode: 'hunter2' }), cfg())).toBe('gated');
-    expect(appSeoState(app({ manifest: { ...app().manifest, priceMorsels: 5 } }), cfg())).toBe('gated');
+    // An app with a pacing amount is taken first (POST /v1/app-store/purchase), so it is gated too.
+    expect(appSeoState(app({ manifest: { ...app().manifest, tollMorsels: 5 } }), cfg())).toBe('gated');
     // …and it stays gated even with the owner's switch on, because the switch was never the issue.
     expect(appSeoState(visible({}, { accessCode: 'hunter2' }), cfg())).toBe('gated');
   });

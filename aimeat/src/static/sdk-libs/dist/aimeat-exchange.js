@@ -172,6 +172,10 @@
       // agent-work: a task type one of your agents performs, settled per delivered task.
       agent_name: pick(s.agentName, s.agent_name),
       task_type: pick(s.taskType, s.task_type),
+      // The pacing amount: morsels per delivered task, never a price. priceMorsels / price_morsels are
+      // the deprecated 3.x names: sent under their own name, so the node reads them as pacing until
+      // 4.0.0 and refuses them from then on with a message that names the field to use.
+      toll_morsels: pick(s.tollMorsels, s.toll_morsels),
       price_morsels: pick(s.priceMorsels, s.price_morsels),
       price_money: pick(s.priceMoney, s.price_money),
       plans: s.plans,
@@ -208,7 +212,8 @@
       tool: surface.kind === "app-tool" ? surface.tool : void 0,
       agentName: surface.kind === "agent-work" ? surface.agentName : void 0,
       taskType: surface.kind === "agent-work" ? surface.taskType : void 0,
-      priceMorsels: o.kind === "agent-work" && o.unit === "morsels" ? o.basePrice : void 0,
+      // The pacing amount: toll_morsels as the node presents it, then the 3.x morsel-rail basePrice.
+      tollMorsels: o.kind === "agent-work" ? pick(o.toll_morsels, o.tollMorsels, o.unit === "morsels" ? o.basePrice : void 0) : void 0,
       priceMoney: o.kind === "agent-work" && o.unit === "money" ? { amount: o.basePrice, currency: o.currency } : void 0,
       inputSchema: o.taskSpec ? o.taskSpec.inputSchema : void 0,
       outputSchema: o.taskSpec ? o.taskSpec.outputSchema : void 0,
@@ -594,14 +599,17 @@
     const n = Math.round(Number(amount) || 0);
     return n + (Math.abs(n) === 1 ? " morsel" : " morsels");
   }
+  function fmtPacing(amount) {
+    return "pacing " + fmtMorsels(amount);
+  }
   var MORSEL_UNITS = ["morsels", "morsel", "MORSEL", "MORSELS"];
   var MONEY_UNITS = ["money"];
   function fmtUnit(amount, unit, currency) {
     if (unit === void 0 || unit === null || unit === "") {
       const impliedMoney = !!currency && currency !== "morsel" && currency !== "MORSEL";
-      return impliedMoney ? money(amount, currency) : fmtMorsels(amount);
+      return impliedMoney ? money(amount, currency) : fmtPacing(amount);
     }
-    if (MORSEL_UNITS.indexOf(unit) !== -1) return fmtMorsels(amount);
+    if (MORSEL_UNITS.indexOf(unit) !== -1) return fmtPacing(amount);
     if (MONEY_UNITS.indexOf(unit) !== -1) return money(amount, currency);
     throw new Error(
       `fmtUnit: unknown unit "${unit}". The signature is fmtUnit(amount, unit, currency), where unit is "money" or "morsels". If "${unit}" is a currency, you want fmtUnit(amount, "money", "${unit}") — passing it as the unit used to render money as morsels, silently and wrongly.`
@@ -776,6 +784,7 @@
     // ── Helpers ──
     fmtUnit,
     fmtMorsels,
+    fmtPacing,
     odpsCompleteness,
     ODPS_AUTHORED_FIELDS
   };

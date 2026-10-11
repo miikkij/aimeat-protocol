@@ -19,6 +19,9 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.11.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa): offeringTollMorsels + presentOffering. Responses carry `toll_morsels`; a
+ *     morsel-rail offering is free and its `unit`/`basePrice` are deprecated mirrors until 4.0.0.
  *   v1.10.0 — 2026-07-27 — A consumer row carries its `callers` breakdown: the row is the human who
  *     pays, and underneath it their agents, apps and their own direct calls.
  *   v1.9.0 — 2026-07-27 — Consumer lineage marks GRANTS (`granted`, `carriedUnits`): a guest belongs on
@@ -51,12 +54,20 @@ import type { AimeatConfig } from '../config.js';
 import { createEntitlement, readContractForCall, listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
 import { readCallTiming } from './call-timing.js';
+import { resolvePacingToll } from './metered-settlement.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { logger } from '../utils/logger.js';
 
 export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
 /** The action `commercial` block an offering/contract prices against. */
 export interface ActionCommercial {
+  /** The pacing amount per call on the morsel rail. Never a price. */
+  tollMorsels?: number;
+  /**
+   * Deprecated (3.x): an extension manifest's old morsel price, as stored. Read as the pacing amount
+   * when `tollMorsels` is absent, so a 3.26.1 record keeps working; nothing new writes it here.
+   */
   payMorsels?: number;
   payMoney?: { amount: number; currency: string };
   plans?: OfferingPlan[];
@@ -66,19 +77,25 @@ export interface ActionCommercial {
  * Resolve the AUTHORITATIVE unit + per-call price + (optional plan) pricing spec from a provider action's
  * commercial block — the single source of truth shared by the acceptance route AND bid-accept, so a
  * consumer can never undercut the provider. Money (payMoney) takes precedence over morsels.
+ *
+ * `unit: 'morsels'` names the contract's RAIL, not a currency: a morsel-rail contract is free, and its
+ * per-call amount is charged as pacing (services/metered-settlement.ts settleMorsels, through
+ * chargePacing). Responses present that amount as `toll_morsels` (presentOffering).
  */
 export function resolveActionPricing(
   comm: ActionCommercial | undefined, planId: string | null,
 ): { ok: true; unit: EntitlementUnit; pricePerCall: number; currency: string | null; pricing: PricingSpec | null }
   | { ok: false; code: string; message: string } {
   const money = comm?.payMoney;
-  let unit: EntitlementUnit; let pricePerCall: number; let currency: string | null = null;
+  const pacing = comm?.tollMorsels ?? comm?.payMorsels;
+  // `perCall` is the money price on the money rail and the pacing amount on the morsel rail.
+  let unit: EntitlementUnit; let perCall: number; let currency: string | null = null;
   if (money && typeof money.amount === 'number' && Number.isInteger(money.amount) && money.amount > 0) {
-    unit = 'money'; pricePerCall = money.amount; currency = money.currency;
-  } else if (typeof comm?.payMorsels === 'number' && Number.isInteger(comm.payMorsels) && comm.payMorsels > 0) {
-    unit = 'morsels'; pricePerCall = comm.payMorsels;
+    unit = 'money'; perCall = money.amount; currency = money.currency;
+  } else if (typeof pacing === 'number' && Number.isInteger(pacing) && pacing > 0) {
+    unit = 'morsels'; perCall = pacing;
   } else {
-    return { ok: false, code: 'NOT_PRICED', message: 'Action has no price; only priced actions are contractable' };
+    return { ok: false, code: 'NOT_PRICED', message: 'Neither a money price nor a pacing amount is set, so this is not offered to other owners' };
   }
   let pricing: PricingSpec | null = null;
   if (planId) {
@@ -91,7 +108,7 @@ export function resolveActionPricing(
       pricing = { model: 'subscription', periodSeconds: plan.periodSeconds, periodPrice: plan.periodPrice, callsPerWindow: plan.callsPerWindow, windowSeconds: plan.windowSeconds, validUntil: epoch, windowStart: epoch, windowCount: 0 };
     }
   }
-  return { ok: true, unit, pricePerCall, currency, pricing };
+  return { ok: true, unit, pricePerCall: perCall, currency, pricing };
 }
 
 /** A provider pricing plan surfaced on an offering (mirrors the action's commercial.plans). */
@@ -149,7 +166,9 @@ export interface Offering {
   title: string;
   description: string;
   unit: EntitlementUnit;
-  basePrice: number;            // per-call/task, in `unit` (micros for money, morsels otherwise)
+  /** Per call or task on the `unit` rail: the money price in micro-units, or on the morsel rail the
+   *  pacing amount (a free offering). Presented as `toll_morsels` on the morsel rail (presentOffering). */
+  basePrice: number;
   currency: string | null;
   plans: OfferingPlan[];
   /** For kind==='agent-work': the task interface (what the consumer sends / the agent delivers). */
@@ -179,7 +198,8 @@ export interface Offering {
    */
   aiProvenance?: Record<string, unknown> | null;
   /**
-   * Morsels burned per call on top of whatever this offering is paid in — the provider's own pacing.
+   * The pacing amount per call on top of whatever this offering is paid in — the provider's own pacing.
+   * Part burns, the operator share follows the fee policy, the rest is credited to the provider.
    * Projected from the source and captured into the contract at accept, so changing it later governs
    * new contracts while existing ones keep the terms they were signed at.
    */
@@ -207,6 +227,79 @@ export interface Offering {
   updatedAt: string;
 }
 
+/**
+ * The pacing amount one call on an offering is charged, in morsels (ruling decision-morseli-on-
+ * tahdistus-ei-hinta-tarjouksen-kaksi-arvoa, 2026-10-11). A morsel-rail offering is free, and its
+ * per-call amount is pacing (settleMorsels charges it through chargePacing), so it adds to the
+ * declared toll; a money offering carries only the toll. `declared` defaults to the listing's own
+ * toll; the detail route passes the extension action's live one for a raw ext offering.
+ */
+export function offeringTollMorsels(
+  config: AimeatConfig, o: Pick<Offering, 'unit' | 'basePrice' | 'tollMorsels'>, declared: number | null | undefined = o.tollMorsels,
+): number {
+  const toll = resolvePacingToll(config, declared);
+  return o.unit === 'morsels' ? Math.max(0, o.basePrice) + toll : toll;
+}
+
+/** An offering as a response shows it: `toll_morsels` always, and a money price only on the money rail. */
+export type PresentedOffering = Omit<Offering, 'unit' | 'basePrice' | 'currency'> & {
+  unit?: EntitlementUnit; basePrice?: number; currency?: string | null;
+  /** The pacing amount per call, in morsels. */
+  toll_morsels: number;
+  /** The deprecated mirrors of a morsel-rail offering, each with the note on what to read instead. */
+  deprecated?: Record<string, string>;
+};
+
+/**
+ * Present an offering. A money offering keeps `unit`, `basePrice` (micro-units) and `currency`, which
+ * are its money price. A morsel-rail offering is free with pacing: until MORSEL_PRICE_FIELDS_REMOVED_IN
+ * its `unit: 'morsels'` and `basePrice` stay as mirrors of the pacing amount, named in `deprecated`;
+ * from that release they are left out and `toll_morsels` is the only figure.
+ */
+export function presentOffering(
+  config: AimeatConfig, o: Offering, opts: { declaredToll?: number | null; mirror?: boolean } = {},
+): PresentedOffering {
+  const toll = offeringTollMorsels(config, o, opts.declaredToll !== undefined ? opts.declaredToll : o.tollMorsels);
+  if (o.unit !== 'morsels') return { ...o, toll_morsels: toll };
+  const rest: Omit<Offering, 'unit' | 'basePrice' | 'currency'> & Partial<Offering> = { ...o };
+  delete rest.unit; delete rest.basePrice; delete rest.currency;
+  if (!(opts.mirror ?? legacyMorselFieldsLive())) return { ...rest, toll_morsels: toll };
+  return {
+    ...rest, unit: 'morsels', basePrice: toll, currency: null, toll_morsels: toll,
+    deprecated: { unit: MORSEL_PRICE_DEPRECATION, basePrice: MORSEL_PRICE_DEPRECATION },
+  };
+}
+
+/**
+ * A contract's money price and pacing as a response shows them, for the REST and MCP contract views.
+ * A money contract keeps `unit`, `currency` and `price_per_call` (micro-units) and adds `toll_morsels`.
+ * A morsel-rail contract is free: its per-call amount is pacing charged beside the toll
+ * (services/metered-settlement.ts settleMorsels), so `toll_morsels` counts both, and `unit`, `currency`
+ * and `price_per_call` are deprecated mirrors of it until MORSEL_PRICE_FIELDS_REMOVED_IN, gone from it.
+ */
+export function presentContractTerms(
+  config: AimeatConfig, e: { unit: EntitlementUnit; currency?: string | null; pricePerCall: number; tollMorsels?: number | null },
+): Record<string, unknown> {
+  const toll = resolvePacingToll(config, e.tollMorsels);
+  if (e.unit === 'money') return { unit: e.unit, currency: e.currency ?? null, price_per_call: e.pricePerCall, toll_morsels: toll };
+  const pacing = Math.max(0, e.pricePerCall) + toll;
+  if (!legacyMorselFieldsLive()) return { toll_morsels: pacing };
+  return {
+    unit: e.unit, currency: e.currency ?? null, price_per_call: pacing, toll_morsels: pacing,
+    deprecated: { unit: MORSEL_PRICE_DEPRECATION, price_per_call: MORSEL_PRICE_DEPRECATION },
+  };
+}
+
+/**
+ * The BUDGET_TOO_LOW sentence, one for the REST and MCP accept paths: a money floor names its currency,
+ * a morsel-rail floor names the pacing one call (or block) takes, never a price.
+ */
+export function budgetFloorText(capUnits: number, minCharge: number, unit: EntitlementUnit, currency: string | null): string {
+  return unit === 'money'
+    ? `Budget cap (${capUnits}) is below the ${minCharge}-${currency ?? 'EUR'} minimum charge`
+    : `Budget cap (${capUnits}) is below the ${minCharge} morsels of pacing one charge takes`;
+}
+
 /** The metered coordinate for an app-tool surface — the (ext, action) pair the entitlement + gate key on. */
 export function appToolCoordinate(ownerName: string, appId: string, tool: string): { ext: string; action: string } {
   return { ext: `apptool:${ownerName}/${appId}`, action: tool };
@@ -221,7 +314,7 @@ export function agentWorkCoordinate(ownerName: string, agentName: string, taskTy
  *  (resolveActionPricing) works for app-tool offerings too — the offering's listing IS the authoritative price. */
 export function offeringToCommercial(o: Offering): ActionCommercial {
   return {
-    payMorsels: o.unit === 'morsels' ? o.basePrice : undefined,
+    tollMorsels: o.unit === 'morsels' ? o.basePrice : undefined,
     payMoney: o.unit === 'money' ? { amount: o.basePrice, currency: o.currency ?? 'EUR' } : undefined,
     plans: o.plans,
   };
@@ -533,9 +626,10 @@ export interface ConsumerRow {
   unit: EntitlementUnit;
   calls: number;
   settledUnits: number;
-  /** The pacing burn this contract carries, per call — the morsel half of a combined price. */
+  /** The pacing toll this contract carries per call, beside its money price. */
   tollMorsels: number;
-  /** Morsels burned across this contract's calls: `calls * tollMorsels`. */
+  /** Pacing charged across this contract's calls: `calls * tollMorsels`. The name is kept for its
+   *  readers; since 2026-10-11 only the burn rate's share of it burns (chargePacing). */
   burnedMorsels: number;
   /** True when the PROVIDER carries this consumer rather than billing them (an EXCHANGE grant). */
   granted: boolean;

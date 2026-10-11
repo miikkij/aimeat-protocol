@@ -30,8 +30,11 @@
  *               features: ['Every app', 'Your own agents'], cta: 'Choose Pro' }] } });
  *   Amounts straight from AIMEAT.commerce (6-decimal micro-units) need no conversion:
  *     data: { currency: 'EUR', unit: 'micros', plans: [{ id: 'pro', price: 19000000 }] }
- *   or per plan `priceMicros` / `priceYearlyMicros`. Currency 'morsels' shows a morsel count.
+ *   or per plan `priceMicros` / `priceYearlyMicros`. Currency 'morsels' shows the amount as pacing
+ *   ("pacing 40 morsels"): a morsel is never a price.
  * @version-history
+ *   v0.66.2 — 2026-10-11 — priceTable shows a 'morsels' amount as pacing, never as a price
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v0.62.2 — 2026-10-01 — priceTable keeps a plain price's cents: 4.90 showed as "€5". A whole price
  *     still shows whole ("€19").
  *   v0.62.1 — 2026-10-01 — The parts' own words come from the kit dictionary (./i18n.js): the
@@ -48,7 +51,7 @@ import { NODE_URL } from '../_core/config.js';
 import { num, money as fmtMoney } from '../_core/format.js';
 import { t } from './i18n.js';
 import { emptyState } from './state.js';
-import { isMorsels, speaksMicros, hasAmount, readAmount, roundMicros, fractionDigits, morselText } from './money-units.js';
+import { isMorsels, speaksMicros, hasAmount, readAmount, roundMicros, fractionDigits, pacingText } from './money-units.js';
 
 /** `window` has no declared `anime`; one cast here beats a cast at every call site. */
 const W = /** @type {any} */ (window);
@@ -311,14 +314,14 @@ function currencyCode(value) {
  * Whole units, grouped the way the viewer's locale groups numbers. A three-letter code goes
  * through Intl's own currency style; a symbol like '€' is placed in front of the grouped number,
  * because Intl has nothing to look that up by. Figures from micro-units keep their decimals (two,
- * up to six when sub-cent); a morsel count is an integer with the kit's word, never money.
+ * up to six when sub-cent); a morsel amount reads as pacing ("pacing 5 morsels"), never money.
  * @param {number} value
  * @param {string} currency
  * @param {number} [digits]  decimals for a figure from micro-units; omitted, whole units
  * @returns {string}
  */
 function money(value, currency, digits) {
-  if (isMorsels(currency)) return morselText(value);
+  if (isMorsels(currency)) return pacingText(value);
   const d = digits || 0;
   const whole = d ? roundMicros(value) : Math.round(Number(value) || 0);
   const code = currencyCode(currency);

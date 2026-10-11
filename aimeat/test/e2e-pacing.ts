@@ -7,9 +7,13 @@
  *   What this proves is the hole the developer spotted: a MONEY-priced capability used to have no morsel
  *   brake at all — its only limit was the buyer's total budget, which a runaway loop empties at machine
  *   speed. The toll now burns on the chokepoint every metered path shares, so the same loop hits a
- *   morsel ceiling first, and the burn is a burn: the provider is never credited by it.
+ *   morsel ceiling first. Since 2026-10-11 a share of the pacing burns and the rest is credited to the
+ *   provider (chargePacing).
  * @usage cd aimeat && pnpm exec tsx test/e2e-pacing.ts
  * @version-history
+ *   v1.2.0 — 2026-10-11 — Pacing is charged through chargePacing (decision-morseli-on-tahdistus-ei-
+ *     hinta-tarjouksen-kaksi-arvoa): the "toll is a burn" case reads a share burned and the rest, at
+ *     most, credited to the provider, with the burn on the caller's ledger as pacing_burn.
  *   v1.1.0 — 2026-09-27 — GET /v1/wallet reports `pacing.enabled` and the default toll on a paced node;
  *     a signed-out caller is refused (401/403) on the paced capability and on the wallet read, and no
  *     morsels move. The suite's denial-coverage exemption is removed with it.
@@ -127,11 +131,24 @@ await test('A signed-out caller is refused before anything burns, and cannot rea
   assert(w.status === 401, `signed-out wallet read ${w.status}`);
 });
 
-await test('The toll is a BURN: the provider is not credited by it', async () => {
+// Pacing is no longer a pure burn (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+// arvoa, 2026-10-11): chargePacing burns the burn rate's share, sends the rake where the fee policy
+// says, and credits the rest to the provider. This asserted "the provider gained nothing", the old model.
+await test('The toll is PACING: a share burns, and the provider is credited at most the rest', async () => {
+  const rate = Number((await json('/v1/exchange/info')).body.data?.pacing?.burn_rate ?? 0);
+  const burn = Math.min(TOLL, Math.ceil(TOLL * (Math.round(rate * 10_000) / 100) / 100));
+  const cBefore = await balance(consumer.token);
   const pBefore = await balance(provider.token);
   const call = await json(`/v1/ext/${EXT}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'y' }) });
   assert(call.status === 200, `call ${call.status}`);
-  assert(await balance(provider.token) === pBefore, 'the provider gained no morsels from the pacing toll');
+  assert(cBefore - await balance(consumer.token) === TOLL, `the caller is charged the ${TOLL} morsels of pacing`);
+  const gained = await balance(provider.token) - pBefore;
+  // The provider here is also the node's first owner, so it may receive the operator share as well.
+  assert(gained >= 0 && gained <= TOLL - burn, `the provider is credited at most the pacing less the burn (${TOLL - burn}): +${gained}`);
+  const r = await json('/v1/wallet/transactions?limit=20', { headers: auth(consumer.token) });
+  const rows = (r.body.data.transactions ?? r.body.data.items ?? []) as any[];
+  assert(burn === 0 || rows.some(t => t.type === 'pacing_burn' && Number(t.amount) === -burn),
+    `the burn is on the caller's ledger as pacing_burn: ${JSON.stringify(rows.slice(0, 4).map(t => [t.type, t.amount]))}`);
 });
 
 await test('Pacing stops a runaway loop before the money budget does', async () => {

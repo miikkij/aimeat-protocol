@@ -2,11 +2,12 @@
  * @file app-store.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description App Store routes — purchase flow, license verification, purchase history.
- *   Handles morsel-based app purchases with immutable receipts and cryptographic proofs.
+ * @description App Store routes — taking an app, license verification, purchase history.
+ *   An app with a pacing amount (`tollMorsels`) is taken once with one pacing charge, and the take
+ *   is an immutable receipt with a cryptographic proof. A morsel is pacing, never a price.
  *
  * @structure
- *   - POST /v1/app-store/purchase — Buy an app with morsels
+ *   - POST /v1/app-store/purchase — Take an app: one pacing charge, then the licence receipt
  *   - GET  /v1/app-store/purchases — List buyer's purchase history
  *   - GET  /v1/app-store/purchases/:txId — Get full purchase detail with content
  *   - GET  /v1/app-store/sales — List seller's sales history
@@ -18,6 +19,14 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   v1.4.0 — 2026-10-11 — Ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa: an
+ *     app's morsel price is its pacing amount. POST /purchase is ONE chargePacing (burn share, the
+ *     existing operator share as feePercent, the rest to the app owner; pacing_* ledger rows) in place
+ *     of the debit / credit / settleMarketplaceFee legs and the app_purchase / app_sale rows. A short
+ *     balance answers 402 INSUFFICIENT_MORSELS with the x402 challenge (was INSUFFICIENT_BALANCE).
+ *     Responses carry `toll_morsels`, `pacing` and `operator_share_morsels`; `price_morsels` /
+ *     `transaction_fee_morsels` stay as deprecated mirrors until 4.0.0. The receipt is written in a
+ *     guard that reverses the charge if it fails.
  *   v1.3.1 — 2026-09-26 — The receipt keeps the manifest as anybody but the seller sees it
  *     (services/app-public-manifest.ts): the seller's own notes are not copied to the buyer
  *     (secaudit 2026-09, A6-10).
@@ -41,16 +50,37 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest } from '../storage/interface.js';
+import type { Storage, AppManifest, AppPurchaseRecord } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { ownerCoordinate } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
-import { settleMarketplaceFee } from '../services/marketplace-fee.js';
 import { appSpendRefusal } from '../services/metered-access.js';
-import { percentFee } from '../commerce/money.js';
+import { chargePacing, pacingReceipt, resolvePacingToll } from '../services/metered-settlement.js';
+import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
+import { paymentChallenge } from '../commerce/x402.js';
 import { publicAppManifest } from '../services/app-public-manifest.js';
+import { appToll, presentAppManifest } from '../services/app-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+
+/**
+ * The 3.x receipt fields, while legacyMorselFieldsLive(): `price_morsels` (and, with `withShare`,
+ * `transaction_fee_morsels`) carrying the same morsels as `toll_morsels` / the operator share, with a
+ * `deprecated` object naming each one. Empty from MORSEL_PRICE_FIELDS_REMOVED_IN.
+ */
+function receiptMirror(
+    p: Pick<AppPurchaseRecord, 'tollMorsels' | 'operatorShareMorsels'>,
+    withShare = true,
+): { price_morsels?: number; transaction_fee_morsels?: number; deprecated?: Record<string, string> } {
+    if (!legacyMorselFieldsLive()) return {};
+    return withShare
+        ? {
+            price_morsels: p.tollMorsels, transaction_fee_morsels: p.operatorShareMorsels,
+            deprecated: { price_morsels: MORSEL_PRICE_DEPRECATION, transaction_fee_morsels: MORSEL_PRICE_DEPRECATION },
+        }
+        : { price_morsels: p.tollMorsels, deprecated: { price_morsels: MORSEL_PRICE_DEPRECATION } };
+}
 
 export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -89,11 +119,15 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        const price = app.manifest.priceMorsels ?? 0;
-        if (price <= 0) {
-            res.status(400).json(error(config.nodeId, 'APP_IS_FREE', 'This app is free — no purchase needed. Download it directly.'));
+        // The app's pacing amount (a manifest stored with the 3.x `priceMorsels` reads as it). An app
+        // with none is opened directly, with nothing to take.
+        const declaredToll = appToll(app.manifest);
+        if (declaredToll <= 0) {
+            res.status(400).json(error(config.nodeId, 'APP_IS_FREE', 'This app has no pacing amount, so there is nothing to take. Open or download it directly.'));
             return;
         }
+        // Held to the node's per-use ceiling (AIMEAT_EXT_MAX_DEBIT), as every other pacing charge is.
+        const toll = resolvePacingToll(config, declaredToll);
 
         // Prevent buying your own app
         if (app.ownerGaii === buyerGaii) {
@@ -110,19 +144,14 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Transaction fee
-        const feePercent = config.marketplaceTransactionFeePercent ?? 5;
-        const transactionFee = percentFee(price, feePercent);
-        const totalCost = price;
-
-        // SECURITY: money leaves the buyer on the next line, so the spend permission is asked on
+        // SECURITY: morsels leave the buyer on the next line, so the spend permission is asked on
         // this one. `appSpendRefusal` is the same check the four checkout doors share through
         // commerce/session-service.ts (audit H-3, 2026-08-10), and its own docblock says it belongs
         // "at EVERY place that actually charges" — this door was the fifth, and it asked nothing. An
         // app grant resolves to the owner's GHII in debitBalance, so an app the owner approved for
         // reading their notes could buy from the store with their morsels, and the per-app ceiling
         // they set was never consulted either. Asked HERE rather than as a middleware because the
-        // answer only matters once the price is known: a free app leaves at APP_IS_FREE above, and a
+        // answer only matters once the pacing amount is known: an app without one leaves at APP_IS_FREE above, and a
         // buyer who already holds a lifetime licence leaves at ALREADY_LICENSED, neither of them
         // needing permission to spend nothing.
         const spendRefusal = await appSpendRefusal(storage, req.auth ?? null);
@@ -140,51 +169,10 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Debit buyer (atomic — resolves GAII to GHII internally)
-        const debited = await storage.debitBalance(buyerGaii, totalCost);
-        if (!debited) {
-            const buyerGhii = await storage.getGHIIByOwner(buyerOwner);
-            const balance = buyerGhii?.morselBalance ?? 0;
-            res.status(402).json(error(config.nodeId, 'INSUFFICIENT_BALANCE',
-                `Insufficient morsels. Need ${totalCost}, have ${balance}`));
-            return;
-        }
-
-        // Credit seller (price minus transaction fee — resolves GAII to GHII internally)
-        const sellerEarnings = price - transactionFee;
-        await storage.creditBalance(app.ownerGaii, sellerEarnings);
-
-        const now = new Date().toISOString();
-        const txId = `mktx_${Date.now()}_${randomBytes(6).toString('hex')}`;
-
-        // Wallet transactions for audit trail
-        await storage.addTransaction({
-            id: `tx-${Date.now()}-${randomBytes(4).toString('hex')}`,
-            gaii: buyerGaii,
-            type: 'app_purchase',
-            amount: -totalCost,
-            counterpartyGaii: app.ownerGaii,
-            trackingCode: txId,
-            timestamp: now,
-        });
-
-        await storage.addTransaction({
-            id: `tx-${Date.now()}-${randomBytes(4).toString('hex')}`,
-            gaii: app.ownerGaii,
-            type: 'app_sale',
-            amount: sellerEarnings,
-            counterpartyGaii: buyerGaii,
-            trackingCode: txId,
-            timestamp: now,
-        });
-
-        // Fee leg: credited to the operator or burned per AIMEAT_MARKETPLACE_FEE_MODE
-        // (replaces the old app_store_fee tx that recorded a vanishing fee on the seller).
-        await settleMarketplaceFee(storage, config, { fee: transactionFee, payerGhii: buyerGaii, trackingCode: txId, source: 'app-store' });
-
         // Snapshot app content. The buyer reads the receipt, so the manifest in it is the one anybody
         // but the seller sees: the seller's own notes (the publish checks' findings, the build-spec
-        // state, the reviewer log) are not part of what was sold.
+        // state, the reviewer log) are not part of what was sold. Read BEFORE the charge, so a failed
+        // read leaves the buyer's morsels where they were.
         const appContent = app.data.toString('base64');
         const appManifest: AppManifest = publicAppManifest(app.manifest);
 
@@ -194,37 +182,65 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         if (screenshotFile) {
             appScreenshot = screenshotFile.data.toString('base64');
         }
-
-        // Sign the transaction with node key
         const nodeKey = await storage.getNodeKey();
-        const sigPayload = JSON.stringify({
-            txId, buyerGaii, sellerGaii: app.ownerGaii,
-            appFilename: app_filename, appVersionNumber: app.versionNumber,
-            licenseType, priceMorsels: price, purchasedAt: now,
-        });
-        const signature = nodeKey ? await sign(nodeKey.privateKey, sigPayload) : '';
 
-        // Create immutable purchase receipt
-        const purchase = await storage.createAppPurchase({
-            transactionId: txId,
-            buyerGaii,
-            buyerOwner,
-            sellerGaii: app.ownerGaii,
-            sellerOwner: app.ownerName,
-            appFilename: app_filename,
-            appName: app.manifest.name,
-            appVersionNumber: app.versionNumber,
-            licenseType,
-            priceMorsels: price,
-            transactionFeeMorsels: transactionFee,
-            purchasedAt: now,
-            appContent,
-            appManifest,
-            appScreenshot,
-            signature,
-            nodeId: config.nodeId,
-            nodePublicKey: nodeKey?.publicKey ?? '',
+        // ONE pacing charge (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa):
+        // the buyer's owner is debited the pacing amount, the burn rate's share burns, the app
+        // store's existing operator share still goes where the marketplace fee policy sends it, and
+        // the rest is credited to the app owner. One storage transaction writes the debit, the
+        // credits and the pacing_* ledger rows together, so the old app_purchase / app_sale legs are
+        // not written for a new take (old rows stay readable). Null = the balance is short, nothing moved.
+        const charge = await chargePacing({
+            config, storage, caller: buyerGaii, providerGhii: app.ownerGaii, amount: toll,
+            label: `app-store:${app.ownerName}/${app_filename}`,
+            feePercent: config.marketplaceTransactionFeePercent ?? 5,
         });
+        if (!charge) {
+            res.status(402).json({
+                ...error(config.nodeId, 'INSUFFICIENT_MORSELS', insufficientMorselsMessage(config, toll)),
+                ...paymentChallenge(config),
+            });
+            return;
+        }
+
+        const now = new Date().toISOString();
+        const txId = `mktx_${Date.now()}_${randomBytes(6).toString('hex')}`;
+
+        // Sign the receipt with the node key and store it. If either fails, the take did not happen,
+        // so the pacing charge is given back before the error leaves this handler. Receipts signed
+        // before 2026-10-11 named the amount `priceMorsels`; the value was the same morsels.
+        let purchase: AppPurchaseRecord;
+        try {
+            const sigPayload = JSON.stringify({
+                txId, buyerGaii, sellerGaii: app.ownerGaii,
+                appFilename: app_filename, appVersionNumber: app.versionNumber,
+                licenseType, tollMorsels: charge.morsels, purchasedAt: now,
+            });
+            const signature = nodeKey ? await sign(nodeKey.privateKey, sigPayload) : '';
+            purchase = await storage.createAppPurchase({
+                transactionId: txId,
+                buyerGaii,
+                buyerOwner,
+                sellerGaii: app.ownerGaii,
+                sellerOwner: app.ownerName,
+                appFilename: app_filename,
+                appName: app.manifest.name,
+                appVersionNumber: app.versionNumber,
+                licenseType,
+                tollMorsels: charge.morsels,
+                operatorShareMorsels: charge.fee,
+                purchasedAt: now,
+                appContent,
+                appManifest,
+                appScreenshot,
+                signature,
+                nodeId: config.nodeId,
+                nodePublicKey: nodeKey?.publicKey ?? '',
+            });
+        } catch (err) {
+            await charge.reverse();
+            throw err;
+        }
 
         res.status(201).json(success(config.nodeId, {
             transaction_id: purchase.transactionId,
@@ -232,11 +248,12 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             app_name: purchase.appName,
             app_version_number: purchase.appVersionNumber,
             license_type: purchase.licenseType,
-            price_morsels: purchase.priceMorsels,
-            transaction_fee_morsels: purchase.transactionFeeMorsels,
+            toll_morsels: purchase.tollMorsels,
+            pacing: pacingReceipt(charge),
+            ...receiptMirror(purchase),
             purchased_at: purchase.purchasedAt,
             buyer_balance: (await storage.getGHIIByOwner(buyerOwner))?.morselBalance ?? 0,
-            note: `Purchased "${purchase.appName}" (${licenseType} license). The full app content is included in this receipt.`,
+            note: `Took "${purchase.appName}" (${licenseType} license) with ${purchase.tollMorsels} morsels of pacing. The full app content is included in this receipt.`,
         }, [
             { description: 'View purchase details', method: 'GET', url: `/v1/app-store/purchases/${txId}` },
             { description: 'List all purchases', method: 'GET', url: '/v1/app-store/purchases' },
@@ -256,7 +273,8 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
                 app_name: p.appName,
                 app_version_number: p.appVersionNumber,
                 license_type: p.licenseType,
-                price_morsels: p.priceMorsels,
+                toll_morsels: p.tollMorsels,
+                ...receiptMirror(p, false),
                 seller_owner: p.sellerOwner,
                 purchased_at: p.purchasedAt,
             })),
@@ -289,11 +307,12 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             app_name: purchase.appName,
             app_version_number: purchase.appVersionNumber,
             license_type: purchase.licenseType,
-            price_morsels: purchase.priceMorsels,
-            transaction_fee_morsels: purchase.transactionFeeMorsels,
+            toll_morsels: purchase.tollMorsels,
+            operator_share_morsels: purchase.operatorShareMorsels,
+            ...receiptMirror(purchase),
             purchased_at: purchase.purchasedAt,
             app_content: purchase.appContent,
-            app_manifest: purchase.appManifest,
+            app_manifest: presentAppManifest(purchase.appManifest),
             app_screenshot: purchase.appScreenshot ?? null,
             signature: purchase.signature,
             node_id: purchase.nodeId,
@@ -313,8 +332,9 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
                 app_name: s.appName,
                 app_version_number: s.appVersionNumber,
                 license_type: s.licenseType,
-                price_morsels: s.priceMorsels,
-                transaction_fee_morsels: s.transactionFeeMorsels,
+                toll_morsels: s.tollMorsels,
+                operator_share_morsels: s.operatorShareMorsels,
+                ...receiptMirror(s),
                 buyer_owner: s.buyerOwner,
                 purchased_at: s.purchasedAt,
             })),

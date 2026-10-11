@@ -185,12 +185,42 @@
       const s = ((Number(micros) || 0) / MONEY_UNIT).toFixed(6).replace(/(\.\d{2}\d*?)0+$/, "$1");
       return currency ? s + " " + currency : s;
     },
-    /** Format any session/offer amount currency-aware: morsels are integers, money is micro-units. */
+    /**
+     * Format a pacing amount: "pacing 5 morsels" / "pacing 1 morsel". A morsel paces use and is never
+     * a price, so this is never shown as a cost.
+     * @param {unknown} n
+     * @returns {string}
+     */
+    fmtPacing(n) {
+      const v = Math.max(0, Math.trunc(Number(n) || 0));
+      return "pacing " + v + (v === 1 ? " morsel" : " morsels");
+    },
+    /**
+     * Format a session or offer amount. Money is micro-units in a currency. A currency of 'morsel'
+     * (or none) comes only from a session stored before 4.x and is shown as pacing, never as a price.
+     */
     fmtAmount(amount, currency) {
       if (!currency || currency === "morsel" || currency === "MORSEL") {
-        return (Number(amount) || 0) + " morsels";
+        return commerce.fmtPacing(amount);
       }
       return commerce.fmtMoney(amount, currency);
+    },
+    /**
+     * A checkout session's two values in one line: "1.50 EUR · pacing 5 morsels", "free · pacing 5
+     * morsels", or "free". Reads `total` + `currency` (money) and `pacingMorsels`.
+     * @param {{ total?: number, currency?: string, pacingMorsels?: number } | null | undefined} session
+     * @returns {string}
+     */
+    fmtSession(session) {
+      if (!session) return "";
+      const s = (
+        /** @type {{ total?: number, currency?: string, pacingMorsels?: number }} */
+        session
+      );
+      const legacy = s.currency === "morsel" || s.currency === "MORSEL";
+      const pacing = legacy ? Number(s.total) || 0 : Number(s.pacingMorsels) || 0;
+      const money = !legacy && Number(s.total) > 0 ? commerce.fmtMoney(s.total, s.currency) : "free";
+      return pacing > 0 ? money + " · " + commerce.fmtPacing(pacing) : money;
     },
     /**
      * Parse an amount in any common notation into a number, or null. '12,000.00' → 12000,
@@ -213,14 +243,14 @@
       return Math.round(n * MONEY_UNIT);
     },
     // ── Offer discovery + price reading ──
-    /** Public product feed: every PUBLIC, priced agent offer on the node (no login needed). */
+    /** Public product feed: every PUBLIC agent offer on the node with a money price (no login needed). */
     async feed() {
       const r = await fetch(NODE_URL2 + "/v1/commerce/feed");
       const res = await r.json();
       if (res.error) throw commerceError(res, "Failed to read the commerce feed");
       return res;
     },
-    /** Read one offer (with price/priceMoney) from an agent's published offers. */
+    /** Read one offer (with priceMoney and tollMorsels) from an agent's published offers. */
     async getOffer(agent, offerId) {
       const res = await authFetch2("/v1/agents/" + encodeURIComponent(agent) + "/offers");
       if (!res.ok) throw commerceError(res, "Failed to read offers");
@@ -230,25 +260,81 @@
       }) || null;
     },
     /**
-     * The price of an offer or app-tool entry in one currency.
-     * → { amount, currency, formatted } or null when it has no price in that currency.
-     * currency omitted/'morsel' → price.morsels; 'EUR'/'USD' → priceMoney micro-units.
+     * The MONEY price of an offer or app-tool entry. → { amount, currency, formatted } or null when it
+     * has none (the item is free). Reads priceMoney, then pricesMoney. currency 'EUR'/'USD' asks for
+     * that currency; omitted, the first money price. A morsel is never a price: 'morsel' returns null,
+     * and the pacing amount is pacingOf(offer).
+     * @param {any} offer
+     * @param {string} [currency]
+     * @returns {{ amount: number, currency: string, formatted: string } | null}
      */
     priceOf(offer, currency) {
-      if (!offer) return null;
-      if (!currency || currency === "morsel") {
-        const m = offer.price && Number(offer.price.morsels);
-        if (!m || m <= 0) return null;
-        return { amount: m, currency: "morsel", formatted: commerce.fmtAmount(m, "morsel") };
+      if (!offer || currency === "morsel" || currency === "MORSEL") return null;
+      const prices = [];
+      if (offer.priceMoney && Number(offer.priceMoney.amount) > 0) prices.push(offer.priceMoney);
+      if (Array.isArray(offer.pricesMoney)) {
+        for (const p of offer.pricesMoney) if (p && Number(p.amount) > 0) prices.push(p);
       }
-      const pm = offer.priceMoney;
-      if (!pm || pm.currency !== currency) return null;
-      return { amount: pm.amount, currency, formatted: commerce.fmtMoney(pm.amount, currency) };
+      const pm = currency ? prices.find(function(p) {
+        return p.currency === currency;
+      }) : prices[0];
+      if (!pm) return null;
+      return { amount: pm.amount, currency: pm.currency, formatted: commerce.fmtMoney(pm.amount, pm.currency) };
+    },
+    /**
+     * The pacing amount of an offer, app-tool entry or action: whole morsels per use, 0 when none.
+     * Reads tollMorsels / toll_morsels first, then the deprecated 3.x morsel price fields (price.morsels,
+     * priceMorsels, price_morsels, base_morsels), which the node reads as pacing until 4.0.0.
+     * @param {any} item
+     * @returns {number}
+     */
+    pacingOf(item) {
+      if (!item) return 0;
+      const first = [item.tollMorsels, item.toll_morsels];
+      for (const v of first) if (typeof v === "number" && v >= 0) return Math.trunc(v);
+      const legacy = item.price && item.price.morsels || item.priceMorsels || item.price_morsels || item.pricing && (item.pricing.toll_morsels || item.pricing.base_morsels) || 0;
+      return Math.max(0, Math.trunc(Number(legacy) || 0));
+    },
+    /**
+     * The pacing pack this node's operator sells: { morsels, price: { amount, currency }, checkout_item }
+     * (GET /v1/wallet, data.pacing_pack), or null when the node sells none. Signed in.
+     * @returns {Promise<{ morsels: number, price: { amount: number, currency: string }, checkout_item: { kind: string, quantity: number } } | null>}
+     */
+    async pacingPack() {
+      const res = await authFetch2("/v1/wallet");
+      if (!res.ok) throw commerceError(res, "Failed to read the wallet");
+      return res.data && res.data.pacing_pack || null;
+    },
+    /**
+     * Buy pacing capacity from the operator: opens a checkout for { kind: 'pacing-pack', quantity } in
+     * the pack's currency and completes it with opts.payment ({ handler, instrument? }), which a money
+     * total needs. Ask the person first: it spends money. Throws code PACING_PACK_UNAVAILABLE when the
+     * node sells none.
+     * @param {number} [quantity]
+     * @param {{ payment?: { handler?: string, instrument?: unknown }, note?: string }} [opts]
+     */
+    async buyPacingPack(quantity, opts) {
+      const pack = await commerce.pacingPack();
+      if (!pack) {
+        const err = (
+          /** @type {Error & { code?: string }} */
+          new Error("This node does not sell pacing capacity; the daily allowance is POST /v1/wallet/request")
+        );
+        err.code = "PACING_PACK_UNAVAILABLE";
+        throw err;
+      }
+      const session = await commerce.openCheckout(
+        [{ kind: "pacing-pack", quantity: Math.max(1, Math.trunc(Number(quantity) || 1)) }],
+        { currency: pack.price.currency, note: opts && opts.note }
+      );
+      return commerce.completeCheckout(session.id, opts && opts.payment);
     },
     // ── Checkout sessions (/v1/commerce/checkout-sessions) ──
     /**
-     * Open a checkout session. items: [{ agent, offer_id, quantity? }] (kind defaults to 'offer').
-     * opts: { note?, currency? } — currency 'EUR'/'USD' needs a money price + a settling handler.
+     * Open a checkout session. items: [{ agent, offer_id, quantity? }] (kind defaults to 'offer'; also
+     * 'app-tool' and 'pacing-pack'). opts: { note?, currency? } — currency 'EUR'/'USD'; omitted, the
+     * node uses the first money currency every item is priced in. The session carries `total` (money
+     * micro-units, 0 = free), `currency` and `pacingMorsels` (fmtSession shows both).
      */
     async openCheckout(items, opts) {
       const body = (
@@ -298,9 +384,13 @@
       return res.data.session;
     },
     /**
-     * Complete (pay + fulfill) a session. payment: { handler?, instrument? } — omit for the
-     * node default (morsels). On 402 the thrown error has err.paymentRequired + err.accepts.
-     * Returns the completed session: session.receipt { handler, charged, fee }, session.fulfillment.
+     * Complete (pay + fulfill) a session. payment: { handler, instrument? } — a session with a money
+     * total names its handler (code PAYMENT_HANDLER_REQUIRED lists them); a free session needs none.
+     * The session's pacing is debited from the owner's morsel balance. On 402 the thrown error has
+     * err.paymentRequired + err.accepts; for code INSUFFICIENT_MORSELS the entry with scheme
+     * 'aimeat-morsel-topup' names the daily allowance and the pacing pack (buyPacingPack).
+     * Returns the completed session: session.receipt { handler, charged, fee, pacing?: { morsels,
+     * burned, fee, providerEarned, trackingCode } }, session.fulfillment.
      */
     async completeCheckout(id, payment) {
       const res = await authFetch2("/v1/commerce/checkout-sessions/" + encodeURIComponent(id) + "/complete", {
@@ -328,7 +418,8 @@
     // ── App tools (TARGET-034 — priced tool calls on agent-faced apps) ──
     /**
      * Read an app's declared tool manifest: the public memory record apps.{appId}.tools under the
-     * app owner's GHII — { tools: [{ name, description, inputSchema, action_id?, agent?, price?, priceMoney? }] }.
+     * app owner's GHII — { tools: [{ name, description, inputSchema, action_id?, agent?, priceMoney?, pricesMoney?, tollMorsels? }] }
+     * (priceOf reads the money price, pacingOf the pacing amount).
      * Returns null when the app declares no tools. Works logged out (public read).
      */
     async getAppTools(ownerGhii, appId) {

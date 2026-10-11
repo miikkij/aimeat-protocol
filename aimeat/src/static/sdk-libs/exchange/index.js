@@ -27,6 +27,8 @@
  *   const { offerings } = await AIMEAT.exchange.list({ q: 'company' });
  *   const contract = await AIMEAT.exchange.accept(offerings[0].offeringId, { capUnits: 500 });
  * @version-history
+ *   v1.1.1 — 2026-10-11 — fmtPacing(n) is exported: "pacing 5 morsels", for an amount in morsels where a
+ *     price would stand.
  *   v1.1.0 — 2026-07-30 — The second rake: declare who shares what a capability earns, read what you
  *     are owed and what you owe, release a share, and see the verification that gates a payout.
  *   v1.0.0 — 2026-07-28 — Initial: the EXCHANGE browser library (NOSTE prompt 02 / requirements R-K3).
@@ -48,7 +50,7 @@ import {
   payoutQuote, payout, earnings as beneficiaryEarnings,
 } from './beneficiaries.js';
 import { needs, postNeed, closeNeed, bids, bid, acceptBid } from './demand.js';
-import { fmtUnit, fmtMorsels } from './format.js';
+import { fmtUnit, fmtMorsels, fmtPacing } from './format.js';
 import { odpsCompleteness, ODPS_AUTHORED_FIELDS } from './odps-completeness.js';
 
 const exchange = {
@@ -75,7 +77,7 @@ const exchange = {
   needs, postNeed, closeNeed, bids, bid, acceptBid,
 
   // ── Helpers ──
-  fmtUnit, fmtMorsels, odpsCompleteness, ODPS_AUTHORED_FIELDS,
+  fmtUnit, fmtMorsels, fmtPacing, odpsCompleteness, ODPS_AUTHORED_FIELDS,
 };
 
 attach('exchange', exchange);

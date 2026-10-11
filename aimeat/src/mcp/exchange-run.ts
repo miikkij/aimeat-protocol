@@ -21,6 +21,9 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-11 — aimeat_app_tool_invoke charges a free tool's pacing amount before the call (paceFreeToolUse,
+ *     the REST twin's function), gives it back when the call throws, and answers `pacing` with the result
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   2026-10-08 — aimeat_exchange_work_deliver asks provenanceDeclarationRefusal BEFORE it settles: a
  *     declaration the session may not make threw after the buyer was charged, left the work open, and
  *     a retry charged again. The session's scopes reach both provenance calls. The work view is the
@@ -94,6 +97,9 @@ import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai
 import { logger } from '../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { paceFreeToolUse } from '../commerce/app-tool-catalog.js';
+import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
+import { pacingReceipt } from '../services/metered-settlement.js';
 
 /** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
 async function listAppToolManifests(storage: Storage, ownerGhii: string): Promise<string[]> {
@@ -218,6 +224,14 @@ export function registerExchangeRunTools(
             const cap = await storage.getCapability(binding);
             if (!cap) return fail(`CAPABILITY_NOT_FOUND: backing capability not found (${binding})`);
 
+            // A tool with no money price and no contract runs free in money but is paced: its pacing
+            // amount is charged before the call, as on the REST twin (commerce/app-tool-catalog.ts).
+            const paced = outcome.kind === 'no_right'
+                ? await paceFreeToolUse({ config, storage, caller: callerGaii, ownerName, appId: app, tool: toolDef, capRef: cap.source?.ref })
+                : { kind: 'run' as const, pass: 'settled' as const, charge: null };
+            if (paced.kind === 'insufficient') return fail(`INSUFFICIENT_MORSELS: ${insufficientMorselsMessage(config, paced.toll)}`);
+            if (paced.kind === 'anonymous') return fail('AUTH_REQUIRED: sign in to use this tool');
+
             // Settled → invoke; refund on throw (never leave a phantom charge).
             try {
                 const { invokeCapability } = await import('../services/capability-invoke.js');
@@ -230,7 +244,7 @@ export function registerExchangeRunTools(
                 // As on the REST route, a missing contract permits only an unpriced tool. That
                 // pass retires sibling app-tool prices, while the action's own price still applies.
                 const invoked = await invokeCapability(config, storage, cap, toolInput,
-                    callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool, outcome.kind === 'no_right' ? 'unpriced' : 'settled'), { scopes });
+                    callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool, outcome.kind === 'no_right' ? paced.pass : 'settled'), { scopes });
                 // Measured, so the provider can propose a service commitment from evidence rather
                 // than from a guess (services/call-timing.ts). The REST twin has recorded this since
                 // it was written, so a capability's published p50/p95 described its HTTP traffic only
@@ -240,9 +254,13 @@ export function registerExchangeRunTools(
                 // Delivered → book whoever the provider owes a share of this call, out of their own cut.
                 const shared = takeDesignations(invoked.result);
                 if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
-                return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: outcome.kind === 'settled', result: shared.result });
+                return ok({
+                    app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: outcome.kind === 'settled', result: shared.result,
+                    ...(paced.charge && paced.charge.morsels > 0 ? { pacing: pacingReceipt(paced.charge) } : {}),
+                });
             } catch (err) {
                 if (outcome.kind === 'settled') await outcome.refund();
+                await paced.charge?.reverse();
                 const e = err as { code?: string; message?: string };
                 return fail(`${e.code ?? 'TOOL_INVOKE_FAILED'}: ${e.message ?? 'tool invocation failed (you were refunded)'}`);
             }

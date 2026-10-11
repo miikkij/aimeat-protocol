@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 -- 2026-10-11 -- Export and import carry an action's pacing amount as pricing.tollMorsels
+ *     (a morsel is pacing, not a price); export mirrors it as the deprecated baseMorsels until 4.0.0,
+ *     and import reads a 3.x bundle's baseMorsels as tollMorsels.
  *   v1.12.1 -- 2026-10-05 -- The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.12.0 -- 2026-10-02 -- POST /v1/agents/:name/scope-narrowing: replace an agent's `*` with the
  *     permissions it used, with one press (services/scope-use.ts, ruling C).
@@ -62,6 +65,8 @@ import { logger } from '../../utils/logger.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { leaveMemories } from '../../services/classification-exits.js';
+import { actionPricingFromRecord } from '../../services/action-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config-pacing.js';
 
 /** Why the read-through doors are the owner's in person: letting an agent read mail is consent. */
 const READ_IN_PERSON = 'Letting an agent read your mail is your own decision, so only you, signed in yourself, can make it here.';
@@ -142,7 +147,10 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
         category: a.category,
         input_schema: a.inputSchema,
         output_schema: a.outputSchema,
-        pricing: a.pricing,
+        // tollMorsels is the pacing amount; until 4.0.0 baseMorsels mirrors it for a 3.x importer.
+        pricing: legacyMorselFieldsLive()
+          ? { ...a.pricing, baseMorsels: a.pricing.tollMorsels, deprecated: { baseMorsels: MORSEL_PRICE_DEPRECATION } }
+          : a.pricing,
         tags: a.tags,
       })),
       trust_history: {
@@ -234,7 +242,8 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
             category: a.category,
             inputSchema: a.input_schema ?? {},
             outputSchema: a.output_schema ?? {},
-            pricing: a.pricing ?? { baseMorsels: 0 },
+            // A 3.x bundle carries baseMorsels, the old morsel price: it is the pacing amount now.
+            pricing: actionPricingFromRecord(a.pricing),
             tags: a.tags ?? [],
             createdAt: now,
             updatedAt: now,

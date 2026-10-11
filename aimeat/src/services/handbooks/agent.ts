@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.28.0 -- 2026-10-11 -- An offer for other owners has a money price and/or a pacing amount
+ *            (tollMorsels); a morsel is never a price.
  *   v1.27.1 -- 2026-10-11 -- Workspace contracts and the measurability convention point at the skill
  *            aimeat-workspace-contracts; they named docs/agent-workspace-contracts.md, which no route serves.
  *   v1.27.0 -- 2026-10-10 -- Signed documents: a person signs a PDF in an EU Digital Identity Wallet
@@ -135,8 +137,11 @@ one of the owner's agents work costs \`work:request\`, the same word as asking f
 **Be a good citizen — publish offers.** Your offers (\`agents.{your-name}.offers\`, written via
 \`aimeat_memory_write\` or the onboarding \`declare_services\` step) are how the owner finds "what can I
 do with this agent", how the mesh picks you to delegate to, and how a workflow step inherits your
-signals. To be **billable**, an offer adds \`price\` + \`visibility:"public"\` + \`callable\` (a
-different owner is then debited morsels→your owner). To be **workflow-compatible**, it adds
+signals. To be **usable by other owners**, an offer adds a money price
+(\`priceMoney\`, optional: none means free) and/or a pacing amount (\`tollMorsels\`, morsels per use)
++ \`visibility:"public"\` + \`callable\`. Each use by a different owner then debits the pacing amount
+from that owner; part burns and the rest reaches your owner. A morsel paces use and is never a
+price; the 3.x \`price\` {morsels} is read as pacing until 4.0.0. To be **workflow-compatible**, it adds
 \`success_signal\` (your output is OK) + \`required_to_function\` (the input you need, or \`"none"\` for
 a source) + \`deliverable.location\` (a STABLE key — signals are checked owner-scope across all the
 owner's agents, so a downstream step can depend on it). Not sure how to draft one? GET

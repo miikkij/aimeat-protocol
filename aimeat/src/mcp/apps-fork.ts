@@ -8,6 +8,9 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — Gate 2 reads the app's pacing amount (`tollMorsels`; a morsel is pacing, not
+ *     a price) and asks the licence of the caller's owner GHII, as POST .../fork does. It asked the
+ *     agent's own GAII, which no receipt is keyed on, so an agent could not fork an app its owner took.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: the write goes through forkApp() in
  *     services/app-lifecycle.ts, the same function POST /v1/apps/:owner/:filename/fork calls. Five
@@ -25,6 +28,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { forkApp, resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { logger } from '../utils/logger.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
+import { appIsPaced, appToll } from '../services/app-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAppForkTool(
@@ -59,11 +64,13 @@ export function registerAppForkTool(
             if (!sameOwner && !source.forkable) {
                 return { content: [{ type: 'text' as const, text: 'This app is not open for forking by others. Ask the owner to enable forking.' }], isError: true };
             }
-            // Gate 2 — a paid source's bytes must not bypass the paywall.
-            if (config.marketplaceEnabled && source.manifest.priceMorsels && source.manifest.priceMorsels > 0 && !sameOwner) {
-                const hasLicense = await storage.hasValidLicense(agentGaii, source.ownerGaii, filename);
+            // Gate 2 — a paced source's bytes are not copied before the app is taken. A licence is
+            // keyed on the buyer's OWNER GHII (app-store.ts), so it is asked of ownerGhiiOf(agentGaii),
+            // the coordinate POST .../fork asks; an agent's own GAII holds no receipt.
+            if (appIsPaced(config, source.manifest) && !sameOwner) {
+                const hasLicense = await storage.hasValidLicense(ownerGhiiOf(agentGaii), source.ownerGaii, filename);
                 if (!hasLicense) {
-                    return { content: [{ type: 'text' as const, text: `This app costs ${source.manifest.priceMorsels} morsels. Purchase it first before forking.` }], isError: true };
+                    return { content: [{ type: 'text' as const, text: `This app has ${appToll(source.manifest)} morsels of pacing. Take it first (POST /v1/app-store/purchase), then fork it.` }], isError: true };
                 }
             }
 

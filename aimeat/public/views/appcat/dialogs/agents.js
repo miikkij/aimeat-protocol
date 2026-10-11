@@ -16,6 +16,8 @@
  * @usage openDialog('agents', { owner, filename })  — props: owner, filename; agents (optional: the
  *   manifest's crew definitions, manifest.cortex.agents; without it the store's listing row is read).
  * @version-history
+ *   v1.2.0 — 2026-10-11 — An offer's line is its money price (or Free) and its pacing amount, read
+ *     from tollMorsels with price.morsels as the 3.x fallback; no morsel amount is shown as a price.
  *   v1.1.0 — 2026-09-27 — Parity: "owner/filename" after the title in the typewriter face (titleRef).
  *   v1.0.0 — 2026-09-27 — Initial (appcat, dialogs builder 2), from the old app-agents.js.
  */
@@ -30,6 +32,8 @@ import { Stack, Row as Line, Split } from '/components/Layout.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { Select } from '/components/Select.js';
 import { apiGet, apiPost } from '/js/api.js';
+import { t } from '/js/i18n.js';
+import { priceAndPacing, moneyPriceOf } from '/js/format.js';
 import { authHeaders, getSession } from '/js/services/auth.js';
 import { useCatalog, notice } from '/views/appcat/store.js';
 import { x } from '/views/appcat/i18n.js';
@@ -38,12 +42,13 @@ import { appUrl, findRow } from '/views/appcat/dialogs/app-io.js';
 
 const html = htm.bind(h);
 
-/** "12 🥩/run · 2.50 EUR", or "ask for price". */
+/**
+ * "2,50 € · pacing 12 morsels" or "Free · pacing 12 morsels": the money price (or Free) and the
+ * pacing amount. "ask for price" only when the offer declares neither (a morsel is never a price).
+ */
 function price(o) {
-  const parts = [];
-  if (o.price && typeof o.price.morsels === 'number') parts.push(o.price.morsels + ' \u{1F969}' + (o.price.unit ? '/' + o.price.unit : ''));
-  if (o.price_money && typeof o.price_money.amount === 'number') parts.push((o.price_money.amount / 1e6).toFixed(2) + ' ' + (o.price_money.currency || 'EUR'));
-  return parts.length ? parts.join(' · ') : x('agents.askPrice');
+  const declared = o.tollMorsels != null || o.toll_morsels != null || o.price != null || moneyPriceOf(o);
+  return declared ? priceAndPacing(o, t) : x('agents.askPrice');
 }
 
 /** Deploy or undeploy on the person's own fleet; the notice says what happened. */

@@ -15,6 +15,10 @@
  *   reconcile(opts) · providerHistory() · grants() · grant(spec) · revokeGrant(spec) · normalizeSpec
  * @usage await AIMEAT.exchange.publish({ ext: 'prh-api', action: 'validate', title: '…', usageTerms: {…} });
  * @version-history
+ *   v1.1.0 — 2026-10-11 — An agent-work listing sends its pacing amount as `toll_morsels` (tollMorsels;
+ *     priceMorsels is the deprecated 3.x name, sent under its own name so the node reads it as pacing
+ *     until 4.0.0 and refuses it after), never as a morsel price
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 02 — the EXCHANGE browser library, gap G19).
  */
 import { authed, pub, send, qs, exchangeError } from './client.js';
@@ -54,6 +58,10 @@ export function normalizeSpec(spec) {
     // agent-work: a task type one of your agents performs, settled per delivered task.
     agent_name: pick(s.agentName, s.agent_name),
     task_type: pick(s.taskType, s.task_type),
+    // The pacing amount: morsels per delivered task, never a price. priceMorsels / price_morsels are
+    // the deprecated 3.x names: sent under their own name, so the node reads them as pacing until
+    // 4.0.0 and refuses them from then on with a message that names the field to use.
+    toll_morsels: pick(s.tollMorsels, s.toll_morsels),
     price_morsels: pick(s.priceMorsels, s.price_morsels),
     price_money: pick(s.priceMoney, s.price_money),
     plans: s.plans,
@@ -73,12 +81,13 @@ export function normalizeSpec(spec) {
  * List a supply OFFERING. The node enforces a legibility gate before anything reaches the market:
  * a published input AND output schema (`SCHEMA_REQUIRED`) and stated usage terms
  * (`USAGE_TERMS_REQUIRED`), because a listing nobody can integrate or govern is not supply. The
- * price is read from the source, so an unpriced capability is refused with `NOT_PRICED` rather than
- * listed for free.
+ * money price and the pacing amount are read from the source, so a capability with neither is
+ * refused with `NOT_PRICED` rather than listed.
  * @param {Record<string, any>} spec
  *   ext-action: `{ ext, action, title?, description?, tags?, usageTerms, provenance?, odps? }`
  *   app-tool:   `{ kind: 'app-tool', appId, tool, … }`
- *   agent-work: `{ kind: 'agent-work', agentName, taskType, priceMorsels|priceMoney, inputSchema, outputSchema, … }`
+ *   agent-work: `{ kind: 'agent-work', agentName, taskType, priceMoney?, tollMorsels?, inputSchema, outputSchema, … }`
+ *     (priceMoney: { amount in micro-units, currency }; tollMorsels: the pacing amount per task)
  * @returns {Promise<any>}  The created offering.
  */
 export async function publish(spec) {
@@ -121,7 +130,10 @@ export async function update(id, patch) {
     tool: surface.kind === 'app-tool' ? surface.tool : undefined,
     agentName: surface.kind === 'agent-work' ? surface.agentName : undefined,
     taskType: surface.kind === 'agent-work' ? surface.taskType : undefined,
-    priceMorsels: o.kind === 'agent-work' && o.unit === 'morsels' ? o.basePrice : undefined,
+    // The pacing amount: toll_morsels as the node presents it, then the 3.x morsel-rail basePrice.
+    tollMorsels: o.kind === 'agent-work'
+      ? pick(o.toll_morsels, o.tollMorsels, o.unit === 'morsels' ? o.basePrice : undefined)
+      : undefined,
     priceMoney: o.kind === 'agent-work' && o.unit === 'money' ? { amount: o.basePrice, currency: o.currency } : undefined,
     inputSchema: o.taskSpec ? o.taskSpec.inputSchema : undefined,
     outputSchema: o.taskSpec ? o.taskSpec.outputSchema : undefined,

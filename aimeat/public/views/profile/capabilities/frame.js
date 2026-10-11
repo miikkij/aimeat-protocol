@@ -10,6 +10,7 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, groupCapabilities, agentRule } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — costWord says the money price (or free) and the pacing amount (cost.morsels, the pacing per use); "priced" means a money price only (ruling "morseli on tahdistus, ei hinta").
  *   v1.1.0 — 2026-09-26 — crumb() and pageLinks() return data (the steps, the sibling pages) for the
  *     SettingsPage component; openTab is the rail's own (components/Rail.js) (page group G7).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Kyvykkyydet-sivu", direction A, with the
@@ -46,7 +47,8 @@ export function groupCapabilities(caps, ownerGhii) {
     g.calls += c.stats?.totalInvocations || 0;
     g.errors += c.stats?.errorCount || 0;
     g.vouches += c.trust?.vouchCount || 0;
-    if (c.cost && (c.cost.morsels > 0 || c.cost.amount > 0)) g.priced = true;
+    // Priced means a money price; `cost.morsels` is the pacing amount per use and never a price.
+    if (c.cost && c.cost.amount > 0) g.priced = true;
     if (c.callable) g.callable = true;
     if (c.visibility !== 'public') g.visibility = c.visibility;
     if (c.status !== 'active') g.status = c.status;
@@ -59,11 +61,12 @@ export function groupCapabilities(caps, ownerGhii) {
 
 export const ownerName = (ghii) => String(ghii || '').split('@')[0];
 export const authWord = (c) => (c.authRequired === 'none' ? x('auth.none') : c.authRequired === 'anonymous' ? x('auth.anonymous') : x('auth.registered'));
+/** "free · pacing 3 morsels" or "0.02 EUR · pacing 3 morsels": the money price (or free) and the pacing amount. */
 export function costWord(c) {
   if (!c.cost) return x('cost.free');
-  if (c.cost.morsels > 0) return x('cost.morsels', { n: c.cost.morsels });
-  if (c.cost.amount > 0) return `${c.cost.amount} ${c.cost.currency || ''}`.trim();
-  return x('cost.free');
+  const head = c.cost.amount > 0 ? `${c.cost.amount} ${c.cost.currency || ''}`.trim() : x('cost.free');
+  const toll = Number(c.cost.tollMorsels ?? c.cost.toll_morsels ?? c.cost.morsels) || 0;
+  return toll > 0 ? `${head} · ${x('cost.morsels', { n: toll })}` : head;
 }
 /** Words that only differ per member when they differ: an action's own summary is shown only when it is not the group's. */
 export const memberSummary = (g, c) => (c.summary && c.summary !== g.summary ? c.summary : '');

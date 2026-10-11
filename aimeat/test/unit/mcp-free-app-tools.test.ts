@@ -2,7 +2,8 @@
  * @file test/unit/mcp-free-app-tools.test.ts
  * @description MCP app-tool price decisions preserve free calls, refusals and pinned contracts.
  * @version-history
- *   2026-10-06 — Regression: cross-owner unpriced tools incorrectly answered NO_CONTRACT over MCP.
+ *   2026-10-11 — The `price.morsels` case asserted the old model; a morsel amount is pacing, so only money keeps a tool behind its contract.
+ *   2026-10-06 —Regression: cross-owner unpriced tools incorrectly answered NO_CONTRACT over MCP.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -58,7 +59,9 @@ describe('unpriced app tools over node MCP', () => {
     expect(consumeInternalPass(args[7])).toEqual({ kind: 'unpriced', coordExt: 'apptool:seller/sample.html', coordAction: 'read' });
   });
 
-  it.each([{ price: { morsels: 1 } }, { priceMoney: { amount: 1000, currency: 'EUR' } },
+  // Money prices only: an old `price.morsels` is a pacing amount since 2026-10-11, so that tool runs
+  // without a contract and is charged its pacing (e2e-app-tool-free-mcp covers the charge).
+  it.each([{ priceMoney: { amount: 1000, currency: 'EUR' } },
     { pricesMoney: [{ amount: 1000, currency: 'USD' }] }])('keeps a priced tool behind its contract: %j', async fields => {
     const result = await harness(fields).call();
     expect(result.isError).toBe(true); expect(result.content[0].text).toContain('NO_CONTRACT:');

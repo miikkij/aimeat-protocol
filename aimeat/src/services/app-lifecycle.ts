@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.4.1 — 2026-10-11 — A fork drops the source's pacing amount `tollMorsels` (was `priceMorsels`;
+ *     a morsel is pacing, not a price).
  *   v1.4.0 — 2026-10-08 — A fork of another owner's app that nobody else can read carries a copy of
  *     its provenance record (forkProvenance) instead of the record itself, which the public fork row
  *     would have made resolvable to anyone (aiprov D12).
@@ -266,7 +268,7 @@ export interface PublishAppDraftInput {
  * Promote the draft to a new live version, then clear the slot.
  *
  * The draft manifest IS the caller's statement, so every field it can express is passed as stated;
- * what it cannot express — pricing, licence, per-locale descriptions — is left unmentioned and
+ * what it cannot express — the pacing amount, licence, per-locale descriptions — is left unmentioned and
  * publishApp carries it from the live app. Both doors wrote that mapping out by hand, nine fields
  * each, which is how the two of them can disagree about whether promoting a draft keeps an app paid.
  */
@@ -406,11 +408,11 @@ export async function forkApp(
     ...source.manifest,
     name: `${source.manifest.name || sourceFilename.replace(/\.html?$/i, '')} (fork)`,
     authorDisplay: callerOwner,
-    // A fork starts as its own independent, free app — drop the source's paid terms; the forker can
-    // price their own copy later. Record its origin.
+    // A fork starts as its own independent app with no pacing amount and no licence terms; the forker
+    // sets their own copy's toll_morsels later. Record its origin.
     forkedFrom: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber, node: config.nodeId },
   };
-  delete forkedManifest.priceMorsels;
+  delete forkedManifest.tollMorsels;
   delete forkedManifest.licenseType;
   // The build-spec state describes how the SOURCE's last publish was made. It says nothing about this
   // fork, and it is owner-only besides — copying it hands one owner's note about their own working

@@ -14,6 +14,10 @@
  * @usage import { OffersDocSchema } from '../models/offer-schemas.js';
  *   const parsed = OffersDocSchema.safeParse(req.body);
  * @version-history
+ *   Pacing — 2026-10-11 — A morsel is pacing, never a price: `price.morsels` is deprecated (accepted
+ *     and mirrored until 4.0.0, config-pacing.ts) and is read as part of `tollMorsels`
+ *     (normalizeOfferPacing, presentOfferPacing). An offer's price is `priceMoney`; none means free.
+ *     A `price` that carries `deprecated` is the GET mirror sent back, and is not added twice.
  *   Text limits raised — 2026-07-30 — notes/instructions/examples to 10 000 and `sample` to 200 000:
  *     a worked sample is JSON, and 8 000 characters cut it off mid-document.
  *   v2.5.0 -- 2026-07-25 -- `tollMorsels`: an offer declares its own pacing burn (see AppTool).
@@ -45,11 +49,14 @@ import { ProvenanceSchema, OdpsExtrasSchema } from './odps-schemas.js';
 import { MONEY_CURRENCIES } from '../commerce/money.js';
 
 // ── v2: billable / listable / callable ──────────────────────────────────────
-// Concrete morsel price for cross-owner invocation. `null`/absent = not for sale (self-use only).
-// Distinct from the qualitative `cost` ('free'|'cheap'|'expensive') hint, which stays for goal-search.
+// DEPRECATED (2026-10-11, removed in 4.0.0): the old morsel price. Accepted on write and read as part of
+// the pacing amount `tollMorsels` (normalizeOfferPacing). A morsel is pacing, never a price; an offer's
+// price is `priceMoney`, and an offer without one is free.
 const PriceSchema = z.object({
   morsels: z.number().int().nonnegative(),
   unit: z.enum(['per-call', 'per-result', 'subscription']).optional(), // default per-call at the billing site
+  // Present on the mirror a GET answers with; a client that sends it back is not charged it twice.
+  deprecated: z.string().max(400).optional(),
 }).nullable();
 
 // Machine-invocable binding. Present ⇒ a non-owner can invoke and be billed; absent ⇒ human-prompt/task offer.
@@ -157,7 +164,11 @@ export const OfferSchema = z.object({
   // `required_to_function` (the workflow consumer gate): dependsOn is the human-facing "needs first".
   dependsOn: z.array(DependencySchema).max(20).optional(),
   // ── v2 billable/listable/callable (all optional; default to private, not-for-sale, human-driven) ──
-  /** Morsels burned per delivered task to pace consumption — a brake, never revenue (see AppTool). */
+  /**
+   * The pacing amount: morsels per use, set by the offer's maker within the node's default and
+   * ceiling. Each use debits it from the user's owner; part burns and the rest is credited to the
+   * maker's owner (services/metered-settlement.ts chargePacing). A pace, never a price.
+   */
   tollMorsels: z.number().int().min(0).max(100).optional(),
   price: PriceSchema.optional(),
   // Money price (TARGET-033 phase 6): amount in 6-decimal MICRO-UNITS (1 EUR = 1_000_000 micros;
@@ -209,3 +220,38 @@ export const OffersDocSchema = z.object({
 
 export type Offer = z.infer<typeof OfferSchema>;
 export type OffersDoc = z.infer<typeof OffersDocSchema>;
+
+/** The highest pacing amount a source may declare (the node's per-use ceiling still applies on top). */
+export const TOLL_MORSELS_MAX = 100;
+
+/**
+ * An offer as the pacing model reads it (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+ * arvoa, 2026-10-11). A morsel PRICE stored before the ruling (`price.morsels`) is pacing: added to any
+ * declared toll, so a use costs the same morsels it did, and `price` is dropped. An offer with no old
+ * price comes back unchanged. Applied on every write and every read, so a record stored by 3.26.1 and
+ * one written today look the same to every caller.
+ */
+export function normalizeOfferPacing<T extends { tollMorsels?: number; price?: { morsels: number; unit?: string; deprecated?: string } | null }>(offer: T): T {
+  const legacy = offer.price && Number.isInteger(offer.price.morsels) && offer.price.morsels > 0 ? offer.price.morsels : 0;
+  if (offer.price === undefined) return offer;
+  const rest: Omit<T, 'price'> & { tollMorsels?: number } = { ...offer };
+  delete (rest as { price?: unknown }).price;
+  // A price marked `deprecated` is the mirror a GET answered with (presentOfferPacing). A client that
+  // sends the offer back unchanged has sent the same pacing amount twice; count it once.
+  const toll = offer.price?.deprecated ? (rest.tollMorsels || legacy) : (rest.tollMorsels ?? 0) + legacy;
+  return (toll > 0 ? { ...rest, tollMorsels: Math.min(toll, TOLL_MORSELS_MAX) } : rest) as T;
+}
+
+/**
+ * An offer as a response shows it: normalized, and, until MORSEL_PRICE_FIELDS_REMOVED_IN, with the old
+ * `price.morsels` field mirroring the pacing amount and marked deprecated, so a 3.x client that reads
+ * it keeps working and learns what to read instead.
+ */
+export function presentOfferPacing<T extends { tollMorsels?: number; price?: { morsels: number; unit?: string } | null }>(
+  offer: T, mirror: boolean, note: string,
+): Omit<T, 'price'> & { price?: { morsels: number; unit: string; deprecated: string } } {
+  const n = normalizeOfferPacing(offer) as Omit<T, 'price'>;
+  const toll = (n as { tollMorsels?: number }).tollMorsels ?? 0;
+  if (!mirror || toll <= 0) return n;
+  return { ...n, price: { morsels: toll, unit: offer.price?.unit ?? 'per-call', deprecated: note } };
+}

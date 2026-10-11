@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-11 — aimeat_catalogue_search answers `pricing.toll_morsels` (the pacing amount, with the
+ *     deprecated `base_morsels` mirror) and aimeat_work_request's `cost` carries `toll`, as REST does.
  *   2026-10-11 — aimeat_agents_list rows carry `stopped`, `stopped_at` and `stopped_by`.
  *   2026-10-08 — The storage tools receive the session's scopes, for a declared ai_provenance.
  *   2026-10-08 — aimeat_work_deliver answers with the output's provenance record (aiprov D8).
@@ -179,6 +181,8 @@ import { taskStartView, scopeUseLookup } from '../services/agent-task-start-writ
 import { stoppedView } from '../services/agent-stop-rules.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { presentWorkCost } from '../services/morsel.js';
+import { presentActionPricing } from '../services/action-pacing.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -265,7 +269,7 @@ export function registerCoreTools(
                 display_name: a.displayName,
                 description: a.description,
                 category: a.category,
-                pricing: a.pricing,
+                pricing: presentActionPricing(a.pricing),
                 tags: a.tags,
             }));
             return jsonContent(shapeResponse('aimeat_catalogue_search', response_format, payload));
@@ -643,11 +647,7 @@ export function registerCoreTools(
                     text: JSON.stringify({
                         tracking_code: work.trackingCode,
                         status: work.status,
-                        cost: {
-                            base_price: work.cost.basePrice,
-                            network_fee: work.cost.networkFee,
-                            total: work.cost.total,
-                        },
+                        cost: presentWorkCost(work.cost, 'snake'),
                     }, null, 2),
                 }],
             };

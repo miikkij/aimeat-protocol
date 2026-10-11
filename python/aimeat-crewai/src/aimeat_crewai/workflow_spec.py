@@ -205,6 +205,18 @@ def _required_to_function_ok(value: Any) -> bool:
         return False
 
 
+def _offers_a_value(offer: dict[str, Any]) -> bool:
+    """True when the offer has a money price or a pacing amount (either one makes it usable by other owners)."""
+    money = offer.get("priceMoney")
+    if isinstance(money, dict) and isinstance(money.get("amount"), (int, float)) and money["amount"] > 0:
+        return True
+    toll = offer.get("tollMorsels")
+    if isinstance(toll, (int, float)) and toll > 0:
+        return True
+    legacy = offer.get("price")
+    return isinstance(legacy, dict) and isinstance(legacy.get("morsels"), (int, float)) and legacy["morsels"] > 0
+
+
 def assess_offer(offer: dict[str, Any]) -> dict[str, Any]:
     """Return a verdict for one offer: which levels it reaches and what's missing.
 
@@ -212,7 +224,9 @@ def assess_offer(offer: dict[str, Any]) -> dict[str, Any]:
       - offering:            id + title + ask present
       - workflow_compatible: success_signal + required_to_function (signal | "none")
                              + deliverable.location present
-      - priced:             price (non-null) + visibility=="public"
+      - priced:             a money price (priceMoney) and/or a pacing amount
+                             (tollMorsels; a morsel is pacing, never a price)
+                             + visibility=="public"
                              + callable with action_id or webhook_url
 
     Returns {id, offering, workflow_compatible, priced, missing: {level: [reasons]},
@@ -249,10 +263,14 @@ def assess_offer(offer: dict[str, Any]) -> dict[str, Any]:
     if wf_missing:
         missing["workflow_compatible"] = wf_missing
 
-    # Level 2 -- priced
+    # Level 2 -- priced (offered to other owners): a money price and/or a pacing amount. A morsel
+    # is pacing, never a price; the 3.x morsel price (`price.morsels`) still counts as pacing,
+    # because the node reads it so until 4.0.0.
     priced_missing: list[str] = []
-    if offer.get("price") is None:
-        priced_missing.append("missing price (or price is null)")
+    if not _offers_a_value(offer):
+        priced_missing.append(
+            "missing a money price (priceMoney) or a pacing amount (tollMorsels, morsels per use)"
+        )
     if offer.get("visibility") != "public":
         priced_missing.append('visibility is not "public"')
     callable_ = offer.get("callable") or {}

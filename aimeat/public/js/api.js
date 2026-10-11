@@ -13,6 +13,9 @@
  *   - parseJwtPayload/sleep: internal helpers (unverified JWT expiry check, backoff delay)
  *
  * @version-history
+ *   v1.4.0 -- 2026-10-11 -- A 402 INSUFFICIENT_MORSELS throws with the page's own words: the use needs more
+ *     morsels of pacing, get them from the daily allowance or, when the operator sells one, a pacing
+ *     pack at its money price (GET /v1/wallet pacing_pack). err.code and err.response are unchanged.
  *   v1.3.0 -- 2026-09-16 -- Read-only transport retries, POST/PUT request keys, and credential
  *     refresh independent of the retry budget. Preserve the original server error.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -21,6 +24,7 @@
  *     bodies return as a string; JSON error envelopes still parse and throw
  */
 import { getSession } from '/js/services/auth.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Make an authenticated API call.
@@ -99,7 +103,8 @@ export async function api(path, opts = {}) {
       }
       const json = await resp.json();
       if (json && json.ok === false && json.error) {
-        const err = new Error(json.error.message || json.error.code || 'Request failed');
+        const words = json.error.code === 'INSUFFICIENT_MORSELS' ? await insufficientMorselsWords() : '';
+        const err = new Error(words || json.error.message || json.error.code || 'Request failed');
         err.code = json.error.code;
         err.status = resp.status;
         err.response = json;
@@ -124,6 +129,30 @@ export async function api(path, opts = {}) {
     }
   }
   throw new Error('Request failed');
+}
+
+/**
+ * The page's own words for a 402 INSUFFICIENT_MORSELS: the use needs more morsels of pacing than the
+ * balance holds. It points to the daily allowance, and, when the operator sells a pacing pack
+ * (GET /v1/wallet `pacing_pack`), to buying one, with the pack's money price. A morsel is pacing,
+ * never a price, so the words never call the amount a cost. '' when the words cannot be built (the
+ * caller then keeps the server's English message). i18n.js and format.js are loaded on demand: they
+ * sit above this module in the import graph (i18n → utils → format → display-prefs → api).
+ */
+async function insufficientMorselsWords() {
+  try {
+    const [{ t }, { money }, wallet] = await Promise.all([
+      import('/js/i18n.js'), import('/js/format.js'),
+      api('/v1/wallet').catch((err) => { swallowed('api.insufficientMorselsWords', err); return null; }),
+    ]);
+    const pack = wallet?.data?.pacing_pack;
+    if (!pack || !pack.price) return t('pacing.insufficient');
+    const price = money(pack.price.amount / 1e6, pack.price.currency);
+    return `${t('pacing.insufficient')} ${t('pacing.insufficientPack', { n: pack.morsels, price })}`;
+  } catch (err) {
+    swallowed('api.insufficientMorselsWords', err);
+    return '';
+  }
 }
 
 /** UUID v4 also works on an HTTP LAN node, where randomUUID is not exposed by the browser. */

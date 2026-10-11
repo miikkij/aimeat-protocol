@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). PUT stores an old price.morsels as part of tollMorsels; the GETs return
+ *     the old field as a deprecated mirror until 4.0.0 (config-pacing.ts). The invoke charges the
+ *     pacing amount through chargePacing (part burned, the operator's share kept, the rest to the
+ *     provider) and refuses a money-priced offer to another owner with the checkout to use instead.
  *   v1.7.0 — 2026-09-29 — GET /v1/offers evaluates prerequisites as the caller's classification
  *     reader (TARGET-082 V4).
  *   v1.6.2 — 2026-09-26 — Whether the caller owns the agent is asked with localAccountName
@@ -31,7 +36,6 @@
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
  */
 import type { Router } from 'express';
-import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
@@ -39,11 +43,13 @@ import { callAuthority } from '../../auth/effective-scopes.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, resolveIdentity, localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { OffersDocSchema, type Offer } from '../../models/offer-schemas.js';
+import { OffersDocSchema, normalizeOfferPacing, presentOfferPacing, type Offer } from '../../models/offer-schemas.js';
 import { evaluateOfferPrereqs, offerHasPrereqs } from '../../services/offer-prereqs.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { settleMarketplaceFee } from '../../services/marketplace-fee.js';
-import { percentFee } from '../../commerce/money.js';
+import { chargePacing, pacingReceipt, resolvePacingToll } from '../../services/metered-settlement.js';
+import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
+import { paymentChallenge } from '../../commerce/x402.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../../config-pacing.js';
 import { listWorkflows } from '../../services/workflow/store.js';
 import { reconcileAfterSourceWrite, exchangeOutcome } from '../../services/exchange-projection.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
@@ -66,12 +72,18 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
 
     const parsed = OffersDocSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_OFFERS', parsed.error.message)); return; }
+    // The old morsel price is read as the pacing amount until MORSEL_PRICE_FIELDS_REMOVED_IN, and refused after it.
+    if (!legacyMorselFieldsLive() && parsed.data.offers.some(o => o.price)) {
+      res.status(400).json(error(config.nodeId, 'MORSEL_PRICE_REMOVED',
+        `price.morsels was removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}: a morsel is pacing, not a price. Set tollMorsels (the pacing amount per use) and priceMoney.`));
+      return;
+    }
 
     const key = `agents.${agent.name}.offers`;
     const existing = await storage.getMemory(agentGaii, key);
     const now = new Date().toISOString();
     const prevDocVersion = (existing?.value as { version?: number } | undefined)?.version ?? 0;
-    const value = { version: prevDocVersion + 1, updatedAt: now, offers: parsed.data.offers };
+    const value = { version: prevDocVersion + 1, updatedAt: now, offers: parsed.data.offers.map(o => normalizeOfferPacing(o)) };
     // An offer flagged for EXCHANGE whose changed text would publish an ODPS document past a schema cap
     // is refused here, before the write (the developer's decision of 2026-09-13; one rule for every door).
     const odps = odpsWriteRefusal(key, value, existing?.value);
@@ -101,7 +113,8 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     const name = identifier.split('#')[0];
     const rec = await storage.getMemory(agentGaii, `agents.${name}.offers`);
     const doc = (rec?.value as { version?: number; updatedAt?: string; offers?: Offer[] } | undefined) ?? {};
-    const offers = doc.offers ?? [];
+    const mirror = legacyMorselFieldsLive();
+    const offers = (doc.offers ?? []).map(o => presentOfferPacing(o, mirror, MORSEL_PRICE_DEPRECATION));
     const agent = await storage.getAgent(agentGaii);
     const isOwnerOfAgent = !!agent && agent.owner === localAccountName(owner);
     res.json(success(config.nodeId, {
@@ -139,8 +152,9 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
       const online = !!(a.lastSeen && (now - new Date(a.lastSeen).getTime()) < 10 * 60 * 1000);
 
       const enriched: Array<Record<string, unknown>> = [];
+      const mirror = legacyMorselFieldsLive();
       for (const offer of offers) {
-        const o: Record<string, unknown> = { ...offer };
+        const o: Record<string, unknown> = presentOfferPacing(offer, mirror, MORSEL_PRICE_DEPRECATION);
         // Prerequisites — evaluated only when the offer declares any (bounds the per-feed cost).
         if (offerHasPrereqs(offer)) {
           try { o.prereq = await evaluateOfferPrereqs(storage, config, owner, a.name, offer, reader); }
@@ -197,15 +211,24 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
     if (!cap) { res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${actionId}`)); return; }
 
     const callerGhii = resolveIdentity(req.auth!, config.nodeId);
-    const price = (!isSelf && offer.price && offer.price.morsels > 0) ? Number(offer.price.morsels) : 0;
-
-    // Reserve funds up front (atomic debit); refund if dispatch fails.
-    if (price > 0) {
-      const debited = await storage.debitBalance(callerGhii, price);
-      if (!debited) {
-        const ghii = await storage.getGHIIByOwner(callerOwner);
-        res.status(402).json(error(config.nodeId, 'INSUFFICIENT_BALANCE', `This offer costs ${price} morsels; you have ${ghii?.morselBalance ?? 0}`)); return;
-      }
+    // A money price is paid through the checkout, never here: this route moves no money, so an offer
+    // with one is refused to another owner rather than handed over for nothing.
+    if (!isSelf && offer.priceMoney) {
+      res.status(402).json(error(config.nodeId, 'PAYMENT_REQUIRED',
+        `This offer costs ${offer.priceMoney.amount / 1_000_000} ${offer.priceMoney.currency}. Buy it with a checkout `
+        + `(POST /v1/commerce/checkout-sessions with { items: [{ agent: "${providerGaii}", offer_id: "${offerId}" }] }).`));
+      return;
+    }
+    // The pacing amount (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa), charged
+    // before the call: part burns, the operator keeps its share, the rest goes to the provider.
+    const pacing = isSelf ? 0 : resolvePacingToll(config, normalizeOfferPacing(offer).tollMorsels);
+    const charge = await chargePacing({
+      config, storage, caller: callerGhii, providerGhii: `${agent.owner}@${config.nodeId}`, amount: pacing,
+      label: `offer:${agent.name}:${offerId}`, feePercent: config.marketplaceTransactionFeePercent ?? 5,
+    });
+    if (!charge) {
+      res.status(402).json({ ...error(config.nodeId, 'INSUFFICIENT_MORSELS', insufficientMorselsMessage(config, pacing)), ...paymentChallenge(config) });
+      return;
     }
 
     const jwt = (req.headers.authorization || '').replace('Bearer ', '');
@@ -218,27 +241,13 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
       result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode,
         undefined, callAuthority(req.auth!));
     } catch (err) {
-      if (price > 0) await storage.creditBalance(callerGhii, price); // refund the reservation
+      await charge.reverse();   // the call failed: the pacing comes back
       const e = err as { statusCode?: number; code?: string; message?: string };
       res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'OFFER_INVOKE_FAILED', e.message || 'Offer invocation failed')); return;
     }
 
-    // Success → settle: credit the provider (price minus the marketplace fee) + record the audit
-    // trail. The fee leg routes to the operator or burns per AIMEAT_MARKETPLACE_FEE_MODE.
-    let receipt: Record<string, unknown> = { charged: 0 };
-    if (price > 0) {
-      const providerGhii = `${agent.owner}@${config.nodeId}`;
-      const feePercent = config.marketplaceTransactionFeePercent ?? 5;
-      const fee = percentFee(price, feePercent);
-      const earnings = price - fee;
-      await storage.creditBalance(providerGhii, earnings);
-      const now = new Date().toISOString();
-      const trackingCode = `offtx_${Date.now()}_${randomBytes(6).toString('hex')}`;
-      await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: callerGhii, type: 'offer_spend', amount: -price, counterpartyGaii: providerGhii, trackingCode, timestamp: now });
-      await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: providerGhii, type: 'offer_earn', amount: earnings, counterpartyGaii: callerGhii, trackingCode, timestamp: now });
-      await settleMarketplaceFee(storage, config, { fee, payerGhii: callerGhii, trackingCode, source: 'offer' });
-      receipt = { charged: price, earned: earnings, fee, trackingCode };
-    }
+    // No money moved here. The receipt names the pacing; `charged` stays 0 and is kept for 3.x readers.
+    const receipt: Record<string, unknown> = { charged: 0, ...(charge.morsels > 0 ? { pacing: pacingReceipt(charge) } : {}) };
     res.json(success(config.nodeId, { offer: offerId, agent: agent.name, result, receipt }));
   });
 }

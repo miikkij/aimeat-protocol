@@ -70,12 +70,12 @@ import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
-import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } from '../commerce/payment-handlers.js';
+import { registerPaymentHandler, resetPaymentHandlers } from '../commerce/payment-handlers.js';
 import { stripePaymentHandler } from '../commerce/stripe-handler.js';
 import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
-import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver } from '../commerce/sellable-resolvers.js';
+import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver, pacingPackSellableResolver } from '../commerce/sellable-resolvers.js';
 import { packageSellableResolver } from '../services/packages/sale/package-sale-checkout.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
@@ -413,7 +413,6 @@ export async function mountRoutes(
     : null);
 
   resetPaymentHandlers();
-  registerPaymentHandler(morselPaymentHandler());
   // Money rails. Neither carries a node-level credential: the Stripe handler charges on the
   // seller's own key (commerce.psp) and the invoice handler books an obligation instead of
   // capturing anything, so both are safe to register on every node.
@@ -424,6 +423,7 @@ export async function mountRoutes(
   registerSellableResolver(appToolSellableResolver());
   registerSellableResolver(extCallSellableResolver());   // priced raw-call money channel (rm-commercial-raw-calls)
   registerSellableResolver(packageSellableResolver(peers));   // a package this node sells, priced from its catalogue
+  registerSellableResolver(pacingPackSellableResolver());   // pacing capacity the operator sells for money
   // TEST ONLY: a fake EUR/USD rail so the money chain is E2E-provable without a real PSP. Off in prod.
   if (config.testMoneyHandler) {
     const { testMoneyPaymentHandler, testMoneyHandlerActive } = await import('../commerce/test-money-handler.js');

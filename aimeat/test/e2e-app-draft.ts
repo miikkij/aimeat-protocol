@@ -15,6 +15,8 @@
  * @version-history
  *   v1.2.1 — 2026-10-11 — The paywall read is signed in as owner B: an anonymous read of a paid
  *     app answers 401 since secaudit 2026-10-10 C1, and the 402 that names the price needs a caller.
+ *   v1.3.0 — 2026-10-11 — Phase 6 reads the app's pacing amount `tollMorsels` (a morsel is pacing, not
+ *     a price; priceMorsels is checked once as the deprecated mirror). These asserted the old morsel price model.
  *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit (e2e-app-draft:178): "drafts are
  *     owner-scoped" was proved only by asking about owner B's OWN path, so owner B's token had never
  *     been sent at /v1/apps/{ownerA}/…. Phase 3 now does exactly that on the write, the preview-token
@@ -331,7 +333,9 @@ await test('A paid app with per-locale descriptions is published inline', async 
         }),
     }));
     assert(status === 201, `publish status ${status}: ${JSON.stringify(body)}`);
-    assert(body.data?.manifest?.priceMorsels === 5, `priceMorsels=5, got ${body.data?.manifest?.priceMorsels}`);
+    // The 3.x price_morsels is read as the app's pacing amount (2026-10-11); priceMorsels is its mirror.
+    assert(body.data?.manifest?.tollMorsels === 5, `tollMorsels=5, got ${body.data?.manifest?.tollMorsels}`);
+    assert(body.data?.manifest?.priceMorsels === 5, `the deprecated priceMorsels mirror=5, got ${body.data?.manifest?.priceMorsels}`);
     assert(body.data?.manifest?.licenseType === 'lifetime', 'licenseType=lifetime');
     assert(body.data?.manifest?.descriptions?.fi === 'Maksullinen sovellus', 'fi description stored');
 });
@@ -346,7 +350,7 @@ await test('Promoting a draft keeps the price, the licence and the translations'
     const pub = await json(`/v1/apps/${ownerAName}/${PAID}/publish-draft`, aAuthed({ method: 'POST' }));
     assert(pub.status === 201, `publish-draft status ${pub.status}: ${JSON.stringify(pub.body)}`);
     const m = pub.body.data?.manifest ?? {};
-    assert(m.priceMorsels === 5, `a promoted draft must stay paid — priceMorsels=${m.priceMorsels}`);
+    assert(m.tollMorsels === 5, `a promoted draft must keep its pacing amount — tollMorsels=${m.tollMorsels}`);
     assert(m.licenseType === 'lifetime', `licenceType survived — got ${m.licenseType}`);
     assert(m.descriptions?.fi === 'Maksullinen sovellus', `per-locale descriptions survived — got ${JSON.stringify(m.descriptions)}`);
 });
@@ -358,8 +362,8 @@ await test('The paywall agrees: reading the promoted version still costs 5 morse
     // 2026-10-10 C1), so only a signed-in read reaches the 402 that names the price.
     const { status, body } = await json(`/v1/apps/${ownerAName}/${PAID}`, bAuthed());
     assert(status === 402, `a priced app answers 402 — got ${status}: ${JSON.stringify(body)}`);
-    assert(String(body.error?.message ?? '').includes('5 morsels'),
-        `the paywall still names the price — got "${body.error?.message}"`);
+    assert(String(body.error?.message ?? '').includes('5 morsels of pacing'),
+        `the gate still names the pacing amount — got "${body.error?.message}"`);
 });
 
 await test('Promoting a draft records a public-activity event, like the other two doors', async () => {

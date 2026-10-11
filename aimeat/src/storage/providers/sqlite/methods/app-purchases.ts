@@ -8,12 +8,16 @@
  * @structure appPurchaseMethods
  * @usage Object.assign(SqliteStorage.prototype, appPurchaseMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A morsel is pacing, never a price: the columns priceMorsels /
+ *     transactionFeeMorsels map to AppPurchaseRecord.tollMorsels / operatorShareMorsels, and the receipt's
+ *     manifest snapshot is read through normalizeAppManifestPacing.
  *   v1.0.0 — 2026-10-05 — createAppPurchase, getAppPurchase, listAppPurchasesByBuyer,
  *     listAppPurchasesBySeller, hasValidLicense, deserializeAppPurchase moved here from apps.ts so the file
  *     mirrors postgres-kysely/methods/app-purchases.ts (secaudit 2026-10, M8).
  */
 import type { AppPurchaseRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { normalizeAppManifestPacing } from '../../../app-manifest-pacing.js';
 
 export const appPurchaseMethods = {
 
@@ -24,7 +28,8 @@ export const appPurchaseMethods = {
       record.transactionId, record.buyerGaii, record.buyerOwner,
       record.sellerGaii, record.sellerOwner, record.appFilename,
       record.appName, record.appVersionNumber, record.licenseType,
-      record.priceMorsels, record.transactionFeeMorsels, record.purchasedAt,
+      // The 3.x column names hold the pacing amount and its operator share (ruling 2026-10-11).
+      record.tollMorsels, record.operatorShareMorsels, record.purchasedAt,
       record.appContent, JSON.stringify(record.appManifest),
       record.appScreenshot ?? null, record.signature,
       record.nodeId, record.nodePublicKey,
@@ -70,11 +75,11 @@ export const appPurchaseMethods = {
       appName: row.appName as string,
       appVersionNumber: row.appVersionNumber as number,
       licenseType: row.licenseType as 'single' | 'lifetime',
-      priceMorsels: row.priceMorsels as number,
-      transactionFeeMorsels: row.transactionFeeMorsels as number,
+      tollMorsels: row.priceMorsels as number,
+      operatorShareMorsels: row.transactionFeeMorsels as number,
       purchasedAt: row.purchasedAt as string,
       appContent: row.appContent as string,
-      appManifest: JSON.parse((row.appManifest as string) || '{}'),
+      appManifest: normalizeAppManifestPacing(JSON.parse((row.appManifest as string) || '{}')),
       signature: row.signature as string,
       nodeId: row.nodeId as string,
       nodePublicKey: row.nodePublicKey as string,

@@ -29,6 +29,7 @@
  * @usage import type { InvoiceRecord, ... } from '../models/finance-schemas.js';
  *
  * @version-history
+ *   v1.1.0 — 2026-10-11 — VoucherSource drops 'morsel': a morsel is pacing, never a booking.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1: initial finance domain.
  */
 
@@ -158,8 +159,12 @@ export interface InvoiceRecord {
   updatedAt: string;
 }
 
-/** Where a voucher came from. */
-export type VoucherSource = 'stripe' | 'checkout' | 'invoice' | 'receipt' | 'manual' | 'morsel';
+/**
+ * Where a voucher came from. Money only: a morsel is pacing, not a price, and never a booking
+ * (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). The 'morsel' source is
+ * gone; no code path ever wrote it (POST /v1/finance/vouchers takes receipt or manual).
+ */
+export type VoucherSource = 'stripe' | 'checkout' | 'invoice' | 'receipt' | 'manual';
 
 /**
  * 'transfer' is money moving between the company's own balances (e.g. a Stripe payout to

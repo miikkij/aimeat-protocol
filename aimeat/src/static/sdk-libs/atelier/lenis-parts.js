@@ -32,8 +32,11 @@
  *     shipping: [{ id: 'std', label: 'Posti, 2 to 4 days', price: 5.9 }] },
  *     onSubmit(order) { place(order); } });
  *   Amounts straight from AIMEAT.commerce (6-decimal micro-units): `unit: 'micros'` on the data,
- *   or `priceMicros` on a line or a delivery option. Currency 'morsels' shows a morsel count.
+ *   or `priceMicros` on a line or a delivery option. Currency 'morsels' shows the amounts as
+ *   pacing ("pacing 5 morsels"): a morsel is never a price.
  * @version-history
+ *   v0.66.2 — 2026-10-11 — checkout shows a 'morsels' amount as pacing, never as a price
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v0.62.1 — 2026-10-01 — The words of thread and checkout come from the kit dictionary
  *     (./i18n.js, en/fi/es, overridable with i18n.use()): section names, field labels and hints,
  *     buttons, totals, refusals, statuses and the day headings. The field list and the step names
@@ -50,7 +53,7 @@ import { emptyState } from './state.js';
 import { form } from './form.js';
 import { stagger } from './motion.js';
 import { t } from './i18n.js';
-import { isMorsels, speaksMicros, readAmount, roundMicros, fractionDigits, morselText } from './money-units.js';
+import { isMorsels, speaksMicros, readAmount, roundMicros, fractionDigits, pacingText } from './money-units.js';
 
 /** One shared load of Lenis (script + stylesheet), whoever asks first. */
 let lenisPromise = null;
@@ -368,15 +371,15 @@ function detailFields() {
 
 /**
  * Money in the reader's own number habits; the symbol or code is the caller's. A figure from
- * micro-units keeps two decimals, up to six when sub-cent; a morsel count is an integer with the
- * kit's word and never money.
+ * micro-units keeps two decimals, up to six when sub-cent; a morsel amount reads as pacing ("pacing
+ * 5 morsels") and never as money.
  * @param {number} value  whole currency units, or a morsel count
  * @param {string} [currency]
  * @param {boolean} [micros]  the figure came from micro-units
  * @returns {string}
  */
 function money(value, currency, micros) {
-  if (isMorsels(currency)) return morselText(value);
+  if (isMorsels(currency)) return pacingText(value);
   const v = micros ? roundMicros(value) : Math.round((Number(value) || 0) * 100) / 100;
   const d = micros ? fractionDigits(v) : 2;
   const cur = currency || '€';

@@ -5,8 +5,9 @@
  * @description x402 payment challenge body (TARGET-033 phase 5, TARGET-042): every 402 response from a
  *   commerce adapter carries an `accepts` array telling the paying agent HOW it could settle. Two
  *   layers live here:
- *   - The AIMEAT-native schemes (`aimeat-checkout`, `aimeat-morsel-topup`) — the registered payment
- *     handlers plus the morsel top-up path — which an AIMEAT client understands.
+ *   - The AIMEAT-native schemes (`aimeat-checkout`, `aimeat-morsel-topup`) — the registered money
+ *     handlers, plus how to get more morsels of pacing (the daily allowance, and the pacing pack the
+ *     operator may sell for money) — which an AIMEAT client understands.
  *   - The REAL x402 `exact` scheme (TARGET-042), added for a MONEY session when the x402 handler is
  *     enabled, the session's currency has a settlement asset on the configured network (USD → USDC,
  *     EUR → EURC), and the seller has a payout address: full x402 vocabulary (network, payTo, asset,
@@ -18,6 +19,8 @@
  *   const extra = await x402ExactAccepts(config, storage, session); // [] unless x402 applies
  *   res.status(402).json({ ...error(...), ...paymentChallenge(config, extra) });
  * @version-history
+ *   v1.4.0 — 2026-10-11 — The top-up entry names the daily allowance route and, when the operator sells
+ *     one, the pacing pack (morsels, money price, checkout_item). No handler settles morsels any more.
  *   v1.3.0 — 2026-10-11 — paymentChallenge takes `moneyOnly` for the ACP and UCP surfaces, which no
  *     longer offer the morsel ledger as a way to pay (ruling D4).
  *   v1.2.0 — 2026-07-25 — The exact scheme is built from the SESSION CURRENCY's settlement asset, so
@@ -30,7 +33,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CheckoutSessionRecord } from './types.js';
 import { listPaymentHandlers } from './payment-handlers.js';
-import { isMoneyCurrency } from './money.js';
+import { isMoneyCurrency, formatMoneyMajor } from './money.js';
+import { pacingPackOffer } from './pacing-pack.js';
 import { getX402Network, getX402Asset, buildExactRequirements, extractPayTo } from './x402-facilitator.js';
 
 /**
@@ -39,7 +43,7 @@ import { getX402Network, getX402Asset, buildExactRequirements, extractPayTo } fr
  * client finds a scheme it can settle first; the AIMEAT-native schemes always follow.
  *
  * `moneyOnly` is for the ACP and UCP surfaces, where a price is money (commerce/protocol-money.ts):
- * the morsel ledger is left out of the handlers, and the morsel top-up scheme is not offered.
+ * only money currencies are listed, and the morsel top-up scheme is not offered.
  */
 export function paymentChallenge(
   config: AimeatConfig,
@@ -60,10 +64,17 @@ export function paymentChallenge(
     });
   }
   if (!opts.moneyOnly) {
+    // Morsels pace use; they are not a payment. When a use is refused for want of them, this entry
+    // says how to get more: the daily allowance, and the pacing pack when the operator sells one.
+    const pack = pacingPackOffer(config);
     accepts.push({
       scheme: 'aimeat-morsel-topup',
-      description: 'Insufficient morsels: ask the node operator to mint, receive the daily allowance, or earn by selling offers',
+      description: pack
+        ? `Not enough morsels for the pacing: request the daily allowance (POST /v1/wallet/request), or buy ${pack.morsels} morsels of pacing capacity for ${formatMoneyMajor(pack.price.amount)} ${pack.price.currency} by opening a checkout with checkout_item`
+        : 'Not enough morsels for the pacing: request the daily allowance (POST /v1/wallet/request), or ask the operator of this node',
       resource: `${b}/v1/wallet`,
+      daily_allowance: { method: 'POST', url: `${b}/v1/wallet/request` },
+      ...(pack ? { morsels: pack.morsels, price: pack.price, checkout_item: pack.checkout_item, checkout: `${b}/v1/commerce/checkout-sessions` } : {}),
     });
   }
   return { x402Version: 1, accepts };

@@ -13,6 +13,8 @@
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
  *
  * @version-history
+ *   v1.5.0 — 2026-10-11 — The catalogue push sends an action's pricing as toll_morsels, the pacing
+ *     amount, with base_morsels as a deprecated mirror until 4.0.0 (a morsel is pacing, not a price).
  *   v1.4.1 — 2026-10-06 — syncSubscribedMemory signs the seven fields /v1/federation/replicate verifies
  *     (it signed source_genesis too, so every push got 401), sends the delivery proof, and counts only a
  *     push the peer accepted (wish-genesis-subscribed-memory-sync-never-lands).
@@ -35,6 +37,7 @@ import { sign } from '../auth/keypair.js';
 import { deliveryProof } from './signed-node-request.js';
 import { logger } from '../utils/logger.js';
 import { leaveToPeer } from './classification/egress.js';
+import { presentActionPricing } from './action-pacing.js';
 
 /** System GAII used to store genesis catalogue entries as memory. */
 const GENESIS_SYSTEM_GAII = '__genesis__';
@@ -142,10 +145,8 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
           display_name: a.displayName,
           description: a.description,
           category: a.category,
-          pricing: {
-            base_morsels: a.pricing.baseMorsels,
-            per_unit: a.pricing.perUnit,
-          },
+          // toll_morsels is the pacing amount; base_morsels mirrors it for a 3.x peer until 4.0.0.
+          pricing: presentActionPricing(a.pricing),
           tags: a.tags,
           semantic: a.semantic,
         })),

@@ -8,6 +8,8 @@
  *   ceils, commission cuts always floor and reconcile exactly, and currency validation is strict.
  * @usage cd aimeat && pnpm exec vitest run src/commerce/__tests__/money.test.ts
  * @version-history
+ *   Name only — 2026-10-11 — The isMoneyCurrency case says why 'morsel' is refused: a morsel is pacing,
+ *     never a currency (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.0.0 — 2026-07-14 — Initial chokepoint tests (TARGET-033 phase 7c)
  */
 import { describe, it, expect } from 'vitest';
@@ -39,7 +41,8 @@ describe('scale constants', () => {
 });
 
 describe('currency validation', () => {
-  it('isMoneyCurrency separates money from morsels', () => {
+  // A morsel is pacing, never a currency: a 3.x record's 'morsel' must never read as money.
+  it('isMoneyCurrency never reads the 3.x "morsel" value as money', () => {
     expect(isMoneyCurrency('EUR')).toBe(true);
     expect(isMoneyCurrency('USD')).toBe(true);
     expect(isMoneyCurrency('morsel')).toBe(false);

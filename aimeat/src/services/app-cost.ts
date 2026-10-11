@@ -18,6 +18,8 @@
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  *   res.json(success(config.nodeId, r.view, r.links));
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A morsel contract's per-call amount is `toll_morsels` (a morsel is pacing,
+ *     not a price); `price_per_call` stays on it as a deprecated mirror until 4.0.0. Money rows unchanged.
  *   v1.0.0 — 2026-09-27 — Moved unchanged out of routes/apps-cost.ts (toContractView, spendTotals,
  *     the entitlement filter and the roll-up) so the MCP tool calls the same code as the route.
  */
@@ -27,6 +29,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { commerceFeePercent } from './marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import { listEntitlementsByApp, type MeteredEntitlement } from './metered-entitlements.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 
 /** A refusal the caller renders: REST as the envelope error, MCP as `CODE: message`. */
 export interface AppCostRefusal {
@@ -52,6 +55,10 @@ function ownerOf(gaii: string): string {
 function toContractView(config: AimeatConfig, e: MeteredEntitlement) {
   const rakePct = e.rakePercent ?? commerceFeePercent(config);
   const remaining = e.budget.capUnits === null ? null : Math.max(0, e.budget.capUnits - e.budget.spentUnits);
+  // A morsel contract's per-call amount is pacing, never a price (ruling 2026-10-11): it is
+  // `toll_morsels`, and `price_per_call` stays beside it only as a deprecated mirror until 4.0.0.
+  const morsels = e.unit === 'morsels';
+  const mirror = legacyMorselFieldsLive();
   return {
     entitlement_id: e.entitlementId,
     capability: e.capabilityLabel,
@@ -60,7 +67,9 @@ function toContractView(config: AimeatConfig, e: MeteredEntitlement) {
     state: e.state,
     unit: e.unit,
     currency: e.currency,
-    price_per_call: e.pricePerCall,
+    ...(morsels ? { toll_morsels: e.pricePerCall } : {}),
+    ...(!morsels || mirror ? { price_per_call: e.pricePerCall } : {}),
+    ...(morsels && mirror ? { deprecated: { price_per_call: MORSEL_PRICE_DEPRECATION } } : {}),
     pricing: e.pricing ?? { model: 'per_call' },
     rake_percent: rakePct,
     rake_per_call: percentFee(e.pricePerCall, rakePct),

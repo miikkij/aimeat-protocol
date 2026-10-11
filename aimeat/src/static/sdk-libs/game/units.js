@@ -8,6 +8,8 @@
  *
  *   MORSELS are plain integers, and the word beside them is a translated word. Never the meat
  *   emoji: it is not a currency symbol, it does not align, and it does not survive a font change.
+ *   A morsel paces use and is never a price: beside a price it reads as pacing
+ *   (`morsels(5, { pacing: true })` → "pacing 5 morsels").
  *
  *   THE TWO NEVER MEET IN ONE FIGURE. There is deliberately no combined formatter here — a view
  *   showing both shows them as two rows, because a sum of morsels and euros means nothing.
@@ -15,6 +17,8 @@
  * @usage  AIMEAT.game.money(1500000, 'EUR')  // "1.50 EUR"
  *         AIMEAT.game.morsels(12)            // "12 morsels" / "12 murusta"
  * @version-history
+ *   v1.1.0 — 2026-10-11 — morsels(n, { pacing: true }) reads "pacing 5 morsels": a morsel is pacing,
+ *     never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
  */
 import { i18n } from './i18n.js';
@@ -35,18 +39,26 @@ export function money(micros, currency) {
 }
 
 /**
- * Format a morsel amount: an integer and a translated word, never a symbol or an emoji.
+ * Format a morsel amount: an integer and a translated word, never a symbol or an emoji. Where the
+ * amount stands beside a price (what one use of a thing paces), pass `pacing: true`: it reads
+ * "pacing 5 morsels" (the kit word `pacingAmount`, with the count in `{amount}`; until a dictionary
+ * carries it, the English word goes in front). A morsel is never a price.
  * @param {number} n
- * @param {{ bare?: boolean }} [opts]  `bare: true` returns the number alone.
+ * @param {{ bare?: boolean, pacing?: boolean }} [opts]  `bare: true` returns the number alone.
  * @returns {string}
  */
 export function morsels(n, opts) {
   const v = Math.round(Number(n) || 0);
-  return opts && opts.bare ? String(v) : v + ' ' + i18n.t('morsels');
+  if (opts && opts.bare) return String(v);
+  const amount = v + ' ' + i18n.t('morsels');
+  if (!(opts && opts.pacing)) return amount;
+  const text = i18n.t('pacingAmount', { amount: amount });
+  return text === 'pacingAmount' ? 'pacing ' + amount : text;
 }
 
 /**
  * Is this currency real money (as opposed to the morsel meter)? The branch every seller view needs.
+ * 'morsel' appears only on a checkout session stored before 4.x; a session is priced in money now.
  * @param {string} [currency]
  * @returns {boolean}
  */

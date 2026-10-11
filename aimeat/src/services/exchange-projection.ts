@@ -16,13 +16,11 @@
  *   (kind, ext, action, unit, currency) — a price change therefore UPDATES the existing listing instead
  *   of minting a rival one.
  *
- *   COMBINED PRICE: a source that names both a money price and a morsel figure is stating ONE price —
- *   "1 morsel · 0.01 EUR", which is how the authoring UI and the marketplace card both show it. It
- *   projects to ONE money listing carrying the morsels as its pacing toll, so a call pays the provider
- *   the money and burns the morsels. It used to project a morsel listing BESIDE the money one, which
- *   made two purchasable alternatives out of one declared product: a buyer could take the morsel side
- *   and never pay the provider anything, for a second product nobody authored. Morsels WITHOUT money
- *   remain a listing of their own — that one is a deliberate no-money offer.
+ *   TWO VALUES: a source has an optional money price and a pacing amount in morsels per use, and a
+ *   morsel is never a price. A source with money projects ONE money listing per currency carrying its
+ *   pacing as the toll (a morsel listing beside it made two purchasable products out of one). A source
+ *   with only pacing is free and still lists, on the morsel rail, whose per-call amount is charged as
+ *   pacing. The rules are listingTerms in exchange-source-terms.ts.
  *
  *   HARD INVARIANT: a projection never touches a CONTRACT. Entitlements keep the interface version and
  *   the price they were signed at (`app-tool-interfaces.ts` deliberately does not freeze price — it is
@@ -41,6 +39,10 @@
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.7.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). A free agent offer with a pacing amount lists again (its old price is
+ *     folded into tollMorsels by the offers route, and it was being skipped as NOT_PRICED), and with a
+ *     money price the toll is the declared toll plus a legacy morsel figure (listingTerms).
  *   v1.6.1 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1). ownerGhiiOf hands over to the one in utils/gaii.ts rather than keep a copy.
  *   v1.6.0 — 2026-09-13 — List once, as the developer decided: when a flagged app-tool binds a flagged
  *     extension action without lockedInput, only the tool is listed and the action is skipped with
@@ -65,14 +67,14 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { AppToolsDocSchema, appToolsKey, type AppTool } from '../models/app-tool-schemas.js';
-import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
+import { OffersDocSchema, normalizeOfferPacing, type Offer } from '../models/offer-schemas.js';
 import { ensureInterfaceVersion, getLatestInterface } from './app-tool-interfaces.js';
 import {
   appToolCoordinate, agentWorkCoordinate, listAllOfferings, newOfferingId, putOffering,
   type Offering, type OfferingPlan,
 } from './exchange-market.js';
 import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOverruns } from './exchange-odps.js';
-import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, prices, pacingTollOf } from './exchange-source-terms.js';
+import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './exchange-source-terms.js';
 import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchange-projection-types.js';
 import { logger } from '../utils/logger.js';
 import { ownerGhiiOf as ownerGhiiOfPrincipal, localAccountName } from '../utils/gaii.js';
@@ -141,9 +143,9 @@ export async function desiredFromAppTools(
       const label = `${appId}/${tool.name}`;
       const skip = (reason: string) => skips.push({ action: 'skipped', offeringId: null, kind: 'app-tool', label, unit: null, currency: null, reason });
       if (!hasSchema(tool.inputSchema) || !hasSchema(tool.outputSchema)) { skip('SCHEMA_REQUIRED'); continue; }
-      const money = moneyPricesOf(tool.priceMoney, tool.pricesMoney);
-      const morsels = tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0;
-      if (!money.length && !morsels) { skip('NOT_PRICED'); continue; }
+      // A money price and a pacing amount; a 3.x `price.morsels` is pacing (exchange-source-terms.ts).
+      const sold = listingTerms(tool.tollMorsels, tool.price?.morsels ?? 0, moneyPricesOf(tool.priceMoney, tool.pricesMoney));
+      if (!sold) { skip('NOT_PRICED'); continue; }
 
       // ── UNBOUND: the task shape. Listed as agent-work, settled when the assignee delivers. ──
       if (!tool.action_id) {
@@ -160,10 +162,10 @@ export async function desiredFromAppTools(
           provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
           odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
           aiProvenance: inheritAiProvenance(parsed.data.aiProvenance, tool.aiProvenance),
-          tollMorsels: pacingTollOf(tool.tollMorsels, morsels, money.length > 0),
+          tollMorsels: sold.tollMorsels,
           taskSpec: { inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {} },
         };
-        for (const p of prices(morsels, money)) {
+        for (const p of sold.rows) {
           out.push({
             ...taskBase, ...p,
             key: listingKey('agent-work', taskCoord.ext, taskCoord.action, p.unit, p.currency),
@@ -196,10 +198,10 @@ export async function desiredFromAppTools(
         // merging with it: it is a self-describing document, and half of one laid over half of
         // another is a document that claims to be something it is not.
         aiProvenance: inheritAiProvenance(parsed.data.aiProvenance, tool.aiProvenance),
-        tollMorsels: pacingTollOf(tool.tollMorsels, morsels, money.length > 0),
+        tollMorsels: sold.tollMorsels,
         binding: tool.action_id, lockedInput: hasSchema(tool.lockedInput),
       };
-      for (const p of prices(morsels, money)) {
+      for (const p of sold.rows) {
         out.push({
           ...base, ...p,
           key: listingKey('app-tool', coord.ext, coord.action, p.unit, p.currency),
@@ -229,17 +231,17 @@ async function desiredFromExtActions(
       const label = `${ext.name}/${act.id}`;
       const skip = (reason: string) => skips.push({ action: 'skipped', offeringId: null, kind: 'ext-action', label, unit: null, currency: null, reason });
       if (!hasSchema(act.inputSchema) || !hasSchema(act.outputSchema)) { skip('SCHEMA_REQUIRED'); continue; }
-      const money = moneyPricesOf(comm.payMoney, comm.pricesMoney);
-      const morsels = comm.payMorsels > 0 ? comm.payMorsels : 0;
-      if (!money.length && !morsels) { skip('NOT_PRICED'); continue; }
+      // A 3.x `commercial.payMorsels` is pacing (exchange-source-terms.ts listingTerms).
+      const sold = listingTerms(act.tollMorsels, comm.payMorsels, moneyPricesOf(comm.payMoney, comm.pricesMoney));
+      if (!sold) { skip('NOT_PRICED'); continue; }
       const base = {
         kind: 'ext-action' as const, ext: ext.name, action: act.id, surface: null,
         title: `${ext.name} · ${act.id}`, description: ext.description ?? '',
         plans: (comm.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(comm.usageTerms), tags: [] as string[],
         provenance: provenanceOf(comm.provenance), odps: comm.odps ?? null,
-        tollMorsels: pacingTollOf(act.tollMorsels, morsels, money.length > 0),
+        tollMorsels: sold.tollMorsels,
       };
-      for (const p of prices(morsels, money)) {
+      for (const p of sold.rows) {
         out.push({
           ...base, ...p,
           key: listingKey('ext-action', ext.name, act.id, p.unit, p.currency),
@@ -272,9 +274,11 @@ async function desiredFromAgentOffers(
       // Selling implies being discoverable: `exchange` is the sale switch, `visibility` the shop window.
       if (offer.visibility !== 'public') { skip('NOT_PUBLIC'); continue; }
       if (!hasSchema(offer.inputSchema) || !hasSchema(offer.outputSchema)) { skip('SCHEMA_REQUIRED'); continue; }
-      const money = moneyPricesOf(offer.priceMoney, offer.pricesMoney);
-      const morsels = offer.price && offer.price.morsels > 0 ? offer.price.morsels : 0;
-      if (!money.length && !morsels) { skip('NOT_PRICED'); continue; }
+      // A free offer with a pacing amount lists too: the offers route folds a 3.x `price.morsels`
+      // into `tollMorsels` (normalizeOfferPacing), and that offer used to be skipped as unpriced.
+      const paced = normalizeOfferPacing(offer);
+      const sold = listingTerms(paced.tollMorsels, 0, moneyPricesOf(offer.priceMoney, offer.pricesMoney));
+      if (!sold) { skip('NOT_PRICED'); continue; }
       const coord = agentWorkCoordinate(ownerName, agent.name, offer.id);
       const base = {
         kind: 'agent-work' as const, ext: coord.ext, action: coord.action,
@@ -282,10 +286,10 @@ async function desiredFromAgentOffers(
         title: offer.title || `${agent.name}: ${offer.id}`, description: offer.ask ?? '',
         plans: [] as OfferingPlan[], usageTerms: usageTermsOf(offer.usageTerms), tags: (offer.tags ?? []) as string[],
         provenance: provenanceOf(offer.provenance), odps: offer.odps ?? null,
-        tollMorsels: pacingTollOf(offer.tollMorsels, morsels, money.length > 0),
+        tollMorsels: sold.tollMorsels,
         taskSpec: { inputSchema: offer.inputSchema ?? {}, outputSchema: offer.outputSchema ?? {} },
       };
-      for (const p of prices(morsels, money)) {
+      for (const p of sold.rows) {
         out.push({
           ...base, ...p,
           key: listingKey('agent-work', coord.ext, coord.action, p.unit, p.currency),

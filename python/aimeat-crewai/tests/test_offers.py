@@ -62,7 +62,7 @@ def _level3_offer() -> dict:
         deliverable={"format": "document", "location": {"key": "research.out"}},
         success_signal=Sig.count_nonempty(key_glob="research.*", min=1),
         required_to_function=NONE,
-        price={"morsels": 10, "unit": "per-call"},
+        toll_morsels=10,
         visibility="public",
         callable={"action_id": "research-run"},
     )
@@ -95,16 +95,45 @@ def test_level1_only_offer_flags_missing_workflow_bits() -> None:
 def test_priced_requires_public_and_callable() -> None:
     offer = build_offer(
         id="x", title="X", ask="do x; not y",
-        price={"morsels": 5}, visibility="unlisted", callable={"action_id": "x"},
+        toll_morsels=5, visibility="unlisted", callable={"action_id": "x"},
     )
     v = assess_offer(offer)
     assert v["priced"] is False
     assert any("public" in r for r in v["missing"]["priced"])
 
 
+def test_priced_reads_money_price_or_pacing() -> None:
+    base = {"visibility": "public", "callable": {"action_id": "x"}}
+    money = build_offer(id="m", title="M", ask="do m; not n",
+                        price_money={"amount": 1_500_000, "currency": "EUR"}, **base)
+    assert money["priceMoney"] == {"amount": 1_500_000, "currency": "EUR"}
+    assert assess_offer(money)["priced"] is True
+    paced = build_offer(id="p", title="P", ask="do p; not q", toll_morsels=3, **base)
+    assert paced["tollMorsels"] == 3
+    assert assess_offer(paced)["priced"] is True
+    neither = build_offer(id="n", title="N", ask="do n; not o", **base)
+    v = assess_offer(neither)
+    assert v["priced"] is False
+    assert any("tollMorsels" in r for r in v["missing"]["priced"])
+
+
+def test_deprecated_morsel_price_becomes_pacing() -> None:
+    # A morsel is pacing, never a price: the 3.x price={"morsels": n} is written as tollMorsels,
+    # added to any toll_morsels, and the document carries no `price`.
+    with pytest.warns(DeprecationWarning, match="toll_morsels"):
+        offer = build_offer(id="x", title="X", ask="do x; not y", price={"morsels": 7}, toll_morsels=2)
+    assert "price" not in offer
+    assert offer["tollMorsels"] == 9
+    # A stored 3.x offer that still carries price.morsels counts as offered to other owners.
+    legacy = {"id": "l", "title": "L", "ask": "do l; not m", "price": {"morsels": 4},
+              "visibility": "public", "callable": {"action_id": "l"}}
+    assert assess_offer(legacy)["priced"] is True
+
+
 def test_build_offer_drops_none() -> None:
     offer = build_offer(id="x", title="X", ask="do x; not y")
     assert "price" not in offer and "success_signal" not in offer
+    assert "priceMoney" not in offer and "tollMorsels" not in offer
     assert offer == {"id": "x", "title": "X", "ask": "do x; not y"}
 
 

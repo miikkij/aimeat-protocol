@@ -26,6 +26,8 @@
  *   flushVisibility · mergeDay · resetVisibilityState (tests)
  * @usage countVisit(storage, config, { ownerGaii, target: app.filename, ...visit });
  * @version-history
+ *   v1.2.0 — 2026-10-11 — recordPurchase sums money only: a purchase in morsels is counted as a free
+ *     purchase with no amount, since a morsel is pacing, not a price (isMorselCurrency).
  *   v1.1.0 — 2026-10-08 — The owner's settings moved to visibility-settings.ts, which also holds the
  *     analytics tag ids of layer B.
  *   v1.0.0 — 2026-10-08 — Initial, for AI visibility (layer A).
@@ -217,10 +219,17 @@ export interface PurchaseInput {
   channel: VisitChannel | 'none';
   family?: AiFamily | string | null;
   via: PurchaseVia;
-  /** In the session's currency unit: 6-decimal micro-units for money, whole morsels for morsels. */
+  /**
+   * In 6-decimal micro-units of `currency`. Money only: a morsel is pacing, not a price (ruling
+   * decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa), so a use paced in morsels and
+   * sold for no money is counted as a free purchase and its morsels are not summed.
+   */
   amount: number;
   currency: string;
 }
+
+/** A currency name that means morsels. Never a bucket of the purchase amounts. */
+export const isMorselCurrency = (currency: string): boolean => /^morsels?$/i.test(currency.trim());
 
 /** Count one completed purchase under the channel it came from. Never throws. */
 export function recordPurchase(storage: Storage, config: AimeatConfig, input: PurchaseInput): void {
@@ -236,7 +245,10 @@ export function recordPurchase(storage: Storage, config: AimeatConfig, input: Pu
       const d = deltaDay(storage, ownerGhii, dayOf(nowIso()));
       const p = (d.purchases[`${channel}|${family}|${via}`] ??= { n: 0, amounts: {} });
       p.n += 1;
-      if (Number.isFinite(input.amount) && input.amount > 0) bump(p.amounts, currency, Math.round(input.amount));
+      // Money only. A morsel-paced use is a free purchase: counted in `n`, no amount.
+      if (!isMorselCurrency(input.currency) && Number.isFinite(input.amount) && input.amount > 0) {
+        bump(p.amounts, currency, Math.round(input.amount));
+      }
     } catch (e) {
       logger.warn('visibility: a purchase could not be counted', { error: String(e) });
     }

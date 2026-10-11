@@ -8,6 +8,7 @@
  *   that fails is tried again by the upkeep when its wait is over.
  * @version-history
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
+ *   v1.0.1 — 2026-10-11 — The stub sellable names its price `unitPrice` (was `priceMorsels`) and its pacing `tollMorsels`.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
@@ -31,7 +32,7 @@ vi.mock('../../src/commerce/sellable-resolvers.js', () => ({
   getSellableResolver: () => ({
     resolve: async (_s: unknown, _c: unknown, ref: { offer_id?: string }) => {
       if (ref.offer_id === 'gone') throw Object.assign(new Error('gone'), { code: 'OFFER_NOT_FOUND' });
-      return { kind: 'offer', agentGaii: 'vendor#shop@node-1', offerId: ref.offer_id, title: 'Audit', priceMorsels: 19_990_000, sellerOwner: 'shop', sellerGhii: 'shop@node-1' };
+      return { kind: 'offer', agentGaii: 'vendor#shop@node-1', offerId: ref.offer_id, title: 'Audit', unitPrice: 19_990_000, tollMorsels: 0, sellerOwner: 'shop', sellerGhii: 'shop@node-1' };
     },
   }),
 }));

@@ -10,6 +10,9 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, rowWords, sourcesOf } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — Pacing rows in words (pacing_charge, pacing_burn, pacing_earn, pacing_refund,
+ *     the operator's share, and a pacing pack bought with money), named by the use their tracking code
+ *     carries (ruling "morseli on tahdistus, ei hinta").
  *   v1.1.0 — 2026-09-26 — On the component kit (page group G7): the crumb and the rail's page links are
  *     data for SettingsPage (components/Crumb.js, Rail.js), and openTab is Rail.js's.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
@@ -22,6 +25,19 @@ export const x = (key, vars) => t('walpage.' + key, vars);
 
 /** Row kinds that are the pace or a gift, not something earned from somebody. */
 export const GRANTED = new Set(['allowance', 'daily_allowance', 'welcome_bonus', 'mint']);
+
+/**
+ * The pacing rows one use writes (src/services/metered-settlement.ts chargePacing): what left the
+ * user's balance, the part of it that burned, what reached the provider, a reversal when the use
+ * failed, and the operator's share (a marketplace_fee row with a pacing tracking code).
+ */
+const PACING_ROW = {
+  pacing_charge: 'row.pacingCharge',
+  pacing_burn: 'row.pacingBurn',
+  pacing_earn: 'row.pacingEarn',
+  pacing_refund: 'row.pacingRefund',
+  marketplace_fee: 'row.pacingFee',
+};
 
 // The six copies of localeTag() that used to live here derived the FORMAT from the LANGUAGE, and
 // they had already drifted: five gave English en-GB while the money path special-cased en-US. The
@@ -90,6 +106,12 @@ export function rowWords(tx, self, agents) {
   let title;
   if (kind === 'granted') {
     title = x('kind.' + (tx.type === 'daily_allowance' ? 'allowance' : tx.type));
+  } else if (tx.type === 'pacing_pack') {
+    title = x('row.pacingPack');
+  } else if (parts[0] === 'pacing' && PACING_ROW[tx.type]) {
+    // pacing[:granted]:<label>:<8 hex>, written by chargePacing; the label names the use.
+    const what = parts.slice(parts[1] === 'granted' ? 2 : 1, -1).join(':') || x('row.noCode');
+    title = x(PACING_ROW[tx.type], { what });
   } else if (parts[0] === 'exchange' && (parts[1] === 'apptool' || parts[1] === 'agentwork') && parts[2]) {
     const slash = parts[2].indexOf('/');
     const owner = slash > 0 ? parts[2].slice(0, slash) : '';
