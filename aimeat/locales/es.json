@@ -11307,6 +11307,8 @@
       "untied": "Asociación quitada. La aplicación y el agente quedan como estaban.",
       "tieNone": "Todas tus aplicaciones ya están en esta lista, o todavía no tienes ninguna.",
       "tieLabel": "¿Qué aplicación muestra su trabajo?",
+      "tiePick": "Escribe una parte del nombre de la aplicación",
+      "tieNoMatch": "Ninguna de tus aplicaciones tiene eso en su nombre.",
       "tieNote": "La asociación es una anotación en el mapa de datos de la aplicación. No le da ningún permiso nuevo.",
       "tieDo": "Asociar la aplicación",
       "untieLabel": "¿Qué aplicación ya no muestra su trabajo?",

@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.0.1 -- 2026-10-11 -- Step 4: the first run's task text is the first offer's example, and
+ *     the purpose only when there is none.
  *   v1.0.0 -- 2026-10-11 -- Moved from builtin-skills.ts (max-file-lines).
  */
 /**
@@ -91,8 +93,11 @@ not a product they do not use.
    approved for one named connector waits for that connector (the answer's \`connector\` names it),
    and another computer of the owner's connecting is not given it. If a connector was reached
    and did not take it on, the owner updates the connector and presses Attach. The approval also
-   gives the new agent its work once, as a task that carries its name and its purpose, so the owner
-   sees that it works and has a first result; write the \`purpose\` so that it reads as that task.
+   gives the new agent its work once, so the owner sees that it works and has a first result. The
+   task's text is the \`example\` of the definition's first offer, so write that example as one real
+   request with a sample of what a person would give the agent ("Make a slogan for the product
+   Morning Coffee"), never as an input with its result. A definition whose offer has no example is
+   given the \`purpose\` as the task, which suits only an agent that needs no input.
 5. **Work on a clock comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
    agent (\`aimeat_schedule_create\`), made once the agent exists. Say so when you propose it.
 

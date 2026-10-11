@@ -24,6 +24,8 @@
  * @structure default AgentWorkView({ navigate })
  * @usage routed at /v1/home?agent=<name>&work=<task id> by spa.html
  * @version-history
+ *   v1.1.1 — 2026-10-11 — The page opens the live stream itself (lib/live-updates.js
+ *     relayLiveUpdates), so a running task that ends shows its result without a reload.
  *   v1.1.0 — 2026-10-11 — What this work is tied to: where the result is and who sees it (the
  *     outcome's `shared_with`), and the apps that show the agent's work.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentin-ty-n-tulos-n-kyviin-yksinkertaisessa-agenttin-kym-ss).
@@ -34,6 +36,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useSession } from '/js/use-session.js';
+import { getSession } from '/js/services/auth.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { ago } from '/js/format.js';
 import { PageFrame } from '/components/PageFrame.js';
@@ -105,7 +109,8 @@ export default function AgentWorkView({ navigate }) {
   loadRef.current = load;
   useEffect(() => { if (session && name && id) loadRef.current(); }, [session, name, id]);
   // The live-update contract every server-data page keeps: a running task that ends shows its
-  // result here without a reload.
+  // result here without a reload. This page is a route of its own, so it opens the stream itself.
+  useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session]);
   useEffect(() => {
     const handler = () => { if (session && name && id) loadRef.current(); };
     window.addEventListener('aimeat-live-update', handler);

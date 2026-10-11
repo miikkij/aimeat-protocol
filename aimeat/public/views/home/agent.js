@@ -23,6 +23,9 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.5.1 — 2026-10-11 — The page opens the live stream itself (lib/live-updates.js
+ *     relayLiveUpdates): it listened for a change and nothing sent one, so a finished task showed
+ *     as "working" until a reload.
  *   v1.5.0 — 2026-10-11 — What the agent's work is tied to (agent-ties-parts.js): the offer to make
  *     an app right after the agent is made, the row "Where its work goes" with its one choice, and
  *     the section Apps. A new agent's page says that it does its work once now.
@@ -44,6 +47,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
+import { getSession } from '/js/services/auth.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { ago, dateTime } from '/js/format.js';
 import { areaLine } from '/js/consent-vocab.js';
@@ -116,7 +121,8 @@ export default function AgentView({ navigate }) {
   loadRef.current = load;
   useEffect(() => { if (session && name) loadRef.current(); }, [session, name]);
   // The live-update contract every server-data page keeps: a task finishing or a machine
-  // connecting moves this page too.
+  // connecting moves this page too. This page is a route of its own, so it opens the stream itself.
+  useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session]);
   useEffect(() => {
     const handler = () => { if (session && name) loadRef.current(); };
     window.addEventListener('aimeat-live-update', handler);

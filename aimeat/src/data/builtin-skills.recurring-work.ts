@@ -33,6 +33,7 @@
  * @version-history
  *   v1.7.2 — 2026-10-11 — Section 4: one `offers` entry in the definition puts the agent on the
  *     person's offers page; the node adds one when there is none.
+ *   v1.7.3 — 2026-10-11 — Section 4: the first run's task text is the offer's example.
  *   v1.7.1 — 2026-10-11 — Section 4: the approval gives the new agent its work once, as a task with
  *     its name and its purpose (services/agent-first-run.ts).
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -164,8 +165,8 @@ proposal: an agent approved without one exists and cannot start. One \`offers\` 
 definition (\`id\`, \`title\`, \`ask\`) is what puts the agent on the person's "Ask your agents" page once
 it has started; the node adds one from the name and the purpose when the definition has none.
 
-The approval gives the new agent its work once, as a task with its name and its purpose, so the
-person sees a first result without waiting for the clock. Once it runs, section 2 applies: a
+The approval gives the new agent its work once, as a task with its name and the offer's \`example\`
+(its purpose when the offer has none), so the person sees a first result without waiting for the clock. Once it runs, section 2 applies: a
 schedule of \`kind: "agent_task"\` gives it the work on a clock. How to write the definition and how
 to check it is in the skill \`node:add-a-crew-agent\`.
 

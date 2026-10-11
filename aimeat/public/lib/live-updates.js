@@ -263,6 +263,25 @@ export function offUpdate(callback) {
 }
 
 /**
+ * For a page that is a route of its own: open the stream and relay each change as the window event
+ * 'aimeat-live-update', which is what a page's blocks listen for. Returns the cleanup, so it is the
+ * whole body of a useEffect. The profile, the admin and the home's first page each wired this by
+ * hand; the home's other routes (one agent, one piece of work, the computers, the history) listened
+ * for the event and opened no stream, so an agent's page showed "working" until a reload although
+ * its task had finished (found on production, 2026-10-11).
+ * @param {() => string|undefined} getJwt
+ * @returns {() => void}
+ */
+export function relayLiveUpdates(getJwt) {
+  const notify = (domains) => {
+    window.dispatchEvent(new CustomEvent('aimeat-live-update', { detail: { domains } }));
+  };
+  connect(getJwt);
+  onUpdate(notify);
+  return () => { offUpdate(notify); disconnect(); };
+}
+
+/**
  * Convenience for views: listen to the window 'aimeat-live-update' event, filtered to the
  * domains a view cares about, and run `fn` only when one of those domains changed (or when the
  * payload is the legacy "everything changed"). Replaces the old per-tab

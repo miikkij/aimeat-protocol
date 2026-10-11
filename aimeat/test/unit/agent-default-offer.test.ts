@@ -7,10 +7,11 @@
  *   wrote is completed with every key the crew runtime reads, and nothing gives the offer a price
  *   or a visibility.
  * @version-history
+ *   v1.1.0 — 2026-10-11 — firstRequestOf: the first offer's example, given to a new agent as its first work.
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { defaultOfferFor, withDefaultOffer } from '../../src/services/agent-default-offer.js';
+import { defaultOfferFor, withDefaultOffer, firstRequestOf } from '../../src/services/agent-default-offer.js';
 
 const AGENT = { name: 'morning-news', displayName: 'Morning news', purpose: 'Reads the morning news and writes a short summary.' };
 
@@ -73,5 +74,20 @@ describe('the offer a new agent carries', () => {
     expect(def.agent_name).toBe('morning-news');
     expect(def.listen_for).toEqual(['tasks']);
     expect(def.agents).toEqual([{ role: 'R' }]);
+  });
+});
+
+describe('the request a new agent is given first', () => {
+  it('is the example of the definition\'s first offer', () => {
+    expect(firstRequestOf({ offers: [{ id: 'a', example: '  Make a slogan for Morning Coffee.  ' }, { id: 'b', example: 'second' }] }))
+      .toBe('Make a slogan for Morning Coffee.');
+  });
+
+  it('is empty when there is no offer, no example, or no definition, so the caller uses the purpose', () => {
+    expect(firstRequestOf({ offers: [{ id: 'a', example: '' }] })).toBe('');
+    expect(firstRequestOf({ offers: [{ id: 'a' }] })).toBe('');
+    expect(firstRequestOf({ offers: ['x', null] })).toBe('');
+    expect(firstRequestOf({})).toBe('');
+    expect(firstRequestOf(null)).toBe('');
   });
 });

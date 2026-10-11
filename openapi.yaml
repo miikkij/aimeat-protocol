@@ -9304,8 +9304,10 @@ paths:
         refused with UNKNOWN_CONNECTOR before anything is created.
 
         ITS WORK, ONCE, NOW. An agent that was given a definition gets one task the moment it is
-        made: its display name as the title, its purpose as the description (what a schedule of the
-        agent gives it), and scope `kind: first-run`. The owner sees that the agent works and has a
+        made: its display name as the title and scope `kind: first-run`. The description is the
+        `example` of the definition's first offer when it has one, because that is one real request
+        with a sample of what a person would give the agent; without one it is the agent's purpose
+        (what a schedule of the agent gives it). The owner sees that the agent works and has a
         first result. The task follows the ordinary start rules, so it waits when the agent's
         computer is away. `first_run: false` in the body asks for none.
 

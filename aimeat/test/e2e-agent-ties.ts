@@ -223,6 +223,24 @@ console.log('\n=== Agent ties: apps, the workplace, the first run, the build ins
         for (const key of RUNTIME_KEYS) assert(key in offer, `the offer lacks ${key}, which the runtime reads`);
     });
 
+    await test('the first run is given the offer\'s example as its task, because a purpose is not a request', async () => {
+        const EXAMPLE = 'Make one short slogan for the product Morning Coffee.';
+        const p = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({
+                name: 'sloganer', display_name: 'Slogan maker', purpose: PURPOSE, scopes: ['memory:read'],
+                crew_def: { ...DEF, offers: [{ id: 'sloganer', title: 'A slogan', ask: 'Give me a product name.', example: EXAMPLE }] },
+            }),
+        });
+        assert(p.status === 201 || p.status === 200, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+        const ok = await approve(p.body.data.proposal.id);
+        assert(ok.status === 200, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+        const t = await json(`/v1/agents/sloganer/tasks/${ok.body.data.first_run?.task_id}`, { headers: authA });
+        assert(t.status === 200, `task ${t.status}`);
+        assert(t.body.data.task.description === EXAMPLE, `description: ${t.body.data.task.description}`);
+        assert(t.body.data.task.title === 'Slogan maker', `title: ${t.body.data.task.title}`);
+    });
+
     // ── 2. The tie between an app and an agent ─────────────────────────────────
     await publish(a, 'shows.html', 'Shows the news');
     await publish(a, 'digest.html', 'Digest');

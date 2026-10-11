@@ -34,6 +34,8 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-10-11 -- An agent the node says was DELETED is removed from this home too (key, token and
+ *     config), on the same word from the node as a moved one. It stayed listed, with its key on disk.
  *   2026-10-11 -- An identity whose credential the node refuses: the others on a socket it opened get a new
  *     socket and keep their channels (./tunnel-hub.ts rehome), an agent the node says was MOVED is removed
  *     from this home (../forget-agent.ts), and serve.json is rewritten. It stayed listed, with its key on disk.
@@ -144,7 +146,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
 import { TunnelHub, statusOfIdentity, principalRow, rehome } from './tunnel-hub.js';
 import { resolveToken, forgetCachedToken } from '../agent-key.js';
-import { forgetLocalAgent } from '../forget-agent.js';
+import { forgetOnNodeWord } from '../forget-agent.js';
 import { refusedCredential, noteCredentialAnswer } from '../refused-credentials.js';
 import { type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
@@ -321,13 +323,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         // identity on it is given a new one (./tunnel-hub.ts rehome).
         const stopped = hubs.retire(entry);
         if (stopped) void rehome<RegisteredAgent, AgentChannel>(stopped, entry.gaii, registry.list(), g => channels.get(g), attachRegistered, (e, c) => c.tunnel?.subscribe(c.getSubscriptions(), e.gaii)).then(identityChanged);
-        // The owner moved it to another connector: it is not this home's agent any more.
-        if (reason === 'moved') {
-          detachAgent(entry.gaii);
-          void forgetLocalAgent(entry.agent, entry.owner).then(gone => console.error(
-            `[serve] ${entry.agent}@${entry.owner}: moved to another connector, removed from this one (key ${gone.key ? 'removed' : 'absent'}, config ${gone.config ? 'removed' : 'absent'})`,
-          )).catch(err => console.error(`[serve] ${entry.agent}@${entry.owner}: moved away, but its files could not be removed: ${String(err)}`));
-        }
+        // The owner moved it to another connector, or deleted it on the node: either way it is not
+        // this home's agent any more, and the node said so itself (../forget-agent.ts).
+        forgetOnNodeWord(reason, entry.agent, entry.owner, () => detachAgent(entry.gaii));
         identityChanged();
       },
     };

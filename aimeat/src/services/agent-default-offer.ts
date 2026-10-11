@@ -27,9 +27,11 @@
  *
  *   `verification` is `ungated` and `repeatability` is `accumulative` by default: the result is a
  *   model's free prose that nothing checks, and each run adds a result beside the earlier ones.
- * @structure InlineOffer · defaultOfferFor(agent) · withDefaultOffer(crewDef, agent)
+ * @structure InlineOffer · defaultOfferFor(agent) · firstRequestOf(crewDef) · withDefaultOffer(crewDef, agent)
  * @usage const def = withDefaultOffer(proposal.crew_def, { name, displayName, purpose });
  * @version-history
+ *   v1.1.0 — 2026-10-11 — firstRequestOf: the first offer's example, which a new agent is given as
+ *     its first work.
  *   v1.0.0 — 2026-10-11 — Initial (wish-kodista-tehty-agentti-saa-tarjoaman-automaattisesti-offering).
  */
 
@@ -92,6 +94,22 @@ function completed(entry: Record<string, unknown>, agent: OfferedAgent): InlineO
     verification: oneOf(entry.verification, ['deterministic', 'gated', 'ungated'] as const, base.verification),
     consequences: Array.isArray(entry.consequences) ? entry.consequences : [],
   };
+}
+
+/**
+ * The request a new agent is given as its first work: the `example` of its definition's first
+ * offer, which is one real request as a person would send it. Empty when the definition has no
+ * offer or the offer has no example; the caller then falls back to the agent's purpose.
+ *
+ * WHY NOT THE PURPOSE. A purpose describes the agent ("Makes one short slogan for a product whose
+ * name the task gives"). Given as a task, an agent that needs an input has none: on production,
+ * 2026-10-11, a slogan agent's first run made a slogan for its own description.
+ */
+export function firstRequestOf(crewDef: unknown): string {
+  const offers = (crewDef as { offers?: unknown } | null)?.offers;
+  if (!Array.isArray(offers)) return '';
+  const first = offers.find((o): o is Record<string, unknown> => !!o && typeof o === 'object' && !Array.isArray(o));
+  return first ? text(first.example) : '';
 }
 
 /**

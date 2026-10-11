@@ -1339,11 +1339,25 @@ await test('Deleting an agent closes its socket: it stops saying online, with no
   let row: any;
   for (let i = 0; i < 40; i++) {
     row = await statusRow(gaiiB);
-    if (row && row.tunnel_status !== 'online') break;
+    // Gone from the list, or listed and no longer online: both mean the socket closed.
+    if (!row || row.tunnel_status !== 'online') break;
     await sleep(100);
   }
   assert(row?.tunnel_status !== 'online',
     `a deleted agent must stop reading online, got ${row?.tunnel_status}`);
+});
+
+// The node says WHY it cut the identity (`auth_revoked`, reason 'deleted'), and the connector acts
+// on that word: the deleted agent's credential leaves this machine. Until 2026-10-11 it stayed, and
+// a connector on production still held the key of an agent deleted hours before.
+await test('The deleted agent\'s credential is removed from the connector home, and the neighbour\'s is not', async () => {
+  const deleted = join(home3, 'tokens', `concierge@${acc3b!.ownerName}.token`);
+  const kept = join(home3, 'tokens', `concierge@${acc3a!.ownerName}.token`);
+  for (let i = 0; i < 40 && existsSync(deleted); i++) await sleep(100);
+  assert(!existsSync(deleted), 'the deleted agent\'s token file is still in the connector home');
+  assert(existsSync(kept), 'the other owner\'s token file must stay');
+  const gone = await statusRow(`concierge#${acc3b!.ownerName}@${NODE_ID}`);
+  assert(!gone, `the deleted agent is still listed by the daemon: ${JSON.stringify(gone)}`);
 });
 
 await test('and nothing else on that daemon lost its connection', async () => {

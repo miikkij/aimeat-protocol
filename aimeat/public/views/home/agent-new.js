@@ -22,6 +22,8 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.2.1 — 2026-10-11 — "Where does its work go?" is WorkplaceChoice (agent-ties-parts.js): a
+ *     grouped drop-down on an account with many workspaces, and names decoded for display.
  *   v1.2.0 — 2026-10-11 — The row "What it offers": the offer the agent's definition carries, which
  *     shows on the Offerings page once the agent has started.
  *   v1.1.0 — 2026-10-11 — One choice about the agent's results, "Where does its work go?": its own
@@ -58,6 +60,7 @@ import {
   draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeTools, readHomeAgents, offerShown,
 } from '/js/services/agent-draft.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
+import { WorkplaceChoice } from '/views/home/agent-ties-parts.js';
 import { machineName } from '/views/home/agents-band.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -365,16 +368,7 @@ export default function AgentNewView({ navigate }) {
 
         ${/* The one choice about the agent's results (Jouni, 2026-10-11): its own memory unless the
              person names a workspace. It is offered only when there is a workspace to name. */''}
-        ${places.length > 0 && html`
-          <${Choice} boxed cols=${2} label=${tr('home.agentTies.placeLabel', 'Where does its work go?')} value=${place} onChange=${setPlace}
-            options=${[
-              { value: 'own', label: tr('home.agentTies.placeOwn', 'The agent\'s own memory'), hint: tr('home.agentTies.placeOwnHint', 'Only you see it.') },
-              ...places.map((pl) => ({
-                value: `${pl.organism_id}/${pl.workspace_id}`,
-                label: pl.workspace_name,
-                hint: tr('home.agentTies.placeHint', 'Organism {organism}. Its members see the finished work.').replace('{organism}', pl.organism_name),
-              })),
-            ]} />`}
+        ${places.length > 0 && html`<${WorkplaceChoice} places=${places} value=${place} onChange=${setPlace} />`}
 
         ${problem && html`<${Note} kind="message" error>${problem}<//>`}
 
