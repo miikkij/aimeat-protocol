@@ -15,6 +15,9 @@
  * @structure summariseMap · checkMap · noMapStamp · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.3.0 — 2026-10-11 — DATAMAP_ROW_BAD_AGENT: a row's optional `agent` that cannot be an agent's
+ *     name is a finding, after the missing `why` and before the classification one, and never a
+ *     refusal.
  *   v1.2.0 — 2026-09-29 — DATAMAP_ROW_BAD_CLASSIFICATION: a row's optional `classification` that
  *     cannot be a label id is a finding, last in the order, and never a refusal (TARGET-082 V5).
  *   v1.1.0 — 2026-08-26 — `organism-rows` gets its own words, and counts as being in an organism for
@@ -26,6 +29,7 @@ import {
   DATA_MAP_SPEC, appDataMapKey,
   type DataMap, type DataMapRow, type DataMapStamp, type DataMapGap, type DataLocation,
 } from './data-map-types.js';
+import { isValidAgentName } from '../../utils/gaii.js';
 
 /** Findings, worst first. The order is the order a reader should care. */
 export const FINDING_CODES = [
@@ -36,6 +40,7 @@ export const FINDING_CODES = [
   'DATAMAP_FORM_CONTRADICTED',
   'DATAMAP_ROW_NO_WHY',
   'DATAMAP_NO_ROWS',
+  'DATAMAP_ROW_BAD_AGENT',
   'DATAMAP_ROW_BAD_CLASSIFICATION',
 ] as const;
 
@@ -49,6 +54,13 @@ const LABEL_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 /** True when a row's optional `classification` is present and cannot be a label id. */
 const badClassification = (r: DataMapRow): boolean =>
   r.classification !== undefined && !(typeof r.classification === 'string' && LABEL_ID.test(r.classification));
+
+/**
+ * True when a row's optional `agent` is present and cannot be an agent's name (utils/gaii.ts holds
+ * the grammar). It checks the SHAPE and not whether the agent exists: an agent can be removed after
+ * the map is written, and the pages that read the tie say so then.
+ */
+const badAgent = (r: DataMapRow): boolean => r.agent !== undefined && !isValidAgentName(r.agent);
 
 export type FindingCode = typeof FINDING_CODES[number];
 
@@ -186,6 +198,15 @@ export function checkMap(map: DataMap | null, at: string): MapCheck {
       message: `${badLabel.length} of ${map.held.length} rows name a classification that cannot be a `
         + 'label id: use 1 to 40 lowercase letters, digits and dashes, such as "luottamuksellinen", '
         + `or leave the field out. Rows: ${badLabel.map(r => r.what).join(', ')}.`,
+    });
+  }
+  const badName = map.held.filter(badAgent);
+  if (badName.length > 0) {
+    findings.push({
+      code: 'DATAMAP_ROW_BAD_AGENT',
+      message: `${badName.length} of ${map.held.length} rows name an agent with something that cannot `
+        + 'be an agent\'s name: use the local name of one of your own agents, such as "morning-news", '
+        + `or leave the field out. Rows: ${badName.map(r => r.what).join(', ')}.`,
     });
   }
 

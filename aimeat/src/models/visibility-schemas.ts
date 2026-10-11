@@ -20,6 +20,8 @@
  * @structure caps · keys · VisibilityDay · VisibilityMonthRecord · VisibilitySettings · emptyVisibilityDay
  * @usage import { visibilityMonthKey, type VisibilityMonthRecord } from '../models/visibility-schemas.js';
  * @version-history
+ *   v1.2.1 — 2026-10-11 — VISIBILITY_MONTH_SPEC names /v1/specs/visibility-contract.md, which the
+ *     node serves; /docs/specs/ had answered 404.
  *   v1.2.0 — 2026-10-08 — The day keeps agents' checkouts by stage and where they failed, and outside
  *     agents' calls to the owner's tools by outcome (layers E and C).
  *   v1.1.0 — 2026-10-08 — VisibilitySettings carries the owner's Clarity and GA4 ids (layer B).
@@ -71,7 +73,8 @@ export const VISIBILITY_DAYS_DEFAULT = 30;
 export const VISIBILITY_MONTH_PREFIX = 'signals.visibility.month.';
 export const visibilityMonthKey = (month: string): string => `${VISIBILITY_MONTH_PREFIX}${month}`;
 export const VISIBILITY_SETTINGS_KEY = 'signals.visibility.settings';
-export const VISIBILITY_MONTH_SPEC = '/docs/specs/visibility-contract.md';
+/** The contract these records follow, at the address the node serves it (routes/spec.ts). */
+export const VISIBILITY_MONTH_SPEC = '/v1/specs/visibility-contract.md';
 
 // ── The day ───────────────────────────────────────────────────────────────────────────────────
 

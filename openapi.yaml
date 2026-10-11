@@ -7771,6 +7771,28 @@ paths:
         '200':
           description: This OpenAPI specification
 
+  /v1/specs/{name}:
+    get:
+      operationId: getRecordContract
+      summary: A public record contract
+      description: >-
+        The contract a self-describing record follows, as Markdown: the address its `spec` field
+        names. Served: signals-contract.md (signals.hits.*), visibility-contract.md
+        (signals.visibility.*, behaviour.*) and tracked-response-contract.md. Open, with CORS, so
+        another node or an AI reading such a record can open what it says it follows. The old
+        address /docs/specs/{name}, which records written before 2026-10-11 carry, redirects here.
+      tags: [Bootstrap]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string, enum: [signals-contract.md, visibility-contract.md, tracked-response-contract.md] } }
+      responses:
+        '200':
+          description: The contract document
+          content:
+            text/markdown:
+              schema: { type: string }
+        '404':
+          description: No contract by that name
+
   /v1/docs:
     get:
       operationId: getDocs
@@ -9280,6 +9302,12 @@ paths:
         waits for it (`waiting_for_connector` true, `connector` naming it), and another connector of
         the same owner connecting is offered nothing. A connector the account does not have is
         refused with UNKNOWN_CONNECTOR before anything is created.
+
+        ITS WORK, ONCE, NOW. An agent that was given a definition gets one task the moment it is
+        made: its display name as the title, its purpose as the description (what a schedule of the
+        agent gives it), and scope `kind: first-run`. The owner sees that the agent works and has a
+        first result. The task follows the ordinary start rules, so it waits when the agent's
+        computer is away. `first_run: false` in the body asks for none.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -9298,6 +9326,9 @@ paths:
                 install_id:
                   type: string
                   description: The connector the agent is ordered to, by install id or by name. Overrides the proposal's own choice.
+                first_run:
+                  type: boolean
+                  description: False asks for no first run. Default true.
       responses:
         '200':
           description: The agent exists, with its definition
@@ -9333,6 +9364,18 @@ paths:
                             properties:
                               id: { type: string }
                               name: { type: string, nullable: true }
+                          first_run:
+                            type: object
+                            nullable: true
+                            description: The agent's work given once now. Null when the body asked for none or the agent has no definition to run. `problem` is present when the task could not be created; the agent is made either way.
+                            properties:
+                              task_id: { type: string, nullable: true }
+                              started: { type: boolean, description: True when the task started at once; false when it waits (for the agent's computer, or for the owner). }
+                              problem:
+                                type: object
+                                properties:
+                                  code: { type: string }
+                                  message: { type: string }
                           next_step: { type: string }
                           agent: { type: object }
                           run_mode_corrected:
@@ -13689,6 +13732,60 @@ paths:
                                 when: { type: string }
                                 chars: { type: integer }
 
+  /v1/prompts/build-app/agent/{name}:
+    get:
+      operationId: getBuildAppAgentPrompt
+      summary: The build instructions for an app that shows the work of one of the caller's agents
+      description: |
+        The agent section in front of the build specification. The section is composed from the
+        caller's own account: which agent, how to read its finished work, the structure of its
+        latest finished result (field names and value types, every text cut short; or a sentence
+        saying there is no finished work yet), and the data map row that ties the app to the agent
+        (`agent`, `madeFor`).
+
+        `data.context` is the section alone and `data.prompt` is the section followed by the whole
+        specification, for an AI that cannot ask for more. `?part=context` answers with the section
+        alone as `data.content`; the MCP tool aimeat_handbook_get serves that for tier
+        "build-app/agent/{name}". Another account's agent answers 404.
+      tags:
+        - Discovery
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: The bare name of one of the caller's own agents. }
+        - { name: idea, in: query, schema: { type: string }, description: What the app should show; passed on to the specification's idea field. }
+        - { name: lang, in: query, schema: { type: string, default: en } }
+        - { name: part, in: query, schema: { type: string, enum: [context] }, description: context returns the agent section alone. }
+        - { name: format, in: query, schema: { type: string, enum: [txt] }, description: txt returns text/plain instead of the JSON envelope. }
+      responses:
+        '200':
+          description: The section, and the whole prompt unless `part=context`
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          agent:
+                            type: object
+                            properties:
+                              name: { type: string }
+                              display_name: { type: string }
+                              gaii: { type: string }
+                          has_result: { type: boolean, description: False while the agent has finished nothing. }
+                          context: { type: string }
+                          prompt: { type: string }
+                          content: { type: string, description: With `part=context`, the section and a pointer to the specification. }
+                          spec_token: { type: string }
+        '400': { description: Not an agent name }
+        '401': { description: No session }
+        '404': { description: No such agent on this account }
+
   /v1/prompts/build-app/sections/{id}:
     get:
       operationId: getBuildAppPromptSection
@@ -14465,6 +14562,28 @@ paths:
                                 active: { type: integer }
                                 last_at: { type: string, format: date-time, nullable: true }
                                 last_failed_at: { type: string, format: date-time, nullable: true }
+                                apps:
+                                  type: array
+                                  description: The apps whose data map names this agent in a `held` row (`agent`), which is the tie between an app and the agent whose work it shows. Apps made for the agent first. An app that no longer exists is left out.
+                                  items:
+                                    type: object
+                                    properties:
+                                      owner: { type: string }
+                                      filename: { type: string }
+                                      name: { type: string }
+                                      url: { type: string, nullable: true, description: The address a person opens the app at. }
+                                      made_for: { type: boolean, description: True when the app was built for this agent's work, false when it uses it among other things. }
+                                      holds: { type: string, description: What the row says the app holds from the agent, in the app's own words. }
+                                work_goes_to:
+                                  type: object
+                                  nullable: true
+                                  description: The workspace this agent's finished work is shared with (PUT /v1/agents/{name}/workplace). Null while the work stays in the agent's own memory.
+                                  properties:
+                                    organism_id: { type: string }
+                                    organism_name: { type: string }
+                                    workspace_id: { type: string }
+                                    workspace_name: { type: string }
+                                    since: { type: string, format: date-time }
                           worker_total: { type: integer }
                           connectors:
                             type: array
@@ -14482,6 +14601,101 @@ paths:
                                 agents: { type: integer, description: How many agents live on it }
                                 waiting: { type: integer, description: How many agents wait for it }
         '403': { description: Not the account holder in person }
+
+  /v1/home/agents/choices:
+    get:
+      operationId: getHomeAgentChoices
+      summary: What the owner can pick for an agent's ties
+      description: |
+        One read for the two pickers on an agent's page: `places`, the workspaces of the organisms
+        the owner is an active member of (where an agent's finished work may be shared), and
+        `apps`, the owner's own apps (which may be tied to an agent).
+
+        Requires the account holder's own session.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Places and apps
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          places:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                organism_id: { type: string }
+                                organism_name: { type: string }
+                                workspace_id: { type: string }
+                                workspace_name: { type: string }
+                          apps:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                filename: { type: string }
+                                name: { type: string }
+        '403': { description: Not the account holder in person }
+
+  /v1/agents/{name}/workplace:
+    put:
+      operationId: setAgentWorkplace
+      summary: Name the workspace an agent's finished work is shared with
+      description: |
+        By default the result of a task is a record in the agent's own memory, which only the owner
+        reads. With a workplace set, the node shares the result of each task the agent completes
+        from then on with that workspace: the task's result records (the key the completion named,
+        and the records tagged `task:<id>`) change from private to visibility `workspace`, with the
+        workspace as their reference. Nothing is copied or moved, a result the agent made public or
+        shared elsewhere is left as it is, and work finished before the workplace was set is not
+        touched.
+
+        The owner must be an active member of the organism. Allowed for the owner and for a session
+        of theirs that holds `agent:write`. `GET /v1/home/agents` reads the place back with names,
+        as `work_goes_to`.
+      tags:
+        - Agents
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: The agent's bare name. }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organism_id, workspace_id]
+              properties:
+                organism_id: { type: string }
+                workspace_id: { type: string }
+      responses:
+        '200': { description: 'Stored. `data.workplace` is the record: agent, organism_id, workspace_id, since, set_by.' }
+        '400': { description: No organism_id or workspace_id, or not an agent name }
+        '404': { description: No such agent on this account, no such organism the owner is a member of, or no such workspace in it }
+    delete:
+      operationId: clearAgentWorkplace
+      summary: Keep an agent's finished work in its own memory again
+      description: Removes the workplace. Work that was already shared stays shared.
+      tags:
+        - Agents
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: The agent's bare name. }
+      responses:
+        '200': { description: 'Done. `data.workplace` is null.' }
+        '404': { description: No such agent on this account }
 
   /v1/home/state:
     get:
@@ -16198,6 +16412,55 @@ paths:
         '403': { description: Another account's map, or a granted app }
         '404': { description: No such app }
         '422': { description: The map could not be stored }
+
+  /v1/datamap/apps/{owner}/{filename}/agents/{agent}:
+    put:
+      summary: State that an app shows the work of one of the owner's agents
+      description: |
+        The tie between an app and an agent is a `held` row of the app's data map that carries
+        `agent` (the agent's bare name) and `madeFor`. This changes that one row: a row that already
+        names the agent takes the new `madeFor` and keeps everything else, otherwise one row is
+        added. An app with no map gets one whose purpose and whose row's `why` stay empty, because
+        only whoever built the app can write them, and the findings say so.
+
+        The tie is a statement and grants nothing. `GET /v1/home/agents` lists it on the agent as
+        `apps`. Same rule as the whole-map write: the owner or their agent, never another account
+        and never a granted app.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: agent, in: path, required: true, schema: { type: string }, description: The bare name of one of the caller's own agents. }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                made_for: { type: boolean, description: True when the app was built for this agent's work. Default false. }
+                holds: { type: string, description: 'What the app holds from the agent, one short line. Used only when a row is added.' }
+      responses:
+        '200': { description: 'The map after the change, with `stamp` and `findings`.' }
+        '400': { description: Not an app reference or not an agent name }
+        '403': { description: Another account's map, or a granted app }
+        '404': { description: No such app, or no such agent on this account }
+    delete:
+      summary: Take the tie between an app and an agent away
+      description: |
+        A row the route above added is removed; a row the app's builder wrote keeps everything
+        except the agent's name. The app, the agent and the agent's work stay as they are.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: agent, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 'The map after the change, with `stamp` and `findings`.' }
+        '403': { description: Another account's map, or a granted app }
+        '404': { description: No such app, or the app is not tied to that agent }
 
   /v1/classification/policy:
     get:
@@ -25696,6 +25959,23 @@ paths:
             application/json:
               schema: { type: object }
 
+  /ns/credentials/v1:
+    get:
+      operationId: credentialsContext
+      summary: The identity credential's JSON-LD context
+      description: >-
+        The context https://aimeat.io/ns/credentials/v1 that an identity credential from
+        GET /v1/ghii/{ghii}/credential names: its type names and subject fields in the aimeat:
+        namespace. Every node serves it at this path; aimeat.io answers the canonical address.
+        Public, unenveloped (application/ld+json), with CORS, so a JSON-LD processor can fetch it.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The JSON-LD context document
+          content:
+            application/ld+json:
+              schema: { type: object }
+
   /v1/ns:
     get:
       operationId: coreOntology
@@ -25827,10 +26107,10 @@ paths:
       operationId: ucpProfile20260408
       summary: UCP business profile, version 2026-04-08 (the signed-in checkout)
       description: >-
-        The profile of the signed-in checkout at /ucp/v1, unchanged from when it was the only
-        profile: REST transport, the checkout capability endpoints, every payment handler
-        registered on this node (morsels, cards on the seller's own Stripe, invoice, x402), and the
-        node's Ed25519 signing key.
+        The profile of the signed-in checkout at /ucp/v1: REST transport, the checkout capability
+        endpoints, every payment handler registered on this node that settles money (cards on the
+        seller's own Stripe, invoice, x402), and the node's Ed25519 signing key. A morsel paces
+        writes and is not a currency, so the morsel ledger is not listed as a payment handler.
       tags: [Commerce]
       responses:
         '200':
@@ -26904,11 +27184,13 @@ paths:
       operationId: commerceFeed
       summary: Public product feed (ACP-shaped)
       description: >-
-        Every PUBLIC, priced agent offer on the node as an ACP-shaped product entry
-        (sku "offer:<agentGaii>:<offerId>", price in morsels), plus every priced app-tool
-        from public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>";
-        money prices in 6-decimal micro-units; fulfillment 'call' = synchronous capability
-        invoke, 'task' = agent TASK for the app owner). Discovery: /.well-known/acp.json.
+        Every PUBLIC agent offer on the node that has a money price, as an ACP-shaped product
+        entry (sku "offer:<agentGaii>:<offerId>"), plus every app-tool with a money price from
+        public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>"; fulfillment
+        'call' = synchronous capability invoke, 'task' = agent TASK for the app owner). Every
+        price is money in 6-decimal micro-units ({ amount, currency, unit, scale: 6 }); an item
+        priced only in morsels is not listed, because a morsel is not a currency.
+        Discovery: /.well-known/acp.json.
       tags: [Commerce]
       responses:
         '200':
@@ -27208,7 +27490,9 @@ paths:
         Universal Commerce Protocol (2026-04-08) shaped checkout over the commerce core. Every
         response carries ucp.version + ucp.capabilities; the UCP-Agent header (platform profile
         URL) is fetched best-effort for capability negotiation. Item ids:
-        "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>".
+        "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>". A session here is
+        always in money: the requested currency, or else the first money currency every item is
+        priced in. An item with no money price is refused with MONEY_PRICE_REQUIRED.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27224,12 +27508,14 @@ paths:
                   type: array
                   items: { type: object }
                 note: { type: string }
-                currency: { type: string, description: "'morsel' (default) or a money code an EE handler supports" }
+                currency: { type: string, description: "A money currency (EUR or USD). Omitted: the first one every item is priced in." }
       responses:
         '201':
           description: UCP checkout session
         '402':
           description: Payment required (x402-style accepts block)
+        '422':
+          description: MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money)
 
   /ucp/v1/checkout-sessions/{id}:
     get:
@@ -27265,11 +27551,16 @@ paths:
       responses:
         '200': { description: Completed UCP checkout session }
         '402': { description: Payment required (x402-style accepts block) }
+        '422': { description: PAYMENT_HANDLER_REQUIRED (payment.handler is required; the message lists the handlers that settle the session's currency) }
 
   /acp/v1/checkout_sessions:
     post:
       operationId: acpCreateCheckoutSession
       summary: ACP checkout — create session by sku
+      description: >-
+        A session here is always in money: the requested currency, or else the first money
+        currency every item is priced in. An item with no money price is refused with
+        MONEY_PRICE_REQUIRED.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27284,8 +27575,11 @@ paths:
                 items:
                   type: array
                   items: { type: object }
+                note: { type: string }
+                currency: { type: string, description: "A money currency (EUR or USD). Omitted: the first one every item is priced in." }
       responses:
         '201': { description: ACP checkout session (status ready_for_payment) }
+        '422': { description: MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money) }
 
   /acp/v1/checkout_sessions/{id}:
     get:
@@ -27311,7 +27605,7 @@ paths:
       responses:
         '200': { description: Completed ACP checkout session }
         '402': { description: Payment required (x402-style accepts block) }
-        '422': { description: Unknown payment handler (e.g. stripe on a Community node) }
+        '422': { description: "PAYMENT_HANDLER_REQUIRED (neither payment_data.provider nor payment_data.handler; the message lists the handlers that settle the session's currency), or an unknown payment handler" }
 
   /v1/commerce/checkout-sessions/{id}/complete:
     post:
@@ -52760,6 +53054,12 @@ paths:
         had to already know that a second, differently-shaped endpoint existed in order to find out
         what happened. The deliverable comes back as an ADDRESS rather than as content, because an
         output may be megabytes.
+
+        On this read of one task, a finished task's `outcome` also carries `shared_with` when its
+        result is shared with a workspace: a list of `organism_id`, `organism_name`, `workspace_id`
+        and `workspace_name`. The node shares a result that way when the owner named a workspace
+        for the agent's work (PUT /v1/agents/{name}/workplace). The field is absent when the result
+        is private or public, and it is not on the task list.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []

@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.11.0 -- 2026-10-11 -- tier "build-app/agent/<name>": the build instructions' section about
+ *     one of the caller's own agents, for an app that shows that agent's work.
  *   v1.10.1 -- 2026-10-03 -- The `tier` description says "settings" also holds the system's words in
  *     plain language ("settings/concept.<id>"), the same meaning on every page and tool.
  *   v1.10.0 -- 2026-10-02 -- tier "settings" and "settings/<term>": the setting explanations the pages
@@ -60,6 +62,9 @@ import { journeyHandbookFor } from '../services/journey-state.js';
 import { substituteVariables } from '../services/prompt-variables.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildAppPiece, buildAppPieceIds } from '../services/build-app-layers.js';
+import { buildAppAgentContext } from '../services/build-app-agent-context.js';
+import { readerForAgent } from '../services/classification/reader.js';
+import type { CallerContext } from '../services/caller-context.js';
 import { buildAtelierPrompt } from '../services/build-atelier-prompt.js';
 import { atelierPieceIds } from '../services/build-atelier-layers.js';
 import { atelierPieceWithBook } from '../services/build-atelier-book.js';
@@ -78,6 +83,8 @@ export function registerPromptsTools(
     _emitResourceListChanged: (agentGaii: string) => void,
     /** The surface this session is connected to. 'all' is /v1/mcp, which carries every tool. */
     role: SurfaceRole | 'all' = 'all',
+    /** The session's caller (services/caller-context.ts): its scopes, for a tier that reads account data. */
+    caller?: () => CallerContext,
 ): void {
 
     // ── Tool 1: aimeat_handbook_get ──
@@ -121,6 +128,23 @@ export function registerPromptsTools(
             // Served in pieces, because the whole of it is more than one tool result carries: even
             // the 66 kB core never reached the model in the first measured run (the client wrote
             // it to a file a chat cannot read). "build-app" is the first of four parts.
+            // The agent section for an app that shows one agent's work, read from the caller's own
+            // account (services/build-app-agent-context.ts). Before the specification's own parts,
+            // because its id begins with the same word.
+            if (tierKey.startsWith('build-app/agent/')) {
+                // The section describes a record of an agent's memory, so it takes the word the
+                // REST route takes, asked of this session.
+                const session = caller?.();
+                if (!session || !session.has('memory:read')) {
+                    return toolError('SCOPE_DENIED', 'Reading what one of the owner\'s agents produces takes memory:read, which this session does not hold.');
+                }
+                const ownerName = localAccountName(getAgentGaii());
+                const ctx = await buildAppAgentContext({ config, storage }, ownerName, tierKey.slice('build-app/agent/'.length),
+                    readerForAgent({ storage, config }, getAgentGaii(), session.scopes));
+                if (!ctx.ok) return toolError(ctx.code, ctx.message);
+                const next = 'Next: read the build specification, aimeat_handbook_get { tier: "build-app" }.';
+                return { content: [{ type: 'text' as const, text: `${ctx.text}\n${next}\n` }] };
+            }
             if (tierKey === 'build-app' || tierKey.startsWith('build-app/')) {
                 const full = buildAppPrompt(config, { mode: 'new', lang: 'en' }).full;
                 const id = tierKey.slice('build-app/'.length) || 'start';

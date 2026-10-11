@@ -7,11 +7,15 @@
  * @version-history
  *   v1.0.0 — 2026-03-01 — Initial unsigned JSON implementation
  *   v2.0.0 — 2026-05-02 — Add JWT signing with Ed25519
+ *   v2.1.0 — 2026-10-11 — The credential's context is https://aimeat.io/ns/credentials/v1, the node's
+ *     own namespace, served at /ns/credentials/v1 (services/vc-context.ts); it was a host this
+ *     project does not serve. verifyIdentityCredential accepts both the new and the old context.
  */
 
-import { SignJWT, importJWK, type JWK } from 'jose';
+import { SignJWT, importJWK, jwtVerify, type JWK } from 'jose';
 import type { AimeatConfig } from '../config.js';
 import type { GHIIRecord } from '../storage/interface.js';
+import { ACCEPTED_CREDENTIALS_CONTEXTS, CREDENTIALS_CONTEXT, W3C_CREDENTIALS_CONTEXT } from './vc-context.js';
 
 export interface VerifiableCredential {
   '@context': string[];
@@ -24,6 +28,12 @@ export interface VerifiableCredential {
 export interface VcIssuerService {
   issueIdentityCredential(ghiiRecord: GHIIRecord): VerifiableCredential;
   issueSignedCredential(ghiiRecord: GHIIRecord): Promise<string>;
+  /**
+   * Check a signed credential this node issued: its signature against the node key, the issuer, the
+   * type, and a context this node issues now or issued before (services/vc-context.ts). Returns the
+   * credential, or throws with the reason.
+   */
+  verifyIdentityCredential(jwt: string): Promise<VerifiableCredential>;
   getIssuerDid(): string;
   getPublicJwk(): Promise<JWK>;
   setNodeKeyPair(kp: { publicKey: string; privateKey: string }): void;
@@ -38,10 +48,7 @@ export function createVcIssuerService(
 
   function buildCredentialPayload(ghiiRecord: GHIIRecord): VerifiableCredential {
     return {
-      '@context': [
-        'https://www.w3.org/ns/credentials/v2',
-        'https://aimeat.spechops.com/ns/credentials/v1',
-      ],
+      '@context': [W3C_CREDENTIALS_CONTEXT, CREDENTIALS_CONTEXT],
       type: ['VerifiableCredential', 'AIMEATIdentityCredential'],
       issuer: issuerDid,
       issuanceDate: new Date().toISOString(),
@@ -92,6 +99,21 @@ export function createVcIssuerService(
         .setExpirationTime(now + validityDays * 86400)
         .setIssuedAt(now)
         .sign(privateKey);
+    },
+
+    async verifyIdentityCredential(jwt: string): Promise<VerifiableCredential> {
+      if (!nodeKeyPair) throw new Error('Node keypair not available for VC verification');
+      const publicKey = await importJWK({
+        kty: 'OKP', crv: 'Ed25519', x: Buffer.from(nodeKeyPair.publicKey, 'base64').toString('base64url'),
+      }, 'EdDSA');
+      const { payload } = await jwtVerify(jwt, publicKey, { issuer: issuerDid, typ: 'vc+ld+jwt', algorithms: ['EdDSA'] });
+      const vc = payload.vc as VerifiableCredential | undefined;
+      const context = Array.isArray(vc?.['@context']) ? vc['@context'] : [];
+      if (context[0] !== W3C_CREDENTIALS_CONTEXT || context.length !== 2 || !ACCEPTED_CREDENTIALS_CONTEXTS.includes(context[1] as string)) {
+        throw new Error(`Credential context is not one this node issues: ${JSON.stringify(context)}`);
+      }
+      if (!vc!.type?.includes('AIMEATIdentityCredential')) throw new Error('Not an AIMEAT identity credential');
+      return vc!;
     },
 
     getIssuerDid(): string {

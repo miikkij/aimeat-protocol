@@ -753,6 +753,9 @@
       "/views/home/agent-new.js": "/views/home/agent-new.js",
       "/views/home/agent.js": "/views/home/agent.js",
       "/views/home/agent-work.js": "/views/home/agent-work.js",
+      "/views/home/agent-app.js": "/views/home/agent-app.js",
+      "/views/home/agent-ties-parts.js": "/views/home/agent-ties-parts.js",
+      "/js/services/agent-ties.js": "/js/services/agent-ties.js",
       "/views/home/machines.js": "/views/home/machines.js",
       "/js/services/agent-draft.js": "/js/services/agent-draft.js",
       "/views/profile/agents/crew-templates.js": "/views/profile/agents/crew-templates.js",
@@ -1166,6 +1169,9 @@
       }
       // One piece of an agent's work and what it produced: /v1/home?agent=<name>&work=<task id>.
       // Before the agent's own page, whose address it extends.
+      if (pathname === '/v1/home' && /[?&]agent=/.test(search) && /[?&]new-app=/.test(search)) {
+        return () => import('/views/home/agent-app.js' + B);
+      }
       if (pathname === '/v1/home' && /[?&]agent=/.test(search) && /[?&]work=/.test(search)) {
         return () => import('/views/home/agent-work.js' + B);
       }

@@ -23,6 +23,9 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.3.0 — 2026-10-11 — A `held` row may carry `agent` and `madeFor`: the tie between an app and
+ *     the agent whose work it shows (decision "From an agent to an app", Jouni, 2026-10-11).
+ *     Optional and additive, so the spec stays /2.
  *   v2.2.0 — 2026-09-29 — A `held` row may carry `classification`, the label id the app expects for
  *     that key family by default (TARGET-082 V5). Optional and additive, so the spec stays /2.
  *   v2.1.0 — 2026-08-26 — `organism-rows` joins the location vocabulary. A workspace's row store is
@@ -145,6 +148,23 @@ export interface DataMapRow {
    * never labels a record and never refuses a map; an id that cannot be a label is a finding.
    */
   classification?: string;
+  /**
+   * The agent whose work this row reads: the local name of one of the app owner's own agents, such
+   * as `morning-news`.
+   *
+   * OPTIONAL, AND THE WHOLE TIE BETWEEN AN APP AND AN AGENT. A row that names an agent says "this
+   * app shows what that agent produces", and that one statement is what the agent's page lists as
+   * its apps and what the app's page lists as its agents (services/agent-ties.ts). It lives here
+   * because the map is already the app's own statement of where its data is: the tie goes when the
+   * app goes, and no second list has to be kept true. It grants nothing: what the app may read is
+   * decided by its permissions, as before.
+   */
+  agent?: string;
+  /**
+   * With `agent`: true when the app was built for that agent's work, false or absent when it only
+   * uses it among other things. A reader sees "made for this agent" or "uses its work".
+   */
+  madeFor?: boolean;
 }
 
 /** The second table: what is unresolved, or is not ours. */

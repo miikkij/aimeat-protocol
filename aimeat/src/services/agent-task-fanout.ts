@@ -38,6 +38,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.6.0 — 2026-10-11 — afterTaskCompleted shares the task's result with the workspace the owner
+ *     named for the agent's work (services/agent-workplace.ts shareFinishedWork).
  *   v1.5.0 — 2026-10-08 — completeTask() takes the session's scopes and answers a declaration the
  *     caller may not make as a 403 result before the state move, so the REST route can carry
  *     ai_provenance (aiprov D5). The public feed entry for a public deliverable no longer copies the
@@ -74,6 +76,7 @@ import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { onUcpTaskDone } from '../commerce/ucp-guest-checkout.js';
+import { shareFinishedWork } from './agent-workplace.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
 
@@ -112,6 +115,10 @@ export async function afterTaskCompleted(
         .catch(e => logger.error('switching off the open item behind a task failed', { taskId: id, error: String(e) }));
 
     emitChange('agent-tasks', actor);
+
+    // Where the owner said this agent's work goes: the result is shared with that workspace
+    // (services/agent-workplace.ts). It never throws, and with no workplace set it is one read.
+    void shareFinishedWork({ storage, config }, task, deliverableKey ?? updated?.deliverableKey);
 
     // The owner's own "what has happened". Their agent finishing work is the single most ordinary
     // thing they would want told without asking for it.

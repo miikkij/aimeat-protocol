@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.7.1 — 2026-10-11 — Section 4: the approval gives the new agent its work once, as a task with
+ *     its name and its purpose (services/agent-first-run.ts).
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.7.0 — 2026-10-10 — Section 4: a person with more than one connector names the machine, with
  *     aimeat_connector_list and the proposal's `connector`.
@@ -158,8 +160,10 @@ definition and hands it to their connector to run. The answer carries \`approval
 \`next_step\`: give the person both, so they know where to press. Send the \`crew_def\` with the
 proposal: an agent approved without one exists and cannot start.
 
-Once it runs, section 2 applies: a schedule of \`kind: "agent_task"\` gives it the work on a
-clock. How to write the definition and how to check it is in the skill \`node:add-a-crew-agent\`.
+The approval gives the new agent its work once, as a task with its name and its purpose, so the
+person sees a first result without waiting for the clock. Once it runs, section 2 applies: a
+schedule of \`kind: "agent_task"\` gives it the work on a clock. How to write the definition and how
+to check it is in the skill \`node:add-a-crew-agent\`.
 
 Say what this needs before you propose it: a connector of theirs running on a computer of theirs,
 and a model that computer can reach. Without the connector the agent is created and waits, and the

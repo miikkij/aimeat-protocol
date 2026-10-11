@@ -23,6 +23,9 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.5.0 — 2026-10-11 — What the agent's work is tied to (agent-ties-parts.js): the offer to make
+ *     an app right after the agent is made, the row "Where its work goes" with its one choice, and
+ *     the section Apps. A new agent's page says that it does its work once now.
  *   v1.4.0 — 2026-10-11 — "Give it a task", "Talk to it" and "Latest work" each sit under a
  *     small headline band (PageSection `group`) in place of a sub heading, and each shows where
  *     it stops (`ends`), so they read as three groups.
@@ -61,6 +64,7 @@ import { LineList } from '/components/LineList.js';
 import { listTasks, createTask } from '/js/services/agent-tasks.js';
 import { readHomeAgents, moveAgent, setAgentStopped } from '/js/services/agent-draft.js';
 import { machineName, whenWords, stateWords } from '/views/home/agents-band.js';
+import { AppOffer, AgentApps, WorkplaceEditor, placeWords } from '/views/home/agent-ties-parts.js';
 import TabMessages from '/views/profile/agents/tab-messages.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -92,6 +96,7 @@ export default function AgentView({ navigate }) {
   const [said, setSaid] = useState(null);
   const [moving, setMoving] = useState(false);
   const [target, setTarget] = useState('');
+  const [placing, setPlacing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -220,6 +225,9 @@ export default function AgentView({ navigate }) {
       <${PageIntro} title=${worker.display_name || name} sub=${worker.description || ''} />
 
       ${startedNote && html`<${Note} kind="message">${startedNote}<//>`}
+      ${startedAs && startedAs !== 'made' && html`<${Note} kind="quiet">${p('firstRun', 'It does its work once now, so you see that it works. The result comes to Latest work.')}<//>`}
+      ${/* Right after an agent is made, the way on is an app that shows its work (agent-ties-parts.js). */''}
+      ${startedAs && html`<${AppOffer} name=${name} fresh navigate=${navigate} />`}
       ${scheduleFailed && html`<${Note} kind="message" error>${p('scheduleFailed', 'The agent was made, but its schedule could not be saved. Add it in all its settings.')}<//>`}
 
       <${Facts} wide rows=${[
@@ -235,9 +243,28 @@ export default function AgentView({ navigate }) {
             ? html`<${Action} small onClick=${() => { setMoving(true); setTarget(others[0].id); }}>${p('move', 'Move to another computer')}<//>`
             : undefined },
         { k: p('reach', 'What it reaches'), v: areaLine(record.default_scopes ?? [], t) },
+        { k: p('goes', 'Where its work goes'),
+          v: worker.work_goes_to ? placeWords(worker.work_goes_to) : p('goesOwn', 'The agent\'s own memory'),
+          sub: worker.work_goes_to
+            ? p('goesShared', 'The members of that organism see the finished work.')
+            : p('goesOwnSub', 'Only you see it.'),
+          action: !placing
+            ? html`<${Action} small onClick=${() => { setPlacing(true); setSaid(null); }}>${p('goesChange', 'Change')}<//>`
+            : undefined },
       ]} />
 
-      ${(said?.at === 'move' || said?.at === 'stop') && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+      ${(said?.at === 'move' || said?.at === 'stop' || said?.at === 'place') && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+
+      ${placing && html`
+        <${WorkplaceEditor} name=${name} current=${worker.work_goes_to}
+          onCancel=${() => setPlacing(false)}
+          onDone=${async (own) => {
+            setPlacing(false);
+            setSaid({ ok: true, at: 'place', text: own
+              ? p('goesSavedOwn', 'Saved. Its work stays in its own memory from now on.')
+              : p('goesSaved', 'Saved. Its next finished work is shared with that workspace.') });
+            await load();
+          }} />`}
 
       ${moving && html`
         <${Fields}>
@@ -291,6 +318,8 @@ export default function AgentView({ navigate }) {
               href: `${HOME}?agent=${encodeURIComponent(name)}&work=${encodeURIComponent(task.id)}`,
             }))} />`}
       <//>
+
+      <${AgentApps} name=${name} owner=${record.owner} worker=${worker} navigate=${navigate} onChanged=${load} />
 
       <${FormActions}>
         <${Action} href=${settings}>${p('all', 'All its settings →')}<//>

@@ -19,8 +19,11 @@
  *   - nsRouter(config): mounts the endpoints
  *   - GET /v1/ns      — the core ontology as JSON-LD (application/ld+json)
  *   - GET /v1/ns.md   — the same for an agent reading prose
+ *   - GET /ns/credentials/v1 — the identity credential's JSON-LD context (application/ld+json)
  * @usage app.use(nsRouter(config));
  * @version-history
+ *   v1.1.0 — 2026-10-11 — GET /ns/credentials/v1 serves the identity credential's context, which had
+ *     named a host this project does not serve.
  *   v1.0.0 — 2026-09-08 — Initial.
  */
 import { Router } from 'express';
@@ -28,6 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import { CORE_CLASSES, CORE_RELATIONS, DEFAULT_CONTEXT, buildCoreOntology, AIMEAT_NS } from '../utils/onto-context.js';
 import { findTerm } from '../data/glossary.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
+import { credentialsContextDocument } from '../services/vc-context.js';
 
 /** The glossary definition for a term, or undefined when it has none. */
 function definitionOf(term: string): string | undefined {
@@ -109,6 +113,14 @@ export function nsRouter(config: AimeatConfig): Router {
     // it to a JSON-LD processor cannot be asked to unwrap a node-specific wrapper first. Same
     // reasoning as /v1/glossary/jsonld.json.
     res.type('application/ld+json').send(JSON.stringify(buildCoreOntology(definitionOf), null, 2));
+  });
+
+  // GET /ns/credentials/v1 — the JSON-LD context the identity credential names
+  // (https://aimeat.io/ns/credentials/v1, services/vc-context.ts). At this path on every node, so
+  // aimeat.io answers the canonical address and any node answers its own copy.
+  router.get('/ns/credentials/v1', (_req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.type('application/ld+json').send(JSON.stringify(credentialsContextDocument(), null, 2));
   });
 
   // GET /v1/ns.md — the same for a reader.

@@ -15,6 +15,8 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.10.0 — 2026-10-11 — The UCP 2026-04-08 profile lists only the payment handlers that settle
+ *     money; the morsel ledger is no longer advertised as a payment handler (ruling D4).
  *   v1.9.0 — 2026-10-08 — GET /.well-known/ucp is the UCP 2026-08-25 business profile
  *     (services/ucp/business-profile.ts): the guest checkout at /ucp/2026-08-25, the order
  *     capability, keys[] and supported_versions. The 2026-04-08 profile moves, unchanged, to
@@ -49,7 +51,7 @@ import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { getSoftwareVersion } from '../utils/version.js';
-import { listPaymentHandlers } from '../commerce/payment-handlers.js';
+import { moneyPaymentHandlers } from '../commerce/protocol-money.js';
 import { businessProfile } from '../services/ucp/business-profile.js';
 import {
   getWebBotAuthState, signatureDirectoryBody, signDirectoryResponse, SIGNATURES_DIRECTORY_MEDIA_TYPE,
@@ -235,8 +237,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
 
   // UCP business profile (Universal Commerce Protocol, version 2026-04-08) — declares the
   // commerce transports (REST + MCP), the checkout capability, and every payment handler in the
-  // commerce registry. The handler list is an honest edition indicator: a Community node
-  // advertises only io.aimeat.morsels; an EE node's real-money handlers appear here automatically.
+  // commerce registry that settles money.
   // The current profile, UCP 2026-08-25: the guest checkout for AI shopping platforms, the order
   // capability, and the keys (services/ucp/business-profile.ts). It names the profile below in
   // `supported_versions`.
@@ -295,9 +296,9 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
             },
           ],
         } : {},
-        payment_handlers: config.commerceEnabled ? listPaymentHandlers().map((h) => ({
-          id: h.id, title: h.title, currencies: h.currencies,
-        })) : [],
+        // Money handlers only: a UCP price is money, and the morsel ledger is not a way to pay one
+        // (commerce/protocol-money.ts).
+        payment_handlers: config.commerceEnabled ? moneyPaymentHandlers() : [],
       },
       signing_keys: signingKeys,
     });

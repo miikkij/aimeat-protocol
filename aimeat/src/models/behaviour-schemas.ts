@@ -16,6 +16,7 @@
  * @structure VIEWPORT_CLASSES · BehaviourDay · BehaviourAppRecord · BehaviourSettings · keys and caps
  * @usage const rec = (await storage.getMemory(owner, behaviourAppKey(filename)))?.value as BehaviourAppRecord;
  * @version-history
+ *   v1.0.1 — 2026-10-11 — `spec` names /v1/specs/visibility-contract.md, which the node serves.
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
 
@@ -66,7 +67,7 @@ export interface BehaviourDay {
 
 export interface BehaviourAppRecord {
   type: 'aimeat.behaviour.app';
-  spec: '/docs/specs/visibility-contract.md';
+  spec: '/v1/specs/visibility-contract.md';
   app: string;
   days: Record<string, BehaviourDay>;
   updatedAt: string;

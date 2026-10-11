@@ -12,6 +12,7 @@
  * @structure handbookTierPath(tier)
  * @usage client.get(handbookTierPath('build-app'))   // → /v1/prompts/build-app/sections/start
  * @version-history
+ *   2026-10-11 — "build-app/agent/<name>" maps to the agent section route (prompts-build-app-agent.ts).
  *   2026-10-02 — "settings" and "settings/<term>" map to the setting explanations' parts route.
  *   2026-10-01 — "features" and "features/<id>" map to the feature map's parts route.
  *   2026-09-19 — "build-app-atelier" and "build-app-atelier/<id>" map to the Atelier parts route,
@@ -33,6 +34,10 @@ export function handbookTierPath(tier: string): string {
   if (tier === 'settings') return '/v1/prompts/settings/sections/start';
   if (tier.startsWith('settings/')) {
     return '/v1/prompts/settings/sections/' + encodeURIComponent(tier.slice('settings/'.length));
+  }
+  // The agent section for an app that shows one agent's work, read from the caller's own account.
+  if (tier.startsWith('build-app/agent/')) {
+    return '/v1/prompts/build-app/agent/' + encodeURIComponent(tier.slice('build-app/agent/'.length)) + '?part=context';
   }
   if (tier === 'build-app') return '/v1/prompts/build-app/sections/start';
   if (tier.startsWith('build-app/')) {

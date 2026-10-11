@@ -12,6 +12,12 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.8.0 — 2026-10-11 — Goldens updated for the eighth intentional output change: the JSON-LD lists
+ *     only money-priced tools as Offers (utils/app-head-meta.ts v1.4.3, ruling D4). 4 of 19 cases
+ *     changed, exactly the four whose head meta carries the morsel-priced `search` tool, and each
+ *     differs from its old golden only by the removed `"offers":[…"priceCurrency":"MORSEL"}]`
+ *     block (checked byte for byte when re-captured). The third of the three cases: the assertion
+ *     was right and the behaviour changed under it.
  *   v1.7.0 — 2026-10-05 — Goldens updated for the seventh intentional output change: HTML is escaped
  *     with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10,
  *     C8). 9 of 19 cases changed, exactly the nine that carry the discovery block, and each by two
