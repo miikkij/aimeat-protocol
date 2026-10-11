@@ -16,6 +16,8 @@
  * @structure CONSENT_LANGS · ConsentServices · consentSettingsLabels() · consentTexts(lang, categories, opts)
  * @usage translations[lang] = consentTexts(lang, ['necessary', 'analytics'], { services: { clarity: true, ga4: false } })
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The banner always links to a privacy policy: the service's own, in the
+ *     reader's language, when the operator set no address (it had no link then).
  *   v1.0.0 — 2026-10-11 — Initial: the banner in en, fi and es, with the analytics services named.
  */
 import { escapeHtml } from '../utils/html-escape.js';
@@ -120,7 +122,9 @@ const joined =(parts: string[], and: string): string => (parts.length > 1 ? `${p
 
 /** One language's texts, in the shape vanilla-cookieconsent's `language.translations[lang]` takes. */
 export function consentTexts(
-  lang: ConsentLang, categories: readonly string[], opts: { services?: ConsentServices; policyUrl?: string | null } = {},
+  lang: ConsentLang, categories: readonly string[],
+  /** `base` is the service's own address for a page on another origin; empty on its own pages. */
+  opts: { services?: ConsentServices; policyUrl?: string | null; base?: string } = {},
 ): Record<string, unknown> {
   const w = WORDS[lang];
   const names = [opts.services?.clarity ? 'Microsoft Clarity' : '', opts.services?.ga4 ? 'Google Analytics' : ''].filter(Boolean);
@@ -140,9 +144,14 @@ export function consentTexts(
     else sections.push({ title: escapeHtml(cat.charAt(0).toUpperCase() + cat.slice(1)), linkedCategory: cat });
   }
 
-  const policy = opts.policyUrl && /^https?:\/\//i.test(opts.policyUrl)
-    ? `<a href="${escapeHtml(opts.policyUrl)}" target="_blank" rel="noopener noreferrer">${w.policy}</a>`
-    : undefined;
+  // THE BANNER ALWAYS LINKS TO A PRIVACY POLICY. With no address set (or one that is not a web
+  // address) it had no link at all, so it asked for consent without saying where the terms are.
+  // The link is then the service's own policy in this language: GET /v1/privacy, and
+  // /v1/privacy/<lang> for the others, which answers in English until that language is written and
+  // tells the operator what to fill in while the policy cannot be shown (routes/portal-policy-not-set.ts).
+  const own = `${(opts.base ?? '').replace(/\/+$/, '')}/v1/privacy${lang === 'en' ? '' : `/${lang}`}`;
+  const href = opts.policyUrl && /^https?:\/\//i.test(opts.policyUrl) ? opts.policyUrl : own;
+  const policy = `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${w.policy}</a>`;
 
   return {
     consentModal: {
@@ -151,7 +160,7 @@ export function consentTexts(
       acceptAllBtn: w.acceptAll,
       acceptNecessaryBtn: w.onlyNecessary,
       showPreferencesBtn: w.choose,
-      ...(policy ? { footer: policy } : {}),
+      footer: policy,
     },
     preferencesModal: {
       title: w.prefsTitle,

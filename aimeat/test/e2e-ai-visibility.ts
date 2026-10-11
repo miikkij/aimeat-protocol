@@ -14,6 +14,8 @@
  *   The refusals are measured: a second owner sees none of the first owner's counts, an agent
  *   holding the wrong scope is refused on REST and has no such tool on MCP, and no token is 401.
  * @version-history
+ *   v1.3.0 — 2026-10-11 — The banner's link to a privacy policy, and the page that link reaches
+ *     while the operator fields are not filled in (18e).
  *   v1.2.0 — 2026-10-11 — The cookie banner: it names the owner's analytics in three languages and
  *     clears their cookies on a taken-back consent (18); switched on in Config it reaches the
  *     service's own page at once with the page's CSP nonce (18b); the category list is a list (18c).
@@ -563,6 +565,49 @@ await test('18c. the category list is a list: text is refused, and a list gives 
     const reset = await setCategories(['necessary']);
     assert(reset.status === 200, 'the list is back to necessary');
   }
+});
+
+await test('18e. the banner links to a privacy policy: the service\'s own unless an address is set, and that page says what to fill in while it cannot be shown', async () => {
+  const setConfig = (path: string, value: unknown) => json('/v1/admin/config', {
+    method: 'PUT', headers: authed(OP.token), body: JSON.stringify({ changes: [{ path, value }] }),
+  });
+  const dropOverride = (path: string) => json(`/v1/admin/config/${encodeURIComponent(path)}`, { method: 'DELETE', headers: authed(OP.token) });
+  const footer = async (lang: string): Promise<string> => bannerConfig(await page(appPath))?.language.translations[lang].consentModal.footer ?? '';
+
+  await setTags(S.token, { clarity_project_id: 'k7x2m9qp1a' });
+  await setBanner(true);
+  try {
+    // No address set: until 2026-10-11 the banner then had no link at all.
+    const en = await footer('en');
+    assert(/<a href="https?:\/\/[^"/]+\/v1\/privacy" /.test(en), `the app's banner links to the service's own policy by its full address, got ${en}`);
+    assert(/<a href="https?:\/\/[^"/]+\/v1\/privacy\/fi" /.test(await footer('fi')), 'and to the Finnish one for a Finnish reader');
+    const set = await setConfig('cookies.consent_policy_url', 'https://policies.example/privacy');
+    assert(set.status === 200, `an address is taken: ${set.status}`);
+    assert((await footer('fi')).includes('<a href="https://policies.example/privacy" '), 'a set address is the link, as it is, in every language');
+  } finally {
+    await setBanner(false);
+    await setConfig('cookies.consent_policy_url', '');
+    await dropOverride('cookies.consent_policy_url');
+  }
+
+  // FAILURE MODE: the policy cannot be shown while the operator fields are not filled in. The page
+  // the link then reaches says so and sends the operator to the Config page.
+  const read = await json('/v1/admin/config', { headers: authed(OP.token) });
+  const name = read.body.data.schema['operator.name'].value as string;
+  assert(typeof name === 'string' && name.length > 0, 'the test node has an operator name');
+  try {
+    assert((await setConfig('operator.name', '')).status === 200, 'the operator name is emptied');
+    const res = await fetch(`${BASE}/v1/privacy/fi`, { headers: { Accept: 'text/html' } });
+    const text = await res.text();
+    assert(res.status === 503, `the policy is not served half filled in, got ${res.status}`);
+    assert(text.includes('Tällä palvelulla ei ole vielä tietosuojaselostetta'), 'the page says there is no policy yet, in the reader\'s language');
+    assert(text.includes('<a href="/v1/admin?tab=config">') && text.includes('Operaattorin nimi') && text.includes('AIMEAT_OPERATOR_NAME'), 'and names the missing field and where to fill it in');
+  } finally {
+    assert((await setConfig('operator.name', name)).status === 200, 'the operator name is back');
+    await dropOverride('operator.name');
+  }
+  // Saving is enough: the policy is served again with no restart.
+  assert((await fetch(`${BASE}/v1/privacy`, { headers: { Accept: 'text/html' } })).status === 200, 'the policy is served again');
 });
 
 await test('19. null removes a tag, and with both removed the page carries none', async () => {

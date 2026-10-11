@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-11 — The page for a policy that cannot be shown yet moved to portal-policy-not-set.ts
+ *     and sends the operator to the Config page (it said to set environment variables and restart).
  *   2026-10-11 — The privacy page's {{ownerAnalyticsNotice}}: the paragraph about account holders'
  *     own analytics, written only while one of them uses Clarity or Google Analytics.
  *   2026-10-09 — /v1/oauth-round joins the SPA routes: the owner confirms a sign-in round an agent
@@ -104,6 +106,7 @@ import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { tagsInUseOnNode } from '../services/visibility/visibility-settings.js';
 import { ownerAnalyticsNotice } from '../services/visibility/privacy-notice.js';
+import { renderPolicyNotSetPage } from './portal-policy-not-set.js';
 
 /**
  * Returns a Record<placeholder, value> for the templated static pages
@@ -194,31 +197,6 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
           es: 'Este nodo rechaza en robots.txt los rastreadores de entrenamiento de IA de terceros. Es una preferencia declarada, no un control técnico: mantiene tu contenido público fuera de lo que esos modelos aprenden por su cuenta, pero no detiene a quien ignore el archivo.',
         }[locale],
   };
-}
-
-/**
- * Render a 503 "Privacy policy not configured" fallback page when the
- * operator has not filled in the required env vars. Aimed at the operator,
- * not the end user -- it tells them which AIMEAT_OPERATOR_* fields to set.
- */
-function renderPrivacyNotConfiguredPage(missing: string[], locale: Locale): string {
-  const envVars = missing.map(field => {
-    const upper = field.replace(/[A-Z]/g, c => '_' + c).toUpperCase();
-    return `AIMEAT_OPERATOR_${upper}`;
-  });
-  const title = locale === 'fi' ? 'Tietosuojaseloste ei ole konfiguroitu' : 'Privacy policy not configured';
-  const body = locale === 'fi'
-    ? `<p>Tämän AIMEAT-solmun ylläpitäjä ei ole määrittänyt vaadittuja tietosuojaselosteen kenttiä. Älä tallenna henkilötietoja tälle solmulle ennen kuin ylläpitäjä on korjannut tämän.</p>
-       <p><strong>Ylläpitäjälle:</strong> aseta seuraavat ympäristömuuttujat ja käynnistä solmu uudelleen. Tarkemmat tiedot: <a href="https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/.env.example"><code>.env.example</code></a>.</p>`
-    : `<p>The operator of this AIMEAT node has not filled in the required privacy policy fields. Do not store personal data on this node until the operator has fixed this.</p>
-       <p><strong>For the operator:</strong> set the environment variables below and restart the node. Details in <a href="https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/.env.example"><code>.env.example</code></a>.</p>`;
-  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><title>${title}</title>
-    <style>body{font-family:system-ui,sans-serif;max-width:680px;margin:60px auto;padding:0 24px;line-height:1.6;color:#1a1a18}
-    h1{font-size:24px;margin-bottom:16px}pre{background:#f4f4f0;padding:14px 16px;border-radius:6px;font-size:13px;overflow-x:auto}
-    .warn{background:#fff5f4;border-left:3px solid #E8564A;padding:12px 16px;border-radius:4px;margin:18px 0}</style>
-    </head><body><h1>${title}</h1><div class="warn">${body}</div>
-    <pre>${envVars.join('\n')}</pre>
-    </body></html>`;
 }
 
 
@@ -666,9 +644,10 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // injection. Used for privacy policy, connect/MCP docs, and other public-
   // facing static pages required by the Anthropic Connectors Directory.
   //
-  // For privacy pages specifically: if any required AIMEAT_OPERATOR_* env
-  // var is missing, the helper returns 503 with an operator-facing fallback
-  // page that lists the missing fields. This is intentional fail-loud so a
+  // For the privacy and terms pages specifically: if any required operator
+  // field is missing, the helper returns 503 with a page that lists the
+  // missing fields and sends the operator to the Config page
+  // (portal-policy-not-set.ts). This is intentional fail-loud so a
   // self-hoster cannot accidentally ship a partly-filled-in policy that
   // still names the upstream author. See `missingOperatorConfig()` in
   // `src/config.ts` for the validation rule.
@@ -699,7 +678,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     if (isPrivacyPage || isTermsPage) {
       const missing = missingOperatorConfig(config.operator);
       if (missing.length > 0) {
-        res.status(503).type('text/html').send(renderPrivacyNotConfiguredPage(missing, locale));
+        res.status(503).type('text/html').send(renderPolicyNotSetPage(missing, locale, isTermsPage ? 'terms' : 'privacy'));
         return;
       }
     }

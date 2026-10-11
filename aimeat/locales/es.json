@@ -9327,7 +9327,7 @@
     "cfgDesc_portfolio_max_images": "Máximo de imágenes por portafolio.",
     "cfgDesc_cookies_consent_enabled": "Muestra el aviso de cookies en cada aplicación, portafolio y página de empresa cuyo dueño usa su propio Clarity o Google Analytics. Las páginas propias de este servicio lo muestran solo cuando la lista de categorías tiene algo más que necessary. El cambio se aplica de inmediato.",
     "cfgDesc_cookies_consent_categories": "Lo que pregunta el aviso en las páginas propias de este servicio, una palabra por línea: necessary, analytics, marketing. Una página con la analítica de su dueño siempre pregunta por la analítica.",
-    "cfgDesc_cookies_consent_policy_url": "La dirección de la política de privacidad a la que enlaza el aviso.",
+    "cfgDesc_cookies_consent_policy_url": "La dirección de la política de privacidad a la que enlaza el aviso. Vacío: el aviso enlaza a la política de privacidad de este servicio, en el idioma del visitante.",
     "cfgDesc_cors_allowed_origins": "Orígenes permitidos por CORS, separados por comas (* = todos).",
     "cfgDesc_realtime_enabled": "Señalización P2P en tiempo real activada.",
     "cfgDesc_realtime_max_rooms": "Máximo de salas P2P.",

@@ -350,7 +350,7 @@ describe('cookieConsentMiddleware', () => {
     expect(result).toContain('Tietosuojaseloste');
   });
 
-  it('omits footer link when cookieConsentPolicyUrl is null', () => {
+  it('links to the service\'s own privacy page when cookieConsentPolicyUrl is null', () => {
     const config = makeConfig({
       cookieConsentEnabled: true,
       cookieConsentPolicyUrl: null,
@@ -374,8 +374,10 @@ describe('cookieConsentMiddleware', () => {
     res.send('<html><body></body></html>');
 
     const result = capturedBody as string;
-    expect(result).not.toContain('Privacy policy');
-    expect(result).not.toContain('footer');
+    // A banner with no way to the policy asked for consent without saying where the terms are.
+    expect(result).toContain('"footer"');
+    expect(result).toContain('href=\\"/v1/privacy\\"');
+    expect(result).toContain('href=\\"/v1/privacy/fi\\"');
   });
 
   it('passes HTML through unchanged when there is no </body> tag', () => {
@@ -597,9 +599,33 @@ describe('buildCookieConsentRunConfig', () => {
     expect(footer.match(/<a /g)).toHaveLength(1);
   });
 
-  it('does not make a link of a policy value that is not a web address', () => {
+  it('does not make a link of a policy value that is not a web address: the service\'s own page stands in', () => {
     const run = JSON.parse(buildCookieConsentRunConfig(makeConfig({ cookieConsentEnabled: true, cookieConsentPolicyUrl: 'javascript:alert(1)' }))) as Run;
-    expect(run.language.translations.en!.consentModal.footer).toBeUndefined();
+    const footer = run.language.translations.en!.consentModal.footer!;
+    expect(footer).not.toContain('javascript');
+    expect(footer).toContain('href="/v1/privacy"');
+  });
+
+  it('with no policy address set, links to the service\'s own privacy page in the reader\'s language', () => {
+    const run = JSON.parse(buildCookieConsentRunConfig(config)) as Run;
+    expect(run.language.translations.en!.consentModal.footer).toContain('<a href="/v1/privacy" ');
+    expect(run.language.translations.fi!.consentModal.footer).toContain('<a href="/v1/privacy/fi" ');
+    expect(run.language.translations.fi!.consentModal.footer).toContain('>Tietosuojaseloste</a>');
+    expect(run.language.translations.es!.consentModal.footer).toContain('<a href="/v1/privacy/es" ');
+  });
+
+  it('on a page of another origin the link to the service\'s own privacy page is a full address', () => {
+    const run = JSON.parse(buildCookieConsentRunConfig(config, { assetBase: 'https://node.example/' })) as Run;
+    expect(run.language.translations.en!.consentModal.footer).toContain('<a href="https://node.example/v1/privacy" ');
+    expect(run.language.translations.fi!.consentModal.footer).toContain('<a href="https://node.example/v1/privacy/fi" ');
+  });
+
+  it('a policy address the operator set is the link in every language, as it is', () => {
+    const set = makeConfig({ cookieConsentEnabled: true, cookieConsentPolicyUrl: 'https://policies.example/privacy' });
+    const run = JSON.parse(buildCookieConsentRunConfig(set, { assetBase: 'https://node.example' })) as Run;
+    for (const lang of ['en', 'fi', 'es']) {
+      expect(run.language.translations[lang]!.consentModal.footer).toContain('<a href="https://policies.example/privacy" ');
+    }
   });
 });
 
