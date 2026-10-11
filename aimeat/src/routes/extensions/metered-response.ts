@@ -19,18 +19,26 @@
  *                         instead of sent, for a caller that answers in another protocol.
  *   v1.2.0 — 2026-10-11 — Wording: a morsel figure is pacing, never a price or a burned toll
  *                         (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+ *   v1.3.0 — 2026-10-11 — A contract holder short of morsels hears the daily allowance and, when the
+ *                         operator sells one, the pacing pack and its money price (insufficientMorselsMessage),
+ *                         as every other INSUFFICIENT_MORSELS answer says.
  */
 import type { AimeatConfig } from '../../config.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { formatMoneyMajor } from '../../commerce/money.js';
+import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
 import type { MeteredOutcome } from '../../services/metered-access.js';
 
 /** A refusal is anything that is neither a settled call, a free one, nor "you hold no right". */
 type Refusal = Exclude<MeteredOutcome, { kind: 'settled' } | { kind: 'free_owner' } | { kind: 'no_right' }>;
 
-/** The status + code + human sentence for one refusal, without deciding how to transmit it. */
-export function meteredRefusalText(outcome: Refusal, label: string): { status: number; code: string; message: string } {
+/**
+ * The status + code + human sentence for one refusal, without deciding how to transmit it. With the
+ * node's `config`, a caller short of morsels is told the same thing every INSUFFICIENT_MORSELS answer
+ * says: the daily allowance, and the pacing pack with its money price when the operator sells one.
+ */
+export function meteredRefusalText(outcome: Refusal, label: string, config?: AimeatConfig): { status: number; code: string; message: string } {
   switch (outcome.kind) {
     case 'inactive': {
       const e = outcome.entitlement;
@@ -64,8 +72,10 @@ export function meteredRefusalText(outcome: Refusal, label: string): { status: n
         message: outcome.carried
           ? `This call carries ${outcome.needed} morsels of pacing, which the provider carries for you `
             + 'under their grant, and their balance does not cover it right now. Morsels replenish daily.'
-          : `This call carries ${outcome.needed} morsels of pacing and the balance does not cover it. Morsels `
-            + 'replenish daily; pacing bounds how fast a capability can be used, and it is not a price.' };
+          : config
+            ? insufficientMorselsMessage(config, outcome.needed)
+            : `This call carries ${outcome.needed} morsels of pacing and the balance does not cover it. Morsels `
+              + 'replenish daily; pacing bounds how fast a capability can be used, and it is not a price.' };
     case 'scope_required':
       return { status: 403, code: 'SCOPE_DENIED',
         message: `This app may not spend on your behalf. It needs the "${outcome.scope}" permission, `
@@ -118,7 +128,7 @@ export function refusalText(refusal: { status: number; body: unknown }): string 
 
 /** Send a refusal. Payment-shaped refusals carry the x402 challenge; a rate limit and a failure do not. */
 export function respondMeteredRefusal(config: AimeatConfig, res: PaywallResponder, outcome: Refusal, label: string): void {
-  const { status, code, message } = meteredRefusalText(outcome, label);
+  const { status, code, message } = meteredRefusalText(outcome, label, config);
   const body = error(config.nodeId, code, message);
   res.status(status).json(status === 402 ? { ...body, ...paymentChallenge(config) } : body);
 }

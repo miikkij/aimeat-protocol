@@ -25,6 +25,8 @@
  *   contract from opposite ends: the door calls one of them, never both.
  * @structure settleMeteredCharge · resolvePacingToll · chargePacing · SettlementResult · BeneficiaryAccrual
  * @version-history
+ *   v1.2.1 — 2026-10-11 — A pacing charge's tracking code says "granted" only when somebody other than
+ *     the caller's owner pays; an ordinary checkout passed its own buyer as the payer and read "granted".
  *   v1.2.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). chargePacing replaces the all-burn toll: the payer's owner is debited,
  *     the burn rate's share burns, a flow's existing operator share is kept, and the rest is credited
@@ -129,7 +131,9 @@ export async function chargePacing(args: {
     ? await resolveOperatorFeeGhii(storage, config) : null;
   if (fee > 0 && !operatorGhii) { burned += fee; fee = 0; }
   const providerEarned = amount - burned - fee;
-  const trackingCode = `${args.payer ? 'pacing:granted' : 'pacing'}:${label}:${randomUUID().slice(0, 8)}`;
+  // "granted" only when somebody other than the caller's owner pays (a provider carrying a member).
+  const granted = !!args.payer && payerGhii !== ownerGhiiOf(caller);
+  const trackingCode = `${granted ? 'pacing:granted' : 'pacing'}:${label}:${randomUUID().slice(0, 8)}`;
   const ts = new Date().toISOString();
 
   let ok = false;

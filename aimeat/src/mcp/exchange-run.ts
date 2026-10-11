@@ -21,6 +21,7 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-11 — A refusal for want of morsels names the daily allowance and the pacing pack, as REST does.
  *   2026-10-11 — aimeat_app_tool_invoke charges a free tool's pacing amount before the call (paceFreeToolUse,
  *     the REST twin's function), gives it back when the call throws, and answers `pacing` with the result
  *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -207,7 +208,7 @@ export function registerExchangeRunTools(
                 return fail(`NO_CONTRACT: accept a contract for "${ownerName}/${app}/${tool}" first (aimeat_exchange_accept with its offering_id)`);
             }
             if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner' && outcome.kind !== 'no_right') {
-                const r = meteredRefusalText(outcome, label);
+                const r = meteredRefusalText(outcome, label, config);
                 return fail(`${r.code}: ${r.message}`);
             }
 
@@ -332,7 +333,7 @@ export function registerExchangeRunTools(
             });
             if (outcome.kind === 'no_right') return fail('NO_CONTRACT: no active contract to settle against');
             if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
-                const r = meteredRefusalText(outcome, workLabel);
+                const r = meteredRefusalText(outcome, workLabel, config);
                 return fail(`${r.code}: ${r.message}`);
             }
             const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
