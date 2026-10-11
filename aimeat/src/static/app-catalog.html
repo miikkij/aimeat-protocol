@@ -8279,7 +8279,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       var m = money[i];
       if (!m || !(m.amount > 0) || seen[m.currency]) continue;
       seen[m.currency] = true;
-      parts.push(m.amount / MONEY_UNIT + " " + m.currency);
+      parts.push((m.amount / MONEY_UNIT).toFixed(2) + " " + m.currency);
     }
     var toll = tollOf(tool);
     if (!parts.length && !toll) return t("monetize.notForSale");

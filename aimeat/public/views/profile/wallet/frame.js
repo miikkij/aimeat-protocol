@@ -10,6 +10,8 @@
  *   crumb · pageLinks · openTab
  * @usage import { x, rowWords, sourcesOf } from './frame.js';
  * @version-history
+ *   v1.2.1 — 2026-10-12 — A pacing row names its use in words (pacingWhat; a checkout is "a use", never
+ *     its session id), and "your agent …" shows only for an agent of this wallet's own owner.
  *   v1.2.0 — 2026-10-11 — Pacing rows in words (pacing_charge, pacing_burn, pacing_earn, pacing_refund,
  *     the operator's share, and a pacing pack bought with money), named by the use their tracking code
  *     carries (ruling "morseli on tahdistus, ei hinta").
@@ -81,6 +83,23 @@ export function shortName(gaii) {
   return hash > 0 ? `${local.slice(0, hash)} (${local.slice(hash + 1)})` : local;
 }
 
+/**
+ * The use a pacing row's label names, in words: an offer, an app tool, an extension action, an app
+ * bought in the store, or an EXCHANGE coordinate. A checkout's own id is no use to a reader, and the
+ * word "checkout" beside a morsel amount reads as a purchase, so it becomes "a use".
+ */
+function pacingWhat(label) {
+  const [flow, a = '', b = ''] = label;
+  if (!flow) return x('row.noCode');
+  if (flow === 'checkout') return x('row.pacingUse');
+  if (flow === 'offer') return [a, b].filter(Boolean).join(' · ');
+  if (flow === 'app-store') return a.split('/').pop() || a;
+  if (flow.startsWith('apptool')) return b || a.split('/').pop() || a;
+  if (flow === 'ext') return [a, b].filter(Boolean).join(' · ');
+  if (flow === 'exchange') return [a.replace(/^(apptool|agentwork):/, ''), b].filter(Boolean).join(' · ');
+  return label.join(' · ');
+}
+
 /** The owner half of a GAII: "exchange-composer#jounidude@node" → "jounidude". */
 const ownerOf = (gaii) => { const s = shortName(gaii); const i = s.indexOf(' ('); return i > 0 ? s.slice(i + 2, -1) : s; };
 
@@ -110,8 +129,7 @@ export function rowWords(tx, self, agents) {
     title = x('row.pacingPack');
   } else if (parts[0] === 'pacing' && PACING_ROW[tx.type]) {
     // pacing[:granted]:<label>:<8 hex>, written by chargePacing; the label names the use.
-    const what = parts.slice(parts[1] === 'granted' ? 2 : 1, -1).join(':') || x('row.noCode');
-    title = x(PACING_ROW[tx.type], { what });
+    title = x(PACING_ROW[tx.type], { what: pacingWhat(parts.slice(parts[1] === 'granted' ? 2 : 1, -1)) });
   } else if (parts[0] === 'exchange' && (parts[1] === 'apptool' || parts[1] === 'agentwork') && parts[2]) {
     const slash = parts[2].indexOf('/');
     const owner = slash > 0 ? parts[2].slice(0, slash) : '';
@@ -132,8 +150,12 @@ export function rowWords(tx, self, agents) {
   else if (tx.type === 'org_offer_spend') title = x('row.offerPaid');
   else title = amount > 0 ? x('row.earned') : x('row.spent');
 
-  const agent = tx.initiator_gaii ? (agents || []).find((a) => a.gaii === tx.initiator_gaii) : null;
-  const who = tx.initiator_gaii ? x('row.byAgent', { name: agent?.name || shortName(tx.initiator_gaii) }) : '';
+  // "your agent …" only for one of this owner's own agents: the owner acting in person, or another
+  // owner named on an older row, is not an agent of theirs.
+  const ini = tx.initiator_gaii || '';
+  const ownAgent = !!ini && ini !== self && !!self && ownerOf(ini) === ownerOf(self);
+  const agent = ownAgent ? (agents || []).find((a) => a.gaii === ini) : null;
+  const who = ownAgent ? x('row.byAgent', { name: agent?.name || shortName(ini) }) : '';
   const sub = [who, cpName && !cpSelf ? x('row.with', { name: cpName }) : '', code || x('row.noCode')].filter(Boolean).join(' · ');
   return { title, sub, who };
 }
