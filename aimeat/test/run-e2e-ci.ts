@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-11 -- e2e-model-suite.ts joins the list (not the guard tier): the suite
+ *     docs/coding-guidelines/testing-requirements.md names as the model, signed in with a password.
  *   2026-10-11 -- e2e-test-money-guard.ts joins the list (not the guard tier): a node others can reach
  *     never registers the test-only money handler.
  *   2026-10-11 -- e2e-record-spec-pointers.ts joins the list (not the guard tier): every `spec` a
@@ -767,6 +769,7 @@ const ALL_SUITES = [
     'test/e2e-write-guards.ts',
     'test/e2e-wallet-page.ts',
     'test/e2e-data-wallet-page.ts',
+    'test/e2e-model-suite.ts',
     'test/e2e-access-page.ts',
     'test/e2e-invitations.ts',
     'test/e2e-invite-grants.ts',
