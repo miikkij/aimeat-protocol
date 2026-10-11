@@ -14,6 +14,8 @@
  * @structure HoldRecord · createHold · getHold · listHolds · captureHold · releaseHold
  * @usage import { createHold, captureHold, releaseHold } from '../commerce/hold-book.js';
  * @version-history
+ *   v1.2.1 — 2026-10-11 — A money hold picks test.money only on a loopback test node
+ *     (utils/test-money-guard.ts); on any other node the flag no longer routes a hold to it.
  *   v1.2.0 — 2026-10-05 — The limit is checked and the amount counted in one compare-and-swap before the
  *     rail authorizes, and given back when the rail declines (secaudit 2026-10, PKG-6).
  *   v1.1.0 — 2026-10-02 — An agent's hold is held to the daily purchase limit its owner set on its card:
@@ -29,6 +31,7 @@ import { CommerceError } from './errors.js';
 import { isMoneyCurrency } from './money.js';
 import { STRIPE_HANDLER_ID } from './stripe-handler.js';
 import { TEST_MONEY_HANDLER_ID } from './test-money-handler.js';
+import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 import { logger } from '../utils/logger.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 
@@ -88,7 +91,7 @@ async function sellerFor(storage: Storage, hold: Pick<HoldRecord, 'sellerGhii' |
 function holdHandler(config: AimeatConfig, currency: string, handlerId?: string): PaymentHandler {
   const id = handlerId
     ?? (isMoneyCurrency(currency)
-      ? (config.testMoneyHandler ? TEST_MONEY_HANDLER_ID : STRIPE_HANDLER_ID)
+      ? (testMoneyHandlerActive(config) ? TEST_MONEY_HANDLER_ID : STRIPE_HANDLER_ID)
       : undefined);
   const handler = id ? getPaymentHandler(id) : undefined;
   if (!handler || !handler.currencies.includes(currency) || !handler.authorize || !handler.capture || !handler.release) {

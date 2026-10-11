@@ -14,6 +14,8 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   v3.4.1 — 2026-10-11 — The status sentence starts with AIMEAT_TEST_MONEY_HANDLER when it is set:
+ *     refused on a node others reach, or in force on a loopback test node.
  *   v3.4.0 — 2026-09-29 — The node's classification has a section before "Ask your AI" (TARGET-082
  *     V5): the switch, the node policy, a waiting proposal, the labels and rules, the audit log.
  *   v3.3.0 — 2026-09-26 — The question before a decision is made of one part per kind of row the name
@@ -63,6 +65,9 @@ const S = (key, params) => t('admin.security.' + key, params);
 /** The sentence beside the status word: what needs a person, or that nothing does. */
 export function alertLine(ov) {
   const parts = [];
+  // A test-only setting that moves no real money comes first: it is the one thing here that is never right on a live node.
+  const tm = ov.now.test_money_handler;
+  if (tm?.requested) parts.push(S(tm.active ? 'now.lineTestMoneyOn' : 'now.lineTestMoneyRefused'));
   const open = ov.now.open_incidents.value;
   if (open === 1) parts.push(S('now.lineOpenOne'));
   else if (open > 1) parts.push(S('now.lineOpenMany', { n: num(open) }));

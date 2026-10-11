@@ -9,6 +9,10 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-11 -- e2e-model-suite.ts joins the list (not the guard tier): the suite
+ *     docs/coding-guidelines/testing-requirements.md names as the model, signed in with a password.
+ *   2026-10-11 -- e2e-test-money-guard.ts joins the list (not the guard tier): a node others can reach
+ *     never registers the test-only money handler.
  *   2026-10-11 -- e2e-record-spec-pointers.ts joins the list (not the guard tier): every `spec` a
  *     self-describing record carries opens from the node.
  *   2026-10-11 -- Two sessions can run at once. A lane's port is computed from the runner's own
@@ -529,6 +533,7 @@ const ALL_SUITES = [
     // Self-spawns its own node with AIMEAT_PACING_TOLL_DEFAULT set: the feature IS the node-wide
     // default, so it cannot be proven on the shared server.
     'test/e2e-pacing.ts',
+    'test/e2e-test-money-guard.ts',
     'test/e2e-exchange.ts',
     'test/e2e-exchange-projection.ts',
     // The MCP half of EXCHANGE (act-on-exchange tools). It existed unregistered, so nothing was
@@ -764,6 +769,7 @@ const ALL_SUITES = [
     'test/e2e-write-guards.ts',
     'test/e2e-wallet-page.ts',
     'test/e2e-data-wallet-page.ts',
+    'test/e2e-model-suite.ts',
     'test/e2e-access-page.ts',
     'test/e2e-invitations.ts',
     'test/e2e-invite-grants.ts',
