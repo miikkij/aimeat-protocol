@@ -1,11 +1,11 @@
 {
  "title": "AIMEAT Feature List",
  "stamp": {
-  "version": "3.24.0",
-  "date": "2026-10-05"
+  "version": "3.26.1",
+  "date": "2026-10-12"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 3.24.0, checked against the code on 2026-10-05.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 3.26.1, checked against the code on 2026-10-12.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, the economy, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a>.",
@@ -468,19 +468,19 @@
      "slug": "g-3-agent-identity-gaii",
      "cells": [
       "<strong>Agent identity (GAII)</strong>",
-      "Every agent has <code>agent#owner@node-id</code>, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name.",
+      "Every agent has <code>agent#owner@node-id</code>, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. The outside accounts the agent connected are removed with it, so a new agent given the same name sees none of them.",
       "<code>/v1/agents</code>, <code>/v1/agents/:name</code>, <code>aimeat_agents_list</code>, <code>aimeat_agent_profile</code>"
      ],
-     "plain": "Agent identity (GAII) Every agent has agent#owner@node-id, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. /v1/agents, /v1/agents/:name, aimeat_agents_list, aimeat_agent_profile"
+     "plain": "Agent identity (GAII) Every agent has agent#owner@node-id, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. The outside accounts the agent connected are removed with it, so a new agent given the same name sees none of them. /v1/agents, /v1/agents/:name, aimeat_agents_list, aimeat_agent_profile"
     },
     {
      "slug": "g-3-device-authorization-rfc-8628",
      "cells": [
       "<strong>Device authorization (RFC 8628)</strong>",
-      "The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path.",
-      "<code>/v1/agents</code> device flow"
+      "The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue and read the workspaces of your organisms; the &quot;standard&quot; choice on the approval page also lets it write and publish there.",
+      "<code>/v1/agents</code> device flow, <code>scopes.default_agent_scopes</code> (<code>AIMEAT_DEFAULT_AGENT_SCOPES</code>)"
      ],
-     "plain": "Device authorization (RFC 8628) The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. /v1/agents device flow"
+     "plain": "Device authorization (RFC 8628) The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue and read the workspaces of your organisms; the \"standard\" choice on the approval page also lets it write and publish there. /v1/agents device flow, scopes.default_agent_scopes (AIMEAT_DEFAULT_AGENT_SCOPES)"
     },
     {
      "slug": "g-3-what-an-agent-was-refused",
@@ -558,10 +558,10 @@
      "slug": "g-3-document-signing",
      "cells": [
       "<strong>Document signing</strong>",
-      "Ask up to ten people or agents on the node to sign a document; only its SHA-256 is kept. A person signs with a passkey, which must check them with a PIN, fingerprint or face, and an agent signs as itself with its key or session, never in its owner's name. The node seals each signature with its own key, so a signature can be checked without the node, and anyone holding the document sees who signed it by its hash, with no account. Each signer is notified. The notification, and your AI's answer when it creates or reads a request, link to the signing app the operator names; on aimeat.io that is the Allekirjoitus app (allekirjoitus.apps.aimeat.io). A passkey signs on the node's own pages or in an app on the node's own domain, and the signature records which of them it came from. Your AI creates the request, follows it and tells you who has signed; it never signs for you. This is an electronic signature in the eIDAS sense, not a qualified one. Limits: the parties are identities on this node; a request names one document; with no signing app named, the notification names the request without a link.",
-      "<code>/v1/docsign/requests</code>, <code>/v1/docsign/requests/:id/passkey-options</code>, <code>/v1/docsign/requests/:id/sign</code>, <code>/v1/docsign/lookup/:sha256</code>, <code>docsign.app_url</code> (<code>AIMEAT_DOCSIGN_APP_URL</code>), <code>docsign.enabled</code> (<code>AIMEAT_DOCSIGN_ENABLED</code>), <code>aimeat_docsign_request_create</code>, <code>aimeat_docsign_requests</code>, <code>aimeat_docsign_request_get</code>, <code>aimeat_docsign_sign</code>, <code>aimeat_docsign_cancel</code>, <code>aimeat_docsign_lookup</code>"
+      "Ask up to ten people or agents on the node to sign a document; only its SHA-256 is kept. A person signs with a passkey, which must check them with a PIN, fingerprint or face, and an agent signs as itself with its key or session, never in its owner's name. The node seals each signature with its own key, so a signature can be checked without the node, and anyone holding the document sees who signed it by its hash, with no account. Each signer is notified. The notification, and your AI's answer when it creates or reads a request, link to the signing app the operator names; on aimeat.io that is the Allekirjoitus app (allekirjoitus.apps.aimeat.io). A passkey signs on the node's own pages or in an app on the node's own domain, and the signature records which of them it came from. Your AI creates the request, follows it and tells you who has signed; it never signs for you. This is an electronic signature in the eIDAS sense, not a qualified one. Its creator can delete a request nobody has signed, with the files the node stored for it; a request that carries a signature is a record and can only be cancelled. Limits: the parties are identities on this node; a request names one document; with no signing app named, the notification names the request without a link.",
+      "<code>/v1/docsign/requests</code>, <code>DELETE /v1/docsign/requests/:id</code>, <code>/v1/docsign/requests/:id/passkey-options</code>, <code>/v1/docsign/requests/:id/sign</code>, <code>/v1/docsign/lookup/:sha256</code>, <code>docsign.app_url</code> (<code>AIMEAT_DOCSIGN_APP_URL</code>), <code>docsign.enabled</code> (<code>AIMEAT_DOCSIGN_ENABLED</code>), <code>aimeat_docsign_request_create</code>, <code>aimeat_docsign_requests</code>, <code>aimeat_docsign_request_get</code>, <code>aimeat_docsign_sign</code>, <code>aimeat_docsign_cancel</code>, <code>aimeat_docsign_delete</code>, <code>aimeat_docsign_lookup</code>"
      ],
-     "plain": "Document signing Ask up to ten people or agents on the node to sign a document; only its SHA-256 is kept. A person signs with a passkey, which must check them with a PIN, fingerprint or face, and an agent signs as itself with its key or session, never in its owner's name. The node seals each signature with its own key, so a signature can be checked without the node, and anyone holding the document sees who signed it by its hash, with no account. Each signer is notified. The notification, and your AI's answer when it creates or reads a request, link to the signing app the operator names; on aimeat.io that is the Allekirjoitus app (allekirjoitus.apps.aimeat.io). A passkey signs on the node's own pages or in an app on the node's own domain, and the signature records which of them it came from. Your AI creates the request, follows it and tells you who has signed; it never signs for you. This is an electronic signature in the eIDAS sense, not a qualified one. Limits: the parties are identities on this node; a request names one document; with no signing app named, the notification names the request without a link. /v1/docsign/requests, /v1/docsign/requests/:id/passkey-options, /v1/docsign/requests/:id/sign, /v1/docsign/lookup/:sha256, docsign.app_url (AIMEAT_DOCSIGN_APP_URL), docsign.enabled (AIMEAT_DOCSIGN_ENABLED), aimeat_docsign_request_create, aimeat_docsign_requests, aimeat_docsign_request_get, aimeat_docsign_sign, aimeat_docsign_cancel, aimeat_docsign_lookup"
+     "plain": "Document signing Ask up to ten people or agents on the node to sign a document; only its SHA-256 is kept. A person signs with a passkey, which must check them with a PIN, fingerprint or face, and an agent signs as itself with its key or session, never in its owner's name. The node seals each signature with its own key, so a signature can be checked without the node, and anyone holding the document sees who signed it by its hash, with no account. Each signer is notified. The notification, and your AI's answer when it creates or reads a request, link to the signing app the operator names; on aimeat.io that is the Allekirjoitus app (allekirjoitus.apps.aimeat.io). A passkey signs on the node's own pages or in an app on the node's own domain, and the signature records which of them it came from. Your AI creates the request, follows it and tells you who has signed; it never signs for you. This is an electronic signature in the eIDAS sense, not a qualified one. Its creator can delete a request nobody has signed, with the files the node stored for it; a request that carries a signature is a record and can only be cancelled. Limits: the parties are identities on this node; a request names one document; with no signing app named, the notification names the request without a link. /v1/docsign/requests, DELETE /v1/docsign/requests/:id, /v1/docsign/requests/:id/passkey-options, /v1/docsign/requests/:id/sign, /v1/docsign/lookup/:sha256, docsign.app_url (AIMEAT_DOCSIGN_APP_URL), docsign.enabled (AIMEAT_DOCSIGN_ENABLED), aimeat_docsign_request_create, aimeat_docsign_requests, aimeat_docsign_request_get, aimeat_docsign_sign, aimeat_docsign_cancel, aimeat_docsign_delete, aimeat_docsign_lookup"
     },
     {
      "slug": "g-3-signing-with-an-eu-digital-identity-wallet",
@@ -1036,10 +1036,10 @@
      "slug": "g-6-skills",
      "cells": [
       "<strong>Skills</strong>",
-      "SKILL.md packs at node and user scope, linked to agents, pinned by version, and bound to an app when they are that app's operating guide. Downloadable as a ZIP for Claude and other runtimes. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/skills-registry.md\" target=\"_blank\" rel=\"noopener\">skills-registry.md</a>.",
-      "<code>/v1/skills</code>, <code>aimeat_skill_*</code>, <code>/.well-known/agent-skills/index.json</code>"
+      "SKILL.md packs at node and user scope, linked to agents, pinned by version, and bound to an app when they are that app's operating guide. Downloadable as a ZIP for Claude and other runtimes. Every node ships its own operating guides for an AI as built-in skills, so an AI on any node reads them from the node and not from a repository file: for example building an app (<code>aimeat-app-builder</code>), using AI from an app (<code>aimeat-ai-capabilities</code>), an agent that works inside a workspace (<code>aimeat-workspace-contracts</code>) and putting recurring work on a clock (<code>aimeat-recurring-work</code>). See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/skills-registry.md\" target=\"_blank\" rel=\"noopener\">skills-registry.md</a>.",
+      "<code>/v1/skills</code>, <code>node:&lt;name&gt;</code> on <code>aimeat_skill_get</code>, <code>aimeat_skill_*</code>, <code>/.well-known/agent-skills/index.json</code>"
      ],
-     "plain": "Skills SKILL.md packs at node and user scope, linked to agents, pinned by version, and bound to an app when they are that app's operating guide. Downloadable as a ZIP for Claude and other runtimes. See skills-registry.md. /v1/skills, aimeat_skill_*, /.well-known/agent-skills/index.json"
+     "plain": "Skills SKILL.md packs at node and user scope, linked to agents, pinned by version, and bound to an app when they are that app's operating guide. Downloadable as a ZIP for Claude and other runtimes. Every node ships its own operating guides for an AI as built-in skills, so an AI on any node reads them from the node and not from a repository file: for example building an app (aimeat-app-builder), using AI from an app (aimeat-ai-capabilities), an agent that works inside a workspace (aimeat-workspace-contracts) and putting recurring work on a clock (aimeat-recurring-work). See skills-registry.md. /v1/skills, node:<name> on aimeat_skill_get, aimeat_skill_*, /.well-known/agent-skills/index.json"
     },
     {
      "slug": "g-6-typed-records-and-shared-vocabularies",
@@ -1464,10 +1464,10 @@
      "slug": "g-8-extensions",
      "cells": [
       "<strong>Extensions</strong>",
-      "Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in.",
-      "<code>/v1/extensions</code>, <code>/v1/ext/:name/:action</code>, <code>aimeat_extension_*</code>"
+      "Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the person installing it sees the ceiling.",
+      "<code>/v1/extensions</code>, <code>/v1/ext/:name/:action</code>, <code>aimeat_extension_*</code>, <code>ctx.fetch(url, { gunzip: true })</code>, manifest <code>limits.fetch_max_mb</code>"
      ],
-     "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_*"
+     "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the person installing it sees the ceiling. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_*, ctx.fetch(url, { gunzip: true }), manifest limits.fetch_max_mb"
     },
     {
      "slug": "g-8-an-extension-names-the-services-it-calls",
@@ -1500,10 +1500,10 @@
      "slug": "g-8-install-sets",
      "cells": [
       "<strong>Install sets</strong>",
-      "Set up a customer's node in one step from an install bundle bought from a package repository: the owner user, the bundle's packages with their config, its organisms and workspaces under the customer's names, the other users and the crew agents. Each user has an email, and either gets an account now or an email invitation. A person whose account the set created gets an email naming the account, with a sign-in link that works once for 7 days; so does an owner account made before the set (by a shop, say) when its verified address is the set's, once per set; later they ask the sign-in dialog for a new link, or sign in with Google or Entra. A plan lists what would be made and what is missing before anything is created, and applying again creates nothing twice. Entitlement to the bundle also serves the packages it lists. A new node can apply its set at start-up from a file, and link the repository the set names; it tries again until the repository serves it. The repository the set names is reached and checked for updates even when package exchange with other nodes is switched off; everything else stays off. The crew agents of the bundle's apps wait as proposals the owner approves. The purchase is the approval for the apps: the set records the owner's permission for each app it installs, for what the app says it uses, so the apps sign in with no question; an update that asks for more still asks, and the owner can take each permission away, which stays when the set is applied again (<code>grant_apps: false</code> turns this off). The owner's welcome link can open one of the set's apps, signed in (<code>landing</code>). Limits: operator only; no screen yet.",
+      "Set up a customer's node in one step from an install bundle bought from a package repository: the owner user, the bundle's packages with their config, its organisms and workspaces under the customer's names, the other users and the crew agents. Each user has an email, and either gets an account now or an email invitation. A person whose account the set created gets an email naming the account, with a sign-in link that works once for 7 days; so does an owner account made before the set (by a shop, say) when its verified address is the set's, once per set; later they ask the sign-in dialog for a new link, or sign in with Google or Entra. A plan lists what would be made and what is missing before anything is created, and applying again creates nothing twice. Entitlement to the bundle also serves the packages it lists. A new node can apply its set at start-up from a file, and link the repository the set names; it tries again until the repository serves it. The repository the set names is reached and checked for updates even when package exchange with other nodes is switched off; everything else stays off. The crew agents of the bundle's apps wait as proposals the owner approves. The purchase is the approval for the apps: the set records the owner's permission for each app it installs, for what the app says it uses, so the apps sign in with no question; an update that asks for more still asks, and the owner can take each permission away, which stays when the set is applied again (<code>grant_apps: false</code> turns this off). The owner's welcome link can open one of the set's apps, signed in (<code>landing</code>), and the apply record keeps the path it opens. When a set is applied to an account that existed before, that person's account feed says an operator installed it, how many packages it brought and how many apps got permissions. Limits: operator only; no screen yet.",
       "<code>/v1/install-sets/apply</code>, <code>/v1/install-sets</code>, <code>aimeat_admin_install_set</code>, <code>AIMEAT_INSTALL_SET</code>"
      ],
-     "plain": "Install sets Set up a customer's node in one step from an install bundle bought from a package repository: the owner user, the bundle's packages with their config, its organisms and workspaces under the customer's names, the other users and the crew agents. Each user has an email, and either gets an account now or an email invitation. A person whose account the set created gets an email naming the account, with a sign-in link that works once for 7 days; so does an owner account made before the set (by a shop, say) when its verified address is the set's, once per set; later they ask the sign-in dialog for a new link, or sign in with Google or Entra. A plan lists what would be made and what is missing before anything is created, and applying again creates nothing twice. Entitlement to the bundle also serves the packages it lists. A new node can apply its set at start-up from a file, and link the repository the set names; it tries again until the repository serves it. The repository the set names is reached and checked for updates even when package exchange with other nodes is switched off; everything else stays off. The crew agents of the bundle's apps wait as proposals the owner approves. The purchase is the approval for the apps: the set records the owner's permission for each app it installs, for what the app says it uses, so the apps sign in with no question; an update that asks for more still asks, and the owner can take each permission away, which stays when the set is applied again (grant_apps: false turns this off). The owner's welcome link can open one of the set's apps, signed in (landing). Limits: operator only; no screen yet. /v1/install-sets/apply, /v1/install-sets, aimeat_admin_install_set, AIMEAT_INSTALL_SET"
+     "plain": "Install sets Set up a customer's node in one step from an install bundle bought from a package repository: the owner user, the bundle's packages with their config, its organisms and workspaces under the customer's names, the other users and the crew agents. Each user has an email, and either gets an account now or an email invitation. A person whose account the set created gets an email naming the account, with a sign-in link that works once for 7 days; so does an owner account made before the set (by a shop, say) when its verified address is the set's, once per set; later they ask the sign-in dialog for a new link, or sign in with Google or Entra. A plan lists what would be made and what is missing before anything is created, and applying again creates nothing twice. Entitlement to the bundle also serves the packages it lists. A new node can apply its set at start-up from a file, and link the repository the set names; it tries again until the repository serves it. The repository the set names is reached and checked for updates even when package exchange with other nodes is switched off; everything else stays off. The crew agents of the bundle's apps wait as proposals the owner approves. The purchase is the approval for the apps: the set records the owner's permission for each app it installs, for what the app says it uses, so the apps sign in with no question; an update that asks for more still asks, and the owner can take each permission away, which stays when the set is applied again (grant_apps: false turns this off). The owner's welcome link can open one of the set's apps, signed in (landing), and the apply record keeps the path it opens. When a set is applied to an account that existed before, that person's account feed says an operator installed it, how many packages it brought and how many apps got permissions. Limits: operator only; no screen yet. /v1/install-sets/apply, /v1/install-sets, aimeat_admin_install_set, AIMEAT_INSTALL_SET"
     },
     {
      "slug": "g-8-package-repository",
@@ -2099,10 +2099,10 @@
      "slug": "g-10-app-design-spec",
      "cells": [
       "<strong>App design spec</strong>",
-      "One document beside the app that says what it is for, its screens, where its data lives, what was decided and what is open. The owner and everybody with a development right read and write it; an AI reads it before changing the app and writes it back after a publish, and the publish answer says when the spec has fallen behind the app's version. Writing the same text again marks it current. A write may name the revision it read, so two builders' AIs cannot overwrite each other unseen. Only the owner removes it. The app's own page in the App Catalog shows and edits it in its Design spec section, beside the Roadmap and Who else may build this sections, with a prompt for an AI connected over MCP and a paste box for any other AI. A person building somebody else's app finds it under App Catalog &gt; Building for others. The rail of the app's page marks the section when the spec is missing or has fallen behind. Not visible outside the build.",
+      "One document beside the app that says what it is for, its screens, where its data lives, what was decided and what is open. The owner and everybody with a development right read and write it; an AI reads it before changing the app and writes it back after a publish, and the publish answer says when the spec has fallen behind the app's version. Every publish answer also says whether the app has its data map and its design spec, and how to write the one that is missing; nothing refuses the publish. Writing the same text again marks it current. A write may name the revision it read, so two builders' AIs cannot overwrite each other unseen. Only the owner removes it. The app's own page in the App Catalog shows and edits it in its Design spec section, beside the Roadmap and Who else may build this sections, with a prompt for an AI connected over MCP and a paste box for any other AI. A person building somebody else's app finds it under App Catalog &gt; Building for others. The rail of the app's page marks the section when the spec is missing or has fallen behind. Not visible outside the build.",
       "<code>/v1/apps/:owner/:filename/design-spec</code>, <code>aimeat_app_manage</code> actions <code>spec</code>, <code>spec_set</code> and <code>spec_clear</code>, App Catalog &gt; the app &gt; Design spec, App Catalog &gt; Building for others"
      ],
-     "plain": "App design spec One document beside the app that says what it is for, its screens, where its data lives, what was decided and what is open. The owner and everybody with a development right read and write it; an AI reads it before changing the app and writes it back after a publish, and the publish answer says when the spec has fallen behind the app's version. Writing the same text again marks it current. A write may name the revision it read, so two builders' AIs cannot overwrite each other unseen. Only the owner removes it. The app's own page in the App Catalog shows and edits it in its Design spec section, beside the Roadmap and Who else may build this sections, with a prompt for an AI connected over MCP and a paste box for any other AI. A person building somebody else's app finds it under App Catalog > Building for others. The rail of the app's page marks the section when the spec is missing or has fallen behind. Not visible outside the build. /v1/apps/:owner/:filename/design-spec, aimeat_app_manage actions spec, spec_set and spec_clear, App Catalog > the app > Design spec, App Catalog > Building for others"
+     "plain": "App design spec One document beside the app that says what it is for, its screens, where its data lives, what was decided and what is open. The owner and everybody with a development right read and write it; an AI reads it before changing the app and writes it back after a publish, and the publish answer says when the spec has fallen behind the app's version. Every publish answer also says whether the app has its data map and its design spec, and how to write the one that is missing; nothing refuses the publish. Writing the same text again marks it current. A write may name the revision it read, so two builders' AIs cannot overwrite each other unseen. Only the owner removes it. The app's own page in the App Catalog shows and edits it in its Design spec section, beside the Roadmap and Who else may build this sections, with a prompt for an AI connected over MCP and a paste box for any other AI. A person building somebody else's app finds it under App Catalog > Building for others. The rail of the app's page marks the section when the spec is missing or has fallen behind. Not visible outside the build. /v1/apps/:owner/:filename/design-spec, aimeat_app_manage actions spec, spec_set and spec_clear, App Catalog > the app > Design spec, App Catalog > Building for others"
     },
     {
      "slug": "g-10-bound-operating-skills",
@@ -2313,10 +2313,10 @@
      "slug": "g-11-vendored-libraries",
      "cells": [
       "<strong>Vendored libraries</strong>",
-      "three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, and an ffmpeg core so an app can encode video in the browser.",
-      "<code>/v1/libs/*</code>"
+      "three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream.",
+      "<code>/v1/libs/*</code>, library pack <code>hls</code>"
      ],
-     "plain": "Vendored libraries three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, and an ffmpeg core so an app can encode video in the browser. /v1/libs/*"
+     "plain": "Vendored libraries three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream. /v1/libs/*, library pack hls"
     },
     {
      "slug": "g-11-realtime-library",
@@ -2448,6 +2448,15 @@
       "<code>/v1/connections</code>"
      ],
      "plain": "Connected social accounts Connect Mastodon, YouTube, Bluesky, LinkedIn and X; apps you allow publish to them and read how a post is doing over time. Where a service reports nothing, it says so instead of showing zero. /v1/connections"
+    },
+    {
+     "slug": "g-12-outside-accounts-your-agents-connect",
+     "cells": [
+      "<strong>Outside accounts your agents connect</strong>",
+      "When an agent, a CLI or your AI starts connecting an outside account or signing in to an attached MCP server, the sign-in waits for you: you open the node's page, see what it connects and for whom, and confirm it signed in yourself. A sign-in you start on the node's own page is bound to your browser. The Access page lists the outside accounts your agents connected, with no credential shown, and you revoke one there; deleting the agent removes them all. Limits: listing and revoking an agent's connection is yours in person, so there is no MCP tool for it.",
+      "<code>/v1/oauth-round?state=</code>, <code>POST /v1/oauth-rounds/{state}/approve</code>, <code>GET /v1/connections/agents</code>, <code>DELETE /v1/connections/agents/{id}</code>, Account › Access"
+     ],
+     "plain": "Outside accounts your agents connect When an agent, a CLI or your AI starts connecting an outside account or signing in to an attached MCP server, the sign-in waits for you: you open the node's page, see what it connects and for whom, and confirm it signed in yourself. A sign-in you start on the node's own page is bound to your browser. The Access page lists the outside accounts your agents connected, with no credential shown, and you revoke one there; deleting the agent removes them all. Limits: listing and revoking an agent's connection is yours in person, so there is no MCP tool for it. /v1/oauth-round?state=, POST /v1/oauth-rounds/{state}/approve, GET /v1/connections/agents, DELETE /v1/connections/agents/{id}, Account › Access"
     },
     {
      "slug": "g-12-outbound-email",
@@ -2949,6 +2958,15 @@
      "plain": "Pages an AI can read /llms.txt is a one-page map, /llms-full.txt the builder's manual, and every public page has a markdown twin. /AGENTS.md, /sitemap.md and a glossary say what the words mean; the glossary gives each word a plain sentence in English, Finnish or Spanish beside its technical definition. /llms.txt, .md mirrors, /v1/glossary (?lang=)"
     },
     {
+     "slug": "g-16-record-contracts-at-an-address",
+     "cells": [
+      "<strong>Record contracts at an address</strong>",
+      "A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. The old <code>/docs/specs/</code> addresses redirect there.",
+      "<code>GET /v1/specs/{name}</code> (<code>signals-contract.md</code>, <code>visibility-contract.md</code>, <code>tracked-response-contract.md</code>)"
+     ],
+     "plain": "Record contracts at an address A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. The old /docs/specs/ addresses redirect there. GET /v1/specs/{name} (signals-contract.md, visibility-contract.md, tracked-response-contract.md)"
+    },
+    {
      "slug": "g-16-search-engine-setup",
      "cells": [
       "<strong>Search engine setup</strong>",
@@ -3214,10 +3232,19 @@
      "slug": "g-19-runtime-configuration",
      "cells": [
       "<strong>Runtime configuration</strong>",
-      "Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart; the configuration reference lists the available settings.",
-      "<code>/v1/admin/config</code>, <code>aimeat_admin_config</code>"
+      "Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart, rate limits included; the configuration reference lists the available settings. The range beside a number setting is either a recommendation, which a larger value may pass, or a limit, and the Config tab and a refused save say which.",
+      "<code>/v1/admin/config</code> (<code>rangeKind</code>), <code>aimeat_admin_config</code>"
      ],
-     "plain": "Runtime configuration Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart; the configuration reference lists the available settings. /v1/admin/config, aimeat_admin_config"
+     "plain": "Runtime configuration Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart, rate limits included; the configuration reference lists the available settings. The range beside a number setting is either a recommendation, which a larger value may pass, or a limit, and the Config tab and a refused save say which. /v1/admin/config (rangeKind), aimeat_admin_config"
+    },
+    {
+     "slug": "g-19-which-code-the-node-runs",
+     "cells": [
+      "<strong>Which code the node runs</strong>",
+      "The node says which commit it runs, where it read that (the build stamp of the installed package, or the checkout it was started from), whether the running build is older than the code on disk, and when the process started. To know whether a fix is live, check that its commit is an ancestor of this one. Limits: an install with neither a build stamp nor a git checkout, such as a container image built without one, reports no commit.",
+      "<code>GET /v1/build</code> (<code>commit</code>, <code>commit_source</code>, <code>state</code>, <code>started_at</code>), <code>GET /v1/health</code> (<code>data.build</code>)"
+     ],
+     "plain": "Which code the node runs The node says which commit it runs, where it read that (the build stamp of the installed package, or the checkout it was started from), whether the running build is older than the code on disk, and when the process started. To know whether a fix is live, check that its commit is an ancestor of this one. Limits: an install with neither a build stamp nor a git checkout, such as a container image built without one, reports no commit. GET /v1/build (commit, commit_source, state, started_at), GET /v1/health (data.build)"
     },
     {
      "slug": "g-19-people-and-roles",
@@ -3421,6 +3448,15 @@
       "<code>*.apps.&lt;apex&gt;</code>, the isolated frame"
      ],
      "plain": "Host-only cookies and app isolation The session cookie never reaches app subdomains. On a node several people share without app subdomains, an app runs in an opaque-origin frame, where neither the cookie nor the stored session can be read. *.apps.<apex>, the isolated frame"
+    },
+    {
+     "slug": "g-20-no-session-token-in-a-socket-address",
+     "cells": [
+      "<strong>No session token in a socket address</strong>",
+      "A browser or a client that opens a live socket (a realtime room, a personal node's tunnel, the connector tunnel) asks first for a ticket that works once, for 60 seconds, for one kind of socket, so no session token lands in a proxy's access log. The old <code>?token=</code> in the address still works in 3.x, is counted in the node's statistics and can be switched off; it is removed in 4.0.0.",
+      "<code>POST /v1/ws/ticket</code>, <code>security.ws_query_token</code> (<code>AIMEAT_WS_QUERY_TOKEN</code>)"
+     ],
+     "plain": "No session token in a socket address A browser or a client that opens a live socket (a realtime room, a personal node's tunnel, the connector tunnel) asks first for a ticket that works once, for 60 seconds, for one kind of socket, so no session token lands in a proxy's access log. The old ?token= in the address still works in 3.x, is counted in the node's statistics and can be switched off; it is removed in 4.0.0. POST /v1/ws/ticket, security.ws_query_token (AIMEAT_WS_QUERY_TOKEN)"
     },
     {
      "slug": "g-20-security-profile",
@@ -3958,9 +3994,9 @@
    ]
   }
  ],
- "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
+ "outro": "AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 397
+  "rows": 401
  }
 }
