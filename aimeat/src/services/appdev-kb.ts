@@ -14,6 +14,7 @@
  *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   v1.5.1 -- 2026-10-11 -- Deleting an entry kept to its owner tells that owner's streams only.
  *   v1.5.0 -- 2026-10-06 -- pitfallIndex(): the merged index (own, curated, shared by scope) that
  *     aimeat_appdev_pitfall_list built inline, moved here so GET /v1/appdev/pitfalls/index answers
  *     the same thing and the connector's tool can call it (secaudit 2026-10 follow-up, Part B).
@@ -48,7 +49,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
-import { emitChange } from './event-bus.js';
+import { emitRecordChange } from './event-bus.js';
 import { writeMemoryRecord } from './memory-write.js';
 import type { ContentReader } from './classification/reader.js';
 import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
@@ -624,7 +625,8 @@ export async function deletePitfallEntry(
     await upsertPitfallManifest(storage, config, callerGaii, key, '', true);
     // The record and the manifest both changed, so every screen holding the list is out of date.
     // The MCP tool used to emit this and the REST door did not, which is how a browser delete left
-    // the entry visible until a reload.
-    emitChange('memory');
+    // the entry visible until a reload. An entry kept to its owner is told to that owner's streams;
+    // a shared one is told to everybody who may be reading the list.
+    emitRecordChange('memory', existing.ownerGaii, existing.visibility);
     return true;
 }

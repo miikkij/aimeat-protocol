@@ -25,7 +25,7 @@ can only be corrected by rewriting history, so the damage is permanent.
 | You want to | Do this |
 |---|---|
 | Commit with a message longer than one line | Write the message to a file, then `bash scripts/git-commit.sh <file>` |
-| Commit with a one-line message | `git commit -m "…"` is fine — one line, one pair of quotes, no here-string |
+| Commit with a one-line message | `git commit -m "…"` is fine: one line, one pair of quotes, no here-string |
 | Write a file with any content | Use the editor / file-writing tool, never `echo`, `cat <<EOF` or `python -c` |
 | Change part of an existing file | Use the editing tool, never `sed -i`, `perl -pi` or a rewrite-in-place script |
 | Read or search a file | The shell is the right tool: `cat`, `head`, `sed -n`, `grep`, `find` |
@@ -34,7 +34,7 @@ can only be corrected by rewriting history, so the damage is permanent.
 The reading half and the writing half are not the same question. Reading through the shell is
 cheap and reversible; `sed -n '40,80p'` that lands on the wrong lines shows you the wrong lines and
 you notice. Writing through it is neither. `sed -i` with a pattern that matches twice edits both,
-matches zero times and edits nothing, or matches inside a string literal — and all three exit 0.
+matches zero times and edits nothing, or matches inside a string literal, and all three exit 0.
 The editing tool refuses when its anchor is not unique or not found, which converts the same
 mistake into a message on the spot.
 
@@ -65,7 +65,7 @@ an assistant, either shell. It refuses:
 - an empty message, and the `Co-Authored-By` trailer this project does not use
 
 It is structural, not stylistic. It does not judge tone, length (below a runaway threshold), mood or
-wording — a gate that refuses the repo's own history gets bypassed, and then it protects nothing.
+wording: a gate that refuses the repo's own history gets bypassed, and then it protects nothing.
 The first version of this one rejected a real 131-character subject and was corrected.
 
 The validator is a pure function (`lintCommitMessage`) with unit tests in
@@ -129,7 +129,7 @@ Wrap the body at 72 again only if patches start to travel by email.
 
 ## Why both
 
-The script removes the failure. The hook catches it when someone does not use the script — which
+The script removes the failure. The hook catches it when someone does not use the script, which
 will happen, because the shell is right there and `-m` is shorter. Neither alone is enough: a
 convenience nobody is obliged to use is not a control, and a gate without an easy correct path
 teaches people to work around it.
@@ -164,13 +164,20 @@ p.write_bytes(p.read_bytes().replace(b'old', b'new'))
 Up to eight Claude Code sessions, several machines and more than one account commit to this
 repo, and every commit carries the same author. On 2026-09-04 that meant the commit that stopped
 main from booting could only be attributed by content and time, after three sessions had been
-asked in turn. Three hooks and a variable answer it; the ritual around them is skill
+asked in turn. Three hooks and two variables answer it; the ritual around them is skill
 `aimeat-dev-session` on the node.
+
+The two variables and the one-worktree rule are for maintainer sessions, the Claude Code sessions
+that work on this repo. A contributor committing from VS Code or a terminal is never asked for
+them. `check:imports-tracked` and the `pre-push` checks apply to every commit.
 
 - **`AIMEAT_SESSION=cc-<owner>-<tag>`** in the shell a session commits from. The
   `prepare-commit-msg` hook stamps `Session: <name>` as a trailer on every commit; the same name
   is on the session's claim record. In a Claude Code session (`CLAUDECODE=1`) a missing variable
   REFUSES the commit; a person committing from VS Code or a terminal is never asked.
+- **`AIMEAT_PROJECT=aimeat-protocol`** beside it. The same hook stamps `Project: <name>` when the
+  variable is set and the message has no `Project:` line yet. A missing `AIMEAT_PROJECT` refuses
+  nothing; the commit only goes without the trailer.
 - **`check:imports-tracked`** (in `pnpm gate` and CI, not in the pre-commit hook since the hook
   was slimmed on 2026-09-05) refuses a tracked file whose relative import
   resolves to a file git does not track. It reads the index copy of a file with unstaged edits,
@@ -181,7 +188,8 @@ asked in turn. Three hooks and a variable answer it; the ritual around them is s
   commits about to go that carry no `Session:` trailer, and runs `pnpm boot:smoke`, which
   imports the modules on the server's boot path and refuses when one throws at load.
 - **One session, one worktree**, made by Claude Code (`claude --worktree cc-<owner>-<tag>`, or
-  the `EnterWorktree` tool), whose hook runs the whole recipe. By hand it is
+  the `EnterWorktree` tool), whose `WorktreeCreate` hook (`.claude/hooks/worktree-create.sh`)
+  runs the whole recipe. By hand it is
   `git worktree add --detach .worktrees/cc-<owner>-<tag> origin/main`, then `cd aimeat`,
   `pnpm install` and `pnpm test:env:init`: inside the repository under `.worktrees/`, detached at
   `origin/main`, never a branch and never a sibling directory. Then everything from there. In a shared checkout `git log origin/main..HEAD` shows a peer's

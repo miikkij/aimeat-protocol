@@ -23,6 +23,9 @@
  *   v1.4.0 — 2026-06-22 — `MemoryWriteEvent` carries an optional `op` ('created'|'updated') so the
  *     connector record-push (ConnectTunnelManager) can label workspace.record wakes; best-effort,
  *     set by the generic memory route, defaulted to 'updated' by consumers when absent.
+ *   v1.5.0 — 2026-10-11 — emitRecordChange: a `memory` or `files` change to a private or
+ *     owner-visible record carries its owner, so it reaches that owner's streams only. Every such
+ *     change was global, which v1.3.0's owner scope never reached.
  */
 import { EventEmitter } from 'node:events';
 
@@ -43,6 +46,38 @@ export interface ChangeEvent {
 
 export function emitChange(domain: string, ownerGaii?: string): void {
   bus.emit('change', { domain, timestamp: Date.now(), ...(ownerGaii ? { ownerGaii } : {}) } satisfies ChangeEvent);
+}
+
+/** The visibilities under which only the owner and the owner's own agents and apps read a record. */
+const OWNER_ONLY_VISIBILITY: ReadonlySet<string> = new Set(['private', 'owner']);
+
+/**
+ * True when a change to a record of `ownerGaii` concerns that owner alone: the owner is an account
+ * (a GHII or a GAII, which carry an '@'), and every visibility given is one nobody else reads.
+ * Several visibilities are given when a write moved a record from one to another: a record that
+ * was public a moment ago is still somebody else's business once.
+ */
+export function isOwnerOnlyChange(ownerGaii: string | null | undefined, ...visibilities: Array<string | null | undefined>): boolean {
+  if (!ownerGaii || !ownerGaii.includes('@') || visibilities.length === 0) return false;
+  return visibilities.every(v => typeof v === 'string' && OWNER_ONLY_VISIBILITY.has(v));
+}
+
+/**
+ * A change to one stored record or file, told to the streams that may read it.
+ *
+ * A private or owner-visible record of an account goes to that owner's streams only. Everything
+ * else is global as before: a record other people read (public, group, workspace, members), a
+ * record of a namespace that is no account (`ext:name`), and a record whose visibility the caller
+ * does not know. Until 2026-10-11 every `memory` and `files` change was global, so one owner's
+ * private write woke every other owner's open page and told it, by the timing alone, that somebody
+ * was writing (measured in test/e2e-sse.ts).
+ */
+export function emitRecordChange(
+  domain: 'memory' | 'files',
+  ownerGaii: string | null | undefined,
+  ...visibilities: Array<string | null | undefined>
+): void {
+  emitChange(domain, isOwnerOnlyChange(ownerGaii, ...visibilities) ? ownerGaii as string : undefined);
 }
 
 export function onChangeEvent(handler: (evt: ChangeEvent) => void): void {
