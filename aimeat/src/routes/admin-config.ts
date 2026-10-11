@@ -48,7 +48,7 @@
  *     into a KV store where it would look editable. PUT refuses the WHOLE request when any path
  *     in it is sealed, before applying any of it: partial application across a security boundary
  *     leaves the operator working out which three of their four changes landed.
- *     docs/plans/sealed-config-plan.md
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';

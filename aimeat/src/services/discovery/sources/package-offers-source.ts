@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `package-offers` discovery source: the packages this node sells, as `offering`
- *   entries with segment `package` (docs/specs/package-sale-design.md, phase 5: the offer in discovery
+ *   entries with segment `package` (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, phase 5: the offer in discovery
  *   for agents). An agent that searches for something to buy finds the package, its price and the
  *   call that buys it. Read from this node's sales catalogue (package-sale-catalogue.ts); only entries
  *   on sale, in the public scope and in the caller's own scope alike, because a price on sale is

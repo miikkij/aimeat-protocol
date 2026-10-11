@@ -2,7 +2,7 @@
  * @file services/packages/compose/package-compose-set.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The set composer (docs/specs/package-sale-design.md, section 4): one call that turns the
+ * @description The set composer (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, section 4): one call that turns the
  *   author's chosen apps into one package per app and an install bundle that lists them, with the
  *   organism and workspaces the apps declare and the crews they carry. With `dryRun` it writes nothing
  *   and answers what the author must see first.

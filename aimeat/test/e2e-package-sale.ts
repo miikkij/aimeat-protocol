@@ -2,7 +2,7 @@
  * @file e2e-package-sale.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A package sold through a selling node's own checkout (docs/specs/package-sale-design.md,
+ * @description A package sold through a selling node's own checkout (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e,
  *   phase 3). R is the package repository, S the selling node (a shop's own AIMEAT, test money on), B a
  *   node that is to receive a package. The buyer has an account on S only, never on R.
  * @structure

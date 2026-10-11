@@ -2,7 +2,7 @@
  * @file e2e-package-sets.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The set composer and a set installed by its buyer (docs/specs/package-sale-design.md,
+ * @description The set composer and a set installed by its buyer (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e,
  *   section 4; package sale design, phase 4). Apps declare their workspace in an aimeat-workspace block;
  *   compose-set turns them into one package per app and an install bundle; a second owner installs the
  *   set for themselves, and each installed app reads where its workspace was made.
