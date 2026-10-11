@@ -78,12 +78,27 @@ of them built the wrong thing three times in a row.
 ## Working in this repository
 
 - Every session works in its own git worktree under `.worktrees/`, never in the main checkout.
+  Set it up from `origin/main` with `git worktree add .worktrees/<session> origin/main`, then
+  `cd aimeat && pnpm install`, then `pnpm test:env:init`. Never copy `.env.test.*` by hand: the
+  examples name one port and one database for everybody, and the test runner empties that
+  database between suites, so two sessions testing at once wipe each other.
+- Coordination lives on aimeat.io, not in chat. Name the session and the project
+  (`AIMEAT_SESSION=cc-<owner>-<tag>`, `AIMEAT_PROJECT=aimeat-protocol`), read the Lifecycle
+  Central board, and claim the paths and the E2E port before you edit. Skill
+  `aimeat-dev-session` on the node has the ritual.
+- Look at a change on your own node: `pnpm sandbox` from `aimeat/`. Run the E2E suites the change
+  can reach, one at a time with `--test=<suite>`. Never start the full sweep on your own: it takes
+  about two hours and runs only when Jouni asks for it.
 - Never `git add -A`. Stage files by name. No `Co-Authored-By` trailer.
 - A multi-line commit message goes in a file: `bash scripts/git-commit.sh <file>`.
 - Edit files with your editing tool, never with `sed`, a heredoc or an inline script.
-- Finished work is merged to `main` and pushed, after `pnpm gate`, and CI is checked green before
-  the word "done".
+- Reuse what exists. A new MCP tool, route, table or page type needs a reason that a memory record
+  and a prompt could not cover.
+- Finished work is merged to `main` and pushed. A green `pnpm gate` is what "done" needs; do not
+  wait for GitHub CI or poll `gh`. Push `main` only: the origin is public, and a work branch pushed
+  there shows half-done work to everyone.
 - Answer in Finnish when Jouni writes Finnish, composed in Finnish, plain and short. The answer
-  first, the evidence after it. No em-dashes.
+  first, the evidence after it: a status question is answered in the first sentence as "done",
+  "done, except X, which needs your decision" or "not done, it is at X". No em-dashes.
 - Ask before spending money, changing AI settings, touching infrastructure, deleting anything, or
   building something that was not agreed.

@@ -1,153 +1,125 @@
 # Frontend Development Guide
 
-Architecture and conventions for contributing to the AIMEAT SPA frontend.
+Architecture and conventions for contributing to the AIMEAT SPA, the node's own screens under
+`aimeat/public/`. Paths below are relative to `aimeat/` unless they start with `.claude/` or `docs/`.
+
+Three shorter sources sit beside this guide and win where they disagree with it:
+
+- `.claude/rules/frontend.md`: the rules that apply to every change under `public/`.
+- Skill `aimeat-design-language` (`.claude/skills/aimeat-design-language/SKILL.md`): faces,
+  colours, shapes, the token map and where each CSS rule lives.
+- Skill `aimeat-frontend-verify` (`.claude/skills/aimeat-frontend-verify/SKILL.md`): the styling
+  rules that recur, and how a finished change is verified in a real browser.
 
 ## Architecture Overview
 
-The AIMEAT SPA uses **Preact + HTM** with no build step — all code runs directly in the browser via native ESM modules.
+The SPA uses **Preact + HTM** with no build step. Every file under `public/` runs in the browser as
+a native ES module.
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Preact 10.25.4 (3 KB React alternative) |
-| Template DSL | HTM 3.1.1 (tagged template literals → JSX) |
-| Module system | Native ESM via importmap |
-| Routing | Client-side History API with lazy-loaded views |
-| State | Preact hooks (useState, useEffect, useCallback, useRef) |
-| Styling | External CSS per view + shared theme.css |
-| Auth | JWT via window.AIMEAT.auth SDK |
-| i18n | JSON locale files with dot-notation keys |
+| Framework | Preact, vendored as `public/lib/preact.mjs` and `public/lib/preact-hooks.mjs` |
+| Template DSL | HTM (tagged template literals in place of JSX), vendored as `public/lib/htm.mjs` |
+| Module system | Native ESM through the importmap in `public/spa.html` |
+| Routing | Client-side History API; the `ROUTES` map in `spa.html` lazy-loads each view |
+| State | Preact hooks (`useState`, `useEffect`, `useCallback`, `useRef`) |
+| Styling | Tokens in `css/theme.css`, shapes in `css/poster.css`, one sheet per component in `css/components/`, view sheets in `css/views/` |
+| Auth | `/js/services/auth.js` (`getSession`, `onAuthChange`) is the one session source; the `aimeat/no-direct-auth` lint rule refuses direct reads of `window.AIMEAT.auth` |
+| i18n | `locales/*.json`, dot-notation keys, read through `t()` in `/js/i18n.js` |
+
+The vendored versions, their sources and licences are listed in `public/lib/VENDORED.md`. Read the
+version there, or in each file's own banner, rather than from this guide.
 
 ### Why No Build Step?
 
-- Instant edit→reload development cycle
-- No toolchain setup for contributors
-- Direct browser debugging (source = running code)
-- Works offline on any HTTP server
+- An edit shows after a browser reload. Files under `public/` are served `no-cache` with an ETag,
+  so F5 fetches the new copy.
+- A contributor needs no toolchain to change a view.
+- The source in the debugger is the running code.
+
+Two parts of the frontend are built and are the exceptions: the served SDK libraries
+(`src/static/sdk-libs/`, `pnpm build:sdk`) and the app catalog (`pnpm build:app-catalog`). See
+`docs/pitfalls.md`, "An edit seems to have no effect".
 
 ### Type Checking (no build, still type-safe)
 
-The browser loads the raw `.js` — but the frontend is **still type-checked** so the no-build choice
-doesn't cost type safety. `pnpm typecheck:frontend` runs `tsc --noEmit -p tsconfig.frontend.json`
-with `checkJs` over `public/`, validating the JSDoc you write. It emits nothing; it only checks.
+The browser loads the raw `.js`, and the frontend is still type-checked. `pnpm typecheck:frontend`
+runs `tsc --noEmit -p tsconfig.frontend.json` with `checkJs` over `public/`, which validates the
+JSDoc you write. It emits nothing.
 
-- **`aimeat/tsconfig.frontend.json`** — `checkJs` config; `paths` map the importmap specifiers
-  (`preact`, `preact/hooks`, `htm`, `/js/*`, `/components/*`, `/views/*`) so `tsc` resolves them.
-- **`public/types/aimeat-globals.d.ts`** — ambient declarations for browser/SDK globals loaded
-  outside ES modules (`window.AIMEAT`, `Chart`, `mermaid`, build-time `__APP_VERSION__`) and the
-  `code`/`status`/`response` fields `api.js` attaches to thrown errors.
-- **`public/types/vendored-libs.d.ts`** — loose stubs so minified vendored libs aren't deep-checked.
-- Add a JSDoc cast for DOM access TS can't infer: `const v = /** @type {HTMLInputElement} */ (el).value;`
-- Vendored minified files under `public/lib/` carry `// @ts-nocheck`; don't type-check them.
+- **`tsconfig.frontend.json`**: the `checkJs` config. Its `paths` map `preact`, `preact/hooks` and
+  `htm` to the stubs in `public/types/vendored-libs.d.ts`, and `/*` to `public/*`, so `tsc`
+  resolves the same absolute specifiers the importmap does. It excludes `public/lib/`,
+  `public/cortex-bundled/`, `public/samples/` and `public/sw.js`.
+- **`public/types/aimeat-globals.d.ts`**: ambient declarations for browser and SDK globals loaded
+  outside ES modules (`window.AIMEAT`, `Chart`, `mermaid`, the build-time `__APP_VERSION__`) and
+  the `code`, `status` and `response` fields `api.js` attaches to thrown errors.
+- **`public/types/vendored-libs.d.ts`**: loose stubs, so the minified vendored libraries are not
+  deep-checked.
+- Add a JSDoc cast for DOM access TS cannot infer:
+  `const v = /** @type {HTMLInputElement} */ (el).value;`
 
-**`pnpm check:importmap`** is a separate guard (`tsc` can't catch this): every absolute first-party
-import (`/js/…`, `/components/…`, `/views/…`) must have an identity entry in the `spa.html`
-importmap, or it loads **without** the `?v=BUILD_ID` cache-bust stamp and goes stale after a deploy.
+**`pnpm check:importmap`** is a separate guard, because `tsc` cannot catch this case. Every absolute
+first-party import (`/js/…`, `/components/…`, `/views/…`) must have an identity entry in the
+`spa.html` importmap. Without one, the module loads without the `?v=BUILD_ID` stamp and can stay
+stale after a deploy. The same check refuses a view stylesheet that has no `<link>` in `spa.html`.
 
-All of `typecheck:frontend`, `check:importmap`, and `lint` (now covering `public/`) run in the
-pre-commit hook and in CI — see CLAUDE.md "Key Commands".
+`pnpm lint` and `pnpm typecheck:frontend` run in the pre-commit hook. `check:importmap` runs in
+`pnpm gate` (with the other read-only checks) and in CI.
 
 ---
 
 ## File Structure
 
+The tree shows the folders and a few files in each. `ls` the folder for the full list.
+
 ```
 public/
-├── spa.html                  # SPA shell (importmap, router, Header, ErrorBoundary)
+├── spa.html                  # SPA shell: importmap, stylesheet links, ROUTES, Header, ErrorBoundary
 ├── css/
-│   ├── theme.css             # Global design tokens + shared component styles
-│   └── views/                # Per-view scoped CSS
-│       ├── portal.css
-│       ├── profile.css       # Profile view + all tab styles (pf-*)
-│       ├── portfolio.css
-│       ├── portal-classic.css
-│       ├── portal-dev.css
-│       ├── admin.css          # Admin dashboard styles (adm-* prefix)
-│       ├── hobbies.css
-│       ├── marketplace.css
-│       ├── openclaw.css
-│       └── aimeat-os.css
-├── components/               # Shared Preact components
-│   ├── Alert.js
-│   ├── Card.js
-│   ├── CopyButton.js
-│   ├── FormField.js
-│   ├── Modal.js              # Modal + useConfirm() hook
-│   ├── Spinner.js
-│   ├── Toast.js
-│   ├── useViewCSS.js
-│   └── index.js              # Barrel export
-├── cortex-bundled/            # Self-contained UI cortex extensions (aui-* prefix)
-│   ├── aimeat-ui-layout.js
+│   ├── theme.css             # Design tokens only (pnpm check:theme-tokens refuses any other rule)
+│   ├── poster.css            # The shared shapes (.poster-*, .showroom-*)
+│   ├── components/           # One sheet per component: button.css, card.css, dialog.css, ...
+│   └── views/                # Per-view sheets: landing.css, help.css, profile.css, *-poster.css, ...
+├── components/               # Shared Preact components, one module per component
+│   ├── Action.js             # Action, Loud, Icon, Actions: every way on a page offers
+│   ├── Modal.js              # Modal, ConfirmDialog, useConfirm
+│   ├── Note.js
+│   ├── SettingsPage.js       # The frame of a Settings & Controls page
+│   ├── Toast.js              # useToast
+│   ├── index.js              # Barrel export of the older components
 │   └── ...
+├── cortex-bundled/           # Self-contained UI cortex extensions (aui-* prefix)
 ├── js/                       # Shared modules
 │   ├── api.js                # Authenticated fetch wrapper
-│   ├── i18n.js               # Translation system
-│   ├── utils.js              # Shared utilities (escHtml, timeAgo, copyToClipboard, etc.)
-│   └── services/             # API service layer (one file per domain)
-│       ├── admin.js           # Admin dashboard API
-│       ├── agents.js          # Agent management API
-│       ├── apps.js            # App upload/list/delete API
-│       ├── auth.js            # Auth + session API
-│       ├── boards.js          # Discussion boards API
-│       ├── catalogue.js       # Directory/catalogue API
-│       ├── consent.js         # Consent management API
-│       ├── cortex.js          # Cortex extension API
-│       ├── extensions.js      # Extension management API
-│       ├── federation.js      # Federation API
-│       ├── knowledge.js       # Knowledge package API
-│       ├── memory.js          # Memory key-value API
-│       ├── nodes.js           # Federated nodes API
-│       ├── organisms.js       # Group management API
-│       ├── packages.js        # Package distribution API
-│       ├── security.js        # Security/CORS API
-│       ├── stats.js           # Usage statistics API
-│       ├── wallet.js          # Morsel economy API
-│       └── work.js            # Work/task queue API
-├── lib/                      # Self-hosted third-party libraries
-│   ├── preact.mjs
-│   ├── preact-hooks.mjs
-│   ├── htm.mjs
-│   ├── yaml.mjs
-│   ├── three.min.js
-│   ├── live-updates.js        # SSE singleton for real-time UI refresh
-│   └── realtime.js
-├── views/                    # View modules (lazy-loaded)
-│   ├── portal.js
-│   ├── portal-classic.js
-│   ├── portal-dev.js
-│   ├── profile.js             # Profile shell (tabs, session, SSE dispatcher)
-│   ├── profile/               # Profile tab components (one file per tab)
-│   │   ├── shared.js          # Shared profile components (Spinner, etc.)
-│   │   ├── access-tab.js      # Session keys, login history
-│   │   ├── agents-tab.js      # Agent management + device auth
-│   │   ├── apps-tab.js        # App upload & gallery
-│   │   ├── boards-tab.js      # Discussion boards
-│   │   ├── chat-sessions-tab.js  # AI chat history
-│   │   ├── data-wallet-tab.js    # Consent audit, GDPR export
-│   │   ├── email-tab.js       # Email notification settings
-│   │   ├── extensions-tab.js  # Installed extensions/cortex
-│   │   ├── federation-tab.js  # Node federation
-│   │   ├── knowledge-tab.js   # Knowledge packages
-│   │   ├── mcp-tab.js         # MCP server management
-│   │   ├── memory-tab.js      # Key-value storage + files
-│   │   ├── node-stats-tab.js  # Node performance metrics
-│   │   ├── nodes-tab.js       # Federated peer nodes
-│   │   ├── notifications-tab.js  # Push notification config
-│   │   ├── organisms-tab.js   # Group/org membership
-│   │   ├── packages-tab.js    # Package distribution
-│   │   ├── portfolio-tab.js   # Service portfolio redirect
-│   │   ├── security-tab.js    # CORS policies, session revoke
-│   │   ├── services-tab.js    # Service/CSM registration
-│   │   ├── wallet-tab.js      # Morsel balance & transactions
-│   │   └── work-tab.js        # Work/task queue
-│   ├── guides.js
-│   ├── hobbies.js
-│   ├── marketplace.js
-│   ├── openclaw.js
-│   └── aimeat-os.js
-└── locales/
-    ├── en.json
-    └── fi.json
+│   ├── i18n.js               # t(), the locale loader
+│   ├── format.js             # Dates, times, numbers, money, morsels
+│   ├── dialog.js             # The closing rules of the one dialog
+│   ├── theme.js              # Light and dark theme
+│   ├── utils.js              # escHtml, escAttr, sanitizeHtml, copyToClipboard, ...
+│   └── services/             # API service layer, one file per domain (admin.js, agents.js, ...)
+├── lib/                      # Self-hosted third-party libraries and AIMEAT browser libraries
+│   ├── VENDORED.md           # What is vendored, which version, from where, under which licence
+│   ├── preact.mjs, preact-hooks.mjs, htm.mjs
+│   ├── live-updates.js       # Server-sent events for real-time UI refresh
+│   └── ...
+├── types/                    # .d.ts files for the frontend type check
+└── views/                    # View modules, lazy-loaded by ROUTES in spa.html
+    ├── _template.js          # Scaffold for a new view
+    ├── admin.js              # Admin dashboard shell
+    ├── admin/                # Admin tabs and their parts
+    ├── profile.js            # Profile shell (tab registry, session, live-update dispatcher)
+    ├── profile/              # Profile tabs: one <name>-tab.js each, and a folder for its parts
+    ├── home/                 # The signed-in home (/v1/home)
+    ├── appcat/               # The app catalogue on the component library (/v1/appcat)
+    ├── design-lab/           # Demos of every catalogue component
+    ├── landing.js            # The signed-out front page (/v1/portal)
+    ├── help.js, members.js, glossary.js, changelog.js, ...
+    └── ...
+locales/                      # aimeat/locales, beside public/, served at /locales/*.json
+├── en.json                   # The source of truth for which keys exist
+├── fi.json
+└── es.json
 ```
 
 ---
@@ -156,29 +128,29 @@ public/
 
 Every view module in `public/views/` must:
 
-1. **Export a default Preact component** as the view root
-2. **Accept a `navigate` prop** for SPA link navigation
-3. **Load its own CSS** using the `useViewCSS` hook
-4. **Set `document.title`** in a `useEffect`
+1. **Export a default Preact component** as the view root.
+2. **Accept the `navigate` prop** for SPA link navigation. The shell also passes `locale`.
+3. **Have its stylesheet linked in `spa.html`.** `useViewCSS()` is a no-op kept for old call
+   sites: view stylesheets are `<link>` tags in `spa.html`, stamped with the build id by the server.
+4. **Write all user-visible text through `t()`.**
+
+A public content page gets its `<title>`, description and canonical link from its entry in
+`PUBLIC_PAGES` (`src/data/public-pages.ts`), which the server writes into the shell's head. A route
+the registry does not name is served as the bare shell titled "AIMEAT"; such a view may set
+`document.title` itself.
 
 ### Minimal View Template
 
+`public/views/_template.js` is the scaffold to copy. The smallest working view:
+
 ```javascript
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
 
 export default function MyView({ navigate }) {
-  useViewCSS('/css/views/my-view.css');
-
-  useEffect(() => {
-    document.title = t('myview.title') + ' — AIMEAT';
-  }, []);
-
   return html`
     <div class="mv-root">
       <h1>${t('myview.title')}</h1>
@@ -192,7 +164,8 @@ export default function MyView({ navigate }) {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `navigate` | `(path: string) => void` | Navigate to a SPA route without full page reload |
+| `navigate` | `(path: string) => void` | Navigate to a SPA route without a full page reload |
+| `locale` | `string` | The active locale tag |
 
 ### Navigation
 
@@ -202,208 +175,238 @@ Use the `navigate` prop for internal links:
 html`<a href="/v1/profile" onClick=${e => { e.preventDefault(); navigate('/v1/profile'); }}>Profile</a>`
 ```
 
-Or use standard `<a href="/v1/...">` links — the SPA shell intercepts clicks on `/v1/*` paths automatically.
+A plain `<a href="/v1/...">` also works: the shell intercepts clicks on `/v1/*` paths.
 
 ---
 
 ## Component Library
 
-Import shared components from `/components/`:
+**The component catalogue says what exists.** `GET /v1/ui/components`, and the MCP tools
+`aimeat_ui_component_list` and `aimeat_ui_component_get`, give each component's data shape, when to
+use it, its variants, an example and the pages that draw it. To see them drawn, open
+aimeat-design-lab in the admin dashboard (group Design). Read the catalogue before you build a
+page, and reuse the component that exists.
+
+A page passes data and named options to a component and writes no class of its own. Each component
+is one module in `public/components/` (the markup) and one sheet in `public/css/components/` (the
+look). A new component also gets an entry in `src/services/ui-library/`; `pnpm build:ui-library`
+fills in the rest from the files, and `pnpm check:ui-library` refuses a sheet with no entry. The
+design-language skill has the rules.
+
+Import each component from its own file, as every view does:
 
 ```javascript
-import { Alert, Card, CopyButton, FormField, Modal, Spinner, useToast } from '/components/index.js';
+import { Action, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
+import { Modal } from '/components/Modal.js';
 ```
 
-### Alert
+`/components/index.js` is a barrel for the older components (`Alert`, `Card`, `CopyButton`,
+`FormField`, `Modal`, `Spinner`, `useToast`, `EmptyState`, `DataTable` and others).
+
+### Action and Loud
 
 ```javascript
-html`<${Alert} type="error" message="Something failed" onDismiss=${() => setError(null)} />`
-// Types: success, error, info, warn
+html`<${Action} small onClick=${open}>${t('x.open')}<//>`
+html`<${Action} small soft tone="danger" onClick=${remove}>${t('x.remove')}<//>`
+html`<${Loud} control disabled=${busy} onClick=${save}>${t('x.save')}<//>`
+html`<${Action} small copy=${ref} copiedLabel=${t('x.copied')}>${t('x.copyRef')}<//>`
+```
+
+`Action` is an underlined word, `Loud` is the one loud action of a place, `Icon` is a button that is
+a mark. The file header of `Action.js` lists every option.
+
+### Note
+
+```javascript
+html`<${Note} kind="quiet">${t('x.none')}<//>`
+html`<${Note} kind="loading" />`
+html`<${Note} kind="message" error>${error}<//>`
 ```
 
 ### Card
 
 ```javascript
-html`<${Card} title="Agent" subtitle="gaii:abc" hoverable onClick=${expand}>
-  ...content...
-</${Card}>`
+html`<${Card} name=${app.name} text=${app.description} meta=${when} onOpen=${open} />`
 ```
+
+`tone` picks the look (`framed`, `section`, `panel`, `figure`); the file header of `Card.js` lists
+the parts of a tile. A `Card` with no `tone` and no `name` draws the classic card.
 
 ### CopyButton
 
 ```javascript
-html`<${CopyButton} text=${gaii} label="Copy GAII" copiedLabel="Copied!" />`
-```
-
-### FormField
-
-```javascript
-html`<${FormField} label="Name" hint="Your display name">
-  <input class="input-field" value=${name} onInput=${e => setName(e.target.value)} />
-</${FormField}>`
+html`<${CopyButton} text=${gaii} label=${t('x.copyGaii')} copiedLabel=${t('x.copied')} />`
 ```
 
 ### Modal
 
 The site has one dialog. `Modal` renders a native `<dialog class="dlg">` opened with `showModal()`:
 a header with the title and the X, a body that is the only part to scroll, and a footer for the
-actions (quiet words first, the loud slab last). On a phone (560px and narrower) it is a sheet at
-the bottom edge. The look is `/css/dialog.css` and the closing rules are `/js/dialog.js`; the app
-catalog uses the same two files through `src/static/app-catalog/js/dialogs.js`. Escape and the page
-behind close only while nothing has been typed; the X always closes.
+actions. On a phone (560px and narrower) it is a sheet at the bottom edge. The look is
+`css/components/dialog.css` and the closing rules are `/js/dialog.js`; the app catalog uses the same
+two files through `src/static/app-catalog/js/dialogs.js`. Escape and a click on the page behind
+close the dialog only while nothing has been typed; the X always closes it.
 
 ```javascript
 html`<${Modal} open=${showEdit} onClose=${() => setShowEdit(false)} title=${t('x.editTitle')} size="md"
-  footer=${html`<button class="btn-ghost" onClick=${close}>${t('common.cancel')}</button>
-                <button class="btn-primary" onClick=${save}>${t('common.save')}</button>`}>
-  <section class="poster-section">
-    <h3 class="poster-section-title">${t('x.section')}</h3>
-    ...fields...
-  </section>
+  footer=${html`<${Action} onClick=${close}>${t('common.cancel')}<//>
+                <${Loud} control onClick=${save}>${t('common.save')}<//>`}>
+  ...fields...
 </${Modal}>`
 ```
 
-Props: `size` (`sm` 440, `md` 560, `lg` 840, `xl` 1080), `footer`, `footerStart` (a side door at
-the footer's other end), `showClose` (default on), `guard` (default on; turn it off for a dialog with
-nothing to lose, such as a viewer). A section headline inside the body is `.poster-section-title`,
-drawn a step smaller than on the page. A toast raised while a dialog is open goes above it through
-`raiseAboveDialogs`. `pnpm check:dialogs` refuses a hand-rolled overlay, backdrop or
-`role="dialog"` box anywhere in the SPA or the catalog.
-
-### Spinner
-
-```javascript
-html`<${Spinner} text="Loading..." />`
-```
+Props: `size` (`sm` 440, `md` 560, `lg` 840, `xl` 1080), `footer`, `footerStart` (an action at the
+other end of the footer), `showClose` (default on), `guard` (default on; turn it off for a dialog
+with nothing to lose, such as a viewer). A toast raised while a dialog is open goes above it through
+`raiseAboveDialogs` in `/js/dialog.js`. `pnpm check:dialogs` refuses a hand-rolled overlay, backdrop
+or `role="dialog"` box anywhere in the SPA or the catalog.
 
 ### Toast (useToast hook)
 
 ```javascript
 const { showToast, ToastContainer } = useToast();
-showToast('Saved!', 'success');
+showToast(t('x.saved'), 'success');
 
 // In render:
 html`<${ToastContainer} />`
 ```
 
+A profile tab gets `showToast` as a prop from the profile shell instead.
+
 ### useViewCSS
 
-```javascript
-import { useViewCSS } from '/components/useViewCSS.js';
-
-// Inside component:
-useViewCSS('/css/views/my-view.css');
-// Creates <link> on mount, removes on unmount
-```
+`useViewCSS(path)` does nothing. It stays so old call sites keep working. Link a view's stylesheet
+in `spa.html`; `pnpm check:importmap` refuses a `useViewCSS('/css/…')` path that has no `<link>`
+there.
 
 ---
 
 ## CSS Conventions
 
-### MANDATORY Rules
+### Where a rule lives
 
-These rules are **non-negotiable** (enforced by CLAUDE.md Rule 7):
+| File | Holds |
+|------|-------|
+| `css/theme.css` | Custom properties only: type, colour and shape tokens, for light and dark. `pnpm check:theme-tokens` refuses any other rule there |
+| `css/poster.css` | The shared shapes (`.poster-section`, `.poster-action`, `.poster-slab`, `.poster-box`, ...) |
+| `css/components/<name>.css` | One component's look, composing the shapes and reading the tokens |
+| `css/views/<view>.css` | A view's own layout: its grid, placement and dimensions |
 
-1. **No inline `style=""` attributes** for layout, colors, spacing, or typography — use CSS classes
-2. **No inline CSS constants** in JS files — all CSS goes in external `.css` files
-3. **Use CSS variables** from `theme.css` — never hardcode color/spacing values in JS
-4. **Prefix all view CSS classes** to avoid collisions
-5. **Use `useViewCSS()`** to load view CSS dynamically (automatic cleanup on unmount)
-6. **Campsite rule:** If you encounter inline styles while editing a file, move them to CSS
+A view sheet composes a shape by class and never re-declares the shape's font, rule, fill, padding or
+shadow. Change a token or a shape at its home. The design-language skill maps which surfaces follow
+each token.
+
+### Rules
+
+These are the rules from `.claude/rules/frontend.md` and the `aimeat-frontend-verify` skill:
+
+1. **No inline `style=""`** for layout, colours, spacing or typography. Put the CSS in a `.css` file.
+2. **No CSS constants in JS.**
+3. **Colours, spacing and type from `theme.css` tokens.** Never a hex value in JS or a view sheet,
+   and no `rgba(255,255,255,…)`.
+4. **Prefix view CSS classes** to avoid collisions (table below).
+5. **All user-visible text through `t()`.**
+6. **No emoji in the interface:** not in a heading, a button, a menu item, a dialog title, a label
+   or a locale string. Icons are inline SVG. The only symbols in text are `✓ ✗ → ↩`.
+7. **A setting a person cannot read from its label explains itself** with `help="<term>"` and
+   `explain.<term>.*` keys. The rule file has the details.
+8. **Campsite rule:** fix inline styles, `class="btn btn-*"` and `rgba(255,255,255…)` in a file you
+   touch.
 
 ### View-Scoped CSS
 
-Each view has its own CSS file in `public/css/views/`. Classes are prefixed with a 2-3 letter abbreviation to avoid collisions:
+Each view sheet in `css/views/` prefixes its classes with a short abbreviation:
 
-| View | Prefix | Example |
-|------|--------|---------|
-| portal | `gn-` | `.gn-hero-title` |
-| profile | `pf-` | `.pf .section-title`, `.pf .section-desc` |
-| portfolio | (in portfolio.css) | |
-| portal-classic | `cl-` | `.cl-root` |
-| portal-dev | `dv-` | `.dv-root` |
-| admin | `adm-` | `.adm-card`, `.adm-btn` |
-| hobbies | `hb-` | `.hb-root` |
-| marketplace | `mk-` | `.mk-root` |
-| openclaw | `oc-` | `.oc-root` |
-| aimeat-os | `os-` | `.os-root` |
+| View | Prefix | Sheets |
+|------|--------|--------|
+| landing (front page) | `ld-` | `landing.css`, `landing-showroom.css`, `landing-v2.css` |
+| profile shell | `.pf`, `pf-` | `profile.css` |
+| Settings & Controls pages | `og-`, with the page name on the root (`.og-skills`) | `css/components/tab-page.css`, `settings-page.css`, and a `*-poster.css` per page |
+| admin | `adm-` | `css/components/operator-frame.css`, `operator-menu.css` |
+| portal-classic | `cl-` | `portal-classic.css` |
+| portal-dev | `dv-` | `portal-dev.css` |
+| aimeat-os | `os-` | `aimeat-os.css` |
+| portfolio | `portfolio-` | `portfolio.css` |
+| help | `hlp-` | `help.css` |
+| members | `mbr-` | `members.css` |
+| changelog | `chg-` | `changelog.css` |
+| glossary | `gl-` | `glossary.css` |
+| start | `st-` | `start.css` |
 
 ### theme.css Design Tokens
 
-Use CSS custom properties from `theme.css` for consistent theming:
+The faces, colours and shape tokens, with their values in both themes, are in the design-language
+skill. The names a sheet reads most:
 
 ```css
-/* Colors — ALWAYS use variables, never hardcode */
-color: var(--text);              /* #1A1A2E — primary text */
-color: var(--text-dim);          /* #6B7280 — secondary text, descriptions */
-color: var(--text-muted);        /* #9CA3AF — tertiary text, timestamps */
-color: var(--accent);            /* #E8564A — AIMEAT coral brand color */
-background: var(--bg);           /* #FAFAF8 — page background */
-background: var(--bg-card);      /* #FFFFFF — card background */
-border: 1px solid var(--border); /* #E5E7EB — borders, dividers */
+/* Colours: always a token, never a literal */
+color: var(--text);              /* ink: words, frames, rules */
+color: var(--text-dim);          /* the quieter line, placeholders */
+color: var(--text-muted);        /* tertiary text, timestamps */
+color: var(--accent);            /* coral */
+background: var(--bg);           /* paper: the page */
+background: var(--bg-card);      /* a box on the page */
+border: 1px solid var(--border); /* hairline rows */
 
-/* Semantic colors */
-color: var(--success);           /* #10B981 — positive states */
-color: var(--warn);              /* #F59E0B — warning states */
-color: var(--danger);            /* #EF4444 — error/destructive */
+/* Semantic colours */
+color: var(--success);
+color: var(--warn);
+color: var(--danger);
 
-/* Spacing & radius */
-border-radius: var(--radius);    /* 16px — large containers */
-border-radius: var(--radius-sm); /* 10px — buttons, inputs */
-border-radius: var(--radius-xs); /* 6px — badges, small elements */
-
-/* Typography */
-font-family: var(--font);        /* 'DM Sans' — UI text */
-font-family: var(--font-mono);   /* 'JetBrains Mono' — code, IDs */
-
-/* Shadows */
-box-shadow: var(--shadow-sm);    /* Subtle elevation */
-box-shadow: var(--shadow-heart); /* Coral glow for primary buttons */
+/* Type */
+font-family: var(--font-headline);  /* headlines */
+font-family: var(--font-body);      /* everything read as a sentence; --font is an alias */
+font-family: var(--font-mono);      /* identifiers, keys, commands */
 ```
+
+The shape tokens (`--shape-corner`, `--shape-frame`, `--shape-shadow-*` and the rest) set corners,
+frames and shadows. A component sheet reads them rather than writing a value. `--radius`,
+`--radius-sm` and `--radius-xs` serve the classic shell only; the poster and showroom faces have no
+radius.
 
 #### Dark theme (`[data-theme="dark"]`)
 
-The app supports light **and** dark themes. `theme.css` defines the light values
-in `:root` and overrides the color/depth tokens in `[data-theme="dark"]`
-(`/js/theme.js` flips the `data-theme` attribute on `<html>`, persists the
-choice to `localStorage['aimeat-theme']`, and otherwise follows the OS
-`prefers-color-scheme`). **This is exactly why hardcoded colors are banned:** a
-literal like `#FFFFFF` or `#1A1A2E` stays put when the theme flips, so it looks
-broken in dark mode. Only tokens invert automatically.
+The app supports light and dark themes. `theme.css` defines the light values in `:root` and
+overrides the colour and depth tokens in `[data-theme="dark"]`. `/js/theme.js` sets the
+`data-theme` attribute on `<html>`, keeps the choice in `localStorage['aimeat-theme']`, and
+otherwise follows the operating system's `prefers-color-scheme`. **This is why hard-coded colours
+are banned:** a literal such as `#FFFFFF` or `#1A1A2E` stays put when the theme changes, so it looks
+broken in dark mode. Only tokens change with the theme.
 
-Canonical surface/text tokens (all defined in `:root`, all flip in dark):
-`--bg`, `--bg-surface`, `--bg-card`, `--card-bg-alt`, `--text`, `--text-dim`,
-`--text-muted`, `--border`, `--border-subtle`. A small alias layer maps common
-shorthands to these (`--card`→`--bg-card`, `--surface`/`--bg-dim`→`--bg-surface`,
-`--muted`→`--text-dim`, `--error`→`--danger`, `--warning`→`--warn`), so those
-inherit dark mode too — but prefer the canonical names in new code.
+Canonical surface and text tokens (all in `:root`, all with a dark value): `--bg`, `--bg-surface`,
+`--bg-card`, `--card-bg-alt`, `--text`, `--text-dim`, `--text-muted`, `--border`,
+`--border-subtle`. A small alias layer maps common short names to these (`--card` to `--bg-card`,
+`--surface` and `--bg-dim` to `--bg-surface`, `--muted` to `--text-dim`, `--error` to `--danger`,
+`--warning` to `--warn`), so those follow dark mode too. Prefer the canonical names in new code.
 
-#### `--border` collides with daisyUI, and it will bite the next shared component
+#### `--border` collides with daisyUI
 
 `theme.css` defines `--border` as a **colour** (`#E5E7EB`). daisyUI 5 defines the same name as a
 border **width**, and uses it inside `calc()` on nearly every component
 (`padding-inline: calc(var(--size)/2 - var(--border))` on `.badge`, plus toggle geometry and input
-paddings). The two meanings are incompatible, and both are load-bearing where they live.
+paddings). The two meanings are incompatible, and each one is needed where it lives.
 
-Two failure directions, both already observed:
+Both failure directions have happened:
 
 | Direction | What happens |
 |---|---|
-| A colour leaks into a daisyUI context | The `calc()` becomes invalid at computed-value time. Paddings collapse to 0 and toggles render as slivers. This is what bridge v1.0.0-v1.2.0 did by mapping the colour at `:root`, and it broke every page that loaded the bridge |
-| A shared component lands in a daisyUI app | `border: 1px solid var(--border)` resolves to `1px solid 1px`, the declaration is dropped, and the component silently loses its edge |
+| A colour leaks into a daisyUI context | The `calc()` becomes invalid at computed-value time. Paddings collapse to 0 and toggles render as slivers. Bridge v1.0.0 to v1.2.0 did this by mapping the colour at `:root`, and it broke every page that loaded the bridge |
+| A shared component lands in a daisyUI app | `border: 1px solid var(--border)` resolves to `1px solid 1px`, the browser drops the declaration, and the component loses its edge with no error |
 
-**The rule: any component that may render inside a vendored-styling app must declare its own
-`--border` in a rule scoped to the component's own class.** Never rely on the ambient value and
-never map it at `:root`.
+**The rule: a component that may render inside a vendored-styling app declares its own `--border`
+in a rule scoped to the component's own class.** Never rely on the ambient value, and never map it
+at `:root`.
 
 Two existing fixes are the pattern to copy:
 
 - `public/lib/aimeat-daisyui-bridge.css` scopes the colour to `[class^='aui-'], [class*=' aui-']`,
-  and restores the width via `--border-w` for daisyUI components nested inside an `aui-*` container.
-- `src/static/sdk-libs/ai/disclose.js` (`APP_TOKENS`) scopes the same mapping to `.ai-label`, reading
-  daisyUI's own palette tokens where they exist (`--color-base-300`) and falling back to the AIMEAT
-  literals where they do not. That is what lets the AI-disclosure chip follow an app's palette and
-  its light/dark mode without the app doing anything.
+  and restores the width through `--border-w` for daisyUI components nested inside an `aui-*`
+  container.
+- `src/static/sdk-libs/ai/disclose.js` (`APP_TOKENS`) scopes the same mapping to the AI-disclosure
+  label. It reads daisyUI's own palette tokens where they exist (`--color-base-300`) and falls back
+  to the AIMEAT literals where they do not, so the label follows an app's palette and its light and
+  dark mode with no work from the app.
 
 The general form, for a component `.foo`:
 
@@ -414,317 +417,266 @@ The general form, for a component `.foo`:
 }
 ```
 
-Same reasoning applies to any other token name shared with a vendored framework. `--border` is the
-one that has actually cost us time twice, which is why it is written down.
+The same reasoning applies to any other token name shared with a vendored framework. `--border` is
+the one that has cost time twice.
 
-### Button Classes (Available in theme.css)
+### The classic shell
 
-Always use these classes — **never set button colors via inline styles**:
+The older views and some admin parts still use the classic shell: rounded controls and cards. It is
+kept and not extended; new work uses the components. Its rules are in `css/components/`, one sheet
+each.
 
-| Class | Appearance | When to Use |
-|-------|-----------|-------------|
-| `.btn-primary` | Coral gradient, white text, heart shadow | Primary CTA |
-| `.btn-outline` | Transparent, gray border | Secondary action |
-| `.btn-ghost` | Transparent, subtle border | Tertiary / Cancel |
-| `.btn-danger` | Light red bg, red text | Soft destructive |
-| `.btn-success` | Green bg, white text | Positive action (activate, confirm) |
-| `.btn-info` | Blue bg, white text | Informational action (package, link) |
-| `.btn-danger-solid` | Solid red bg, white text | Hard destructive (delete, remove) |
-| `.btn-sm` | Smaller size modifier | Compact contexts (combine with above) |
+The classic buttons are in `css/components/button.css`:
 
-### Profile Tab Layout Pattern
+| Class | When to use |
+|-------|-------------|
+| `.btn-primary` | Primary action |
+| `.btn-outline` | Secondary action |
+| `.btn-ghost` | Tertiary, Cancel |
+| `.btn-danger` | Soft destructive |
+| `.btn-success` | Positive action (activate, confirm) |
+| `.btn-info` | Informational action |
+| `.btn-danger-solid` | Hard destructive (delete, remove) |
+| `.btn-sm` | Smaller size; combine with one of the above |
 
-Every profile tab **must** start with the canonical section header:
+There is no `.btn` base class, so `class="btn btn-primary"` is wrong.
 
-```javascript
-// ✅ CORRECT — use CSS classes
-return html`
-  <div class="section-title">${t('profile.mytab.title')}</div>
-  <div class="section-desc">${t('profile.mytab.desc')}</div>
-  ...content...
-`;
+### Banned patterns (grep-checkable)
 
-// ❌ WRONG — inline styles, raw HTML elements
-return html`
-  <h3 style="color:var(--accent);font-size:1rem">${title}</h3>
-  <p style="font-size:.85rem;color:#6B7280">${desc}</p>
-`;
-```
-
-### Card Pattern
-
-```javascript
-// ✅ CORRECT
-html`<div class="card">
-  <div class="card-header">
-    <div class="card-title">${name}</div>
-    <span class="badge badge-success">Active</span>
-  </div>
-  <div class="card-subtitle">${meta}</div>
-</div>`
-
-// ❌ WRONG — inline styles for card content
-html`<div class="card">
-  <h3 style="color:var(--accent);font-size:1rem">${name}</h3>
-  <p style="font-size:.8rem;color:var(--text-dim)">${meta}</p>
-</div>`
-```
-
-### Form Pattern
-
-```javascript
-// ✅ CORRECT — use .create-form, .form-row, .input-field classes
-html`<div class="create-form">
-  <div class="form-row">
-    <label>${t('myform.nameLabel')}</label>
-    <input class="input-field" value=${val} onInput=${e => setVal(e.target.value)} />
-  </div>
-  <div class="form-actions">
-    <button class="btn-primary">${t('myform.save')}</button>
-    <button class="btn-outline">${t('profile.cancel')}</button>
-  </div>
-</div>`
-```
-
-### Common Anti-Patterns to Avoid
-
-```javascript
-// ❌ Inline flex layout — should be a CSS class
-<div style="display:flex;gap:8px;margin-top:12px">
-
-// ❌ Inline text styling — should use .card-subtitle or a CSS class
-<p style="font-size:.85rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem">
-
-// ❌ Inline button colors — should use .btn-success
-<button style="background:var(--success,#22c55e);color:#fff">
-
-// ❌ "btn" prefix class — design guide classes are self-contained
-<button class="btn btn-primary">     // ❌ WRONG
-<button class="btn-primary">          // ✅ CORRECT
-
-// ❌ Hardcoded color — should use var(--accent)
-<h3 style="color:#E8564A">
-
-// ❌ Hardcoded English — should use t()
-<button>Back</button>
-
-// ❌ Dark-theme rgba values in CSS — use CSS variables
-background: rgba(255,255,255,0.06);  // ❌ WRONG
-background: var(--card, #FFFFFF);     // ✅ CORRECT
-border: 1px solid rgba(255,255,255,0.1);  // ❌ WRONG
-border: 1px solid var(--border, #E5E7EB); // ✅ CORRECT
-```
-
-### Banned Patterns (grep-checkable)
-
-These patterns MUST NOT appear in any `public/` JS or CSS file:
+These patterns must not appear in any `public/` JS or CSS file:
 
 | Pattern | Why | Fix |
 |---------|-----|-----|
-| `class="btn btn-` | "btn" base class doesn't exist | Use `class="btn-primary"` etc. directly |
-| `class="revoke-btn"` | Non-standard class | Use `class="btn-danger-solid btn-sm"` |
-| `style="` in `.js` files | Inline styles banned | Move to CSS file |
-| `rgba(255,255,255` or hardcoded hex in CSS | Won't flip for dark theme | Use tokens that invert: `var(--bg-surface)`, `var(--card-bg-alt)`, `var(--border)` |
-| Raw `<h3>` for section titles | Inconsistent styling | Use `<div class="section-title">` |
-| Hardcoded colors in JS | Theme-unaware | Use CSS variables via classes |
-| `toLocaleDateString` / `toLocaleTimeString` / `toLocaleString` | Follows the browser, or the page's language, instead of the reader's own setting | Import from `/js/format.js` — see below |
+| `class="btn btn-` | The `btn` base class does not exist | `class="btn-primary"`, or the `Action` and `Loud` components |
+| `style="` in `.js` files | Inline styles are banned | Move the rule to a CSS file |
+| `rgba(255,255,255` or a hex colour in a view sheet | It does not change with the theme | A token: `var(--bg-surface)`, `var(--card-bg-alt)`, `var(--border)` |
+| A hard-coded colour in JS | It ignores the theme | A class that reads a token |
+| `toLocaleDateString`, `toLocaleTimeString`, `toLocaleString` | Follows the browser or the page's language instead of the reader's own setting | Import from `/js/format.js` (next section); the `aimeat/no-raw-locale-format` lint rule refuses these calls |
+
+`pnpm check:poster-shapes` refuses a new per-file copy of a shared shape, and `pnpm debt` shows the
+copies that remain.
 
 ---
 
 ## Dates, times and numbers
 
-**A format is never derived from a language.** The pill at the top of the page decides which WORDS a
-person reads. It does not decide whether a date is 9/12/2026 or 12.9.2026, and it does not decide
-which clock they are looking at. Those are two more settings of their own, and a person mixes all
-three freely, the way an operating system has let them for thirty years: Finnish words with an
-American date format is a real preference, and so is English words with a Helsinki clock.
+**A format is never derived from a language.** The language switch at the top of the page decides
+which words a person reads. It does not decide whether a date is 9/12/2026 or 12.9.2026, and it
+does not decide which clock they are looking at. Those are two more settings of their own, and a
+person mixes all three freely: Finnish words with an American date format is a real preference,
+and so is English words with a Helsinki clock.
 
-`aimeat/no-raw-locale-format` refuses the raw calls, so this is checked rather than remembered. It
-exists because the library was already there and thirty call sites wrote their own anyway, and the
-copies disagreed with each other about what English meant.
+The `aimeat/no-raw-locale-format` lint rule refuses the raw `toLocale*` calls, so this is checked
+rather than remembered.
 
 ```javascript
 import { num, date, time, dateTime, calendar, relative, ago, duration, money, morsels } from '/js/format.js';
 
-num(1234)                                  // 1 234   — the reader's own grouping
+num(1234)                                  // 1 234: the reader's own grouping
 date(iso)                                  // their date format
 time(iso, { hour: '2-digit', minute: '2-digit' })   // their clock
 dateTime(iso)                              // both
-relative(iso)                              // "3 päivää sitten", "eilen" — a POINT in the past
-ago(iso, { horizonDays: 7 })               // the same, giving way to a date past the horizon
-duration(ms)                               // "1pv 23t 26min" — a LENGTH of time
+relative(iso)                              // "3 päivää sitten", "eilen": a POINT in the past
+ago(iso, { horizonDays: 7 })               // the same, a date past the horizon (default 30 days)
+duration(ms)                               // "1pv 23t 26min": a LENGTH of time
 duration(ms, { style: 'long', max: 2 })    // "1 päivä ja 23 tuntia"
 money(12.5, 'EUR')                         // 12,50 €
-morsels(625)                               // 625 morsels — never a currency symbol
+morsels(625)                               // 625 morsels, never a currency symbol
 ```
 
 **A word is not a unit, and the two follow different settings.** `relative()` and `duration()`
-produce WORDS, so they follow the page's LANGUAGE: a person who chose Finnish words with a British
-date format asked for exactly that, and gets `3 päivää sitten` beside `13/09/2026`. Everything else
-here — a number's separators, a date's order, a clock — follows the regional format. Getting this
-backwards is how a Finnish page came to read `3 days ago` beside a Finnish `eilen` that a
-translation key had produced, on the same screen.
+produce words, so they follow the page's language: a person who chose Finnish words with a British
+date format gets `3 päivää sitten` beside `13/09/2026`. Everything else here (a number's
+separators, a date's order, a clock) follows the regional format.
 
-**Never write a `{n} min ago` translation key.** It survives Finnish only because `min` does not
-inflect, it cannot produce `eilen`, and one `{n}` cannot carry a language whose noun changes with
-the number: Polish writes `1 dzień` but `2 dni`, Russian `1 день`, `2 дня`, `5 дней`. CLDR holds
-every one of those rules and these two functions read them. Eleven such keys were deleted on
-2026-09-13 for that reason.
+**Never write a `{n} min ago` translation key.** It cannot produce `eilen`, and one `{n}` cannot
+carry a language whose noun changes with the number: Polish writes `1 dzień` but `2 dni`, Russian
+`1 день`, `2 дня`, `5 дней`. CLDR holds those rules, and `relative()` and `duration()` read them.
 
-**A moment and a calendar date are different things, and the difference is a wrong number rather
-than a wrong format.** A message arrived at an instant, and the reader should see it on their own
-clock. A heat-map square, a month rail and the day a usage row was counted into are days on a
-calendar: re-read them in the reader's zone and they label themselves the day before for anyone west
-of the node, so a heading ends up disagreeing with the rows under it. `calendar()` pins those, and
-`dayKey()` / `sameDay()` answer "is this today" in the reader's zone rather than the browser's.
+**A moment and a calendar date are different things, and mixing them gives a wrong number rather
+than a wrong format.** A message arrived at an instant, and the reader sees it on their own clock.
+A heat-map square, a month rail and the day a usage row was counted into are days on a calendar:
+read them in the reader's zone and they label themselves the day before for anyone west of the
+node, so a heading disagrees with the rows under it. `calendar()` pins those, and `dayKey()` and
+`sameDay()` answer "is this today" in the reader's zone rather than the browser's.
 
-Three things follow from this that are easy to get wrong:
+Three things follow:
 
-- **`money()` refuses morsels, on purpose.** A morsel is a pacer, not a currency: it paces what
-  agents may push into a person's store, it accrues while they are idle, and it buys nothing. The
-  two are numbers of the same size sitting on the same pages, so a formatter that took both would
-  print `625 €` over a balance. `morsels()` is the one that formats them.
-- **Absent means follow the browser.** A person who never opened the settings sees exactly what they
-  always saw. Nobody is migrated into a preference they did not express.
+- **`money()` refuses morsels.** A morsel is a pacer, not a currency: it paces what agents may push
+  into a person's store, it accrues while they are idle, and it buys nothing. `money()` throws a
+  `TypeError` when asked to format one; `morsels()` formats them.
+- **Absent means follow the browser.** A person who never opened the settings sees what they always
+  saw. Nobody is moved into a preference they did not express.
 - **The same rule reaches apps and the server.** In an app: `AIMEAT.fmt` (cortex `aimeat-i18n`) and
-  `_core/format.js` inside a served SDK library. On the server: `displayPrefsFor()` the person the
-  message is FOR, then `formatForPerson()` — the recipient is the key, because an email written by
-  an hourly sweep has no request, no browser and no cookie to ask.
+  `_core/format.js` inside a served SDK library. On the server: `displayPrefsFor()` for the person
+  the message is for, then `formatForPerson()` (both in `src/services/display-prefs.ts`). The
+  recipient is the key, because an email written by an hourly sweep has no request, no browser and
+  no cookie to ask.
 
 ---
 
 ## Mobile & Responsive UX
 
-**"Mobile-optimized" does NOT mean "the desktop layout, but the columns stack."** It means the view uses the phone's interface the way a native app does and *feels* right. The bar is: open it on a phone and it should feel like a real mobile app, not a desktop page squeezed into a narrow column. When a task says "make X mobile-friendly," aim for that — incremental chrome-trimming (hiding a header, widening a column) is usually not enough. Reference implementation: the profile **Messages** tab (`public/views/profile/inbox-tab/` + `public/css/views/inbox.css` — full-screen chat, native composer, keyboard handling).
+**"Mobile-optimised" means more than "the desktop layout with the columns stacked."** The view uses
+the phone's interface the way a native app does. Open it on a phone and it should feel like a real
+mobile app, not a desktop page squeezed into a narrow column. When a task says "make X
+mobile-friendly", aim for that; hiding a header or widening a column is usually not enough. The
+reference implementation is the profile Messages tab (`public/views/profile/inbox-tab/` and
+`public/css/views/inbox-poster.css`): full-screen chat, a native composer, keyboard handling.
 
 ### The full-screen pattern (focused views: chat, editor, wizard)
 
-A focused mobile view should take the **whole screen**, with a clear way back to the app. The app shell (top nav, sidebar toggle, breadcrumb) is chrome the user doesn't need while doing the task — get it out of the way.
+A focused mobile view takes the whole screen, with a clear way back. The app shell (top bar, sidebar
+toggle, breadcrumb) is chrome the user does not need during the task.
 
-- **Lift the view out of the shell** with `position: fixed; inset: 0; z-index: 1000` under `@media (max-width: 760px)`, gated on an "is-active" class (e.g. a thread is open). This overlays the shell entirely.
-- **Hide shell chrome you can't cover.** The sticky `.topnav` lives in a **higher stacking context** than the profile subtree, so your overlay's `z-index` will NOT paint over it — a fixed overlay at z-index 1000 still renders *under* a z-index-100 nav that sits in an ancestor context. Hide it instead: `@media (max-width: 760px) { body:has(.your-fullscreen-class) .topnav { display: none; } }`. Also lock background scroll: `body:has(.your-fullscreen-class) { overflow: hidden; }`.
-- **Give a Back affordance** that drops the is-active class → the overlay disappears and the shell/menus return. No new route needed.
-- **Desktop is untouched** — every rule above is inside `@media (max-width: 760px)`, so the desktop layout (e.g. a two-pane messenger) is unchanged. Verify `position` is `static` on desktop.
+- **Lift the view out of the shell** with `position: fixed; inset: 0; z-index: 1000` under
+  `@media (max-width: 760px)`, gated on an "is-active" class (for example, a thread is open). This
+  covers the shell.
+- **Hide shell chrome you cannot cover.** The sticky `.topnav` is in a higher stacking context than
+  the profile subtree, so the overlay's `z-index` does not paint over it: a fixed overlay at
+  z-index 1000 still renders under a z-index 100 bar in an ancestor context. Hide it instead:
+  `@media (max-width: 760px) { body:has(.your-fullscreen-class) .topnav { display: none; } }`. Also
+  lock the page behind: `body:has(.your-fullscreen-class) { overflow: hidden; }`.
+- **Give a Back control** that removes the is-active class. The overlay goes and the shell returns.
+  No new route is needed.
+- **Leave desktop as it is.** Every rule above sits inside `@media (max-width: 760px)`, so the
+  desktop layout (for example, a two-pane messenger) does not change. Check that `position` is
+  `static` on desktop.
 
-### The on-screen keyboard (the part everyone gets wrong)
+### The on-screen keyboard
 
-A bottom-pinned input (chat composer, sticky footer) hides *behind* the keyboard by default, because engines disagree on what the keyboard does to the viewport:
+A bottom-pinned input (chat composer, sticky footer) hides behind the keyboard by default, because
+engines disagree on what the keyboard does to the viewport:
 
-- **Android Chrome:** the keyboard shrinks the **visual** viewport; the **layout** viewport (and `100dvh`) does NOT shrink unless you opt in.
-- **iOS Safari:** same — the layout viewport stays full-height, `position: fixed; bottom: 0` anchors to it, so the input ends up under the keyboard.
+- **Android Chrome:** the keyboard shrinks the **visual** viewport. The **layout** viewport (and
+  `100dvh`) does not shrink unless you opt in.
+- **iOS Safari:** the same. The layout viewport stays full height, `position: fixed; bottom: 0`
+  anchors to it, and the input ends up under the keyboard.
 
-Fix it with **two layers**:
+Fix it with two layers:
 
-1. **Viewport meta (primary, iOS16+/Android):** in `public/spa.html`,
+1. **Viewport meta (primary, iOS 16+ and Android):** `public/spa.html` carries
    `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">`.
-   `interactive-widget=resizes-content` makes the keyboard resize the **layout** viewport, so `100dvh` and `fixed inset:0` shrink to the keyboard-excluded area and the composer stays above it. `viewport-fit=cover` exposes `env(safe-area-inset-*)`.
-2. **`visualViewport` measurement (fallback, older engines):** a hook reads `window.visualViewport.height` on its `resize`/`scroll` events and publishes the real available height as a CSS var; the container height uses `var(--measured, 100dvh)`. See `useMobileComposerKeyboard(mode)` in `inbox-tab/use-thread-ux.js` — it measures `body-top → visualViewport-bottom`.
+   `interactive-widget=resizes-content` makes the keyboard resize the **layout** viewport, so
+   `100dvh` and `fixed inset: 0` shrink to the area above the keyboard and the composer stays
+   visible. `viewport-fit=cover` exposes `env(safe-area-inset-*)`.
+2. **`visualViewport` measurement (fallback, older engines):** a hook reads
+   `window.visualViewport.height` on its `resize` and `scroll` events and publishes the available
+   height as a CSS variable, which the container's height reads with `100dvh` as the fallback. See
+   `useMobileComposerKeyboard(mode)` in `inbox-tab/use-thread-ux.js`; it measures from the top of
+   the body to the bottom of the visual viewport and writes `--conversation-avail`.
 
 Then:
-- **Never `scrollIntoView({ block: 'center' })` a bottom input on focus** — it centers the input and leaves a dead gap below it. Keep the message list pinned to the bottom instead.
-- **Never do `calc(100dvh − keyboardHeight)`** — with `resizes-content`, `dvh` *already* accounts for the keyboard, so subtracting it again double-counts and collapses the pane. Use the measured height OR `dvh`, not both subtracted.
-- **Pad for the home-indicator:** `padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px))` on the bottom bar.
-- `VirtualKeyboard API` (`navigator.virtualKeyboard.overlaysContent` + `env(keyboard-inset-*)`) is Chromium-only and requires manual inset management — `interactive-widget=resizes-content` is simpler and covers our case, so we don't use it.
+
+- **Never `scrollIntoView({ block: 'center' })` a bottom input on focus.** It centres the input and
+  leaves a dead gap below it. Keep the message list pinned to the bottom instead.
+- **Never write `calc(100dvh - keyboardHeight)`.** With `resizes-content`, `dvh` already accounts for
+  the keyboard, so subtracting it again counts it twice and collapses the pane. Use the measured
+  height or `dvh`, not one subtracted from the other.
+- **Pad for the home indicator:** `padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px))` on
+  the bottom bar.
+- The `VirtualKeyboard` API (`navigator.virtualKeyboard.overlaysContent` with
+  `env(keyboard-inset-*)`) is Chromium-only and needs manual inset handling.
+  `interactive-widget=resizes-content` covers this case with less code, so the SPA does not use it.
 
 ### Native-feeling controls
 
-Swap heavy desktop widgets for simple ones on mobile. The rich Toast UI editor (Write/Preview tabs, WYSIWYG toolbar) is miserable behind a phone keyboard — the composer opens as a plain auto-growing `<textarea>` on `≤760px` (and Toast UI never even loads there), keeping the rich editor for desktop. Detect once with `window.matchMedia('(max-width: 760px)').matches` at mount.
+Swap heavy desktop widgets for simple ones on mobile. The rich Toast UI editor (Write and Preview
+tabs, a toolbar) is hard to use behind a phone keyboard, so at 760px and narrower the composer is a
+plain auto-growing `<textarea>` and Toast UI does not load. Desktop keeps the rich editor. Detect the
+width with `window.matchMedia('(max-width: 760px)').matches`.
 
-### Verify on a real (emulated) phone
+### Verify on an emulated phone
 
-Per Rule 1b, drive the Playwright MCP browser at a mobile viewport (e.g. 390×780): open the flow, confirm the view fills the screen with no app chrome, click Back and confirm the shell returns, then **shrink the viewport height** (e.g. → 440) to emulate the keyboard and confirm the input stays fully visible at the bottom with **no gap below it**. Screenshot as evidence.
+Drive the Playwright MCP browser at a phone viewport (390x844, as in the `aimeat-frontend-verify`
+skill): open the flow, confirm the view fills the screen with no app chrome, press Back and confirm
+the shell returns. Then reduce the viewport height (for example to 440) to emulate the keyboard,
+and confirm that the input stays fully visible at the bottom with no gap below it. Keep a
+screenshot as evidence.
 
 ---
 
 ## Profile Tab SPA
 
-The profile view (`/v1/profile`) is a tabbed SPA within the main SPA. It manages its tab components, one file per tab in `public/views/profile/`.
+The profile view (`/v1/profile`) is a tabbed area inside the main SPA. `public/views/profile.js`
+holds the tab registry (`TABS`: `id`, the label's locale key, the component and the lowest account
+tier that sees it) and passes the same props to every tab. Each tab is a `<name>-tab.js` file in
+`public/views/profile/`, with a folder of the same name for its parts when it has several.
 
 ### Profile Tab Component Contract
 
 Every tab in `public/views/profile/` must:
 
-1. **Export a default Preact component** as the tab content
-2. **Accept the standard tab props** (see below)
-3. **Start with `.section-title` + `.section-desc`** using i18n keys
-4. **Use CSS classes** from `profile.css` (never inline styles)
-5. **Listen for live updates** if displaying server data (see SSE section in CLAUDE.md)
+1. **Export a default Preact component** as the tab content.
+2. **Accept the standard tab props** (below).
+3. **Draw its frame with `SettingsPage`** (`/components/SettingsPage.js`) and its content with the
+   components. A Settings & Controls page writes no class of its own.
+4. **Re-fetch on live updates** if it shows server data (see "SSE Live Updates" below).
+5. **Write all text through `t()`.**
 
 ### Tab Props
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `session` | `object` | Current user session (`{ owner, ghii, jwt, ... }`) |
-| `showToast` | `(msg, isError?) => void` | Show toast notification |
-| `onStats` | `(stats) => void` | Update stat counters in profile header |
+| `session` | `object` | The current session (`{ owner, ghii, jwt, ... }`) |
+| `showToast` | `(msg, kind?) => void` | Show a toast |
+| `onStats` | `(stats) => void` | Update the stat counters in the profile header |
 | `navigate` | `(path) => void` | SPA navigation |
+| `locale` | `string` | The active locale tag |
 
 ### Minimal Profile Tab Template
 
 ```javascript
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { Spinner } from './shared.js';
+import { apiGet } from '/js/api.js';
+import { SettingsPage } from '/components/SettingsPage.js';
+import { Note } from '/components/Note.js';
 
-export default function MyTab({ session, showToast, onStats }) {
+export default function MyTab({ session }) {
   const [data, setData] = useState(null);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (session) loadData();
-  }, [session]);
-
-  // Live update listener (required for tabs showing server data)
-  const loadRef = useRef(loadData);
-  loadRef.current = loadData;
-  useEffect(() => {
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+  const loadData = useCallback(async () => {
+    try {
+      const r = await apiGet('/v1/my-items');
+      setData(r.data);
+    } catch (e) { setError(e.message); }
   }, []);
 
-  async function loadData() {
-    try {
-      // fetch data...
-    } catch { setData(null); }
-  }
+  useEffect(() => { if (session) loadData(); }, [session, loadData]);
 
-  if (!data) return html`<${Spinner} text=${t('profile.mytab.loading')} />`;
+  // Live update listener (required for tabs that show server data)
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [loadData]);
 
   return html`
-    <div class="section-title">${t('profile.mytab.title')}</div>
-    <div class="section-desc">${t('profile.mytab.desc')}</div>
-    <!-- Tab content using .card, .badge, etc. -->
-  `;
+    <${SettingsPage}
+      crumb=${[t('nav.profile'), t('profile.tabs.mytab')]}
+      title=${t('profile.mytab.title')}
+      desc=${t('profile.mytab.desc')}>
+      ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
+      ${!data && !error ? html`<${Note} kind="loading" />` : null}
+      <!-- the tab's content, drawn with components -->
+    <//>`;
 }
 ```
 
-### Profile CSS Classes (Available in profile.css)
-
-| Class | Usage |
-|-------|-------|
-| `.pf .section-title` | Coral heading (1.15rem, 700 weight) |
-| `.pf .section-desc` | Gray description text below title |
-| `.pf .card` | White card with border, 12px radius, coral hover |
-| `.pf .card-header` | Flex row: title left, badges right |
-| `.pf .card-title` | Bold card name (1rem) |
-| `.pf .card-subtitle` | Gray meta text (0.8rem) |
-| `.pf .badge` | Inline badge (combine with `-success`, `-warn`, `-info`, `-danger`, `-muted`) |
-| `.pf .sub-tabs` | In-tab sub-navigation |
-| `.pf .action-bar` | Search + create button row above lists |
-| `.create-form` | Form container (white, bordered, 12px radius) |
-| `.form-row` | Form field row with label |
-| `.form-actions` | Button row at form bottom |
-| `.input-field` | Standard text input |
-| `.empty` | Empty state placeholder |
+Register the tab in `TABS` in `profile.js`. The file header of `SettingsPage.js` describes its three
+layouts and every prop (`sections`, `pages`, `rail`, `strip`, `actions`, ...).
 
 ---
 
 ## Service Layer (`js/services/`)
 
-All API calls from frontend views go through service modules in `public/js/services/`. Each module wraps `apiGet`, `apiPost`, `apiPut`, `apiDelete` from `/js/api.js`.
+API calls from views go through service modules in `public/js/services/`, one file per domain. Each
+module wraps `apiGet`, `apiPost`, `apiPut`, `apiPatch` and `apiDelete` from `/js/api.js`.
 
 ### Pattern
 
@@ -740,49 +692,60 @@ export const deleteItem = (id)         => apiDelete(`/v1/my-items/${encodeURICom
 
 ### Adding a New Service Module
 
-1. Create `public/js/services/my-service.js`
-2. Import from `/js/api.js`
-3. Export named functions (no default export)
-4. Always `encodeURIComponent()` path parameters
-5. Add the module to the importmap in `spa.html`
+1. Create `public/js/services/my-service.js`.
+2. Import from `/js/api.js`.
+3. Export named functions (no default export).
+4. Always `encodeURIComponent()` path parameters.
+5. Add an identity entry to the importmap in `spa.html`; `pnpm check:importmap` refuses the import
+   otherwise.
 
 ---
 
-## i18n Key Naming
+## i18n
 
-Translation keys follow dot-notation in nested JSON under `locales/en.json` and `locales/fi.json`:
+### Keys
 
-```
-{namespace}.{section}.{key}
-```
+Translation keys use dot notation, `{namespace}.{section}.{key}`. The locale files hold both
+nested objects and flat dotted keys; the loader in `/js/i18n.js` flattens them, so
+`t('profile.agents.title')` reads either form. `t(key, vars)` replaces `{name}` placeholders from
+`vars`. On a missing key, `t()` returns the English text, and the key itself when English has none;
+`tOr(key, fallbackText)` returns `fallbackText` instead.
 
-### Namespaces
+A few of the namespaces in `en.json`:
 
 | Namespace | Used by |
 |-----------|---------|
+| `common` | Words shared across views (Cancel, Save, Retry, ...) |
 | `nav` | Header navigation |
-| `hero` | Landing page hero section |
-| `cards` | Landing page cards |
-| `groups` | Expandable groups |
-| `welcome` | Welcome board |
-| `profile` | Profile view (all tabs: `profile.agents.*`, `profile.wallet.*`, `profile.skills.*`, etc.) |
-| `dashboard` | Admin dashboard (all tabs) |
-| `dev` | Dev portal |
-| `classic` | Classic portal |
-| `hobbies` | Hobbies view |
-| `mkt` | Marketplace view |
+| `profile` | The profile view and its tabs (`profile.agents.*`, `profile.wallet.*`, ...) |
+| `dashboard`, `admin` | The admin dashboard |
+| `explain` | The explanations behind `help="<term>"` controls |
+| `dev` | Dev portal (`portal-dev.js`) |
+| `classic` | Classic portal (`portal-classic.js`) |
 | `init` | CLI init wizard |
 
 ### Adding New Keys
 
-1. Add nested JSON to both `locales/en.json` and `locales/fi.json`
-2. Use `t('namespace.key')` in views (via `import { t } from '/js/i18n.js'`)
-3. For view-specific prefixes, create a wrapper: `function mt(key) { return t('myview.' + key); }`
+1. **Add the key to `locales/en.json`.** It is the source of truth for which keys exist.
+2. **Finnish and Spanish follow.** `pnpm locale:extract <lang> --prefix <screen>.` writes one
+   screen's missing keys to `locales/.todo-<lang>.json`; translate that file, then
+   `pnpm locale:merge <lang> <file>` validates it and merges it in. `pnpm check:locales` gates the
+   result.
+3. **A key a language does not have falls back to English**, so a language can be filled in over
+   several passes. A `[TODO:xx]` placeholder fails the gate; never commit one.
+4. **Before you write Finnish or Spanish, read the language context:**
+   `.claude/skills/aimeat-writing/references/language-context.md` says what each thing in the
+   product is and which word is already settled for it in each language. Use the established term
+   in that language, or keep the English one as is; never invent a form.
+5. Use `t('namespace.key')` in views (`import { t } from '/js/i18n.js'`).
+
+A new language is the same loop plus two lines: the tag in `LOCALES` in `src/i18n.ts`, and an empty
+`locales/<tag>.json`. `.claude/rules/locales.md` is the rule.
 
 ### Existing Conventions
 
-- portal-dev.js: Uses `dt(key)` → `globalT('dev.' + key)`
-- portal-classic.js: Uses `ct(key)` → `globalT('classic.' + key)`
+- `portal-dev.shared.js`: `dt(key)` returns `globalT('dev.' + key)`.
+- `portal-classic.js`: `ct(key)` returns `globalT('classic.' + key)`.
 
 ---
 
@@ -790,316 +753,308 @@ Translation keys follow dot-notation in nested JSON under `locales/en.json` and 
 
 ### View Errors
 
-The SPA shell wraps all view renders in an `ErrorBoundary` component. If a view throws during render, it shows a retry UI instead of crashing the whole app.
+The SPA shell wraps every view in an `ErrorBoundary` (in `spa.html`). If a view throws during
+render, the shell shows a retry message instead of a blank app.
 
 ### API Errors
 
+`api()` and its shorthands return the parsed AIMEAT envelope `{ ok, data, hints }` and **throw** when
+the server answers `ok: false`. The thrown error carries `message`, `code` (for example
+`NOT_FOUND`), `status` and `response`.
+
 ```javascript
-const result = await apiGet('/v1/memory/key');
-if (!result.ok) {
-  // result.error = { code: 'NOT_FOUND', message: 'Resource not found' }
-  setError(result.error.message);
-  return;
+try {
+  const r = await apiGet('/v1/memory/key');
+  setValue(r.data);
+} catch (e) {
+  setError(e.message);
 }
-// Use result.data
 ```
 
-The `api()` wrapper automatically retries on 429 (rate limit) and 5xx errors with exponential backoff (max 3 retries). Network failures return `{ ok: false, error: { code: 'NETWORK_ERROR', message: '...' } }`.
+What `api()` does around the call:
+
+- **Reads are retried, writes are not.** A `GET`, `HEAD` or `OPTIONS` that gets a 429, a 5xx, a
+  network error or a timeout is retried up to 3 times with exponential backoff. A write is never
+  retried automatically, because a failure does not prove it did not happen.
+- **`POST` and `PUT` carry an `Idempotency-Key` header**, one per call.
+- **A 401 refreshes the session once** and repeats the call.
+- **A network failure** that runs out of retries throws with `code: 'NETWORK_ERROR'`.
+- **The timeout is 30 seconds**; pass `timeoutMs` for a slow call.
 
 ### XSS Prevention
 
-Always escape user-generated content:
+Preact escapes every text node and attribute value it renders. **Do not call `escHtml()` on a value
+you put in an `html` template:** the text is escaped twice, and the reader sees `&quot;` or `&amp;`.
 
 ```javascript
-import { escHtml, escAttr, sanitizeHtml } from '/js/utils.js';
+// Text and attributes: pass the value as it is
+html`<span title=${userInput}>${userInput}</span>`
 
-// In templates
-html`<span>${escHtml(userInput)}</span>`
-
-// In attributes
-html`<div title="${escAttr(userInput)}">`
-
-// For rich text (allows <b>, <i>, <a>, <code>, etc.)
+// Rich text (keeps <b>, <i>, <em>, <strong>, <code>, <a>, <br>, <p>, lists, <blockquote>)
+import { sanitizeHtml } from '/js/utils.js';
 html`<div dangerouslySetInnerHTML=${{ __html: sanitizeHtml(richContent) }} />`
 ```
+
+`escHtml()` and `escAttr()` in `/js/utils.js` are for a string you build as HTML outside Preact, for
+example for `innerHTML` or a print page. For Markdown, use the `Markdown` component.
 
 ---
 
 ## Testing
 
-### Playwright Tests
+**A finished frontend change is verified by driving a real browser** through the Playwright MCP
+server, as the `aimeat-frontend-verify` skill describes: three viewports (390x844, 1280x900 and
+1280x460), the real interaction, the console and the network log, and a check that the result
+persists. "It rendered" is not a pass.
 
-Frontend E2E tests live in `test/playwright/`:
+`pnpm lint`, `pnpm typecheck:frontend` and `pnpm check:importmap` are the static checks. `pnpm gate`
+runs them, with every other check the change can reach, once the work is finished.
 
-| File | Tests |
-|------|-------|
-| `views.spec.ts` | SPA routing (8 routes), CSP headers, view rendering |
-| `libs.spec.ts` | SDK library loading, auth flow, data operations |
+### The Playwright spec suite
 
-Run tests (requires server on port 40251):
+`test/playwright/` holds a `.spec.ts` suite, one file per area: `views.spec.ts` (routes, security
+headers), `libs.spec.ts` (served libraries), the `profile-*.spec.ts` and `admin-*.spec.ts` files for
+single tabs, and a few for one feature each. **Do not write or run it:** `.claude/rules/frontend.md`
+rules it unreliable, and verification is the browser drive above.
 
-```bash
-npx playwright test
-```
-
-### What to Test
-
-- **Route loads**: Each `/v1/*` route renders its view without errors
-- **Unauthenticated state**: Login prompts appear, protected features hidden
-- **Interactive elements**: Tab switching, accordion expand, search/filter
-- **Security headers**: CSP, X-Content-Type-Options, X-Frame-Options present
-
-### Writing New View Tests
-
-```typescript
-test('my view renders correctly', async ({ page }) => {
-  await page.goto('/v1/myview');
-  await page.waitForLoadState('networkidle');
-  const content = page.locator('.mv-root');
-  await expect(content).toBeVisible({ timeout: 10_000 });
-});
-```
+For the record, the commands are `pnpm test:playwright` (the same as `test:playwright:sqlite`) and
+`pnpm test:playwright:postgres-kysely`. Each runs `test/run-playwright-ci.ts`, which reads
+`.env.test.sqlite` or `.env.test.postgres-kysely`, starts its own server on that file's
+`AIMEAT_PORT`, and then runs `npx playwright test`. `pnpm test:env:init` writes those files with a
+port of the worktree's own. `playwright.config.ts` still names `http://localhost:40251` as its
+`baseURL`.
 
 ---
 
 ## Development Workflow
 
-1. Start the dev server: `cd aimeat && pnpm dev`
-2. Open `http://localhost:40050/v1/portal` in your browser
-3. Edit view files — reload the page to see changes (no build step)
-4. Type-check: `npx tsc --noEmit`
-5. Run Playwright tests: `npx playwright test`
+1. Start a node: `pnpm dev` from `aimeat/` serves the SPA on port 40050. A maintainer session uses
+   its own sandbox instead (`pnpm sandbox`, port 40600 upward; owners and tokens in
+   `aimeat/.sandbox.json`), because the dev server on 40050 is shared.
+2. Open `http://localhost:40050/v1/portal` (or the sandbox's base URL).
+3. Edit files under `public/` and reload the page. A change under `src/` needs a server restart.
+4. Type-check: `pnpm typecheck:frontend`.
+5. When the change is finished, verify it in a browser (see "Testing") and run `pnpm gate`.
 
 ### Adding a New View
 
-1. Create `public/views/my-view.js` with the default export component
-2. Create `public/css/views/my-view.css` with scoped styles (use unique prefix)
-3. Add the route in `spa.html` (the route → module mapping)
-4. Add translation keys to `locales/en.json` and `locales/fi.json`
-5. Add a Playwright test in `test/playwright/views.spec.ts`
-6. Run `npx tsc --noEmit` to verify
+1. Create `public/views/my-view.js` with the default export component (copy `_template.js`).
+2. Create `public/css/views/my-view.css` with a prefix of its own, and add its `<link>` to
+   `spa.html`.
+3. Register the route in **both** places: `ROUTES` in `spa.html` (the client-side route) and
+   `spaRoutes` in `src/routes/portal.ts` (so a reload of that address serves the shell). With only
+   the first, F5 on the page answers 404.
+4. Add an importmap entry in `spa.html` for every new absolute module the view imports.
+5. A public content page also gets an entry in `PUBLIC_PAGES` (`src/data/public-pages.ts`) for its
+   title, description and sitemap line.
+6. Add the keys to `locales/en.json`; Finnish and Spanish follow as described under "i18n".
+7. Run `pnpm typecheck:frontend` and `pnpm check:importmap`, then verify the page in a browser.
 
 ---
 
 ## Admin Dashboard SPA
 
-The admin dashboard (`/v1/admin`) is a self-contained SPA within the main AIMEAT frontend. It uses the same Preact + HTM stack but has its own component library, layout system, and CSS.
+The admin dashboard (`/v1/admin`) is the operator's area inside the main SPA. It uses the same
+Preact + HTM stack and the same components.
 
 ### Architecture
 
-```
-public/views/
-├── admin.js                    # Main dashboard shell (sidebar, routing, data loading)
-└── admin/                      # Tab components
-    ├── shared.js               # Shared admin components (Badge, StatsGrid, ExpandableHelp, etc.)
-    ├── overview-tab.js          # Node health, stats, economy, warnings
-    ├── economy-tab.js           # Morsel economy details
-    ├── config-tab.js            # Live configuration editor
-    ├── consul-tab.js            # Consul integration management
-    ├── cors-tab.js              # CORS policy management
-    ├── maintenance-tab.js       # Maintenance mode toggle
-    ├── hooks-tab.js             # Extension hooks management
-    ├── portal-tab.js            # Portal template editor, memory keys, KV pairs
-    ├── stats-tab.js             # Usage statistics with charts
-    ├── owners-tab.js            # Owner management
-    ├── agents-tab.js            # Agent management
-    ├── ghii-tab.js              # GHII identity & verification
-    ├── actions-tab.js           # Published actions
-    ├── boards-tab.js            # Discussion boards
-    ├── chat-instances-tab.js    # Chat sessions
-    ├── knowledge-tab.js         # Knowledge package management
-    ├── memory-tab.js            # Memory key management
-    ├── packages-tab.js          # Package distribution management
-    ├── prompts-tab.js           # Prompt management
-    ├── realtime-tab.js          # WebSocket rooms
-    ├── scheduler-tab.js         # Scheduled tasks / cron
-    ├── services-tab.js          # Service/CSM management
-    ├── work-tab.js              # Work requests & deliveries
-    ├── email-tab.js             # Email/SMTP configuration
-    ├── push-tab.js              # Push notifications
-    ├── directory-tab.js         # Directory index management
-    ├── matching-tab.js          # Matching engine
-    ├── csm-tab.js               # CSM template management
-    ├── msm-tab.js               # MSM integration management
-    ├── federation-tab.js        # Federation cluster management
-    └── genesis-tab.js           # Genesis peer management
+| Path | What it holds |
+|------|---------------|
+| `public/views/admin.js` | The shell: the tab registry, the frame and menu, `loadAll()`, the live-update reload |
+| `public/views/admin/` | One `<name>-tab.js` per tab, and its parts as `<name>-tab.<part>.js` (for example `cors-tab.form.js`, `hooks-tab.runs.js`) |
+| `public/views/admin/shared.js` | Helpers shared by the tabs |
+| `public/js/services/admin.js` | The admin API service layer |
+| `css/components/operator-frame.css`, `operator-menu.css` | The frame and the side menu |
 
-public/css/views/admin.css       # All admin dashboard styles (adm-* prefix)
-public/js/services/admin.js      # Admin API service layer
+The frame and the side menu are the `OperatorFrame` and `OperatorMenu` components. The admin pages
+are drawn from the component library and write no class of their own.
+
+### The tab registry
+
+`NAV_GROUPS` in `admin.js` is the registry. Each group has a label key and a list of items:
+
+```javascript
+{ id: 'my-tab', key: 'dashboard.myTab', component: MyTab, count: 'myCount' }
 ```
+
+`id` is the value of `?tab=` in the address, `key` is the menu label's locale key, `component` is
+the imported tab, and `count` (optional) names the figure from the loaded counts that the menu shows
+beside the label. `TAB_ALIASES` maps an old `?tab=` value to its current tab.
 
 ### Tab Component Contract
 
 Every tab module in `public/views/admin/` must:
 
-1. **Export a default Preact component** as the tab content
-2. **Accept `{ data, reload }` props** (some tabs also receive `session`, `navigate`, `locale`, `switchPage`)
-3. **Use `t('dashboard.keyName')` for all user-visible text** (i18n)
-4. **Use shared components** from `./shared.js` (Badge, StatsGrid, EconRow, ExpandableHelp, Empty, etc.)
+1. **Export a default Preact component** as the tab content.
+2. **Accept the tab props.** The shell passes every tab the same object:
+   `{ data, reload, session, navigate, locale, switchPage }`. `data` is what `loadAll()` fetched;
+   `reload` runs it again; `switchPage(id)` opens another tab.
+3. **Write all user-visible text through `t()`**, under `dashboard.*` or `admin.*`.
+4. **Draw with the components** (`Section`, `Note`, `Action`, `List`, `Box`, `Figure`, ...) and the
+   helpers in `./shared.js`.
 
 ```javascript
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
-import { StatsGrid, Empty, ExpandableHelp } from './shared.js';
+import { Note } from '/components/Note.js';
+import { Empty, ExpandableHelp } from './shared.js';
 
-export default function MyTab({ data, reload }) {
+export default function MyTab({ data }) {
   const myData = data.mySection;
   if (!myData) return html`<${Empty} text=${t('dashboard.myEmptyMsg')} />`;
 
   return html`
-    <p class="adm-explain">${t('dashboard.myExplain')}</p>
+    <${Note}>${t('dashboard.myExplain')}<//>
     <${ExpandableHelp} title=${t('dashboard.myHelpTitle')}>
       <p>${t('dashboard.myHelpDetail')}</p>
     </${ExpandableHelp}>
-    <!-- Tab content here -->
+    <!-- tab content -->
   `;
 }
 ```
 
-### Shared Admin Components (`shared.js`)
+### Shared admin helpers (`shared.js`)
 
-| Component | Props | Description |
-|-----------|-------|-------------|
-| `Badge` | `{ type }` | Colored badge (healthy/watch/critical/info/public/private/etc.) |
-| `StatCard` | `{ label, value, sub, color }` | Single stat card with large number |
-| `StatsGrid` | `{ items }` | 4-column grid of StatCards |
-| `EconRow` | `{ label, value }` | Key-value row (like economy stats) |
-| `HealthRow` | `{ label, obj }` | Health metric row with badge + value |
-| `ExpandableHelp` | `{ title, children }` | Collapsible help section with styled details/summary |
-| `Empty` | `{ text }` | Empty state placeholder |
-| `ErrorBox` | `{ message }` | Red error box |
-| `Spinner` | `{ text }` | Loading spinner |
-| `DataTable` | `{ headers, rows, scroll }` | Generic data table |
-| `num(n)` | — | Format number with locale |
-| `dt(s)` | — | Format date string |
-| `fmtUp(s)` | — | Format uptime seconds |
-| `fmtBytes(b)` | — | Format bytes |
+| Export | Description |
+|--------|-------------|
+| `Badge` | `{ type, label }`: a coloured status badge |
+| `StatsGrid` | `{ items }`: a grid of figures |
+| `Row`, `EconRow` | A named row with a value |
+| `ExpandableHelp` | `{ title, children, open }`: a section of help that opens and closes |
+| `Empty`, `ErrorBox`, `Spinner` | Empty, error and loading states |
+| `DataTable` | `{ headers, rows, scroll }`: a generic table |
+| `useToast`, `Toast` | The admin toast |
+| `num`, `dt`, `day`, `fmtUp`, `fmtBytes`, `shortDate`, `when` | Formatters (the first five come from `/js/format.js`) |
 
 ### Adding a New Admin Tab
 
-1. Create `public/views/admin/my-tab.js` following the tab component contract above
-2. Import it in `public/views/admin.js` and add to the `tabs` array:
-   ```javascript
-   import MyTab from './admin/my-tab.js';
-   // In tabs array:
-   { id: 'my-tab', icon: '\u{1F4CB}', key: 'dashboard.myTab', component: MyTab, count: 'myCount' }
-   ```
-3. Add API functions to `public/js/services/admin.js` if needed
-4. Add translation keys under `dashboard.*` in both `locales/en.json` and `locales/fi.json`
-5. Add CSS classes to `public/css/views/admin.css` using `adm-*` prefix
-
-### Admin CSS Classes
-
-All admin styles use the `adm-` prefix. Key classes:
-
-| Class | Usage |
-|-------|-------|
-| `adm-card` | Card container with glass background |
-| `adm-grid adm-grid-4` | 4-column responsive grid |
-| `adm-grid adm-grid-2` | 2-column responsive grid |
-| `adm-card-grid` | Auto-fill card grid (340px min) |
-| `adm-btn` | Primary button (blue) |
-| `adm-btn-sm` | Small outlined button |
-| `adm-btn-action` | Action button (outlined, accent color) |
-| `adm-badge adm-badge-{type}` | Status badge |
-| `adm-erow` | Economy/key-value row |
-| `adm-hrow` | Health metric row |
-| `adm-help` | Expandable help section |
-| `adm-help-summary` | Help section header |
-| `adm-help-body` | Help section content |
-| `adm-nav-item` | Sidebar navigation item |
-| `adm-sub-panel` | Nested sub-panel |
+1. Create `public/views/admin/my-tab.js` following the contract above.
+2. Import it in `public/views/admin.js` and add an item to the right group in `NAV_GROUPS`.
+3. Add API functions to `public/js/services/admin.js` if needed.
+4. Add the keys under `dashboard.*` in `locales/en.json`; Finnish and Spanish follow as described
+   under "i18n".
+5. Draw with components. A look that no component has yet is a new component (see "Component
+   Library"), not a rule in a view sheet.
 
 ### Admin API Service (`admin.js`)
 
-All admin API calls go through `public/js/services/admin.js`. This module imports `apiGet`, `apiPost`, `apiPut`, `apiDelete` from `/js/api.js` and exports named functions for each admin endpoint.
+Admin API calls go through `public/js/services/admin.js`. It imports `apiGet`, `apiPost`, `apiPut`
+and `apiDelete` from `/js/api.js` and exports a named function per admin endpoint.
 
 ```javascript
-// Pattern for adding new admin API functions:
-export const getMyData  = ()     => apiGet('/v1/admin/my-endpoint');
+export const getMyData    = ()         => apiGet('/v1/admin/my-endpoint');
 export const updateMyData = (id, data) => apiPut(`/v1/admin/my-endpoint/${encodeURIComponent(id)}`, data);
 ```
 
 ### Admin i18n Keys
 
-Admin translation keys live under `dashboard.*` in the locale files. Conventions:
+Admin keys live under `dashboard.*`, and the newer tabs under `admin.*`. Conventions:
 
 | Pattern | Example | Usage |
 |---------|---------|-------|
-| `dashboard.{tabName}` | `dashboard.overview` | Tab label in sidebar |
-| `dashboard.{feature}Explain` | `dashboard.emailExplain` | Tab explanation paragraph |
-| `dashboard.{feature}HelpTitle` | `dashboard.emailSmtpHelp` | ExpandableHelp title |
-| `dashboard.{feature}HelpDetail` | `dashboard.emailSmtpHelpDetail` | ExpandableHelp body text |
-| `dashboard.{feature}Empty` / `dashboard.no{Feature}` | `dashboard.marketplaceEmpty` | Empty state message |
-| `dashboard.cfg_{path}` | `dashboard.cfg_economy_welcome_bonus` | Config setting label |
-| `dashboard.cfgGroup_{group}` | `dashboard.cfgGroup_economy` | Config group header |
-
-### XSS Prevention in Admin
-
-- Use `escHtml()` **only** for user-provided data (owner names, agent IDs, descriptions)
-- Do **NOT** use `escHtml()` on `t()` translations — Preact's virtual DOM handles escaping automatically
-- Double-escaping issue: `escHtml()` in htm templates causes `<=` to render as `&lt;=` because Preact already escapes text nodes
+| `dashboard.{tabName}` | `dashboard.overview` | Tab label in the menu |
+| `dashboard.{feature}Explain` | `dashboard.emailExplain` | The tab's explanation paragraph |
+| `dashboard.{feature}...Help` | `dashboard.emailSmtpHelp` | `ExpandableHelp` title |
+| `dashboard.{feature}...HelpDetail` | `dashboard.emailSmtpHelpDetail` | `ExpandableHelp` body |
+| `dashboard.{feature}Empty` | `dashboard.marketplaceEmpty` | Empty state |
+| `dashboard.cfg_{path}` | (no such key in `en.json` today) | A config setting's label: the path with dots as underscores. Without the key, `config-tab.js` shows the path's last segment |
+| `dashboard.cfgGroup_{group}` | `dashboard.cfgGroup_boards` | A config group's heading |
 
 ---
 
 ## ES Module Cache Busting (Importmap + BUILD_ID)
 
-**Problem:** ES modules stay in the browser's module registry for the entire SPA session. HTTP `no-cache` + ETag is insufficient — once a module is loaded, the browser reuses it without re-fetching, even after a server restart deploys new code.
+**Problem:** an ES module stays in the browser's module registry for the whole SPA session. Once a
+module is loaded, the browser reuses it without fetching it again, even after a server restart has
+deployed new code.
 
-**Solution:** `portal.ts` generates a `BUILD_ID` (timestamp) on every server restart and stamps all importmap values with `?v=BUILD_ID`. The importmap in `spa.html` maps module paths to themselves (identity mapping), and `serveSpa()` rewrites the values with the version suffix using a generic regex.
+**Solution:** `src/routes/portal-spa.ts` sets `BUILD_ID` (a timestamp) when the process starts, and
+`serveSpa()` stamps the shell's first-party assets with `?v=BUILD_ID` on every response.
+`src/routes/portal.ts` imports and re-exports `serveSpa()` and calls it for each SPA route.
 
 **How it works:**
-1. `spa.html` has an importmap with entries like `"/js/services/foo.js": "/js/services/foo.js"`
-2. `portal.ts` `serveSpa()` rewrites ALL importmap values starting with `/` to append `?v=BUILD_ID`
-3. Dynamic route imports use `+ window.__B` suffix (also injected by `serveSpa()`)
-4. Result: every module gets a unique URL per server restart → fresh fetch guaranteed
 
-**Rule: When adding a new shared JS module** (absolute import path like `/js/services/foo.js`, `/components/Bar.js`, `/lib/baz.js`):
-1. Add an identity entry to the importmap in `public/spa.html`: `"/js/services/foo.js": "/js/services/foo.js"`
-2. That's it — `portal.ts` stamps it automatically via generic regex. No manual `.replace()` needed.
+1. `spa.html` has an importmap with identity entries such as
+   `"/js/services/foo.js": "/js/services/foo.js"`.
+2. `stampAssets()` in `portal-spa.ts` appends `?v=BUILD_ID` to every importmap value that starts
+   with `/` and ends in `.js` or `.mjs`, and to every first-party `<link rel="stylesheet">`: the view
+   sheets, `theme.css`, `poster.css`, the component sheets and `/lib`.
+3. `serveSpa()` injects `window.__B = "?v=BUILD_ID"`, and the dynamic imports in `ROUTES` append it
+   (`import('/views/help.js' + B)`).
+4. The same injected script polls `/v1/build` every 60 seconds and when the tab becomes visible. When
+   the server reports a different build, the page reloads itself, so an open tab picks up a restart
+   without a manual refresh.
 
-**What does NOT need importmap entries:**
-- Relative imports (`./profile/some-tab.js`) — resolved relative to parent module which is already cache-busted
-- Bare specifiers already in the map (`preact`, `htm`) — already handled
-- CSS files — stamped by a separate generic regex in `serveSpa()`
+**Rule: when you add a shared JS module** on an absolute path (`/js/services/foo.js`,
+`/components/Bar.js`, `/lib/baz.js`), add an identity entry to the importmap in `public/spa.html`.
+The stamp is added by the regular expression; no code change is needed.
 
-**Key files:** `public/spa.html` (importmap definition), `src/routes/portal.ts` (`serveSpa()` with BUILD_ID stamping).
+**What needs no importmap entry:**
 
-> Note: public JS changes require a `pnpm dev` restart — the browser caches modules by BUILD_ID.
+- Relative imports (`./profile/some-tab.js`): they resolve against a parent module that is already
+  stamped.
+- Bare specifiers already in the map (`preact`, `htm`).
+- CSS files: `stampAssets()` stamps every stylesheet link.
+
+**Key files:** `public/spa.html` (the importmap, the stylesheet links and `ROUTES`),
+`src/routes/portal-spa.ts` (`BUILD_ID`, `serveSpa()`, `stampAssets()`).
+
+Files under `public/` are also served `no-cache` with an ETag, so during development a reload
+fetches an edited file without a restart.
 
 ---
 
 ## SSE Live Updates (Real-Time UI Refresh)
 
-**Problem:** When data changes on the server (another user, an API call, a scheduled job), the UI must reflect it without manual page reload.
+**Problem:** when data changes on the server (another user, an API call, a scheduled job), the page
+must show it without a manual reload.
 
-**Solution:** Singleton SSE (Server-Sent Events) connection with debounced `CustomEvent` broadcasting.
+**Solution:** one server-sent events connection, debounced, that tells the page which data domains
+changed.
 
 **How it works:**
-1. `public/lib/live-updates.js` — singleton EventSource connection with reference counting
-   - `connect(getJwt)` — opens SSE via `POST /v1/events/ticket` → `GET /v1/events?ticket=...`
-   - `onUpdate(callback)` — registers listener (debounced 2s to batch rapid changes)
-   - `disconnect()` — decrements refcount, closes when 0
-2. `public/views/profile.js` — connects on mount, dispatches `aimeat-live-update` CustomEvent
-3. Tab components listen for the event and re-fetch their data
 
-**Rule: Every profile/admin tab that displays server data MUST listen for live updates:**
+1. `public/lib/live-updates.js` holds the connection.
+   - `connect(getJwt)` opens it: `POST /v1/events/ticket`, then `GET /v1/events?ticket=...`.
+     Calls are reference-counted.
+   - One browser tab holds the connection and relays events to the other tabs over a
+     `BroadcastChannel`. A hidden tab does not re-fetch, and catches up once when it is shown again.
+   - `subscribe(domains, fn)` and `onUpdate(fn)` register a listener; changes are collected over a
+     one-second debounce.
+   - `disconnect()` lowers the count and closes the connection at zero.
+2. The profile shell (`public/views/profile.js`), the home (`views/home/index.js`) and the fleet
+   view (`views/fleet.js`) connect on mount and dispatch the window event `aimeat-live-update`, with
+   `detail.domains` set to the domains that changed.
+3. A tab listens for that event and re-fetches its data.
+
+**Rule: every profile or admin tab that shows server data listens for live updates**
+(`.claude/rules/frontend.md`):
+
 ```javascript
 useEffect(() => {
-  const handler = () => { loadData(); };
+  const handler = () => loadData();
   window.addEventListener('aimeat-live-update', handler);
   return () => window.removeEventListener('aimeat-live-update', handler);
 }, []);
 ```
 
-**Exceptions (no live updates needed):**
-- Tabs showing only static/local data (e.g., access-tab with session keys)
-- Tabs that are pure navigation (e.g., portfolio-tab redirect)
-- Push notification preference tabs (user-initiated only)
+To re-fetch only when a domain you show has changed, use `onLiveUpdate(domains, fn)` from
+`/lib/live-updates.js`. It returns the cleanup function:
 
-**Currently listening (13 tabs):** agents, boards, chat-sessions, data-wallet, extensions, federation, knowledge, mcp, memory, node-stats, nodes, organisms, wallet.
+```javascript
+useEffect(() => onLiveUpdate(['agent-tasks'], () => loadTasks()), [loadTasks]);
+```
 
-**Key files:** `public/lib/live-updates.js` (SSE connection singleton), `public/views/profile.js` (event dispatcher).
+**Exceptions:** tabs that show only static or local data, tabs that only navigate, and push
+notification preference tabs.
+
+**The admin shell works differently.** `admin.js` subscribes with `onUpdate()` and reloads its
+`data` prop silently, debounced by 1.5 seconds; a tab that renders `data` is refreshed with it. The
+admin shell does not dispatch `aimeat-live-update`, so on `/v1/admin` an admin tab that loads its own
+data and listens for that event hears only the events that other modules dispatch.
+
+**Key files:** `public/lib/live-updates.js` (the connection), `public/views/profile.js` (the event
+dispatcher for the profile tabs), `public/views/admin.js` (the admin reload).

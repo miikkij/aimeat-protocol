@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 -- 2026-10-11 -- Upload and delete leave the change event to their service, which scopes
+ *     it to the owner of a file nobody else reads; the tag update scopes its own.
  *   v1.7.0 -- 2026-10-08 -- POST takes ai_provenance / ai_provenance_id (inline and presigned), and the
  *     inline write goes through services/storage-file-write.ts writeStorageFile, so the anonymous key
  *     fence and the group binding apply here as on POST /v1/storage. The answer carries `ai_provenance`.
@@ -40,7 +42,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
 import { versionedAddress } from '../../utils/http-range.js';
-import { emitChange } from '../../services/event-bus.js';
+import { emitChange, emitRecordChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
@@ -168,7 +170,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // because the document image normaliser reads its path as owner plus key.
       versioned_url: versionedAddress(pubEmbedUrl(file.ownerGaii, file.key), file),
     }));
-    emitChange('memory');
+    // No change event from here: writeStorageFile tells the streams, scoped to the file's owner
+    // when nobody else reads it.
   });
 
   // PATCH /v1/memory/files/:key/visibility — update file visibility
@@ -202,6 +205,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       key: updated.key,
       visibility: updated.visibility,
     }));
+    // Global on purpose: the file's visibility is what changed, and this route does not read what
+    // it was, so those who could read the file until now are told as well.
     emitChange('memory');
   });
 
@@ -236,7 +241,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       tags: updated.tags || [],
       created_at: updated.createdAt,
     }));
-    emitChange('memory');
+    emitRecordChange('memory', updated.ownerGaii, updated.visibility);
   });
 
   // GET /v1/memory/files — list files (owner sees all agents' files + GHII files)
@@ -329,6 +334,6 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     res.json(success(config.nodeId, { deleted: key }));
-    emitChange('memory');
+    // The change event is removeStorageFile's, scoped as the write's is.
   });
 }

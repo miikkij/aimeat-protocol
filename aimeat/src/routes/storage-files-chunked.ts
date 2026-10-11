@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   v1.4.1 -- 2026-10-11 -- The `files` change of an upload goes to the uploader's streams unless
+ *     the file is one other people read (event-bus.ts emitRecordChange). All four were global.
  *   v1.4.0 -- 2026-10-08 -- Complete takes ai_provenance / ai_provenance_id and answers with the
  *     file's `ai_provenance` block; the shared write decides the record with the completing writer.
  *   v1.3.0 -- 2026-09-29 -- A chunked upload lands bound like POST /v1/storage: init takes 'workspace'
@@ -34,7 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitRecordChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { appOwnedKeyRefusal, writeStorageFile } from '../services/storage-file-write.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
@@ -124,7 +126,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             { description: 'Upload chunk', method: 'PUT', url: `/v1/storage/upload/${uploadId}/0` },
             { description: 'Complete upload', method: 'POST', url: `/v1/storage/upload/${uploadId}/complete` },
         ]));
-        emitChange('files');
+        emitRecordChange('files', gaii, visibility ?? 'private');
     });
 
     // PUT /v1/storage/upload/:id/:chunk — upload a single chunk
@@ -177,7 +179,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             chunk_size: data.length,
             received: true,
         }));
-        emitChange('files');
+        emitRecordChange('files', upload.ownerGaii, upload.visibility);
     });
 
     // POST /v1/storage/upload/:id/complete — assemble chunks into final file
@@ -258,7 +260,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         }, [
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(file.key)}` },
         ]));
-        emitChange('files');
+        emitRecordChange('files', file.ownerGaii, file.visibility);
     });
 
     // DELETE /v1/storage/upload/:id — abort chunked upload
@@ -277,7 +279,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         await storage.deleteChunkedUpload(uploadId);
 
         res.json(success(config.nodeId, { upload_id: uploadId, aborted: true }));
-        emitChange('files');
+        emitRecordChange('files', upload.ownerGaii, upload.visibility);
     });
 
     return router;

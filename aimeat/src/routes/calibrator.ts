@@ -20,6 +20,8 @@
  *   - PUT  /v1/calibrator/:id/batches/:batchId — update batch
  *   - DELETE /v1/calibrator/:id/batches/:batchId — delete batch
  * @version-history
+ *   2026-10-11 — The `memory` change of a calibrator record, which is always private, goes to its
+ *     owner's streams only (event-bus.ts emitRecordChange). It was a global event.
  *   v1.0.0 — 2026-03-29 — Initial implementation
  *   v2.0.0 — 2026-03-29 — V2 redesign: batch-based 4-step flow
  *   v2.1.0 — 2026-07-16 — GET /:id/detail composite (project + dimensions + versions + current version +
@@ -41,7 +43,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitRecordChange } from '../services/event-bus.js';
 import { createCalibratorDetailService } from '../services/db/calibrator-detail-db-service.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
@@ -343,7 +345,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       };
       await setCalMemory(gaii, `calibrator.${projectId}.project`, project, ['calibrator', 'project']);
       res.status(201).json(success(config.nodeId, { project }));
-      emitChange('memory');
+      emitRecordChange('memory', gaii, 'private');
     }
   );
 
@@ -440,7 +442,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       if (status !== undefined) project.status = status;
       await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
       res.json(success(config.nodeId, { project }));
-      emitChange('memory');
+      emitRecordChange('memory', gaii, 'private');
     }
   );
 
@@ -455,7 +457,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         await storage.deleteMemory(gaii, m.key);
       }
       res.json(success(config.nodeId, { deleted: allKeys.length }));
-      emitChange('memory');
+      emitRecordChange('memory', gaii, 'private');
     }
   );
 
@@ -486,7 +488,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       project.currentVersion = newVersion;
       await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
       res.status(201).json(success(config.nodeId, { version }));
-      emitChange('memory');
+      emitRecordChange('memory', gaii, 'private');
     }
   );
 
@@ -569,7 +571,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
 
       await setCalMemory(gaii, `calibrator.${id}.batch.${batchId}`, batch, ['calibrator', 'batch']);
       res.status(201).json(success(config.nodeId, { batch }));
-      emitChange('memory');
+      emitRecordChange('memory', gaii, 'private');
     }
   );
 
@@ -677,7 +679,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       res.json(success(config.nodeId, { batch }));
-      emitChange('memory');
+      emitRecordChange('memory', gaii, 'private');
     }
   );
 
@@ -694,7 +696,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       }
       await storage.deleteMemory(gaii, `calibrator.${id}.batch.${batchId}`);
       res.json(success(config.nodeId, { deleted: 1 }));
-      emitChange('memory');
+      emitRecordChange('memory', gaii, 'private');
     }
   );
 

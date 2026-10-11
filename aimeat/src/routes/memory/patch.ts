@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.5.3 — 2026-10-11 — The `memory` change goes to the owner's streams when the record is one
+ *     only its owner reads, before and after the patch (event-bus.ts emitRecordChange).
  *   v1.5.2 — 2026-10-08 — The provenance stamp names the caller (resolveIdentity), not the namespace
  *     the write lands in. With owner_scope the namespace is the owner's GHII, so an agent's PATCH into
  *     its owner's records was never stamped as model-written (aiprov E5).
@@ -58,7 +60,7 @@ import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { logger } from '../../utils/logger.js';
-import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
+import { emitChange, emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
 import { reconcileAfterSourceWrite } from '../../services/exchange-projection.js';
 import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
@@ -177,12 +179,16 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // (below the loop). An attempt that loses the swap drops its own: the store is append-only, so a
     // record about bytes that never landed could not be taken back (secaudit 2026-09, N2).
     let held: AiProvenanceRecordRow[] = [];
+    // Who could read the record before this patch; a patch may move its visibility, and those who
+    // could read it until now are told it changed (event-bus.ts emitRecordChange).
+    let priorVisibility: string | undefined;
 
     for (let attempt = 0; attempt < MAX_MERGE_ATTEMPTS && !record; attempt++) {
       held = [];
       // Re-read on EVERY attempt. This is the whole point: a writer that lost the swap must merge its
       // subtree onto what the winner actually stored, not onto the stale copy it started from.
       const existing = await storage.getMemory(gaii, key);
+      priorVisibility = existing?.visibility;
 
       if (if_version !== undefined && (existing?.version ?? 0) !== if_version) {
         res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
@@ -354,7 +360,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       { description: 'Patch it again', method: 'PATCH', url: `/v1/memory/${encodeURIComponent(key)}`, example_body: { patch: { field: 'value' } } },
     ]));
 
-    emitChange('memory');
+    emitRecordChange('memory', record.ownerGaii, record.visibility, ...(priorVisibility ? [priorVisibility] : []));
     if (key.startsWith('organism.')) emitChange('organisms');
     getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
       .catch(e => logger.error('workflow event trigger (memory.patch) failed', { key, error: String(e) }));

@@ -11,6 +11,9 @@
  *     3. An app-grant stream does NOT mark the owner present. Only a real owner session may.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sse.ts
  * @version-history
+ *   v1.2.0 — 2026-10-11 — Phase 6: one owner's private record and file are not another owner's
+ *     event, a public record still is, and so is the write that takes it private. The last test
+ *     of v1.0.0 measured the leak and left it; this closes it.
  *   v1.1.0 — 2026-10-11 — A memory delete reaches the stream as `memory`, which the live library's
  *     description now states and used to deny.
  *   v1.0.0 — 2026-07-25 — Initial, with the SSE open-immediately fix + scope gate.
@@ -280,23 +283,103 @@ async function main() {
             assert(replay === 401, `the same ticket opened the stream twice: ${replay}`);
         });
 
+        const B = await register(`${user}b`);
         await test('a second owner opens THEIR OWN stream with THEIR OWN ticket', async () => {
-            // The credential half of the same question. What this deliberately does NOT assert is
-            // that owner A's writes stay off owner B's stream: they do not. Every one of the thirty
-            // `emitChange('memory')` call sites passes no owner, so a memory change is an OWNER-LESS
-            // event and routes/sse.ts forwards those to every open stream — measured here, one frame
-            // on B's stream per write by A. The owner filter that v1.4.0 added ("owner B's agent churn
-            // no longer wakes owner A") never reached the memory domain. The payload is a domain name
-            // only, but the file's own comment says why that still matters: the name plus its timing
-            // is metadata nobody consented to hand out. Left for the developer to decide, because the
-            // fix is thirty call sites, not a test.
-            const B = await register(`${user}b`);
+            // The credential half of the question. The other half is Phase 6.
             const t = await json('/v1/events/ticket', { method: 'POST', headers: { Authorization: `Bearer ${B.token}` } });
             assert(t.status === 200, `B ticket: ${t.status}`);
             const own = await openRaw(`?ticket=${t.body.data.ticket}`);
             assert(own === 200, `B could not open their own stream: ${own}`);
         });
 
+        console.log('\nPhase 6: One owner\'s private records are nobody else\'s event');
+        // Until 2026-10-11 every `memory` and `files` change was sent with no owner, so routes/sse.ts
+        // forwarded it to every open stream: one frame on B's stream for each write by A, measured
+        // here by the session that wrote this suite's v1.0.0 and left for the developer to decide.
+        // The payload is a domain name only, and the name plus its timing is still something B was
+        // never entitled to: that A, or an agent of A's, is writing right now. Decided 2026-10-11:
+        // a record only its owner reads is told to that owner's streams (event-bus.ts
+        // emitRecordChange). A record other people read stays a global event, and so does a write
+        // that takes a record away from them.
+        const authA = { Authorization: `Bearer ${A.token}` };
+        const count = (s: Stream, domain: string) => domainsSeen(s.text()).filter(d => d === domain).length;
+        // The stream coalesces for a second: a frame is waited for with waitFor, and an absence is
+        // only asserted after the window has had time to flush.
+        const SETTLE_MS = 2_500;
+        // PUT asks for the version it replaces.
+        const versionOf = async (key: string): Promise<number> => {
+            const g = await json(`/v1/memory/${key}`, { headers: authA });
+            assert(g.status === 200 && typeof g.body.data?.version === 'number', `read ${key}: ${g.status} ${JSON.stringify(g.body).slice(0, 200)}`);
+            return g.body.data.version;
+        };
+        const settle = () => new Promise(r => setTimeout(r, SETTLE_MS));
+        let other: Stream | null = null;
+        let mine: Stream | null = null;
+
+        await test('B\'s stream stays silent through A\'s private write, update, patch and delete', async () => {
+            other = await openStream(B.token);
+            mine = await openStream(A.token);
+            await other.waitFor(t => t.includes(':open'), 3_000, 'the :open comment on B');
+            await mine.waitFor(t => t.includes(':open'), 3_000, 'the :open comment on A');
+            await settle();
+            const before = count(other, 'memory');
+            const mineBefore = count(mine, 'memory');
+
+            const w = await json('/v1/memory', { method: 'POST', headers: authA, body: JSON.stringify({ key: 'sse.private.a', value: { n: 1 }, visibility: 'private' }) });
+            assert(w.status === 200 || w.status === 201, `private write: ${w.status}`);
+            const u = await json('/v1/memory/sse.private.a', { method: 'PUT', headers: authA, body: JSON.stringify({ value: { n: 2 }, version: await versionOf('sse.private.a') }) });
+            assert(u.status === 200, `private update: ${u.status} ${JSON.stringify(u.body)}`);
+            const p = await json('/v1/memory/sse.private.a', { method: 'PATCH', headers: authA, body: JSON.stringify({ patch: { m: 3 } }) });
+            assert(p.status === 200 || p.status === 201, `private patch: ${p.status} ${JSON.stringify(p.body)}`);
+            const d = await json('/v1/memory/sse.private.a', { method: 'DELETE', headers: authA });
+            assert(d.status === 200, `private delete: ${d.status}`);
+
+            // A hears their own record change, which also proves the four writes emitted at all.
+            await mine.waitFor(t => domainsSeen(t).filter(x => x === 'memory').length > mineBefore, 6_000, 'memory on A\'s own stream');
+            await settle();
+            assert(count(other, 'memory') === before,
+                `B heard ${count(other, 'memory') - before} memory frame(s) for A's private record; frames: ${JSON.stringify(domainsSeen(other.text()))}`);
+        });
+
+        await test('B\'s stream stays silent through A\'s private file upload and delete', async () => {
+            assert(!!other && !!mine, 'both streams open');
+            const before = { memory: count(other!, 'memory'), files: count(other!, 'files') };
+            const mineBefore = count(mine!, 'files');
+            const up = await json('/v1/storage', { method: 'POST', headers: authA, body: JSON.stringify({ key: 'sse/private.txt', data: b64('hello'), mime_type: 'text/plain', visibility: 'private' }) });
+            assert(up.status === 200 || up.status === 201, `private upload: ${up.status} ${JSON.stringify(up.body)}`);
+            const del = await json('/v1/storage/sse/private.txt', { method: 'DELETE', headers: authA });
+            assert(del.status === 200, `private file delete: ${del.status} ${JSON.stringify(del.body)}`);
+            await mine!.waitFor(t => domainsSeen(t).filter(x => x === 'files').length > mineBefore, 6_000, 'files on A\'s own stream');
+            await settle();
+            assert(count(other!, 'files') === before.files && count(other!, 'memory') === before.memory,
+                `B heard A's private file: ${JSON.stringify(domainsSeen(other!.text()))}`);
+        });
+
+        await test('a PUBLIC record of A\'s still reaches B, because B may read it', async () => {
+            assert(!!other, 'B stream open');
+            const before = count(other!, 'memory');
+            const w = await json('/v1/memory', { method: 'POST', headers: authA, body: JSON.stringify({ key: 'sse.public.a', value: { n: 1 }, visibility: 'public' }) });
+            assert(w.status === 200 || w.status === 201, `public write: ${w.status}`);
+            await other!.waitFor(t => domainsSeen(t).filter(x => x === 'memory').length > before, 6_000, 'memory on B for A\'s public record');
+        });
+
+        await test('taking that record private is told to B once more, and after that it is silent', async () => {
+            assert(!!other, 'B stream open');
+            await settle();
+            const before = count(other!, 'memory');
+            const u = await json('/v1/memory/sse.public.a', { method: 'PUT', headers: authA, body: JSON.stringify({ value: { n: 2 }, visibility: 'private', version: await versionOf('sse.public.a') }) });
+            assert(u.status === 200, `public to private: ${u.status} ${JSON.stringify(u.body)}`);
+            await other!.waitFor(t => domainsSeen(t).filter(x => x === 'memory').length > before, 6_000, 'memory on B when the record left public');
+            await settle();
+            const after = count(other!, 'memory');
+            const again = await json('/v1/memory/sse.public.a', { method: 'PUT', headers: authA, body: JSON.stringify({ value: { n: 3 }, version: await versionOf('sse.public.a') }) });
+            assert(again.status === 200, `private update: ${again.status}`);
+            await settle();
+            assert(count(other!, 'memory') === after, `B heard a write to a record that is private now: ${JSON.stringify(domainsSeen(other!.text()))}`);
+        });
+
+        other?.close();
+        mine?.close();
         app?.close();
         console.log(`\n${passed} passed, ${failed} failed (${passed + failed} total)`);
     } finally {

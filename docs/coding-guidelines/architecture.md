@@ -2,12 +2,12 @@
 
 ## What Is AIMEAT?
 
-**AIMEAT** (AI Memory Exchange and Action Transfer) is an open protocol for AI agent infrastructure. As of the **v4.0 spec re-baseline**, it is understood as two layers:
+**AIMEAT** (AI Memory Exchange and Action Transfer) is an open protocol for AI agent infrastructure. The v4.0 specification describes it as two layers:
 
-- **Core** — a thin, generic, federatable protocol: three principals (human GHII, agent GAII, ecosystem-app GEAI), a consent-governed memory + storage, an authorization stack (consent + access-guard + IAM + scoped delegation), collaboration primitives (organisms + workspaces), an economy of *meters* (morsels + real-currency metering) behind a non-mandatory payment interface, and federation whose live use is cross-node identity/login.
-- **Platform (aimeat.io)** — what's built on the Core: the app platform (app grants + H-2 origin isolation), the agent fleet operational plane, the sandboxed compute + metered-AI plane (extensions/cortex/scheduler/workflows), and skills/capabilities. This is where most real value lives, because AI-generated apps on generic APIs supplant purpose-built protocol features.
+- **Core**: a thin, generic protocol that nodes can federate. It has three principals (human GHII, agent GAII, ecosystem app GEAI), consent-governed memory and file storage, an authorization stack (consent, access guard, IAM and scoped delegation), collaboration primitives (organisms and workspaces), an economy of *meters* (morsels and real-currency metering) behind an optional payment interface, and federation, whose live use is cross-node identity and login.
+- **Platform (aimeat.io)**: what is built on the Core. The app platform (app grants and H-2 origin isolation), the agent fleet plane, sandboxed compute with metered AI (extensions, cortex, scheduler, workflows), and skills and capabilities. Most of the value a person gets is here, because AI-generated apps on generic APIs replace purpose-built protocol features.
 
-Canonical specs: `docs/AIMEAT-RFC-v4.0-Core-full.md` + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (see `CLAUDE.md` → Spec Documents). This repository contains both the protocol specification and the **reference implementation** (Node.js/TypeScript server, route modules listed in the current repository).
+The specification is [Core v4.0](../AIMEAT-RFC-v4.0-Core-full.md) and [Platform v4.0](../AIMEAT-RFC-v4.0-Platform-full.md), corrected by the [errata](../AIMEAT-RFC-v4.0-errata.md). The API contract is [openapi.yaml](../../openapi.yaml). This repository holds the specification and the reference implementation, a Node.js and TypeScript server under `aimeat/`.
 
 ---
 
@@ -24,66 +24,68 @@ version before choosing its authentication or delivery path.
 The identity-wallet verification path is blocked at startup. Its earlier design
 is not a deployable verification feature. See [the current status](../aimeat-eudiw-integration.md).
 
-### Identity Model — GHII, GAII, and Owners
+### Identity Model: GHII, GAII, and Owners
 
 AIMEAT has three identity layers:
 
-**Owner** — the account layer. Created during registration. Has a name, Ed25519 keypair, and roles (`owner`, `operator`). Owners can manage agents and access all their data.
+**Owner**: the account layer. Created during registration. Has a name, an Ed25519 public key and roles (`owner`, `operator`). Owners manage agents and reach all their data.
 
-**GHII (Global Human Intelligence Identifier)** — the human profile layer.
-Format: `username@node-id` (e.g., `alice@aimeat-finland-001`)
-Contains display name, bio, avatar, locale, password hash, TOTP settings. Links to an owner via `ownerName`. GHII is for display and human profile data — it is NOT used for authentication directly.
+**GHII (Global Human Intelligence Identifier)**: the human profile layer.
+Format: `username@node-id` (for example `alice@aimeat-finland-001`).
+Holds display name, bio, avatar, locale, password hash and TOTP settings. Links to an owner through `ownerName`. The GHII is also the identity a person's records are stored under (`resolveIdentity` turns the owner session's bare name into it); the session itself authenticates as the owner.
 
-**GAII (Global AI Identifier)** — the agent identity layer.
-Format: `agent#owner@node-id` (e.g., `claude#alice@aimeat-finland-001`)
-Each agent has its own Ed25519 keypair, trust score, capabilities, and scopes. The human owner's GHII holds the morsel balance; the agent balance field stays zero.
+**GAII (Global AI Identifier)**: the agent identity layer.
+Format: `agent#owner@node-id` (for example `claude#alice@aimeat-finland-001`).
+Each agent has its own Ed25519 keypair, trust score, capabilities and scopes. The human owner's GHII holds the morsel balance; an agent's balance stays zero.
 
-**Authentication rule:**
-- **Human users (GHII)** authenticate as **owners**. The JWT has `sub: username`, `roles: ['owner']`, and bypasses scope checks entirely. Owner refresh uses the session lifecycle in `routes/auth.ts`.
-- **AI agents (GAII)** authenticate as **agents** via device auth (RFC 8628). The owner approves the agent and selects scopes. The JWT has `sub: agent#owner@node`, `roles: ['agent']`, and scopes are enforced.
+**Authentication:**
+- **Human users (GHII)** authenticate as **owners**. The JWT has `sub: username` and `roles: ['owner']`, and scope checks pass for it. Owner refresh uses the session lifecycle in `routes/auth.ts`.
+- **AI agents (GAII)** authenticate as **agents** through device authorization (RFC 8628). The owner approves the agent and selects its scopes. The JWT has `sub: agent#owner@node` and `roles: ['agent']`, and scopes are enforced.
 
-**Agents are never created implicitly.** When a human registers or logs in, they get an owner session. Agents connect later through the device auth flow, where the owner explicitly approves each agent and its permissions.
+In route code, ask the caller object for these facts instead of reading the token: see [identity-model.md](identity-model.md) and `.claude/rules/security.md`.
+
+**Agents are never created implicitly.** When a human registers or signs in, they get an owner session. Agents connect later through device authorization, where the owner approves each agent and its permissions.
 
 ```
 Owner ("alice")
-├── GHII profile (alice@node — display name, bio, avatar)
+├── GHII profile (alice@node: display name, bio, avatar)
 ├── Owner JWT (sub: "alice", roles: ['owner'], scopes: ['*'])
-└── Agents (connected via device auth)
+└── Agents (connected through device authorization)
     ├── claude#alice@node (roles: ['agent'], scopes: ['memory:*', 'work:*'])
     └── cursor#alice@node (roles: ['agent'], scopes: ['memory:read'])
 ```
 
-**Agent mode** — every agent carries one of **five** modes that classifies how it is used and which Hello Integration steps apply:
+**Agent mode**: every agent carries one of **five** modes. The mode says how the agent is used and which Hello Integration steps apply (`AgentMode` in `models/agent-onboarding-schemas.ts`):
 
-- `autonomous` — runs continuously (Hermes, OpenClaw). Full 16-step Hello Integration (12 required + 4 optional).
-- `interactive` — chat/IDE session (Claude Code, Cursor, Cline). Full 16-step Hello Integration. **Default for backward compatibility** when mode is omitted.
-- `coordinator` — orchestrates other agents (Claude Desktop, LangGraph supervisor). Treated as `interactive` for onboarding.
-- `task-runner` — triggered, runs one task, exits (CrewAI crews). **7-step** flow (authenticate, identify_platform, install_skill, report_capabilities, accept_test_task, complete_test_task, publish_config). No slash-command/message/telemetry steps — but the **test-task pair is KEPT**: a runner isn't "ready" until its subprocess has executed a real test task end-to-end (that IS its capability proof).
-- `workstation` — a workstation tool visiting the node via MCP as one tool among many (VSCode, Claude Desktop), NOT node-resident. **4-step** flow (authenticate, identify_platform, report_capabilities, read_directives); the MCP round-trip is its smoke test, so no separate test task.
+- `autonomous`: runs continuously (Hermes, OpenClaw). Full 16-step Hello Integration (12 required, 4 optional).
+- `interactive`: a chat or IDE session (Claude Code, Cursor, Cline). Full 16-step Hello Integration. **The default** when the mode is omitted.
+- `coordinator`: orchestrates other agents (Claude Desktop, a LangGraph supervisor). Treated as `interactive` for onboarding.
+- `task-runner`: triggered, runs one task, exits (CrewAI crews). **7 steps**: authenticate, identify_platform, install_skill, report_capabilities, accept_test_task, complete_test_task, publish_config. It has no slash-command, message or telemetry steps, but it **keeps the test-task pair**: a runner is not ready until its subprocess has run a real test task end to end, which is its capability proof.
+- `workstation`: a tool on the person's own machine that visits the node over MCP as one tool among many (VS Code, Claude Desktop), and is not node-resident. **4 steps**: authenticate, identify_platform, report_capabilities, read_directives. The MCP round trip is its smoke test, so there is no separate test task.
 
-Mode is set at `POST /v1/agents/device-authorize` and can be changed later via `PATCH /v1/agents/:name/mode` (owner-only). It is independent of `tags` (owner-managed grouping labels) — see [agent-tags.md](agent-tags.md).
+The mode is set at `POST /v1/agents/device-authorize` and changed later with `PATCH /v1/agents/:name/mode`, by the owner or by an agent of the same owner that holds `agent:write` (a crew sets its own mode at startup this way). It is independent of `tags` (owner-managed grouping labels): see [agent-tags.md](agent-tags.md).
 
-### Economy — Meters, Not Currencies
+### Economy: Meters, Not Currencies
 
-v4.0 reframes the economy as **meters for different kinds of consumption**, not competing currencies:
-- **Morsels** — non-cryptocurrency internal token; the quality gate / steering unit (work pricing, board posts, storage overage, offer settlement, welcome bonus + daily allowance).
-- **Usage ledger** — real-currency (USD) accounting of actual LLM/model spend (`ledger.ts`, fed by agent telemetry).
-- **AI budget** — a USD cap on an owner's own LLM draw through the node's key (`ai-usage.*`).
+v4.0 describes the economy as **meters for different kinds of consumption**:
+- **Morsels**: an internal pacing unit, not a cryptocurrency. They pace what agents push into the store (work pricing, board posts, storage overage, offer settlement, welcome bonus and daily allowance).
+- **Usage ledger**: real-currency (USD) accounting of actual LLM and model spend (`ledger.ts`, fed by agent telemetry).
+- **AI budget**: a USD cap on an owner's own LLM use through the node's key (memory under `ai-usage.*`).
 
-They meter different things and coexist. The Core provides a **pluggable, non-mandatory payment interface** (intended direction: an HTTP 402 index); the operator decides whether/how to charge and owns KYC.
+They meter different things and coexist. The Core provides an **optional, pluggable payment interface** (intended direction: an HTTP 402 index); the operator decides whether and how to charge, and owns KYC.
 
-### Hints — HATEOAS for AI
+### Hints: HATEOAS for AI
 
-Every API response includes `hints.next_actions` — telling AI agents what they can do next. This is how the protocol is self-describing.
+Every API response includes `hints.next_actions`, which tells an AI agent what it can do next. This is how the protocol describes itself.
 
 ### Four Tiers of Access
 
 | Tier | Auth | Identity | Access |
 |------|------|----------|--------|
-| 0 | None | — | Public endpoints (bootstrap, spec, catalogue) |
+| 0 | None | none | Public endpoints (bootstrap, spec, catalogue) |
 | 1 | JWT (agent) | GAII | Agent-scoped operations (scopes enforced) |
-| 1 | JWT (ecosystem app) | GEAI | App-scoped operations (scopes + data-area allowlist) |
-| 2 | JWT (owner) | GHII/Owner | Full access, agent management, admin (scopes bypassed) |
+| 1 | JWT (ecosystem app) | GEAI | App-scoped operations (scopes and data-area allowlist) |
+| 2 | JWT (owner) | GHII/Owner | Full access, agent management, admin (scopes pass) |
 
 > Tier 0.5 writes and micro-memory were removed on 2026-08-23. Boards are current and were reinstated on 2026-08-30.
 
@@ -94,7 +96,7 @@ Every API response includes `hints.next_actions` — telling AI agents what they
 ```
 ┌─────────────────────────────────────────────┐
 │                  Clients                     │
-│  (AI agents, SPA portal, admin dashboard)    │
+│  (AI agents over REST and MCP, SPA portal)   │
 └──────────────┬──────────────────────────────┘
                │ HTTP/WS
 ┌──────────────▼──────────────────────────────┐
@@ -107,12 +109,12 @@ Every API response includes `hints.next_actions` — telling AI agents what they
 │                   ▼                          │
 │  ┌────────────────────────────────────────┐  │
 │  │           Route Handlers               │  │
-│  │  (~132 files in src/routes/)           │  │
+│  │  src/routes/, one file per domain      │  │
 │  └────────────────┬───────────────────────┘  │
 │                   ▼                          │
 │  ┌────────────────────────────────────────┐  │
 │  │          Business Services             │  │
-│  │  (~184 files in src/services/)         │  │
+│  │  src/services/                         │  │
 │  └────────────────┬───────────────────────┘  │
 │                   ▼                          │
 │  ┌────────────────────────────────────────┐  │
@@ -123,261 +125,250 @@ Every API response includes `hints.next_actions` — telling AI agents what they
 │  │  (Kysely; prod)  │  (better-sqlite3)   │  │
 │  └──────────────────┴─────────────────────┘  │
 └──────────────────────────────────────────────┘
-                                                
-Valid backends: PostgreSQL+Kysely (primary / production) and SQLite
-(personal + fast iteration). "In-memory" = SQLite with
-AIMEAT_SQLITE_PATH=:memory: (same code path); the old pure in-memory
-provider is deprecated. The Prisma backends (MongoDB + legacy
-Prisma-PG) were removed 2026-07-16.
 ```
+
+Two backends are valid: PostgreSQL with Kysely (production) and SQLite (personal nodes and fast iteration). An in-memory node is SQLite with `AIMEAT_SQLITE_PATH=:memory:`, on the same code path. The Prisma backends (MongoDB and legacy Prisma-PG) were removed on 2026-07-16.
+
+`src/server.ts` (`createServer()`) builds the HTTP stack, and `mountRoutes()` in `src/server-bootstrap/routes-loader.ts` mounts every router in order. Two siblings hold groups moved out of it: `routes-loader-ai.ts` and `routes-loader-outbound.ts`.
 
 ---
 
 ## Core vs Platform (v4.0 two-layer)
 
-The old "eight pillars" framing is superseded by the v4.0 Core/Platform split. Boundary test: *"would a second, different service also use this?"* → Core; aimeat.io-only → Platform. Full detail in the v4.0 spec docs.
+The boundary test is *"would a second, different service also use this?"*. If yes, it is Core; if only aimeat.io uses it, it is Platform. The v4.0 specification has the full detail. File names below are under `aimeat/src/routes/` unless the row says otherwise; a large domain has a directory of the same name beside its file.
 
 ### Core (generic, federatable protocol)
 
 | Domain | Routes | Purpose |
 |--------|--------|---------|
-| Identity (GHII/GAII/**GEAI**) | `owners.ts`, `agents.ts`, `ghii.ts`, `ecosystem-apps.ts` | Three principals; `resolveIdentity`; device auth + owner OAuth/TOTP |
-| Verification | `verification.ts`, `totp.ts`, `oauth-login.ts` | EUDIW / DID / VC / FTN identity assurance |
-| Memory & Storage | `memory.ts`, `storage-files.ts`, `schemas.ts` | Key-value + files, visibility tiers (private/owner/group/members/public/workspace), schema-lock |
-| Authorization | `consent.ts`, `access-guard` (service), `sharing-groups.ts`, IAM (service) | Consent + runtime read-guard + capability model + scoped delegation |
-| Collaboration | `organisms.ts` (+ workspaces within), `knowledge.ts`, `librarian.ts` | Organisms + **workspaces** (the shared living surface), knowledge + links |
-| Economy & Metering | `wallet.ts`, `actions.ts`, `work.ts`, `disputes.ts`, `ledger.ts` | Morsels (quality gate) + USD usage ledger; actions = backing primitive |
-| Federation | `federation*.ts`, `personal.ts`, `connect-tunnel.ts` | Peering + **cross-node identity/login** + personal/connector tunnels |
-| Observability | `stats.ts`, `admin-*` routes | Monitoring, telemetry, config |
+| Identity (GHII/GAII/**GEAI**) | `owners.ts`, `agents.ts`, `ghii.ts`, `ecosystem-apps.ts` | Three principals; `resolveIdentity`; device authorization, owner OAuth and TOTP |
+| Verification | `verification.ts`, `totp.ts`, `oauth-login.ts` | EUDIW, DID, VC and FTN identity assurance |
+| Memory and storage | `memory.ts`, `storage-files.ts`, `schemas.ts` | Key-value records and files, visibility tiers (private/owner/group/members/public/workspace), schema lock |
+| Authorization | `consent.ts`, `sharing-groups.ts`, the access guard and IAM services | Consent, runtime read guard, capability model, scoped delegation |
+| Collaboration | `organisms.ts` (workspaces inside it), `knowledge.ts`, `librarian.ts` | Organisms and **workspaces** (the shared living surface), knowledge and links |
+| Economy and metering | `wallet.ts`, `actions.ts`, `work.ts`, `disputes.ts`, `ledger.ts` | Morsels (pacing) and the USD usage ledger; actions are the backing primitive |
+| Federation | `federation*.ts`, `personal.ts`, `connect-tunnel.ts` | Peering, **cross-node identity and login**, personal-node and connector tunnels |
+| Observability | `stats.ts`, `admin-*.ts` | Monitoring, telemetry, configuration |
 
-### Platform (built on the Core — see `AIMEAT-RFC-v4.0-Platform-full.md`)
+### Platform (built on the Core: see the Platform specification)
 
 | Cluster | Routes | Purpose |
 |---------|--------|---------|
-| App platform | `apps.ts`, `app-store.ts`, `app-grants.ts`, `subdomains.ts`, `libs.ts`/`lib-*.ts` | Hosted apps, scoped grants, H-2 origin isolation, served browser SDK |
-| Agent fleet plane | `agent-onboarding.ts`, `agent-tasks.ts`, `agent-directives.ts`, `agent-telemetry.ts`, `presence.ts` | Onboard/task/direct/meter/observe real agents |
-| Compute & metered AI | `extensions.ts` (QuickJS-WASM), `cortex.ts`, `ai.ts`, `openrouter.ts`, `schedules.ts`, `workflows.ts` | Sandboxed logic, owner-LLM proxy, clock, pipelines |
-| Skills & capabilities | `skills.ts`, `capabilities.ts` | Installable competence; capability invoke + vouch |
-| Ecosystem (GEAI) | `ecosystem-apps.ts`, `ecosystem-events.ts` | External apps + event plane |
+| App platform | `apps.ts`, `app-store.ts`, `app-grants.ts`, `subdomains.ts`, `libs.ts` | Hosted apps, scoped grants, H-2 origin isolation, the served browser SDK |
+| Agent fleet plane | `agent-onboarding.ts`, `agent-tasks.ts`, `agent-directives.ts`, `agent-telemetry.ts`, `presence.ts` | Onboard, task, direct, meter and observe real agents |
+| Compute and metered AI | `extensions.ts` (QuickJS-WASM), `cortex.ts`, `ai.ts`, `openrouter.ts`, `schedules.ts`, `workflows.ts` | Sandboxed logic, owner LLM proxy, clock, pipelines |
+| Skills and capabilities | `skills.ts`, `capabilities.ts` | Installable competence; capability invoke and vouch |
+| Ecosystem (GEAI) | `ecosystem-apps.ts`, `ecosystem-events.ts` | External apps and their event plane |
 | Realtime UX | `sse.ts`, `notifications.ts`, `push.ts`, `realtime.ts`, `public-events.ts` | Live updates, push, WebRTC |
 
-**Removed:** micro-memory, OTK write routes, Generator and Foundry. The legacy Ed25519 challenge-response remains mounted but is deprecated. **Boards are current Core functionality.** App builders start with `GET /v1/prompts/build-app`.
+**Removed:** micro-memory, the OTK write routes, the Generator and the Foundry. The legacy Ed25519 challenge (`GET /v1/auth/challenge`) is still mounted and is deprecated. **Boards are current Core functionality.** App builders start with `GET /v1/prompts/build-app`.
 
 ---
 
 ## Subsystem Reference
 
-Short architectural notes on the subsystems that grew up since the original "eight pillars." Full normative detail in the v4.0 spec docs; this is the map. **The center of gravity of real usage is here, not in federation.**
+Short notes on the subsystems that carry most real use. The v4.0 specification has the normative detail; this section is the map.
 
-### Collaboration — Organisms & Workspaces (Core)
+### Collaboration: Organisms and Workspaces (Core)
 
-The substrate for nearly all shared work, built entirely on the generic memory API (no per-object-type endpoints).
-- **Organism** (`organisms.ts`) — a membership-gated group (team, club, cooperative, project); content keyed `organism.{id}.*` but owned by the contributing member's GHII.
-- **Workspace** (inside `organisms.ts`; `organism.{id}.w.{ws}.*`) — a shared, **versioned, access-gated record space**: draft → publish → version, per-workspace member grants (viewer/contributor), manifest-driven aggregated read, engagements, activity, dangling-ref scan. This is the **"shared living surface"** — humans, agents, and apps mutating the same records concurrently, fanned out by live updates.
+The base for nearly all shared work, built on the generic memory API with no per-object-type endpoints.
+- **Organism** (`organisms.ts`): a membership-gated group (team, club, cooperative, project). Content is keyed `organism.{id}.*` and owned by the contributing member's GHII.
+- **Workspace** (inside `organisms.ts`; `organism.{id}.w.{ws}.*`): a shared, **versioned, access-gated record space**. Draft, publish and version; per-workspace member grants (viewer, contributor); manifest-driven aggregated read; engagements; activity; a dangling-reference scan. This is the **shared living surface**: humans, agents and apps change the same records at the same time, and live updates fan the changes out.
 
-### Applications & the App Platform (Platform)
+### Applications and the App Platform (Platform)
 
-Hosted single-file apps that reach owner data **only** through the Core APIs under a scoped grant — never with ambient session authority.
-- **Apps** (`apps.ts`, `app-store.ts`, `app-templates.ts`, `apps-backup.ts`) — catalog, versioning, drafts, fork+lineage, store purchase (morsel-settled), backup ZIP.
-- **App grants** (`app-grants.ts`) — an OAuth/PKCE flow issuing short-lived, scoped `role:'app'` tokens that resolve to the owner's data identity but are fenced to the user-approved scopes (realizes Core "scoped delegation"). Apps are **identity-bearing principals**.
-- **H-2 origin isolation** (`subdomains.ts`) — apps run on `*.apps.<apex>`, isolated from the portal session; depends on host-only auth cookies + CSP `frame-ancestors`.
-- **Served browser SDK** (`libs.ts`, `lib-*.ts`) — the node serves `aimeat-auth/data/storage/social/wallet/organism/…` JS to apps and cortex; the de-facto AIMEAT SDK.
+Hosted single-file apps reach owner data **only** through the Core APIs under a scoped grant, never with the portal session's authority.
+- **Apps** (`apps.ts`, `app-store.ts`, `app-templates.ts`, `apps-backup.ts`): catalog, versioning, drafts, fork and lineage, store purchase, backup ZIP.
+- **App grants** (`app-grants.ts`): an OAuth/PKCE flow that issues short-lived, scoped `role:'app'` tokens. They resolve to the owner's data identity but are fenced to the scopes the user approved (the Core's scoped delegation). Apps are **identity-bearing principals**.
+- **H-2 origin isolation** (`subdomains.ts`): apps run on `*.apps.<apex>`, isolated from the portal session; this depends on host-only auth cookies and CSP `frame-ancestors`.
+- **Served browser SDK** (`libs.ts`, `libs/sdk-serve.ts`): the node serves the `aimeat-auth`, `data`, `storage`, `social`, `wallet`, `organism` and other browser libraries to apps and cortex. Their source is under `src/static/sdk-libs/`, one folder per library; the build writes `src/static/sdk-libs/dist/`.
 
-### Ecosystem Apps — GEAI (Platform)
+### Ecosystem Apps: GEAI (Platform)
 
-External applications (`ecosystem-apps.ts`, `ecosystem-events.ts`) onboarded via a device-auth-style hello→approve→token with TOFU key pinning + a scope + data-area allowlist, writing into their own `eco:` namespace and **consented like agents**. The third principal type (`eco:{app}#owner@node`); an event plane feeds the workflow engine's `ecosystem.event` trigger. Canonical guide: `docs/building-an-aimeat-compatible-ecosystem-app.md`.
+External applications (`ecosystem-apps.ts`, `ecosystem-events.ts`) onboard through a hello, approve, token flow with TOFU key pinning and a scope and data-area allowlist. They write into their own `eco:` namespace and are **consented like agents**. This is the third principal type (`eco:{app}#owner@node`). An event plane feeds the workflow engine's `ecosystem.event` trigger. Guide: [building an ecosystem app](../building-an-aimeat-compatible-ecosystem-app.md).
 
 ### Agent Fleet Plane (Platform)
 
-Where "operate real AI agents" lives — the deepest-churned cluster. The owner→agent **task** lifecycle draft→queued→active→done/failed (`agent-tasks.ts`), directives incl. the optional Secretary (`agent-directives.ts`), telemetry→ledger (`agent-telemetry.ts`), agent↔agent DMs (`agent-messages.ts`), presence (`presence.ts`), and webhooks (`agent-webhook.ts`). Fleets attach via the connector tunnel or personal node.
+Where real AI agents are operated. The owner-to-agent **task** lifecycle draft, queued, active, done or failed (`agent-tasks.ts`); directives, including the optional Secretary (`agent-directives.ts`); telemetry into the ledger (`agent-telemetry.ts`); agent-to-agent messages (`agent-messages.ts`); presence (`presence.ts`); and webhooks (`agent-webhook.ts`). Fleets attach through the connector tunnel or a personal node.
 
 #### Hello Integration (agent onboarding)
 
-An agent connects via device auth, then walks a mode-keyed onboarding step machine (`agent-onboarding.ts`, `models/agent-onboarding-schemas.ts`). The full flow is **16 steps: 12 required + 4 optional** (for `autonomous`/`interactive`/`coordinator`). Reduced flows: **`task-runner` = 7 steps** (keeps the test-task pair — see mode list above), **`workstation` = 4 steps** (auth + platform + capabilities + directives; the MCP round-trip is its smoke test). The **12 required** steps of the full flow: `authenticate` → `identify_platform` → `install_skill` → `report_capabilities` → `read_directives` → `send_test_message` → `configure_delivery` → `report_telemetry` → `accept_test_task` → `complete_test_task` → `publish_commands` → `publish_config`. The **4 optional** steps: `declare_services` + the offers ladder `declare_offerings` / `make_workflow_compatible` / `price_offer`. Readiness completes when all required steps pass; the node drives each pending step deterministically via a `step_guide`. Agent-side counterpart: `docs/building-an-aimeat-compatible-agent.md`.
+An agent connects through device authorization, then walks a mode-keyed onboarding step machine (`agent-onboarding.ts`, `models/agent-onboarding-schemas.ts`). The full flow is **16 steps: 12 required and 4 optional** (for `autonomous`, `interactive` and `coordinator`). Reduced flows: **`task-runner` has 7 steps** (it keeps the test-task pair; see the mode list above) and **`workstation` has 4** (authenticate, platform, capabilities, directives; the MCP round trip is its smoke test). The **12 required** steps of the full flow: `authenticate`, `identify_platform`, `install_skill`, `report_capabilities`, `read_directives`, `send_test_message`, `configure_delivery`, `report_telemetry`, `accept_test_task`, `complete_test_task`, `publish_commands`, `publish_config`. The **4 optional** steps: `declare_services` and the offers ladder `declare_offerings`, `make_workflow_compatible`, `price_offer`. Readiness completes when all required steps pass; the node drives each pending step with a `step_guide`. The agent-side counterpart is [the agent guide](../building-an-aimeat-compatible-agent.md).
 
-#### Capability measurement & verification (why this matters)
+#### Capability declaration and proof
 
-An agent doesn't just *claim* what it can do — it must *prove* it, which is essential for **interactive and externally-supplied agents**.
-- **Declaration** — `PUT /v1/agents/:name/capabilities` (`agent-capabilities.ts`): technical (MCP servers, skills, tools), domain expertise, languages. **MCP-type capabilities are auto-verified** because an agent session implies a live MCP connection (`verified = isAgentSession && cap.type === 'mcp'`).
-- **Proof** — the onboarding **test task** (`accept_test_task` → `complete_test_task`, steps 9–10) makes the agent actually run the real read→propose-todos→execute→complete loop over its own transport. This is the true gate. In practice this is where platforms diverge: **Grok has failed the interactive test-task proof, while Claude, CrewAI-driven agents, Hermes, and OpenClaw pass it.** Capability + trust (see Trust, above) together decide what work an agent is allowed to take.
+An agent declares what it can do and then has to prove it. This matters most for interactive agents and agents supplied by other parties.
+- **Declaration**: `PUT /v1/agents/:name/capabilities` (`agent-capabilities.ts`, written by `services/agent-profile-write.ts`): technical capabilities (MCP servers, skills, tools), domain expertise, languages. A capability of type `mcp` is marked verified when the caller is an agent session, because that session is a live MCP connection.
+- **Proof**: the onboarding **test task** (`accept_test_task` then `complete_test_task`, steps 9 and 10) makes the agent run the real read, propose todos, execute, complete loop over its own transport. This is the gate that counts. Capability and trust together decide what work an agent may take.
 
-### Agent Runtime & Desktop — crewaimeat / aimeat-agency (ecosystem)
+### Agent Runtime: the Python liaison and the desktop app
 
-The agents that connect through Hello Integration are produced and run by a companion runtime, partly in this repo and partly in a sibling repo:
-- **`python/aimeat-crewai/`** (in THIS repo) — the pip-installable **liaison/connector**: a CrewAI integration mirroring the node contract (`liaison.py`, `mcp_client.py`, `daemon.py`, `offers.py` + `workflow_spec.py`, `cli.py`). It has its own version line (tag-triggered PyPI). The **node schema wins** on any mismatch (`offer-schemas.ts`, `workflow-schemas.ts`).
-- **crewaimeat runtime** (separate repo `miikkij/crewaimeat`, local `e:/dev/GitHub/crewfive`) — the fleet runtime + a library of **crew templates** (`crews/` — app-builder, app-conductor, app-designer, extension-builder, realtime-builder, crew-forge, …) and the daemon that runs them.
-- **aimeat-agency** (`crewfive/aimeat-agency`) — a **Tauri desktop appliance** (over a local Python FastAPI) that installs agents **directly to the user's desktop**, ships **40+ ready-to-use agent/crew templates**, and connects each to a node via Hello Integration. Shipped as the signed **aimeat-desktop installer** (Authenticode via `release-desktop.yml`).
+- **`python/aimeat-crewai/`** (in this repository): the pip-installable **liaison and connector**, a CrewAI integration that mirrors the node contract (`liaison.py`, `mcp_client.py`, `daemon.py`, `offers.py`, `workflow_spec.py`, `cli.py`). It has its own version line and is published to PyPI from a tag. The **node schema wins** on any mismatch (`models/offer-schemas.ts`, `models/workflow-schemas.ts`), so keep the liaison in sync when an agent-facing contract changes (offers, workflow signals, onboarding, MCP surface).
+- **`aimeat-desktop/`** (in this repository): a Tauri desktop app. It attaches AI tools on the person's computer to their AIMEAT and can run a local node with persistent SQLite. See its [README](../../aimeat-desktop/README.md).
+- **The crew runtime** (the fleet daemon and its crew templates) lives in the sibling repository `miikkij/crewaimeat` and builds on the Python liaison.
 
-Keep the Python liaison in sync when agent-facing contracts change (offers, workflow signals, onboarding, MCP surface) — the node schema is canonical.
+### Programmable Compute and Metered AI (Platform)
 
-### Programmable Compute & Metered AI (Platform)
+- **Extensions** (`extensions.ts`): server-side action scripts in a **QuickJS-WASM** sandbox with a scoped context (memory, fetch through the SSRF guard, wallet, consent), encrypted secrets and cron. They own the `ext:{name}` namespace.
+- **Cortex** (`cortex.ts`): materializes a manifest's schemas, prompts and actions, and serves browser IIFE library bundles.
+- **Metered AI proxy** (`ai.ts`, `openrouter.ts`): the owner's encrypted LLM key exposed as a **metered, scoped, consent-gated resource** (`ai:use` scope, per-owner USD budget, provider allowlist).
+- **Scheduler** (`schedules.ts`): recurring jobs on a server-owned clock (extension, AI, agent task, ecosystem capability).
+- **Workflows** (`workflows.ts`): declared, DAG-validated agent pipelines with per-step input and output **signals** ("did it produce"); a deterministic engine with runs and cancel.
 
-- **Extensions** (`extensions.ts`) — server-side action scripts in a **QuickJS-WASM** sandbox with a scoped ctx (memory/fetch-through-SSRF-guard/wallet/consent), encrypted secrets, and cron. Own the `ext:{name}` namespace.
-- **Cortex** (`cortex.ts`) — materializes a manifest's schemas/prompts/actions and serves browser IIFE lib bundles.
-- **Metered AI proxy** (`ai.ts`, `openrouter.ts`) — the owner's encrypted LLM key exposed as a **metered, scoped, consent-gated resource** (`ai:use` scope, per-owner USD budget, provider allowlist).
-- **Scheduler** (`schedules.ts`) — recurring jobs on a server-owned clock (extension / ai / agent_task / eco-capability).
-- **Workflows** (`workflows.ts`) — declared, DAG-validated agent pipelines with per-step input/output **signals** ("did it produce"); deterministic engine with runs/cancel.
+### Economy: Offerings, Work, Tasks, Ledger
 
-### Economy — Offerings, Work, Tasks, Ledger
+The atomic primitive is an **action** (`actions.ts`, a callable unit of work). It is rarely invoked directly; the rest is built on it:
+- **Offerings** (`models/offer-schemas.ts`): the billable, discoverable face of a service (morsel-priced `callable`, workflow signals). The marketplace surface.
+- **Work queue** (`work.ts`, `disputes.ts`): escrow with settlement on delivery and a dispute state machine. Live, with little traffic.
+- **Agent tasks and engagements**: fleet assignment (above), **not** morsel-priced.
+- **Trust** (`services/trust.ts`): an automatically computed 0 to 100 reputation that gates paid actions.
+- **Ledger and metering** (`ledger.ts`): real-currency (**USD**) accounting of actual LLM spend, fed by agent telemetry. A separate *meter*, not a second currency (see "Economy: Meters, Not Currencies" above). Budgets and CSV billing export, behind the optional payment interface.
 
-The atomic primitive is an **action** (`actions.ts`, a callable unit of work); it is rarely invoked directly — everything else is a manifestation of it:
-- **Offerings** (`models/offer-schemas.ts`) — the billable, discoverable face of a service (morsel-priced `callable`, workflow signals). The marketplace surface.
-- **Work queue** (`work.ts`, `disputes.ts`) — escrow settlement-on-delivery + dispute state machine; live but low-traffic.
-- **Agent tasks / engagements** — fleet assignment (above), **not** morsel-priced.
-- **Trust** (`trust.ts`) — auto-computed 0–100 reputation, gates paid actions.
-- **Ledger / metering** (`ledger.ts`) — real-currency (**USD**) accounting of actual LLM spend, fed by agent telemetry; a separate *meter*, not a competing currency (see "Economy — Meters, Not Currencies" above). Budgets + CSV billing export behind a *pluggable, non-mandatory* payment interface.
+### Skills and Capabilities (Platform)
 
-### Skills & Capabilities (Platform)
+- **Skills** (`skills.ts`, `agent-skill-bundle.ts`): a SKILL.md pack registry (node and user scopes). Agents link skills, connectors materialize them, and per-runtime ZIP bundles download (including a claude.ai and `~/.claude/skills` form). One function, `resolveSkillRef` in `services/skills.ts`, checks access and resolves scopes, references, `@semver` pins and app-bound skills. See the [skills registry](../skills-registry.md).
+- **Capabilities** (`capabilities.ts`): an agent capability registry with discovery, an **invoke proxy**, telemetry and peer **vouch** (attestation). An action exposed as a unit others can vouch for.
 
-- **Skills** (`skills.ts`, `agent-skill-bundle.ts`) — a SKILL.md-pack registry (node + user scopes); agents link skills, connectors materialize them, per-runtime ZIP bundles download (incl. a claude.ai/`~/.claude/skills` form). One choke point `resolveSkillRef` (scopes/refs/`@semver`, app-bound skills). This is the "install competence into an AI in seconds" acceleration.
-- **Capabilities** (`capabilities.ts`) — an agent capability registry with discovery, an **invoke proxy**, telemetry, and peer **vouch** (attestation) — an action exposed as a first-class, vouchable unit.
+### Knowledge and Retrieval (Core and convenience)
 
-### Knowledge & Retrieval (Core + convenience)
-
-- **Knowledge** (`knowledge.ts`) — importable packages + a graph of typed **links** with reputation/operator review.
-- **Librarian** (`librarian.ts`) — one ranked natural-language search (FTS, not vector) across every organism + personal memory; app-grant-gated.
+- **Knowledge** (`knowledge.ts`): importable packages and a graph of typed **links** with reputation and operator review.
+- **Librarian** (`librarian.ts`): one ranked natural-language search (full-text, not vector) across every organism and personal memory; gated by app grant.
 
 ### Live Surface (Platform)
 
-`sse.ts` (authenticated, typed, owner-scoped live updates — one shared connection, subscribe via `onLiveUpdate`, never poll), `public-events.ts` (unauthenticated landing feed), `notifications.ts` (bell inbox), `push.ts` (VAPID), `realtime.ts` (WebRTC/Yjs, flagged). These make the shared living surface actually *live*.
+`sse.ts` (authenticated, typed, owner-scoped live updates: one shared connection, subscribe with `onLiveUpdate`, never poll), `public-events.ts` (the unauthenticated landing feed), `notifications.ts` (the bell inbox), `push.ts` (VAPID) and `realtime.ts` (WebRTC and Yjs, behind a flag). These make the shared living surface live.
 
-### Portal Product Surfaces (ecosystem — thin here by design)
+### Portal Product Surfaces
 
-Shipped user-facing surfaces in the portal that are *clients* of the generic APIs (hence not first-class protocol concepts), listed for completeness so the map isn't misleading:
-- **Notebook** (`notebook-tab.js`, `services/notebook-*.ts`) — free-text capture → AI classify/enrich → distribute into organisms; a primary consumer of the librarian.
-- **Living Docs** (`living.ts`) — AI author for plain-language → living-document templates.
-- **Portfolio** (`portfolio.ts`, `lib-portfolio-standalone.ts`) — per-user public portfolio builder + content catalog + themes.
-- **Matching** (`matches.ts`) — consent-gated shared-interest matching between owners (also an admin tab).
-- **Packages & Instances** (`packages.ts`, `instances.ts`) — the **package marketplace** (versioned CRUD, export/import, reviews) + install-and-track running **instances**. Distinct from knowledge/skill packs; this is the v3-era package system.
-- **Chat Sessions** (`chat-instances.ts`) — a persisted store of live chat-session registrations.
-- **Calibrator** (`calibrator.ts`) — a prompt-calibration workbench (projects/versions/batches, LLM editor, charts).
-- **Personal Access Tokens** (`access-tokens.ts`) — owner-minted PATs, a non-device-auth credential path for agents/scripts.
-- **Moderation** (`flags.ts`, `appeals.ts`) — content flagging + appeal workflow (distinct from work disputes).
-- **app-catalog** (`src/static/app-catalog/` + `app-catalog.html`) — a pre-built **esbuild** static catalog app shell, distinct from the DB-backed `apps.ts`/`app-store.ts` store; edit the sources under `src/static/app-catalog/`, not the built file.
+User-facing surfaces in the portal that are *clients* of the generic APIs, and so not protocol concepts:
+- **Notebook** (`public/views/profile/notebook-tab.js`, `services/notebook-*.ts`): free-text capture, AI classification and enrichment, then distribution into organisms. A main consumer of the librarian.
+- **Living Docs** (`living.ts`): an AI author for plain-language living-document templates.
+- **Portfolio** (`portfolio.ts`, the browser library in `src/static/sdk-libs/portfolio-standalone/`): a per-user public portfolio builder with a content catalog and themes.
+- **Packages and Instances** (`packages.ts`, `instances.ts`): the **package marketplace** (versioned CRUD, export and import, reviews) and install-and-track running **instances**. Separate from knowledge packs and skill packs.
+- **Chat Sessions** (`chat-instances.ts`): a stored list of live chat-session registrations.
+- **Calibrator** (`calibrator.ts`): a prompt-calibration workbench (projects, versions, batches, LLM editor, charts).
+- **Personal Access Tokens** (`access-tokens.ts`): owner-minted PATs, a credential path for agents and scripts outside device authorization.
+- **Moderation** (`flags.ts`, `appeals.ts`): content flagging and an appeal workflow, separate from work disputes.
+- **App catalog** (`src/static/app-catalog/` and `app-catalog.html`): a static catalog app shell built with **esbuild**, separate from the database-backed `apps.ts` and `app-store.ts`. Edit the sources under `src/static/app-catalog/`, not the built file.
 
-### Operator Admin Dashboard (the one SSR exception)
+### Operator Admin
 
-A single operator control plane (`admin-*.ts`, ~17 routes; `public/views/admin/`, ~45 tabs) — the deliberate exception to the no-SSR rule. Tab groups:
-- **Node** — Overview, Economy, Config, Security, CORS, Maintenance, Hooks, Portal, Subdomains, Statistics, Usage, System Prompts.
-- **Identity** — Owners, Agents, GHII Users, Agent Integration.
-- **Data** — Actions, Boards, Chat Instances, Realtime, Work, Direct Messages, Memory, Agent Tasks, Sharing Groups, All Capabilities, Applications.
-- **Infrastructure** — Email, Push, Consul (centralized config), Scheduler, Generator Debug.
-- **Services** — Directory, Matching, Services, Cortex Extensions, CSM Management, Knowledge, Skills, Packages.
-- **Integrations / Federation** — MSM Management, Federation, Genesis Peers.
-
-The dashboard is operator-only tooling (it does not define protocol); it exposes/curates the same generic APIs the rest of the system uses.
+The admin dashboard is SPA views under `public/views/admin/`, served by `admin.ts`, the `admin-*.ts` route files and `routes/admin/`, which answer JSON like every other route. The admin sign-in and first-run setup page is one static HTML string (`routes/admin/setup-html.ts`) that `admin.ts` sends. The admin is operator tooling and defines no protocol; it uses the same generic APIs as the rest of the system.
 
 ---
 
 ## Backend Design Principles
 
-### NO Server-Side Rendering
-
-The backend is **protocol-only**. Every route provides a generic, reusable API endpoint.
-
-**Rules:**
-1. No `res.send('<html>...')` in route handlers.
-2. Every new route must be generic — "Would a second, different service also use this endpoint?"
-3. No per-service backend files (e.g., no `portal-hobbies.ts`).
-4. Admin dashboard is the ONE exception (operator tooling).
-5. If data is available via an existing API, don't wrap it.
-
-### Generic API Design
-
-AIMEAT's architecture: **CSM defines data shape + rules → Generic APIs handle storage/consent/validation → Clients render UI.**
-
-Any service (hobby directory, marketplace, dating, news) is just a client reading a CSM definition and talking to generic APIs. No per-service backend code.
+The backend is protocol-only: no server-side rendering, every route a generic API that a second, different service could use, no per-service backend files, and no wrapper around data an existing API already returns. One capability has one implementation, whatever the interface (REST, MCP, CLI). The rules and their gates are in `.claude/rules/backend.md`.
 
 ---
 
 ## Directory Structure
 
-### Monorepo layout (top level)
+### Repository layout (top level)
 
 ```
 aimeat-protocol/                  pnpm workspace (root package.json proxies to aimeat/)
-├── openapi.yaml                  canonical API contract (OpenAPI 3.1) — keep in sync (Rule 3)
-├── CLAUDE.md                     AI-assistant instructions (mandatory rules)
-├── startup.prompt.md             paste-to-AI repo bootstrapping prompt (README-linked)
-├── .github/                      CI (ci.yml) + release workflows (release-desktop.yml)
-├── .githooks/                    pre-commit gate: lint / typecheck / typecheck:frontend /
-│                                 check:importmap / check:no-max-tokens / check:app-catalog
-├── aimeat/                       ★ the reference implementation (Node 24 / TS / Express 5)
-│   ├── src/                      backend (see tables below) — ~132 routes, ~184 services
-│   ├── public/                   Preact + HTM SPA, no build step
-│   ├── locales/                  en.json / fi.json (Rule 4: keep in sync)
-│   ├── test/                     E2E suites + run-e2e-ci.ts orchestrator
-│   ├── tools/                    dev tools (synthtraces self-play harness)
-│   ├── scripts/  bin/            build/ops scripts, `aimeat` CLI entry
-│   ├── eslint-rules/             custom lint rules (file headers, no-max-tokens)
-│   ├── Dockerfile  docker-compose.{,sqlite}.yml  (default = Postgres+Kysely)
-│   └── docs/                     implementation-local docs (integrations/…)
-├── python/aimeat-crewai/         ★ pip-installable CrewAI liaison/connector (own PyPI line)
-│   └── src/aimeat_crewai/        liaison.py, mcp_client.py, daemon.py, offers.py, cli.py
-├── aimeat-desktop/               ★ Tauri desktop app (Personal Node installer): src/ + src-tauri/
-├── packages/                     hosted app SOURCE (agent-kanban, club-board, digital-signage…)
-│                                 + build scripts (build-*.mjs); built .zip bundles are gitignored
-├── assets/                       brand/design assets, logos, mockups, screenshots
-└── docs/                         protocol spec (v4.0 Core/Platform) + coding-guidelines/ + guides
+├── openapi.yaml                  canonical API contract (OpenAPI 3.1), changed with the route
+├── CLAUDE.md, AGENTS.md          instructions for AI coding assistants
+├── startup.prompt.md             a prompt that bootstraps an AI assistant in this repository
+├── .github/workflows/            CI (ci.yml), CodeQL, release and publish workflows
+├── .githooks/                    pre-commit, pre-push, commit-msg, prepare-commit-msg
+├── aimeat/                       the reference implementation (Node 24, TypeScript, Express 5)
+│   ├── src/                      backend (table below)
+│   ├── public/                   Preact + HTM SPA, no build step (table below)
+│   ├── locales/                  en.json (source of truth), fi.json, es.json
+│   ├── test/                     E2E suites, unit tests, the run-e2e-ci.ts runner
+│   ├── scripts/                  gates, build and operations scripts
+│   ├── bin/                      the `aimeat` CLI entry
+│   ├── eslint-rules/             custom lint rules (file header, file length, layer rules)
+│   ├── security/                 ratchet ledgers the gates read
+│   ├── tools/                    developer tools (synthtraces and others)
+│   ├── docs/                     implementation-local guides
+│   └── Dockerfile, docker-compose.yml (Postgres + Kysely), docker-compose.sqlite.yml
+├── python/aimeat-crewai/         pip-installable CrewAI liaison (own version line)
+├── aimeat-desktop/               Tauri desktop app (src/ and src-tauri/)
+├── packages/                     hosted app and package SOURCE, plus build-*.mjs; built .zip files are gitignored
+├── scripts/                      repository-level scripts (git-commit.sh, gen_image.py, eval-skill.mjs)
+├── security/                     the semantic security audit rules
+├── tools/                        kits for outside tools (OpenHands, local decision models)
+├── assets/                       brand and design assets
+└── docs/                         specification, guides, coding-guidelines/
 ```
 
-The agent **runtime** (fleet daemon + 40+ crew templates) is the sibling repo `miikkij/crewaimeat` (not vendored here); `python/aimeat-crewai/` is the in-repo connector it builds on, and `aimeat-desktop` ships those agents to the user's machine.
+The pre-commit hook (`.githooks/pre-commit`) runs `pnpm lint`, `pnpm typecheck`, `pnpm typecheck:frontend`, `pnpm typecheck:sdk` and `pnpm check:silent-catch -- --strict --staged`, plus `pnpm check:notices` when `THIRD-PARTY-NOTICES.md` is staged. Everything slower runs in `pnpm gate`, once, when a piece of work is finished.
 
 ### Backend (`aimeat/src/`)
 
-| Directory | Purpose |
-|-----------|---------|
-| `auth/` | JWT, keypair generation, auth middleware, session management |
-| `cli/` | CLI wizards (init wizard, config display) |
-| `generated/` | Auto-generated types from OpenAPI spec |
-| `middleware/` | Response envelope, rate limiting, CORS, idempotency, request-id |
-| `models/` | Data model schemas |
-| `routes/` | Express route handlers (one file per domain, ~132 files) |
-| `schemas/` | JSON schema validation |
-| `server-bootstrap/` | Server initialization modules (config, services, middleware, routes) |
-| `services/` | Business logic (~184 files) |
-| `static/` | Static assets served directly |
-| `storage/` | Data layer abstraction + implementations |
-| `storage/providers/` | Database adapters (postgres-kysely, SQLite) |
-| `storage/repositories/` | Record-specific data access (36 repositories) |
-| `types/` | TypeScript type definitions |
-| `utils/` | Utilities (logger, GAII, env config, env validator) |
+| Path | Purpose |
+|------|---------|
+| `index.ts`, `index-*.ts` | CLI entry: node commands, `start`, connector dispatch |
+| `server.ts` | `createServer()`: the Express application and its middleware |
+| `config.ts`, `config-*.ts` | Configuration loading and the config type, split by area |
+| `i18n.ts` | Server-side translation and the `LOCALES` list |
+| `auth/` | JWT, keys, auth middleware, account security |
+| `cli/` | CLI wizards and commands (init wizard, config export and import, connect) |
+| `commerce/` | Payments and payouts: purchase limits, beneficiaries, order intake |
+| `data/` | Built-in data: skills, app templates, agent definitions, the appdev pitfall list |
+| `mcp/` | The node's MCP server: transport, OAuth 2.1, tool groups |
+| `middleware/` | Response envelope, the caller object, rate limiting, CORS, request id |
+| `models/` | Request and record schemas, most of them Zod |
+| `routes/` | Express route handlers, one file per domain, with a directory beside a file that grew |
+| `schemas/` | JSON Schema definitions (knowledge package manifests and entries) |
+| `server-bootstrap/` | Start-up modules: config init, service init, middleware guards, route mounting |
+| `services/` | Business logic; a service takes no Express request |
+| `static/` | Files served as they are, the app catalog sources and the browser SDK sources (`sdk-libs/`) |
+| `storage/` | The `Storage` interface (`interface.ts`) and `storage-factory.ts` |
+| `storage/types/` | Record and value types, one file per domain, re-exported by `interface.ts` |
+| `storage/repositories/` | Repository interfaces, one per record kind |
+| `storage/providers/` | The two backends: `postgres-kysely/` and `sqlite/` |
+| `tool-catalog/` | Tool names, descriptions and input schemas shared by every tool surface |
+| `tool-dispatch/` | Shared REST tool dispatch for node invoke, the connector MCP server and the CLI |
+| `types/` | Shared TypeScript declarations |
+| `utils/` | Utilities (logger, GAII helpers, env config) |
+
+`src/generated/` holds `api-types.ts`, written by `pnpm generate:types` from `openapi.yaml`. It is gitignored.
 
 ### Frontend (`aimeat/public/`)
 
-| Directory | Purpose |
-|-----------|---------|
-| `css/` | Theme + per-view scoped CSS |
-| `components/` | Shared Preact components (Alert, Card, Modal, etc.) |
-| `js/` | Shared modules (api.js, i18n.js, utils.js) |
-| `js/services/` | API service layers (admin.js) |
-| `lib/` | Self-hosted libraries (Preact, HTM, Three.js) |
-| `views/` | Lazy-loaded view modules |
-| `views/admin/` | Admin dashboard tab components |
-| `locales/` | i18n translations (en.json, fi.json) |
+| Path | Purpose |
+|------|---------|
+| `spa.html` | The SPA shell and its importmap |
+| `components/` | Shared Preact components |
+| `css/` | Theme tokens and per-view CSS |
+| `js/` | Shared modules (`api.js`, `i18n.js`, `utils.js`) and `js/services/` (API service layers) |
+| `views/` | Lazy-loaded view modules, with `views/admin/` for the operator dashboard |
+| `lib/` | Self-hosted third-party libraries (Preact, HTM and others; see `lib/VENDORED.md`) |
+| `cortex-bundled/` | Cortex packs that ship with the node |
+
+Translations are in `aimeat/locales/`, not under `public/`. See the [frontend guide](../frontend-development-guide.md).
 
 ### Documentation (`docs/`)
 
-| Directory | Purpose |
-|-----------|---------|
-| `docs/01-core.md` through `docs/09-community.md` | RFC specification sections |
+[docs/README.md](../README.md) says which document answers which question, and [docs/catalog.md](../catalog.md) lists every file with its purpose. The ones a platform developer opens most:
+
+| Path | Purpose |
+|------|---------|
+| `docs/AIMEAT-RFC-v4.0-*.md` | The specification (Core, Platform, errata) |
+| `docs/a-endpoints.md`, `docs/b-config.md` | API reference and configuration reference |
 | `docs/coding-guidelines/` | Development standards (this folder) |
 | `docs/frontend-development-guide.md` | Frontend architecture and conventions |
-| `docs/testing/` | Test plans (T-1 through T-9) |
-| `docs/plans/` | Implementation plans and roadmaps |
-| `docs/msm-examples/` | Service manifest examples |
-| `docs/mermaidjs/` | Sequence diagrams |
-| `docs/hello-world/` | Getting started guides |
+| `docs/pitfalls.md` | Traps already hit, by symptom |
+| `docs/known_gaps.md` | Deferred technical gaps |
 
 ### Tests (`aimeat/test/`)
 
-| Pattern | Purpose |
-|---------|---------|
-| `api-full.ts` | Core API integration tests (35 tests) |
-| `e2e-*.ts` | Feature-specific E2E suites (18 suites) |
-| `run-e2e-ci.ts` | CI test orchestrator |
+| Path | Purpose |
+|------|---------|
+| `e2e-*.ts` | E2E suites, one feature each |
+| `run-e2e-ci.ts` | The E2E runner; `--test=<suite>` runs one suite |
+| `api-full.ts` | Core API integration test |
+| `unit/` | Unit tests (Vitest; more sit in `src/**/__tests__/`) |
+| `helpers/`, `fixtures/` | Shared test code and data |
+| `playwright/` | Browser tests |
 | `docker/` | Containerized test runner |
-| `playwright/` | Frontend E2E tests |
+
+How to run them: [testing-requirements.md](testing-requirements.md).
 
 ---
 
@@ -385,41 +376,38 @@ The agent **runtime** (fleet daemon + 40+ crew templates) is the sibling repo `m
 
 ### Repository Pattern
 
-The storage layer uses a repository pattern with provider abstraction:
+The storage layer uses a repository pattern with a provider abstraction:
 
 ```
-Storage Interface (interface.ts)
-    ├── Repositories (36 domain-specific repos)
-    │   ├── owner.repository.ts
-    │   ├── agent.repository.ts
-    │   ├── memory.repository.ts
-    │   └── ... (33 more)
-    └── Providers (database adapters, src/storage/providers/)
-        ├── postgres-kysely (pg + Kysely; PRIMARY / production, SQL migrations on boot)
-        └── SQLite (better-sqlite3; personal + fast iteration, incl. :memory:)
+Storage interface (src/storage/interface.ts)
+    ├── Record types (src/storage/types/*.ts, re-exported by interface.ts)
+    ├── Repositories (src/storage/repositories/*.repository.ts, one per record kind)
+    └── Providers (src/storage/providers/)
+        ├── postgres-kysely: pg + Kysely; production; SQL migrations run on boot
+        └── sqlite: better-sqlite3; personal nodes and fast iteration, including :memory:
 ```
 
 ### Storage Factory
 
-`src/storage/storage-factory.ts` creates the appropriate provider based on config:
-- `AIMEAT_STORAGE=sqlite` → Better-sqlite3 (use `AIMEAT_SQLITE_PATH=:memory:` for ephemeral, same code path)
-- `AIMEAT_STORAGE=postgres-kysely` (aliases `postgres`, `postgresql`) → PostgreSQL via Kysely, `DATABASE_URL=postgresql://…`; SQL migrations run on boot
+`src/storage/storage-factory.ts` creates the provider the configuration names:
+- `AIMEAT_STORAGE=sqlite`: better-sqlite3. `AIMEAT_SQLITE_PATH=:memory:` gives an ephemeral node on the same code path.
+- `AIMEAT_STORAGE=postgres-kysely` (aliases `postgres`, `postgresql`): PostgreSQL through Kysely, `DATABASE_URL=postgresql://…`. SQL migrations run on boot.
 
-> The old pure in-memory provider is **deprecated** — SQLite `:memory:` covers the fast/ephemeral role using the real SQL code path. Valid backends: **PostgreSQL+Kysely and SQLite**; a data-model change updates both in the same commit (see storage-sync.md). `AIMEAT_STORAGE=mongodb` fails fast with migration guidance — the Prisma backends were removed 2026-07-16.
+`AIMEAT_STORAGE=mongodb` fails at start with migration guidance. A data-model change updates both backends in the same commit: see [storage-sync.md](storage-sync.md).
 
 ---
 
 ## Read-Cache Layer (`services/cache.ts`)
 
-A few read endpoints recompute the same expensive result on every page load / poll (owner usage
-summary, memory counts, catalogue scans). `services/cache.ts` is a tiny process-local TTL cache with
+A few read endpoints recompute the same expensive result on every page load or poll (owner usage
+summary, memory counts, catalogue scans). `services/cache.ts` is a small process-local TTL cache with
 tag-based invalidation that those hot paths opt into with one call. The node is a single Express
-process (federation/relay coordinate out-of-band, not via shared app cache), so a plain in-process
-`Map` is coherent — **do not** add Redis/memcached/lru-cache.
+process (federation and relay coordinate out of band, not through a shared app cache), so a plain
+in-process `Map` is coherent. **Do not** add Redis, memcached or lru-cache.
 
-**When to reach for it:** a read that (a) recurs on every load/poll and (b) is materially more
-expensive than a `Map` lookup (full scans, byte-sums, multi-query aggregation). One-off reads, writes,
-and anything not measurably hot don't need it.
+**When to use it:** a read that (a) recurs on every load or poll and (b) costs much more than a `Map`
+lookup (full scans, byte sums, multi-query aggregation). One-off reads, writes, and anything not
+measurably hot do not need it.
 
 ```ts
 import { cached, TTL } from '../services/cache.js';
@@ -428,80 +416,34 @@ const summary = await cached(`usage:${owner}`, TTL.dashboard,
   [`owner:${owner}:memory`, `owner:${owner}:files`, `domain:memory`, `domain:files`]);
 ```
 
-**Keying convention:** include the owner/GAII in the key for anything identity-scoped (one user must
-never read another's cached value); include any filter params (prefix/visibility) so different filters
-don't collide. Global (non-identity) data omits the owner segment.
+**Keys:** include the owner or GAII in the key for anything identity-scoped (one user must never read
+another's cached value), and include every filter parameter (prefix, visibility) so different filters
+do not collide. Global data omits the owner segment.
 
-**Tagging convention:** tag entries with `domain:<d>` (+ `owner:<owner>:<d>` when identity-scoped) for
-each domain whose writes should drop the entry. The event bus is wired centrally in
-`server-bootstrap/routes-loader.ts` to translate every `emitChange(domain, ownerGaii?)` into
-`invalidateTag('domain:<d>')` (plus the owner-scoped tag when the write carries an owner). TTL is the
-backstop; tags are the precise drop. Many write paths broadcast `emitChange(domain)` *without* an
-owner, so the broad `domain:<d>` tag is the safety net — always include it. Cache health
-(`entries`/`tags`/`evictions`) is exposed in `GET /v1/stats` gauges.
+**Tags:** tag entries with `domain:<d>` (and `owner:<owner>:<d>` when identity-scoped) for each domain
+whose writes should drop the entry. `initProcessBuffers()` in `server-bootstrap/process-buffers.ts`
+subscribes to the event bus and turns every `emitChange(domain, ownerGaii?)` into
+`invalidateTag('domain:<d>')`, plus the owner-scoped tag when the write carries an owner. The TTL is
+the backstop and the tags are the precise drop. Many write paths call `emitChange(domain)` *without*
+an owner, so always include the broad `domain:<d>` tag. Cache health (entries, tags, evictions) is
+in the `GET /v1/stats` gauges.
 
 ---
 
 ## Federation
 
-Nodes can federate to form a decentralized network. The default config ships **peerless**; a federated deployment is established by peering explicitly (real topology: a home/personal node ↔ aimeat.io ↔ a peer's node).
+Nodes can federate into a decentralized network. The default configuration ships **without peers**; a federated deployment peers explicitly (in practice: a home or personal node, aimeat.io, and another person's node).
 
-- **Cross-node identity/login (the live use)**: once peered, owners are recognizable on a peer and can log into each other's systems with their own credentials, subject to each node's consent + access-guard.
-- **Peering**: bilateral request → test → approve → activate → key exchange.
-- **Sync/replication**: delta catalogue sync + push/pull memory replication for `public` + federation-consented data (built, exercised once peers exist).
-- **Relay / genesis / trust broadcasts**: optional and, by default, dormant (relay is receive/settlement-side only; multi-hop not constructed). Treat as an advanced profile.
-- **Personal node / connector tunnel**: a machine behind a home connection participates via a parent tunnel (`personal.ts`) or an outbound per-principal WebSocket (`connect-tunnel.ts`) that lets a local agent fleet act through the hosted node.
+- **Cross-node identity and login (the live use)**: once peered, owners are recognized on a peer and can sign in to each other's systems with their own credentials, subject to each node's consent and access guard.
+- **Peering**: bilateral request, test, approve, activate, key exchange.
+- **Sync and replication**: delta catalogue sync and push or pull memory replication for `public` and federation-consented data (built, and exercised once peers exist).
+- **Relay, genesis and trust broadcasts**: optional and off by default. Treat them as an advanced profile.
+- **Personal node and connector tunnel**: a machine behind a home connection takes part through a parent tunnel (`personal.ts`) or an outbound per-principal WebSocket (`connect-tunnel.ts`) that lets a local agent fleet act through the hosted node.
 
 ---
 
 ## Configuration
 
-Configuration comes from multiple sources (in priority order):
+A value can come from a built-in default, a config file, an environment variable, a CLI flag, Consul or the database (what an operator saved in the admin dashboard). The order in which they override each other, and the immutable and sealed fields that stand outside that order, are in [b-config.md, "Where a value comes from"](../b-config.md#where-a-value-comes-from).
 
-1. CLI arguments (`--db postgres-kysely`, `--port 40050`)
-2. Config file (`--config production.ini`)
-3. Environment variables (`AIMEAT_*`)
-4. Consul (centralized config management)
-5. Defaults in `src/config.ts`
-
-See `.env.example` for all 80+ configuration options with documentation.
-
-See `docs/b-config.md` for the complete configuration schema reference.
-
----
-
-## Backend is protocol-only — SSR removal history
-
-The AIMEAT backend never renders HTML (see the "NO Server-Side Rendering" rule in `CLAUDE.md`). This section records how the codebase reached that state.
-
-### SSR removal — COMPLETED (2026-03-03)
-
-6 SSR backend files (~9,000 lines) were removed and replaced with static HTML files in `aimeat/public/`:
-
-| Deleted backend file | Replaced by | Lines removed |
-|---------------------|-------------|---------------|
-| `portal-hobbies.ts` | `public/hobbies.html` | 1,153 |
-| `portal-marketplace.ts` | `public/marketplace.html` | 910 |
-| `portal-human.ts` | `public/human.html` | 2,546 |
-| `profile.ts` | `public/profile.html` | 2,048 |
-| `guides.ts` | `public/guides.html` | 1,793 |
-| `aimeat-os.ts` | `public/aimeat-os.html` | 551 |
-
-**Remaining exceptions (kept intentionally):**
-- `admin-dashboard.ts` — operator tooling (will migrate to SPA later)
-- `portal.ts` — landing page entry point (serves static HTML inline at `/v1/portal`) + dev portal SSR (`?view=dev`)
-- `personal.ts` — pure JSON API, NOT SSR
-- `portal-api.ts` — pure JSON API (extracted from portal-human.ts)
-- `setup.ts` — pure JSON API for first-run node initialization
-
-**Static HTML URL routing (2026-03-04):**
-- Static HTML files in `public/` are NOT directly accessible by filename.
-- They are served inline at canonical `/v1/` URLs via backward-compatible routes in `portal.ts`.
-- Direct access to e.g. `/human.html` returns 301 redirect to `/v1/portal`.
-- Route map: `/v1/portal` → human.html, `/v1/profile` → profile.html, `/v1/guides` → guides.html, `/v1/aimeat-os` → aimeat-os.html, `/v1/hobbies` → hobbies.html, `/v1/marketplace` → marketplace.html
-
-**Phase 1 gap closure (2026-03-04):**
-- `setup.ts` + `public/wizard.html` — first-run web wizard (5-step node setup)
-- Memory `flagCount` field + `max_flags` query filter — Phase 1.5 flag integration
-- `profile.html` Data Wallet tab — consents list, audit report, GDPR export
-- `hobbies.html` #matches view — shows people with shared interests
+`aimeat/.env.example` documents every environment variable. [b-config.md](../b-config.md) is the configuration reference.

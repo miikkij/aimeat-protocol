@@ -2,36 +2,21 @@
 
 ## MANDATORY RULES (HIGH PRIORITY)
 
-### Rule 1: E2E Tests Must Pass After Major Changes
+### Rule 1: E2E tests pass on both backends before work is done
 
-**The two supported backends (post Phase 5 — the Postgres+Kysely cutover; prod runs Kysely):**
-- **PostgreSQL + Kysely** (`postgres-kysely`, `.env.test.postgres-kysely`, `src/storage/providers/postgres-kysely/`) — **the PRIMARY production backend; it MUST always pass.**
-- **SQLite** (better-sqlite3; `:memory:` via `AIMEAT_SQLITE_PATH=:memory:` for the fast-iteration role on the real prod code path) — **first-class; it MUST always pass.**
+The rule itself is in [CLAUDE.md](../../CLAUDE.md), section "Gates": E2E on both backends, targeted suites rather than the full sweep, new features ship with tests, and a failure in an area you touched means the work is not done. In practice:
 
-MongoDB and the legacy Prisma-based `postgres` provider were **removed on 2026-07-16** (no Prisma remains in the codebase). The in-memory backend's test commands were removed on 2026-10-11. **Default verification = PostgreSQL+Kysely + SQLite** (both green).
-
-When a feature, bugfix, or structural change is completed:
-
-1. **Iterate against only the suites your change can plausibly affect** — not the whole sweep. Use the filter runner:
-   ```bash
-   cd aimeat
-
-   # Single suite, fastest backend:
-   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
-
-   # Multiple suites at once:
-   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding --test=agent-skill-bundle
-   ```
-   For changes scoped to one layer (CLI-only, single route, single view), state explicitly which suites you ran and why others were not needed.
-
-2. **Finish with the affected suites on both supported backends and run `pnpm gate --postgres` once.** A full E2E sweep requires Jouni's explicit request or approval, as specified in `CLAUDE.md`; completing a multi-step plan does not authorize it.
-
-3. **Target: 0 failures in the suites you ran.**
-   - Failures in an area your change touches → change is NOT complete; fix it.
-   - Failures in an unrelated suite → verify they pre-exist on `main` in a separate clean worktree with its own test port and database. Report as pre-existing; do not change another agent's working tree or fix unrelated failures in the current work.
-   - Complicated or ambiguous → ask the user before continuing.
-
-4. **Create test environments per worktree.** Claim a free port in Lifecycle Central, then run `AIMEAT_E2E_PORT=<claimed-port> pnpm test:env:init` from `aimeat/`. Never copy `.env.test.*` from another checkout. The initializer currently honors explicit ports only from 40251 through 40499. For a higher claimed port, set both `AIMEAT_PORT` and `AIMEAT_TEST_PORT` in the test process. The runner refuses ports hard-coded by a selected suite; use another free claimed port when that happens.
+- **Both backends must pass.** PostgreSQL + Kysely (`.env.test.postgres-kysely`) is the production backend; SQLite (`.env.test.sqlite`) is the fast local one. There is no other test backend: the Prisma providers were removed on 2026-07-16 and the in-memory test commands on 2026-10-11.
+- **Run the suites your change can plausibly affect**, one or several at a time, on both backends:
+  ```bash
+  cd aimeat
+  pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
+  pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=agent-onboarding --test=agent-skill-bundle
+  ```
+  For a change scoped to one layer (CLI only, one route, one view), say which suites you ran and why the others were not needed.
+- **Finish with `pnpm gate --postgres`, once.** The full E2E sweep (`pnpm test:e2e:sqlite`, `pnpm test:e2e:postgres-kysely`, `pnpm test:e2e:all-backends`) takes about two hours and is never a routine step. In this repository it runs only when the maintainer asks for it.
+- **A failure in a suite you did not touch:** confirm it fails on `main` too, in a separate clean worktree with its own test port and database, report it as pre-existing, and leave it.
+- **Each worktree has its own test environment.** Run `pnpm test:env:init` from `aimeat/`. It writes `.env.test.sqlite` and `.env.test.postgres-kysely` from the committed `*.example` files with a port and a Postgres database derived from the worktree's name, and creates the database. Never copy `.env.test.*` from another checkout: the runner empties its database between suites, so two checkouts sharing one database wipe each other. `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force` takes a port you choose (the script accepts 40251 to 40499). Maintainer sessions take that port from their Lifecycle Central claim. The runner refuses a port that a selected suite hard-codes; choose another free port when that happens.
 
 ### Rule 1b: The guard tier is the part CI refuses to merge without
 
@@ -44,21 +29,21 @@ pnpm test:e2e:guards:sqlite
 pnpm test:e2e:guards:postgres-kysely
 ```
 
-The current suite list is `GUARD_SUITES` in the runner. It prints both suite and assertion totals; `check:doc-counts` holds the counts stated in CLAUDE.md and CI. The runner uses four lanes (`--workers=4`: four nodes, four ports, four databases, every suite alone on an empty node). Membership is one question: **does a failure here mean a principal can reach money, an identity, or another account's data that they must not?** Everything in it asserts a refusal or an isolation boundary.
+The current suite list is `GUARD_SUITES` in the runner. It prints both suite and assertion totals. The suite count is stated in `.claude/rules/testing.md` and in `ci.yml`, and `pnpm check:doc-counts` holds both to the runner. The guard scripts use two lanes (`--workers=2`: two nodes, two ports, two databases, every suite alone on an empty node). Membership is one question: **does a failure here mean a principal can reach money, an identity, or another account's data that they must not?** Everything in it asserts a refusal or an isolation boundary.
 
-- **Run it once, when the work is finished**, through `pnpm gate`, which runs the tier only when the change touched `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, `src/mcp/`, `src/middleware/`, `src/utils/`, `src/commerce/`, `src/server-bootstrap/`, `src/config.ts` or `src/config-types.ts` (`--postgres` adds the production backend; `pnpm gate:full` runs static checks, all unit tests, changed E2E suites and the guard tier on both backends; it does not run the full E2E sweep). A change elsewhere gets the static gates and the unit tests it reaches, and the tier is skipped for cause, which the plan says out loud. Not on every commit and not on every push: a day of iterative work is twenty commits, and a tier on each of them is a day lost. The pre-push hook does not run it; CI runs it on every push and blocks a merge on it, so a push that skipped the gate is caught there, after the fact, without holding anyone up.
+- **Run it once, when the work is finished**, through `pnpm gate`, which runs the tier only when the change touched `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, `src/mcp/`, `src/middleware/`, `src/utils/`, `src/commerce/`, `src/server-bootstrap/`, `src/config.ts` or `src/config-types.ts` (`--postgres` adds the production backend; `pnpm gate:full` runs static checks, all unit tests, changed E2E suites and the guard tier on both backends; it does not run the full E2E sweep). A change elsewhere gets the static gates and the unit tests it reaches, and the tier is skipped for cause, which the plan says out loud. Not on every commit and not on every push: a day of iterative work is twenty commits, and a tier on each of them is a day lost. The pre-push hook does not run it. CI runs it on every push as well, but a green `pnpm gate` is what "done" needs; do not wait for CI.
 - **A suite you fixed can be promoted into the tier after three consecutive identical green runs on each backend**, alone on a freshly cleaned test database. That is how the advisory sweep shrinks.
 - **A suite cannot be in the tier if its result depends on what ran before it.** `e2e-money-audit` and `e2e-zip-security` were held out for a day on that basis and are in now: the dependency turned out to be a defect, not a property. See the rule below.
-- **A suite that boots its own node must say where that node's data goes.** Thirteen suites call `createServer()` themselves, and `config.ts` defaults `sqlitePath` to `./data/aimeat.db` — the developer's working node. `e2e-money-audit` had been registering its accounts there for months (242 owners measured on 2026-08-15, 241 of them its own), and because the first owner on a node is promoted to operator and nobody else ever is, its first run took that role permanently and every run after it failed the same 18 assertions. The runner pins `AIMEAT_SQLITE_PATH` now, so a suite has to opt OUT of the test database rather than opt in; a suite running a SECOND node beside the runner's should still name a file of its own, because two nodes must not share one SQLite file.
+- **A suite that boots its own node must say where that node's data goes.** Some suites call `createServer()` themselves, and `config.ts` defaults `sqlitePath` to `./data/aimeat.db`, the developer's working node. `e2e-money-audit` had been registering its accounts there for months (242 owners measured on 2026-08-15, 241 of them its own), and because the first owner on a node is promoted to operator and nobody else ever is, its first run took that role permanently and every run after it failed the same 18 assertions. The runner pins `AIMEAT_SQLITE_PATH` now, so a suite has to opt OUT of the test database rather than opt in; a suite running a SECOND node beside the runner's should still name a file of its own, because two nodes must not share one SQLite file.
 - Removing an entry is a decision to stop guarding something. Say why in the commit.
 
 ### Rule 2: New Features Must Have Tests
 
-Every new feature or significant change should include E2E tests that verify it works correctly and won't break silently later. Quality over quantity — test the critical paths and edge cases.
+Every new feature or significant change includes E2E tests: the happy path and at least one failure mode. Test the critical paths and the edge cases; quality over quantity.
 
 ### Rule 3: Test Before Claiming Done
 
-Never claim a feature is "done" or "working" without running the relevant test suite. Evidence before assertions.
+Never claim a feature is "done" or "working" without running the relevant suites. Evidence before assertions.
 
 ---
 
@@ -68,41 +53,38 @@ Never claim a feature is "done" or "working" without running the relevant test s
 
 | Runner | Location | Pattern | When to Use |
 |--------|----------|---------|-------------|
-| E2E (standalone TSX) | `test/e2e-*.ts` | Custom `test()`/`assert()`, runs against live server on `:40251` | API integration tests |
+| E2E (standalone TSX) | `test/e2e-*.ts`, run by `test/run-e2e-ci.ts` | Its own `test()`/`assert()`, against the node the runner starts at `E2E_BASE` | API integration tests |
 | Unit (Vitest) | `test/unit/*.test.ts` | `describe`/`it`/`expect` | Pure functions, isolated logic |
-| Type-check | `npx tsc --noEmit` | TypeScript compiler | After every code change |
+| Type-check | `pnpm typecheck`, `pnpm typecheck:frontend`, `pnpm typecheck:sdk` | TypeScript compiler, one project each | After every code change |
 
-### E2E Test Commands
+### Commands
 
 ```bash
-# All commands from aimeat/ directory
+# All commands from the aimeat/ directory
 cd aimeat
 
-# Type-check (always run first)
-npx tsc --noEmit
+# Once per worktree: write .env.test.sqlite and .env.test.postgres-kysely
+pnpm test:env:init
+
+# Type-check (the backend, the browser code and the SDK libs are separate projects)
+pnpm typecheck && pnpm typecheck:frontend && pnpm typecheck:sdk
 
 # Unit tests
 pnpm test
 
-# E2E with PostgreSQL+Kysely -- PRIMARY / prod backend, must pass
-pnpm test:e2e:postgres-kysely
-
-# E2E with SQLite backend -- fast iteration, must pass
-pnpm test:e2e:sqlite
-
-# Both backends in one go:
-pnpm test:e2e:all-backends      # SQLite + PostgreSQL+Kysely, full sweep each
-
-# Run a single suite (preferred during iteration -- much faster than the full sweep):
+# One or more E2E suites (the normal check during iteration)
 pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
+pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=agent-onboarding
 
-# Or via the filter alias (uses whichever env-file is currently set):
-pnpm test:e2e:ci:filter -- --test=security
+# The finish line for a piece of work
+pnpm gate --postgres
 ```
+
+`--test=<name>` matches a suite by its file name without `test/` and `.ts`, with or without the `e2e-` prefix (`--test=owner-home` runs `test/e2e-owner-home.ts`). An exact name wins over a substring, and a substring that matches more than one suite is an error.
 
 ### E2E Test Suites
 
-`ALL_SUITES` in `aimeat/test/run-e2e-ci.ts` is the current runnable inventory; `GUARD_SUITES` is its blocking subset. Register new standalone suites in the runner. Use `--test=<name>` for targeted verification.
+`ALL_SUITES` in `aimeat/test/run-e2e-ci.ts` is the current runnable inventory; `GUARD_SUITES` is its blocking subset. The runner compares `ALL_SUITES` with the files in `test/`: a suite file on no list fails a full run and warns on a filtered one. A `.ts` file in `test/` that is not a suite is named in `NOT_SUITES` with the reason.
 
 ### Storage conformance
 
@@ -112,149 +94,64 @@ pnpm test:e2e:ci:filter -- --test=security
 
 ## Writing E2E Tests
 
-### E2E Test Template
+### The model suite
 
-All E2E tests follow the same self-contained pattern:
+Copy a current suite rather than a template. **`test/e2e-owner-home.ts`** is short and shows every part a suite needs:
 
-```typescript
-// Description of what this test suite covers
-// Run: cd aimeat && pnpm exec tsx test/e2e-my-feature.ts
-// Requires: server running on port 40251
+- it reads `E2E_BASE` and `E2E_NODE_ID` from the environment (the runner sets `E2E_BASE` to the node it started; the `localhost:40251` fallback is for running the file by hand against a node you started yourself);
+- it defines its own `test()`, `assert()` and `json()` helpers;
+- `setupOwner()` registers an owner with `POST /v1/ghii` (`username`, `display_name`, `password`) and gets a session token;
+- **sign in with the password in a new suite**: `POST /v1/ghii/login` with `username` and `password` returns the token in `data.token`, as `test/e2e-data-wallet-page.ts` does. `e2e-owner-home.ts` and most older suites still sign `name + NODE_ID + timestamp` with the owner's private key and call `POST /v1/auth/token`. That is the owner-key login, which is deprecated (`AIMEAT_OWNER_KEY_LOGIN`) and removed in 4.0.0, so do not copy that part;
+- it tests the happy path, the parity with the endpoints it replaces, and the refusal (`401` without a token);
+- it deletes its owner at the end with `DELETE /v1/owners/:name` and the owner's Bearer token (the route requires a local owner session; no signature header);
+- it exits non-zero when any test failed.
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-
-let passed = 0;
-let failed = 0;
-
-async function test(name: string, fn: () => Promise<void>) {
-  try {
-    await fn();
-    passed++;
-    console.log(`  ✅ ${name}`);
-  } catch (err: any) {
-    failed++;
-    console.error(`  ❌ ${name}: ${err.message}`);
-  }
-}
-
-function assert(cond: boolean, msg: string) {
-  if (!cond) throw new Error(msg);
-}
-
-async function json(path: string, opts: RequestInit = {}) {
-  const res = await fetch(`${BASE}${path}`, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
-  });
-  const ct = res.headers.get('content-type') ?? '';
-  const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
-  return { status: res.status, body, headers: res.headers };
-}
-
-// Ed25519 signing helper (if needed)
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.etc.sha512Sync = (...m: Uint8Array[]) =>
-  new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-  const privKey = Buffer.from(privateKeyB64, 'base64');
-  const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-  return Buffer.from(sig).toString('base64');
-}
-
-// ─── State ───
-const ownerName = `test-owner-${Date.now()}`;
-let ownerToken = '';
-let ownerPrivKey = '';
-
-// ─── Setup ───
-async function setup() {
-  console.log('\n📋 My Feature E2E Tests');
-  console.log(`   Base: ${BASE}\n`);
-
-  // Register owner
-  const reg = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: ownerName }),
-  });
-  assert(reg.status === 201, `Owner registration failed: ${reg.status}`);
-  ownerToken = reg.body.data.token;
-  ownerPrivKey = reg.body.data.keys.privateKey;
-}
-
-// ─── Tests ───
-async function run() {
-  await setup();
-
-  await test('my feature works correctly', async () => {
-    // Test implementation
-  });
-
-  // ─── Cleanup ───
-  const sig = await signMsg(ownerPrivKey, ownerName);
-  await json(`/v1/owners/${ownerName}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${ownerToken}`, 'x-signature': sig },
-  });
-
-  // ─── Summary ───
-  console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
-  process.exit(failed > 0 ? 1 : 0);
-}
-
-run().catch(err => { console.error(err); process.exit(1); });
-```
+A suite that needs two accounts calls `setupOwner()` twice (`test/e2e-memory-discover.ts` does). A suite that needs helpers beyond that takes them from `test/helpers/` (for example `wait-for-server.ts`, `node-entry.ts`, `fake-ai-provider.ts`, `fake-smtp.ts`).
 
 ### Conventions
 
-1. **Self-contained**: Each test file registers its own owner/agents and cleans up via cascade delete at the end.
-2. **Unique names**: Use `Date.now()` suffix for owner/agent names to avoid collisions.
-3. **Sequential**: Tests run sequentially within a file (no parallel test execution).
-4. **Fetch-based**: Use the `json()` helper for all HTTP calls.
-5. **Timing**: For TTL tests, use short durations (milliseconds/seconds) to keep tests fast.
-6. **Exit code**: `process.exit(failed > 0 ? 1 : 0)` — non-zero on any failure.
+1. **Self-contained**: each suite registers its own owners and agents and deletes its owners at the end.
+2. **Unique names**: a `Date.now()` suffix on owner and agent names avoids collisions.
+3. **Sequential**: tests run in order within a file.
+4. **Fetch-based**: all HTTP calls go through the suite's `json()` helper.
+5. **Timing**: TTL tests use short durations (milliseconds or seconds).
+6. **Exit code**: `process.exit(failed > 0 ? 1 : 0)`.
 
 ### Adding a New E2E Suite
 
-1. Create `test/e2e-my-feature.ts` following the template above.
-2. Add to `ALL_SUITES` array in `test/run-e2e-ci.ts`.
-3. Add npm scripts to `package.json`:
-   ```json
-   "test:e2e:my-feature": "tsx test/e2e-my-feature.ts",
-   "test:e2e:docker:my-feature": "bash test/docker/e2e-runner.sh test/e2e-my-feature.ts"
+1. Create `test/e2e-my-feature.ts`, starting from `test/e2e-owner-home.ts`. Give it the standard file header and a `// Run:` line with its `--test=` command.
+2. Add `'test/e2e-my-feature.ts'` to `ALL_SUITES` in `test/run-e2e-ci.ts`, and add a version-history line to the runner's header. Do not add it to `GUARD_SUITES`; a suite earns that (Rule 1b).
+3. Run it on both backends:
+   ```bash
+   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=my-feature
+   pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=my-feature
    ```
-4. Run on all backends to verify.
+
+A suite needs no `package.json` script. `pnpm check:package-scripts` refuses a script that points at a missing file.
 
 ### Multi-Backend Testing
 
-Tests must pass on the **persistent** storage backends:
+| Backend | Env file | Notes |
+|---------|----------|-------|
+| **PostgreSQL + Kysely** | `.env.test.postgres-kysely` | **Production backend; must always pass.** Migrations run on boot; the runner empties the database between suites. |
+| **SQLite** | `.env.test.sqlite` | **First-class; must always pass.** Fast iteration on the same SQL code path. |
 
-| Backend | Env File | Command | Notes |
-|---------|----------|---------|-------|
-| **PostgreSQL + Kysely** | `.env.test.postgres-kysely` | `pnpm test:e2e:postgres-kysely` | **PRIMARY / prod backend — must always pass.** Recreate the test DB before a full run (schema drops + migrations re-run on boot). |
-| **SQLite** | `.env.test.sqlite` | `pnpm test:e2e:sqlite` | **First-class — must always pass.** Fast iteration; set `AIMEAT_SQLITE_PATH=:memory:` for in-memory speed on the real SQL code path. |
-
-There is no in-memory test backend: SQLite `:memory:` covers that role on the production code path.
-
-The CI runner (`test/run-e2e-ci.ts`) handles server lifecycle automatically — it starts the server, runs the requested suites, then shuts down.
+Both env files come from `pnpm test:env:init`. The runner (`test/run-e2e-ci.ts`) starts the node, runs the requested suites, and stops it.
 
 ---
 
 ## When to Run What
 
-Default is **scoped, not exhaustive** — run the minimum that gives confidence in the change. Full sweeps belong at the end of a plan, not during iteration.
+Default is **scoped, not exhaustive**: run the minimum that gives confidence in the change.
 
 | Situation | What to Run |
 |-----------|-------------|
-| After any code change | `npx tsc --noEmit` + `pnpm lint` |
-| After changing a single route/service | `--test=<suite>` for the affected suite(s) on SQLite |
+| After any code change | `pnpm typecheck` (plus `typecheck:frontend` or `typecheck:sdk` for those areas) and `pnpm lint` |
+| After changing a single route or service | `--test=<suite>` for the affected suites on SQLite |
 | After changing a CLI subcommand | The CLI's own integration test, if any. Server suites do not exercise CLI code. |
-| After changing storage layer | Affected suites and storage conformance on both backends; finish with `pnpm gate --postgres` |
-| Before claiming a feature is done | The affected suites on PostgreSQL+Kysely **and** SQLite |
-| End of a multi-step plan | Affected suites on both backends and the final gate; full sweep only with Jouni's authorization |
-| Before claiming completion | Relevant checks on both backends, final gate, and green CI for the pushed commit |
+| After changing the storage layer | The affected suites and storage conformance on both backends; finish with `pnpm gate --postgres` |
+| Before claiming a feature is done | The affected suites on PostgreSQL + Kysely **and** SQLite, then `pnpm gate --postgres` once |
+| The full E2E sweep | Only when the maintainer asks for it |
 
 ---
 
@@ -262,23 +159,23 @@ Default is **scoped, not exhaustive** — run the minimum that gives confidence 
 
 ### What Makes a Good Test
 
-- **Tests the contract**, not the implementation — verify API responses, status codes, and side effects.
-- **Tests edge cases** — empty inputs, maximum values, unauthorized access, concurrent operations.
-- **Tests error paths** — invalid inputs should return proper error codes, not 500s.
-- **Is deterministic** — no flaky timing dependencies, no reliance on external state.
-- **Cleans up after itself** — cascade delete owners at the end.
+- **Tests the contract**, not the implementation: verify API responses, status codes, and side effects.
+- **Tests edge cases**: empty inputs, maximum values, unauthorized access, concurrent operations.
+- **Tests error paths**: invalid inputs return proper error codes, not 500s.
+- **Is deterministic**: no timing dependencies, no reliance on external state.
+- **Cleans up after itself**: delete the suite's owners at the end.
 
 ### Test Grouping
 
-Group tests logically within a file:
-1. **Setup phase** — register owners, agents, create test data
-2. **Happy path tests** — normal operations work correctly
-3. **Authorization tests** — wrong role/token gets 401/403
-4. **Edge case tests** — boundary conditions, empty data, large payloads
-5. **Cleanup phase** — delete test data
+Group tests within a file:
+1. **Setup**: register owners and agents, create test data
+2. **Happy path**: normal operations work
+3. **Authorization**: the wrong role or token gets 401/403
+4. **Edge cases**: boundary conditions, empty data, large payloads
+5. **Cleanup**: delete test data
 
 ### Coverage Goals
 
-- Every API endpoint should be tested by at least one E2E suite.
-- Every authorization boundary should be tested (owner vs agent vs anonymous vs operator).
-- Every storage operation must work on both backends (PostgreSQL+Kysely + SQLite).
+- Every API endpoint is tested by at least one E2E suite.
+- Every authorization boundary is tested (owner, agent, anonymous, operator).
+- Every storage operation works on both backends (PostgreSQL + Kysely and SQLite).

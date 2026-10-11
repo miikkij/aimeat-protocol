@@ -18,9 +18,13 @@ Set at registration (`POST /v1/agents/device-authorize`, body field `mode`) and 
 
 Existing agents (created before this field existed) default to `interactive` -- they already went through the full flow. New agents declare a mode at registration; if omitted, the server treats it as `interactive`.
 
+## Run mode (how the agent is run)
+
+Field: `AgentRecord.runMode: 'spawn' | 'resident' | null` (`src/storage/types/identity.ts`). `spawn` means the agent is data on the node until work arrives, and its runtime starts a worker for the job; `resident` means the runtime keeps the agent running. The node stores and shows the value and does not enforce it: only the runtime can honour it. Absent means nobody has said, which is not the same as `spawn`; `null` on an update clears it. The owner sets it with `PATCH /v1/agents/:name/run-mode` (body `{ run_mode }`, needs `agent:write`) or the MCP tool `aimeat_agent_run_mode_set`. A runtime reads its roster with `GET /v1/agents?run_mode=spawn`. Run mode and mode are independent: mode says what kind of agent it is, run mode says how its process lives.
+
 ## Tags (owner labels)
 
-Field: `AgentRecord.tags: string[]` (already existed -- this work surfaces them in the UI). Each tag is a lowercase string matching `^[a-z0-9][a-z0-9._:-]{0,63}$` (colons allowed, `@` excluded), max 20 tags per agent.
+Field: `AgentRecord.tags: string[]`. Each tag is a lowercase string matching `^[a-z0-9][a-z0-9._:-]{0,63}$` (colons allowed, `@` excluded), max 20 tags per agent.
 
 ### Conventions
 
@@ -41,13 +45,15 @@ Common combos: `crew:* + role:*` lets the owner see "everyone in the marketing c
 - MCP: `aimeat_agent_tags_set` -- replaces the tag list.
 - REST: `PATCH /v1/agents/:name/tags` body `{ tags: string[] }`.
 
-**Auth: same-owner.** The owner may tag any of their agents; an agent may set tags on
-itself or a same-owner sibling (the same self-report pattern as
-`aimeat_agent_capabilities_report`). Cross-owner is rejected. Crew scaffolds rely on this
-to self-tag (e.g. `concierge`, `web-search`, `vision`) on every start, which feeds
-tag-based discovery/matching. Contrast with **mode**, which stays owner-only (`PATCH /mode`).
+**Auth: same-owner.** The owner may tag any of their agents. An agent may set tags on
+itself without any scope, and on a same-owner sibling only when it holds `agent:write`
+(`requireScopeUnlessSelf('agent:write')` on `PATCH /v1/agents/:name/tags` in
+`src/routes/agents/profile-metadata.ts`; the rule is `src/auth/self-or-scope.ts`).
+Cross-owner is rejected. Crew scaffolds rely on this to self-tag (e.g. `concierge`,
+`web-search`, `vision`) on every start, which feeds tag-based discovery/matching. Contrast
+with **mode**, which needs `agent:write` even on the agent's own record (`PATCH /mode`).
 
-> Validation: tags match `^[a-z0-9][a-z0-9._:-]{0,63}$` — lowercase alphanumerics plus `.`, `_`,
+> Validation: tags match `^[a-z0-9][a-z0-9._:-]{0,63}$`: lowercase alphanumerics plus `.`, `_`,
 > `:`, `-`. Colons are allowed so the `prefix:value` facets above (`source:crewai`, `role:editor`)
 > validate and compose with `aimeat_discover`'s `tags` CSV filter (`tags=source:crewai,role:editor`,
 > AND semantics). `@` is excluded so a tag can never be mistaken for a GAII.
@@ -66,5 +72,5 @@ The filter applies before grouping. Filtering to a tag and then grouping by mode
 ## Don't
 
 - Don't make tags carry semantics the backend depends on (e.g. don't gate scopes by `tag === 'admin'`). Tags are owner UI labels only.
-- Don't use mode for grouping things tags should handle (which crew, which project). Mode is one-of-four, tags are free-form.
-- Don't add a fifth mode without a corresponding doc + UI + onboarding-step decision in the same PR.
+- Don't use mode for grouping things tags should handle (which crew, which project). Mode is one of five, tags are free-form.
+- Don't add another mode without a corresponding doc + UI + onboarding-step decision in the same change.
