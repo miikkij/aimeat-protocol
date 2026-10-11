@@ -8551,6 +8551,8 @@
     "savedChanges": "Cambios guardados",
     "cfgReadOnlyBanner": "Este nodo guarda los datos en memoria. No se puede editar la configuración.",
     "cfgSealed": "(lo fija quien administra esto para ti)",
+    "cfgRangeRecommended": "recomendado {range}",
+    "cfgRangeLimit": "permitido {range}",
     "cfgSealedBanner": "Algunos ajustes de aquí los fija quien administra esto para ti. Puedes ver cuáles son; para cambiarlos, habla con ellos.",
     "cfgReadOnlyHelpTitle": "¿Por qué es de solo lectura?",
     "cfgReadOnlyHelpDetail": "Para que la configuración persista hace falta una base de datos (PostgreSQL o SQLite). Un nodo en memoria pierde todo al reiniciar. Configura este nodo por el archivo .env, aimeat.ini, aimeat.json, o por argumentos de la CLI (aimeat start --db sqlite).",

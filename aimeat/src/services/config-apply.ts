@@ -11,6 +11,8 @@
  * @structure ConfigChange · ConfigApplyResult · applyConfigChanges(deps, changes)
  * @usage const r = await applyConfigChanges({ config, storage, provenance }, [{ path, value }]);
  * @version-history
+ *   v1.3.0 — 2026-10-11 — A refused value on a setting whose range is a recommendation is answered
+ *     with the minimum, not with the range as if it were a limit.
  *   v1.2.0 — 2026-10-09 — A secret row is stored encrypted with the node key (config-at-rest.ts); it
  *     went into SystemSetting in plain text (secrets audit 2026-10-09, S4b).
  *   v1.1.0 — 2026-10-02 — The four settings in RANGE_ENFORCED are refused outside their stated
@@ -24,7 +26,7 @@ import type { ConfigProvenance } from './config-provenance.js';
 import { MUTABLE_CONFIG_MAP, serializeConfigValue, readConfigField, writeConfigField } from './config-schema.js';
 import { isSecretField } from './config-sealing.js';
 import { sealSettingForStorage } from './config-at-rest-rows.js';
-import { withinStatedRange, RANGE_ENFORCED } from './config-schema-validators.js';
+import { withinStatedRange, RANGE_ENFORCED, rangeKindOf, numericRangeOf } from './config-schema-validators.js';
 import { logger } from '../utils/logger.js';
 
 export interface ConfigChange { path?: unknown; value?: unknown }
@@ -55,7 +57,12 @@ export async function applyConfigChanges(
         // `validate` checks the type and mostly only the lower bound; for the settings in
         // RANGE_ENFORCED the row's `range` is a limit, so a value outside it is refused here too.
         if (!mapping.validate(value) || (RANGE_ENFORCED.has(path) && !withinStatedRange(mapping, value))) {
-            errors.push({ path, reason: `Invalid value for ${path}${mapping.range ? ` (range ${mapping.range})` : ''}` });
+            // A recommended range has no maximum to break, so the reason names the minimum, the only
+            // bound the value can have missed; a limit names the whole range.
+            const min = rangeKindOf(mapping) === 'recommended' ? numericRangeOf(mapping)?.min : undefined;
+            const hint = min !== undefined ? ` (the minimum is ${min}; ${mapping.range} is the recommended range)`
+                : mapping.range ? ` (range ${mapping.range})` : '';
+            errors.push({ path, reason: `Invalid value for ${path}${hint}` });
             continue;
         }
         const oldValue = readConfigField(config, mapping);

@@ -18,6 +18,8 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.9.0 -- 2026-10-11 -- GET serves `rangeKind` on a number field with a range: `limit` when a
+ *     larger value is refused, `recommended` when it is accepted (rangeKindOf).
  *   v1.8.0 -- 2026-10-09 -- POST /v1/admin/consul/export leaves the secret rows out unless the body
  *     says include_secrets: true, and answers secrets_skipped (services/consul-export.ts, shared with
  *     the CLI); the Consul import stores a secret row encrypted (secrets audit 2026-10-09, S3, S4b).
@@ -53,6 +55,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, readConfigField } from '../services/config-schema.js';
+import { rangeKindOf } from '../services/config-schema-validators.js';
 import { planConsulExport } from '../services/consul-export.js';
 import { sealSettingForStorage } from '../services/config-at-rest-rows.js';
 import { applyConfigChanges, type ConfigChange } from '../services/config-apply.js';
@@ -77,7 +80,7 @@ export function adminConfigRouter(
     router.get('/v1/admin/config', requireAuth(), requireOperator(storage), async (_req, res) => {
         const editable = storage.supportsConfigPersistence();
         type SchemaEntry = {
-            value: unknown; type: string; description: string; range?: string; choices?: readonly string[];
+            value: unknown; type: string; description: string; range?: string; rangeKind?: 'limit' | 'recommended'; choices?: readonly string[];
             mutable: boolean; editable: boolean; path: string;
             source?: string; canReset?: boolean; sealed?: boolean;
         };
@@ -113,11 +116,15 @@ export function adminConfigRouter(
             // operator is entitled to see what their limits are, only not to move them.
             const sealed = isSealed(config, field.dotPath);
             const src = sealed ? 'sealed' : (provenance?.getSource(field.dotPath) ?? 'default');
+            // A number's range is a limit (a larger value is refused) or a recommendation (a larger
+            // value is accepted); the page words the range by it.
+            const rangeKind = rangeKindOf(field);
             schema[field.dotPath] = {
                 value: readConfigField(config, field),
                 type: typeStr,
                 description: field.description,
                 ...(field.range ? { range: field.range } : {}),
+                ...(rangeKind ? { rangeKind } : {}),
                 ...(field.choices ? { choices: field.choices } : {}),
                 mutable: !field.immutable && !sealed,
                 editable: editable && !field.immutable && !sealed,

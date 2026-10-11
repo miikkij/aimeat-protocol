@@ -12,7 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
- *   v1.28.1 — 2026-10-10 — The descriptions say the versions: realtime.turn_username and turn_credential are removed in 4.0.0; federation.audience_required is on by default from 3.27.0 and the older message format is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23, I22).
+ *   v1.29.0 — 2026-10-11 — Fifteen capacity rows lose their upper bound, so their `range` is a recommendation and a larger number is accepted (Jouni, 2026-10-11; the list is in docs/b-config.md). The rate-limit rows moved to config-schema-rate-limits.ts unchanged (max-file-lines).
+ *   v1.28.1 — 2026-10-10 —The descriptions say the versions: realtime.turn_username and turn_credential are removed in 4.0.0; federation.audience_required is on by default from 3.27.0 and the older message format is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23, I22).
  *   v1.28.0 — 2026-10-09 — security.ws_query_token (AIMEAT_WS_QUERY_TOKEN), mutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, d3).
  *   v1.27.0 — 2026-10-09 — The document signing rows (config-schema-docsign.ts), beside identity verification.
  *   v1.26.0 — 2026-10-09 — security.owner_key_login (AIMEAT_OWNER_KEY_LOGIN), immutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, S2).
@@ -99,6 +100,7 @@ import { DOCSIGN_CONFIG_FIELDS } from './config-schema-docsign.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
+import { RATE_LIMIT_CONFIG_FIELDS } from './config-schema-rate-limits.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -199,7 +201,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Version shown on the privacy policy and the terms. Raise it whenever their substance changes' },
 
   ...MORSEL_CONFIG_FIELDS,
-  { key: 'appAuditKeepDefault', dotPath: 'apps.audit_keep_default', envVar: 'AIMEAT_APP_AUDIT_KEEP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 1000000, immutable: false, description: 'Entries of each app\'s audit log an owner keeps when they set no limit of their own (0 = all)', range: '0-1000000' },
+  { key: 'appAuditKeepDefault', dotPath: 'apps.audit_keep_default', envVar: 'AIMEAT_APP_AUDIT_KEEP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Entries of each app\'s audit log an owner keeps when they set no limit of their own (0 = all)', range: '0-1000000' },
   { key: 'boardPublicPerOwnerMax', dotPath: 'boards.public_per_owner_max', envVar: 'AIMEAT_BOARD_PUBLIC_PER_OWNER_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Public notice boards one account may keep (system boards stay operator-only)', range: '0-1000' },
 
   // ── Auth (mutable) ──
@@ -237,20 +239,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
   { key: 'federationRelayClaim', dotPath: 'federation.relay_claim', envVar: 'AIMEAT_FEDERATION_RELAY_CLAIM', type: 'string', ...oneOf('optional', 'required'), immutable: false, description: "Must an inbound relayed request carry a signed relay claim? 'required' refuses one without; 'optional' lets an older peer through and is a migration position rather than protection. The default is 'required' from 3.20.0; 'optional' is still taken when set, and is removed in 4.0.0. Until then one peer can keep its own answer (relay_claim on the peer), and the federation overview names the peers that still relay without a claim", range: 'optional | required' },
 
-  // ── Rate Limits (mutable, per-endpoint with global fallback) ──
-  { key: 'rlGlobal', dotPath: 'rate_limits.global', envVar: 'AIMEAT_RL_GLOBAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Global rate limit (requests/second)', range: '1-10000' },
-  { key: 'rlAuth', dotPath: 'rate_limits.auth', envVar: 'AIMEAT_RL_AUTH', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Auth endpoint rate limit (req/s)', range: '1-10000' },
-  { key: 'rlWork', dotPath: 'rate_limits.work', envVar: 'AIMEAT_RL_WORK', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Work queue rate limit (req/s)', range: '1-10000' },
-  { key: 'rlMemory', dotPath: 'rate_limits.memory', envVar: 'AIMEAT_RL_MEMORY', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Memory read/write rate limit (req/s)', range: '1-10000' },
-  { key: 'rlBoards', dotPath: 'rate_limits.boards', envVar: 'AIMEAT_RL_BOARDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Board endpoint rate limit (req/s)', range: '1-10000' },
-  { key: 'rlOwners', dotPath: 'rate_limits.owners', envVar: 'AIMEAT_RL_OWNERS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Owner endpoint rate limit (req/s, default: global)', range: '1-10000' },
-  { key: 'rlGhii', dotPath: 'rate_limits.ghii', envVar: 'AIMEAT_RL_GHII', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Identity (GHII) rate limit (req/s, default: global)', range: '1-10000' },
-  { key: 'rlFlags', dotPath: 'rate_limits.flags', envVar: 'AIMEAT_RL_FLAGS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Content flagging rate limit (req/s, default: global)', range: '1-10000' },
-  { key: 'rlAppeals', dotPath: 'rate_limits.appeals', envVar: 'AIMEAT_RL_APPEALS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Flag appeals rate limit (req/s, default: global)', range: '1-10000' },
-  { key: 'rlAdminSetup', dotPath: 'rate_limits.admin_setup', envVar: 'AIMEAT_RL_ADMIN_SETUP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Admin setup rate limit (req/s, default: global)', range: '1-10000' },
-  { key: 'rlFederation', dotPath: 'rate_limits.federation', envVar: 'AIMEAT_RL_FEDERATION', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Federation peering rate limit (req/s, default: global)', range: '1-10000' },
-  { key: 'rlCatalogue', dotPath: 'rate_limits.catalogue', envVar: 'AIMEAT_RL_CATALOGUE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Catalogue search rate limit (req/s, default: global)', range: '1-10000' },
-  { key: 'rlAuthChallenge', dotPath: 'rate_limits.auth_challenge', envVar: 'AIMEAT_RL_AUTH_CHALLENGE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Auth challenge rate limit (req/s, default: global)', range: '1-10000' },
+  // ── Rate Limits (mutable, per-endpoint with global fallback) ── config-schema-rate-limits.ts
+  ...RATE_LIMIT_CONFIG_FIELDS,
 
   // ── Email (Phase 1.1, mutable) ──
   { key: 'emailEnabled', dotPath: 'email.enabled', envVar: 'AIMEAT_EMAIL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Email service enabled (requires SMTP host)' },
@@ -267,10 +257,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Consent (Phase 0.3, mutable) ──
   { key: 'consentEnabled', dotPath: 'consent.enabled', envVar: 'AIMEAT_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Consent layer enabled' },
-  { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10 && (v as number) <= 10000, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
+  { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
   { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
   { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', ...oneOf('off', 'owner', 'all'), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
-  { key: 'consentMaxPerUser', dotPath: 'consent.max_per_user', envVar: 'AIMEAT_CONSENT_MAX_PER_USER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max consent records per user', range: '1-10000' },
+  { key: 'consentMaxPerUser', dotPath: 'consent.max_per_user', envVar: 'AIMEAT_CONSENT_MAX_PER_USER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max consent records per user', range: '1-10000' },
 
   // ── TOTP (Phase 0.5, mutable) ──
   { key: 'totpEnabled', dotPath: 'totp.enabled', envVar: 'AIMEAT_TOTP_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'TOTP two-factor authentication enabled' },
@@ -326,7 +316,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'webBotAuthSign', dotPath: 'federation.web_bot_auth_sign', envVar: 'AIMEAT_WEB_BOT_AUTH_SIGN', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sign outbound HTTP with the node Ed25519 key (RFC 9421 Web Bot Auth); the key directory is always served' },
   { key: 'installSetPath', dotPath: 'packages.install_set', envVar: 'AIMEAT_INSTALL_SET', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'An install set file (JSON, spec aimeat.install-set/1) this node applies at start-up: the owner user, a bundle\'s packages, its organisms, the other users and the crew agents. Applying again creates nothing twice, so the file may stay. Unset: nothing is applied' },
   { key: 'installSetSecretsPath', dotPath: 'packages.install_set_secrets', envVar: 'AIMEAT_INSTALL_SET_SECRETS', type: 'string', validate: v => v === null || typeof v === 'string', immutable: true, description: 'A JSON file of the secret config values for that install set; read at start-up and never stored in the record of the apply' },
-  { key: 'packagePeerCap', dotPath: 'federation.package_peer_cap', envVar: 'AIMEAT_PACKAGE_PEER_CAP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100000, immutable: false, description: 'On a package repository: the most nodes registered as packages-only peers through grants, sales and named sellers. Beyond it a new node is refused and the operator is told once', range: '1-100000' },
+  { key: 'packagePeerCap', dotPath: 'federation.package_peer_cap', envVar: 'AIMEAT_PACKAGE_PEER_CAP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'On a package repository: the most nodes registered as packages-only peers through grants, sales and named sellers. Beyond it a new node is refused and the operator is told once', range: '1-100000' },
   { key: 'packageRepository', dotPath: 'federation.package_repository', envVar: 'AIMEAT_PACKAGE_REPOSITORY', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Package repository role: serve a private package to the peer nodes entitled to it (signed requests; entitlements per package). Off: private packages reach their author only' },
 
   // ── Search-engine presence (mutable) ── config-schema-seo.ts
@@ -342,16 +332,16 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Extensions (Phase 2.7, mutable) ──
   { key: 'extensionsEnabled', dotPath: 'extensions.enabled', envVar: 'AIMEAT_EXTENSIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Sandboxed extension system enabled' },
   { key: 'extensionMaxMemoryMb', dotPath: 'extensions.max_memory_mb', envVar: 'AIMEAT_EXT_MAX_MEMORY_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 8 && (v as number) <= 512, immutable: false, description: 'Max memory per extension sandbox (MB)', range: '8-512' },
-  { key: 'extensionTimeoutMs', dotPath: 'extensions.timeout_ms', envVar: 'AIMEAT_EXT_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 60000, immutable: false, description: 'Extension execution timeout (ms)', range: '100-60000' },
+  { key: 'extensionTimeoutMs', dotPath: 'extensions.timeout_ms', envVar: 'AIMEAT_EXT_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100, immutable: false, description: 'Extension execution timeout (ms)', range: '100-60000' },
   // 10000, not 500: an extension that walks a list of external documents spends one call per
   // document, and 500 capped such work at a few hundred items per run for no reason anyone had
   // measured. The real brakes are the wall clock and the per-call timeout, both of which bound a
   // run regardless of how many calls it is allowed to attempt.
   { key: 'extensionMaxApiCalls', dotPath: 'extensions.max_api_calls', envVar: 'AIMEAT_EXT_MAX_API_CALLS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max API calls per extension execution', range: '1-10000' },
   { key: 'extensionMaxCodeSizeKb', dotPath: 'extensions.max_code_size_kb', envVar: 'AIMEAT_EXT_MAX_CODE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16 && (v as number) <= 2048, immutable: false, description: 'Max code size per extension (KB)', range: '16-2048' },
-  { key: 'extensionMaxInstalled', dotPath: 'extensions.max_installed', envVar: 'AIMEAT_EXT_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max installed extensions', range: '1-100' },
+  { key: 'extensionMaxInstalled', dotPath: 'extensions.max_installed', envVar: 'AIMEAT_EXT_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max installed extensions', range: '1-100' },
   { key: 'extInstallRole', dotPath: 'extensions.install_role', envVar: 'AIMEAT_EXT_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Role required to install extensions: operator or owner' },
-  { key: 'maxExtensionsPerOwner', dotPath: 'extensions.max_per_owner', envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max extensions per owner', range: '1-100' },
+  { key: 'maxExtensionsPerOwner', dotPath: 'extensions.max_per_owner', envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max extensions per owner', range: '1-100' },
 
 
   // ── Push Notifications (Phase 3.1, mutable) ──
@@ -368,14 +358,14 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Cross-Federation (Phase 3.4, mutable) ──
   { key: 'crossFederationEnabled', dotPath: 'cross_federation.enabled', envVar: 'AIMEAT_CROSS_FEDERATION_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Cross-federation peering enabled' },
-  { key: 'maxGenesisPeers', dotPath: 'cross_federation.max_genesis_peers', envVar: 'AIMEAT_MAX_GENESIS_PEERS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max genesis peers for cross-federation', range: '1-100' },
+  { key: 'maxGenesisPeers', dotPath: 'cross_federation.max_genesis_peers', envVar: 'AIMEAT_MAX_GENESIS_PEERS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max genesis peers for cross-federation', range: '1-100' },
   { key: 'genesisSyncIntervalHours', dotPath: 'cross_federation.sync_interval_hours', envVar: 'AIMEAT_GENESIS_SYNC_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between genesis sync rounds', range: '1-168' },
 
   // ── Federation Data Sync (mutable) ──
   { key: 'syncMode', dotPath: 'federation_sync.mode', envVar: 'AIMEAT_SYNC_MODE', type: 'string', ...oneOf('bulk', 'instant', 'hybrid'), immutable: false, description: 'Sync mode: bulk sends changes only in the scheduled round; instant and hybrid also send each change at once. The scheduled round runs in every mode, so instant and hybrid behave the same today.' },
   { key: 'syncIntervalHours', dotPath: 'federation_sync.interval_hours', envVar: 'AIMEAT_SYNC_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between scheduled sync rounds', range: '1-168' },
   { key: 'syncBatchDelayMs', dotPath: 'federation_sync.batch_delay_ms', envVar: 'AIMEAT_SYNC_BATCH_DELAY_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 60000, immutable: false, description: 'Event batching window in ms (instant/hybrid mode)', range: '100-60000' },
-  { key: 'replicationQueueMax', dotPath: 'federation_sync.replication_queue_max', envVar: 'AIMEAT_REPLICATION_QUEUE_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 100000, immutable: false, description: 'Max replication queue entries', range: '100-100000' },
+  { key: 'replicationQueueMax', dotPath: 'federation_sync.replication_queue_max', envVar: 'AIMEAT_REPLICATION_QUEUE_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100, immutable: false, description: 'Max replication queue entries', range: '100-100000' },
   { key: 'replicationQueueTtlHours', dotPath: 'federation_sync.replication_queue_ttl_hours', envVar: 'AIMEAT_REPLICATION_QUEUE_TTL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 720, immutable: false, description: 'Max age of replication queue entries in hours', range: '1-720' },
   { key: 'maxConcurrentSyncs', dotPath: 'federation_sync.max_concurrent_syncs', envVar: 'AIMEAT_MAX_CONCURRENT_SYNCS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max parallel outbound sync operations', range: '1-50' },
   { key: 'federationTimeoutMs', dotPath: 'federation_sync.timeout_ms', envVar: 'AIMEAT_FEDERATION_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000 && (v as number) <= 60000, immutable: false, description: 'Timeout for outbound federation requests in ms', range: '1000-60000' },
@@ -384,7 +374,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Personal Nodes (mutable) ──
   { key: 'personalNodesEnabled', dotPath: 'personal_nodes.enabled', envVar: 'AIMEAT_PERSONAL_NODES_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Personal node hosting enabled' },
-  { key: 'personalNodeMaxSlots', dotPath: 'personal_nodes.max_slots', envVar: 'AIMEAT_PERSONAL_NODE_MAX_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max personal node slots', range: '1-10000' },
+  { key: 'personalNodeMaxSlots', dotPath: 'personal_nodes.max_slots', envVar: 'AIMEAT_PERSONAL_NODE_MAX_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max personal node slots', range: '1-10000' },
 
   // ── Match Notifications (Phase 1.6, mutable) ──
 
@@ -512,7 +502,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'vapidSubject', dotPath: 'push.vapid_subject', envVar: 'AIMEAT_VAPID_SUBJECT', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'VAPID subject (mailto: or https: URI)' },
   { key: 'pushNotifyTypes', dotPath: 'push.notify_types', envVar: 'AIMEAT_PUSH_NOTIFY_TYPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Comma-separated notification types to push' },
   { key: 'pushCooldownMin', dotPath: 'push.cooldown_min', envVar: 'AIMEAT_PUSH_COOLDOWN_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Push notification cooldown in minutes', range: '1-1440' },
-  { key: 'pushMaxSubscriptionsPerNode', dotPath: 'push.max_subscriptions_per_node', envVar: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max push subscriptions per node', range: '1-100' },
+  { key: 'pushMaxSubscriptionsPerNode', dotPath: 'push.max_subscriptions_per_node', envVar: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max push subscriptions per node', range: '1-100' },
   { key: 'pushMaxFailures', dotPath: 'push.max_failures', envVar: 'AIMEAT_PUSH_MAX_FAILURES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max push failures before disabling', range: '1-50' },
 
   // ── Door defences: what happens when somebody is refused (src/config-security.ts) ──
@@ -577,7 +567,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Cortex Extensions (mutable) ──
   { key: 'cortexEnabled', dotPath: 'cortex.enabled', envVar: 'AIMEAT_CORTEX_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable manifest-based cortex extensions' },
-  { key: 'cortexMaxInstalled', dotPath: 'cortex.max_installed', envVar: 'AIMEAT_CORTEX_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Max installed cortex modules', range: '1-1000' },
+  { key: 'cortexMaxInstalled', dotPath: 'cortex.max_installed', envVar: 'AIMEAT_CORTEX_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max installed cortex modules', range: '1-1000' },
   { key: 'cortexMaxLibSizeKb', dotPath: 'cortex.max_lib_size_kb', envVar: 'AIMEAT_CORTEX_MAX_LIB_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16, immutable: false, description: 'Max cortex library size in KB', range: '16-4096' },
 
   // ── Portfolio (mutable) ──
@@ -667,13 +657,13 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── AI jobs (a model call with a handle, running in the background) ──
   // Every range here is deliberately WIDER than the number an operator is likely to want, because
-  // extensionTimeoutMs above is the cautionary tale: its 60000 ceiling is why a production node
-  // could not raise the extension timeout even when it wanted to. Do not set a range you will one
-  // day need to exceed.
+  // extensionTimeoutMs above is the cautionary tale: its 60000 ceiling (lifted 2026-10-11) is why a
+  // production node could not raise the extension timeout even when it wanted to. Do not enforce a
+  // maximum you will one day need to exceed.
   { key: 'aiJobSlots', dotPath: 'ai.job_slots', envVar: 'AIMEAT_AI_JOB_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'How many AI jobs may be calling a provider at once, node-wide. Protects the process, not a budget: money is controlled by the daily budget and the per-app quota', range: '1-10000' },
-  { key: 'aiJobMaxQueued', dotPath: 'ai.job_max_queued', envVar: 'AIMEAT_AI_JOB_MAX_QUEUED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100000, immutable: false, description: "The node-wide wait line. Past it a start is refused with AI_JOB_QUEUE_FULL and a Retry-After — the one refusal that means 'come back shortly'", range: '1-100000' },
+  { key: 'aiJobMaxQueued', dotPath: 'ai.job_max_queued', envVar: 'AIMEAT_AI_JOB_MAX_QUEUED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: "The node-wide wait line. Past it a start is refused with AI_JOB_QUEUE_FULL and a Retry-After — the one refusal that means 'come back shortly'", range: '1-100000' },
   { key: 'aiJobMaxPromptBytes', dotPath: 'ai.job_max_prompt_bytes', envVar: 'AIMEAT_AI_JOB_MAX_PROMPT_BYTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1024 && (v as number) <= 268435456, immutable: false, description: 'The biggest assembled prompt (prompt text plus every input_keys record read into it) one job may carry. This is the number that multiplies with concurrency', range: '1024-268435456' },
-  { key: 'aiJobMaxQueuedPerOwner', dotPath: 'ai.job_max_queued_per_owner', envVar: 'AIMEAT_AI_JOB_MAX_QUEUED_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100000, immutable: false, description: 'How many jobs one owner may have queued. An abuse brake, not a fairness knob — fairness is the round-robin order in the pool', range: '1-100000' },
+  { key: 'aiJobMaxQueuedPerOwner', dotPath: 'ai.job_max_queued_per_owner', envVar: 'AIMEAT_AI_JOB_MAX_QUEUED_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'How many jobs one owner may have queued. An abuse brake, not a fairness knob — fairness is the round-robin order in the pool', range: '1-100000' },
   { key: 'aiJobMaxChain', dotPath: 'ai.job_max_chain', envVar: 'AIMEAT_AI_JOB_MAX_CHAIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How deep an on_done chain may go before it is stopped and the parent records why', range: '1-1000' },
   { key: 'aiJobLogRetentionDays', dotPath: 'ai.job_log_retention_days', envVar: 'AIMEAT_AI_JOB_LOG_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'How many days of folded ai.jobs.log.<day> records to keep before the nightly prune removes them', range: '1-3650' },
 
@@ -717,7 +707,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     validate: v => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: true,
     description: 'Environment variable names the chat agent may see beside its allow-list, for a provider key passed in the environment. Set by whoever runs this node' },
   { key: 'gooseProviderApiKey', dotPath: 'ai.chat_agent_key', envVar: 'AIMEAT_GOOSE_PROVIDER_API_KEY', type: 'string', validate: () => true, immutable: false, description: "For a special case only. When set, EVERY chat turn is spent from this key and BYPASSES METERING: no allowance, daily budget or model policy applies to the chat. Empty (the default): each person's chat calls this node's /v1/llm, and the use is metered to that person", adminDisplay: 'configured' },
-  { key: 'chatMaxLiveThreads', dotPath: 'ai.chat_max_live_threads', envVar: 'AIMEAT_CHAT_MAX_LIVE_THREADS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How many conversations stay open before the oldest rolls into a per-month archive record', range: '1-1000' },
+  { key: 'chatMaxLiveThreads', dotPath: 'ai.chat_max_live_threads', envVar: 'AIMEAT_CHAT_MAX_LIVE_THREADS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'How many conversations stay open before the oldest rolls into a per-month archive record', range: '1-1000' },
 
   // The site links (the apps, the store and the people the public pages point at) are in
   // config-schema-site-links.ts, spread here in the place they always stood.

@@ -36,6 +36,30 @@ Two kinds of setting stand outside that order:
   override on that path is ignored with a line in the boot log. Empty on a self-hosted node, where
   nothing changes. → `docs/plans/sealed-config-plan.md`
 
+### A number's range: recommended or allowed
+
+A number setting states a range (`quota.memory_mb` 1-10000). The range is one of two kinds, and
+`GET /v1/admin/config` says which in `rangeKind`; the Config tab shows the same word beside the field.
+
+- **`recommended`**: the node accepts and applies a number above the range. The range says what an
+  ordinary node needs, and a large installation sets what it needs. The quotas, the rate limits and
+  the "how many" settings are of this kind. The minimum is still enforced.
+- **`limit`** (shown as "allowed"): the node refuses a value outside the range. These are settings
+  where a larger value cannot work or removes a protection: a port, a share between 0 and 1, the
+  sign-in defences, the token lifetimes, the daily AI spending caps.
+
+A recommended range does not make a larger value free. A quota multiplies with the number of owners,
+and the size of one item (one memory value, one file, one app) is held by the request body limit and
+by the memory of the process before the setting is reached.
+
+Fifteen settings refused a larger value until 2026-10-11 and are recommendations since:
+`apps.audit_keep_default`, `account_events.window`, `consent.max_per_user`,
+`federation.package_peer_cap`, `extensions.timeout_ms`, `extensions.max_installed`,
+`extensions.max_per_owner`, `cross_federation.max_genesis_peers`,
+`federation_sync.replication_queue_max`, `personal_nodes.max_slots`,
+`push.max_subscriptions_per_node`, `cortex.max_installed`, `ai.job_max_queued`,
+`ai.job_max_queued_per_owner`, `ai.chat_max_live_threads`.
+
 ### Seeing what this node is running with
 
 ```bash

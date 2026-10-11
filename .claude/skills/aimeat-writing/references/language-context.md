@@ -127,6 +127,7 @@ everywhere at once, and say so in the Changes section.
 | the most a model may write in one answer | counted in tokens (pieces of words); the API's max_tokens | longest answer | pisin vastaus | respuesta más larga |
 | how long a reasoning model thinks before it answers | off, light, medium, deep; the thinking is paid for in tokens | thinking (a setting); reasoning model | päättely; päättelymalli | razonamiento; modelo de razonamiento |
 | the question mark beside a setting | a tooltip on hover or focus, a dialog when pressed that says what the setting does, its range and examples | explanation (button: "Explain: X") | ohje (napin nimi: "Ohje: X") | explicación (botón: "Explicación: X") |
+| the range beside a number setting on the Config tab | one of two kinds, and the page says which: a recommended range, where the node accepts a larger number, or an allowed range, where it refuses one; the minimum is enforced in both | recommended (range) / allowed (range) | suositus / sallittu | recomendado / permitido |
 | an AI model server on the node's own machine | LM Studio, Ollama or llama.cpp on the machine the node runs on; the data does not leave it | local AI server | paikallinen tekoälypalvelin | servidor de IA local |
 | cleaning what leaves for a decision | e-mails, phones, identity codes, account numbers, street addresses and names are taken out before anything is sent, and put back into the answer | remove personal data | henkilötietojen poisto / poistaa henkilötiedot | eliminar los datos personales |
 | permission a person grants | revocable, per agent, per area | permission | oikeus | permiso |
@@ -316,6 +317,7 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-10-11**: recommended and allowed (*suositus* / *sallittu*, *recomendado* / *permitido*) for the range beside a number setting on the Config tab. Jouni's words: "suositeltava maximi" and "suositeltu range", with a larger number still accepted. *Sallittu* names the ranges the node enforces.
 - **2026-10-11**: stopped (*pysäytetty*, *detenido*) for an agent the owner stopped, with the Stop and Start action on the agent's page and the "Takes new work" switch on its card. *Käynnistää* and *iniciar* are the words the pages already use for starting a task, so starting an agent takes the same verb.
 - **2026-10-11**: computer (*tietokone*, *computadora*) for where an agent runs, with the home page's agents block and its three pages. The pages first said *machine*, *kone* and *máquina*; 47 strings in each language were changed in one commit. Jouni's words: computer, laptop, server, cloud and AIMEAT instance, instead of machine.
 - **2026-10-10**: the EU Digital Identity Wallet and the test signature, for signing a PDF in the wallet. The long names are the ones DVV and the Spanish eIDAS texts use; *EU-lompakko* and *cartera de la UE* are the short forms for a button.

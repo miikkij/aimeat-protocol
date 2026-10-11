@@ -28450,6 +28450,10 @@ paths:
         set of values carries `choices`, the list of those values; the value stored and sent back
         on PUT is one of them as it is.
 
+        A number field whose `range` is a "min-max" pair carries `rangeKind`. `limit`: PUT refuses a
+        value above the maximum. `recommended`: the range is the recommended range, and PUT accepts
+        and applies a larger value. The minimum is enforced in both cases.
+
         SEALED FIELDS. On a node one party runs on behalf of another, the party that STARTED the
         node may nominate paths as read-only (`AIMEAT_SEALED_CONFIG_KEYS`). Such a field carries
         `sealed: true`, `mutable: false`, `editable: false` and `source: "sealed"`, and its VALUE is
