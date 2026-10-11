@@ -5,6 +5,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.28.0 -- 2026-10-11 -- "Takes new work" (StoppedLine): stop the agent and start it again.
  *   v2.27.0 -- 2026-10-02 -- The question mark that explains the run mode: agent.run_mode on its CardLine label (components/HelpTip.js).
  *   v2.26.0 -- 2026-10-02 -- The opened card names the last task, who ordered it and when (LastTaskLine).
  *   v2.25.0 -- 2026-10-02 -- WildcardLine under the start switch for an agent holding `*`.
@@ -147,7 +148,7 @@ import { agentState, getDefaultTab } from './state-detector.js';
 import { GaiiChip } from './gaii-chip.js';
 import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge, stepTone } from './agent-card-badges.js';
 import { RunModeSwitch } from './agent-card-run-mode.js';
-import { FactsLine, LastTaskLine, PurchaseLimitLine, AutonomyLine, WildcardLine } from './agent-card-autonomy.js';
+import { FactsLine, LastTaskLine, PurchaseLimitLine, AutonomyLine, StoppedLine, WildcardLine } from './agent-card-autonomy.js';
 import { RefusalNote, AccessLine, hasRefusals } from './agent-card-access.js';
 import { templateLabel } from './scope-config.js';
 import { detectTemplate } from './scope-model.js';
@@ -431,6 +432,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
       <${FactsLine} agent=${agent} />
       <${LastTaskLine} agent=${agent} />
       <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
+      <${StoppedLine} agent=${agent} showToast=${showToast} />
       <${AutonomyLine} agent=${agent} showToast=${showToast} />
       <${WildcardLine} agent=${agent} showToast=${showToast} />
       <${AccessLine} agent=${agent} />

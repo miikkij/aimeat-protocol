@@ -14,9 +14,11 @@
  *   is the person's own AI and is not given tasks. When the agent can spend money, send mail or
  *   delete as the owner, its work always waits, and the switch says so instead of moving.
  * @structure FactsLine({ agent }) · LastTaskLine({ agent }) · PurchaseLimitLine({ agent, showToast }) ·
- *   AutonomyLine({ agent, showToast }) · WildcardLine({ agent, showToast })
+ *   AutonomyLine({ agent, showToast }) · StoppedLine({ agent, showToast }) · WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.6.0 — 2026-10-11 — StoppedLine: "Takes new work", the switch that stops an agent and starts
+ *     it again, with its explanation (agent.stopped).
  *   v1.5.0 — 2026-10-02 — The question marks that explain "Starts work by itself" (agent.self_start)
  *     and the daily purchase limit (agent.purchase_limit, which carries what buyHint said)
  *     (components/HelpTip.js).
@@ -192,6 +194,46 @@ export function AutonomyLine({ agent, showToast }) {
     <${CardLine} label=${html`<${HelpLabel} term="agent.self_start" label=${f('selfStart')}>${f('selfStart')}<//>`}>
       <${Switch} on=${on} disabled=${held} onToggle=${toggle} label=${on ? f('yes') : f('no')} ariaLabel=${f('selfStart')} />
       <span>${held ? f('selfStartHeld') : on ? f('selfStartOn') : f('selfStartOff')}</span>
+    <//>
+  `;
+}
+
+/**
+ * "Takes new work": on is an agent at work, off is one the person stopped (POST
+ * /v1/agents/:name/stop and /start). A stopped agent finishes the work it has and starts nothing
+ * new; what it is given waits. Not shown for a chat connection or a workstation, the person's own
+ * AI, which is not given tasks. The same switch as the Stop action on the agent's home page.
+ */
+export function StoppedLine({ agent, showToast }) {
+  const [stopped, setStopped] = useState(!!agent.stopped);
+  const [saving, setSaving] = useState(false);
+  // The state also changes from the home page and from the person's AI; follow the list.
+  useEffect(() => { setStopped(!!agent.stopped); }, [agent.stopped]);
+  if (agent.mode === 'workstation' || placeOf(agent) === 'chat') return null;
+
+  async function toggle() {
+    if (saving) return;
+    const stop = !stopped;
+    setSaving(true);
+    setStopped(stop);
+    try {
+      const out = await apiPost(`/v1/agents/${encodeURIComponent(agent.name)}/${stop ? 'stop' : 'start'}`, {});
+      const released = out?.data?.released ?? 0;
+      showToast?.(stop ? f('takesWorkOffSaved') : released > 0 ? f('takesWorkOnSavedWork', { n: released }) : f('takesWorkOnSaved'), 'success');
+    } catch (err) {
+      // Put it back: a switch that disagrees with the node is worse than the failed write.
+      setStopped(!stop);
+      swallowed('agent-card: stop or start', err);
+      showToast?.(err?.message || f('selfStartFailed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return html`
+    <${CardLine} label=${html`<${HelpLabel} term="agent.stopped" label=${f('takesWork')}>${f('takesWork')}<//>`}>
+      <${Switch} on=${!stopped} onToggle=${toggle} label=${stopped ? f('no') : f('yes')} ariaLabel=${f('takesWork')} />
+      <span>${stopped ? f('takesWorkOff') : f('takesWorkOn')}</span>
     <//>
   `;
 }

@@ -19,11 +19,12 @@
  * @structure WHEN_KINDS · DEFAULT_TOOLS · draftPrompt(tools) · parseDraft(text) · draftAgent(sentence, opts) ·
  *   templateDraft(id) · ownAiRequest(sentence, connectorName) · cronFor(days, hhmm) · startAgent(draft, choice) ·
  *   approveProposal(id, name, draft, choice) · scheduleFor(name, draft, choice) · runtimeTools(agents) ·
- *   readHomeAgents(limit)
+ *   readHomeAgents(limit) · moveAgent(name, connectorId) · setAgentStopped(name, stop)
  * @usage
  *   const draft = await draftAgent('Gather the industry news every weekday morning', { tools });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.2.0 — 2026-10-11 — setAgentStopped(name, stop): stop an agent and start it again.
  *   v1.1.0 — 2026-10-11 — A definition that listens for direct messages gets the `dm` tool on its
  *     first member when no member has it. An agent made as "when someone writes to it" or "always
  *     on" from a ready definition read a message and could not answer.
@@ -252,5 +253,14 @@ export async function readHomeAgents(limit, agent) {
 /** Send one agent to another machine (POST /v1/agents/v2/agents/:name/move). */
 export async function moveAgent(name, connectorId) {
   const resp = await apiPost(`/v1/agents/v2/agents/${encodeURIComponent(name)}/move`, { install_id: connectorId });
+  return resp?.data ?? null;
+}
+
+/**
+ * Stop one agent, or start it again (POST /v1/agents/:name/stop and /start). A stopped agent
+ * starts no new work; the answer's `released` says how many waiting tasks a start began.
+ */
+export async function setAgentStopped(name, stop) {
+  const resp = await apiPost(`/v1/agents/${encodeURIComponent(name)}/${stop ? 'stop' : 'start'}`, {});
   return resp?.data ?? null;
 }

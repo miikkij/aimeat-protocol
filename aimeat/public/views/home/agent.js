@@ -23,6 +23,8 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.2.0 — 2026-10-11 — Stop the agent and start it again, on the "Now" row; the task field and
+ *     the conversation say that what is given to a stopped agent waits.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.1.0 — 2026-10-10 — "Talk to it": the agent's conversation, from its Messages tab.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
@@ -52,7 +54,7 @@ import { Mark } from '/components/Mark.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { LineList } from '/components/LineList.js';
 import { listTasks, createTask } from '/js/services/agent-tasks.js';
-import { readHomeAgents, moveAgent } from '/js/services/agent-draft.js';
+import { readHomeAgents, moveAgent, setAgentStopped } from '/js/services/agent-draft.js';
 import { machineName, whenWords, stateWords } from '/views/home/agents-band.js';
 import TabMessages from '/views/profile/agents/tab-messages.js';
 
@@ -138,7 +140,28 @@ export default function AgentView({ navigate }) {
   const machines = home.connectors ?? [];
   const others = machines.filter((c) => c.id !== worker.connector?.id);
   const settings = `/v1/profile?tab=agents&agent=${encodeURIComponent(name)}`;
-  const tone = !worker.has_key || (worker.connector && !worker.connector.online) ? 'attention' : 'fine';
+  const tone = worker.stopped ? 'off'
+    : !worker.has_key || (worker.connector && !worker.connector.online) ? 'attention' : 'fine';
+
+  // Stop and start are one press each and neither asks first: a stop loses nothing (work in hand
+  // finishes, new work waits), and a start is how it is taken back.
+  const stopOrStart = async () => {
+    if (busy) return;
+    const stopping = !worker.stopped;
+    setBusy(true);
+    setSaid(null);
+    try {
+      const out = await setAgentStopped(name, stopping);
+      const text = stopping
+        ? p('stoppedNow', 'Stopped. Work it had started finishes, and new work waits until you start it.')
+        : (out?.released ?? 0) > 0
+          ? p('startedAgainWork', 'Started. The tasks that waited are running now ({n}).').replace('{n}', String(out.released))
+          : p('startedAgain', 'Started. It takes new work again.');
+      setSaid({ ok: true, at: 'stop', text });
+      await load();
+    } catch (err) { setSaid({ ok: false, at: 'stop', text: err?.message || String(err) }); }
+    finally { setBusy(false); }
+  };
 
   const give = async () => {
     const text = ask.trim();
@@ -148,7 +171,9 @@ export default function AgentView({ navigate }) {
     try {
       await createTask(name, { title: text.slice(0, 80), description: text });
       setAsk('');
-      setSaid({ ok: true, at: 'task', text: p('given', 'The task is with the agent. Its result appears below.') });
+      setSaid({ ok: true, at: 'task', text: worker.stopped
+        ? p('givenWaits', 'The task waits. The agent gets it when you start the agent.')
+        : p('given', 'The task is with the agent. Its result appears below.') });
       await load();
     } catch (err) { setSaid({ ok: false, at: 'task', text: err?.message || String(err) }); }
     finally { setBusy(false); }
@@ -195,7 +220,11 @@ export default function AgentView({ navigate }) {
 
       <${Facts} wide rows=${[
         { k: p('now', 'Now'), state: tone, v: stateWords(worker),
-          sub: worker.schedule?.next_run_at ? p('next', 'Next work {when}').replace('{when}', dateTime(worker.schedule.next_run_at, { dateStyle: 'medium', timeStyle: 'short' })) : undefined },
+          // A stopped agent's next scheduled run is skipped, so the line that promises it is left out.
+          sub: worker.stopped
+            ? p('stoppedSince', 'Stopped {when}. Tasks and messages wait, and scheduled runs are skipped, until you start it.').replace('{when}', ago(worker.stopped_at))
+            : worker.schedule?.next_run_at ? p('next', 'Next work {when}').replace('{when}', dateTime(worker.schedule.next_run_at, { dateStyle: 'medium', timeStyle: 'short' })) : undefined,
+          action: html`<${Action} small disabled=${busy} onClick=${stopOrStart}>${worker.stopped ? p('start', 'Start the agent') : p('stop', 'Stop the agent')}<//>` },
         { k: p('when', 'When it works'), v: whenWords(worker) },
         { k: p('where', 'Where it runs'), v: where,
           action: others.length > 0 && !moving
@@ -204,7 +233,7 @@ export default function AgentView({ navigate }) {
         { k: p('reach', 'What it reaches'), v: areaLine(record.default_scopes ?? [], t) },
       ]} />
 
-      ${said?.at === 'move' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+      ${(said?.at === 'move' || said?.at === 'stop') && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
 
       ${moving && html`
         <${Fields}>
@@ -224,6 +253,7 @@ export default function AgentView({ navigate }) {
       <${Fields}>
         <${TextArea} label=${p('giveLabel', 'What should it do now?')} rows=${2} value=${ask} onInput=${setAsk} onSend=${give}
           placeholder=${p('givePlaceholder', 'Say it as you would say it to a person.')} />
+        ${worker.stopped && said?.at !== 'task' && html`<${Note} kind="quiet">${p('giveWaits', 'The agent is stopped. A task you give now waits, and the agent gets it when you start it.')}<//>`}
         ${said?.at === 'task' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
         <${FormActions}>
           <${Loud} control disabled=${busy || !ask.trim()} onClick=${give}>${busy ? p('giving', 'Sending…') : p('give', 'Give the task')}<//>
@@ -235,6 +265,7 @@ export default function AgentView({ navigate }) {
         ? html`<${Note} kind="quiet">${p('talkDeaf', 'This agent does not read messages. It starts work from a task: give it one above.')}<//>`
         : html`
           ${!worker.has_key && html`<${Note} kind="quiet">${p('talkWaits', 'It reads your message when its computer has taken it on.')}<//>`}
+          ${worker.stopped && html`<${Note} kind="quiet">${p('talkStopped', 'The agent is stopped. It reads your message when you start it.')}<//>`}
           ${said?.at === 'talk' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
           <${TabMessages} agent=${record} agentName=${name}
             showToast=${(text, isError) => setSaid({ ok: !isError, at: 'talk', text })} />`}

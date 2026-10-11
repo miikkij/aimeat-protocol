@@ -245,8 +245,8 @@ publish_offers(build_offers_doc([offer]), agent_name="research-bot")  # writes a
 
 ## 5c. When the owner stops your agent
 
-An owner can stop an agent (`POST /v1/agents/{name}/stop` or `aimeat_agent_stop`) and start it
-again. Your agent's key and permissions stay as they are, so there
+An owner can stop an agent (the action on the agent's page, `POST /v1/agents/{name}/stop` or
+`aimeat_agent_stop`) and start it again. Your agent's key and permissions stay as they are, so there
 is nothing to re-enrol. What your runtime sees while it is stopped:
 
 | What your runtime does | What the node answers |

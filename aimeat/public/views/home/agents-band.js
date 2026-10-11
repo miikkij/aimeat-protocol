@@ -21,6 +21,7 @@
  * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · stateWords(worker)
  * @usage html`<${AgentsBand} data=${homeAgents} navigate=${ctx.navigate} />`
  * @version-history
+ *   2026-10-11 — A stopped agent's row says "stopped", and how many tasks wait for it.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
@@ -60,6 +61,13 @@ export function whenWords(worker) {
 
 /** What the agent is doing or last did, in one phrase. */
 export function stateWords(worker) {
+  // Stopped comes first: it is the person's own decision, and it is why nothing else is happening.
+  if (worker.stopped) {
+    const stopped = tr('home.agents.state.stopped', 'stopped');
+    return worker.queued > 0
+      ? `${stopped}, ${tr('home.agents.state.waiting', 'tasks waiting: {n}').replace('{n}', String(worker.queued))}`
+      : stopped;
+  }
   if (!worker.has_key) {
     const waits = worker.connector
       ? tr('home.agents.state.waitsFor', 'waits for {machine}').replace('{machine}', machineName(worker.connector))
