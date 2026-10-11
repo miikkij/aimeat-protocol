@@ -119,7 +119,7 @@ As of **v4.0**, AIMEAT is specified as two layers, and the spec is split to matc
 2. **Memory and storage.** Consent-governed key-value plus files with visibility tiers (`private` / `owner` / `group` / `members` / `workspace` / `public`), versioning, and schema locking.
 3. **Authorization.** Consent, a runtime access-guard, a capability (IAM) model, and scoped delegation grants.
 4. **Collaboration.** Organisms (groups) and workspaces (shared, versioned, access-gated record spaces): the living surface humans, agents and apps mutate together.
-5. **Economy and metering.** Two separate meters: morsels, an internal token that paces what gets written, *and* a real-currency usage ledger in USD for what the models cost. Both sit behind a pluggable, non-mandatory payment interface where the operator owns any KYC and billing. That interface has real, **non-custodial** settlement: a protocol-agnostic checkout (native REST plus **UCP** and **ACP** adapters) that settles in **USDC over x402** (Base) or in **euros on the seller's own Stripe account**. Funds land on the seller, never the node.
+5. **Economy and metering.** Two separate meters: morsels, an internal token that paces what gets written, *and* a real-currency usage ledger in USD for what the models cost. Money moves only through a pluggable, non-mandatory payment interface where the operator owns any KYC and billing. That interface has real, **non-custodial** settlement: a protocol-agnostic checkout (native REST plus **UCP** and **ACP** adapters) that settles in **USDC over x402** (Base) or in **euros on the seller's own Stripe account**. Funds land on the seller, never the node.
 6. **Federation.** Bilateral peering whose live use is logging into a peered node with your own credentials.
 7. **Observability.** Metrics, health, telemetry.
 
@@ -372,18 +372,9 @@ Every app below is a **single HTML file** living on the node, built by talking t
 
 You write a sentence; a window appears on the board and fills itself in. The window can be data, a chart, a form, a published app running as the real program, or work handed to one of your agents. Alternatives fold out beside a frame so you can compare them, and the winner gets promoted. The first two [recordings above](#see-it-in-action) are both ORIGAMI, one driven by an agent over MCP and one by a human.
 
-<p align="center">
-  <img src="assets/screenshots/origami-till-nuotta.png" alt="An ORIGAMI board: on the left a till showing EUR settled, morsels, paid calls and buyers under contract; on the right the NUOTTA app running live inside a frame" width="820" />
-</p>
-<p align="center"><em>Left: a till the owner described in one sentence, re-reading the seller's own public figures every five seconds. Right: NUOTTA, the actual app, running inside a frame on the same board.</em></p>
-
 #### EXCHANGE: a marketplace where apps buy what they need
 
-Providers list capabilities (data feeds, APIs, agent work, callable app-tools); apps and agents browse or post a need, accept a budget-capped contract, and every call is metered. Prices show on both rails at once: real money settled to the provider, and morsels that pace usage. Today the board carries 45 offerings, 5 open needs and 41 providers.
-
-<p align="center">
-  <img src="assets/screenshots/app-exchange.png" alt="EXCHANGE: 45 offerings, 5 needs, 9 contracts, settlement in USDC and EURC over x402 and in Stripe EUR/USD, with a composite listing priced at 20 morsels per call" width="820" />
-</p>
+Providers list capabilities (data feeds, APIs, agent work, callable app-tools); apps and agents browse or post a need, accept a budget-capped contract, and every call is metered. Prices are in money, settled to the provider in USDC or EURC over x402 or in EUR or USD on the provider's own Stripe account. Morsels only pace how much is used. Today the board carries 45 offerings, 5 open needs and 41 providers.
 
 #### ODPS: the descriptor a listing already speaks
 
@@ -560,7 +551,6 @@ Any priced thing on a node, an agent offer or a callable **app-tool**, is a chec
 
 Settlement is **non-custodial** and pluggable. The same session settles in:
 
-- **morsels**, the internal pacing token, on the node's own ledger;
 - **USDC over x402** (Base): an external x402-compatible agent signs an EIP-3009 authorization, a facilitator verifies and settles it on-chain, and funds move straight to the seller's wallet. The node holds nothing, proven end to end on Base Sepolia;
 - **euros over Stripe**: the charge runs on the seller's OWN Stripe secret, so they are the merchant of record and the money lands on their balance. The node holds neither key nor funds;
 - **an invoice**: nothing is captured online, the order completes and the obligation is booked for the seller to bill offline.
