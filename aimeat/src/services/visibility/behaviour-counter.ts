@@ -19,6 +19,7 @@
  * @structure recordBehaviour · flushBehaviour · mergeBehaviourDay · BehaviourBeacon
  * @usage recordBehaviour(storage, { ownerGhii, app, optedOut, vc, scroll, heat, dead, rage });
  * @version-history
+ *   v1.0.1 — 2026-10-11 — A new record's `spec` is the served contract address (VISIBILITY_MONTH_SPEC).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -28,6 +29,7 @@ import {
   behaviourAppKey, emptyBehaviourDay, type BehaviourDay, type BehaviourAppRecord,
 } from '../../models/behaviour-schemas.js';
 import { dayOf } from '../../models/signal-schemas.js';
+import { VISIBILITY_MONTH_SPEC } from '../../models/visibility-schemas.js';
 import { withKeyLock } from '../signals/signal-service.js';
 import { localAccountOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -180,7 +182,7 @@ async function mergeApp(storage: Storage, ownerGhii: string, app: string, days: 
       const now = new Date().toISOString();
       const rec: BehaviourAppRecord = row
         ? (row.value as unknown as BehaviourAppRecord)
-        : { type: 'aimeat.behaviour.app', spec: '/docs/specs/visibility-contract.md', app, days: {}, updatedAt: now };
+        : { type: 'aimeat.behaviour.app', spec: VISIBILITY_MONTH_SPEC, app, days: {}, updatedAt: now };
       rec.days = rec.days ?? {};
       for (const [day, delta] of days) {
         const stored = normalizeBehaviourDay(rec.days[day]);

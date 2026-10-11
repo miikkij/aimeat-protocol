@@ -7771,6 +7771,28 @@ paths:
         '200':
           description: This OpenAPI specification
 
+  /v1/specs/{name}:
+    get:
+      operationId: getRecordContract
+      summary: A public record contract
+      description: >-
+        The contract a self-describing record follows, as Markdown: the address its `spec` field
+        names. Served: signals-contract.md (signals.hits.*), visibility-contract.md
+        (signals.visibility.*, behaviour.*) and tracked-response-contract.md. Open, with CORS, so
+        another node or an AI reading such a record can open what it says it follows. The old
+        address /docs/specs/{name}, which records written before 2026-10-11 carry, redirects here.
+      tags: [Bootstrap]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string, enum: [signals-contract.md, visibility-contract.md, tracked-response-contract.md] } }
+      responses:
+        '200':
+          description: The contract document
+          content:
+            text/markdown:
+              schema: { type: string }
+        '404':
+          description: No contract by that name
+
   /v1/docs:
     get:
       operationId: getDocs

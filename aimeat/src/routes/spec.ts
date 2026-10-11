@@ -8,8 +8,12 @@
  *
  * @structure
  *   - specRouter(): mounts GET /v1/spec (locates + serves openapi.yaml) and GET /v1/docs (Swagger UI)
+ *   - GET /v1/specs/:name: a public record contract as text/markdown; GET /docs/specs/:name redirects there
  *
  * @version-history
+ *   v1.4.0 — 2026-10-11 — GET /v1/specs/:name serves the public record contracts that signals,
+ *     visibility and tracked-response records name in their `spec` field, and the old
+ *     /docs/specs/:name address those records carried redirects to it.
  *   v1.3.0 — 2026-09-28 — The file is found by services/openapi-file.ts, which also looks where a
  *     packaged install keeps it (dist/openapi.yaml); every packaged node answered 404 here.
  *   v1.2.0 — 2026-09-24 — /v1/docs carries the operation index as HTML (services/api-index.ts) until
@@ -28,6 +32,8 @@ import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.
 import { renderPageMarkdown } from './markdown-mirrors.js';
 import { apiIndexHtml } from '../services/api-index.js';
 import { findOpenApiFile } from '../services/openapi-file.js';
+import { findContractDoc, PUBLIC_CONTRACTS } from '../services/contract-docs.js';
+import { error } from '../middleware/envelope.js';
 
 export function specRouter(config: AimeatConfig): Router {
   const router = Router();
@@ -44,6 +50,29 @@ export function specRouter(config: AimeatConfig): Router {
       ok: false,
       error: { code: 'NOT_FOUND', message: 'OpenAPI spec not found' },
     });
+  });
+
+  // GET /v1/specs/:name — a public record contract, the address a self-describing record's `spec`
+  // field names (services/contract-docs.ts). Open: any node or AI reading such a record fetches it.
+  router.get('/v1/specs/:name', (req, res) => {
+    const path = findContractDoc(req.params.name as string);
+    if (!path) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No contract named ${req.params.name as string}. This node serves: ${PUBLIC_CONTRACTS.join(', ')}.`));
+      return;
+    }
+    res.set('Access-Control-Allow-Origin', '*');
+    res.type('text/markdown; charset=utf-8').send(readFileSync(path, 'utf-8'));
+  });
+
+  // GET /docs/specs/:name — the address records stored before 2026-10-11 carry. It never resolved;
+  // it now redirects to the served contract, so those records describe themselves too.
+  router.get('/docs/specs/:name', (req, res) => {
+    const name = req.params.name as string;
+    if (!findContractDoc(name)) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No contract named ${name}.`));
+      return;
+    }
+    res.redirect(301, `/v1/specs/${encodeURIComponent(name)}`);
   });
 
   // GET /v1/docs — Swagger UI with relaxed CSP for unpkg.com assets

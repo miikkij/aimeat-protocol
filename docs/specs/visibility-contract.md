@@ -36,7 +36,7 @@ report says so in its `reading.not_seen` line.
 ```jsonc
 {
   "type": "aimeat.visibility.month",
-  "spec": "/docs/specs/visibility-contract.md",
+  "spec": "/v1/specs/visibility-contract.md",   // this document, as the node serves it
   "month": "2026-10",
   "days": {
     "2026-10-08": {
@@ -145,7 +145,7 @@ days, so an owner's key count grows with their apps and never with time:
 ```jsonc
 {
   "type": "aimeat.behaviour.app",
-  "spec": "/docs/specs/visibility-contract.md",
+  "spec": "/v1/specs/visibility-contract.md",
   "app": "shop.html",
   "days": {
     "2026-10-08": {
