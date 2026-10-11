@@ -8,6 +8,9 @@
  *   duplicate check, catalog staleness report (a warning, never a failure).
  * @usage pnpm check:docs
  * @version-history
+ *   v1.3.1 - 2026-10-12 - PENDING_ELSEWHERE is gone, the list and the code that read it: a waiting
+ *     list in a gate is a standing way to silence a finding, and a dead reference in a file another
+ *     session is editing is fixed by that session before its own push, as check-doc-links.ts does.
  *   v1.3.0 - 2026-10-12 - A repository path quoted in backticks outside a fenced block must exist,
  *     as a link must (the docs audit of 2026-10-11 found five dead ones the link check never read).
  *     A catalog row whose "checked YYYY-MM-DD" is older than its source file's last commit is listed
@@ -29,14 +32,6 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = path => readFileSync(resolve(ROOT, path), 'utf8').replace(/\r\n/g, '\n');
 const errors = [];
 const warnings = [];
-const pendingSeen = new Set();
-/**
- * Dead backtick references in files another live session owns, fixed in that session's change.
- * Each entry says whose; an entry whose reference is gone is reported, so the list only shrinks.
- * Shape: { '<doc path>': { '<path as written>': '<whose, and why it waits>' } }. Empty since phase 2
- * of the docs audit fixed its three references (2026-10-12).
- */
-const PENDING_ELSEWHERE = {};
 let tracked = null;
 /** Every file git tracks, read once: a backtick path must name one, or a directory above one. */
 function trackedFiles() {
@@ -118,15 +113,8 @@ for (const path of files) {
     if (rel.startsWith('..') || isAbsolute(rel) || !existsSync(destination)) errors.push(`${path}: missing local link ${target}`);
   }
   // A path in backticks is a reference too, and a reader follows it the same way.
-  const waiting = PENDING_ELSEWHERE[path] ?? {};
   for (const problem of backtickPathProblems({ path, content, tracked: trackedFiles(), ignored: isIgnored })) {
-    if (waiting[problem.ref]) { pendingSeen.add(`${path} ${problem.ref}`); continue; }
     errors.push(`${path}:${problem.line}: \`${problem.ref}\` ${problem.reason}`);
-  }
-}
-for (const [path, refs] of Object.entries(PENDING_ELSEWHERE)) {
-  for (const ref of Object.keys(refs)) {
-    if (!pendingSeen.has(`${path} ${ref}`)) warnings.push(`PENDING_ELSEWHERE names a reference that is gone, remove it: ${path} \`${ref}\``);
   }
 }
 
