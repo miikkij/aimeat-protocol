@@ -8,6 +8,9 @@
  *   (input/output schema, perUnit, semantic) round-trip through jsonb, and the (actionId, providerGaii)
  *   unique key is enforced by an explicit existence check on create (ACTION_EXISTS).
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The column pricingBaseMorsels maps to pricing.tollMorsels, the pacing amount
+ *     per use (a morsel is pacing, not a price). The column keeps its name; no migration. A write
+ *     that still carries the 3.26.x `baseMorsels` (a restored backup) stores it as the pacing amount.
  *   v1.1.0 — 2026-09-09 — deleteActionsByProvider deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: action domain on Postgres+Kysely.
  */
@@ -20,12 +23,21 @@ import { jsonb } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
+/**
+ * The pacing amount a write stores. A record built by 3.26.x (an admin backup being restored, an
+ * export bundle) still says `baseMorsels`; it is the same pacing amount, so it is stored rather than
+ * failing the NOT NULL column.
+ */
+const tollOf = (p: ActionRecord['pricing']): number =>
+  p.tollMorsels ?? (p as { baseMorsels?: number }).baseMorsels ?? 0;
+
 function toAction(r: Selectable<Action>): ActionRecord {
   return {
     id: r.actionId, providerGaii: r.providerGaii, displayName: r.displayName, description: r.description,
     category: r.category ?? undefined,
     inputSchema: r.inputSchema as Record<string, unknown>, outputSchema: r.outputSchema as Record<string, unknown>,
-    pricing: { baseMorsels: r.pricingBaseMorsels, perUnit: r.pricingPerUnit as ActionRecord['pricing']['perUnit'] },
+    // pricingBaseMorsels keeps its SQL name and holds the pacing amount per use (not a price).
+    pricing: { tollMorsels: r.pricingBaseMorsels, perUnit: r.pricingPerUnit as ActionRecord['pricing']['perUnit'] },
     estimatedTimeSeconds: r.estimatedTimeSeconds ?? undefined, maxInputSizeBytes: r.maxInputSizeBytes ?? undefined,
     tags: r.tags ?? [], webhookUrl: r.webhookUrl ?? undefined,
     semantic: (r.semantic ?? undefined) as ActionRecord['semantic'], federate: r.federate ?? false,
@@ -41,7 +53,7 @@ export const actionMethods = {
     const [row] = await this.db.insertInto('Action').values({
       actionId: action.id, providerGaii: action.providerGaii, displayName: action.displayName, description: action.description,
       category: action.category ?? null, inputSchema: jsonb(action.inputSchema), outputSchema: jsonb(action.outputSchema),
-      pricingBaseMorsels: action.pricing.baseMorsels, pricingPerUnit: jsonb(action.pricing.perUnit ?? null),
+      pricingBaseMorsels: tollOf(action.pricing), pricingPerUnit: jsonb(action.pricing.perUnit ?? null),
       estimatedTimeSeconds: action.estimatedTimeSeconds ?? null, maxInputSizeBytes: action.maxInputSizeBytes ?? null,
       tags: action.tags, webhookUrl: action.webhookUrl ?? null, semantic: jsonb(action.semantic ?? null),
       federate: action.federate ?? false, createdAt: new Date(action.createdAt), updatedAt: new Date(action.updatedAt),
@@ -96,7 +108,7 @@ export const actionMethods = {
     if (updates.semantic !== undefined) data.semantic = jsonb(updates.semantic ?? null);
     if (updates.federate !== undefined) data.federate = updates.federate;
     if (updates.pricing) {
-      data.pricingBaseMorsels = updates.pricing.baseMorsels;
+      data.pricingBaseMorsels = tollOf(updates.pricing);
       data.pricingPerUnit = jsonb(updates.pricing.perUnit ?? null);
     }
     const rows = await this.db.updateTable('Action').set(data as never)

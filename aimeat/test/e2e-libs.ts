@@ -5,6 +5,8 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.13.3 — 2026-10-11 — fmtUnit shows an amount in morsels as pacing ("pacing 10 morsels"); three
+ *     assertions read the old price wording.
  *   v1.13.2 — 2026-10-03 — Atelier's boundary also names /v1/themes/fonts.css, exactly once: the
  *     kit links the added faces' sheet when a look names one (0.65.1, atelier/added-faces.js).
  *   v1.13.1 — 2026-10-03 — Atelier's network boundary names five calls: the card verbs' submit
@@ -914,14 +916,15 @@ await test('aimeat-exchange fmtUnit — money is money, morsels are morsels, and
     // The two units, each in its own shape.
     assert(fmtUnit(1500000, 'money', 'EUR') === '1.50 EUR', `money: got "${fmtUnit(1500000, 'money', 'EUR')}"`);
     assert(delegated?.micros === 1500000 && delegated?.currency === 'EUR', 'money must delegate to AIMEAT.commerce.fmtMoney');
-    assert(fmtUnit(10, 'morsels') === '10 morsels', `morsels: got "${fmtUnit(10, 'morsels')}"`);
-    assert(fmtUnit(1, 'morsels') === '1 morsel', `singular morsel: got "${fmtUnit(1, 'morsels')}"`);
+    // A morsel amount where a price stands reads as pacing (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+    assert(fmtUnit(10, 'morsels') === 'pacing 10 morsels', `morsels: got "${fmtUnit(10, 'morsels')}"`);
+    assert(fmtUnit(1, 'morsels') === 'pacing 1 morsel', `singular morsel: got "${fmtUnit(1, 'morsels')}"`);
     assert(fmtMorsels(3) === '3 morsels', 'fmtMorsels stays plain integers');
 
     // The documented shorthand: omit the unit and pass a currency.
     assert(fmtUnit(1500000, undefined, 'EUR') === '1.50 EUR', 'omitted unit + currency must format as money');
     // Nothing at all still means morsels, which is the meter and the sensible default.
-    assert(fmtUnit(7) === '7 morsels', 'no unit and no currency is morsels');
+    assert(fmtUnit(7) === 'pacing 7 morsels', 'no unit and no currency is morsels, shown as pacing');
 
     // ── The regression this test exists for ──────────────────────────────────────────────────
     // `fmtUnit(17793800, 'EUR')` put the CURRENCY in the UNIT slot. The old implementation

@@ -7,6 +7,7 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   v0.2.1 — 2026-10-11 — The priced tool has a money price; its morsel price asserted the old model, where a morsel amount was a price.
  *   v0.2.0 — 2026-09-13 — Setup no longer matched production: the workspace document was written
  *     before the manifest declaring its space, which UNDECLARED_SPACE now refuses. The manifest is written first.
  *   v0.1.0 — 2026-06-23 — Phase 1: discovery endpoint coverage (design doc 2026-06-23).
@@ -185,7 +186,8 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
     await test('seed: publish a tool manifest with a priced and a free tool', async () => {
         await putMem(a.token, TOOLS_KEY, {
             tools: [
-                { name: 'probability', description: 'Rates how likely a thing is', price: { morsels: 5, unit: 'per-call' }, action_id: 'ext:demo:probability' },
+                // A money price: a morsel amount is pacing since 2026-10-11, so only money makes it "priced".
+                { name: 'probability', description: 'Rates how likely a thing is', priceMoney: { amount: 500_000, currency: 'EUR' }, action_id: 'ext:demo:probability' },
                 { name: 'freebie', description: 'Costs nothing at all' },
             ],
         }, 'public');

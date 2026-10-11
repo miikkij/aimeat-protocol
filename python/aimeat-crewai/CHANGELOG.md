@@ -3,6 +3,20 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.34.0 - 2026-10-11
+
+- **An offer has two values: a money price and a pacing amount.** `build_offer()` takes
+  `price_money={"amount": <micro-units>, "currency": "EUR"}` (none means the offer is free) and
+  `toll_morsels=n`, the morsels each use by another owner debits from that owner. Part of the
+  pacing burns and the rest reaches your owner. A morsel paces use and is never a price.
+- **Deprecated:** `build_offer(price={"morsels": n})`. It still works: it warns
+  (`DeprecationWarning`) and writes the amount as `tollMorsels`, added to any `toll_morsels`, so
+  your offer keeps the same pacing. The node accepts the old field until 4.0.0 and refuses it
+  after, so change the call before then.
+- `assess_offer()` / `aimeat-offers check`: the "priced" level now means "offered to other owners"
+  and passes with a money price or a pacing amount (plus public visibility and a callable). An
+  offer stored with the old `price.morsels` still passes.
+
 ## 0.33.0 - 2026-10-11
 
 - **The owner can stop your agent, and the daemon respects it.** On a node built after 2026-10-11 a

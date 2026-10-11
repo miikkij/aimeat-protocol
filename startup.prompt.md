@@ -183,8 +183,8 @@ points to their node — also reachable via **profile → Agents tab**), enter t
 - **CrewAI crews:** prefer the **liaison-agent** pattern from the `aimeat-crewai` package, not subprocess
   task-runner. Full walkthrough: **[docs/integrations/crewai.md](docs/integrations/crewai.md)**.
 - **Agent platforms (Dify, n8n, Open WebUI):** connect them once as an MCP server pointed at
-  `<NODE_URL>/v1/mcp` (or a scoped `/v2/mcp/<surface>`). See
-  [aimeat/docs/integrations/dify-hello-integration.md](aimeat/docs/integrations/dify-hello-integration.md).
+  `<NODE_URL>/v1/mcp` (or a scoped `/v2/mcp/<surface>`). For Dify, see
+  [aimeat/tools/dify-bridge/README.md](aimeat/tools/dify-bridge/README.md).
 
 After approval, the agent's token is stored under `~/.aimeat/` — you never handle it directly.
 

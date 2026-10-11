@@ -142,7 +142,7 @@ tags:
   - name: Stats
     description: Node statistics and metrics
   - name: App Store
-    description: Phase 2.6 — App store for purchasing apps with morsels
+    description: 'Phase 2.6: app store licences. A purchase is one pacing charge in morsels, never a price.'
   - name: PWA
     description: Phase 3.1 — Progressive Web App features (push notifications)
   - name: Verification
@@ -2169,12 +2169,23 @@ components:
 
     ActionPricing:
       type: object
-      required: [base_morsels]
+      description: >
+        An action's pacing. A morsel is pacing, never a price: `toll_morsels` is the morsels each use
+        takes from the requester's owner (the burn rate's share burns, the rest goes to the provider).
       properties:
+        toll_morsels:
+          $ref: '#/components/schemas/TollMorsels'
         base_morsels:
           type: integer
           minimum: 0
           example: 5
+          deprecated: true
+          description: >
+            Deprecated until 4.0.0. On write it is read as pacing and added to `toll_morsels`. On read
+            it mirrors `toll_morsels`, and a sibling `deprecated` object names it. From 4.0.0 a write
+            with it answers 400 MORSEL_PRICE_REMOVED and reads leave it out.
+        deprecated:
+          $ref: '#/components/schemas/MorselPriceDeprecation'
         per_unit:
           type: object
           properties:
@@ -2273,9 +2284,19 @@ components:
 
     WorkCost:
       type: object
+      description: >
+        The morsels a work request holds in escrow: the action's pacing amount (`toll`) plus the
+        network fee. Morsels pace use; they are not a price.
       properties:
+        toll:
+          type: integer
+          description: The pacing amount of the action (doubled for high priority), released to the provider on acceptance.
         base_price:
           type: integer
+          deprecated: true
+          description: Deprecated mirror of `toll`, until 4.0.0.
+        deprecated:
+          $ref: '#/components/schemas/MorselPriceDeprecation'
         network_fee:
           type: integer
         total:
@@ -2425,9 +2446,11 @@ components:
         pacing:
           type: object
           description: |
-            Whether this node burns morsels per metered call to bound how fast agents consume
-            capabilities. `enabled` is true when the operator's default toll is above 0 (0 is off and is
-            the shipped default). A capability may declare its own toll, which this does not describe.
+            Whether this node paces metered use by default, to bound how fast agents consume
+            capabilities. `enabled` is true when the operator's default pacing amount is above 0 (0 is
+            off and is the shipped default). An offer may declare its own `toll_morsels`, which this
+            does not describe. Each pacing charge burns the burn rate's share and credits the rest to
+            the provider.
           properties:
             enabled:
               type: boolean
@@ -2436,6 +2459,14 @@ components:
               type: integer
               minimum: 0
               example: 0
+        pacing_pack:
+          description: |
+            The pacing capacity this node's operator sells for money, or null when it sells none (the
+            pack is off while `morsel_policy.pacing_pack_morsels` or `morsel_policy.pacing_pack_price`
+            is 0). Buy it by opening a checkout with `checkout_item` as the line item.
+          anyOf:
+            - $ref: '#/components/schemas/PacingPack'
+            - type: 'null'
         lifetime:
           type: object
           description: |
@@ -2475,6 +2506,123 @@ components:
                 properties:
                   count: { type: integer }
                   sum: { type: integer }
+
+    # === Pacing (a morsel paces use; it is never a price) ===
+    PacingPack:
+      type: object
+      description: >
+        Pacing capacity the operator sells for money. Set by `morsel_policy.pacing_pack_morsels`,
+        `morsel_policy.pacing_pack_price` and `morsel_policy.pacing_pack_currency`. Fulfilment adds the
+        morsels to the buyer's owner, inside the node's daily mint ceiling
+        (`AIMEAT_MAX_OPERATOR_MINT_PER_DAY`, counted together with operator mints). Past the ceiling
+        the checkout's completion fails and the money goes back.
+      required: [morsels, price, checkout_item]
+      properties:
+        morsels: { type: integer, minimum: 1, example: 500 }
+        price:
+          type: object
+          required: [amount, currency]
+          properties:
+            amount: { type: integer, minimum: 1, description: Money in 6-decimal micro-units (1 EUR = 1000000)., example: 2000000 }
+            currency: { type: string, enum: [EUR, USD] }
+        checkout_item:
+          type: object
+          description: The line item to send in POST /v1/commerce/checkout-sessions `items`.
+          properties:
+            kind: { type: string, enum: [pacing-pack] }
+            quantity: { type: integer, minimum: 1 }
+
+    PacingReceipt:
+      type: object
+      description: >
+        One pacing charge. `morsels` left the payer's owner; `burned` is the burn rate's share
+        (`morsel_policy.burn_rate`); `fee` is the flow's operator share where the flow has one; the
+        provider's owner got `providerEarned`. Ledger rows: `pacing_charge`, `pacing_burn`,
+        `pacing_earn`, `marketplace_fee`, and `pacing_refund` when a failed use gives it back.
+      required: [morsels, burned, fee, providerEarned, trackingCode]
+      properties:
+        morsels: { type: integer, minimum: 0 }
+        burned: { type: integer, minimum: 0 }
+        fee: { type: integer, minimum: 0 }
+        providerEarned: { type: integer, minimum: 0 }
+        trackingCode: { type: string }
+
+    TollMorsels:
+      type: integer
+      minimum: 0
+      maximum: 100
+      description: >
+        Pacing amount in morsels per use, set by the provider. Each use by another owner takes this
+        many morsels from the user's owner: the burn rate's share burns and the rest goes to the
+        provider's owner. Omitted: the node default (`morsel_policy.pacing_toll_default`). Clamped to
+        the node ceiling (`AIMEAT_EXT_MAX_DEBIT`, 100 by default). This is not a price; the price is
+        the money field beside it, and an offer without one is free.
+
+    MorselPriceDeprecation:
+      type: object
+      description: >
+        Present while the node is older than release 4.0.0, beside a scalar mirror of an old morsel
+        price field (for example `price_morsels`, `base_morsels`). Each key is the old field's name and
+        each value is the deprecation note. The mirror holds the pacing amount (`toll_morsels`); after
+        4.0.0 neither the mirror nor this object is sent, and a write that sends the old field is
+        refused with 400 MORSEL_PRICE_REMOVED.
+      additionalProperties: { type: string }
+      example:
+        price_morsels: 'Deprecated: a morsel is pacing, not a price. Read toll_morsels (the pacing amount per use) and the money price; this mirror is removed in 4.0.0.'
+
+    DeprecatedOfferMorselPrice:
+      type: object
+      deprecated: true
+      description: >
+        Deprecated until 4.0.0. The old morsel price of an offer. On PUT it is read as pacing and
+        added to `tollMorsels` (clamped to 100). On GET it mirrors `tollMorsels` with a `deprecated`
+        note. From 4.0.0 a PUT with `price` answers 400 MORSEL_PRICE_REMOVED and GET leaves it out.
+      required: [morsels]
+      properties:
+        morsels: { type: integer, minimum: 0 }
+        unit: { type: string, example: per-call }
+        deprecated: { type: string, description: Response only. The deprecation note. }
+
+    PaymentChallenge:
+      type: object
+      description: >
+        Spread into a 402 body beside the error envelope. `accepts[]` lists what the caller can do: an
+        x402 `exact` scheme first when it applies (a money session, x402 enabled, a seller payout
+        address), then one `aimeat-checkout` entry per money payment handler, then, outside the ACP
+        and UCP surfaces, one `aimeat-morsel-topup` entry that says how to get more morsels for
+        pacing. No entry treats morsels as a payment.
+      properties:
+        x402Version: { type: integer, example: 1 }
+        accepts:
+          type: array
+          items:
+            type: object
+            properties:
+              scheme: { type: string, description: 'exact (x402), aimeat-checkout, or aimeat-morsel-topup' }
+              handler: { type: string, description: aimeat-checkout only. The payment handler id. }
+              currencies: { type: array, items: { type: string }, description: aimeat-checkout only. Money currencies the handler settles. }
+              description: { type: string }
+              resource: { type: string }
+              daily_allowance:
+                type: object
+                description: aimeat-morsel-topup only. The route that grants the daily allowance.
+                properties:
+                  method: { type: string, example: POST }
+                  url: { type: string }
+              morsels: { type: integer, description: 'aimeat-morsel-topup only, when the operator sells a pacing pack. Morsels in one pack.' }
+              price:
+                type: object
+                description: aimeat-morsel-topup only, when the operator sells a pacing pack. The pack's money price.
+                properties:
+                  amount: { type: integer, description: 6-decimal micro-units }
+                  currency: { type: string, enum: [EUR, USD] }
+              checkout_item:
+                type: object
+                description: aimeat-morsel-topup only, when the operator sells a pacing pack. The line item to buy it.
+                properties:
+                  kind: { type: string, enum: [pacing-pack] }
+                  quantity: { type: integer }
+              checkout: { type: string, description: 'aimeat-morsel-topup only, when the operator sells a pacing pack. The checkout-sessions URL.' }
     # === Boards ===
     BoardCreate:
       type: object
@@ -6680,7 +6828,11 @@ components:
                         type: integer
 
     PaymentRequired:
-      description: Insufficient morsels for this operation
+      description: >
+        Not enough morsels for the pacing of this operation (INSUFFICIENT_MORSELS). The message says
+        how to get more: the daily allowance (POST /v1/wallet/request), or the operator's pacing pack
+        when one is sold. Where the route spreads a PaymentChallenge, the body also carries
+        `x402Version` and `accepts[]`.
       content:
         application/json:
           schema:
@@ -13043,6 +13195,12 @@ paths:
         delisted[], skipped[{ label, kind, reason, message? }], warnings[] }` for the agent-work listings this
         publish projected, or `{ known: false, note }` naming the reconcile request to run when the
         projection did not report.
+
+        An offer has two values. `priceMoney` (or `pricesMoney`, one per currency) is the money price;
+        an offer without one is free. `tollMorsels` is the pacing amount in morsels per use, 0 to 100
+        and within the node ceiling. A morsel is pacing, never a price. Until release 4.0.0 the old
+        `price: { morsels, unit }` is still accepted and is read as pacing (added to `tollMorsels`,
+        clamped to 100); from 4.0.0 it is refused with 400 MORSEL_PRICE_REMOVED.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -13078,6 +13236,27 @@ paths:
                       availability: { type: object }
                       requirements: { type: array, items: { type: object } }
                       consequences: { type: array, items: { type: object } }
+                      priceMoney:
+                        type: [object, 'null']
+                        description: The money price per use. Absent or null means free.
+                        required: [amount, currency]
+                        properties:
+                          amount: { type: integer, minimum: 1, description: 6-decimal micro-units (1 EUR = 1000000) }
+                          currency: { type: string, enum: [EUR, USD] }
+                      pricesMoney:
+                        type: array
+                        maxItems: 2
+                        description: Every money price the offer declares, one per currency. `priceMoney` stays the primary.
+                        items:
+                          type: object
+                          required: [amount, currency]
+                          properties:
+                            amount: { type: integer, minimum: 1 }
+                            currency: { type: string, enum: [EUR, USD] }
+                      tollMorsels:
+                        $ref: '#/components/schemas/TollMorsels'
+                      price:
+                        $ref: '#/components/schemas/DeprecatedOfferMorselPrice'
                       deliverable:
                         type: object
                         required: [format]
@@ -13087,13 +13266,18 @@ paths:
                           sample: {}
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
-        '400': { description: 'INVALID_OFFERS — descriptor failed validation.' }
+        '400': { description: 'INVALID_OFFERS: the descriptor failed validation. MORSEL_PRICE_REMOVED: from release 4.0.0, an offer sent the old `price` field; send `tollMorsels` (pacing) and `priceMoney` (money) instead.' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/OdpsFieldTooLong' }
     get:
       operationId: getAgentOffers
       summary: Read an agent's published offers
+      description: >
+        The published offers, each with `priceMoney` / `pricesMoney` (money; absent means free) and
+        `tollMorsels` (pacing per use). Until release 4.0.0 an offer with pacing also carries the
+        deprecated mirror `price: { morsels, unit, deprecated }`, where `morsels` equals `tollMorsels`.
+        Read `tollMorsels`; the mirror is not sent from 4.0.0.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -13105,11 +13289,16 @@ paths:
   /v1/agents/{name}/offers/{offerId}/invoke:
     post:
       operationId: invokeAgentOffer
-      summary: Invoke a callable offer (billable)
+      summary: Invoke a callable offer (paced)
       description: >
-        Invoke an offer's machine-callable binding. Free when the caller owns the agent; when a
-        different owner invokes, the caller is debited and the provider credited (morsels, minus the
-        marketplace fee) on success, with a refund if dispatch fails. The offer must declare a
+        Invoke an offer's machine-callable binding. Free when the caller owns the agent. When a
+        different owner invokes, an offer with a money price (`priceMoney`) is refused with 402
+        PAYMENT_REQUIRED, whose message names the checkout to buy it through (POST
+        /v1/commerce/checkout-sessions with the agent and offer_id); this route moves no money. A free
+        offer charges the pacing amount (`tollMorsels`, else the node default) before the call: the
+        burn rate's share burns, the marketplace share (`marketplace.tx_fee_percent`) goes where the fee
+        policy sends it, and the provider's owner gets the rest. A failed dispatch gives the pacing
+        back. The offer must declare a
         `callable.action_id` backing capability — human-prompt / task offers use the Ask flow instead.
         `visibility:'private'` blocks cross-owner invocation. `name` may be a bare agent name (the
         caller's own agent) or a full provider GAII (URL-encoded) for cross-owner calls.
@@ -13131,10 +13320,23 @@ paths:
       responses:
         '200':
           description: >
-            Success — `{ offer, agent, result, receipt }`. `receipt` is `{ charged: 0 }` for self-use,
-            else `{ charged, earned, fee, trackingCode }`.
+            Success — `{ offer, agent, result, receipt }`. `receipt` is `{ charged: 0 }` for self-use
+            or an unpaced offer, else `{ charged: 0, pacing }` with `pacing` a PacingReceipt
+            (`{ morsels, burned, fee, providerEarned, trackingCode }`). `charged` is always 0 and stays
+            for 3.x readers: no money moves on this route.
           content: { application/json: { schema: { $ref: '#/components/responses/AimeatSuccess' } } }
-        '402': { description: INSUFFICIENT_BALANCE — the caller cannot cover the offer price }
+        '402':
+          description: >
+            PAYMENT_REQUIRED: the offer has a money price; buy it through the checkout the message
+            names. INSUFFICIENT_MORSELS: the caller's owner cannot cover the pacing; the body carries
+            the PaymentChallenge, whose `aimeat-morsel-topup` entry names the daily allowance and the
+            pacing pack when the operator sells one.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - $ref: '#/components/schemas/PaymentChallenge'
         '403': { description: OFFER_PRIVATE — a different owner cannot invoke a private offer }
         '404': { description: AGENT_NOT_FOUND / OFFER_NOT_FOUND / CAPABILITY_NOT_FOUND }
         '422': { description: OFFER_NOT_CALLABLE — the offer has no machine-invocable binding }
@@ -21138,8 +21340,11 @@ paths:
         record. Response `data`: `{ app_id, owner_ghii, active_contracts, total_contracts,
         totals: { morsels: { spent_units, calls, contracts }, money: {...} },
         contracts: [{ entitlement_id, capability, provider, contract_ref, state, unit, currency,
-        price_per_call, rake_percent, rake_per_call, escrow_party,
-        budget: { cap_units, spent_units, remaining_units, calls }, estimated_calls_remaining }] }`.
+        price_per_call, toll_morsels, rake_percent, rake_per_call, escrow_party,
+        budget: { cap_units, spent_units, remaining_units, calls }, estimated_calls_remaining, deprecated }] }`.
+        On a morsel-rail contract `toll_morsels` is the pacing amount per call; there `price_per_call` is
+        a deprecated mirror of it until 4.0.0, named in `deprecated`. A money contract's
+        `price_per_call` is its money price in micro-units.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -21711,8 +21916,8 @@ paths:
         call, so the debtor on every entry is the seller. `accrued` means booked and unpaid; it becomes
         payable only once an operator has recorded a verification for your account, which the
         Amounts are money, in integer micro-units keyed by currency. There is no morsel bucket:
-        morsels pace how often a capability may be called, they are not money, and a morsel-priced
-        call never produces a share at all. A share is revenue or it is not a share.
+        morsels pace how often a capability may be called, they are not money, and a call with
+        pacing only never produces a share at all. A share is revenue or it is not a share.
         on the money identity; `wallet:read` gates non-owner principals. Returns
         `{ beneficiary, verification: { state, payable, reason, message }, totals, entries, count, note }`.
       tags: [Commerce]
@@ -21983,6 +22188,11 @@ paths:
         description?, provenance?, usage_terms, tags? }`. LEGIBILITY GATE (both): a non-empty input AND
         output schema is required (else 400 SCHEMA_REQUIRED) and `usage_terms` is required (else 400
         USAGE_TERMS_REQUIRED). `usage_terms` = `{ derivatives?, resale?, attribution?, note? }`. Returns `{ offering }`.
+        An offering has a money price (absent means free) and a pacing amount `toll_morsels`; a morsel
+        is never a price. Until release 4.0.0 an offering stored with `unit: 'morsels'` and `basePrice`
+        is read as a free offering with `basePrice` as its pacing, and responses keep those two fields
+        as deprecated mirrors beside a `deprecated` object that names them. From 4.0.0 they are
+        refused on write (400 MORSEL_PRICE_REMOVED) and not sent.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -21997,7 +22207,8 @@ paths:
           task_type: { type: string, description: "agent-work kind — the task type it performs." },
           input_schema: { type: object, description: "agent-work kind — what the consumer sends (required)." },
           output_schema: { type: object, description: "agent-work kind — what the agent delivers (required)." },
-          price_morsels: { type: integer, description: "agent-work kind — per-task morsel price." },
+          toll_morsels: { type: integer, minimum: 0, maximum: 100, description: "Pacing amount in morsels per use, within the node ceiling. Not a price." },
+          price_morsels: { type: integer, deprecated: true, description: "Deprecated until 4.0.0. agent-work kind: read as pacing and added to toll_morsels. From 4.0.0 refused with 400 MORSEL_PRICE_REMOVED." },
           price_money: { type: object, description: "agent-work kind — per-task money price { amount (micros), currency }." },
           plans: { type: array, items: { type: object }, description: "agent-work kind — optional bundle/subscription plans." },
           title: { type: string }, description: { type: string },
@@ -22021,7 +22232,9 @@ paths:
         Public browse of listed supply. `?ext=&action=` matches a capability exactly; `?q=` free-text over
         title/description/tags; omit both for all listings. `?stats=1` folds usage/reputation
         (`stats: { activeContracts, totalContracts, totalCalls, totalSettledUnits, consumers, listedAt, lastUsedAt }`)
-        into each listing. Cheapest base price first. Returns `{ offerings, count }`.
+        into each listing. Cheapest base price first. Returns `{ offerings, count }`. Every offering
+        carries `toll_morsels`, its pacing per call. An offering stored with `unit: 'morsels'` is free,
+        and until release 4.0.0 it keeps `unit` and `basePrice` as deprecated mirrors.
       tags: [Commerce]
       parameters:
         - { name: ext, in: query, schema: { type: string } }
@@ -22040,8 +22253,10 @@ paths:
         `input_schema`/`output_schema`, a `call_recipe` (the contract IS the access — you call `POST
         /v1/ext/{ext}/{action}` as yourself, no separate API key), and usage `stats` (reputation). Public.
         Returns `{ offering, capability, call_recipe, stats, pacing, odps }`. `pacing.toll_morsels` is the
-        morsel BURN each call costs the consumer to bound consumption rate — not a price: nobody is
-        credited it, and calling your own capability is free. `pacing.source` is `capability` when the
+        pacing amount each call takes from the consumer's owner, to bound the consumption rate. It is
+        not a price: the burn rate's share burns, the contract's operator share goes where the fee
+        policy sends it, and the provider's owner gets the rest. Calling your own capability is free.
+        `pacing.source` is `capability` when the
         provider declared it (`tollMorsels` on the tool/action/offer) and `node` when the node default
         applies. `odps` points at the same listing
         rendered as an Open Data Product Specification v4.1 document.
@@ -22192,7 +22407,7 @@ paths:
             inputSchema: { type: object, description: "The shape the app will SEND on each call." },
             outputSchema: { type: object, description: "The shape the app EXPECTS back (a provider builds a matching app-tool)." } } },
           usage_intent: { type: string, description: "How the requester will USE the data — lets a provider judge before serving." },
-          budget_unit: { type: string, enum: [money, morsels] }, budget_cap: { type: integer },
+          budget_unit: { type: string, enum: [money, morsels], description: "money. 'morsels' is deprecated until 4.0.0 (a morsel is pacing, not a price) and is refused with 400 MORSEL_PRICE_REMOVED from 4.0.0." }, budget_cap: { type: integer },
           autonomy: { type: string, enum: [supervised, auto] } } } } }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
@@ -25109,9 +25324,15 @@ paths:
       parameters:
         - name: type
           in: query
+          description: >
+            One ledger row kind, matched exactly. Among them: allowance, earned, spent, escrow_hold,
+            escrow_release, burn, mint, marketplace_fee, and the pacing kinds pacing_charge (what the
+            payer's owner gave on), pacing_burn (the burned share), pacing_earn (the provider's
+            share), pacing_refund (a failed use gave the pacing back) and pacing_pack (morsels bought
+            with money from the operator).
           schema:
             type: string
-            enum: [allowance, earned, spent, escrow_hold, escrow_release, burn]
+            example: pacing_charge
         - $ref: '#/components/parameters/Pagination'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -27097,10 +27318,15 @@ paths:
         offers ({agent GAII, offer_id, quantity}) or priced app-tools ({kind:'app-tool',
         app:'ownerName/appId', tool, input} — one call per line item; the tool manifest lives in
         the public memory record apps.{appId}.tools and the tool must bind a capability via
-        action_id). All items must belong to the same seller owner. Prices are quoted from the
-        live offer/tool document at creation time (cross-owner purchase requires a declared
-        price; private offers are owner-only; self-purchase is free) — morsels are integers,
-        money currencies are 6-decimal micro-units. Sessions expire after one hour. An app-tool or
+        action_id), or the operator's pacing pack ({kind:'pacing-pack', quantity}, no offer_id;
+        404 PACING_PACK_UNAVAILABLE when the node sells none, 422 SELF_PURCHASE for the operator).
+        All items must belong to the same seller owner. Prices are quoted from the live offer/tool
+        document at creation time (private offers are owner-only; self-purchase is free). The
+        session has two values. `currency` is always a money code (EUR or USD; a 3.x request with
+        'morsel' is read as if no currency was named) and `total` is money in 6-decimal micro-units,
+        where 0 means the items are free. `pacingMorsels` is the pacing the items take when the
+        session completes, and each line carries its `tollMorsels`; a morsel is pacing, never a
+        price. Sessions expire after one hour. An app-tool or
         ext-call item whose extension serves an app with access `members-only` answers 403
         MEMBERS_ONLY for a buyer who is not a member, before any session opens or anything is
         collected.
@@ -27122,7 +27348,7 @@ paths:
                     type: object
                     description: Needs offer_id (offers), tool (app-tools), or app+tool (ext-call).
                     properties:
-                      kind: { type: string, enum: [offer, app-tool, ext-call, package], default: offer, description: 'package: agent is the repository node id, app the package group id, offer_id "buy" or "renew:<node id>", input { node: { node_id, url, public_key }, auto_renew }.' }
+                      kind: { type: string, enum: [offer, app-tool, ext-call, package, pacing-pack], default: offer, description: 'package: agent is the repository node id, app the package group id, offer_id "buy" or "renew:<node id>", input { node: { node_id, url, public_key }, auto_renew }. pacing-pack: only quantity; the pack is the one GET /v1/wallet names as pacing_pack, sold by the operator in its own currency.' }
                       agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
                       offer_id: { type: string }
                       tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools; ext-call: the action id' }
@@ -27130,7 +27356,7 @@ paths:
                       input: { type: object, description: 'app-tool: buyer input forwarded to the capability invoke at completion' }
                       quantity: { type: integer, minimum: 1, maximum: 1000, default: 1, description: app-tool items are limited to 1 }
                 note: { type: string, maxLength: 2000 }
-                currency: { type: string, description: "'morsel' (default) or a money code with a registered handler (amounts in 6-decimal micro-units)" }
+                currency: { type: string, description: "A money code with a registered handler (EUR or USD; amounts in 6-decimal micro-units). Omitted, or 'morsel' from a 3.x client (deprecated until 4.0.0): the first money currency every item is priced in, and EUR for a cart of free items. A pacing pack is sold in the pack's own currency." }
                 attribution:
                   type: object
                   additionalProperties: false
@@ -27140,13 +27366,15 @@ paths:
                     utm_source: { type: string, maxLength: 100, nullable: true }
       responses:
         '201':
-          $ref: '#/components/responses/AimeatSuccess'
-        '402':
-          description: Insufficient balance (on complete)
+          description: >
+            The session: `{ id, status, currency, total, pacingMorsels, items, … }`. `currency` is a
+            money code, `total` is money micro-units (0 = free), `pacingMorsels` is the pacing charged
+            on complete.
+          content: { application/json: { schema: { $ref: '#/components/schemas/AimeatEnvelope' } } }
         '404':
-          description: Agent or offer not found
+          description: Agent or offer not found / PACING_PACK_UNAVAILABLE
         '422':
-          description: Offer not for sale / multi-seller cart
+          description: Offer not for sale / multi-seller cart / CURRENCY_NOT_SUPPORTED / SELF_PURCHASE
 
   /v1/commerce/checkout-sessions/{id}:
     get:
@@ -27202,8 +27430,8 @@ paths:
         entry (sku "offer:<agentGaii>:<offerId>"), plus every app-tool with a money price from
         public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>"; fulfillment
         'call' = synchronous capability invoke, 'task' = agent TASK for the app owner). Every
-        price is money in 6-decimal micro-units ({ amount, currency, unit, scale: 6 }); an item
-        priced only in morsels is not listed, because a morsel is not a currency.
+        price is money in 6-decimal micro-units ({ amount, currency, unit, scale: 6 }). A free item
+        (one with pacing only) is not listed, because a morsel is pacing and not a currency.
         Discovery: /.well-known/acp.json.
       tags: [Commerce]
       responses:
@@ -27255,7 +27483,7 @@ paths:
       description: >-
         Every priced app-tool from every PUBLIC apps.{appId}.tools manifest, as normalized
         entries — sku "app-tool:<owner>/<appId>:<tool>", inputSchema, fulfillment 'call'|'task',
-        morsel/micro-unit money price, the WebMCP listing/invoke URLs, and a ready-made
+        money price in micro-units and its pacing amount, the WebMCP listing/invoke URLs, and a ready-made
         checkout_item. The MCP Server Card's commerce_tools block embeds (inline mode, default)
         or links (pointer mode) this catalog (TARGET-034 phase D).
         A tool sold in money carries every money price it declares in pricesMoney (one per
@@ -27297,7 +27525,7 @@ paths:
         The app's PUBLIC apps.{appId}.tools manifest served as WebMCP tool descriptors
         (name, description, inputSchema — the fields document.modelContext.registerTool takes)
         plus the AIMEAT payment contract per tool: fulfillment 'call' | 'task', and for priced
-        tools the morsel/micro-unit money price with a ready-made checkout line item. The page
+        tools the money price in micro-units, the pacing, and a ready-made checkout line item. The page
         itself registers the same tools in-browser via /v1/libs/aimeat-webmcp.js (TARGET-034 phase C).
         Also carries `app_surface`: the app's public agent-facing description — declared scopes,
         SKILL.md packs bound to the app, bundled crew-defs, live EXCHANGE listings for its tools, and
@@ -27506,7 +27734,9 @@ paths:
         URL) is fetched best-effort for capability negotiation. Item ids:
         "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>". A session here is
         always in money: the requested currency, or else the first money currency every item is
-        priced in. An item with no money price is refused with MONEY_PRICE_REQUIRED.
+        priced in. An item with no money price (a free item with pacing only) is refused with 422
+        MONEY_PRICE_REQUIRED, and a free session opened through /v1/commerce/checkout-sessions is
+        not shown here.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27573,8 +27803,9 @@ paths:
       summary: ACP checkout — create session by sku
       description: >-
         A session here is always in money: the requested currency, or else the first money
-        currency every item is priced in. An item with no money price is refused with
-        MONEY_PRICE_REQUIRED.
+        currency every item is priced in. An item with no money price (a free item with pacing
+        only) is refused with 422 MONEY_PRICE_REQUIRED, and a free session opened through
+        /v1/commerce/checkout-sessions is not shown here.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27626,8 +27857,18 @@ paths:
       operationId: completeCheckoutSession
       summary: Complete a checkout session (charge + fulfill)
       description: >-
-        Charges the buyer through the selected payment handler (default io.aimeat.morsels;
-        marketplace fee applies), fulfills each line item — offers create a TASK on the seller
+        Charges the pacing first: `pacingMorsels` leaves the buyer's owner (the burn rate's share
+        burns, the checkout's operator share `commerce.fee_percent` goes where the fee policy sends
+        it, the seller's owner gets the rest), and a buyer who cannot cover it is refused with 402
+        INSUFFICIENT_MORSELS having paid nothing. Then, when `total` is above 0, it collects the money
+        through the payment handler named in `payment.handler` (marketplace fee applies); a free
+        session needs no handler. There is no morsel handler: `io.aimeat.morsels` no longer exists. A
+        3.x client that still sends it is ignored on a free session and answered 422
+        PAYMENT_HANDLER_REQUIRED on a money session. An open session stored before 2026-10-11 in
+        currency 'morsel' answers 409 SESSION_REPRICED: open a new checkout for the same items. The
+        receipt is `{ handler, charged, earned, fee, trackingCode, pacing? }`, where `handler` is
+        'none' for a free session, `charged` is money micro-units and `pacing` is a PacingReceipt. A
+        failure after the charge gives the pacing back. It then fulfills each line item: offers create a TASK on the seller
         agent (the offer-ask path); app-tools with an action_id binding invoke the backing
         capability with the buyer's persisted input (result on session.fulfillment.results),
         unbound app-tools queue an agent TASK for the manifest agent or the app owner
@@ -27664,19 +27905,29 @@ paths:
                 payment:
                   type: object
                   properties:
-                    handler: { type: string, description: 'Payment handler id (default io.aimeat.morsels; com.coinbase.x402 for USDC/x402)' }
+                    handler: { type: string, description: 'Payment handler id. Required only when the session total is above 0; ignored on a free session. com.coinbase.x402 for USDC/x402. There is no morsel handler.' }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '402':
           description: >-
-            Payment required. The body carries the x402 accepts[] envelope: the AIMEAT-native
-            schemes (aimeat-checkout, aimeat-morsel-topup) plus, on an x402-enabled money session
-            with a seller USDC address, the real x402 `exact` scheme to sign and retry via X-PAYMENT.
+            Payment required, or INSUFFICIENT_MORSELS when the buyer's owner cannot cover the pacing.
+            The body carries the PaymentChallenge: the AIMEAT-native schemes (aimeat-checkout per
+            money handler, aimeat-morsel-topup naming the daily allowance and, when the operator sells
+            one, the pacing pack) plus, on an x402-enabled money session with a seller payout
+            address, the real x402 `exact` scheme to sign and retry via X-PAYMENT.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - $ref: '#/components/schemas/PaymentChallenge'
         '409':
-          description: Session not open or expired
+          description: Session not open or expired / SESSION_REPRICED (an open session stored in currency 'morsel' before 2026-10-11)
         '422':
-          description: Unknown payment handler / currency mismatch / seller has no x402 USDC address
+          description: PAYMENT_HANDLER_REQUIRED (a money session without payment.handler, or with io.aimeat.morsels; the message lists the handlers that settle its currency) / UNKNOWN_PAYMENT_HANDLER / CURRENCY_MISMATCH / seller has no x402 payout address
+        '502':
+          description: FULFILLMENT_FAILED. A line could not be fulfilled; the money and the pacing went back. A pacing pack past the node's daily mint ceiling ends here, with the reason in the message.
 
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:
@@ -28852,6 +29103,16 @@ paths:
         Refuses the WHOLE request with 403 `SEALED_CONFIG` when any path in it was sealed by the
         node's host, applying none of the other changes in the same request. The error `details`
         carry `sealed`, the list of offending paths.
+
+        Pacing settings. `morsel_policy.burn_rate` (0.0 to 1.0) is the share of every pacing charge
+        that burns; the provider gets the rest, after the flow's own operator share
+        (`commerce.fee_percent`, `marketplace.tx_fee_percent`) where the flow has one. The pacing
+        pack, morsels a user buys with money from the operator: `morsel_policy.pacing_pack_morsels`
+        (0 to 100000), `morsel_policy.pacing_pack_price` (micro-units, 1 EUR = 1000000) and
+        `morsel_policy.pacing_pack_currency` (EUR or USD); environment `AIMEAT_PACING_PACK_MORSELS`,
+        `AIMEAT_PACING_PACK_PRICE`, `AIMEAT_PACING_PACK_CURRENCY`. No pack is sold while either number
+        is 0. Morsels from sold packs count against `morsel_policy.max_operator_mint_per_day`
+        together with operator mints.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -30495,7 +30756,8 @@ paths:
                 access_code: { type: string, description: 4-64 chars; gates downloads }
                 screenshot: { type: string, description: 'Base64 PNG, JPEG, WebP, GIF or AVIF image, checked by its bytes before anything is published; anything else is refused with 400' }
                 screenshot_mime_type: { type: string, description: 'Optional. When given, image/png, image/jpeg or image/webp; the bytes decide what is stored' }
-                price_morsels: { type: number }
+                toll_morsels: { type: integer, minimum: 0, maximum: 100, description: 'Pacing amount in morsels a licence takes (stored in the manifest as tollMorsels). Not a price.' }
+                price_morsels: { type: number, deprecated: true, description: 'Deprecated until 4.0.0: read as pacing and added to toll_morsels. From 4.0.0 refused with 400 MORSEL_PRICE_REMOVED.' }
                 license_type: { type: string, enum: [single, lifetime] }
                 uses_cortex:
                   type: array
@@ -33958,7 +34220,7 @@ paths:
         (`<agent_name>-<slug(app_id)>`, any owner; source `deployed`) plus the app AUTHOR's
         original agent under the plain agent_name (source `author`). Each instance carries its
         owner, liveness (last_seen / online), trust score, and the offers that host explicitly
-        marked `visibility: public` - with their morsel and/or money prices. Sorted live +
+        marked `visibility: public` - with their money price, if any. Sorted live +
         offer-bearing first. optionalAuth: exposes nothing beyond the public agents directory
         plus explicitly-public offers; `is_yours` marks the viewer's own instances when
         authenticated. Ordering/checkout of a hosted offer uses the existing offers surfaces
@@ -34013,6 +34275,8 @@ paths:
                                       price:
                                         type: object
                                         nullable: true
+                                        deprecated: true
+                                        description: Deprecated until 4.0.0. The offer's pacing amount under its old name; a morsel is pacing, not a price. Read the offer's `tollMorsels` through GET /v1/agents/{name}/offers.
                                         properties:
                                           morsels: { type: integer }
                                           unit: { type: string }
@@ -41458,9 +41722,13 @@ paths:
       operationId: purchaseApp
       summary: Purchase an app
       description: |
-        Purchase an app with morsels. Debits buyer, credits seller (minus
-        transaction fee), creates an immutable purchase receipt with
-        snapshotted app content and cryptographic signature.
+        Take a licence to an app. A morsel is pacing, never a price: the purchase is one pacing
+        charge of the app's `tollMorsels` (its manifest field; the deprecated `priceMorsels` is read
+        as pacing until release 4.0.0). The burn rate's share burns, the marketplace share
+        (`marketplace.tx_fee_percent`) goes where the fee policy sends it, and the seller's owner gets
+        the rest. Creates an immutable purchase receipt with snapshotted app content and a
+        cryptographic signature. A buyer who cannot cover the pacing is refused with 402
+        INSUFFICIENT_MORSELS.
       tags: [App Store]
       security:
         - BearerAuth: []
@@ -41502,10 +41770,20 @@ paths:
                           license_type:
                             type: string
                             enum: [single, lifetime]
+                          toll_morsels:
+                            $ref: '#/components/schemas/TollMorsels'
+                          pacing:
+                            $ref: '#/components/schemas/PacingReceipt'
                           price_morsels:
                             type: integer
+                            deprecated: true
+                            description: Deprecated until 4.0.0. Mirrors `toll_morsels`; not sent from 4.0.0.
                           transaction_fee_morsels:
                             type: integer
+                            deprecated: true
+                            description: Deprecated until 4.0.0. Mirrors the operator's share of the pacing (`pacing.fee`); not sent from 4.0.0.
+                          deprecated:
+                            $ref: '#/components/schemas/MorselPriceDeprecation'
                           purchased_at:
                             type: string
                             format: date-time
@@ -41558,8 +41836,15 @@ paths:
                                   type: integer
                                 license_type:
                                   type: string
+                                toll_morsels:
+                                  type: integer
+                                  description: The pacing amount this purchase took. A morsel is pacing, not a price.
                                 price_morsels:
                                   type: integer
+                                  deprecated: true
+                                  description: Deprecated until 4.0.0. Mirrors `toll_morsels`; not sent from 4.0.0.
+                                deprecated:
+                                  $ref: '#/components/schemas/MorselPriceDeprecation'
                                 seller_owner:
                                   type: string
                                   description: The seller's account name, or an `erased:` pseudonym once the seller's account has been deleted.
@@ -41616,10 +41901,22 @@ paths:
                             type: integer
                           license_type:
                             type: string
+                          toll_morsels:
+                            type: integer
+                            description: The pacing amount this purchase took. A morsel is pacing, not a price.
+                          operator_share_morsels:
+                            type: integer
+                            description: The operator's share of that pacing.
                           price_morsels:
                             type: integer
+                            deprecated: true
+                            description: Deprecated until 4.0.0. Mirrors `toll_morsels`; not sent from 4.0.0.
                           transaction_fee_morsels:
                             type: integer
+                            deprecated: true
+                            description: Deprecated until 4.0.0. Mirrors `operator_share_morsels`; not sent from 4.0.0.
+                          deprecated:
+                            $ref: '#/components/schemas/MorselPriceDeprecation'
                           purchased_at:
                             type: string
                             format: date-time
@@ -41680,10 +41977,22 @@ paths:
                                   type: integer
                                 license_type:
                                   type: string
+                                toll_morsels:
+                                  type: integer
+                                  description: The pacing amount this purchase took. A morsel is pacing, not a price.
+                                operator_share_morsels:
+                                  type: integer
+                                  description: The operator's share of that pacing.
                                 price_morsels:
                                   type: integer
+                                  deprecated: true
+                                  description: Deprecated until 4.0.0. Mirrors `toll_morsels`; not sent from 4.0.0.
                                 transaction_fee_morsels:
                                   type: integer
+                                  deprecated: true
+                                  description: Deprecated until 4.0.0. Mirrors `operator_share_morsels`; not sent from 4.0.0.
+                                deprecated:
+                                  $ref: '#/components/schemas/MorselPriceDeprecation'
                                 buyer_owner:
                                   type: string
                                   description: The buyer's account name, or an `erased:` pseudonym once the buyer's account has been deleted.
@@ -44927,12 +45236,15 @@ paths:
         The request body is action-specific and defined by the extension manifest.
         Requires authentication (Tier 1+).
 
-        Pricing (per-action, optional; declared in the manifest): the extension owner always calls
-        free. A non-owner may owe (a) an anti-abuse `tollMorsels` burn and/or (b) payment when the
-        action declares `commercial` — `payMorsels` (charged to the caller, credited to the owner)
-        and/or `payMoney`. The money channel requires a one-time token: settle a checkout
-        (`kind: ext-call`) to receive an `x-aimeat-pay-token`, then retry this call with that header.
-        Any of these that the caller cannot satisfy returns 402.
+        Pacing and price (per action, optional; declared in the manifest): the extension owner always
+        calls free. A non-owner owes (a) the pacing amount `tollMorsels` (else the node default),
+        taken from the caller's owner: the burn rate's share burns and the rest goes to the extension
+        owner; and (b) a money price when the action declares `commercial.payMoney`. A morsel is
+        pacing, never a price: the deprecated `commercial.payMorsels` is read as pacing and added to
+        `tollMorsels` until release 4.0.0, so an action with only a morsel price is free. The money
+        channel requires a one-time token: settle a checkout (`kind: ext-call`) to receive an
+        `x-aimeat-pay-token`, then retry this call with that header. Either one the caller cannot
+        satisfy returns 402; the pacing goes back when the call is refused later or the script throws.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -44979,8 +45291,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '402':
           description: |
-            Payment required — the caller could not cover the action's toll and/or price
-            (insufficient morsels, or a `payMoney` action invoked without a valid one-time token).
+            Payment required: the caller's owner could not cover the pacing (INSUFFICIENT_MORSELS),
+            or a `payMoney` action was invoked without a valid one-time token.
             The body carries an x402 `accepts` challenge describing how to settle.
           content:
             application/json:
@@ -68762,9 +69074,11 @@ paths:
                                 cost:
                                   type: object
                                   properties:
-                                    base_price: { type: integer, description: What the provider is paid on delivery. }
+                                    toll: { type: integer, description: The pacing amount held for the provider and paid on delivery. }
+                                    base_price: { type: integer, deprecated: true, description: Deprecated mirror of toll, until 4.0.0. }
+                                    deprecated: { $ref: '#/components/schemas/MorselPriceDeprecation' }
                                     network_fee: { type: integer, description: Split between the nodes and the registry, part of it burned. }
-                                    total: { type: integer, description: base_price plus network_fee, the whole price of the job. }
+                                    total: { type: integer, description: toll plus network_fee, all the morsels the job holds. }
                                     in_escrow:
                                       type: integer
                                       description: >-
@@ -68871,7 +69185,8 @@ paths:
       summary: Mint morsels for an agent
       description: |
         Operator only. Credits morsels to the owner behind a GAII, subject to a daily mint cap
-        (`max_operator_mint_per_day`). Returns 429 when the daily cap would be exceeded.
+        (`max_operator_mint_per_day`). Morsels sold as pacing packs count against the same cap.
+        Returns 429 when the daily cap would be exceeded.
       security:
         - BearerAuth: []
       requestBody:
@@ -69359,7 +69674,7 @@ paths:
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: fiscal_year_id, in: query, schema: { type: string } }
-        - { name: source, in: query, schema: { type: string, enum: [stripe, checkout, invoice, receipt, manual, morsel] } }
+        - { name: source, in: query, schema: { type: string, enum: [stripe, checkout, invoice, receipt, manual] } }
         - { name: direction, in: query, schema: { type: string, enum: [income, expense, transfer] } }
         - { name: from, in: query, schema: { type: string, format: date } }
         - { name: to, in: query, schema: { type: string, format: date } }

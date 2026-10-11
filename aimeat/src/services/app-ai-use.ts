@@ -14,7 +14,7 @@
  *   THE SAME PUBLIC FACTS THE WEBMCP LISTING SERVES. The tools are the app's public tool manifest
  *   read through publicManifestTools, the listing's own gate, the skills are what
  *   listSkillsByBinding gives a caller who is not signed in, and an app the listing refuses (an
- *   access code, an operator hide, a price) gets no mark: appHiddenFromPublicSurfaces is that
+ *   access code, an operator hide, a pacing amount to take first) gets no mark: appHiddenFromPublicSurfaces is that
  *   listing's own test, moved here so the two cannot disagree.
  * @structure
  *   - appHiddenFromPublicSurfaces(config, app) — the WebMCP listing's refusal test
@@ -23,6 +23,7 @@
  * @usage
  *   const aiUse = await appAiUse(storage, config, app);   // → applyServeMarks({ aiUse: … })
  * @version-history
+ *   v1.0.1 -- 2026-10-11 -- The gated test reads the app's pacing amount (appIsPaced); a morsel is pacing, not a price.
  *   v1.0.0 -- 2026-10-09 -- Initial (wish-ai-skill-and-ai-app-tool-badges-on-a-published-app-with-a-pa).
  */
 import type { AimeatConfig } from '../config.js';
@@ -33,18 +34,19 @@ import { listSkillsByBinding } from './skills.js';
 import { cached, TTL } from './cache.js';
 import { logger } from '../utils/logger.js';
 import { appAiUseOn, type AppAiUse } from '../utils/app-ai-use-badge.js';
+import { appIsPaced } from './app-pacing.js';
 export type { AppAiUse } from '../utils/app-ai-use-badge.js';
 
 /** The fields of an app record the decision reads. */
 type AppFacts = Pick<AppRecord, 'ownerName' | 'ownerGaii' | 'filename' | 'accessCode' | 'operatorHidden' | 'manifest'>;
 
-/** True when an app must not be described on a public surface (gated, priced, or moderated away). */
+/** True when an app must not be described on a public surface (gated, taken first for its pacing amount, or moderated away). */
 export function appHiddenFromPublicSurfaces(
   config: Pick<AimeatConfig, 'marketplaceEnabled'>, app: Pick<AppRecord, 'accessCode' | 'operatorHidden' | 'manifest'>,
 ): boolean {
   if (app.accessCode) return true;
   if (app.operatorHidden) return true;
-  if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) return true;
+  if (appIsPaced(config, app.manifest)) return true;
   return false;
 }
 

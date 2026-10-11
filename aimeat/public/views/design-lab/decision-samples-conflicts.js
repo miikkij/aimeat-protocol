@@ -15,6 +15,7 @@
  * @structure CONFLICT_SAMPLES — { [decisionId]: [{ id, measure, solo?, render(), after }] } · CONFLICT_PROPOSALS — { [decisionId]: { measure, render() } }
  * @usage import { CONFLICT_SAMPLES, CONFLICT_PROPOSALS } from './decision-samples-conflicts.js';
  * @version-history
+ *   v1.4.2 — 2026-10-11 — The ecosystem sample's walkthrough line names the guide's GitHub address.
  *   v1.4.1 — 2026-09-27 — The Nodes head's picture finds the Tabs bar by its own name (.tab-row--bar);
  *     the old row (.sub-tabs) keeps its rule in design-lab-proposals.css. The MCP guide's pictures
  *     wear the guide's and the block's own names (.setup-guide-*, .instruction-block-*), the same rules.
@@ -286,7 +287,7 @@ export const CONFLICT_SAMPLES = {
       after: toRows(NODE_STEPS.map((s) => s.replace(/^\d+\.\s*/, ''))) },
     { id: 'ecosystem-how', measure: '.pf-eco-auto-how-steps li', solo: '.pf-eco-auto-how', render: () => pf(html`<div class="pf-eco-auto-how">
       <p class="poster-hint">The app and your agents never talk directly. AIMEAT sits in between. It runs top to bottom:</p>
-      <ol class="pf-eco-auto-how-steps">${items(ECO_STEPS)}</ol><p class="poster-hint pf-eco-auto-how-doc">Full walkthrough: docs/ecosystem-app-automation-howto.md.</p></div>`),
+      <ol class="pf-eco-auto-how-steps">${items(ECO_STEPS)}</ol><p class="poster-hint pf-eco-auto-how-doc">Full walkthrough: github.com/miikkij/aimeat-protocol/blob/main/docs/ecosystem-app-automation-howto.md.</p></div>`),
       after: toRows(ECO_STEPS) },
     { id: 'ai-decide-order', measure: '.pf-dr-order li', solo: '.pf-dr-order', render: () => pf(html`<div class="pf-dr"><ol class="pf-dr-order">${items(DECIDE_ORDER)}</ol></div>`),
       after: toRows(DECIDE_ORDER) },

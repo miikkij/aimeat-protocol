@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-10-11 — A morsel is pacing, never a price: AppManifest.priceMorsels is
+ *     `tollMorsels`, and AppPurchaseRecord's priceMorsels / transactionFeeMorsels are `tollMorsels` /
+ *     `operatorShareMorsels` (the SQL columns keep their names).
  *   v1.15.0 — 2026-10-02 — AppManifest gains `designSpec`: the design spec's stamp (services/app-design-spec.ts).
  *   v1.14.0 — 2026-10-02 — AppManifest gains `formatMd`: the owner's extension action that answers ?format=md.
  *   v1.13.0 — 2026-10-02 — AppManifest gains `workspaces`: the workspaces an app declares it needs.
@@ -165,7 +168,14 @@ export interface AppManifest {
    * forward. The contract is what the set composer matches on.
    */
   workspaces?: Array<{ contract: string; name: string; manifest: Record<string, unknown>; schemas?: Record<string, Record<string, unknown>>; readme?: string }>;
-  priceMorsels?: number;        // 0 or absent = free
+  /**
+   * The app's PACING amount: the morsels taking the app once moves (POST /v1/app-store/purchase),
+   * 0 or absent = unpaced. A morsel is pacing, never a price, and an app has no money price yet. A
+   * manifest stored before 2026-10-11 under the old key `priceMorsels` is read as this field by both
+   * storage providers (storage/app-manifest-pacing.ts); responses mirror it as the deprecated
+   * `priceMorsels` until 4.0.0 (services/app-pacing.ts).
+   */
+  tollMorsels?: number;
   licenseType?: 'single' | 'lifetime';
   // Provenance: when this app was created by forking another app, this records the
   // source it derived from (cross-owner). Set by the fork endpoint, never accepted
@@ -438,6 +448,7 @@ export interface AppListOptions {
   sort?: 'newest' | 'popular';
   limit?: number;
   offset?: number;
+  /** Only apps with no pacing amount (`tollMorsels` absent or 0): the ones opened without taking them first. */
   freeOnly?: boolean;
   // When set, parked AND operator-hidden apps are excluded UNLESS they belong to
   // this GHII, so an owner sees their own parked / operator-hidden apps in listings
@@ -474,8 +485,10 @@ export interface AppPurchaseRecord {
   appName: string;                // from manifest at purchase time
   appVersionNumber: number;
   licenseType: 'single' | 'lifetime';
-  priceMorsels: number;
-  transactionFeeMorsels: number;
+  /** The pacing amount the take moved. Stored in the column `priceMorsels` (the 3.x name). */
+  tollMorsels: number;
+  /** The operator's share of that pacing amount. Stored in the column `transactionFeeMorsels`. */
+  operatorShareMorsels: number;
   purchasedAt: string;            // ISO timestamp
   appContent: string;             // base64-encoded full app content
   appManifest: AppManifest;       // manifest snapshot at purchase time

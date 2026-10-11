@@ -33,7 +33,7 @@ import type { ActionRecord } from '../../src/storage/types/commerce.js';
 
 const published: ActionRecord = {
     id: 'mine', providerGaii: 'bot#opr@node', displayName: 'Mine', description: 'The operator\'s own gate.',
-    inputSchema: {}, outputSchema: {}, pricing: { baseMorsels: 0 }, tags: [],
+    inputSchema: {}, outputSchema: {}, pricing: { tollMorsels: 0 }, tags: [],
     webhookUrl: 'https://operator.example/mine',
     createdAt: '2026-09-01T00:00:00.000Z', updatedAt: '2026-09-01T00:00:00.000Z',
 } as ActionRecord;

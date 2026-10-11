@@ -15,6 +15,7 @@
  * @usage import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
  *   served at GET /v1/prompts/draft-offer
  * @version-history
+ *   v1.0.1 — 2026-10-11 — The agent guide is named by its GitHub address; a repository path does not open from a node.
  *   v1.0.0 — 2026-06-13 — Initial: guided offer-drafting prompt (offering/billable/workflow levels).
  */
 
@@ -79,4 +80,4 @@ Hard rules (these keep the offer honest — follow them exactly):
 After publishing, verify with aimeat_memory_read key="agents.{{agent_name}}.offers". Your onboarding
 "Declare Offerings" (and, if you added signals/pricing, "Make Workflow-Compatible" / "Price an Offer")
 steps tick automatically on the next aimeat_onboarding_status. Full spec:
-docs/building-an-aimeat-compatible-agent.md.`;
+https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md`;

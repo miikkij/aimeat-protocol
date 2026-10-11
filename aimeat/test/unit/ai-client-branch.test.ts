@@ -12,6 +12,9 @@
  *        their own app requires.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-client-branch.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-11 — Six more tools from the merged table (Mistral, LM Studio, Gemini CLI,
+ *     Perplexity, OpenClaw, Copilot Studio), Cursor among the paid-tier apps, and the table's own
+ *     capability held equal to the branch's. Imports from ai-tool-branch.ts.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 1).
  */
 import { describe, it, expect } from 'vitest';
@@ -24,9 +27,9 @@ import {
     normalizeAiClientClaim,
     aiClientQuestionOptions,
     aiClientVariantOptions,
-    buildAiToolSetup,
     type AiToolId,
-} from '../../src/services/ai-tool-setup.js';
+} from '../../src/services/ai-tool-branch.js';
+import { buildAiToolSetup } from '../../src/services/ai-tool-setup.js';
 
 const config = { nodeId: 'aimeat-test-node', baseUrl: 'https://test.example' } as any;
 
@@ -83,6 +86,15 @@ describe('every one of the eight resolves, in the spellings people actually writ
         vscode: ['vscode', 'VS Code', 'Visual Studio Code', 'GitHub Copilot', 'copilot',
             'VS Code (Copilot)', 'Copilot Chat'],
         grok: ['grok', 'Grok', 'grok.com', 'x.ai', 'xAI Grok'],
+        goose: ['goose', 'Block goose', 'goose desktop'],
+        mistral: ['mistral', 'Mistral Le Chat', 'Le Chat', 'Mistral Vibe', 'mistral.ai'],
+        lmstudio: ['lmstudio', 'LM Studio', 'lm-studio', 'LM Studio Bionic'],
+        // The bare id is the variant answer of the Gemini question (ai-client-families.ts), so the
+        // table entry is reached by a claim that only contains it.
+        'gemini-cli': ['Gemini CLI 0.9', 'running in gemini cli'],
+        perplexity: ['perplexity', 'Perplexity', 'perplexity.ai', 'Perplexity Pro'],
+        openclaw: ['openclaw', 'OpenClaw', 'an OpenClaw agent'],
+        'copilot-studio': ['Microsoft Copilot Studio agent', 'an agent built in copilot studio'],
     };
 
     for (const [id, spellings] of Object.entries(SPELLINGS) as [AiToolId, string[]][]) {
@@ -106,8 +118,9 @@ describe('every one of the eight resolves, in the spellings people actually writ
 });
 
 describe('an app name never sends anyone to branch B', () => {
-    it('the six free-tier-capable apps go straight to A', () => {
-        for (const id of ['claude-web', 'claude-desktop', 'claude-code', 'codex', 'cursor', 'vscode']) {
+    it('the free-tier-capable apps go straight to A', () => {
+        for (const id of ['claude-web', 'claude-desktop', 'claude-code', 'codex', 'vscode', 'goose',
+            'mistral', 'lmstudio', 'openclaw']) {
             expect(capabilityOf(id)).toBe('yes');
             const d = branchOf(id);
             expect(d, `${id} must go straight to A`).toMatchObject({ branch: 'A', reason: 'known-capable' });
@@ -122,10 +135,18 @@ describe('an app name never sends anyone to branch B', () => {
         }
     });
 
-    it('the two paid-tier apps are ASKED about the tier, not refused', () => {
-        for (const id of ['chatgpt', 'grok'] as const) {
+    it('the paid-tier apps are ASKED about the tier, not refused', () => {
+        // Cursor since 2026-10-11: its pricing page lists MCP on the paid Individual plan only.
+        for (const id of ['chatgpt', 'grok', 'cursor', 'perplexity'] as const) {
             expect(capabilityOf(id)).toBe('plan-dependent');
             expect(branchOf(id)).toMatchObject({ branch: 'ask', question: 'paid-plan', toolId: id });
+        }
+        expect(capabilityOf('copilot-studio')).toBe('plan-dependent');
+    });
+
+    it('the plan line of the table and the branch agree on which tools need a paid tier', () => {
+        for (const tool of buildAiToolSetup(config)) {
+            expect(capabilityOf(tool.id), tool.id).toBe(tool.mcp.capability ?? 'yes');
         }
     });
 

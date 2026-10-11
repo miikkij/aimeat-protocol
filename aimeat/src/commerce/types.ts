@@ -12,6 +12,9 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   v1.6.0 — 2026-10-11 — A morsel is pacing, never a price: Sellable.priceMorsels is unitPrice (it
+ *     always carried money micro-units), and a sellable, a line, a session and a receipt carry their
+ *     pacing in morsels beside the money (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.5.0 — 2026-10-09 — FulfillOutcome.sellerResult: what the seller's order copy carries in place of
  *     a result that belongs to the buyer alone (secrets audit 2026-10-09, S-3).
  *   v1.4.0 — 2026-10-08 — CheckoutSessionRecord.guest: a buyer with no account (an AI shopping
@@ -50,10 +53,16 @@ export interface Sellable {
   sellerOwner: string;
   sellerGhii: string;
   /**
-   * Unit price in the session currency — morsels, or minor units for money currencies;
-   * 0 for self-purchase (an owner "buying" from their own agent is free).
+   * Unit price in the session's money currency, in 6-decimal micro-units; 0 when the item is free,
+   * and for self-purchase (an owner "buying" from their own agent is free).
    */
-  priceMorsels: number;
+  unitPrice: number;
+  /**
+   * Pacing amount per unit: morsels charged from the buyer's owner at completion, part burned and the
+   * rest credited to the seller (services/metered-settlement.ts chargePacing). Never a price. 0 for
+   * self-purchase and for an item that declares none.
+   */
+  tollMorsels: number;
   /**
    * The SELLER's PSP credentials for money currencies (opaque to core; e.g. { provider:'stripe',
    * secretKey }). Loaded by the resolver from the seller's own records — money always settles on
@@ -116,14 +125,27 @@ export interface CheckoutLineItem {
   /** Snapshot fields resolved from the offer (price may change later; the session keeps its quote). */
   title: string;
   unitPrice: number;
+  /** Pacing morsels per unit, quoted with the price. Absent on lines opened before 2026-10-11. */
+  tollMorsels?: number;
+}
+
+/** What the pacing of a completed session moved, in whole morsels (never a price). */
+export interface PacingReceipt {
+  morsels: number;
+  burned: number;
+  fee: number;
+  providerEarned: number;
+  trackingCode: string;
 }
 
 export interface CheckoutReceipt {
+  /** The money handler that collected, or 'none' for a session with nothing to pay in money. */
   handler: string;
   charged: number;
   earned: number;
   fee: number;
   trackingCode: string;
+  pacing?: PacingReceipt;
 }
 
 /**
@@ -155,9 +177,15 @@ export interface CheckoutSessionRecord {
   sellerOwner: string;
   sellerGhii: string;
   items: CheckoutLineItem[];
-  /** 'morsel' (default) or an ISO money code (amounts in 6-decimal micro-units). */
+  /**
+   * An ISO money code (amounts in 6-decimal micro-units). A session of free items is priced at 0 in
+   * the node's default currency. 'morsel' appears only on sessions stored before 2026-10-11, and is
+   * read through presentSession() (commerce/session-present.ts) as free plus paced.
+   */
   currency: string;
   total: number;
+  /** Pacing morsels for the whole session (sum of line tollMorsels × quantity). Never part of `total`. */
+  pacingMorsels?: number;
   note?: string;
   receipt?: CheckoutReceipt;
   /** Fulfillment: agent tasks created on completion (offer-ask → TASK path) and/or inline
@@ -203,20 +231,21 @@ export interface PaymentResult {
 }
 
 /**
- * A payment method provider. Core registers all of them: `io.aimeat.morsels` (this node's ledger),
- * `com.stripe.spt` (cards on the SELLER's own Stripe account), `io.aimeat.invoice` (settled
- * offline) and `com.coinbase.x402` (stablecoin, when enabled) — one registry, one contract.
+ * A money payment method provider. Core registers all of them: `com.stripe.spt` (cards on the
+ * SELLER's own Stripe account), `io.aimeat.invoice` (settled offline) and `com.coinbase.x402`
+ * (stablecoin, when enabled) — one registry, one contract. No handler settles morsels: a morsel is
+ * pacing, charged by the session service beside the money price.
  *
  * The money flow is split so custom distributions reuse the same handler:
  * `collect` takes the gross from the buyer, `payout` pays one recipient, `refund` reverses a
  * collect. The session service orchestrates: collect → fulfill → payouts/distribute → fee leg.
  */
 export interface PaymentHandler {
-  /** Reverse-DNS handler id advertised in the UCP profile (e.g. `io.aimeat.morsels`). */
+  /** Reverse-DNS handler id advertised in the UCP profile (e.g. `io.aimeat.invoice`). */
   id: string;
   /** Human-readable name for discovery surfaces. */
   title: string;
-  /** Currencies this handler settles (e.g. ['morsel'] or ['USD', 'EUR']). */
+  /** Money currencies this handler settles (e.g. ['USD', 'EUR']). */
   currencies: string[];
   /**
    * Take the gross amount from the buyer (or their payment instrument).

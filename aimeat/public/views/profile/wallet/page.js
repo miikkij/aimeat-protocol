@@ -13,6 +13,7 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.23.0 — 2026-10-11 — The mast names the pacing pack when the operator sells one ("pacing capacity: 500 morsels for 5,00 €", GET /v1/wallet pacing_pack); a 3.x session in currency 'morsel' is never counted as money.
  *   v1.22.0 — 2026-10-03 — The page's start (components/PageStart.js: the first prompt asks the person's AI about their morsels, its button opens the history) and the title's question mark, concept.morsel (guidance part B).
  *   v1.21.0 — 2026-09-26 — On the component kit (page group G7): the frame, crumb, head, rail and
  *     strip are SettingsPage and FigureStrip; the sections are Section; where the morsels came from and
@@ -75,7 +76,7 @@ import { x, money, morsels, signed, dateWord, sourcesOf, crumb, pageLinks, openT
 import { txRow, railRow, shareRow, moneyRow } from './rows.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
-const isMoney = (item) => item.currency && item.currency !== 'morsel';
+const isMoney = (item) => item.currency && !/^morsels?$/i.test(String(item.currency));
 
 export function renderPage(ctx) {
   if (ctx.federated) return federated(ctx);
@@ -121,6 +122,8 @@ function head(ctx) {
   const marks = !w ? [] : [
     { label: morsels(w.balance), tone: 'sun' },
     { label: x('chipPace', { n: pace, cap }) },
+    // Pacing capacity the operator sells for money (GET /v1/wallet pacing_pack); absent when none is sold.
+    w.pacing_pack ? { label: x('chipPack', { n: w.pacing_pack.morsels, price: money(w.pacing_pack.price.amount, w.pacing_pack.price.currency) }) } : null,
     p ? { label: [x('rail.stripe'), p.x402?.enabled ? x('rail.x402') : '', x('rail.invoice')].filter(Boolean).join(' · ').toLowerCase() } : null,
     p?.x402?.enabled && p.x402.testnet ? { label: x('chipTestnet'), tone: 'dim' } : null,
   ];

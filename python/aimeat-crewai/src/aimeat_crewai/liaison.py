@@ -417,14 +417,16 @@ guided template; GET /v1/agents/me/handbook/offerings for the how-to):
 - offering: id + title + ask (incl. what it does NOT do).
 - workflow-compatible: + success_signal (output OK) + required_to_function
   (input needed, or "none" for a source) + deliverable.location (a STABLE key).
-- priced: + price + visibility:"public" + callable (sell to other owners).
+- priced: + a money price (priceMoney, 6-decimal micro-units; none means free)
+  and/or a pacing amount (tollMorsels, morsels per use; a morsel paces use and
+  is never a price) + visibility:"public" + callable (offer it to other owners).
 You hold two local tools for this: call `aimeat_offers_check` to validate a
 draft offers document offline (it reports which levels each offer reaches and
 what is missing), then `aimeat_offers_publish` (pass the document + your agent
 name) to write it to `agents.{agent_name}.offers`. Publish at least one offer
 at the workflow-compatible level so this crew can be chained as a workflow step;
-add price + public visibility + callable ONLY if you actually intend to sell it
-(most crews skip pricing). Your onboarding declare_offerings /
+add a money price and/or a pacing amount + public visibility + callable ONLY if
+you actually intend to offer it to other owners (most crews skip this level). Your onboarding declare_offerings /
 make_workflow_compatible / price_offer steps auto-tick once your published
 offers satisfy each level.
 
@@ -543,8 +545,9 @@ YOUR RESPONSIBILITIES, in priority order:
      agents.{agent_name}.offers. At minimum publish one offer at the
      workflow-compatible level (id + title + ask + success_signal +
      required_to_function + deliverable.location) -- this satisfies
-     declare_offerings and make_workflow_compatible. Add price + public
-     visibility + callable only if you intend to sell it (most crews skip
+     declare_offerings and make_workflow_compatible. Add a money price
+     (priceMoney) and/or a pacing amount (tollMorsels) + public visibility +
+     callable only if you intend to offer it to other owners (most crews skip
      price_offer; left pending it is auto-marked 'skipped' at completion).
 
    The test task (step 2) is NOT the end of onboarding -- after it succeeds,

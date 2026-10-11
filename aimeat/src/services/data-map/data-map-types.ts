@@ -19,7 +19,8 @@
  *   it is used for) and the per-row `why`. They are written once, by whoever built the app. A guess
  *   in either is worse than a blank, because it sits where the answer belongs and reads like one.
  *
- *   Full definition, including every axis and its values: docs/datakartta-maaritelma.md
+ *   Full definition, including every axis and its values: docs/specs/datamap.md, which every node
+ *   serves at /v1/specs/datamap.md. A field or a value added here is added there in the same change.
  * @structure DataMap · DataMapRow · ElsewhereRow · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
@@ -32,7 +33,7 @@
  *     a DIFFERENT answer from the workspace it sits in — appended rather than edited, no version
  *     history, charged to the organism instead of to whoever wrote the row — and a reader told only
  *     "an organism workspace" would expect all three the other way round.
- *   v2.0.0 — 2026-08-25 — Rewritten to docs/datakartta-maaritelma.md. v1 described a key family and
+ *   v2.0.0 — 2026-08-25 — Rewritten to the data map definition (now docs/specs/datamap.md). v1 described a key family and
  *     its compliance columns and never said what the app was FOR, so the map answered nobody's
  *     question. The app-level paragraph, `usedFor` on both levels, the machinery list and the
  *     loss-risk axis are new; the guessed `form` default is gone.

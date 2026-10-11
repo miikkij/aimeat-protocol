@@ -19,6 +19,10 @@
  *   sale, while the books keep the amount, the date and the app.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-store-license
  * @version-history
+ *   v1.5.0 — 2026-10-11 — A take is one pacing charge: the purchase answers `toll_morsels` and `pacing`
+ *     with `price_morsels` as a deprecated mirror, the sales row is read by `toll_morsels`, and the two
+ *     ledger lines are `pacing_earn` / `pacing_charge` under the charge's tracking code (they were
+ *     `app_sale` / `app_purchase` under the receipt id). These asserted the old morsel price model.
  *   v1.4.0 — 2026-10-10 — A caller with no credential gets 401 on the paid app's download, also as the
  *     anonymous identity (secaudit 2026-10-10 C1).
  *   v1.3.0 — 2026-09-26 — Erasure: the other side's ledger line for the sale names the erased buyer
@@ -97,6 +101,13 @@ await test('The buyer purchases the app AS THE OWNER in person', async () => {
     const buy = await json('/v1/app-store/purchase', { ...auth(buyerTok), method: 'POST', body: JSON.stringify({ app_filename: PAID, app_owner: sellerName }) });
     if (buy.status === 403 && buy.body?.error?.code === 'APP_STORE_DISABLED') { marketplaceOn = false; console.log('    (skipped rest: marketplace disabled on this node)'); return; }
     assert(buy.status === 200 || buy.status === 201, `purchase: ${buy.status} ${JSON.stringify(buy.body)}`);
+    // A morsel is pacing, never a price (2026-10-11): the take is one pacing charge of the app's
+    // pacing amount, and the 3.x `price_morsels` is only a deprecated mirror of it.
+    const d = buy.body.data;
+    assert(d.toll_morsels === 50 && d.pacing?.morsels === 50 && typeof d.pacing?.trackingCode === 'string',
+        `the take answers toll_morsels and the pacing receipt: ${JSON.stringify({ toll: d.toll_morsels, pacing: d.pacing })}`);
+    assert(d.price_morsels === 50 && typeof d.deprecated?.price_morsels === 'string',
+        `price_morsels mirrors the pacing amount and is marked deprecated: ${JSON.stringify({ p: d.price_morsels, dep: d.deprecated })}`);
 });
 
 // A6-10. The receipt keeps a copy of the app's manifest, and the buyer reads it. The notes on a
@@ -309,7 +320,7 @@ await test('A name registered again after the BUYER deleted their account inheri
     assert(!!row, `the sale must outlive the buyer's account: ${JSON.stringify(sales.body.data?.sales)}`);
     assert(row.buyer_owner !== name, `the seller's sales list still names the erased buyer: ${JSON.stringify(row)}`);
     assert(ERASED.test(String(row.buyer_owner)), `the buyer is written as a pseudonym: ${JSON.stringify(row)}`);
-    assert(row.price_morsels === 50 && row.app_filename === PAID && row.purchased_at === buy.body.data.purchased_at,
+    assert(row.toll_morsels === 50 && row.app_filename === PAID && row.purchased_at === buy.body.data.purchased_at,
         `the books changed with the erasure: ${JSON.stringify(row)}`);
     const detail = await json(`/v1/app-store/purchases/${txId}`, auth(sellerTok));
     assert(detail.status === 200, `the seller still reads their sale: ${detail.status}`);
@@ -317,8 +328,11 @@ await test('A name registered again after the BUYER deleted their account inheri
     // The node's signature covered the erased identity, so keeping it would confirm a guessed name.
     assert(detail.body.data.signature === '', 'the signature over the erased identity was kept');
     // The seller's ledger line for the sale stays, and names the buyer by the receipt's pseudonym.
-    const ledger = await json('/v1/wallet/transactions?type=app_sale&per_page=200', auth(sellerTok));
-    const sale = (ledger.body.data?.transactions ?? []).find((t: any) => t.tracking_code === txId);
+    // A take is one pacing charge (2026-10-11): the seller's line is `pacing_earn`, under the charge's
+    // own tracking code, which the purchase answer carries as `pacing.trackingCode`.
+    const pacingCode = buy.body.data.pacing?.trackingCode as string;
+    const ledger = await json('/v1/wallet/transactions?type=pacing_earn&per_page=200', auth(sellerTok));
+    const sale = (ledger.body.data?.transactions ?? []).find((t: any) => t.tracking_code === pacingCode);
     assert(!!sale && sale.amount > 0, `the seller's ledger line for the sale must outlive the buyer's account: ${JSON.stringify(sale)}`);
     assert(sale.counterparty_gaii === row.buyer_owner,
         `the seller's ledger line names ${sale.counterparty_gaii}, not the receipt's pseudonym ${row.buyer_owner}`);
@@ -358,8 +372,11 @@ await test('A name registered again after the SELLER deleted their account inher
     assert(mine.body.data.seller_owner !== shop && ERASED.test(String(mine.body.data.seller_owner)),
         `the receipt still names the erased seller: ${JSON.stringify(mine.body.data.seller_owner)}`);
     // So does the customer's ledger line for the purchase, by the same pseudonym.
-    const ledger = await json('/v1/wallet/transactions?type=app_purchase&per_page=200', auth(c.token));
-    const paid = (ledger.body.data?.transactions ?? []).find((t: any) => t.tracking_code === txId);
+    // The take is one pacing charge (2026-10-11): the customer's line is `pacing_charge`, under the
+    // charge's own tracking code (`pacing.trackingCode` in the purchase answer).
+    const pacingCode = buy.body.data.pacing?.trackingCode as string;
+    const ledger = await json('/v1/wallet/transactions?type=pacing_charge&per_page=200', auth(c.token));
+    const paid = (ledger.body.data?.transactions ?? []).find((t: any) => t.tracking_code === pacingCode);
     assert(!!paid && paid.amount < 0, `the customer's ledger line for the purchase must outlive the seller's account: ${JSON.stringify(paid)}`);
     assert(paid.counterparty_gaii === mine.body.data.seller_owner,
         `the customer's ledger line names ${paid.counterparty_gaii}, not the receipt's pseudonym ${mine.body.data.seller_owner}`);

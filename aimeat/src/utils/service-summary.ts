@@ -16,19 +16,26 @@
  * @usage
  *   import { computeServiceSummary, computeSummaryHash } from '../utils/service-summary.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — An action entry carries tollMorsels, its pacing amount per use; `price` is a
+ *     deprecated mirror until 4.0.0 (a morsel is pacing, not a price).
  *   v1.0.0 — 2026-05-20 — Initial implementation for Federation Mesh Phase 2
  */
 
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 
 export interface ServiceSummaryAction {
     id: string;
     displayName: string;
     category?: string;
     providerGaii: string;
-    price: number;
+    /** The action's pacing amount per use, in morsels. A morsel is pacing, not a price. */
+    tollMorsels: number;
+    /** Deprecated mirror of tollMorsels for a 3.x peer, sent until MORSEL_PRICE_FIELDS_REMOVED_IN. */
+    price?: number;
+    deprecated?: { price: string };
 }
 
 export interface ServiceSummaryAgent {
@@ -82,6 +89,7 @@ export async function computeServiceSummary(
         storage.listCsms(),
     ]);
 
+    const mirror = legacyMorselFieldsLive();
     const actions: ServiceSummaryAction[] = allActions
         .filter(a => a.federate === true)
         .map(a => ({
@@ -89,7 +97,8 @@ export async function computeServiceSummary(
             displayName: a.displayName,
             category: a.category,
             providerGaii: a.providerGaii,
-            price: a.pricing.baseMorsels,
+            tollMorsels: a.pricing.tollMorsels,
+            ...(mirror ? { price: a.pricing.tollMorsels, deprecated: { price: MORSEL_PRICE_DEPRECATION } } : {}),
         }));
 
     const agents: ServiceSummaryAgent[] = allAgents

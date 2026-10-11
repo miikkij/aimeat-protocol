@@ -17,6 +17,8 @@
  *   v1.0.0 — 2026-07-28 — Split out when the metered chokepoint stopped writing HTTP itself.
  *   v1.1.0 — 2026-08-10 — PaywallResponder + createRefusalRecorder: a refusal can be captured
  *                         instead of sent, for a caller that answers in another protocol.
+ *   v1.2.0 — 2026-10-11 — Wording: a morsel figure is pacing, never a price or a burned toll
+ *                         (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  */
 import type { AimeatConfig } from '../../config.js';
 import { error } from '../../middleware/envelope.js';
@@ -44,24 +46,26 @@ export function meteredRefusalText(outcome: Refusal, label: string): { status: n
       const e = outcome.entitlement;
       const cap = e.unit === 'money'
         ? `${formatMoneyMajor(e.budget.capUnits ?? 0)} ${e.currency ?? ''}`.trim()
-        : `${e.budget.capUnits} morsel`;
+        : `${e.budget.capUnits}-morsel pacing`;
       return { status: 402, code: 'BUDGET_EXHAUSTED',
         message: `Your EXCHANGE entitlement for ${label} has spent its ${cap} budget (contract ${e.contractRef}).` };
     }
     case 'refused_grant_cap': {
       const g = outcome.entitlement.grant!;
-      const unit = outcome.entitlement.unit === 'money' ? (outcome.entitlement.currency ?? '') : 'morsel';
+      const ceiling = outcome.entitlement.unit === 'money'
+        ? `${g.capCarriedUnits} ${outcome.entitlement.currency ?? ''}`.trim()
+        : `${g.capCarriedUnits}-morsel pacing`;
       return { status: 402, code: 'GRANT_EXHAUSTED',
         message: `Your access to ${label} is carried by the provider, and that grant has reached the `
-          + `${g.capCarriedUnits} ${unit} ceiling they set. Ask them to extend it, or take a contract of your own.` };
+          + `${ceiling} ceiling they set. Ask them to extend it, or take a contract of your own.` };
     }
     case 'insufficient':
       return { status: 402, code: 'INSUFFICIENT_MORSELS',
         message: outcome.carried
-          ? `This call burns a ${outcome.needed}-morsel pacing toll, which the provider carries for you `
+          ? `This call carries ${outcome.needed} morsels of pacing, which the provider carries for you `
             + 'under their grant, and their balance does not cover it right now. Morsels replenish daily.'
-          : `This call needs ${outcome.needed} morsels and the balance does not cover it. Morsels replenish `
-            + 'daily; the pacing toll bounds how fast a capability can be called, whatever it is paid in.' };
+          : `This call carries ${outcome.needed} morsels of pacing and the balance does not cover it. Morsels `
+            + 'replenish daily; pacing bounds how fast a capability can be used, and it is not a price.' };
     case 'scope_required':
       return { status: 403, code: 'SCOPE_DENIED',
         message: `This app may not spend on your behalf. It needs the "${outcome.scope}" permission, `

@@ -20,6 +20,14 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-11 — aimeat_app_tools_publish stores an old `price.morsels` as the tool's `tollMorsels`,
+ *     refuses it from 4.0.0 (legacyToolPriceRefusal), and answers each tool's `toll_morsels`.
+ *   2026-10-11 — aimeat_offer_price_set sets the money price and the pacing amount (`toll_morsels`,
+ *     `clear_toll`): a morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). The offers are normalized before the edit, so a stored price.morsels
+ *     becomes pacing; price_morsels / clear_morsels are read as the pacing names until 4.0.0 and
+ *     refused with MORSEL_PRICE_REMOVED after it. The answer carries tollMorsels, and the old `price`
+ *     only as a deprecated mirror.
  *   2026-10-08 — aimeat_checkout_open attributes the session to the agent, so the seller's AI
  *     visibility report counts the purchase as an agent's (services/visibility/attribution.ts).
  *   2026-10-07 — aimeat_app_tools_publish answers `priced` with isToolPriced, so a tool sold only in
@@ -74,8 +82,10 @@ import { localAccountName } from '../utils/gaii.js';
 import { canonicalAppToolsId } from '../services/app-tools-key.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse } from '../tool-catalog/shape.js';
-import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey, isToolPriced } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey, isToolPriced, legacyToolPriceRefusal, normalizeToolPacing, toolTollMorsels } from '../models/app-tool-schemas.js';
 import { loadAgentOffers, publishAgentOffers } from '../services/agent-offers-write.js';
+import { normalizeOfferPacing, presentOfferPacing, TOLL_MORSELS_MAX } from '../models/offer-schemas.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
@@ -268,6 +278,9 @@ export function registerCommerceTools(
         async ({ app_id: named, tools, odps, provenance }) => {
             const parsed = AppToolsDocSchema.safeParse({ tools, ...(odps ? { odps } : {}), ...(provenance ? { provenance } : {}) });
             if (!parsed.success) return fail(`INVALID_TOOL_MANIFEST: ${parsed.error.message}`);
+            // An old morsel `price` is pacing: refused from 4.0.0, and until then stored as `tollMorsels`.
+            const legacyRefusal = legacyToolPriceRefusal(parsed.data);
+            if (legacyRefusal) return fail(`${legacyRefusal.code}: ${legacyRefusal.message}`);
             // The app's filename, when the caller named the app without it (services/app-tools-key.ts):
             // the shared write stores it there anyway, and the answer has to name where it went.
             const app_id = await canonicalAppToolsId(storage, ownerGhii, named);
@@ -278,7 +291,7 @@ export function registerCommerceTools(
                 updatedAt: new Date().toISOString(),
                 ...(parsed.data.odps ? { odps: parsed.data.odps } : {}),
                 ...(parsed.data.provenance ? { provenance: parsed.data.provenance } : {}),
-                tools: parsed.data.tools,
+                tools: parsed.data.tools.map(t => normalizeToolPacing(t)),
             };
             const written = await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools'], 'commerce:sell');
             if (written.refusal !== null) return { content: [{ type: 'text' as const, text: written.refusal }], isError: true };
@@ -294,6 +307,7 @@ export function registerCommerceTools(
                     name: t.name,
                     fulfillment: t.action_id ? 'call' : 'task',
                     priced: isToolPriced(t),
+                    toll_morsels: toolTollMorsels(t),
                 })),
                 exchange: exchangeOutcome(written.exchange,
                     `POST /v1/exchange/reconcile with {"dry_run": true, "app_id": "${app_id}"}`),
@@ -335,7 +349,13 @@ export function registerCommerceTools(
         // The catalog's schema, which carries the bounds this tool wrote by hand (secaudit 2026-10 follow-up, Part B).
         zodShapeFor('aimeat_offer_price_set'),
         annotationsFor('aimeat_offer_price_set'),
-        async ({ agent_name, offer_id, price_morsels, money_amount_micros, money_currency, clear_morsels, clear_money, visibility }) => {
+        async ({ agent_name, offer_id, toll_morsels, price_morsels, money_amount_micros, money_currency, clear_toll, clear_morsels, clear_money, visibility }) => {
+            // The 3.x morsel-price names are read as the pacing amount until MORSEL_PRICE_FIELDS_REMOVED_IN,
+            // and refused after it (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+            const legacyLive = legacyMorselFieldsLive();
+            if (!legacyLive && (price_morsels !== undefined || clear_morsels)) {
+                return fail(`MORSEL_PRICE_REMOVED: price_morsels and clear_morsels were removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}; a morsel is pacing, not a price. Set toll_morsels (the pacing amount per use) or clear_toll, and money_amount_micros for a money price.`);
+            }
             // Ownership: only the caller's OWN owner's agents. The target is resolved from the
             // session owner, never from input, so a foreign agent name simply will not resolve.
             const loaded = await loadAgentOffers({ storage, config }, owner, agent_name);
@@ -344,12 +364,18 @@ export function registerCommerceTools(
                     ? `AGENT_NOT_FOUND: you have no agent named "${agent_name}"`
                     : `${loaded.code}: ${loaded.message}`);
             }
-            const offers = loaded.offers;
+            // Every offer as the pacing model reads it, so an old price.morsels already stored is pacing
+            // before the edit, and the document written back carries no morsel price (the same
+            // normalization PUT /v1/agents/:name/offers applies on write).
+            const offers = loaded.offers.map((o) => normalizeOfferPacing(o));
             const offer = offers.find((o) => o.id === offer_id);
             if (!offer) return fail(`OFFER_NOT_FOUND: ${offer_id} (agent ${agent_name} has ${offers.length} offer(s))`);
 
-            if (price_morsels !== undefined) offer.price = { morsels: price_morsels, unit: offer.price?.unit ?? 'per-call' };
-            if (clear_morsels) offer.price = null;
+            if (toll_morsels !== undefined || price_morsels !== undefined) {
+                const toll = Math.min((toll_morsels ?? 0) + (price_morsels ?? 0), TOLL_MORSELS_MAX);
+                if (toll > 0) offer.tollMorsels = toll; else delete offer.tollMorsels;
+            }
+            if (clear_toll || clear_morsels) delete offer.tollMorsels;
             if (money_amount_micros !== undefined) {
                 if (!money_currency || !isSupportedMoneyCurrency(money_currency)) {
                     return fail('CURRENCY_REQUIRED: money_amount_micros needs money_currency (EUR or USD)');
@@ -370,9 +396,12 @@ export function registerCommerceTools(
                 authorisingScope: 'commerce:sell',
             }, agent_name, offers);
             if (!published.ok) return fail(`${published.code}: ${published.message}${published.details ? `\n${JSON.stringify(published.details)}` : ''}`);
+            // The 3.x `price` field mirrors the pacing amount, marked deprecated, until 4.0.0.
+            const shown = presentOfferPacing(offer, legacyLive, MORSEL_PRICE_DEPRECATION);
             return ok({
                 agent: published.agentName, offer: offer_id,
-                price: offer.price ?? null, priceMoney: offer.priceMoney ?? null,
+                tollMorsels: offer.tollMorsels ?? 0, priceMoney: offer.priceMoney ?? null,
+                ...(shown.price ? { price: shown.price } : {}),
                 visibility: offer.visibility ?? 'private',
                 // Same block PUT /v1/agents/:name/offers answers, once the offers service hands the report on.
                 ...('exchange' in published ? { exchange: exchangeOutcome((published.exchange as ReconcileReport | null) ?? null,

@@ -23,8 +23,13 @@
  *   rather than done inline because who deserves a share can depend on what the call turned out to be
  *   about, which is knowable only once the capability has run. `accrue` and `refund` are the same
  *   contract from opposite ends: the door calls one of them, never both.
- * @structure settleMeteredCharge · burnPacingTollFor · SettlementResult · BeneficiaryAccrual
+ * @structure settleMeteredCharge · resolvePacingToll · chargePacing · SettlementResult · BeneficiaryAccrual
  * @version-history
+ *   v1.2.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). chargePacing replaces the all-burn toll: the payer's owner is debited,
+ *     the burn rate's share burns, a flow's existing operator share is kept, and the rest is credited
+ *     to the provider's owner. The morsel rail of a contract is charged through it. resolvePacingToll
+ *     moved here from routes/extensions/pacing.ts and reads a legacy morsel price as pacing.
  *   v1.1.0 — 2026-07-30 — Beneficiary splitting: a second rake, taken from the provider's cut and
  *     routed to N GHIIs, accrued per call through the returned `accrue()` and unwound by `refund()`.
  *   v1.0.0 — 2026-07-28 — Extracted from routes/extensions/entitlement-gate.ts; returns a result
@@ -34,7 +39,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { percentFee } from '../commerce/money.js';
-import { commerceFeePercent, settleMarketplaceFee } from './marketplace-fee.js';
+import { commerceFeePercent, resolveOperatorFeeGhii } from './marketplace-fee.js';
 import { settleEntitlementMoney, refundEntitlementMoney } from './entitlement-money.js';
 import { commitSpend, refundSpend, type MeteredEntitlement, type PricingSpec } from './metered-entitlements.js';
 import { readSplit, computeSplit, type DynamicDesignation, type SplitResult } from '../commerce/beneficiary-split.js';
@@ -58,26 +63,112 @@ export type SettlementResult =
   | { kind: 'failed'; reason: string };
 
 /**
- * Burn the pacing toll. Returns false when the payer cannot cover it — the caller has moved no money
- * yet, so a paced-out call costs an attempt rather than a reversal.
+ * The pacing amount of one use: the value the source declares, else the node's default, clamped to
+ * the node's per-use ceiling (AIMEAT_EXT_MAX_DEBIT). Zero means unpaced.
  *
- * `payer` overrides whose balance it comes from: set to the provider under a grant, because the morsel
- * is half of a declared price and a member told their access is carried should not be paying half of it.
+ * `legacyMorsels` is a morsel PRICE a source declared before ruling D4 (2026-10-11): `price.morsels`
+ * on an offer or an app tool, `payMorsels` on an extension action, `baseMorsels` on an action,
+ * `priceMorsels` on an app. A use cost the declared toll plus that price, so the pacing amount is
+ * their sum: a converted source keeps the same per-use brake it had.
  */
-export async function burnPacingTollFor(args: {
-  config: AimeatConfig; storage: Storage; caller: string; label: string; toll: number; payer: string | null;
-}): Promise<boolean> {
-  const { storage, caller, label, toll, payer } = args;
-  if (toll <= 0) return true;
-  const from = payer ?? caller;
-  const carried = !!payer;
-  if (!await storage.debitBalance(from, toll)) return false;
-  await storage.addTransaction({
-    id: `pacing-${randomUUID()}`, gaii: ownerGhiiOf(from), type: 'extension_toll', amount: -toll,
-    trackingCode: carried ? `pacing:granted:${label}` : `pacing:${label}`,
-    initiatorGaii: caller, timestamp: new Date().toISOString(),
+export function resolvePacingToll(config: AimeatConfig, declared: number | undefined | null, legacyMorsels?: number | null): number {
+  const toll = typeof declared === 'number' && Number.isInteger(declared) && declared >= 0 ? declared : null;
+  const legacy = typeof legacyMorsels === 'number' && Number.isInteger(legacyMorsels) && legacyMorsels > 0 ? legacyMorsels : 0;
+  const value = toll === null && legacy === 0 ? config.pacingTollDefault : (toll ?? 0) + legacy;
+  if (!Number.isInteger(value) || value <= 0) return 0;
+  return Math.min(value, config.extensionMaxDebitPerCall);
+}
+
+/** What one pacing charge moved. All amounts in whole morsels. */
+export interface PacingCharge {
+  morsels: number;
+  /** Removed from supply: the burn rate's share, plus the operator's share when the fee mode burns. */
+  burned: number;
+  /** Credited to the operator (fee mode `operator`). */
+  fee: number;
+  providerEarned: number;
+  trackingCode: string;
+  /** Give it all back (the use failed after the charge). Safe to call once. */
+  reverse: () => Promise<void>;
+}
+
+/** A pacing charge as a receipt shows it: the same fields, without the reverse function. */
+export function pacingReceipt(c: PacingCharge): { morsels: number; burned: number; fee: number; providerEarned: number; trackingCode: string } {
+  return { morsels: c.morsels, burned: c.burned, fee: c.fee, providerEarned: c.providerEarned, trackingCode: c.trackingCode };
+}
+
+const NOTHING: PacingCharge = { morsels: 0, burned: 0, fee: 0, providerEarned: 0, trackingCode: '', reverse: async () => {} };
+
+/**
+ * Charge the pacing amount for one use (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+ *
+ * The payer's owner is debited the amount. The burn rate's share burns (config.burnRate, the node's
+ * existing burn setting; rounded up, so a positive amount always burns something while the rate is
+ * above zero). Where the flow had an operator share before the ruling (`feePercent`), that share
+ * still goes where the marketplace fee policy sends it: to the operator, or burned. The rest is
+ * credited to the provider's owner as the sign of a useful contribution. With no provider, the whole
+ * amount burns. One storage transaction: the debit, the credits and every ledger row land together.
+ *
+ * Returns null when the payer cannot cover it, having moved nothing. `payer` overrides whose balance
+ * it comes from (a provider carrying a granted member). The caller's own use of their own source is
+ * the caller's business and is answered before this is called.
+ */
+export async function chargePacing(args: {
+  config: AimeatConfig; storage: Storage; caller: string; payer?: string | null;
+  providerGhii: string | null; amount: number; label: string; feePercent?: number;
+}): Promise<PacingCharge | null> {
+  const { config, storage, caller, providerGhii, label } = args;
+  const amount = Math.max(0, Math.trunc(args.amount));
+  if (amount <= 0) return NOTHING;
+  const from = args.payer ?? caller;
+  const payerGhii = ownerGhiiOf(from);
+  const rate = Math.min(1, Math.max(0, config.burnRate ?? 0));
+  let burned = providerGhii ? Math.min(amount, percentFee(amount, Math.round(rate * 10_000) / 100)) : amount;
+  let fee = providerGhii && (args.feePercent ?? 0) > 0 ? Math.min(amount - burned, percentFee(amount, args.feePercent!)) : 0;
+  const operatorGhii = fee > 0 && (config.marketplaceFeeMode ?? 'operator') === 'operator'
+    ? await resolveOperatorFeeGhii(storage, config) : null;
+  if (fee > 0 && !operatorGhii) { burned += fee; fee = 0; }
+  const providerEarned = amount - burned - fee;
+  const trackingCode = `${args.payer ? 'pacing:granted' : 'pacing'}:${label}:${randomUUID().slice(0, 8)}`;
+  const ts = new Date().toISOString();
+
+  let ok = false;
+  await storage.transaction(async () => {
+    if (!await storage.debitBalance(from, amount)) return;
+    if (providerEarned > 0) await storage.creditBalance(providerGhii!, providerEarned);
+    if (fee > 0) await storage.creditBalance(operatorGhii!, fee);
+    // The payer's rows add up to what left their balance: what went on, and what burned.
+    if (amount - burned > 0) {
+      await storage.addTransaction({ id: `pacing-${randomUUID()}`, gaii: payerGhii, type: 'pacing_charge', amount: -(amount - burned), counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: caller, timestamp: ts });
+    }
+    if (burned > 0) {
+      await storage.addTransaction({ id: `pacing-burn-${randomUUID()}`, gaii: payerGhii, type: 'pacing_burn', amount: -burned, trackingCode, initiatorGaii: caller, timestamp: ts });
+    }
+    if (providerEarned > 0) {
+      await storage.addTransaction({ id: `pacing-earn-${randomUUID()}`, gaii: providerGhii!, type: 'pacing_earn', amount: providerEarned, counterpartyGaii: payerGhii, trackingCode, initiatorGaii: caller, timestamp: ts });
+    }
+    if (fee > 0) {
+      await storage.addTransaction({ id: `pacing-fee-${randomUUID()}`, gaii: operatorGhii!, type: 'marketplace_fee', amount: fee, counterpartyGaii: payerGhii, trackingCode, timestamp: ts });
+    }
+    ok = true;
   });
-  return true;
+  if (!ok) return null;
+
+  let reversed = false;
+  return {
+    morsels: amount, burned, fee, providerEarned, trackingCode,
+    reverse: async () => {
+      if (reversed) return;
+      reversed = true;
+      await storage.transaction(async () => {
+        if (providerEarned > 0) await storage.debitBalance(providerGhii!, providerEarned);
+        if (fee > 0) await storage.debitBalance(operatorGhii!, fee);
+        await storage.creditBalance(from, amount);
+        await storage.addTransaction({ id: `pacing-refund-${randomUUID()}`, gaii: payerGhii, type: 'pacing_refund', amount, counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: caller, timestamp: new Date().toISOString() });
+      });
+      logger.warn(`[metered-settlement] reversed a ${amount}-morsel pacing charge (the use failed after the charge)`, { label });
+    },
+  };
 }
 
 /** Settle one call on whichever rail the right is denominated in, then advance its meter. */
@@ -124,58 +215,36 @@ function beneficiaryAccrualFor(
   };
 }
 
-/** Morsel rail: atomic debit caller / credit provider cut / route rake, then commit. */
+/**
+ * Morsel rail: a contract denominated in morsels is a contract on PACING, not a price (ruling D4,
+ * 2026-10-11). The per-call amount is charged as pacing: the burn rate's share burns, the contract's
+ * rake keeps going where the marketplace fee policy sends it, and the rest is credited to the
+ * provider. Then the meter advances.
+ */
 async function settleMorsels(args: Args): Promise<SettlementResult> {
   const { config, storage, ent, caller, product, charge, newPricing } = args;
   const price = Math.max(0, charge);
   const rakePct = ent.rakePercent ?? commerceFeePercent(config);
-  const fee = percentFee(price, rakePct);          // ceils — a positive charge always carries its rake
-  const providerCut = price - fee;
-  const track = `exchange:${product.ext}:${product.action}:${ent.contractRef}`;
-  const ts = new Date().toISOString();
-
-  // The whole settlement is ONE transaction: debit, provider credit, both ledger rows, the
-  // marketplace fee and the spend commit land together or not at all. Before this a crash between
-  // them could leave a caller debited with no provider credit and no ledger row to find it by.
-  // The hand-written refund below is kept deliberately: it handles a provider credit that REPORTS
-  // failure (a business outcome the transaction cannot see), and with the rollback around it the two
-  // agree rather than conflict.
-  let earlyExit: SettlementResult | null = null;
-  await storage.transaction(async () => {
-    if (price > 0) {
-      if (!await storage.debitBalance(caller, price)) { earlyExit = { kind: 'insufficient', needed: price }; return; }
-      if (providerCut > 0) {
-        if (!await storage.creditBalance(ent.providerGhii, providerCut)) {
-          await storage.creditBalance(caller, price);
-          logger.error('[metered-settlement] provider credit failed; refunded caller', { label: product.label, provider: ent.providerGhii });
-          earlyExit = { kind: 'failed', reason: 'provider_credit_failed' };
-          return;
-        }
-        await storage.addTransaction({ id: `xchg-earn-${randomUUID()}`, gaii: ent.providerGhii, type: 'extension_earn', amount: providerCut, counterpartyGaii: caller, trackingCode: track, initiatorGaii: caller, timestamp: ts });
-      }
-      // Filed under the human whose balance moved; the caller is named beside it.
-      await storage.addTransaction({ id: `xchg-pay-${randomUUID()}`, gaii: ownerGhiiOf(caller), type: 'extension_pay', amount: -price, counterpartyGaii: ent.providerGhii, trackingCode: track, initiatorGaii: caller, timestamp: ts });
-      await settleMarketplaceFee(storage, config, { fee, payerGhii: ownerGhiiOf(caller), trackingCode: track, source: 'exchange' });
-    }
-
-    await commitSpend(storage, ent, price, newPricing, caller);
+  const paced = await chargePacing({
+    config, storage, caller, providerGhii: ent.providerGhii, amount: price,
+    label: `exchange:${product.ext}:${product.action}:${ent.contractRef}`, feePercent: rakePct,
   });
-  if (earlyExit) return earlyExit;
+  if (!paced) return { kind: 'insufficient', needed: price };
+  try {
+    await commitSpend(storage, ent, price, newPricing, caller);
+  } catch (err) {
+    await paced.reverse();
+    throw err;
+  }
   return {
     kind: 'settled', charged: price,
-    // MORSELS ARE NEVER SHARED. They are the node's pacing meter: they bound how often a capability
-    // may be called. They are not money, not convertible to it, and not a proportion of anything a
-    // beneficiary could be owed — so there is nothing here to divide. A provider who declares a
-    // split gets it on their MONEY sales; a morsel-priced call simply paces and settles.
+    // MORSELS ARE NEVER SHARED. They pace how often a capability may be called; they are not money
+    // and not a proportion of anything a beneficiary could be owed. A provider who declares a split
+    // gets it on their MONEY sales.
     accrue: async () => null,
     refund: async () => {
-      if (price > 0) {
-        if (providerCut > 0) await storage.debitBalance(ent.providerGhii, providerCut);
-        await storage.creditBalance(caller, price);
-      }
+      await paced.reverse();
       await refundSpend(storage, caller, product.ext, product.action, price, caller);
-      // Nothing to reverse: the morsel rail books no beneficiary share in the first place.
-      logger.warn(`[metered-settlement] refunded ${price} morsels (the call failed after payment)`, { label: product.label });
     },
   };
 }

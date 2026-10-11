@@ -2,7 +2,7 @@
 
 Reference prototype for the **Dify ↔ AIMEAT** integration. It is the Direction-2 ("AIMEAT calls Dify") translation layer: a tiny, zero-dependency shim that receives AIMEAT capability-invoke webhooks and forwards them to a Dify app's Service API, plus two helper scripts to register and test the capability.
 
-Full design & contract: [`docs/integrations/dify-hello-integration.md`](../../docs/integrations/dify-hello-integration.md).
+The webhook is the node's capability invoke (`POST /v1/capabilities/{id}/invoke` in `openapi.yaml`): the node sends `{ input, caller, capability }` with the headers `X-AIMEAT-Node` and a timestamp, waits 10 seconds, and expects `{ result }`.
 
 ```
 AIMEAT agent ──invoke──▶ AIMEAT node ──webhook──▶ dify-bridge ──Service API──▶ Dify

@@ -1237,6 +1237,7 @@
       done: "Done",
       morsels: "{n} morsels",
       morsel1: "1 morsel",
+      pacingAmount: "pacing {amount}",
       yesterday: "Yesterday",
       earlier: "Earlier",
       wd0: "Sun",
@@ -1408,6 +1409,7 @@
       done: "Valmis",
       morsels: "{n} murusta",
       morsel1: "1 murunen",
+      pacingAmount: "tahdistus {amount}",
       yesterday: "Eilen",
       earlier: "Aiemmin",
       wd0: "Su",
@@ -1579,6 +1581,7 @@
       done: "Hecho",
       morsels: "{n} morsels",
       morsel1: "1 morsel",
+      pacingAmount: "{amount} de ritmo",
       yesterday: "Ayer",
       earlier: "Antes",
       wd0: "Dom",
@@ -23500,6 +23503,11 @@ Known schemas:
     if (v === 1) return t("morsel1");
     return t("morsels", { n: num(v, { maximumFractionDigits: 0 }) });
   }
+  function pacingText(n) {
+    const amount2 = morselText(n);
+    const text = t("pacingAmount", { amount: amount2 });
+    return text === "pacingAmount" ? "pacing " + amount2 : text;
+  }
 
   // src/static/sdk-libs/atelier/lenis-parts.js
   var lenisPromise = null;
@@ -23773,7 +23781,7 @@ Known schemas:
     ];
   }
   function money4(value, currency, micros) {
-    if (isMorsels(currency)) return morselText(value);
+    if (isMorsels(currency)) return pacingText(value);
     const v = micros ? roundMicros(value) : Math.round((Number(value) || 0) * 100) / 100;
     const d = micros ? fractionDigits(v) : 2;
     const cur = currency || "€";
@@ -24292,7 +24300,7 @@ Known schemas:
     return /^[A-Z]{3}$/.test(String(value == null ? "" : value)) ? String(value) : null;
   }
   function money5(value, currency, digits) {
-    if (isMorsels(currency)) return morselText(value);
+    if (isMorsels(currency)) return pacingText(value);
     const d = digits || 0;
     const whole = d ? roundMicros(value) : Math.round(Number(value) || 0);
     const code = currencyCode(currency);
@@ -28251,7 +28259,7 @@ Known schemas:
     return 'url("' + v.replace(/"/g, "%22") + '")';
   }
   function money6(amount2, currency, micros) {
-    if (isMorsels(currency)) return morselText(amount2);
+    if (isMorsels(currency)) return pacingText(amount2);
     const unit = currency || "€";
     const n = micros ? roundMicros(amount2) : Number(amount2) || 0;
     const d = micros ? fractionDigits(n) : 2;
@@ -31424,7 +31432,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.66.1",
+    version: "0.66.2",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

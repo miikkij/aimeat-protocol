@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.6.0 — 2026-10-11 — Comments only: apps.manifest's old price.morsels and app_purchases.priceMorsels
+ *     hold pacing amounts, not prices. No schema change.
  *   v1.5.0 — 2026-09-26 — app_grants.ownerAddedScopes for a fresh database (schema.ts adds it to an
  *     existing one).
  *   v1.4.0 — 2026-08-31 — agent_enrolment_grants: the single-use grant one basic-agents button
@@ -215,6 +217,7 @@ export function applySchemaTables2(db: Database.Database): void {
       ownerName      TEXT NOT NULL,
       filename       TEXT NOT NULL,
       versionNumber  INTEGER NOT NULL DEFAULT 1,
+      -- A price.morsels stored in the manifest by 3.26.x is the app's PACING amount per use, not a price.
       manifest       TEXT NOT NULL DEFAULT '{}',
       mimeType       TEXT NOT NULL DEFAULT 'text/html',
       size           INTEGER NOT NULL DEFAULT 0,
@@ -322,6 +325,8 @@ export function applySchemaTables2(db: Database.Database): void {
       appName                 TEXT NOT NULL,
       appVersionNumber        INTEGER NOT NULL,
       licenseType             TEXT NOT NULL DEFAULT 'single',
+      -- priceMorsels: the PACING amount charged on this acquisition, not a price; transactionFeeMorsels:
+      -- the operator's share of it. Old column names kept, no migration.
       priceMorsels            INTEGER NOT NULL,
       transactionFeeMorsels   INTEGER NOT NULL DEFAULT 0,
       purchasedAt             TEXT NOT NULL,

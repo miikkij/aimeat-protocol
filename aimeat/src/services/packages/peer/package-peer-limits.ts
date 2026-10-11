@@ -2,7 +2,7 @@
  * @file services/packages/peer/package-peer-limits.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The two parts of finding F that were left open (docs/specs/package-sale-design.md,
+ * @description The two parts of finding F that were left open (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e,
  *   section 6, items 2 and 4): a node-wide cap on the packages-only peers a repository registers, and
  *   the removal of the ones nothing uses any more.
  *

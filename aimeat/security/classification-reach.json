@@ -72,9 +72,21 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's offers, tool manifests and payment settings, read to work out price and payment rail."
     },
+    "src/commerce/pacing-pack.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: the operator's payment settings (commerce.psp), read to sell the pacing pack on the operator's own money handler; nothing is returned to the caller."
+    },
+    "src/commerce/platform-fee.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: the existing platform-fee or checkout record, read only to carry its version and creation time into the upsert (moved unchanged from session-service.ts)."
+    },
     "src/commerce/session-service.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 1,
         "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The checkout-session and order ledger, returned to its buyer or seller."

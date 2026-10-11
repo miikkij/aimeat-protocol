@@ -302,15 +302,17 @@ await test('6. The provider publishes an action over REST, with directives so th
     assert(status === 201, `publish action ${status}: ${JSON.stringify(body)}`);
 });
 
-await test('7. aimeat_catalogue_search returns that row with its provider and its price', async () => {
+await test('7. aimeat_catalogue_search returns that row with its provider and its pacing amount', async () => {
     const r = await callTool(reqSession, 'aimeat_catalogue_search', { search: 'Core doors scrape' });
     assert(!r.isError, `catalogue_search refused: ${r.text}`);
     const rows: any[] = Array.isArray(r.data) ? r.data : (r.data.items ?? r.data.results ?? []);
     const mine = rows.find((a: any) => a.action_id === ACTION_ID);
     assert(mine !== undefined, `the published action is not in the answer: ${r.text.slice(0, 400)}`);
     assert(mine.provider_gaii === provider.gaii, `provider_gaii: ${mine.provider_gaii}`);
-    assert(mine.pricing?.baseMorsels === 10,
-        `the price did not survive the mapping: ${JSON.stringify(mine.pricing)}`);
+    // The published base_morsels (3.x) is stored as the pacing amount and answered as toll_morsels, with
+    // the deprecated base_morsels mirror: a morsel is pacing, not a price.
+    assert(mine.pricing?.toll_morsels === 10 && mine.pricing?.base_morsels === 10,
+        `the pacing amount did not survive the mapping: ${JSON.stringify(mine.pricing)}`);
 });
 
 console.log('\nPhase 4 — the work lifecycle, entirely over MCP');

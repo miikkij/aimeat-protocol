@@ -134,6 +134,7 @@
     "check:doc-counts": "cd aimeat && pnpm check:doc-counts",
     "check:instructions": "cd aimeat && pnpm check:instructions",
     "check:prompt-refs": "cd aimeat && pnpm check:prompt-refs",
+    "check:doc-links": "cd aimeat && pnpm check:doc-links",
     "eval:skill": "node scripts/eval-skill.mjs",
     "check:imports-tracked": "cd aimeat && pnpm check:imports-tracked",
     "boot:smoke": "cd aimeat && pnpm boot:smoke",

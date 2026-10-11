@@ -6,6 +6,9 @@
  *   inbox/sent + the owner delete/usage cascades. Translated 1:1 from the Prisma implementation; the
  *   flat cost columns fold back into the nested `cost` object. Replaces the listWorkBy* placeholders.
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The column costBasePrice maps to cost.toll, the escrowed pacing amount (a
+ *     morsel is pacing, not a price). The column keeps its name; no migration. A write that still
+ *     carries the 3.26.x `basePrice` stores it as the toll.
  *   v1.1.0 — 2026-10-08 — Work round-trips aiProvenanceId, the record of the delivered output
  *     (migration 0098, aiprov D8).
  *   v1.0.0 — 2026-07-15 — Phase 5: work domain on Postgres+Kysely.
@@ -23,7 +26,8 @@ function toWork(r: Selectable<Work>): WorkRecord {
   return {
     trackingCode: r.trackingCode, status: r.status, actionId: r.actionId, providerGaii: r.providerGaii, requesterGaii: r.requesterGaii,
     input: r.input as Record<string, unknown>, output: (r.output ?? undefined) as Record<string, unknown> | undefined,
-    cost: { basePrice: r.costBasePrice, networkFee: r.costNetworkFee, total: r.costTotal, inEscrow: r.costInEscrow },
+    // costBasePrice keeps its SQL name and holds the escrowed pacing amount, `toll` (not a price).
+    cost: { toll: r.costBasePrice, networkFee: r.costNetworkFee, total: r.costTotal, inEscrow: r.costInEscrow },
     ttlExpiresAt: iso(r.ttlExpiresAt), callbackUrl: r.callbackUrl ?? undefined,
     rating: r.ratingScore != null ? { score: r.ratingScore, comment: r.ratingComment ?? undefined } : undefined,
     createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
@@ -35,7 +39,7 @@ export const workMethods = {
   async createWork(this: PostgresKyselyStorage, w: WorkRecord): Promise<WorkRecord> {
     const [row] = await this.db.insertInto('Work').values({
       trackingCode: w.trackingCode, status: w.status, actionId: w.actionId, providerGaii: w.providerGaii, requesterGaii: w.requesterGaii,
-      input: jsonb(w.input), costBasePrice: w.cost.basePrice, costNetworkFee: w.cost.networkFee, costTotal: w.cost.total, costInEscrow: w.cost.inEscrow,
+      input: jsonb(w.input), costBasePrice: w.cost.toll ?? (w.cost as { basePrice?: number }).basePrice ?? 0, costNetworkFee: w.cost.networkFee, costTotal: w.cost.total, costInEscrow: w.cost.inEscrow,
       ttlExpiresAt: new Date(w.ttlExpiresAt), callbackUrl: w.callbackUrl ?? null, createdAt: new Date(w.createdAt), updatedAt: new Date(w.updatedAt),
       aiProvenanceId: w.aiProvenanceId ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

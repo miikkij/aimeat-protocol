@@ -18,6 +18,12 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.5.0 — 2026-10-11 — Sections 0, 2c, 2d and 2e and the extension paragraph of section 3, from
+ *     docs/app-developer-ai-guide.md, which the Boards page and llms-full.txt pointed at and no route
+ *     served (docs audit 2026-10-11, D7). Corrected against the code on the way: an app may ask for
+ *     every scope GET /v1/app-grants/scopes lists (the guide named 8 of 43 and left out ai:use),
+ *     usage() is the owner's own and an app reads its budget from capabilities(), and an extension
+ *     action stops after AIMEAT_EXT_TIMEOUT_MS (5 s by default), not 60 s.
  *   v1.4.0 — 2026-10-09 — A provider's refusal: which codes say change the call (PROVIDER_REJECTED,
  *     CONTENT_REFUSED, PROVIDER_NO_CREDIT, INVALID_VOICE) and which two are worth trying again (aiprov A1).
  *   v1.3.0 — 2026-10-05 — A direct AI call counts against the account's limit of AI calls a minute
@@ -44,7 +50,7 @@ export const AI_CAPABILITIES_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-ai-capabilities
-description: How to use the AI capabilities of an AIMEAT node (text, reading images, reading files and PDFs, making images, speech, transcription, embeddings) in an app, an automation or an agent's own work. Check first with aimeat_ai_capabilities or AIMEAT.ai.capabilities(), ask for the capability and not a model, handle a capability that is off visibly, tell the price before an expensive call, and never propose embeddings, which are for a collection far too large for one prompt and only when the person decides. Recipes for a picture button, voice message to summary, asking a PDF, a morning digest of voice messages, alt text, duplicates in a very large collection, and a crew on the node's /v1/llm. Use before building anything that calls AI. Triggers on AI feature, AI role, connect an app's role, generate image, speech, text to speech, transcribe, voice message, PDF, embeddings, vectors, semantic search, kuvan teko, puhe, litterointi, upotus.
+description: How to use the AI capabilities of an AIMEAT node (text, reading images, reading files and PDFs, making images, speech, transcription, embeddings) in an app, an automation or an agent's own work. Check first with aimeat_ai_capabilities or AIMEAT.ai.capabilities(), ask for the capability and not a model, handle a capability that is off visibly, tell the price before an expensive call, and never propose embeddings, which are for a collection far too large for one prompt and only when the person decides. Recipes for a picture button, voice message to summary, asking a PDF, a morning digest of voice messages, alt text, duplicates in a very large collection, and a crew on the node's /v1/llm. Covers AIMEAT.ai in apps and ctx.ai.start too. Use before building anything that calls AI. Triggers on AI feature, AI role, connect an app's role, generate image, speech, text to speech, transcribe, voice message, PDF, embeddings, vectors, semantic search, kuvan teko, puhe, litterointi, upotus.
 license: MIT
 metadata:
   audience: agent
@@ -65,6 +71,15 @@ capabilities. Each is on or off for each caller:
 | \`speech\` | Text read aloud in a synthetic voice. |
 | \`transcription\` | Speech in an audio file turned into text. |
 | \`embed\` | Text turned into vectors, so a search finds what means the same, not only the same words. |
+
+## 0. In an app: load the library and ask for ai:use
+
+Load \`/v1/libs/aimeat-auth.js\` first and \`/v1/libs/aimeat-ai.js\` after it, and declare \`ai:use\` in
+\`<meta name="aimeat-scopes">\`. An app runs on its own origin, where the person's sign-in to the
+node does not exist: \`aimeat-auth\` gets the app its own grant with the scopes the person approved,
+and every \`AIMEAT.ai\` call goes out under it. Never call \`/v1/auth/refresh\` or send cookies from an
+app. \`GET /v1/app-grants/scopes\` lists every scope an app can ask for; ask for the fewest you need.
+No provider key ever reaches the app: it gets the answer, the usage and the cost.
 
 ## 1. Check first
 
@@ -148,11 +163,76 @@ with \`+\` (\`role.illustrator=text+image\`), and its fine-tuning (\`temperature
   \`aimeat_ai_role_set\` proposes a role or a connection, and the owner confirms it. Never connect a role
   the owner has not seen: connecting it is their approval of what that app may run.
 
+## 2c. The library, call by call
+
+Pass \`app_id\` on every call: the owner's usage shows spend per app, and a per-app quota needs it.
+
+| Call | What it does |
+|---|---|
+| \`capabilities({ app_id })\` | What is on for this app now, with \`fix\` and \`settingsUrl\` for what is off (section 1), \`roles\`, and \`budget\` (\`dailyBudgetUsd\`, \`spentTodayUsd\`). Spends nothing. |
+| \`complete({ app_id, prompt, systemPrompt?, images?, files?, role?, modelRole?, temperature?, top_p? })\` | One answer: \`{ content, model, finish_reason, truncated, usage, budget, route, provenance }\`. \`images\` (at most 8, data: or https: URLs) makes it a \`vision\` call, \`files\` a \`files\` call. \`modelRole: 'execution'\` takes the owner's cheaper default, \`'reasoning'\` the stronger one. The prompt holds at most 200 000 characters. |
+| \`completeJson(opts)\` | The same, parsed as JSON into \`parsed\`, with one retry on a bad answer; then \`JSON_PARSE_FAILED\` (or \`JSON_SCHEMA_MISMATCH\` when the asked keys are missing). |
+| \`stream({ app_id, prompt, onText })\` | The answer piece by piece, for a long text the person watches; resolves like \`complete()\`. |
+| \`image({ app_id, prompt, confirm: true })\` | A picture stored in the owner's storage; \`r.src\` shows it, also when it is private. |
+| \`speak({ app_id, input, voice? })\` | Speech; \`onAudio\` for early playback, \`store: true\` keeps it as a private file. |
+| \`transcribe({ app_id, storage_key })\` | Text from a stored recording: \`{ text, language, seconds }\`. |
+| \`embed({ app_id, input })\` | Vectors, at most 256 texts and 500 000 characters a call (section 4 first). |
+| \`models({ capability })\` | The model catalogue; each row's \`ref\` is what \`models=\` and \`prefer.\` take. |
+| \`roles()\` | This app's roles and whether the owner connected them (section 2b). |
+| \`job.start({ prompt, result_key })\`, \`job.waitFor(id)\` | Work that may take minutes: the answer waits at \`result_key\` even when the tab closed. |
+| \`disclose(r.provenance, { target })\`, \`declare(value, r.provenance)\`, \`chatNotice({ target })\` | The AI label a person sees, the record kept with stored content, and the notice a chat surface owes at its first message. Skill: ai-transparency. |
+
+\`isAvailable()\` reads only the older OpenRouter key setup and can say no when text works; check
+\`capabilities()\` instead. \`invalidateCache()\` clears the library's caches after the owner changed
+their providers in another tab. \`session.notify(title, { body })\` (scope \`notifications:send\`) tells
+the signed-in owner that something finished, and opens the app when they press it.
+
+## 2d. When AI fits, and how to ask
+
+AI fits a step that is open-ended (wording, a fitting category, a summary) and whose answer a person
+reviews. It is the wrong tool for a lookup or a count, for a change nobody sees, and for a call that
+costs more than the answer is worth.
+
+- **Suggest, then let the person accept.** Put the answer in a field they can edit before it is
+  saved. Never write a model's answer straight into stored data.
+- **Compose the prompt from the app's own data**: the title, the genre, what exists already. Ask the
+  model only for the step the data cannot give. Fifty words of context beat a vague request.
+- **Say the shape of the answer**: "Output only the tags, comma-separated", or JSON with named keys
+  through \`completeJson()\`. Say the length in the prompt; leave \`max_tokens\` out and check
+  \`truncated\` before you accept the answer.
+- **There is no history between calls.** Each call is one question and one answer; a conversation is
+  what you put into the prompt.
+
+## 2e. What a call costs, and who allows it
+
+The owner's daily budget (one US dollar unless they set another) covers every call: text, streaming,
+pictures, speech, transcription and embeddings, and the failed attempts of a call that moved on to
+another provider (\`route.attempts\`). When it is spent, calls answer QUOTA_EXHAUSTED until midnight
+UTC. The owner can also give one app a smaller daily quota (APP_QUOTA_EXHAUSTED), or allow AI only for
+apps on their list (APP_NOT_ALLOWED, and APP_ID_REQUIRED for a call without \`app_id\`). The cost in
+\`usage.cost_usd\` is what the provider reported when \`cost_exact\` is true, and the catalogue price
+otherwise; the provider's own bill is the real one.
+
+Other codes a call can answer: AI_MODEL_POLICY_EMPTY (the owner's policy and the app's \`models=\` share
+no model), AI_PROVIDER_NOT_CONFIGURED (the named model's provider type is not set up), NO_API_KEY and
+INVALID_API_KEY (the owner enters the key again on the AI settings page; it is not the app's sign-in,
+so do not refresh the session), PROMPT_TOO_LONG, FILES_TOO_LARGE, and the role codes AI_ROLE_NOT_BOUND,
+AI_ROLE_NOT_DECLARED and AI_ROLE_LACKS_CAPABILITY. Each answers with a message to show; never an empty
+result.
+
 ## 3. Automations
 
 - A long answer or a picture in the background: \`aimeat_ai_job_start\` (\`ctx.ai.start\` in an extension),
   with \`op\`: \`text\` (default), \`image\` (the record at \`result_key\` is \`{ storage_key, url, mime_type, model }\`),
   or \`transcribe\` with \`audio_key\`, the audio file's storage key.
+- **In an extension**, \`ctx.ai.start({ prompt | prompt_key, input_keys, result_key, json?, op?,
+  on_done? })\` queues the job and answers at once, because the sandbox stops an action after a few
+  seconds (5 unless the operator set another limit) and a model call can take minutes.
+  It never throws: \`{ ok: true, job_id }\` or \`{ ok: false, code }\` with AI_JOB_QUEUE_FULL,
+  AI_JOB_LIMIT_REACHED (usually a loop), AI_JOB_CHAIN_TOO_DEEP, AI_JOB_PROMPT_TOO_LARGE or
+  AI_JOB_START_FAILED. The extension's installer pays, counted as the app \`ext:<extension name>\`.
+  \`on_done: { extension, action }\` calls that action with \`{ job_id, state, result_key }\` when the job
+  ends. \`ctx.ai\` can be absent: check \`if (!ctx.ai)\` and go on without it.
 - A workflow's \`ai\` step takes the same \`op\`, \`audio_key\` and \`provider\`.
 - Something every morning: \`aimeat_schedule_create\` or a scheduled workflow.
 - A capability that goes off while a run is under way stops that step with its refusal, and the owner is

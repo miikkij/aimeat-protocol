@@ -2,12 +2,15 @@
  * @file test/e2e-ext-paywall.ts
  * @description E2E for the priced raw-call paywall (design notes doc-r6tyr3o, roadmap
  *   rm-commercial-raw-calls). Proves the runtime invariants of routes/extensions/paywall.ts:
- *   owner-free (both direct paths); cross-owner morsel payment is REVENUE (atomic debit-caller +
- *   credit-owner, M1); anti-abuse `tollMorsels` BURNS (debits caller, never credits owner — M1);
+ *   owner-free (both direct paths); a cross-owner call's morsels (`tollMorsels`, a 3.x `payMorsels`)
+ *   are PACING: one charge, the burn rate's share burned and the rest credited to the owner;
  *   money channel → 402 (Phase 3 pending); insufficient balance → 402 with no partial debit;
  *   free (non-commercial) public call; refund-on-throw; and install-time C1/no-mint validation.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-paywall.ts
  * @version-history
+ *   v1.3.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa): `payMorsels` and `tollMorsels` are one pacing charge, part burned and
+ *     the rest credited to the owner. The two economics assertions read that; every refusal stays.
  *   v1.2.0 — 2026-10-09 — A wrong-buyer attempt leaves the token spendable by its buyer, and the
  *     seller's order list carries no pay token (secrets audit 2026-10-09, S-3).
  *   v1.1.0 — 2026-08-10 — The unaffordable action is priced at 9 999 rather than 10 million. What
@@ -103,22 +106,34 @@ await test('Owner calls a PAID action free (owner-free, no charge)', async () =>
   assert(await balance(owner.token) === before, 'owner must not be charged for their own tool');
 });
 
-await test('Cross-owner PAID call = revenue: caller debited, owner credited (atomic, M1)', async () => {
+// A morsel is pacing, never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+// arvoa, 2026-10-11). A 3.x `payMorsels` and a `tollMorsels` are both pacing, charged as ONE pacing
+// charge: the burn rate's share burns and the rest is credited to the owner. The two tests below
+// asserted the old model (payMorsels = revenue credited in full, toll = all burned, owner unchanged).
+/** What chargePacing burns of `amount` on this node: percentFee at the burn rate, which ceils. */
+async function burnOf(amount: number): Promise<number> {
+  const rate = Number((await json('/v1/exchange/info')).body?.data?.pacing?.burn_rate ?? 0);
+  return Math.min(amount, Math.ceil(amount * (Math.round(rate * 10_000) / 100) / 100));
+}
+
+await test('Cross-owner call with a 3.x morsel figure = pacing: caller debited 5, owner credited 5 less the burn', async () => {
+  const burn = await burnOf(5);
   const cb = await balance(caller.token);
   const ob = await balance(owner.token);
   const r = await invoke(caller.token, 'paidcall');
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(await balance(caller.token) === cb - 5, 'caller debited 5');
-  assert(await balance(owner.token) === ob + 5, 'owner credited 5 (revenue)');
+  assert(await balance(caller.token) === cb - 5, 'caller debited the 5 morsels of pacing');
+  assert(await balance(owner.token) === ob + 5 - burn, `owner credited 5 less the burn of ${burn}`);
 });
 
-await test('Cross-owner TOLL burns: caller debited, owner UNCHANGED (M1 — toll is not revenue)', async () => {
+await test('Cross-owner TOLL is pacing: caller debited 2, the burn share burns, the rest reaches the owner', async () => {
+  const burn = await burnOf(2);
   const cb = await balance(caller.token);
   const ob = await balance(owner.token);
   const r = await invoke(caller.token, 'tollcall');
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(await balance(caller.token) === cb - 2, 'caller debited the 2-morsel toll');
-  assert(await balance(owner.token) === ob, 'owner NOT credited — toll is a burn, not revenue');
+  assert(await balance(caller.token) === cb - 2, 'caller debited the 2 morsels of pacing');
+  assert(await balance(owner.token) === ob + 2 - burn, `owner credited 2 less the burn of ${burn}`);
 });
 
 await test('Owner is free of toll too', async () => {

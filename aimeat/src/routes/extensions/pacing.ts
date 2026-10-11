@@ -2,11 +2,11 @@
  * @file src/routes/extensions/pacing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The pacing burn: morsels spent per metered call to bound the RATE at which a capability
- *   can be consumed, independent of how it is paid for.
+ * @description The pacing charge on an uncontracted call: morsels per use that bound the RATE at which a
+ *   capability can be consumed, independent of how it is paid for.
  *
  *   Morsels and money are two different things doing two different jobs. Money moves value to the
- *   provider. Morsels regenerate on a daily allowance with a hard ceiling, so burning them per call puts
+ *   provider. Morsels regenerate on a daily allowance with a hard ceiling, so charging them per use puts
  *   an absolute floor under how fast anything can be consumed — which is the one property money does not
  *   have. A runaway loop against a money-priced capability drains a budget at machine speed and stops
  *   only when the money runs out; the same loop against a paced capability stops at the daily ceiling.
@@ -16,11 +16,17 @@
  *   MCP run tools all reach settlement through `settleMeteredCoordinate` directly and were never paced at
  *   all. The rule this file encodes: money, metering and abuse limits belong at the chokepoint EVERY path
  *   shares, never on one surface. Adding a new metered surface must not mean re-deriving this.
- * @structure resolvePacingToll · burnPacingToll (express wrapper over the shared burn)
+ * @structure resolvePacingToll (re-exported) · burnPacingToll (express wrapper over chargePacing)
  * @usage
  *   const paced = await burnPacingToll({ config, storage, callerGaii, providerOwner, label, toll, res });
  *   if (!paced.ok) return { ok: false };   // 402 already sent
  * @version-history
+ *   v1.5.0 — 2026-10-11 — Pacing is no longer a pure burn (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa): the burn rate's share burns and the rest is credited to the provider's
+ *     owner, through chargePacing in services/metered-settlement.ts. The 402 says how to get more
+ *     morsels: the daily allowance, or buying pacing capacity from the operator (commerce/pacing-pack.ts).
+ *     A legacy morsel price (an extension's `commercial.payMorsels`) is folded into the toll by the
+ *     caller with resolvePacingToll, so one use is one pacing charge.
  *   v1.4.1 — 2026-09-26 — The own-capability exemption names the caller's account with localAccountName
  *     (utils/gaii.ts), which keeps an identity of another node whole, so a visitor is never taken for
  *     the local namesake (secaudit 2026-09, F-1).
@@ -40,49 +46,38 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
-import { burnPacingTollFor } from '../../services/metered-settlement.js';
+import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
+import { chargePacing, type PacingCharge } from '../../services/metered-settlement.js';
 import { localAccountName } from '../../utils/gaii.js';
 
-/**
- * How many morsels this call burns. A per-capability value wins when the source declares one; otherwise
- * the node's default applies, so pacing is a property of the NODE rather than of each seller's memory.
- * Zero disables it — which is the shipped default, because switching it on changes what existing
- * consumers are charged and that is an operator's decision, not a silent upgrade.
- */
-export function resolvePacingToll(config: AimeatConfig, declared: number | undefined | null): number {
-  const value = typeof declared === 'number' && Number.isInteger(declared) && declared >= 0
-    ? declared
-    : config.pacingTollDefault;
-  if (!Number.isInteger(value) || value <= 0) return 0;
-  return Math.min(value, config.extensionMaxDebitPerCall);
-}
+export { resolvePacingToll } from '../../services/metered-settlement.js';
 
 /**
- * Burn the pacing toll from the caller. A BURN, never revenue: the provider is not credited (invariant
- * M1), and the caller's own calls to their own capability are free — pacing protects a provider from a
- * consumer, and the provider is not a consumer of themselves.
+ * Charge the pacing amount of one uncontracted use. The caller's own calls to their own capability are
+ * free: pacing protects a provider from a consumer, and the provider is not a consumer of themselves.
  *
  * Returns `{ ok: false }` after sending 402 when the caller cannot cover it. The caller of this function
- * must not have moved any money yet: the toll is deliberately the first thing charged, so a paced-out
- * call costs the consumer one morsel-sized attempt rather than a settled payment that must be refunded.
+ * must not have moved any money yet: pacing is deliberately the first thing charged, so a paced-out
+ * call costs the consumer nothing rather than a settled payment that must be refunded.
  */
 export async function burnPacingToll(args: {
   config: AimeatConfig; storage: Storage; callerGaii: string; providerOwner: string | null;
   label: string; toll: number; res: PaywallResponder;
-}): Promise<{ ok: boolean }> {
+}): Promise<{ ok: boolean; charge?: PacingCharge }> {
   const { config, storage, callerGaii, providerOwner, label, toll, res } = args;
   if (toll <= 0) return { ok: true };
   if (providerOwner && localAccountName(callerGaii) === providerOwner) return { ok: true };
 
-  const burned = await burnPacingTollFor({ config, storage, caller: callerGaii, label, toll, payer: null });
-  if (!burned) {
+  const charge = await chargePacing({
+    config, storage, caller: callerGaii, label, amount: toll,
+    providerGhii: providerOwner ? `${providerOwner}@${config.nodeId}` : null,
+  });
+  if (!charge) {
     res.status(402).json({
-      ...error(config.nodeId, 'INSUFFICIENT_MORSELS',
-        `This call burns a ${toll}-morsel pacing toll and your balance does not cover it. Morsels replenish `
-        + 'daily; the toll bounds how fast a capability can be called, whatever it is paid in.'),
+      ...error(config.nodeId, 'INSUFFICIENT_MORSELS', insufficientMorselsMessage(config, toll)),
       ...paymentChallenge(config),
     });
     return { ok: false };
   }
-  return { ok: true };
+  return { ok: true, charge };
 }

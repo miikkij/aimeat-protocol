@@ -10,6 +10,8 @@
  *   asserted in the same group, because that is the path every other app on the node still takes.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-dev-grant
  * @version-history
+ *   v1.4.1 — 2026-10-11 — The delegate refusal is read for "pacing amount" (it asserted "price", the old
+ *     morsel price model; a morsel is pacing, not a price).
  *   v1.4.0 — 2026-09-24 — A6-6: a builder's frame-token request is refused before any other check.
  *   v1.3.0 — 2026-09-24 — A6-5: revoking a pure builder's right takes the roster row it made, so
  *     they no longer read as a member on their own standing or on the owner's roster.
@@ -347,7 +349,8 @@ await test('no rung carries what the app costs', async () => {
         }),
     });
     assert(pub.status === 403, `expected 403, got ${pub.status}`);
-    assert(String(pub.body.error?.message).toLowerCase().includes('price'), 'and it says why');
+    // The 3.x price_morsels is the app's pacing amount (2026-10-11), and the refusal names it so.
+    assert(String(pub.body.error?.message).toLowerCase().includes('pacing amount'), 'and it says why');
 });
 
 await test('a publisher may not touch how the app is offered', async () => {

@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-11 — The workspace-contracts guide is the skill aimeat-workspace-contracts; the handbook
+ *     named docs/agent-workspace-contracts.md, which no route serves.
  *   2026-10-09 — aimeat_extension_config_set in the extension tools.
  *   2026-10-08 — aimeat_visibility_behaviour, _behaviour_fix and _behaviour_set: what people do on the owner's apps.
  *   2026-10-08 — aimeat_visibility_report: how people and AIs find the owner's apps.
@@ -259,8 +261,8 @@ contract** with owner-managed tags (the owner sets them on the agent's profile, 
 its own from the agent surface): \`workspace-contract\` (the discovery
 marker — the workspace UI surfaces such agents to their owner) + \`contract.<id>\` per contract served
 (this convention uses dots so \`contract.<id>\` parses by prefix; tags are \`[a-z0-9._:-]\`, no \`@\`). Full guide — machine-readable contract template, exact
-provision calls, the processing loop, schema rules, discovery tags:
-**\`docs/agent-workspace-contracts.md\`**. Read it before building such an agent.
+provision calls, the workspace.record event, the processing loop, schema rules, discovery tags:
+the skill **\`aimeat-workspace-contracts\`** (\`aimeat_skill_get\`). Read it before building such an agent.
 
 ## Layer rules (critical — see the appdev/mcp handbook modules)
 - Extensions own \`ext:{name}\` memory; read owner data via \`ctx.memory.getPublic(ctx.caller.gaii, key)\`.

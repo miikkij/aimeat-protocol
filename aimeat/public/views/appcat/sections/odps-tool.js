@@ -17,6 +17,8 @@
  * @structure OdpsToolBlock({ d, m, tool, form, set }) · odpsFormOf(tool) · readOdpsTool(base, form, open)
  * @usage html`<${OdpsToolBlock} d=${d} m=${m} tool=${base} form=${form} set=${set} />`
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The drafting prompt says the money price (or "free") and the pacing amount
+ *     per call, not "N morsels" as a price (ruling "morseli on tahdistus, ei hinta").
  *   v1.1.0 — 2026-09-27 — Parity with the old page (appcat sections-d): the head row with the file
  *     link (Action tone 'file'), the form at the old spacing (Fields `plain chapter`, the chapter's grey
  *     lines and door rows), the status lines that keep their room, the provenance in its statement box;
@@ -134,12 +136,15 @@ export function readOdpsTool(base, f, open) {
   return { odps: Object.keys(odps).length ? odps : undefined, provenance: Object.keys(prov).length ? prov : undefined };
 }
 
-/** The price the AI is told, in the prompt's own language (the prompt is English by design). */
+/**
+ * The price and pacing the AI is told, in the prompt's own language (the prompt is English by
+ * design). The money price or "free", then the pacing amount; a morsel amount is never a price.
+ */
 function promptPrice(tool) {
-  const parts = [];
-  if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + ' morsels');
-  if (tool.priceMoney && tool.priceMoney.amount > 0) parts.push((tool.priceMoney.amount / MONEY_UNIT) + ' ' + tool.priceMoney.currency);
-  return parts.join(' · ') || 'not for sale';
+  const toll = Math.min(100, (tool.tollMorsels > 0 ? tool.tollMorsels : 0) + (tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0));
+  const money = tool.priceMoney && tool.priceMoney.amount > 0 ? (tool.priceMoney.amount / MONEY_UNIT) + ' ' + tool.priceMoney.currency : '';
+  if (!money && !toll) return 'not for sale';
+  return (money || 'free') + (toll ? ' · pacing ' + toll + ' morsels per call (not a price)' : '');
 }
 
 const DRAFT_SYSTEM = 'You write the descriptive half of an Open Data Product Specification (ODPS v4.1) entry for '

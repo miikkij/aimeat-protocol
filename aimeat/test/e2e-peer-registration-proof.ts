@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description A package repository registers a node as a peer only after the node's own card
  *   answers with the same id and key, and a peer registered that way reaches nothing but packages
- *   (the peer-registration incident of 2026-10-01, finding F of docs/specs/package-sale-design.md).
+ *   (the peer-registration incident of 2026-10-01, finding F of https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e).
  *
  *   WHAT WAS OPEN. Any owner with packages:write named any node id that was not yet a peer, with a
  *   url and key of their own, and the repository wrote it as an active peer. Under the federated

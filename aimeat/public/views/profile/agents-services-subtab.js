@@ -9,6 +9,7 @@
  *   - AgentServicesSubtab (default export) -- main component
  *   - ServiceCard -- individual service display card
  * @version-history
+ *   v1.10.0 -- 2026-10-11 -- A service's price line is its money price (or Free) and its pacing amount (pricing.toll_morsels, 3.x base_morsels or cost as fallback); a morsel count is not a price.
  *   v1.9.0 -- 2026-09-26 -- A service is the List's row (page group G1a): the state dot before its name,
  *     the state word after it, what it does under it, price, visibility, calls, success and time on
  *     the typewriter line, Unpublish at the row's end; the loading, the hint and the empty line are Note.
@@ -34,6 +35,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getAgentServices } from '/js/services/agent-services.js';
+import { priceAndPacing, pacingOf } from '/js/format.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -42,7 +44,8 @@ import { Action } from '/components/Action.js';
 function ServiceCard({ service, onUnpublish }) {
   const name = service.display_name || service.name || service.action_id || t('profile.agents.services.unnamed');
   const desc = service.description || '';
-  const cost = service.cost != null ? `${service.cost} ${t('profile.agents.services.morsels')}` : t('profile.agents.services.free');
+  // The money price (or Free) and the pacing amount; a 3.x `cost` number is the pacing amount.
+  const cost = priceAndPacing(pacingOf(service) > 0 || service.cost == null ? service : { tollMorsels: service.cost }, t);
   const visibility = t('profile.agents.services.visibility.' + (service.visibility || 'public'));
   const isActive = service.active !== false && service.status !== 'inactive';
   const calls = service.invocation_count || service.call_count || 0;

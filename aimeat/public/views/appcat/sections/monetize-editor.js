@@ -3,16 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The tool editor of the Monetize section: one tool of the app's manifest, asked as four
- *   numbered questions in order (what the tool is, what a call costs, whether it goes on the
- *   marketplace with its ODPS description, how a bought call is delivered), the second currency and
- *   the pacing burn folded under the price. As the old catalogue's js/monetize.js editorHtml and
- *   readEditor: the save MERGES over the tool being edited, so the fields this editor does not show
- *   (inputSchema, outputSchema, plans) survive; clearing a field the editor does own removes it;
- *   money is kept in 6-decimal micro-units, and `pricesMoney` only when two currencies are set; an
- *   empty pacing burn is deleted (the node's default), 0 is kept (pacing off).
- * @structure ToolEditor({ d, m, index }) · readEditor(base, form, odpsOpen)
+ *   numbered questions in order (what the tool is, its price and pacing, whether it goes on the
+ *   marketplace with its ODPS description, how a bought call is delivered), the second currency
+ *   folded under the price. As the old catalogue's js/monetize.js editorHtml and readEditor: the save
+ *   MERGES over the tool being edited, so the fields this editor does not show (inputSchema,
+ *   outputSchema, plans) survive; clearing a field the editor does own removes it; money is kept in
+ *   6-decimal micro-units, and `pricesMoney` only when two currencies are set; an empty pacing field
+ *   is deleted (the node's default), 0 is kept (pacing off).
+ * @structure ToolEditor({ d, m, index }) · readEditor(base, form, odpsOpen) · tollFieldOf(tool)
  * @usage html`<${ToolEditor} key=${m.editing} d=${d} m=${m} index=${m.editing} />`
  * @version-history
+ *   v1.3.0 — 2026-10-11 — Two values per tool (ruling "morseli on tahdistus, ei hinta"): the money
+ *     price, and the pacing amount beside it in the open form. The morsel price field is gone; a 3.x
+ *     `price.morsels` shows in the pacing field (added to the toll, as the node does) and a save writes
+ *     it as `tollMorsels` and drops `price`.
  *   v1.2.0 — 2026-10-02 — The question marks that explain the price and the market: commerce.morsels, commerce.pacing_toll (TextField help), commerce.exchange_listing (Check help); the toll and exchange hints moved into them (components/HelpTip.js).
  *   v1.1.0 —2026-09-27 — Parity with the old page (appcat sections-d): the form under the heavy rule
  *     (Fields `plain chapter ruled`), each question a StepCard `question`, the fields in the old grids
@@ -39,6 +43,18 @@ const html = htm.bind(h);
 /** Tool names become sku segments (app-tool:<owner>/<appId>:<name>), the rule src/models/app-tool-schemas.ts enforces. */
 const NAME_RE = /^[a-z0-9][a-z0-9._-]*$/i;
 
+/**
+ * The pacing field's text. A 3.x tool may still carry a morsel price (`price.morsels`); the node
+ * adds it to the declared toll to get the pacing amount (resolvePacingToll), so the field shows the
+ * same sum and a save writes it as `tollMorsels` alone. Empty when neither is declared (node default).
+ */
+function tollFieldOf(tool) {
+  const toll = typeof tool.tollMorsels === 'number' && tool.tollMorsels >= 0 ? tool.tollMorsels : null;
+  const legacy = tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0;
+  if (toll === null && !legacy) return '';
+  return String(Math.min(100, (toll || 0) + legacy));
+}
+
 /** The editor's fields, filled from the tool being edited ({} for a new one). */
 function formOf(tool) {
   const cur = (tool.priceMoney && tool.priceMoney.currency) || 'EUR';
@@ -47,12 +63,11 @@ function formOf(tool) {
   return {
     name: tool.name || '',
     desc: tool.description || '',
-    morsels: tool.price && tool.price.morsels ? String(tool.price.morsels) : '',
     money: tool.priceMoney && tool.priceMoney.amount > 0 ? String(tool.priceMoney.amount / MONEY_UNIT) : '',
     currency: cur,
     money2: second ? String(second.amount / MONEY_UNIT) : '',
     currency2: (second && second.currency) || (cur === 'EUR' ? 'USD' : 'EUR'),
-    toll: typeof tool.tollMorsels === 'number' ? String(tool.tollMorsels) : '',
+    toll: tollFieldOf(tool),
     exchange: !!tool.exchange,
     action: tool.action_id || '',
     agent: tool.agent || '',
@@ -71,9 +86,9 @@ export function readEditor(base, f, odpsOpen) {
   tool.name = name;
   const desc = f.desc.trim();
   if (desc) tool.description = desc; else delete tool.description;
-  const morsels = parseInt(f.morsels, 10);
-  if (Number.isFinite(morsels) && morsels > 0) tool.price = { morsels, unit: 'per-call' };
-  else delete tool.price;
+  // A morsel is never a price: the 3.x morsel price is folded into the pacing field (tollFieldOf)
+  // and written back as tollMorsels only.
+  delete tool.price;
   const moneyRaw = f.money.trim();
   if (moneyRaw) {
     const major = parseFloat(moneyRaw.replace(',', '.'));
@@ -168,9 +183,9 @@ export function ToolEditor({ d, m, index }) {
     <//>
     <${Question} n="2" title=${x('mz.group.price')} lede=${x('mz.priceLede')}>
       <${Fields} plain chapter cols=${3}>
-        <${TextField} type="number" min=${0} step=${1} label=${x('monetize.priceMorsels')} help="commerce.morsels" value=${form.morsels} placeholder="0" onInput=${(v) => set({ morsels: v })} />
         <${TextField} inputMode="decimal" label=${x('monetize.priceMoney')} value=${form.money} placeholder="0.002" onInput=${(v) => set({ money: v })} />
         <${Select} label=${x('monetize.currency')} options=${currencies} value=${form.currency} onChange=${(v) => set({ currency: v })} />
+        <${TextField} type="number" min=${0} max=${100} step=${1} label=${x('monetize.toll')} help="commerce.pacing_toll" value=${form.toll} placeholder="0" onInput=${(v) => set({ toll: v })} />
       <//>
       <${Actions} chapter>
         <${Action} tone="more" expanded=${more} onClick=${() => setMore(!more)}>${x('mz.more.price')}<//>
@@ -181,7 +196,6 @@ export function ToolEditor({ d, m, index }) {
           <${Select} label=${x('monetize.currency2')} options=${currencies} value=${form.currency2} onChange=${(v) => set({ currency2: v })} />
         <//>
         <${Note} kind="hint">${x('monetize.money2Hint')}<//>
-        <${TextField} type="number" min=${0} max=${100} step=${1} label=${x('monetize.toll')} help="commerce.pacing_toll" value=${form.toll} placeholder="0" onInput=${(v) => set({ toll: v })} />
       <//>` : null}
     <//>
     <${Question} n="3" title=${x('mz.group.market')} lede=${x('mz.marketLede')}>

@@ -267,7 +267,7 @@ async function seedErasable(s: Storage) {
     for (const [id, providerGaii] of [['conf-in-person', owner], ['conf-by-agent', gaii]]) {
         await s.createAction({
             id, providerGaii, displayName: id, description: 'conformance', inputSchema: {}, outputSchema: {},
-            pricing: { baseMorsels: 0 }, tags: [], createdAt: now, updatedAt: now,
+            pricing: { tollMorsels:0 }, tags: [], createdAt: now, updatedAt: now,
         });
     }
     const statement = { spec: 'aimeat.provenance/v1', level: 'ai-generated', humanInvolvement: 'none', generatedAt: now } as const;
@@ -324,7 +324,7 @@ async function seedCortexErasure(s: Storage) {
         }]);
         await s.createAction({
             id: c.action, providerGaii: c.app, displayName: c.action, description: 'conformance', inputSchema: {},
-            outputSchema: {}, pricing: { baseMorsels: 0 }, tags: ['cortex', c.name], createdAt: now, updatedAt: now,
+            outputSchema: {}, pricing: { tollMorsels:0 }, tags: ['cortex', c.name], createdAt: now, updatedAt: now,
         });
         await s.setSchema({ keyPattern: c.schema, applyTo: 'exact', schemaJson: { type: 'object' }, schemaMode: 'strict', lockedBy: who, setAt: now, updatedAt: now });
         await s.createBoard({ id: c.board, name: c.board, description: 'conformance', visibility: 'private', ownerGaii: who, allowedGaiis: [], createdAt: now });
@@ -361,7 +361,7 @@ async function seedEcoErasure(s: Storage) {
         await s.setMemory({ key: a.key, ownerGaii: a.geai, value: { from: 'the app' }, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
         await s.createAction({
             id: a.action, providerGaii: a.geai, displayName: a.action, description: 'conformance', inputSchema: {},
-            outputSchema: {}, pricing: { baseMorsels: 0 }, tags: [], createdAt: now, updatedAt: now,
+            outputSchema: {}, pricing: { tollMorsels:0 }, tags: [], createdAt: now, updatedAt: now,
         });
         await s.upsertAutomationRecipe({
             id: randomUUID(), owner: who, app: a.app, trigger: { kind: 'data-published', keyGlob: 'conf.eco.*' },
@@ -400,7 +400,7 @@ async function seedInstalls(s: Storage, who: string, node: string, at: string) {
     await s.setMemory({ key: x.key, ownerGaii: x.geai, value: { from: 'the app' }, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: at, updatedAt: at });
     await s.createAction({
         id: x.action, providerGaii: x.geai, displayName: x.action, description: 'conformance', inputSchema: {},
-        outputSchema: {}, pricing: { baseMorsels: 0 }, tags: [], createdAt: at, updatedAt: at,
+        outputSchema: {}, pricing: { tollMorsels:0 }, tags: [], createdAt: at, updatedAt: at,
     });
     await s.upsertAutomationRecipe({
         id: randomUUID(), owner: who, app: x.app, trigger: { kind: 'data-published', keyGlob: 'conf.inst.*' },
@@ -481,7 +481,7 @@ function workRow(trackingCode: string, providerGaii: string, requesterGaii: stri
     const now = new Date().toISOString();
     return {
         trackingCode, status, actionId: 'conf-work', providerGaii, requesterGaii, input: { text: 'conformance' },
-        cost: { basePrice: 10, networkFee: 1, total: 11, inEscrow: 11 },
+        cost: { toll:10, networkFee: 1, total: 11, inEscrow: 11 },
         ttlExpiresAt: new Date(Date.now() + 86_400_000).toISOString(), createdAt: now, updatedAt: now, ...extra,
     };
 }
@@ -516,15 +516,15 @@ async function seedWorkErasure(s: Storage) {
     // Open work the erased person was to do. The other side's morsels are held, as holdEscrow holds them.
     const heldFor = [
         workRow(tc('open-ghii'), E.ghii, O.gaii, 'pending'),
-        workRow(tc('open-agent'), E.gaii, O.ghii, 'accepted', { cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }),
-        workRow(tc('open-bare'), erased, O.gaii, 'in_progress', { cost: { basePrice: 2, networkFee: 1, total: 3, inEscrow: 3 } }),
+        workRow(tc('open-agent'), E.gaii, O.ghii, 'accepted', { cost: { toll:4, networkFee: 1, total: 5, inEscrow: 5 } }),
+        workRow(tc('open-bare'), erased, O.gaii, 'in_progress', { cost: { toll:2, networkFee: 1, total: 3, inEscrow: 3 } }),
     ];
     for (const w of heldFor) {
         await s.createWork(w);
         await s.debitBalance(w.requesterGaii, w.cost.total);
     }
     // Open work the erased person asked for: their own morsels were held for it.
-    const asked = workRow(tc('open-asked'), O.gaii, E.gaii, 'pending', { cost: { basePrice: 6, networkFee: 1, total: 7, inEscrow: 7 } });
+    const asked = workRow(tc('open-asked'), O.gaii, E.gaii, 'pending', { cost: { toll:6, networkFee: 1, total: 7, inEscrow: 7 } });
     await s.createWork(asked);
     await s.debitBalance(E.gaii, 7);
 
@@ -691,7 +691,7 @@ async function seedAccount(s: Storage, name: string, node: string, at: string): 
 /** An action published under `providerGaii` at `createdAt`, as an owner session stored it before 2026-09-26. */
 const publishAction = (s: Storage, id: string, providerGaii: string, createdAt: string) => s.createAction({
     id, providerGaii, displayName: id, description: 'conformance', inputSchema: {}, outputSchema: {},
-    pricing: { baseMorsels: 10 }, tags: [], createdAt, updatedAt: createdAt,
+    pricing: { tollMorsels:10 }, tags: [], createdAt, updatedAt: createdAt,
 });
 
 /** Everything the cascade must leave empty, read back through the Storage interface. */
@@ -1077,7 +1077,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             });
             const publish = (id: string, providerGaii: string, createdAt: string, tags: string[] = []) => storage.createAction({
                 id, providerGaii, displayName: id, description: 'conformance', inputSchema: {}, outputSchema: {},
-                pricing: { baseMorsels: 10 }, tags, createdAt, updatedAt: createdAt,
+                pricing: { tollMorsels:10 }, tags, createdAt, updatedAt: createdAt,
             });
             const mine = `conf-mig-${tag}`, federated = `peer-node:conf-mig-${tag}`, orphan = `conf-gone-${tag}`, previous = `conf-prev-${tag}`;
             await publish(mine, owner, now);                                   // the owner's own: moves
@@ -1098,7 +1098,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             const gone2 = `confmigh${tag}`, reqGhii = `${requester}@${node}`;
             const tc = (k: string) => `tc-mig-${k}-${tag}`;
             // Asked by a person in person: the morsels go back to the GHII itself.
-            await storage.createWork(workRow(tc('g2'), gone, reqGhii, 'accepted', { cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }));
+            await storage.createWork(workRow(tc('g2'), gone, reqGhii, 'accepted', { cost: { toll:4, networkFee: 1, total: 5, inEscrow: 5 } }));
             await storage.debitBalance(reqGhii, 5);
             // Asked by the deleted person: cancelled, and what was held was theirs.
             await storage.createWork(workRow(tc('g3'), reqGaii, gone, 'pending'));
@@ -1343,7 +1343,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             await storage.createWork(workRow(tc('h-old'), holder, kGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
             await storage.debitBalance(kGhii, 11);
             await storage.createWork(workRow(tc('h-new'), kGhii, holder, 'accepted'));
-            await storage.createWork(workRow(tc('g'), gone, kGhii, 'pending', { cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }));
+            await storage.createWork(workRow(tc('g'), gone, kGhii, 'pending', { cost: { toll:4, networkFee: 1, total: 5, inEscrow: 5 } }));
             await storage.debitBalance(kGhii, 5);
             const line = (k: string, gaii: string, type: string, timestamp: string, extra: { counterpartyGaii?: string; initiatorGaii?: string; trackingCode?: string } = {}) =>
                 insertLineAsStored(name, storage, { txId: `tx-evd-${tag}-${k}`, gaii, type, amount: 1, timestamp, ...extra });
@@ -1492,7 +1492,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             await publishAction(storage, `act-g-${tag}`, gone, longAgo);
             await storage.createWork(workRow(tc('a'), A, kGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo }));
             await storage.debitBalance(kGhii, 11);
-            await storage.createWork(workRow(tc('b'), B, kGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo, cost: { basePrice: 4, networkFee: 1, total: 5, inEscrow: 5 } }));
+            await storage.createWork(workRow(tc('b'), B, kGhii, 'pending', { createdAt: longAgo, updatedAt: longAgo, cost: { toll:4, networkFee: 1, total: 5, inEscrow: 5 } }));
             await storage.debitBalance(kGhii, 5);
             await storage.createWork(workRow(tc('b-done'), B, kGhii, 'accepted', { createdAt: longAgo, updatedAt: longAgo }));
             await storage.updateWork(tc('b-done'), { status: 'delivered', output: { answer: 1 }, updatedAt: longAgo });

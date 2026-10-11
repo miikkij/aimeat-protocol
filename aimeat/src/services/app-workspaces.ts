@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The workspaces an app declares it needs, and where an installed copy finds the ones made
- *   for it (docs/specs/package-sale-design.md, section 4; wish
+ *   for it (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, section 4; wish
  *   wish-an-app-declares-its-workspace-a-bundle-refers-to-it-and-the-).
  *
  *   THE DECLARATION LIVES IN THE APP'S HTML, as `<script type="application/json" id="aimeat-workspace">`

@@ -18,7 +18,11 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
- *   2026-10-06 — aimeat_exchange_accept and aimeat_exchange_need_post register the catalog's schema
+ *   v1.5.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa): offerings and contracts are presented as REST presents them
+ *     (presentOffering, presentContractTerms), with `toll_morsels` and the morsel figures as deprecated
+ *     mirrors until 4.0.0; the budget floor names pacing (budgetFloorText).
+ *   2026-10-06 —aimeat_exchange_accept and aimeat_exchange_need_post register the catalog's schema
  *     (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -54,7 +58,7 @@ import {
     resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
     getOffering, getOfferingWithMeta, listOfferings, matchOfferings, filterOfferings,
     putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid, acceptBid,
-    offeringStats, offeringConsumers, enrichNeeds,
+    offeringStats, offeringConsumers, enrichNeeds, presentOffering, presentContractTerms, budgetFloorText,
 } from '../services/exchange-market.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -75,9 +79,8 @@ function entitlementView(config: AimeatConfig, e: MeteredEntitlement) {
         action: e.action,
         surface: e.surface ?? null,
         capability: e.capabilityLabel,
-        unit: e.unit,
-        currency: e.currency,
-        price_per_call: e.pricePerCall,
+        // The money price and the pacing every call is charged, as the REST view states them.
+        ...presentContractTerms(config, e),
         pricing: e.pricing ?? { model: 'per_call' },
         rake_percent: rakePct,
         rake_per_call: percentFee(e.pricePerCall, rakePct),
@@ -119,10 +122,10 @@ export function registerExchangeTools(
                 ? await filterOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
                 : await listOfferings(storage);
             if (stats) {
-                const withStats = await Promise.all(offerings.map(async o => ({ ...o, stats: await offeringStats(storage, o) })));
+                const withStats = await Promise.all(offerings.map(async o => ({ ...presentOffering(config, o), stats: await offeringStats(storage, o) })));
                 return ok({ offerings: withStats, count: withStats.length });
             }
-            return ok({ offerings, count: offerings.length });
+            return ok({ offerings: offerings.map(o => presentOffering(config, o)), count: offerings.length });
         },
     );
 
@@ -147,7 +150,7 @@ export function registerExchangeTools(
                 const s = o.surface;
                 const iface = await getInterfaceVersion(storage, o.providerGhii, s.appId, s.tool, s.ifaceVersion);
                 return ok({
-                    offering: o,
+                    offering: presentOffering(config, o),
                     capability: iface ? {
                         kind: 'app-tool', app: `${s.ownerName}/${s.appId}`, tool: s.tool, iface_version: s.ifaceVersion,
                         input_schema: iface.inputSchema, output_schema: iface.outputSchema,
@@ -167,7 +170,8 @@ export function registerExchangeTools(
             const extRec = await storage.getExtension(o.ext);
             const act = extRec?.actions.find(a => a.id === o.action);
             return ok({
-                offering: o,
+                // A raw ext offering paces at the action's live toll, as the REST detail states it.
+                offering: presentOffering(config, o, { declaredToll: act ? (act.tollMorsels ?? null) : o.tollMorsels }),
                 capability: act ? {
                     input_schema: act.inputSchema ?? {},
                     output_schema: act.outputSchema ?? {},
@@ -204,7 +208,7 @@ export function registerExchangeTools(
                 if (!priced.ok) return fail(`${priced.code}: ${priced.message}`);
                 const minCharge = priced.pricing?.model === 'bundle' ? priced.pricing.blockPrice : priced.pricing?.model === 'subscription' ? priced.pricing.periodPrice : priced.pricePerCall;
                 if (capUnits !== null && capUnits < minCharge) {
-                    return fail(`BUDGET_TOO_LOW: budget cap (${capUnits}) is below the ${minCharge}-${priced.unit === 'money' ? priced.currency : 'morsel'} minimum charge`);
+                    return fail(`BUDGET_TOO_LOW: ${budgetFloorText(capUnits, minCharge, priced.unit, priced.currency)}`);
                 }
                 const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
                 const ent = await createEntitlement(storage, {
@@ -231,7 +235,7 @@ export function registerExchangeTools(
             const { unit, pricePerCall, currency, pricing } = priced;
             const minCharge = pricing?.model === 'bundle' ? pricing.blockPrice : pricing?.model === 'subscription' ? pricing.periodPrice : pricePerCall;
             if (capUnits !== null && capUnits < minCharge) {
-                return fail(`BUDGET_TOO_LOW: budget cap (${capUnits}) is below the ${minCharge}-${unit === 'money' ? currency : 'morsel'} minimum charge`);
+                return fail(`BUDGET_TOO_LOW: ${budgetFloorText(capUnits, minCharge, unit, currency)}`);
             }
             const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
@@ -313,7 +317,7 @@ export function registerExchangeTools(
             await putNeed(storage, need);
             // Surface offerings that already satisfy it (accept directly, no bid needed).
             const matches = await matchOfferings(storage, { ext: need.ext, action: need.action, text: need.description });
-            return ok({ need, matches: matches.slice(0, 10) });
+            return ok({ need, matches: matches.slice(0, 10).map(o => presentOffering(config, o)) });
         },
     );
 

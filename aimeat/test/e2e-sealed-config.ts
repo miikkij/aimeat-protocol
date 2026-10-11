@@ -2,7 +2,7 @@
  * @file e2e-sealed-config.ts
  * @description Sealed configuration: the settings whoever STARTED this node nominated as read-only,
  *   for a node one party runs on behalf of another (a hosting provider, a university running one per
- *   department, a company running one per team). Design: docs/plans/sealed-config-plan.md
+ *   department, a company running one per team). Design: https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *
  *   THE REGRESSION THIS EXISTS FOR is phase 3 below, and it is worth stating plainly because a
  *   test of the refusal alone would have missed it. Sealing the write doors is not enough: the

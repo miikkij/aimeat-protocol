@@ -33,6 +33,8 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   v1.0.1 — 2026-10-11 — An item with no money price is not sold to a guest: it is free and paced, and
+ *     a guest has no morsel balance (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
  */
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -197,6 +199,11 @@ async function priceLines(storage: Storage, config: AimeatConfig, raw: UcpLineIn
       const code = e instanceof CommerceError ? e.code : 'item_unavailable';
       throw new UcpError(200, 'item_unavailable', `Item ${itemId} cannot be bought here now (${code}).`, 'unrecoverable', `$.line_items[${i}].item.id`);
     }
+    // A buyer with no account here holds no morsels, so an item that is free and paced is not sold to
+    // them: there is nothing to pay in money and no balance to pace from.
+    if (sellable.unitPrice <= 0) {
+      throw new UcpError(200, 'item_unavailable', `Item ${itemId} has no money price, so it is not sold to a buyer without an account here.`, 'unrecoverable', `$.line_items[${i}].item.id`);
+    }
     if (!sellerGhii) { sellerGhii = sellable.sellerGhii; sellerOwner = sellable.sellerOwner; }
     else if (sellerGhii !== sellable.sellerGhii) {
       throw new UcpError(200, 'item_unavailable', 'Every line of one checkout must be sold by the same seller.', 'unrecoverable', `$.line_items[${i}].item.id`);
@@ -204,7 +211,7 @@ async function priceLines(storage: Storage, config: AimeatConfig, raw: UcpLineIn
     lines.push({
       id: `li_${i + 1}`, itemId, sku, kind: ref.kind as 'offer' | 'app-tool', agent: sellable.agentGaii,
       offerId: sellable.offerId, ...(ref.app ? { app: ref.app } : {}), title: sellable.title,
-      unitPrice: sellable.priceMorsels, quantity,
+      unitPrice: sellable.unitPrice, quantity,
     });
   }
   return { lines, sellerGhii, sellerOwner };

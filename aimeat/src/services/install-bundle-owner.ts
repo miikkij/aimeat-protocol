@@ -2,7 +2,7 @@
  * @file services/install-bundle-owner.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A person installs a set they bought, for themselves (docs/specs/package-sale-design.md,
+ * @description A person installs a set they bought, for themselves (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e,
  *   section 4, "The install side needs one split"). The owner part of an install set: the bundle's
  *   packages, its organisms and workspaces under the person's own names, and each app told where its
  *   workspace is. No account is made and nobody else is brought in: that is node work, which stays

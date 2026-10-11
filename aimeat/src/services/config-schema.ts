@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.31.1 — 2026-10-11 — geoHeaders names its guide by the GitHub address; docs/visitor-geography.md
+ *     is not a path the node serves.
  *   v1.31.0 — 2026-10-11 — Six rows the node holds as a list are `list` rows of type object (cors.allowed_origins, scopes.default_agent_scopes, scopes.max_agent_scopes, push.notify_types, realtime.stun_servers, federation.default_scopes): they were typed string, so a save wrote text into a field the code reads as an array. serializeFieldValue() writes a list as comma-separated text. Thirteen whole-number rows refuse a fraction. The five quota descriptions say whose usage is counted.
  *   v1.30.0 — 2026-10-11 — Seven rows removed because no code read them: consent.max_per_user, marketplace.listing_fee, marketplace.escrow_enabled, federation_sync.replication_queue_max, work.otk_ttl_ms, work.max_url_length, personal_nodes.mailbox_retention_days (Jouni, 2026-10-11).
  *   v1.29.0 — 2026-10-11 — Fifteen capacity rows lose their upper bound, so their `range` is a recommendation and a larger number is accepted (Jouni, 2026-10-11; the list is in docs/b-config.md). The rate-limit rows moved to config-schema-rate-limits.ts unchanged (max-file-lines).
@@ -82,7 +84,7 @@
  *   v1.3.0 — 2026-08-18 — The node.sealed_config_keys row. Its `immutable: true` is load-bearing
  *     rather than descriptive: it is what stops the seal list from being sealed or unsealed
  *     through applyConfigOverrides(), which is the door the mechanism exists to close.
- *     docs/plans/sealed-config-plan.md
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *   v1.2.0 — 2026-08-16 — The `ai.` group: whose key pays, which model answers each role, the
  *     free allowance, and the chat agent's binary/provider/model. Every one of them decides what
  *     the node spends and every one of them was .env-and-restart only, so an operator could not
@@ -292,7 +294,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Visitor geography ── the switch is immutable on purpose: it says what the reverse proxy in
   //    front of this node does, and that is a fact about the deployment, not a preference to flip
   //    from a browser. Turned on with no such proxy, the place headers would be the visitor's own.
-  { key: 'geoHeaders', dotPath: 'geo.headers', envVar: 'AIMEAT_GEO_HEADERS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'The reverse proxy reports where each request came from (X-Geo-Country, -Region, -City, -Lat, -Lon), so an app owner can see visitors by place. Leave off unless the proxy sets and overwrites these headers: docs/visitor-geography.md. No address is stored either way' },
+  { key: 'geoHeaders', dotPath: 'geo.headers', envVar: 'AIMEAT_GEO_HEADERS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'The reverse proxy reports where each request came from (X-Geo-Country, -Region, -City, -Lat, -Lon), so an app owner can see visitors by place. Leave off unless the proxy sets and overwrites these headers: https://github.com/miikkij/aimeat-protocol/blob/main/docs/visitor-geography.md. No address is stored either way' },
   { key: 'geoAttribution', dotPath: 'geo.attribution', envVar: 'AIMEAT_GEO_ATTRIBUTION', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false, description: 'The credit line your proxy\'s address database asks for (DB-IP Lite is CC BY 4.0), shown under the visitor map. Empty shows nothing' },
   // ── Visibility and visitors ── one switch per layer (config-schema-visibility.ts).
   ...VISIBILITY_CONFIG_FIELDS,

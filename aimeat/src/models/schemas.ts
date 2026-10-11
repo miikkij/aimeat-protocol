@@ -15,6 +15,9 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Action pacing — 2026-10-11 — ActionPricingSchema takes toll_morsels, the pacing amount per use;
+ *     base_morsels (the 3.x morsel price) is optional and read as pacing until 4.0.0, and pricing is
+ *     optional on publish (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   Board provenance — 2026-10-08 — BoardPostSchema and BoardReplySchema take ai_provenance and
  *     ai_provenance_id (aiprov D5); the objects stripped both, so a REST declaration vanished.
  *   POST /v1/memory lock — 2026-10-06 — MemoryWriteSchema takes expected_version (secaudit 2026-10
@@ -153,8 +156,16 @@ export const MemoryUpdateSchema = z.object({
 
 // ── Actions ─────────────────────────────────────────────────
 
+// An action carries a PACING amount, never a morsel price (ruling
+// decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa, 2026-10-11). `toll_morsels` is the
+// pacing amount per use, within the 100 every pacing amount shares (TOLL_MORSELS_MAX) and the node
+// ceiling the route applies. `base_morsels` is the 3.x morsel price: the route reads it as the pacing
+// amount (clamped to the node ceiling, so no max here) until MORSEL_PRICE_FIELDS_REMOVED_IN and
+// refuses it after (services/action-pacing.ts). Neither sent: the node default on publish, the
+// stored amount on update. `per_unit` is pacing per 1000 units, declared and not charged anywhere.
 export const ActionPricingSchema = z.object({
-    base_morsels: z.number().int().nonnegative(),
+    toll_morsels: z.number().int().nonnegative().max(100).optional(),
+    base_morsels: z.number().int().nonnegative().optional(),
     per_unit: z.object({
         unit: z.string(),
         morsels_per_1000: z.number(),
@@ -168,7 +179,7 @@ export const ActionPublishSchema = z.object({
     category: z.string().max(64).optional(),
     input_schema: z.record(z.string(), z.unknown()),
     output_schema: z.record(z.string(), z.unknown()),
-    pricing: ActionPricingSchema,
+    pricing: ActionPricingSchema.optional(),
     estimated_time_seconds: z.number().int().positive().optional(),
     max_input_size_bytes: z.number().int().positive().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),

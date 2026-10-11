@@ -267,6 +267,7 @@
       inARow: "{n} in a row",
       sortBy: "Sort by",
       morsels: "morsels",
+      pacingAmount: "pacing {amount}",
       target: "Target {n}",
       fix: "Fix this"
     },
@@ -297,6 +298,7 @@
       inARow: "{n} peräkkäin",
       sortBy: "Järjestys",
       morsels: "murusta",
+      pacingAmount: "tahdistus {amount}",
       target: "Tavoite {n}",
       fix: "Korjaa tämä"
     },
@@ -327,6 +329,7 @@
       inARow: "{n} seguidos",
       sortBy: "Ordenar por",
       morsels: "morsels",
+      pacingAmount: "{amount} de ritmo",
       target: "Objetivo {n}",
       fix: "Corrige esto"
     }
@@ -439,7 +442,11 @@
   }
   function morsels(n, opts) {
     const v = Math.round(Number(n) || 0);
-    return opts && opts.bare ? String(v) : v + " " + i18n.t("morsels");
+    if (opts && opts.bare) return String(v);
+    const amount = v + " " + i18n.t("morsels");
+    if (!(opts && opts.pacing)) return amount;
+    const text = i18n.t("pacingAmount", { amount });
+    return text === "pacingAmount" ? "pacing " + amount : text;
   }
   function isMoneyCurrency(currency) {
     return !!currency && currency !== "morsel" && currency !== "MORSEL";

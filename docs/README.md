@@ -46,8 +46,10 @@ in the two trees have different content; they are not interchangeable copies.
 
 ## History and local material
 
-[The archive](archive/README.md) holds earlier implementation plans, audits and
-manual test plans. They explain past work; use current guides for commands and behavior.
+Plans, design specifications and build notes live on the node, in the AIMEAT development
+organism: plans and specifications in its Development workspace, build notes in Platform
+Development Notes. The repository keeps the protocol, the contracts and the guides. The archive
+of earlier plans and manual test plans was removed on 2026-10-11; git history keeps every file.
 
 `docs/internal/` also contains local, gitignored working material. It is not part
 of the public documentation set. This cleanup covers tracked files and preserves

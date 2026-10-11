@@ -96,4 +96,4 @@ configuration sources. Admin writes, stored overrides and Consul cannot change a
 sealed path. Unknown paths refuse startup.
 
 See [configuration precedence](../b-config.md) and
-[the original design](../plans/sealed-config-plan.md).
+[the original design](https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm).

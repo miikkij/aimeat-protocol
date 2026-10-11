@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.21.2 — 2026-10-11 — The licence gate reads the app's pacing amount (`tollMorsels`, services/app-pacing.ts);
+ *     a morsel is pacing, not a price, and the 401 / 402 texts say so.
  *   v1.21.1 — 2026-10-10 — The paid-app gate answers the anonymous identity 401, as it answers no
  *     identity, instead of 402 (secaudit 2026-10-10 C1).
  *   v1.21.0 — 2026-10-09 — A protected app's code is waived for a caller who could set it (the owner in
@@ -122,6 +124,7 @@ import { ownerTagsFor, withOwnerTags } from '../../services/visibility/analytics
 import { escapeHtml } from '../../utils/html-escape.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
+import { appIsPaced, appToll } from '../../services/app-pacing.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
@@ -538,13 +541,14 @@ export function registerReadRoutes(
             }
         }
 
-        // Paid app check: if marketplace enabled and app has a price, require valid license
-        if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) {
+        // Paced app check: if the app store is on and the app has a pacing amount, require a valid
+        // licence (the app taken once through POST /v1/app-store/purchase).
+        if (appIsPaced(config, app.manifest)) {
             // The anonymous identity (AIMEAT_ANONYMOUS_MODE) carries a req.auth, and it can hold no
             // licence, so it gets the 401 that tells a caller to sign in (secaudit 2026-10-10 C1).
             if (!req.auth || req.auth.anonymous) {
                 res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED',
-                    'This is a paid app. Authenticate and purchase it first via POST /v1/app-store/purchase'));
+                    'This app has a pacing amount. Sign in and take it first via POST /v1/app-store/purchase'));
                 return;
             }
             // A right belongs to the PERSON, so both questions here are asked of the owner coordinate
@@ -559,7 +563,7 @@ export function registerReadRoutes(
                 const hasLicense = await storage.hasValidLicense(caller, app.ownerGaii, filename);
                 if (!hasLicense) {
                     res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED',
-                        `This app costs ${app.manifest.priceMorsels} morsels. Purchase it first via POST /v1/app-store/purchase`));
+                        `This app has ${appToll(app.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase`));
                     return;
                 }
             }
@@ -607,7 +611,7 @@ export function registerReadRoutes(
         if (runnable && config.appOriginEnabled && config.appHost && (!req.appOrigin || foreignOrigin)) {
             const target = await appOriginUrl(config, storage, owner, filename);
             const gated = !!app.accessCode
-                || (config.marketplaceEnabled && !!app.manifest.priceMorsels && app.manifest.priceMorsels > 0);
+                || appIsPaced(config, app.manifest);
             if (!gated) {
                 res.redirect(301, target);
                 return;

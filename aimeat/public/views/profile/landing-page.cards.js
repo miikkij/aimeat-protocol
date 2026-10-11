@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.24.0 -- 2026-10-11 -- The Commerce card totals money per currency and the pacing apart ("15,00 € · pacing 10 morsels"), from a checkout session's total / receipt and its pacing (receipt.pacing, pacingMorsels); a 3.x session in currency 'morsel' counts as pacing. A morsel is never a currency.
  *   v1.23.0 -- 2026-10-09 -- Visibility under Business, after Usage.
  *   v1.22.0 -- 2026-10-03 -- The overview's next steps come from the person's path (journey.next first, then the open stages after it; views/home/journey-steps.js), with no emoji; the extensions promo shows once the apps stage is done or the person has three apps, and its cards lose their emoji marks (guidance A2).
  *   v1.21.0 -- 2026-10-01 -- The Packages page is "Get apps", right under Apps and in the basic menu (decision D8 of the user-journey review).
@@ -324,21 +325,26 @@ export function CommerceCard() {
       const sessions = s?.data?.sessions ?? [];
       const orders = o?.data?.orders ?? [];
       const completed = sessions.filter((x) => x.status === 'completed');
-      // Currencies never mix: morsels and each money code (minor units) total separately.
-      const sumBy = (list, pick) => {
+      // Money totals per currency (micro-units); morsels are pacing and never a currency, so they
+      // total on their own. A 3.x session in currency 'morsel' counts as pacing.
+      const isMorselRow = (x) => !x.currency || /^morsels?$/i.test(String(x.currency));
+      const moneyBy = (list, pick) => {
         const by = {};
         for (const x of list) {
-          const cur = x.currency || 'morsel';
-          by[cur] = (by[cur] || 0) + (pick(x) || 0);
+          if (isMorselRow(x)) continue;
+          by[x.currency] = (by[x.currency] || 0) + (pick(x) || 0);
         }
         return by;
       };
+      const pacingSum = (list, pick, legacy) => list.reduce((n, x) => n + (Number(pick(x) ?? (isMorselRow(x) ? legacy(x) : 0)) || 0), 0);
       setStats({
         bought: completed.length,
         open: sessions.filter((x) => x.status === 'open').length,
-        spentBy: sumBy(completed, (x) => x.receipt && x.receipt.charged),
+        spentBy: moneyBy(completed, (x) => (x.receipt && x.receipt.charged) ?? x.total),
+        spentPacing: pacingSum(completed, (x) => x.receipt?.pacing?.morsels ?? x.pacingMorsels, (x) => x.receipt && x.receipt.charged),
         sold: orders.length,
-        earnedBy: sumBy(orders, (x) => x.receipt && x.receipt.earned),
+        earnedBy: moneyBy(orders, (x) => x.receipt && x.receipt.earned),
+        earnedPacing: pacingSum(orders, (x) => x.receipt?.pacing?.providerEarned, (x) => x.receipt && x.receipt.earned),
       });
     } catch (err) { swallowed('landing-page.cards', err); setStats(null); /* commerce disabled or unreachable — render nothing */ }
   }, []);
@@ -347,16 +353,16 @@ export function CommerceCard() {
   useEffect(() => onLiveUpdate(['agent-tasks', 'memory'], () => liveRef.current()), []);
 
   if (!stats) return null;
-  const morsels = t('profile.landing.commerceMorsels') || 'morsels';
-  // "10 morsels · 15.00 EUR" — money amounts are micro-units, never summed with morsels.
-  const fmtTotals = (by) => Object.entries(by)
-    .map(([cur, n]) => cur === 'morsel' ? `${n} ${morsels}` : fmtMoney(n, cur))
-    .join(' · ') || `0 ${morsels}`;
+  // "15.00 EUR · pacing 10 morsels": money in micro-units per currency, the pacing apart from it.
+  const fmtTotals = (by, pacing) => [
+    ...Object.entries(by).filter(([, n]) => n > 0).map(([cur, n]) => fmtMoney(n, cur)),
+    pacing > 0 ? t('pacing.amount', { n: pacing }) : '',
+  ].filter(Boolean).join(' · ') || t('pacing.free');
   return html`
     <${Card} tone="panel" title=${t('profile.landing.commerceTitle') || 'Commerce'}>
       <${FigureStrip} items=${[
-        { key: 'bought', n: String(stats.bought), label: t('profile.landing.commerceBought') || 'Purchases', sub: fmtTotals(stats.spentBy) },
-        { key: 'sold', n: String(stats.sold), label: t('profile.landing.commerceSold') || 'Sales', sub: fmtTotals(stats.earnedBy) },
+        { key: 'bought', n: String(stats.bought), label: t('profile.landing.commerceBought') || 'Purchases', sub: fmtTotals(stats.spentBy, stats.spentPacing) },
+        { key: 'sold', n: String(stats.sold), label: t('profile.landing.commerceSold') || 'Sales', sub: fmtTotals(stats.earnedBy, stats.earnedPacing) },
         { key: 'open', n: String(stats.open), label: t('profile.landing.commerceOpen') || 'Open carts', sub: t('profile.landing.commerceOpenSub') || 'checkout sessions' },
       ]} />
     <//>`;

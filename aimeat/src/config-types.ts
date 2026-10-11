@@ -700,6 +700,12 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    * invokes) and in every unit, so a money-priced capability is rate-bounded too. 0 disables it.
    */
   pacingTollDefault: number;
+  /** Morsels in one pacing pack sold for money (0 = not sold). AIMEAT_PACING_PACK_MORSELS. */
+  pacingPackMorsels: number;
+  /** Money price of one pacing pack in micro-units (0 = not sold). AIMEAT_PACING_PACK_PRICE. */
+  pacingPackPrice: number;
+  /** Currency of the pacing pack price. AIMEAT_PACING_PACK_CURRENCY, default EUR. */
+  pacingPackCurrency: string;
   extensionMaxCodeSizeKb: number;
   extensionMaxInstalled: number;
   maxExtensionsPerOwner: number;

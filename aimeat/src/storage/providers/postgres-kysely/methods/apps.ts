@@ -23,6 +23,8 @@
  *   v1.4.1 — 2026-09-26 — normalizeAppOwnerNames strips only this node's own `@nodeId` suffix, so a
  *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
  *   v1.5.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
+ *   v1.6.0 — 2026-10-11 — Every manifest read (app, listing row, draft) goes through
+ *     normalizeAppManifestPacing: a stored `priceMorsels` is the app's pacing amount `tollMorsels`.
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
@@ -34,6 +36,7 @@ import type {
 import type { App, AppDraft, AppFork } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
+import { normalizeAppManifestPacing } from '../../../app-manifest-pacing.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -45,7 +48,7 @@ function toApp(r: Selectable<App>): AppRecord {
     ownerName: r.ownerName,
     filename: r.filename,
     versionNumber: r.versionNumber,
-    manifest: r.manifest as unknown as AppManifest,
+    manifest: normalizeAppManifestPacing(r.manifest as unknown as AppManifest),
     mimeType: r.mimeType,
     size: r.size,
     data: Buffer.from(r.data),
@@ -87,7 +90,7 @@ function toAppSummary(r: AppSummaryRow): AppSummaryRecord {
     ownerName: r.ownerName,
     filename: r.filename,
     versionNumber: r.versionNumber,
-    manifest: r.manifest as unknown as AppManifest,
+    manifest: normalizeAppManifestPacing(r.manifest as unknown as AppManifest),
     mimeType: r.mimeType,
     size: r.size,
     accessCode: r.accessCode ?? undefined,
@@ -111,7 +114,7 @@ function toDraft(r: Selectable<AppDraft>): AppDraftRecord {
     ownerGaii: r.ownerGaii,
     ownerName: r.ownerName,
     filename: r.filename,
-    manifest: r.manifest as unknown as AppManifest,
+    manifest: normalizeAppManifestPacing(r.manifest as unknown as AppManifest),
     mimeType: r.mimeType,
     size: r.size,
     data: Buffer.from(r.data),
@@ -153,7 +156,8 @@ async function finishAppListing<T extends AppSummaryRecord>(
     const query = opts.q.toLowerCase();
     apps = apps.filter(a => a.filename.toLowerCase().includes(query) || a.manifest.name.toLowerCase().includes(query) || a.manifest.description.toLowerCase().includes(query));
   }
-  if (opts?.freeOnly) apps = apps.filter(a => !a.manifest.priceMorsels);
+  // The rows were mapped through normalizeAppManifestPacing, so an old `priceMorsels` is `tollMorsels` here.
+  if (opts?.freeOnly) apps = apps.filter(a => !a.manifest.tollMorsels);
   // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner (viewerGhii). A scoped
   // ownerGaii query already returns only that owner's apps, so skip the filters there. adminView sees all.
   if (!opts?.ownerGaii && !opts?.adminView) {

@@ -8,6 +8,11 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.8.0 — 2026-10-11 — 2, 4, 5, 7, 9, 17, 18, 22 and 26 asserted the old model, where a morsel amount
+ *     was a price settled by the morsel handler. A morsel amount is pacing now: a morsel-written offer or
+ *     tool is free with that pacing, the receipt carries `pacing`, a short balance is INSUFFICIENT_MORSELS,
+ *     the 402 names the daily allowance, and the handler checks run on a money offer (money-doc)
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.7.0 — 2026-09-16 — 34b: the Stripe secrets are stored encrypted, so the generic memory door
  *     and the operator's memory door carry a hint and no secret; 35 asserts the encrypted shape.
  *   v1.6.0 — 2026-07-28 — Seller payment rails now that money settlement is core: payout status
@@ -95,6 +100,11 @@ const BASE_OFFERS = [
         deliverable: { format: 'document', sample: 'untested' },
         visibility: 'public',
     },
+    {
+        id: 'money-doc', title: 'Translate for money', ask: 'Send a document; I translate it for 1 EUR.',
+        deliverable: { format: 'document', sample: 'untested' },
+        priceMoney: { amount: 1_000_000, currency: 'EUR' }, tollMorsels: 2, visibility: 'public',
+    },
 ];
 
 await test('Setup: operator-neutral + seller + buyer owners; seller publishes priced offers', async () => {
@@ -151,7 +161,9 @@ await test('2. Buyer opens a checkout session (quantity 2) → 201, priced from 
     assert(r.status === 201, `create ${r.status}: ${JSON.stringify(r.body.error)}`);
     const s = r.body.data.session;
     sessionId = s.id;
-    assert(s.status === 'open' && s.total === PRICE * 2 && s.currency === 'morsel', `session: ${JSON.stringify(s)}`);
+    // translate-doc was written with the old `price: { morsels }`, which is its pacing amount now: the
+    // session is free in money and carries the pacing (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+    assert(s.status === 'open' && s.total === 0 && s.currency !== 'morsel' && s.pacingMorsels === PRICE * 2, `session: ${JSON.stringify(s)}`);
     assert(s.sellerOwner === seller.name && s.buyerOwner === buyer.name, 'parties recorded');
 });
 
@@ -162,15 +174,15 @@ await test('3. Buyer reads the session back; seller CANNOT (404 isolation)', asy
     assert(theirs.status === 404, `expected 404 for a foreign session, got ${theirs.status}`);
 });
 
-await test('4. PATCH items → quantity 1, total re-quoted', async () => {
+await test('4. PATCH items → quantity 1, pacing re-quoted', async () => {
     const r = await json(`/v1/commerce/checkout-sessions/${sessionId}`, {
         method: 'PATCH', headers: auth(buyer.token),
         body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc', quantity: 1 }] }),
     });
-    assert(r.status === 200 && r.body.data.session.total === PRICE, `patch ${r.status}: ${JSON.stringify(r.body.data?.session)}`);
+    assert(r.status === 200 && r.body.data.session.pacingMorsels === PRICE, `patch ${r.status}: ${JSON.stringify(r.body.data?.session)}`);
 });
 
-await test('5. Complete → charged, fee split, fulfillment TASK queued for the seller agent', async () => {
+await test('5. Complete → pacing charged and split, fulfillment TASK queued for the seller agent', async () => {
     const buyerBefore = await balance(buyer.token);
     const sellerBefore = await balance(seller.token);
     const opBefore = await balance(op.token);
@@ -178,16 +190,17 @@ await test('5. Complete → charged, fee split, fulfillment TASK queued for the 
     assert(r.status === 200, `complete ${r.status}: ${JSON.stringify(r.body.error)}`);
     const s = r.body.data.session;
     assert(s.status === 'completed', `status ${s.status}`);
-    assert(s.receipt?.handler === 'io.aimeat.morsels' && s.receipt.charged === PRICE, `receipt: ${JSON.stringify(s.receipt)}`);
-    assert(s.receipt.charged === s.receipt.earned + s.receipt.fee, 'fee arithmetic');
+    const p = s.receipt?.pacing ?? {};
+    assert(s.receipt?.handler === 'none' && s.receipt.charged === 0 && p.morsels === PRICE, `receipt: ${JSON.stringify(s.receipt)}`);
+    assert(p.morsels === p.burned + p.fee + p.providerEarned, `pacing arithmetic: ${JSON.stringify(p)}`);
     assert((s.fulfillment?.taskIds || []).length === 1, `taskIds: ${JSON.stringify(s.fulfillment)}`);
-    assert(await balance(buyer.token) === buyerBefore - PRICE, 'buyer debited');
-    assert(await balance(seller.token) === sellerBefore + s.receipt.earned, 'seller credited (minus fee)');
-    // Fee destination (operator mode is the default): when our neutral owner holds the operator
-    // role (fresh DB), the fee lands on them exactly. On a shared server another suite's owner may
+    assert(await balance(buyer.token) === buyerBefore - PRICE, 'buyer debited the pacing');
+    assert(await balance(seller.token) === sellerBefore + p.providerEarned, 'seller credited the rest of the pacing');
+    // Operator share (operator mode is the default): when our neutral owner holds the operator
+    // role (fresh DB), the share lands on them exactly. On a shared server another suite's owner may
     // be the operator — the seller/buyer legs above still pin the arithmetic.
     if (op.roles.includes('operator')) {
-        assert(await balance(op.token) === opBefore + s.receipt.fee, 'operator received the fee (fee mode: operator)');
+        assert(await balance(op.token) === opBefore + p.fee, 'operator received its share (fee mode: operator)');
     }
     const tasks = await json('/v1/agents/vendor/tasks', { headers: auth(seller.token) });
     const task = (tasks.body.data.tasks || []).find((t: any) => (t.scope || []).some((sc: any) => sc.name === 'commerce_session' && sc.value === sessionId));
@@ -200,15 +213,17 @@ await test('6. Double-complete is refused (409 SESSION_NOT_OPEN)', async () => {
     assert(r.status === 409 && r.body.error?.code === 'SESSION_NOT_OPEN', `expected 409 SESSION_NOT_OPEN, got ${r.status} ${r.body.error?.code}`);
 });
 
-await test('7. Insufficient balance → 402, session stays open for retry', async () => {
+await test('7. Not enough morsels for the pacing → 402, session stays open for retry', async () => {
     const create = await json('/v1/commerce/checkout-sessions', {
         method: 'POST', headers: auth(buyer.token),
         body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc', quantity: 1000 }] }),
     });
     assert(create.status === 201, `create ${create.status}`);
     const id = create.body.data.session.id;
+    const before = await balance(buyer.token);
     const r = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
-    assert(r.status === 402 && r.body.error?.code === 'INSUFFICIENT_BALANCE', `expected 402, got ${r.status} ${r.body.error?.code}`);
+    assert(r.status === 402 && r.body.error?.code === 'INSUFFICIENT_MORSELS', `expected 402, got ${r.status} ${r.body.error?.code}`);
+    assert(await balance(buyer.token) === before, 'a refused use moves no morsels');
     const back = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyer.token) });
     assert(back.body.data.session.status === 'open', 'session still open after a failed charge');
 });
@@ -222,11 +237,18 @@ await test('8. Unknown offer → 404; private offer cross-owner → 403; unprice
     assert(unpriced.status === 422 && unpriced.body.error?.code === 'OFFER_NOT_FOR_SALE', `unpriced: ${unpriced.status} ${unpriced.body.error?.code}`);
 });
 
-await test('9. Unknown payment handler → 422', async () => {
-    const create = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }) });
+await test('9. A money session: no handler → 422 PAYMENT_HANDLER_REQUIRED, the old morsel handler → the same, an unknown one → 422', async () => {
+    const create = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'money-doc' }] }) });
+    assert(create.status === 201 && create.body.data.session.currency === 'EUR' && create.body.data.session.total === 1_000_000, `money session: ${JSON.stringify(create.body.data?.session ?? create.body.error)}`);
     const id = create.body.data.session.id;
+    const before = await balance(buyer.token);
+    const none = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(none.status === 422 && none.body.error?.code === 'PAYMENT_HANDLER_REQUIRED', `no handler: ${none.status} ${none.body.error?.code}`);
+    const legacy = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'io.aimeat.morsels' } }) });
+    assert(legacy.status === 422 && legacy.body.error?.code === 'PAYMENT_HANDLER_REQUIRED', `the morsel handler is not a payment: ${legacy.status} ${legacy.body.error?.code}`);
     const r = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'com.example.no-such-rail' } }) });
     assert(r.status === 422 && r.body.error?.code === 'UNKNOWN_PAYMENT_HANDLER', `expected 422, got ${r.status} ${r.body.error?.code}`);
+    assert(await balance(buyer.token) === before, 'a refused completion moves no morsels');
 });
 
 await test('10. Cancel closes the session; complete after cancel → 409', async () => {
@@ -319,7 +341,9 @@ await test('17. 402 responses carry the x402-style accepts block', async () => {
     });
     const r = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
     assert(r.status === 402, `402 expected, got ${r.status}`);
-    assert(Array.isArray(r.body.accepts) && r.body.accepts.some((a: any) => a.scheme === 'aimeat-checkout' && a.handler === 'io.aimeat.morsels'), `accepts: ${JSON.stringify(r.body.accepts)}`);
+    const accepts = (r.body.accepts ?? []) as any[];
+    assert(accepts.some((a: any) => a.scheme === 'aimeat-morsel-topup' && a.daily_allowance?.url?.endsWith('/v1/wallet/request')), `the 402 says how to get more morsels: ${JSON.stringify(accepts)}`);
+    assert(!accepts.some((a: any) => a.handler === 'io.aimeat.morsels' || (a.currencies ?? []).includes('morsel')), `no morsel payment scheme: ${JSON.stringify(accepts)}`);
 });
 
 await test('18. Unknown item kinds and unpriced currencies are refused', async () => {
@@ -328,11 +352,12 @@ await test('18. Unknown item kinds and unpriced currencies are refused', async (
         body: JSON.stringify({ items: [{ kind: 'no-such-kind', agent: 'a', offer_id: 'o' }] }),
     });
     assert(r.status === 400 && r.body.error?.code === 'INVALID_CHECKOUT', `unknown kind: ${r.status} ${r.body.error?.code}`);
-    const eur = await json('/v1/commerce/checkout-sessions', {
+    // An offer priced in EUR only is not sold in USD.
+    const usd = await json('/v1/commerce/checkout-sessions', {
         method: 'POST', headers: auth(buyer.token),
-        body: JSON.stringify({ currency: 'EUR', items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }),
+        body: JSON.stringify({ currency: 'USD', items: [{ agent: vendorGaii, offer_id: 'money-doc' }] }),
     });
-    assert(eur.status === 422 && eur.body.error?.code === 'CURRENCY_NOT_SUPPORTED', `EUR offer on Community: ${eur.status} ${eur.body.error?.code}`);
+    assert(usd.status === 422 && usd.body.error?.code === 'CURRENCY_NOT_SUPPORTED', `EUR offer in USD: ${usd.status} ${usd.body.error?.code}`);
 });
 
 await test('19. Anonymous requests are rejected (401)', async () => {
@@ -431,7 +456,7 @@ await test('21. Morsel-priced app-tools stay out of the money feed; the tool cat
     assert(!!taskEntry && taskEntry.fulfillment === 'task', `task tool with hint: ${JSON.stringify(taskEntry)}`);
 });
 
-await test('22. Buy an app-tool call → charged, capability invoked, result on fulfillment.results', async () => {
+await test('22. Buy an app-tool call → pacing charged, capability invoked, result on fulfillment.results', async () => {
     const buyerBefore = await balance(buyer.token);
     const sellerBefore = await balance(seller.token);
     const create = await json('/v1/commerce/checkout-sessions', {
@@ -440,17 +465,17 @@ await test('22. Buy an app-tool call → charged, capability invoked, result on 
     });
     assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
     const s0 = create.body.data.session;
-    assert(s0.total === 3 && s0.sellerOwner === seller.name, `session: total ${s0.total}, seller ${s0.sellerOwner}`);
+    assert(s0.total === 0 && s0.pacingMorsels === 3 && s0.sellerOwner === seller.name, `session: total ${s0.total}, pacing ${s0.pacingMorsels}, seller ${s0.sellerOwner}`);
     const done = await json(`/v1/commerce/checkout-sessions/${s0.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
     assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
     const s = done.body.data.session;
-    assert(s.status === 'completed' && s.receipt?.charged === 3, `receipt: ${JSON.stringify(s.receipt)}`);
+    assert(s.status === 'completed' && s.receipt?.charged === 0 && s.receipt.pacing?.morsels === 3, `receipt: ${JSON.stringify(s.receipt)}`);
     const result = s.fulfillment?.results?.[0];
     assert(result?.sku === `app-tool:${appRef}:echo`, `result sku: ${JSON.stringify(s.fulfillment)}`);
     assert(result?.result?.echoed === 'Echo: paid call', `capability result: ${JSON.stringify(result?.result)}`);
     assert((s.fulfillment?.taskIds || []).length === 0, 'callable fulfillment creates no TASK');
-    assert(await balance(buyer.token) === buyerBefore - 3, 'buyer debited for the call');
-    assert(await balance(seller.token) === sellerBefore + s.receipt.earned, 'app owner credited (minus fee)');
+    assert(await balance(buyer.token) === buyerBefore - 3, 'buyer debited the pacing for the call');
+    assert(await balance(seller.token) === sellerBefore + s.receipt.pacing.providerEarned, 'app owner credited the rest of the pacing');
 });
 
 await test('23. App-tool failure gates: unknown tool 404, unpriced 422, quantity>1 400, bad app ref 400', async () => {
@@ -495,7 +520,7 @@ await test('25. Self-purchase of an own app-tool is free and still invokes', asy
 
 // ─── App-tool TASK path (TARGET-034 phase B): unbound tools fulfill as an agent TASK ───
 
-await test('26. Buy an unbound app-tool → charged, TASK queued for the manifest agent, input on the task', async () => {
+await test('26. Buy an unbound app-tool → pacing charged, TASK queued for the manifest agent, input on the task', async () => {
     const buyerBefore = await balance(buyer.token);
     const sellerBefore = await balance(seller.token);
     const create = await json('/v1/commerce/checkout-sessions', {
@@ -504,16 +529,17 @@ await test('26. Buy an unbound app-tool → charged, TASK queued for the manifes
     });
     assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
     const s0 = create.body.data.session;
-    assert(s0.total === 5, `task-tool session total: ${s0.total}`);
+    assert(s0.total === 0 && s0.pacingMorsels === 5, `task-tool session: total ${s0.total}, pacing ${s0.pacingMorsels}`);
     const done = await json(`/v1/commerce/checkout-sessions/${s0.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
     assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
     const s = done.body.data.session;
-    assert(s.status === 'completed' && s.receipt?.charged === 5, `receipt: ${JSON.stringify(s.receipt)}`);
-    assert(s.receipt.charged === s.receipt.earned + s.receipt.fee, 'fee arithmetic on the task path');
+    const p = s.receipt?.pacing ?? {};
+    assert(s.status === 'completed' && s.receipt?.charged === 0 && p.morsels === 5, `receipt: ${JSON.stringify(s.receipt)}`);
+    assert(p.morsels === p.burned + p.fee + p.providerEarned, 'pacing arithmetic on the task path');
     assert((s.fulfillment?.taskIds || []).length === 1, `taskIds: ${JSON.stringify(s.fulfillment)}`);
     assert(!(s.fulfillment?.results || []).length, 'task fulfillment returns no inline result');
-    assert(await balance(buyer.token) === buyerBefore - 5, 'buyer debited');
-    assert(await balance(seller.token) === sellerBefore + s.receipt.earned, 'app owner credited (minus fee)');
+    assert(await balance(buyer.token) === buyerBefore - 5, 'buyer debited the pacing');
+    assert(await balance(seller.token) === sellerBefore + p.providerEarned, 'app owner credited the rest of the pacing');
     // The TASK landed on the manifest-declared agent (vendor) with the app-tool scope + buyer input.
     const tasks = await json('/v1/agents/vendor/tasks', { headers: auth(seller.token) });
     const task = (tasks.body.data.tasks || []).find((t: any) => t.id === s.fulfillment.taskIds[0]);
@@ -545,12 +571,14 @@ await test('28. GET /v1/apps/:owner/:app/webmcp — public WebMCP-shaped tool li
     assert(body.library?.endsWith('/v1/libs/aimeat-webmcp.js'), `library: ${body.library}`);
     const echo = (body.tools || []).find((t: any) => t.name === 'echo');
     assert(!!echo && echo.inputSchema && echo.fulfillment === 'call', `echo tool: ${JSON.stringify(echo)}`);
-    assert(echo.payment?.required === true && echo.payment.price?.morsels === 3, `echo payment: ${JSON.stringify(echo.payment)}`);
-    assert(echo.payment.checkout?.items?.[0]?.kind === 'app-tool', 'ready-made checkout item');
+    // echo was written with the old `price: { morsels: 3 }`: it is free in money with 3 morsels of
+    // pacing, and the old field stays as a deprecated mirror until 4.0.0.
+    assert(echo.payment?.required === false && echo.toll_morsels === 3 && echo.payment.toll_morsels === 3, `echo payment: ${JSON.stringify(echo.payment)}`);
+    assert(echo.payment.price?.morsels === 3 && typeof echo.payment.price?.deprecated === 'string', `deprecated mirror: ${JSON.stringify(echo.payment.price)}`);
     const free = (body.tools || []).find((t: any) => t.name === 'unpriced-echo');
-    assert(free?.payment?.required === false, `unpriced tool payment: ${JSON.stringify(free?.payment)}`);
+    assert(free?.payment?.required === false && free.toll_morsels === 0, `unpriced tool payment: ${JSON.stringify(free?.payment)}`);
     const task = (body.tools || []).find((t: any) => t.name === 'concierge');
-    assert(task?.fulfillment === 'task' && task.payment?.required === true, `task tool: ${JSON.stringify(task?.payment)}`);
+    assert(task?.fulfillment === 'task' && task.payment?.required === false && task.toll_morsels === 5, `task tool: ${JSON.stringify(task)}`);
     // The bridge library itself is served and carries the modelContext feature detection.
     const lib = await fetch(`${BASE}/v1/libs/aimeat-webmcp.js`);
     assert(lib.status === 200, `lib ${lib.status}`);
@@ -558,20 +586,20 @@ await test('28. GET /v1/apps/:owner/:app/webmcp — public WebMCP-shaped tool li
     assert(src.includes('modelContext') && src.includes('provideContext'), 'lib feature-detects the WebMCP API');
 });
 
-await test('29. Priced tool unpaid → 402 with x402 accepts; paying the hinted checkout returns the result', async () => {
+// 2026-10-11: this asserted the old model, where a morsel-priced tool answered 402 and was bought
+// through the checkout. A morsel amount is pacing: the tool runs for a signed-in caller, who is
+// charged the pacing; only a money price answers 402 (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+await test('29. A free tool with pacing: signed out → 401; signed in → it runs and the caller pays the pacing', async () => {
     const invokeUrl = `${BASE}/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp/tools/echo`;
-    const r = await fetch(invokeUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: { message: 'x' } }) });
-    assert(r.status === 402, `unpaid invoke ${r.status}`);
-    const body = await r.json() as any;
-    assert(Array.isArray(body.accepts) && body.accepts.some((a: any) => a.scheme === 'aimeat-checkout'), `accepts: ${JSON.stringify(body.accepts)}`);
-    assert(body.payment?.checkout?.items?.[0]?.tool === 'echo', `checkout hint: ${JSON.stringify(body.payment?.checkout)}`);
-    // Follow the hint: same item, real input, through the normal checkout → the result rides back.
-    const item = { ...body.payment.checkout.items[0], input: { message: 'paid via 402 flow' } };
-    const create = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [item] }) });
-    assert(create.status === 201, `create from hint ${create.status}: ${JSON.stringify(create.body.error)}`);
-    const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
-    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
-    assert(done.body.data.session.fulfillment?.results?.[0]?.result?.echoed === 'Echo: paid via 402 flow', `402→checkout→result: ${JSON.stringify(done.body.data.session.fulfillment)}`);
+    const anon = await fetch(invokeUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: { message: 'x' } }) });
+    assert(anon.status === 401, `signed-out invoke ${anon.status}`);
+    const before = await balance(buyer.token);
+    const r = await json(`/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp/tools/echo`, {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ input: { message: 'paced call' } }),
+    });
+    assert(r.status === 200 && r.body.data?.result?.echoed === 'Echo: paced call', `paced invoke: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+    assert(r.body.data.pacing?.morsels === 3, `the answer names the pacing: ${JSON.stringify(r.body.data.pacing)}`);
+    assert(await balance(buyer.token) === before - 3, 'the caller paid 3 morsels of pacing');
 });
 
 await test('30. WebMCP invoke gates: free-callable needs auth then invokes; unknown tool 404; no manifest 404', async () => {

@@ -406,7 +406,7 @@
       const key = String(id).toLowerCase().split("@")[0].split("#").pop();
       const g = grants[key];
       if (!g || !g.calls) return null;
-      const cost = g.unit === "morsels" ? `${g.units} ${g.unit}` : `${(g.units / 1e6).toFixed(2)} ${g.unit}`;
+      const cost = g.unit === "morsels" ? `pacing ${g.units} ${g.units === 1 ? "morsel" : "morsels"}` : `${(g.units / 1e6).toFixed(2)} ${g.unit}`;
       return el("span", { cls: cls("aim-iam-muted"), text: S("usage", { n: g.calls, cost }) });
     }
     function grantCell(id) {

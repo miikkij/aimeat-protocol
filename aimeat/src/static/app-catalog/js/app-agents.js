@@ -14,6 +14,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-17 — Initial creation (Agent-Bundled Apps Slice 2: catalog surface)
  *   v1.1.0 — 2026-09-13 — The modal opens through dialogs.js (the site's one dialog).
+ *   v1.2.0 — 2026-10-11 — An offer's line is its money price (or Free) and its pacing amount; no
+ *     morsel amount is shown as a price (ruling "morseli on tahdistus, ei hinta").
  */
 import { escapeHtml, jsArg } from './util.js';
 import { openDlg } from './dialogs.js';
@@ -42,16 +44,19 @@ export function appHasAgents(manifest) {
   return !!(manifest && manifest.cortex && Array.isArray(manifest.cortex.agents) && manifest.cortex.agents.length);
 }
 
-/** "12 morsels/run · 2.50 EUR" — an offer's price line, or the ask-for-price fallback. */
+/**
+ * "2.50 EUR · pacing 12 morsels" or "Free · pacing 12 morsels": an offer's money price (or Free)
+ * and its pacing amount (tollMorsels; 3.x price.morsels as fallback). A morsel is never a price.
+ * The ask-for-price fallback only when the offer declares neither.
+ */
 function fmtOfferPrice(o) {
-  var parts = [];
-  if (o.price && typeof o.price.morsels === 'number') {
-    parts.push(o.price.morsels + ' \u{1F969}' + (o.price.unit ? '/' + escapeHtml(o.price.unit) : ''));
-  }
-  if (o.price_money && typeof o.price_money.amount === 'number') {
-    parts.push((o.price_money.amount / 1e6).toFixed(2) + ' ' + escapeHtml(o.price_money.currency || 'EUR'));
-  }
-  return parts.length ? parts.join(' · ') : t('agents.askPrice');
+  var money = o.priceMoney || o.price_money;
+  var hasMoney = money && typeof money.amount === 'number' && money.amount > 0;
+  var toll = typeof o.tollMorsels === 'number' ? o.tollMorsels
+    : (o.price && typeof o.price.morsels === 'number' ? o.price.morsels : null);
+  if (!hasMoney && toll === null) return t('agents.askPrice');
+  var head = hasMoney ? (money.amount / 1e6).toFixed(2) + ' ' + escapeHtml(money.currency || 'EUR') : t('pacing.free');
+  return toll > 0 ? head + ' · ' + t('pacing.amount').replace('{n}', String(toll)) : head;
 }
 
 /** One crew-def's inspector block: who's in the crew, what it does, which tools/skills it needs. */

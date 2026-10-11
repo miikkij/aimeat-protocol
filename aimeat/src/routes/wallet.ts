@@ -30,6 +30,8 @@
  *   v1.6.0 — 2026-09-27 — `pacing` beside `daily_allowance`: whether this node burns morsels per metered
  *     call (`enabled`, true when the operator's `pacingTollDefault` is above 0) and the default toll. The
  *     MCP consent page reads it to explain morsels only on a node that paces.
+ *   v1.7.0 — 2026-10-11 — `pacing_pack`: the pacing capacity the operator sells for money (morsels,
+ *     price, checkout_item), or null when the node sells none.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -45,6 +47,7 @@ import { cached, TTL } from '../services/cache.js';
 import { createWalletTabService } from '../services/db/wallet-tab-db-service.js';
 import { lifetimeOf } from '../services/wallet-stats.js';
 import { resolvePacingToll } from './extensions/pacing.js';
+import { pacingPackOffer } from '../commerce/pacing-pack.js';
 
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -114,6 +117,8 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
         enabled: defaultToll > 0,
         toll_default: defaultToll,
       },
+      // Pacing capacity the operator sells for money, or null when this node sells none.
+      pacing_pack: pacingPackOffer(config),
       lifetime,
     }, [
       { description: 'View transaction history', method: 'GET', url: '/v1/wallet/transactions' },

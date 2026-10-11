@@ -9,6 +9,9 @@
  *   the daily cap is. Every policy row carries a sentence about what it does.
  * @structure EconomyTab — strip · morsels · trade · money · grant form
  * @version-history
+ *   v3.1.0 — 2026-10-11 — The morsel row of the trade section is the pacing volume (pacing_volume_today /
+ *     _all_time, the deprecated sales_volume_* as fallback), headed as pacing and not as sales; the
+ *     section is "Pacing", in morsels (ruling "morseli on tahdistus, ei hinta").
  *   v3.0.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a mint error message with a quote or an ampersand showed as &quot; / &amp;.
  *   v3.0.0 — 2026-09-27 — Library components only: the strip is the FigureStrip (the inflation
@@ -123,7 +126,7 @@ export default function EconomyTab({ data, reload }) {
           </div>
           <div>
             <${Readings} rows=${[
-              row('sales', t('dashboard.ecoSales'), t('dashboard.ecoAllTimeToday', { n: num(c.sales_volume_today) }), unit(c.sales_volume_all_time)),
+              row('sales', t('dashboard.ecoPacingVolume'), t('dashboard.ecoAllTimeToday', { n: num(c.pacing_volume_today ?? c.sales_volume_today) }), unit(c.pacing_volume_all_time ?? c.sales_volume_all_time)),
               row('fees', t('dashboard.ecoOperatorFees'), t('dashboard.ecoAllTimeToday', { n: num(c.operator_fees_today) }), unit(c.operator_fees_all_time)),
             ]} />
           </div>

@@ -6,6 +6,8 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   v1.15.1 -- 2026-10-11 -- The openclaw prompt's integration_guide is the Hello Integration walkthrough
+ *     this node serves; it named the OpenClaw setup page of the repository, which no route served.
  *   v1.15.0 -- 2026-10-11 -- Mounts the build instructions for an app that shows one agent's work
  *     (prompts-build-app-agent.ts).
  *   v1.14.0 -- 2026-10-11 -- GET /v1/agents/me/handbook moves to prompts-agent-handbook.ts
@@ -601,7 +603,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
             ? 'Anonymous mode is enabled. No authentication needed \u2014 connect directly to the MCP URL.'
             : 'Authentication required. Use a JWT (POST /v1/auth/token) as a Bearer token in the MCP connection headers.',
           docs: `${baseUrl}/v1/docs`,
-          integration_guide: 'See docs/integrations/openclaw-setup.md for full setup instructions.',
+          integration_guide: `${baseUrl}/v1/prompts/hello-integration`,
         }, [
           { description: 'Connect via MCP', method: 'POST', url: '/v1/mcp' },
           { description: 'Get a JWT for auth', method: 'POST', url: '/v1/auth/token' },

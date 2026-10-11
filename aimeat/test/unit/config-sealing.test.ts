@@ -10,7 +10,7 @@
  *   have been enforced on one of the three roads in. Testing the function tests all three.
  * @usage pnpm test -- config-sealing
  * @version-history
- *   v1.0.0 — 2026-08-18 — Initial. docs/plans/sealed-config-plan.md
+ *   v1.0.0 — 2026-08-18 — Initial. https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  */
 import { describe, it, expect } from 'vitest';
 import { sealedKeysFromEnv, isSealed, sealRefusal, sealedView, hasSealedKeys } from '../../src/services/config-sealing.js';

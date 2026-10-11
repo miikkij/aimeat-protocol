@@ -10,9 +10,12 @@
  * @version-history
  *   v1.0.0 — 2026-08-19 — Extracted with the listApps payload fix: a listing no longer reads the
  *     apps' bytes, which is what made the production catalogue a flat 3.5 s request.
+ *   v1.1.0 — 2026-10-11 — A morsel is pacing, never a price: every listed manifest goes through
+ *     normalizeAppManifestPacing, and `freeOnly` means no pacing amount under either key.
  */
-import type { AppListOptions } from '../../../interface.js';
+import type { AppListOptions, AppManifest } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { normalizeAppManifestPacing } from '../../../app-manifest-pacing.js';
 
 /**
  * The `apps` columns a LISTING selects — every AppRecord field except `data`, the app's own bytes.
@@ -33,7 +36,7 @@ export const SUMMARY_COLUMNS = [
  * `selectClause` is the ONLY difference between them, and the COUNT(*) rewrite below swaps that
  * exact clause — so the two doors can never drift into two different filter sets.
  */
-export async function runAppListing<T>(
+export async function runAppListing<T extends { manifest: AppManifest }>(
   self: SqliteStorage,
   selectClause: string,
   opts: AppListOptions | undefined,
@@ -64,7 +67,10 @@ export async function runAppListing<T>(
     params.push(like, like, like);
   }
   if (opts?.freeOnly) {
-    conditions.push(`(json_extract(a.manifest, '$.priceMorsels') IS NULL OR json_extract(a.manifest, '$.priceMorsels') = 0)`);
+    // No pacing amount under either key: `tollMorsels`, or the 3.x `priceMorsels` a manifest stored
+    // before 2026-10-11 still carries (read as tollMorsels by normalizeAppManifestPacing).
+    conditions.push(`COALESCE(json_extract(a.manifest, '$.tollMorsels'), 0) = 0`);
+    conditions.push(`COALESCE(json_extract(a.manifest, '$.priceMorsels'), 0) = 0`);
   }
   // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner
   // (viewerGhii) — decided purely from who is authenticated. The owner sees their
@@ -106,5 +112,11 @@ export async function runAppListing<T>(
   params.push(limit, offset);
 
   const rows = self.db.prepare(query).all(...params) as Record<string, unknown>[];
-  return { apps: rows.map(deserialize), total };
+  return {
+    apps: rows.map(row => {
+      const app = deserialize(row);
+      return { ...app, manifest: normalizeAppManifestPacing(app.manifest) };
+    }),
+    total,
+  };
 }

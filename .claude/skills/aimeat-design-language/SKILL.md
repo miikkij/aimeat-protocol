@@ -187,6 +187,20 @@ prism: AI and ME, at work on something, and AI-MEAT, the substance an AI is made
 - No second loud action on a page. No colour in a single place written as a hex in a view sheet.
 - No font-family written out in a stylesheet or a component; the token, with its fallback stack,
   is the only spelling.
+- No element a person can neither use nor decide from: no tag wall that does nothing when pressed,
+  no feature list in bullets. Each thing on a screen is something to do, or the fact a decision
+  needs.
+- No word from the system's vocabulary before the person is doing the thing it names. Memory,
+  morsels, MCP or the catalogue are explained where they are in use, in the same sentence, never
+  as a list up front.
+- No empty "coming soon" place. A screen shows real content: real notices on a board, real apps in
+  the catalogue.
+- No quiet text below a 4.5:1 contrast with its ground, in either theme: the dim line is quieter
+  than the body and still readable by tired eyes.
+
+(The four lines above came from the repository's UX principles page, deleted on 2026-10-11. Its other
+rules were superseded: copy is plain rather than crafted to astonish, and the copy-a-prompt box ranks
+under the MCP connection, not above it.)
 
 ## Changing a value, and how far it reaches
 
