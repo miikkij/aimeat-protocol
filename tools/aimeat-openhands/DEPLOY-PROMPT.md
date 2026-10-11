@@ -136,7 +136,9 @@ The bundle is identical on prod; these are the only differences:
 - **Owner / agent identity:** register the agent under the **prod owner** account (the
   `AIMEAT_OWNER` you approve with). It becomes `openhands#<owner>@<node>`. Consider narrowing
   `AIMEAT_SCOPES` in `.env` from `*` to just what app-building needs
-  (`app:* extension:* cortex:* storage:* organism:* workspace:* skill:*`) for least privilege.
+  (`app:* ext:* cortex:* storage:* memory:*`) for least privilege. Publishing an app needs
+  `app:write`, installing an extension `ext:write`, a cortex `cortex:write`, an upload
+  `storage:write`, and a skill or workspace write `memory:write`.
 - **Do NOT expose the UI publicly without auth.** OpenHands has no login of its own and its UI
   can run arbitrary code on this host. Either reach it over an SSH tunnel (set
   `OPENHANDS_PORT_BIND=127.0.0.1:13781` + `PERMITTED_CORS_ORIGINS=http://localhost:13781`, then

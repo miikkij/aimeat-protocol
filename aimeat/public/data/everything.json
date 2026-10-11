@@ -150,10 +150,10 @@
      "slug": "g-1-prompt-driven-road",
      "cells": [
       "<strong>Prompt-driven road</strong>",
-      "For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, &quot;My AI can't connect&quot; gives the first note as a prompt and saves the pasted answer.",
+      "For AIs that cannot connect over MCP (a consumer Gemini app outside the United States, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, &quot;My AI can't connect&quot; gives the first note as a prompt and saves the pasted answer.",
       "Contacts, Email, Workflows, Portfolio, front page and home layout pages"
      ],
-     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, \"My AI can't connect\" gives the first note as a prompt and saves the pasted answer. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
+     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app outside the United States, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, \"My AI can't connect\" gives the first note as a prompt and saves the pasted answer. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
     },
     {
      "slug": "g-1-attach-another-mcp-server",

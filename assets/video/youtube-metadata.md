@@ -1,4 +1,8 @@
-# YouTube metadata for the three README demo videos
+# YouTube metadata for the three published demo clips
+
+The three clips below are uploaded. This file keeps the titles and descriptions as they were
+published, as the house-style example for the next clip (skill `aimeat-video`, Publishing). The
+descriptions are the published text: change them here only after you change them on YouTube.
 
 Visibility: **Unlisted** (or Public). Private videos do not render a thumbnail and the README link
 will 404 for everyone else. All three are vertical and under 3 minutes, so YouTube will file them
@@ -122,22 +126,19 @@ Source and specification: https://github.com/miikkij/aimeat-protocol
 
 ---
 
-## README state
+## Where the clips are linked
 
-All four recordings in the "See it in action" section are YouTube thumbnail links now, in the same
-form. The mp4 files stay in `assets/video/` and each paragraph still carries a direct link to them.
+The README's "See it working" list links all four recordings on YouTube by their `youtu.be`
+address. The mp4 files stay in `assets/video/`.
 
-```markdown
-[![<title>](https://img.youtube.com/vi/<ID>/maxresdefault.jpg)](https://youtu.be/<ID>)
-```
+| Video | ID |
+|---|---|
+| mcp-direct | `Af7prjgCf1s` |
+| origami-live | `U1ORESLh3dM` |
+| helvetinkone | `rh5pBmpnK_Q` |
+| Agent Hello Integration (older) | `ncBX9BaoAWM` |
 
-| Video | ID | README |
-|---|---|---|
-| mcp-direct | `Af7prjgCf1s` | line 49 |
-| origami-live | `U1ORESLh3dM` | line 55 |
-| helvetinkone | `rh5pBmpnK_Q` | line 61 |
-| Agent Hello Integration (older) | `ncBX9BaoAWM` | line 67 |
-
-`README.md` and `aimeat/README.md` are byte-identical copies, so any edit goes to the root file and
-gets copied over the other one. If `maxresdefault.jpg` ever 404s for a vertical upload, use
-`hqdefault.jpg`.
+The npm package's README is a copy of `README.md` made at publish, so the root file is the only one
+to edit. A thumbnail link has the form
+`[![<title>](https://img.youtube.com/vi/<ID>/maxresdefault.jpg)](https://youtu.be/<ID>)`; if
+`maxresdefault.jpg` 404s for a vertical upload, use `hqdefault.jpg`.

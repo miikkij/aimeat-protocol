@@ -1,13 +1,23 @@
 # `aimeat/tools/` — developer tooling
 
-Standalone, dev-only tools that run **on top of** the AIMEAT node via its public
-APIs. Nothing here is part of the server build or the protocol surface — these
-are clients you run with `tsx`. The backend stays protocol-only; tools live out
-here so they can be added, changed, or deleted without touching `src/`.
+Developer tools that run with `tsx`. None of them is loaded by the server at run time. Some are
+clients of a running node; others are build and check scripts that `aimeat/package.json` runs and
+that `pnpm gate` or the build depends on.
 
-| Tool | What it is |
-|------|------------|
-| [`synthtraces/`](synthtraces/) | Self-play harness that generates synthetic AIMEAT agent-session traces (see its own README for run details) |
+| Tool | What it is | Run with |
+|------|------------|----------|
+| [`synthtraces/`](synthtraces/) | Self-play harness that generates synthetic AIMEAT agent-session traces (its own README has the run details) | `pnpm exec tsx tools/synthtraces/src/run.ts` |
+| [`dify-bridge/`](dify-bridge/) | Connects a Dify agent platform to a node | its README |
+| [`aeb/`](aeb/) | The build-prompt acceleration benchmark: task protocol, tier scheme, specs and measured results | `pnpm aeb:prove` |
+| [`perf-bench/`](perf-bench/) | Storage performance benchmark, one backend or both | `pnpm perf:bench`, `pnpm perf:bench:backends` |
+| `build-atelier-looks.ts` | Writes `public/lib/aimeat-atelier/looks.css` from the look registry | `pnpm build:atelier-looks` |
+| `build-atelier-parts.ts` | Reads the Atelier parts list out of the source; `--check` fails when the written list is stale | `pnpm build:atelier-parts`, `pnpm check:atelier-parts` |
+| `build-living-nodes.ts` | The same for the living-document node vocabulary | `pnpm build:living-nodes`, `pnpm check:living-nodes` |
+| `atelier-check.ts` | Checks every Atelier look preset arithmetically | `pnpm check:atelier` |
+| `theme-contrast.ts` | Checks the theme tokens against WCAG 2.1 contrast | `pnpm check:theme` |
+| `odps-coverage.ts` | Reports which ODPS v4.1 fields the EXCHANGE projection fills | `pnpm exec tsx tools/odps-coverage.ts` |
+
+The rest of this page describes SynthTraces.
 
 ---
 
@@ -50,8 +60,10 @@ and messaging operations, reached over REST or MCP.
   scores; a drop points at a newly-introduced sharp edge.
 - **Demo / seed data** — realistic owner/agent/task/memory activity on a node in
   one command.
-- **Cost control** — defaults to the **free** OpenRouter `owl-alpha`; the
-  scripted provider needs no key at all.
+- **Cost control** — the scripted provider needs no key at all, and a local
+  Ollama model costs nothing. The OpenRouter default, `openrouter/owl-alpha`,
+  was a free model; OpenRouter no longer lists it (checked 2026-10-11), so pass
+  `--agent-model` with a model it lists.
 
 ### Design at a glance
 
@@ -68,7 +80,7 @@ and messaging operations, reached over REST or MCP.
 
 Three orthogonal axes, each pluggable:
 
-- **Provider** (how the models think): `openrouter` (free owl-alpha) · `xai`
+- **Provider** (how the models think): `openrouter` · `xai`
   (Grok) · `anthropic` · `scripted` (no key).
 - **Transport** (how the agent's actions reach the node): `rest` · `mcp` ·
   `hybrid` (mixed per call).
@@ -118,8 +130,10 @@ Each run writes `synthtraces/out/traces-<label>.jsonl` (one line per session) an
   read the eval, then fan out across models for comparison.
 - **Treat eval failures as protocol intel.** Every repeated failure is either a
   model weakness (fine-tuning target) or a protocol sharp edge (docs/UX fix).
-- **Never commit secrets or output.** Keys live in gitignored `*.log` files at the
-  repo root; `out/` and `*.db` are gitignored.
+- **Never commit secrets or output.** The harness reads a provider key from its
+  environment variable first and otherwise from a gitignored `*.log` file at the
+  repo root ([`synthtraces/README.md`](synthtraces/README.md) names each one);
+  `out/` and `*.db` are gitignored.
 
 ## Running with local models (Ollama)
 
@@ -199,7 +213,7 @@ harness exists to surface — and the kind of comparison the dataset enables.
 
 Done:
 - ✅ Variant B self-play (owner↔agent + task lifecycle), task-driven traces
-- ✅ Providers: openrouter (free owl-alpha), xai, anthropic, ollama (local), scripted
+- ✅ Providers: openrouter, xai, anthropic, ollama (local), scripted
 - ✅ Per-role providers — agent + persona can differ (SynthTraces "local model
   plays the user": agent on free cloud, persona on local Ollama)
 - ✅ Transports: REST, MCP, hybrid (behind the `AgentDriver` boundary)
