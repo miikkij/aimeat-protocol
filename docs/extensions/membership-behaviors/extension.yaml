@@ -2,11 +2,11 @@ extension: "1.0"
 
 metadata:
   name: "membership-behaviors"
-  version: "1.0.0"
-  description: "Group membership with join policies, invitations, roles, and workspace RBAC"
+  version: "1.1.0"
+  description: "Group membership with join policies, invitations and roles. A group record lives in this extension's own memory; it is not a platform organism"
   author: "aimeat-core"
   license: "MIT"
-  aimeat: ">=1.5"
+  aimeat: ">=3.26"
 
 required_apis:
   - memory
@@ -14,6 +14,34 @@ required_apis:
   - trust
 
 actions:
+  - id: create
+    description: "Create a group; the caller becomes its creator and first admin"
+    method: POST
+    path: "/v1/ext/membership-behaviors/create"
+    auth: required
+    input:
+      organismKey:
+        type: string
+        required: true
+        description: "Key of the new group in this extension's memory, such as org.hiking-club"
+      name:
+        type: string
+        description: "Display name; the key when left out"
+      join_policy:
+        type: string
+        enum: [open, approval_required, invite_only]
+        description: "Who may join; open when left out"
+      max_members:
+        type: integer
+        description: "From 2 to 10000; 10000 when left out"
+    output:
+      status:
+        type: string
+        enum: [created]
+      organismKey:
+        type: string
+    script: "actions/create.js"
+
   - id: join
     description: "Join an organism (respects join policy)"
     method: POST
@@ -140,4 +168,4 @@ federation:
   capabilities:
     - "membership"
     - "join-policies"
-    - "workspace-rbac"
+    - "roles"

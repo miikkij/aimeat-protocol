@@ -25,7 +25,7 @@ export default async function(ctx, input) {
   // Mark purchase as completed
   purchase.status = 'completed';
   purchase.rated = true;
-  await ctx.memory.set('purchase.' + input.purchaseId, purchase);
+  await ctx.memory.set('purchase.' + input.purchaseId, purchase, { visibility: 'private' });
 
   ctx.log.info('Purchase rated', { purchaseId: input.purchaseId, score: input.score });
 

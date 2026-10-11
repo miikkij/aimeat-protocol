@@ -33,7 +33,7 @@ export default async function(ctx, input) {
   request.status = input.decision === 'approve' ? 'approved' : 'rejected';
   request.reviewedBy = ctx.caller.gaii;
   request.reviewedAt = new Date().toISOString();
-  await ctx.memory.set(requestsKey, requestsData);
+  await ctx.memory.set(requestsKey, requestsData, { visibility: 'private' });
 
   // If approved, add as member
   if (input.decision === 'approve') {
@@ -44,7 +44,7 @@ export default async function(ctx, input) {
       joinedAt: new Date().toISOString(),
       approvedBy: ctx.caller.gaii,
     });
-    await ctx.memory.set(membersKey, membersData);
+    await ctx.memory.set(membersKey, membersData, { visibility: 'private' });
   }
 
   ctx.log.info('Join request reviewed', {

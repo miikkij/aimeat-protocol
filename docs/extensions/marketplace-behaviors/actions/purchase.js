@@ -20,33 +20,27 @@ export default async function(ctx, input) {
   if (listing.status !== 'active') throw new Error('Listing is not available');
   if (listing.seller === ctx.caller.gaii) throw new Error('Cannot purchase your own listing');
 
-  // Calculate total with transaction fee
-  const feePercent = ctx.instance.config.transaction_fee_percent ?? ctx.config.transaction_fee_percent ?? 5;
-  const total = listing.price + Math.ceil(listing.price * feePercent / 100);
-
-  // Debit buyer
-  const result = await ctx.wallet.consume(total, 'marketplace_purchase');
-  if (!result.success) throw new Error(result.error || 'Insufficient morsels for purchase');
-
-  // Create purchase record
+  // The buyer agrees to the listing's money price. This action takes no payment: the buyer pays the
+  // seller outside the extension, or through the node's checkout when the seller sells the item as an
+  // offer or app tool with a money price. The node has already charged this action's pacing.
   const purchaseId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const currency = listing.currency || ctx.instance.config.currency || ctx.config.currency || 'EUR';
   await ctx.memory.set('purchase.' + purchaseId, {
     purchaseId,
     listingId: input.listingId,
     buyer: ctx.caller.gaii,
     seller: listing.seller,
     price: listing.price,
-    fee: total - listing.price,
-    total,
-    status: 'purchased',
-    purchasedAt: new Date().toISOString(),
-  });
+    currency,
+    status: 'agreed',
+    agreedAt: new Date().toISOString(),
+  }, { visibility: 'private' });
 
   // Reserve listing
   listing.status = 'reserved';
   await ctx.memory.set('listing.' + input.listingId, listing);
 
-  ctx.log.info('Purchase completed', { purchaseId, buyer: ctx.caller.gaii, total });
+  ctx.log.info('Purchase agreed', { purchaseId, buyer: ctx.caller.gaii, price: listing.price, currency });
 
-  return { purchaseId, total, status: 'purchased' };
+  return { purchaseId, price: listing.price, currency, status: 'agreed' };
 }

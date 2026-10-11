@@ -35,7 +35,7 @@ export default async function(ctx, input) {
   targetMember.role = input.role;
   targetMember.promotedAt = new Date().toISOString();
   targetMember.promotedBy = ctx.caller.gaii;
-  await ctx.memory.set(membersKey, membersData);
+  await ctx.memory.set(membersKey, membersData, { visibility: 'private' });
 
   ctx.log.info('Member role changed', {
     organism: input.organismKey,
