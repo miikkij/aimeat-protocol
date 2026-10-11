@@ -23,6 +23,11 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.4.0 — 2026-10-11 — "Give it a task", "Talk to it" and "Latest work" each sit under a
+ *     small headline band (PageSection `group`) in place of a sub heading, and each shows where
+ *     it stops (`ends`), so they read as three groups.
+ *   v1.3.0 — 2026-10-11 — A row of "Latest work" opens that work and its result on the home
+ *     (agent-work.js); it used to open the agent in Settings & Controls.
  *   v1.2.0 — 2026-10-11 — Stop the agent and start it again, on the "Now" row; the task field and
  *     the conversation say that what is given to a stopped agent waits.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -51,7 +56,7 @@ import { Choice } from '/components/Choice.js';
 import { Facts } from '/components/Facts.js';
 import { Action, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
-import { SubHeading } from '/components/SubHeading.js';
+import { PageSection } from '/components/PageSection.js';
 import { LineList } from '/components/LineList.js';
 import { listTasks, createTask } from '/js/services/agent-tasks.js';
 import { readHomeAgents, moveAgent, setAgentStopped } from '/js/services/agent-draft.js';
@@ -74,8 +79,7 @@ function taskWord(status) {
 
 export default function AgentView({ navigate }) {
   const session = useSession();
-  const query = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const name = query.get('agent') || '';
+  const query = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');  const name = query.get('agent') || '';
   const startedAs = query.get('started') || '';
   const scheduleFailed = query.get('schedule') === 'failed';
 
@@ -249,36 +253,44 @@ export default function AgentView({ navigate }) {
           <//>
         <//>`}
 
-      <${SubHeading} level=${2}>${p('giveTitle', 'Give it a task')}<//>
-      <${Fields}>
-        <${TextArea} label=${p('giveLabel', 'What should it do now?')} rows=${2} value=${ask} onInput=${setAsk} onSend=${give}
-          placeholder=${p('givePlaceholder', 'Say it as you would say it to a person.')} />
-        ${worker.stopped && said?.at !== 'task' && html`<${Note} kind="quiet">${p('giveWaits', 'The agent is stopped. A task you give now waits, and the agent gets it when you start it.')}<//>`}
-        ${said?.at === 'task' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
-        <${FormActions}>
-          <${Loud} control disabled=${busy || !ask.trim()} onClick=${give}>${busy ? p('giving', 'Sending…') : p('give', 'Give the task')}<//>
+      ${/* Three things a person does here, each under a headline band of its own (PageSection
+           `group`, the home band's slab in its small cut) and each showing where it stops (`ends`),
+           so the task field, the conversation and the work list read as three groups and not as one
+           run of controls (Jouni, 2026-10-11). */''}
+      <${PageSection} group ends title=${p('giveTitle', 'Give it a task')}>
+        <${Fields}>
+          <${TextArea} label=${p('giveLabel', 'What should it do now?')} rows=${2} value=${ask} onInput=${setAsk} onSend=${give}
+            placeholder=${p('givePlaceholder', 'Say it as you would say it to a person.')} />
+          ${worker.stopped && said?.at !== 'task' && html`<${Note} kind="quiet">${p('giveWaits', 'The agent is stopped. A task you give now waits, and the agent gets it when you start it.')}<//>`}
+          ${said?.at === 'task' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+          <${FormActions}>
+            <${Loud} control disabled=${busy || !ask.trim()} onClick=${give}>${busy ? p('giving', 'Sending…') : p('give', 'Give the task')}<//>
+          <//>
         <//>
       <//>
 
-      <${SubHeading} level=${2}>${p('talkTitle', 'Talk to it')}<//>
-      ${worker.hears_messages === false
-        ? html`<${Note} kind="quiet">${p('talkDeaf', 'This agent does not read messages. It starts work from a task: give it one above.')}<//>`
-        : html`
-          ${!worker.has_key && html`<${Note} kind="quiet">${p('talkWaits', 'It reads your message when its computer has taken it on.')}<//>`}
-          ${worker.stopped && html`<${Note} kind="quiet">${p('talkStopped', 'The agent is stopped. It reads your message when you start it.')}<//>`}
-          ${said?.at === 'talk' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
-          <${TabMessages} agent=${record} agentName=${name}
-            showToast=${(text, isError) => setSaid({ ok: !isError, at: 'talk', text })} />`}
+      <${PageSection} group ends title=${p('talkTitle', 'Talk to it')}>
+        ${worker.hears_messages === false
+          ? html`<${Note} kind="quiet">${p('talkDeaf', 'This agent does not read messages. It starts work from a task: give it one above.')}<//>`
+          : html`
+            ${!worker.has_key && html`<${Note} kind="quiet">${p('talkWaits', 'It reads your message when its computer has taken it on.')}<//>`}
+            ${worker.stopped && html`<${Note} kind="quiet">${p('talkStopped', 'The agent is stopped. It reads your message when you start it.')}<//>`}
+            ${said?.at === 'talk' && html`<${Note} kind="message" error=${!said.ok}>${said.text}<//>`}
+            <${TabMessages} agent=${record} agentName=${name}
+              showToast=${(text, isError) => setSaid({ ok: !isError, at: 'talk', text })} />`}
+      <//>
 
-      <${SubHeading} level=${2}>${p('latestTitle', 'Latest work')}<//>
-      ${(tasks ?? []).length === 0
-        ? html`<${Note} kind="quiet">${p('latestNone', 'It has not been given any work yet.')}<//>`
-        : html`<${LineList} rows=${tasks.map((task) => ({
-            id: task.id,
-            name: task.title || task.id,
-            text: `${taskWord(task.status)} · ${ago(task.updatedAt || task.createdAt)}`,
-            href: settings,
-          }))} />`}
+      <${PageSection} group ends title=${p('latestTitle', 'Latest work')}>
+        ${(tasks ?? []).length === 0
+          ? html`<${Note} kind="quiet">${p('latestNone', 'It has not been given any work yet.')}<//>`
+          : html`<${LineList} rows=${tasks.map((task) => ({
+              id: task.id,
+              name: task.title || task.id,
+              text: `${taskWord(task.status)} · ${ago(task.updatedAt || task.createdAt)}`,
+              // The work itself, on the home: what was asked and what it produced (views/home/agent-work.js).
+              href: `${HOME}?agent=${encodeURIComponent(name)}&work=${encodeURIComponent(task.id)}`,
+            }))} />`}
+      <//>
 
       <${FormActions}>
         <${Action} href=${settings}>${p('all', 'All its settings →')}<//>

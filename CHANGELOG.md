@@ -1,6 +1,11 @@
 # Changelog
 
-All notable changes to AIMEAT are documented in this file.
+> **This file ends at node 3.15.0 (2026-09-14) and aimeat-crewai 0.27.1 (2026-09-20).** Later changes
+> to the node are in [`aimeat/public/changelog.json`](aimeat/public/changelog.json), which every node serves at
+> `/changelog.json` and as a page at `/v1/changelog`. Later changes to aimeat-crewai are in
+> [`python/aimeat-crewai/CHANGELOG.md`](python/aimeat-crewai/CHANGELOG.md).
+
+All notable changes to AIMEAT up to those versions are documented in this file.
 
 ## [Unreleased]
 
@@ -1524,8 +1529,8 @@ Comprehensive security & vulnerability audit (findings + status tracked in
   Auto status derives from an open portal SSE connection. Presence is **federated** (only
   `everyone`-visibility, change-driven push ≤1/min, mirrored to peers; `contacts` stays node-local).
   `src/services/presence.ts`, `src/routes/presence.ts`, `public/components/PresenceDot.js`,
-  `public/js/presence-store.js`. Future incentive design (uptime rewards → stablecoin, deferred):
-  `docs/federation-economic-layer.md`.
+  `public/js/presence-store.js`. A later incentive design was deferred; its plan was deleted on
+  2026-10-11.
 
 - **Organism Notebook + Librarian — capture anything, let AI file it, find it later.** A new
   profile tab (**Muistikirja**, under the "Tieto" sidebar group) that closes the loop from a loose

@@ -9,6 +9,7 @@
  * @structure PAGE_KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { PAGE_KIT_DEMOS } from './demos-page-kit.js';
  * @version-history
+ *   v1.4.0 — 2026-10-11 — PageSection's `ends`, shown as two small bands in a row.
  *   v1.3.0 — 2026-09-27 — What appcat added: Tabs' line, glyph, caption and fill; Layout's step 'part'
  *     and Space inset; Rail's ink tone; the crumb sheet's dashed, inline and file Action tones;
  *     PageHead's line, low, thing and picture; PageSection's list, chapter and part with the door rows
@@ -279,6 +280,10 @@ export const PAGE_KIT_DEMOS = {
     { name: 'a count, first', render: () => inPage(html`<${PageSection} id="dl-pk-p2" title="Files" count=${12} first><${Note} kind="lead">Newest first.<//><//>`) },
     { name: 'plain', render: () => inPage(html`<${PageSection} plain><${Note} kind="lead">You can come back when someone invites you.<//><//>`) },
     { name: 'band', render: () => inPage(html`<${PageSection} band id="dl-pk-p5" num="02" title="Nodes"><${Note} kind="lead">Three nodes: aimeat.io, harbour-studio and lumo-bakery.<//><//>`) },
+    // Two small bands that each show where they stop (2026-10-11, the home's agent page).
+    { name: 'group that ends, two in a row', render: () => inPage(html`
+        <${PageSection} group ends id="dl-pk-p12" title="Give it a task"><${Note} kind="lead">Say it as you would say it to a person.<//><//>
+        <${PageSection} group ends id="dl-pk-p13" title="Latest work"><${Note} kind="lead">Weekly news summary, done two hours ago.<//><//>`) },
     { name: 'split', render: () => inPage(html`<${PageSection} id="dl-pk-p3" num="03" title="Rules"><${Note} kind="lead">The board's rules are saved.<//>
         <${Split}><${Actions}><${Action} tone="danger" onClick=${noop}>Delete board<//><//><//><//>`) },
     { name: 'long', render: () => inPage(html`<${PageSection} id="dl-pk-p4" num="04" title=${LONG}><${Note} kind="lead">A title long enough to wrap.<//><//>`) },

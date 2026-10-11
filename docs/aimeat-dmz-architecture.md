@@ -2,41 +2,46 @@
 
 **Version:** 1.0
 **Phase:** 0.6
-**Status:** Normative
+**Status:** Describes node 3.26 (checked against the code on 2026-10-11). Its normative content moves to AIMEAT Core 2026-11, which is released with node 4.0.0. Where this page and the code disagree, the code wins.
 
 ---
 
 ## 1. Overview
 
-AIMEAT implements a three-zone data model inspired by network security DMZ architecture. Data flows outward through consent-controlled boundaries, while the outside world never reaches directly into private space.
+AIMEAT uses a three-zone data model inspired by the network security DMZ. Data flows outward through consent-controlled boundaries, and the outside world never reaches directly into private space.
 
 ```
 +--------------------+     +--------------------+     +--------------------+
 |                    |     |                    |     |                    |
-|   PRIVATE ZONE     |     |   DMZ (Owner)      |     |   FEDERATION       |
+|   PRIVATE ZONE     |     |   DMZ              |     |   FEDERATION       |
 |                    |     |                    |     |                    |
 |   visibility:      | --> |   visibility:      | --> |   visibility:      |
 |     'private'      |     |     'owner'        |     |     'public'       |
+|                    |     |     'group'        |     |                    |
+|                    |     |     'workspace'    |     |                    |
+|                    |     |     'members'      |     |                    |
 |                    |     |                    |     |                    |
-|   Agent-only data  |     |   Owner-scoped     |     |   Globally         |
-|   No external      |     |   sharing across   |     |   discoverable     |
-|   access           |     |   same-owner       |     |   Cross-node       |
-|                    |     |   agents           |     |   accessible       |
+|   The writer only, |     |   Shared on this   |     |   Readable by      |
+|   or by consent    |     |   node, never      |     |   anyone, can      |
+|                    |     |   federated        |     |   cross nodes      |
 +--------------------+     +--------------------+     +--------------------+
          |                          |                          |
          |   Consent grants control boundary crossing          |
-         +------- ConsentRecord (scope: dmz | federation) -----+
+         +---- ConsentRecord (scope: private | dmz | federation | auth) ----+
 ```
 
-The three zones map directly to the `MemoryRecord.visibility` field:
+`MemoryRecord.visibility` has six values (`src/storage/types/commerce.ts`). `visibilityToZone()` in `src/routes/memory/shared.ts` maps each one to a zone:
 
-| Zone | `visibility` value | Access scope |
-|------|-------------------|--------------|
-| Private | `'private'` | Only the owning agent (or via explicit consent) |
-| DMZ (Owner) | `'owner'` | All agents belonging to the same owner |
-| Federation (Public) | `'public'` | Any authenticated agent on any node |
+| `visibility` value | Zone | Who can read it |
+|-------------------|------|-----------------|
+| `'private'` | Private | The writing principal, the owner of that principal, or a holder of a matching consent |
+| `'owner'` | DMZ | Every principal of the same owner on this node |
+| `'group'` | DMZ | The owner and the members of the sharing group named in `groupId`, with read permission |
+| `'workspace'` | DMZ | Members of the organism workspaces named in `workspaceRef` |
+| `'members'` | DMZ | Any signed-in user of this node (not the shared anonymous identity) |
+| `'public'` | Federation | Anyone, including a caller with no token (`GET /v1/memory/{gaii}/{key}`) |
 
-Data transitions between zones require either a visibility change by the data owner or an explicit consent grant.
+The order of reach, from low to high, is `private < owner < group < workspace < members < public`. Data moves between zones when the data owner changes the visibility or grants consent.
 
 ---
 
@@ -44,20 +49,19 @@ Data transitions between zones require either a visibility change by the data ow
 
 ### 2.1 Private Zone
 
-The Private zone is the innermost boundary. Memory records with `visibility: 'private'` are accessible only to the agent GAII that created them.
+Memory records with `visibility: 'private'` are readable by the principal that wrote them. Every other reader needs an active `ConsentRecord` that matches the reader, the memory key pattern and the data owner. Without one, `checkConsentForRead()` in `src/services/consent.ts` returns `{ allowed: false, reason: 'no_matching_consent' }`.
 
-**Access rules (from `checkConsentForRead` in `src/services/consent.ts`):**
-- The owning agent (`ownerGaii === accessorGaii`) always has access.
-- All other access requires an explicit `ConsentRecord` matching the accessor, the memory key pattern, and with `status: 'active'`.
-- If no matching consent exists, the access check returns `{ allowed: false, reason: 'no_matching_consent' }`.
+The owner of a principal also reads what that principal holds: a person reads what their own agents and apps stored (`authorizeRead`, ruled 2026-09-08). This does not work the other way round. An agent that reads its owner's private data goes through the ordinary visibility and consent checks.
 
-**MemoryRecord fields governing private data:**
+**MemoryRecord fields governing private data** (shortened; the full type is in `src/storage/types/commerce.ts`):
 ```typescript
 interface MemoryRecord {
   key: string;
-  ownerGaii: string;         // the agent GAII that owns this memory
+  ownerGaii: string;         // the principal that owns this memory
   value: unknown;
-  visibility: 'private';     // private zone marker
+  visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
+  groupId?: string;          // for 'group'
+  workspaceRef?: string;     // for 'workspace': space-separated "<organismId>/<workspaceId>" bindings
   tags: string[];
   ttlHours: number | null;
   version: number;
@@ -66,35 +70,30 @@ interface MemoryRecord {
 }
 ```
 
-### 2.2 Owner Zone (DMZ)
+### 2.2 DMZ
 
-The Owner zone is the controlled sharing layer between an owner's own agents. Memory records with `visibility: 'owner'` are accessible to any agent whose GAII resolves to the same owner identity.
+The DMZ is the node-local sharing layer. Records in it are shared on this node and are never replicated to federation peers.
 
-**Access rules:**
-- Owner identity is extracted from the GAII structure. For GAIIs containing `#`, the owner part is extracted as the segment between `#` and `@`. For plain GAIIs, the owner part is the segment before `@`.
-- If both the data owner and the accessor share the same owner identity, access is granted with `reason: 'same_owner'`.
-- This zone enables multi-agent cooperation within a single owner's infrastructure without requiring explicit consent grants for each agent pair.
+- **`owner`**: `checkConsentForRead()` compares the account names of the data owner and the reader (`localAccountName()`). The same account name on this node gives `reason: 'same_owner'`. A principal of another node that shares the owner's name is a different person and does not match.
+- **`group`**: the group owner and the owner's agents get `reason: 'group_owner'`. A member listed in the sharing group with read permission gets `reason: 'group_member'`.
+- **`workspace`**: the read is checked by `canReadWorkspace()` against the workspaces in `workspaceRef`.
+- **`members`**: any signed-in user of this node.
 
-**Example:** Agent `helper#alice@node1` can read `owner`-visibility memories of `researcher#alice@node1` because both resolve to owner `alice`.
+**Example:** Agent `helper#alice@node1` can read `owner`-visibility memories of `researcher#alice@node1` because both belong to the account `alice` on `node1`.
 
 ### 2.3 Public Zone
 
-The Public zone makes data globally accessible to any authenticated agent on the local node.
-
-**Access rules:**
-- If `visibility === 'public'`, the consent check immediately returns `{ allowed: true, reason: 'public_data' }`.
-- No consent record is needed.
-- Public data is discoverable via `GET /v1/memory` and `POST /v1/memory/search` by any authenticated caller.
+If `visibility === 'public'`, the consent check returns `{ allowed: true, reason: 'public_data' }` at once, and no consent record is needed. A public entry is readable without a token at `GET /v1/memory/{gaii}/{key}`. When data classification is on, a classification that keeps a record inside its organism still refuses a non-member (`403 CLASSIFIED`).
 
 ### 2.4 Federation Zone
 
-The Federation zone extends Public data across node boundaries. Federation-scoped data is shared with peer nodes via the federation sync protocol.
+The federation zone extends public data across node boundaries. Data is shared with peer nodes through the federation sync protocol.
 
 **Key mechanisms:**
-- `CsmRecord.federate` (`boolean`) controls whether a Community Service Manifest and its associated data are automatically distributed to federation peers.
-- `ConsentRecord.scope` includes `'federation'` as a valid value, indicating the consent grant applies to cross-node access.
-- Federated actions are tagged with `federated:{nodeId}` in the `ActionRecord.tags` array to track their origin.
-- The federation sync endpoint (`POST /v1/federation/sync`) upserts remote actions with a composite ID (`{source_node}:{action.id}`) to prevent duplication.
+- `CsmRecord.federate` (`boolean`) marks a Community Service Manifest whose actions are sent to federation peers (section 5.2).
+- `ConsentRecord.scope` includes `'federation'`, for a consent grant that applies to cross-node access.
+- A federated action is tagged `federated:{nodeId}` in `ActionRecord.tags`, to record where it came from.
+- The catalogue sync endpoint `POST /v1/federation/catalogue-sync` upserts remote actions with a composite ID (`{source_node}:{action.id}`) so that they are not duplicated.
 
 ---
 
@@ -102,16 +101,16 @@ The Federation zone extends Public data across node boundaries. Federation-scope
 
 ### 3.1 Grant Flow
 
-A consent grant is created via `POST /v1/consent` and stored as a `ConsentRecord`:
+A consent grant is created with `POST /v1/consent` and stored as a `ConsentRecord` (`src/storage/types/auth.ts`):
 
 ```typescript
 interface ConsentRecord {
   id: string;                 // UUID
   ownerGaii: string;          // Data owner (consent grantor)
   dataPattern: string;        // Glob pattern: "profile.*.interests", "iot.*"
-  recipient: string;          // "*" (anyone) | specific GAII | "organism.{id}"
+  recipient: string;          // see "Recipient matching" below
   purpose: string;            // Free-form: "discovery", "marketplace", "research"
-  scope: 'private' | 'dmz' | 'federation';  // DMZ zone the consent applies to
+  scope: 'private' | 'dmz' | 'federation' | 'auth';
   expires: string | null;     // ISO 8601 timestamp or null (indefinite)
   status: 'active' | 'revoked' | 'expired';
   grantedAt: string;          // ISO timestamp
@@ -120,12 +119,12 @@ interface ConsentRecord {
 }
 ```
 
-**Required fields for creation:** `data_pattern`, `recipient`, `purpose`. The `scope` defaults to `'federation'` if omitted. The `status` is always set to `'active'` on creation.
+**Required fields for creation:** `data_pattern`, `recipient`, `purpose` (`ConsentCreateSchema` in `src/models/schemas.ts`). The `scope` defaults to `'federation'` if omitted. The `status` is always `'active'` on creation.
 
-**Quota:** Maximum 100 consent records per owner.
+**Quota:** at most 100 consent records per owner.
 
-**Data pattern matching** uses dot-separated glob syntax (implemented in `consentMatchPattern`):
-- `*` matches a single segment (any characters except `.`)
+**Data pattern matching** uses glob syntax (`consentMatchPattern()` in `src/storage/pattern-utils.ts`). Both `.` and `/` separate segments:
+- `*` matches one segment (any characters except `.` and `/`)
 - `**` matches any number of segments (including zero)
 - Literal segments match exactly
 
@@ -136,69 +135,76 @@ Examples:
 | `iot.**` | `iot.temp`, `iot.sensor.humidity` | `profile.iot` |
 | `settings.theme` | `settings.theme` | `settings.theme.dark` |
 
-**Recipient matching:**
-- `"*"` matches any accessor GAII.
-- A specific GAII string matches only that exact accessor.
-- `"organism.{id}"` targets a specific organism group.
+**Recipient matching** (`matchesRecipient()` in `src/storage/consent-recipient.ts`):
+- `"*"` matches any reader.
+- An exact GAII matches only that reader.
+- `"ghii:username@node"` matches every agent of that person on that node.
+- `"domain:<glob>"` matches every reader whose home node ID matches the glob.
+- `"node:<node-id>"` matches every reader on that node.
+- `"organism.{id}"` matches an active member of that organism. This needs a membership lookup, so `checkConsentForRead()` handles it after the other patterns (`reason: 'organism_member_consent'`).
 
 ### 3.2 Access Check Flow
 
-The access check is performed by `checkConsentForRead()` in `src/services/consent.ts`. The function evaluates access in a strict priority order:
+`checkConsentForRead()` in `src/services/consent.ts` evaluates access in this order:
 
 ```
-1. Is visibility 'public'?          --> ALLOW (reason: public_data)
-2. Is accessor the data owner?      --> ALLOW (reason: owner_access)
-3. Is visibility 'owner'?           --> Check same-owner identity
-   3a. Same owner part in GAII?     --> ALLOW (reason: same_owner)
-4. Find matching active consents    --> storage.findMatchingConsents()
-   4a. Match found?                 --> ALLOW (reason: consent_granted, consentId)
-   4b. No match?                    --> DENY  (reason: no_matching_consent)
+1. Is visibility 'public'?               --> ALLOW (reason: public_data)
+2. Is the reader the data owner?         --> ALLOW (reason: owner_access)
+3. Is visibility 'owner'?                --> Same account name on this node?
+   3a. Yes                               --> ALLOW (reason: same_owner)
+4. Is visibility 'group'?                --> Decided here, consent is not read
+   4a. Group owner or the owner's agent  --> ALLOW (reason: group_owner)
+   4b. Member with read permission       --> ALLOW (reason: group_member)
+   4c. Otherwise                         --> DENY  (missing_group_id | group_not_found |
+                                                    not_group_member | no_read_permission)
+5. Find matching active consents         --> storage.findMatchingConsents()
+   5a. Match found                       --> ALLOW (reason: consent_granted, consentId)
+6. Active organism.{id} grants           --> Is the reader an active member of that organism?
+   6a. Yes                               --> ALLOW (reason: organism_member_consent, consentId)
+7. Otherwise                             --> DENY  (reason: no_matching_consent)
 ```
 
-The `findMatchingConsents()` method (in `src/storage/memory.ts`) performs the following checks on each `ConsentRecord`:
-1. `consent.ownerGaii === ownerGaii` -- consent must belong to the data owner
-2. `consent.status === 'active'` -- only active consents are valid
-3. Expiration check: if `consent.expires` is set and has passed, the consent is auto-expired (status set to `'expired'`) and skipped
-4. Recipient match: `consent.recipient === '*'` or `consent.recipient === accessorGaii`
-5. Pattern match: `consentMatchPattern(consent.dataPattern, memoryKey)` must return true
+`findMatchingConsents()` is a storage method, implemented in both providers (`src/storage/providers/sqlite/methods/consent.ts` and `src/storage/providers/postgres-kysely/methods/consent.ts`). For each consent of the data owner it checks:
+1. `consent.status === 'active'`. Only active consents count.
+2. Expiry: if `consent.expires` has passed, the consent is marked `'expired'` and skipped.
+3. Recipient: `matchesRecipient()`, as listed above.
+4. Pattern: `consentMatchPattern(consent.dataPattern, memoryKey)` must return true.
 
 ### 3.3 Audit Trail
 
-Every data access attempt (whether allowed or denied) is recorded as a `ConsentAuditEntry`:
+`auditDataAccess()` in `src/services/consent.ts` records a `ConsentAuditEntry` for an access that was **denied**, and for every consent **grant** and **revoke**. An allowed read is not recorded. Entries go to an in-memory buffer that is written to storage in batches (`consent-audit-buffer.ts`).
 
 ```typescript
 interface ConsentAuditEntry {
   id: string;                 // UUID
-  consentId: string;          // References ConsentRecord.id (or 'none' if no consent)
+  consentId: string;          // References ConsentRecord.id
   ownerGaii: string;          // Whose data was accessed
   accessorGaii: string;       // Who accessed the data
-  memoryKey: string;          // Which memory key was accessed
-  action: 'read' | 'list' | 'search';  // What type of access was attempted
+  memoryKey: string;          // The key read, or the consent dataPattern for grant/revoke
+  action: 'read' | 'list' | 'search' | 'grant' | 'revoke';
   timestamp: string;          // ISO timestamp
-  allowed: boolean;           // Whether the access was permitted
+  allowed: boolean;           // Always true for grant/revoke
 }
 ```
 
-**Audit recording** is performed by `auditDataAccess()` in `src/services/consent.ts`. It writes an entry regardless of the access outcome.
+**Audit querying** is available with `GET /v1/consent/audit` and these filters:
+- `days` (integer, default 30): how far back to look
+- `accessor_gaii` (string): filter by who accessed the data
+- `consent_id` (string): filter by one consent grant
 
-**Audit querying** is available via `GET /v1/consent/audit` with the following filters:
-- `days` (integer, default 30): How far back to look
-- `accessor_gaii` (string): Filter by who accessed the data
-- `consent_id` (string): Filter by a specific consent grant
-
-**Consent expiry** is managed by a background job (`startConsentExpiryJob`) that runs every 10 minutes. Additionally, `findMatchingConsents` performs inline expiration -- any consent past its `expires` timestamp is immediately marked `'expired'` during the matching scan.
+**Consent expiry:** the core scheduler job `consent-expiry` runs every 10 minutes and calls `expireConsents()`. `findMatchingConsents()` also expires a consent inline when it finds one past its `expires` timestamp.
 
 ---
 
 ## 4. CSM Visibility Integration
 
-Community Service Manifests (CSMs) define the consent requirements for structured data services. Each CSM includes a `consent_requirements` block that specifies the default visibility zone for data managed by that service.
+Community Service Manifests (CSMs) define the consent requirements for structured data services. Each CSM has a `consent_requirements` block that sets the default visibility for data managed by that service.
 
-**CsmDefinition.consentRequirements** (parsed from YAML by `src/services/csm-parser.ts`):
+**CsmDefinition.consentRequirements** (parsed from YAML by `parseCsm()` in `src/services/csm-parser.ts`):
 
 ```typescript
 consentRequirements: {
-  visibilityDefault: 'private' | 'federation' | 'public';
+  visibilityDefault: 'private' | 'dmz' | 'local' | 'federation' | 'public';
   requiresConsent: boolean;
   consentPurpose: string;
   dataRetention: string;  // e.g. "until_revoked"
@@ -207,34 +213,35 @@ consentRequirements: {
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| `visibility_default` | The default visibility zone for data entries created under this CSM | `'federation'` |
-| `requires_consent` | Whether accessing data requires an explicit consent grant | `true` |
+| `visibility_default` | The default visibility for data entries created under this CSM | `'federation'` |
+| `requires_consent` | Whether reading data requires an explicit consent grant | `true` |
 | `consent_purpose` | The stated purpose for consent grants (shown to users) | `''` |
-| `data_retention` | How long data is retained | `'until_revoked'` |
+| `data_retention` | How long data is kept | `'until_revoked'` |
 
-**Validation:** The `validateCsm()` function enforces that `visibility_default` must be one of `'private'`, `'federation'`, or `'public'`. Invalid values produce a validation error.
+**Validation:** `validateCsm()` requires `visibility_default` to be one of `'private'`, `'dmz'`, `'local'`, `'federation'` or `'public'`. Any other value is a validation error.
 
-Note: The CSM `visibility_default` uses `'federation'` where the `MemoryRecord.visibility` uses `'public'`. The CSM visibility is a policy directive for the service template, while `MemoryRecord.visibility` is the per-record access control value. When a CSM sets `visibility_default: 'federation'`, it indicates data created under this service should be accessible across federated nodes by default.
+Note: the CSM `visibility_default` is a policy for the service template, and its values are not the same set as `MemoryRecord.visibility`. `visibility_default: 'federation'` means that data created under this service should be readable across federated nodes by default.
 
 ---
 
 ## 5. Federation Boundary
 
-### 5.1 Federation-Scoped Consents
+### 5.1 Consent Scopes
 
-A `ConsentRecord` with `scope: 'federation'` explicitly authorizes cross-node data access. When the default `scope` is omitted during consent creation (`POST /v1/consent`), it defaults to `'federation'`, reflecting the protocol's design that consent grants are typically for cross-boundary sharing.
+A `ConsentRecord` with `scope: 'federation'` authorizes cross-node data access. When `scope` is omitted in `POST /v1/consent`, it defaults to `'federation'`.
 
-The three consent scopes align with the zone model:
+The four consent scopes:
 
 | `ConsentRecord.scope` | Zone | Meaning |
 |----------------------|------|---------|
-| `'private'` | Private | Consent for accessing private data on the local node only |
-| `'dmz'` | Owner | Consent for accessing owner-scoped data within the owner's agent pool |
-| `'federation'` | Federation | Consent applies across node boundaries in the federation |
+| `'private'` | Private | Consent to read private data on this node only |
+| `'dmz'` | DMZ | Consent to read node-local shared data |
+| `'federation'` | Federation | Consent that applies across node boundaries |
+| `'auth'` | Federation | Lets another node sign this person in with their password here. The recipient is `node:<requesting-node-id>`, `*` or `domain:*` (`src/routes/federation-auth.ts`). |
 
 ### 5.2 CsmRecord.federate
 
-The `CsmRecord` interface includes an optional `federate` field:
+The `CsmRecord` interface (`src/storage/types/apps.ts`) has an optional `federate` field:
 
 ```typescript
 interface CsmRecord {
@@ -245,19 +252,23 @@ interface CsmRecord {
   registeredBy: string;
   registeredAt: string;
   updatedAt: string;
-  federate?: boolean;  // Phase 3.4 -- auto-distribute to federation peers
+  semantic?: SemanticAnnotation;
+  federate?: boolean;  // Phase 3.4: send this CSM's actions to federation peers
 }
 ```
 
-When `federate` is `true`, the CSM and its associated action catalogue entries are automatically distributed to federation peers during sync operations. The genesis peering service (`src/services/genesis-peering.ts`) marks synchronized resources with `federated: true`.
+When `federate` is `true`:
+- the catalogue sync (`syncCatalogueToPeer()` in `src/services/catalogue-sync.ts`) sends the CSM's actions to each peer that shares its catalogue, signed with the node's Ed25519 key;
+- the CSM is listed in `GET /v1/federation/cross-catalogue` with `federated: true` (`src/routes/federation-genesis.ts`).
 
 ### 5.3 Federation Sync Protocol
 
-The federation sync endpoint (`POST /v1/federation/sync`) handles inbound catalogue data from peer nodes:
-- Each action from a remote node receives a composite ID: `{source_node}:{action.id}`
-- Actions are tagged with `federated:{nodeId}` for provenance tracking
-- Existing federated actions are updated (upserted); new ones are created
-- When a peer is removed, its federated actions are re-tagged from `federated:{nodeId}` to `expiring:{nodeId}` for graceful cleanup
+`POST /v1/federation/catalogue-sync` (`src/routes/federation-sync/catalogue-trust.ts`) receives catalogue data from a peer node:
+- The peer must be active and share its catalogue, and the payload signature must verify against the peer's public key.
+- Each action from a remote node gets a composite ID: `{source_node}:{action.id}`.
+- Actions are tagged `federated:{nodeId}` to record where they came from.
+- An existing federated action is updated; a new one is created.
+- When a peer is removed, its federated actions are re-tagged from `federated:{nodeId}` to `expiring:{nodeId}` for cleanup (`src/services/federation-peer-remove.ts`).
 
 ---
 
@@ -267,32 +278,43 @@ The federation sync endpoint (`POST /v1/federation/sync`) handles inbound catalo
 
 | File | Purpose |
 |------|---------|
-| `src/services/consent.ts` | Core consent logic: `checkConsentForRead()`, `auditDataAccess()`, `expireConsents()`, `startConsentExpiryJob()` |
-| `src/routes/consent.ts` | REST API: `POST/GET/DELETE /v1/consent`, `GET /v1/consent/audit`, `GET /v1/consent/:id` |
-| `src/storage/interface.ts` | Type definitions: `ConsentRecord` (lines 289-301), `ConsentAuditEntry` (lines 303-312), `MemoryRecord` (lines 31-41), `CsmRecord` (lines 314-323) |
-| `src/storage/memory.ts` | In-memory implementation: `findMatchingConsents()`, `consentMatchPattern()` |
-| `src/services/csm-parser.ts` | CSM YAML parser: `CsmDefinition` interface including `consentRequirements`, `parseCsm()`, `validateCsm()` |
-| `src/routes/federation.ts` | Federation sync endpoint: composite ID generation, federated action tagging |
-| `src/services/genesis-peering.ts` | Cross-federation peering with `federated: true` marking |
+| `src/services/consent.ts` | Consent logic: `checkConsentForRead()`, `auditDataAccess()`, `expireConsents()` |
+| `src/routes/consent.ts` | REST API: `POST/GET /v1/consent`, `GET/DELETE /v1/consent/:id`, `GET /v1/consent/audit`, `GET /v1/data-wallet` |
+| `src/routes/memory/shared.ts` | `visibilityToZone()`: memory visibility to zone |
+| `src/storage/types/commerce.ts` | Type definition: `MemoryRecord` |
+| `src/storage/types/auth.ts` | Type definitions: `ConsentRecord`, `ConsentAuditEntry` |
+| `src/storage/types/apps.ts` | Type definition: `CsmRecord` |
+| `src/storage/providers/sqlite/methods/consent.ts`, `src/storage/providers/postgres-kysely/methods/consent.ts` | `findMatchingConsents()` in each storage provider |
+| `src/storage/pattern-utils.ts` | `consentMatchPattern()` |
+| `src/storage/consent-recipient.ts` | `matchesRecipient()` |
+| `src/services/csm-parser.ts` | CSM YAML parser: `CsmDefinition` with `consentRequirements`, `parseCsm()`, `validateCsm()` |
+| `src/routes/federation-sync/catalogue-trust.ts` | `POST /v1/federation/catalogue-sync`: composite ID, `federated:` tag |
+| `src/services/catalogue-sync.ts` | Outbound catalogue sync of federated CSMs' actions |
+| `src/services/federation-peer-remove.ts` | Re-tags a removed peer's actions `expiring:{nodeId}` |
 
 ### Key Functions
 
 | Function | Location | Description |
 |----------|----------|-------------|
-| `checkConsentForRead()` | `src/services/consent.ts` | Evaluates whether an accessor has permission to read a memory key based on visibility and consent grants |
-| `auditDataAccess()` | `src/services/consent.ts` | Records an audit entry for any data access attempt |
-| `findMatchingConsents()` | `src/storage/memory.ts` | Scans active consents for a matching owner, recipient, and data pattern; auto-expires stale consents |
-| `consentMatchPattern()` | `src/storage/memory.ts` | Glob-style pattern matcher for consent `dataPattern` against memory keys |
-| `startConsentExpiryJob()` | `src/services/consent.ts` | Background job (10-minute interval) for batch consent expiration |
-| `parseCsm()` | `src/services/csm-parser.ts` | Parses YAML CSM definitions including consent_requirements |
-| `validateCsm()` | `src/services/csm-parser.ts` | Validates CSM structure including visibility_default enum check |
+| `checkConsentForRead()` | `src/services/consent.ts` | Decides whether a reader may read a memory key, from visibility, group membership and consent grants |
+| `auditDataAccess()` | `src/services/consent.ts` | Records an audit entry for a denied access or a consent grant or revoke |
+| `expireConsents()` | `src/services/consent.ts` | Marks consents past their `expires` time as expired; run by the core job `consent-expiry` every 10 minutes |
+| `findMatchingConsents()` | storage providers (see above) | Scans the owner's active consents for a matching recipient and data pattern; expires stale consents inline |
+| `consentMatchPattern()` | `src/storage/pattern-utils.ts` | Glob matcher for a consent `dataPattern` against a memory key |
+| `matchesRecipient()` | `src/storage/consent-recipient.ts` | Matches a consent `recipient` against a reader |
+| `parseCsm()` | `src/services/csm-parser.ts` | Parses YAML CSM definitions, including `consent_requirements` |
+| `validateCsm()` | `src/services/csm-parser.ts` | Validates CSM structure, including the `visibility_default` value |
 
 ### API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/v1/consent` | Create a new consent grant |
-| `GET` | `/v1/consent` | List own consent records (filterable by `status`, `recipient`) |
-| `GET` | `/v1/consent/:id` | Get a single consent record |
-| `DELETE` | `/v1/consent/:id` | Revoke a consent (soft-delete: sets `status: 'revoked'`) |
+| `POST` | `/v1/consent` | Create a consent grant |
+| `GET` | `/v1/consent` | List own consent records |
+| `GET` | `/v1/consent/:id` | Get one consent record |
+| `DELETE` | `/v1/consent/:id` | Revoke a consent (sets `status: 'revoked'`) |
 | `GET` | `/v1/consent/audit` | Query the consent audit log (filterable by `days`, `accessor_gaii`, `consent_id`) |
+| `GET` | `/v1/data-wallet` | An overview of the caller's consents and recent audit entries |
+| `GET` | `/v1/memory/{gaii}/{key}` | Read a public memory entry without a token |
+| `POST` | `/v1/federation/catalogue-sync` | Receive a peer's catalogue |
+| `GET` | `/v1/federation/cross-catalogue` | Local federated CSMs, federated actions and genesis entries |

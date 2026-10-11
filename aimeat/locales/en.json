@@ -12942,6 +12942,24 @@
       "taskWaiting": "waiting",
       "all": "All its settings →"
     },
+    "agentWork": {
+      "back": "Back to the agent",
+      "missingTitle": "No such work",
+      "missingSub": "This agent has no work by that id.",
+      "untitled": "Work",
+      "state": "State",
+      "steps": "{done} of {total} steps done",
+      "asked": "Asked",
+      "finished": "Ended",
+      "askedTitle": "What it was asked to do",
+      "resultTitle": "What it produced",
+      "running": "The agent is working on this now. The result appears here when it is done.",
+      "waiting": "This work has not started yet.",
+      "says": "The agent says",
+      "loadingResult": "Reading the result…",
+      "noOutput": "The agent saved no separate result. Its own words are above.",
+      "all": "All details of this work →"
+    },
     "machines": {
       "title": "Your computers",
       "sub": "A computer is where your agents run: your laptop, a server, a computer in the cloud, or an AIMEAT instance from the store. An agent can use only what its computer can do and what you allowed it.",

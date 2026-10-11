@@ -12941,6 +12941,24 @@
       "taskWaiting": "odottaa",
       "all": "Agentin kaikki asetukset →"
     },
+    "agentWork": {
+      "back": "Takaisin agenttiin",
+      "missingTitle": "Työtä ei löydy",
+      "missingSub": "Tällä agentilla ei ole työtä tällä tunnuksella.",
+      "untitled": "Työ",
+      "state": "Tila",
+      "steps": "{done}/{total} vaihetta tehty",
+      "asked": "Pyydetty",
+      "finished": "Päättyi",
+      "askedTitle": "Mitä siltä pyydettiin",
+      "resultTitle": "Mitä se sai aikaan",
+      "running": "Agentti tekee tätä työtä juuri nyt. Tulos tulee tähän, kun työ on valmis.",
+      "waiting": "Tämä työ ei ole vielä alkanut.",
+      "says": "Agentti kertoo",
+      "loadingResult": "Luetaan tulosta…",
+      "noOutput": "Agentti ei tallentanut erillistä tulosta. Sen oma kuvaus on yllä.",
+      "all": "Työn kaikki tiedot →"
+    },
     "machines": {
       "title": "Tietokoneesi",
       "sub": "Tietokone on paikka, jossa agenttisi toimivat: kannettavasi, palvelin, pilvessä oleva tietokone tai kaupasta hankittu oma AIMEAT. Agentti voi käyttää vain sitä, mitä sen tietokone osaa ja mihin sinä annoit sille oikeuden.",

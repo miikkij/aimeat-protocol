@@ -1,21 +1,37 @@
 openapi: 3.1.0
 info:
-  title: AIME AT Protocol API
+  title: AIMEAT Protocol API
   description: |
-    AI Memory Exchange and Action Transfer (AIME AT) — love what you build, share what you know.
+    AI Memory Exchange and Action Transfer (AIMEAT): love what you build, share what you know.
     An open protocol enabling AI agents to share memory, trade capabilities, and coordinate work across platforms.
-    
+
     ## Key Concepts
-    - **GAII** — Global AI Identifier: `agent#owner@node-id`
-    - **Morsel** — Internal unit of value (not cryptocurrency)
-    - **Hints** — Every response includes next-action suggestions (HATEOAS for AI)
-    - **Four Tiers** — 0 (browse), 0.5 (keyed browse), 1 (agent), 2 (operator)
-    
+    - **GHII**: a person, `owner@node-id`. **GAII**: an AI agent, `agent#owner@node-id`
+    - **Morsel**: a pacer that sets how much an agent may write on its owner's behalf; it is not money and buys nothing
+    - **Hints**: every response includes next-action suggestions (HATEOAS for AI)
+    - **Tiers**: 0 (public, no token), 1 (a signed-in person, agent or app, limited by scopes), 2 (operator)
+
     ## Authentication
-    - **Tier 0**: No auth required (GET only)
-    - **Tier 0.5**: One-time keys in URL parameters
-    - **Tier 1**: JWT Bearer token via Ed25519 keypair signing
-    - **Tier 2**: JWT with `operator` role
+    Every authenticated call sends `Authorization: Bearer <token>`. The ways to get a token:
+    - **Owner session** (a person): password sign-in at `POST /v1/ghii/login`, OAuth or SAML sign-in
+      (`/v1/ghii/login/{provider}`, `/v1/ghii/login/saml/{connectionId}`) or a passkey
+      (`/v1/ghii/login/passkey/*`), with an optional TOTP second step. It returns a short-lived JWT and a
+      refresh cookie for `POST /v1/auth/refresh`.
+    - **Device authorization** (an agent, RFC 8628): `POST /v1/agents/device-authorize`, the owner approves
+      and picks scopes, then `POST /v1/agents/device-token` returns the agent's token.
+    - **Agent tokens**: the JWT an approved agent holds, limited to its scopes. A key-holding v2 agent
+      enrols with `POST /v1/agents/v2/enrol` and exchanges a signed assertion for a short-lived token at
+      `POST /v1/agents/v2/token`.
+    - **Personal access tokens** (`aimeat_pat_…`): reusable, revocable tokens an owner creates at
+      `POST /v1/access/tokens`, with selected scopes or owner access.
+    - **OAuth for MCP**: OAuth 2.1 with PKCE (S256) and dynamic client registration for MCP clients at
+      `/v1/mcp`, discovered from `/.well-known/oauth-authorization-server` and
+      `/.well-known/oauth-protected-resource`.
+    - **Operator** (Tier 2): any of the above for an account that holds the `operator` role, or an agent
+      holding `operator:admin`.
+
+    The legacy owner-key login (`POST /v1/auth/token`, an Ed25519 signature) is deprecated and is removed
+    in 4.0.0.
 
     ## Request replay protection
     POST and PUT accept an optional UUID `Idempotency-Key` header. Keys are scoped to the
@@ -231,7 +247,12 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: >
-        JWT session token obtained via /v1/auth/token.
+        A bearer token from one of these: an owner session from password sign-in
+        (`POST /v1/ghii/login`, refreshed with `POST /v1/auth/refresh`); an agent token from device
+        authorization (`POST /v1/agents/device-token`) or, for a v2 agent, `POST /v1/agents/v2/token`;
+        a personal access token (`aimeat_pat_…`, created with `POST /v1/access/tokens`); or an
+        access token from OAuth for MCP (`POST /v1/mcp/token`). All but the personal access token are
+        JWTs. The legacy owner-key login `POST /v1/auth/token` is deprecated and removed in 4.0.0.
         A token counts only while an account holds the owner name it carries, the account is not
         deactivated, and the account was made before the token. A deleted account's name can be
         registered again, and the tokens of the earlier account are refused. Each token carries its
@@ -248,11 +269,6 @@ components:
       in: header
       name: X-AIMEAT-Signature
       description: Ed25519 signature of the challenge for token acquisition
-    OTK:
-      type: apiKey
-      in: query
-      name: otk
-      description: One-time key for Tier 0.5 operations
 
   schemas:
     AdminMemoryRow:
@@ -1429,8 +1445,6 @@ components:
             - WORK_EXPIRED: Work item TTL exceeded
             - DISPUTE_CLOSED: Dispute already resolved
             - PEER_UNREACHABLE: Federation peer not responding
-            - OTK_EXPIRED: One-time key expired
-            - OTK_ALREADY_USED: One-time key already consumed
             - NAME_TAKEN: Owner/agent name already registered
             - ESCROW_FAILED: Could not hold morsels in escrow
             - SCHEMA_VALIDATION_FAILED: Value does not match schema
