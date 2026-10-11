@@ -58,7 +58,7 @@ be able to assume the shape.
 |---|---|---|
 | POST | `/v1/csm` | Owner |
 | GET | `/v1/csm` | Anyone (`?type=` filters by service type) |
-| GET | `/v1/csm/templates` | Anyone. Eight built-in templates: marketplace, auction, hobby-directory, dating-directory, news-feed, opinion-board, video-directory, organism |
+| GET | `/v1/csm/templates` | Anyone. Seven built-in templates: marketplace, auction, hobby-directory, dating-directory, news-feed, opinion-board, video-directory |
 | GET | `/v1/csm/templates/{type}` | Anyone. The template's raw YAML, to start from |
 | GET | `/v1/csm/{name}` | Anyone |
 | DELETE | `/v1/csm/{name}` | Owner |
