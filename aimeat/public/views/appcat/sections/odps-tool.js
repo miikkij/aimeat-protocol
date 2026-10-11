@@ -17,6 +17,7 @@
  * @structure OdpsToolBlock({ d, m, tool, form, set }) · odpsFormOf(tool) · readOdpsTool(base, form, open)
  * @usage html`<${OdpsToolBlock} d=${d} m=${m} tool=${base} form=${form} set=${set} />`
  * @version-history
+ *   v1.2.1 — 2026-10-12 — A money price shows two decimals ("0.50 EUR").
  *   v1.2.0 — 2026-10-11 — The drafting prompt says the money price (or "free") and the pacing amount
  *     per call, not "N morsels" as a price (ruling "morseli on tahdistus, ei hinta").
  *   v1.1.0 — 2026-09-27 — Parity with the old page (appcat sections-d): the head row with the file
@@ -142,7 +143,7 @@ export function readOdpsTool(base, f, open) {
  */
 function promptPrice(tool) {
   const toll = Math.min(100, (tool.tollMorsels > 0 ? tool.tollMorsels : 0) + (tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0));
-  const money = tool.priceMoney && tool.priceMoney.amount > 0 ? (tool.priceMoney.amount / MONEY_UNIT) + ' ' + tool.priceMoney.currency : '';
+  const money = tool.priceMoney && tool.priceMoney.amount > 0 ? (tool.priceMoney.amount / MONEY_UNIT).toFixed(2) + ' ' + tool.priceMoney.currency : '';
   if (!money && !toll) return 'not for sale';
   return (money || 'free') + (toll ? ' · pacing ' + toll + ' morsels per call (not a price)' : '');
 }

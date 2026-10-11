@@ -10,6 +10,7 @@
  *   this module re-renders #detail-monetize in place after loads/saves.
  * @usage import { monetizeSectionInner, monetizeOnOpen, monetizeAddTool, ... } from './monetize.js'
  * @version-history
+ *   v1.5.1 — 2026-10-12 — A money price shows two decimals ("0.50 EUR"; it read "0.5 EUR").
  *   v1.5.0 — 2026-10-11 — Two values per tool (ruling "morseli on tahdistus, ei hinta"): the money price
  *     and the pacing amount side by side; the morsel price field is gone. A 3.x price.morsels shows in
  *     the pacing field (added to the toll, as the node does) and a save writes tollMorsels and drops
@@ -142,7 +143,7 @@ function priceLabel(tool) {
     var m = money[i];
     if (!m || !(m.amount > 0) || seen[m.currency]) continue;
     seen[m.currency] = true;
-    parts.push((m.amount / MONEY_UNIT) + ' ' + m.currency);
+    parts.push((m.amount / MONEY_UNIT).toFixed(2) + ' ' + m.currency);
   }
   var toll = tollOf(tool);
   if (!parts.length && !toll) return t('monetize.notForSale');

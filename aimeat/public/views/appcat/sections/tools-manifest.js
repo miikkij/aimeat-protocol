@@ -18,6 +18,7 @@
  *   blockedReason(tool) · priceLabel(tool) · ownerGhiiOf(m) · MONEY_UNIT · CURRENCIES
  * @usage const m = useToolsManifest(d); m.state === 'ready' && m.doc.tools.map(…)
  * @version-history
+ *   v1.1.1 — 2026-10-12 — A money price shows two decimals ("0.50 EUR").
  *   v1.1.0 — 2026-10-11 — priceLabel says the money price (or Free) and the pacing amount; a tool
  *     with a pacing amount and no money price can be listed (ruling "morseli on tahdistus, ei hinta").
  *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder C), from the old catalogue's monetize.js and
@@ -168,7 +169,7 @@ export function priceLabel(tool) {
   for (const m of money) {
     if (!m || !(m.amount > 0) || seen[m.currency]) continue;
     seen[m.currency] = true;
-    parts.push((m.amount / MONEY_UNIT) + ' ' + m.currency);
+    parts.push((m.amount / MONEY_UNIT).toFixed(2) + ' ' + m.currency);
   }
   const toll = Math.min(100, (tool.tollMorsels > 0 ? tool.tollMorsels : 0) + (tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0));
   if (!parts.length && !toll) return x('monetize.notForSale');
