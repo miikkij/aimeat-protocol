@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.34.0 — 2026-10-11 — EVENTS FIRST, A TIMER LAST follows LIVE BY DECLARATION in the mosaic section (build-events-first.ts): the `live` map's `domains` field, agent work as events, the domains an app may hear, and the three places a timer belongs.
  *   v1.33.0 — 2026-10-01 — The interview opens, on any model but Claude Opus or Fable, with one sentence telling the person those build the better app (cold-agent build-app 2026-10-01: Sonnet 5.5 1/3, Opus 5.5 3/3). Outside the token body, so the spec token does not move.
  *   v1.32.0 — 2026-09-28 — The motion parts follow the motion section, each with its call (build-atelier-motion-parts.ts); they sit in the `look` part because `start` is at its size limit.
  *   v1.31.0 — 2026-09-28 — The workbench pieces join the component catalogue (ATELIER_WORKBENCH_COMPONENTS).
@@ -143,6 +144,7 @@ import { AMBIENTS } from '../data/atelier-ambients.js';
 import { EFFECTS, EFFECT_HOSTS, POST_IDS } from '../data/atelier-effects.js';
 import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
 import { ATELIER_FORK_PEOPLE_SECTION, ATELIER_MOSAIC_IN_GENRE, ATELIER_PROPOSAL_SECTION } from './build-atelier-people.js';
+import { atelierEventsFirst } from './build-events-first.js';
 import { buildAtelierLibrarySection } from '../data/library-packs.js';
 import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
 import { atelierMotionParts } from './build-atelier-motion-parts.js';
@@ -384,6 +386,7 @@ function composeBody(config: AimeatConfig): string {
     + 'refuses a memory subscription without a keyPrefix (that would re-fetch on every write '
     + 'anyone makes) and never fires more often than every few seconds. Without the live '
     + 'library on the page the declaration is inert, so it is always safe to write.\n\n'
+    + atelierEventsFirst()
     + 'The layout\'s `nav` field projects the same blocks as stacked sections, a tab row, a bottom '
     + 'bar, a swipeable deck, a step-by-step flow, a pan-zoom canvas, a desktop-grade left rail '
     + '(`rail`) or a full-screen menu in display type (`overlay`) — all of them work on every '

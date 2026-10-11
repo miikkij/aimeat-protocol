@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-11 — Events first, a timer last: the section "Live updates without a firehose" moved to build-events-first.ts and opens with that rule; the real-time section's last line points a simple app at AIMEAT.live, where it said "on a timer".
  *   2026-10-02 — The agent-face part names aimeat-format-md: the app's own extension action answers ?format=md. The AI line: when a capability is off, show its `fix` with a link to `settingsUrl`.
  *   2026-10-01 — Public Intake: the link to share is the app page with ?form=<form id>. The code
  *     comment called defineForm's answer "a shareable link", and its submit_url is an API address.
@@ -172,6 +173,7 @@ import { buildPromptDrivenSection } from './build-app-prompt-driven.js';
 import { buildDecideSection } from './build-app-prompt-decide.js';
 import { buildRenderedContentParagraphs, buildAgentDataSection } from './build-app-prompt-content.js';
 import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
+import { classicLiveUpdatesSection } from './build-events-first.js';
 
 export interface BuildAppPromptOptions {
   /** Conversation/UI language for the generated app. Only 'en' and 'fi' are localized. */
@@ -514,19 +516,10 @@ function composeAppPrompt(
   body += 'ws.onmessage = (e) => handle(JSON.parse(e.data));\n';
   body += '// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n';
   body += '```\n';
-  body += 'Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n';
+  body += 'Simpler apps can skip rooms and follow shared AIMEAT.data keys with `AIMEAT.live` (the next section).\n\n';
 
-  // Live updates — the firehose trap. Correct-looking code that makes the app poll forever
-  // and repaint over the user, on any account with more than a couple of active agents.
-  body += '### Live updates without a firehose (aimeat-live.js)\n';
-  body += '`AIMEAT.live.subscribe(["memory"], reload)` means "call me whenever ANY of this owner\'s memory changed". On an account with an active agent fleet that is near-continuous, so a handler that re-fetches a full listing turns one agent\'s activity into a permanent poll. Gate it:\n';
-  body += '```javascript\n';
-  body += '// fire only when the number of keys under a prefix actually changed:\n';
-  body += 'AIMEAT.live.subscribe(["memory"], reload, { keyPrefix: "crews.", ownerScope: true });\n';
-  body += 'AIMEAT.live.subscribe(["memory"], reload, { minIntervalMs: 10000 });   // or just rate-limit\n';
-  body += '```\n';
-  body += 'The change frame carries a DOMAIN name, never the key that changed, so `keyPrefix` is a client-side count gate: it catches a NEW key, not an in-place update of an existing one. Use `minIntervalMs` for update-sensitive views.\n';
-  body += '**Never let a live event repaint a surface the user is currently reading.** If a dialog/detail view is open, refresh its data in the background and leave the visible content alone — only an explicit user action should replace it. Rebuilding a list or blanking a pane to "Loading…" on every event is what makes an app flicker, and it looks like a crash, not a refresh. Also: render into a detached element and swap it in one operation instead of clearing then filling.\n\n';
+  // Live updates: events first, a timer last, then the firehose trap (build-events-first.ts).
+  body += classicLiveUpdatesSection();
 
   // Agent face — the markdown read-surface agents get on the app URL
   body += '### Agent face (markdown read-surface for agents)\n';
