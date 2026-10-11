@@ -77,7 +77,7 @@ an AI may do in their name.
 - **An AI that can connect** (Claude, ChatGPT with Developer mode, Cursor, VS Code, Codex and
   similar): the person adds their AIMEAT as a connector, with the steps on the Connect page. After
   that, their AI works in AIMEAT directly and they only come to the page to approve, pay or look.
-- **An AI that cannot connect** (the Gemini app, Microsoft Copilot, the free ChatGPT and similar):
+- **An AI that cannot connect** (the Gemini app outside the United States, Microsoft Copilot, the free ChatGPT and similar):
   the person copies a ready prompt from their Home page into you, you answer, and they paste your
   answer back into the box on the Home page. This is a full way to use AIMEAT, not a lesser one.
   When you are that AI, write your answer exactly in the shape the prompt asks for, so the paste

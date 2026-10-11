@@ -84,7 +84,7 @@ contract. To **back up** your node, stop it and copy the whole app-data folder.
 > # 2. rustup toolchain install stable-x86_64-pc-windows-gnu   # rustup is user-level already
 > # 3. cd aimeat-desktop\src-tauri; rustup override set stable-x86_64-pc-windows-gnu
 > $env:PATH = "$env:LOCALAPPDATA\aimeat-tools\mingw64\bin;$env:PATH"
-> cargo test     # 12 tests, ~26 s once the dependencies are compiled
+> cargo test     # ~26 s once the dependencies are compiled (measured 2026-09-18)
 > ```
 >
 > The host toolchain has to be the GNU one, not just the target: build scripts compile for the host, so
@@ -108,24 +108,34 @@ adding to it, which is why the Windows file repeats the two resource folders.
 > `pnpm stage` stages the Node sidecar under **both** Windows triples (`-gnu` and `-msvc`) because the Tauri
 > compiler and the Tauri CLI bundler can each resolve a different one. Whichever your toolchain uses, it's covered.
 
-### Produce a Windows installer
+### Produce an installer
 
 ```bash
 cd aimeat-desktop
 pnpm install            # first time only (installs the Tauri CLI)
-pnpm package            # = pnpm stage && tauri build
+pnpm package            # = pnpm stage && tauri build && node scripts/report-bundles.mjs
 ```
 
-`pnpm stage` runs two scripts:
+Each platform builds its own installer on its own machine: Windows gives NSIS and MSI, macOS an app and
+a dmg, Linux a deb and an AppImage. CI builds all three on their own runners
+([.github/workflows/release-desktop.yml](../.github/workflows/release-desktop.yml)).
 
-- [scripts/stage-node.mjs](scripts/stage-node.mjs) — copies this machine's `node.exe` to
-  `src-tauri/binaries/node-x86_64-pc-windows-msvc.exe` (the Tauri sidecar). Using the host's Node guarantees
-  its ABI matches the staged native `better-sqlite3`.
+`pnpm stage` runs four scripts:
+
+- [scripts/stage-node.mjs](scripts/stage-node.mjs) — copies this machine's Node binary into
+  `src-tauri/binaries/` as the Tauri sidecar, named for the platform triple (on Windows
+  `node-x86_64-pc-windows-msvc.exe`). Using the host's Node guarantees its ABI matches the staged native
+  `better-sqlite3`.
+- [scripts/stage-webview2.mjs](scripts/stage-webview2.mjs) — on Windows, stages `WebView2Loader.dll`.
 - [scripts/stage-server.mjs](scripts/stage-server.mjs) — runs `pnpm build` in `../aimeat`, copies `dist/` into
-  `src-tauri/resources/server/`, and does a **production-only** dependency install there (so the native SQLite
-  binary is present and Prisma engines are dropped).
+  `src-tauri/resources/server/`, and does a **production-only** dependency install there, with the server's
+  install lifecycle scripts removed, so the native SQLite binary is present.
+- [scripts/stage-licenses.mjs](scripts/stage-licenses.mjs) — copies the licence texts the installer must
+  carry (AIMEAT's licence, the server's third-party notices, the licence of the Node runtime being
+  shipped, and on Windows a WebView2 notice) into `src-tauri/resources/licenses/`.
 
-The installers land in:
+After `tauri build`, [scripts/report-bundles.mjs](scripts/report-bundles.mjs) lists what was built. On
+Windows the installers land in:
 
 ```
 src-tauri/target/release/bundle/nsis/    *-setup.exe   (recommended)
@@ -167,8 +177,11 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
 | [src-tauri/src/node_manager.rs](src-tauri/src/node_manager.rs) | Start/stop/status, path resolution, `.env` management, log tailing |
 | [src-tauri/src/ai_connector.rs](src-tauri/src/ai_connector.rs) | Auto-detect local AI services (LM Studio, Ollama) |
 | [src-tauri/src/tray.rs](src-tauri/src/tray.rs) | System tray icon, menu, tooltip |
-| [tauri.conf.json](tauri.conf.json) | Tauri config — sidecar (`externalBin`), bundled `resources`, window |
-| `scripts/` | `stage-node.mjs`, `stage-server.mjs` (run by `pnpm stage`) |
+| [src-tauri/src/opener.rs](src-tauri/src/opener.rs) | Opens an address in the person's browser |
+| [src-tauri/src/updater.rs](src-tauri/src/updater.rs) | The in-app update check against the `desktop-latest` release |
+| [src-tauri/src/webview_policy.rs](src-tauri/src/webview_policy.rs) | Tests that hold the webview's content security policy against the two pages it governs |
+| [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json) | Tauri config — sidecar (`externalBin`), bundled `resources`, window; the `tauri.<platform>.conf.json` files beside it are merged over it |
+| `scripts/` | `stage-node.mjs`, `stage-webview2.mjs`, `stage-server.mjs`, `stage-licenses.mjs` (run by `pnpm stage`) and `report-bundles.mjs` (run by `pnpm package`) |
 
 ---
 
@@ -199,7 +212,7 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
   your own machine" (support.claude.com article 11175166, read 2026-09-18). So a person running their own
   AIMEAT on this computer cannot attach Claude Desktop to it at all, and the app says so instead of offering
   an address that cannot work. A tool that runs on the machine, like Claude Code, has no such limit.
-- **SQLite only.** MongoDB/PostgreSQL backends are intentionally excluded from the desktop bundle.
+- **SQLite only.** The PostgreSQL backend is intentionally excluded from the desktop bundle.
 
 ## Troubleshooting
 
@@ -211,10 +224,11 @@ the app-data folder. To iterate on the **server** itself, run it the normal way 
 - **`icon ... is not RGBA`** — the icons under `src-tauri/icons/` must be 32-bit RGBA PNGs. Regenerate the full
   set from the source SVG: `pnpm tauri icon src-tauri/icons/icon.svg`.
 - **`WebView2Loader.dll was not found`** (at app launch) — the GNU toolchain links this loader dynamically, so it
-  must ship next to the exe. `pnpm stage` stages it (`scripts/stage-webview2.mjs`) and `tauri.conf.json` bundles it
+  must ship next to the exe. `pnpm stage` stages it (`scripts/stage-webview2.mjs`) and `tauri.windows.conf.json` bundles it
   as a top-level resource. If it ever goes missing, run `pnpm stage:webview2` and rebuild. (MSVC links it
   statically and never needs the DLL.) Note this is the *loader*; the Edge **WebView2 runtime** itself ships with
   Windows 11 / is auto-installed by the installer.
-- **Logs** — check the **Logs** tab, or open
+- **Logs** — read the **Log** section of the machine room, or open
   `%APPDATA%\com.overscale.aimeat-desktop\aimeat-node.log` directly.
-- **Port already in use** — another process holds `41050`. Stop it, or change `AIMEAT_PORT` in the Settings tab.
+- **Port already in use** — another process holds `41050`. Stop it, or change the port in the machine
+  room's **Settings** section.

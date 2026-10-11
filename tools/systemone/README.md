@@ -7,7 +7,7 @@ the same request the node sends to TypeSafe's Jev, so the node uses them as **de
 | Model | Licence | Port | Reads Finnish content | Note |
 |---|---|---|---|---|
 | Laya 0.3.11 (multilingual checkpoint) | Apache 2.0 | 8801 | yes | the fastest on a CPU |
-| von 1.1.1 | Apache 2.0 | 8802 | no | |
+| von 1.1.1 | Apache 2.0 | 8802 | no | 1.1.1 is the von-sdk version; the model id in a request is `von-1.1.0` |
 | jeff 0.1.0 (GLiFormer) | MIT | 8803 | yes | carries 60 options |
 
 Each model answers only a call that carries its own key, a random one you make once (below). The
