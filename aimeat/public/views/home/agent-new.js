@@ -22,6 +22,8 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The row "What it offers": the offer the agent's definition carries, which
+ *     shows on the Offerings page once the agent has started.
  *   v1.1.0 — 2026-10-11 — One choice about the agent's results, "Where does its work go?": its own
  *     memory, or a workspace of an organism the person is in. Shown only when there is a workspace.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -53,7 +55,7 @@ import { CREW_TEMPLATES } from '/views/profile/agents/crew-templates.js';
 import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
 import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
-  draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeTools, readHomeAgents,
+  draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeTools, readHomeAgents, offerShown,
 } from '/js/services/agent-draft.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
 import { machineName } from '/views/home/agents-band.js';
@@ -284,6 +286,8 @@ export default function AgentNewView({ navigate }) {
 
   // ── The form: the agent, and the person's four choices ──
   const scopes = proposal ? (proposal.scopes ?? []) : (SCOPE_TEMPLATES[draft.reach] ?? SCOPE_TEMPLATES.standard);
+  // The offer in the definition: the draft's own, or the one the proposer wrote.
+  const offered = offerShown(draft.crewDef ?? proposal?.crew_def);
   const whenOptions = [
     { value: 'ask', label: tr('home.agents.when.ask', 'When I ask'), hint: n('whenAskHint', 'You give it a task when you need one. Otherwise it does nothing.') },
     { value: 'clock', label: tr('home.agents.when.clock', 'By the clock'), hint: n('whenClockHint', 'It gets the same task at the times you set.') },
@@ -350,6 +354,14 @@ export default function AgentNewView({ navigate }) {
             ${' '}${n('noMachine', 'You can start it now: it is made, and it begins working when a computer is connected.')}
             ${' '}<${Action} tone="more" href="/v1/home?computers=1">${tr('home.agents.noMachineDoor', 'Add a computer →')}<//>
           <//>`}
+
+        ${/* What the agent offers, as it will read on the Offerings page once the agent has started.
+             The node writes one from the name and the purpose when the definition has none. */''}
+        <${Facts} wide rows=${[{
+          k: n('offer', 'What it offers'),
+          v: offered?.title || String(draft.displayName || draft.name || ''),
+          sub: `${offered?.ask || String(draft.purpose || '')} ${n('offerHint', 'This shows on your "Ask your agents" page once the agent has started. It has no price and is not on the Exchange.')}`.trim(),
+        }]} />
 
         ${/* The one choice about the agent's results (Jouni, 2026-10-11): its own memory unless the
              person names a workspace. It is offered only when there is a workspace to name. */''}

@@ -12889,7 +12889,9 @@
       "starting": "Starting…",
       "decline": "Decline",
       "cancel": "Cancel",
-      "after": "You can change or remove the agent at any time."
+      "after": "You can change or remove the agent at any time.",
+      "offer": "What it offers",
+      "offerHint": "This shows on your \"Ask your agents\" page once the agent has started. It has no price and is not on the Exchange."
     },
     "agentPage": {
       "signInTitle": "Your agent",

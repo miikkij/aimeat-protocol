@@ -24,6 +24,10 @@
  *   const draft = await draftAgent('Gather the industry news every weekday morning', { tools });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.3.0 — 2026-10-11 — The draft carries one offer (title, ask, example), which goes into the
+ *     definition's `offers`: the crew runtime publishes it when the agent starts, so the agent
+ *     shows on the Offerings page. offerShown(crewDef) reads it back for the proposal page.
+ *     Additive to the prompt: one field and one sentence.
  *   v1.2.0 — 2026-10-11 — setAgentStopped(name, stop): stop an agent and start it again.
  *   v1.1.0 — 2026-10-11 — A definition that listens for direct messages gets the `dm` tool on its
  *     first member when no member has it. An agent made as "when someone writes to it" or "always
@@ -58,6 +62,7 @@ Answer with one JSON object and nothing else, in this shape:
   "does": ["two to four short sentences: what the agent does, step by step, in plain words"],
   "when": { "kind": "ask or clock or talk", "cron": "a five-field cron expression, for clock only" },
   "reach": "readonly or standard",
+  "offer": { "title": "what the agent offers, at most eight words", "ask": "one or two sentences: what to give it, what it returns, and what it does not do", "example": "one short example: an input and what comes back" },
   "crew_def": {
     "agent_name": "the same id as name",
     "process": "sequential",
@@ -69,7 +74,8 @@ Answer with one JSON object and nothing else, in this shape:
 When: choose "clock" when the sentence names a time or a rhythm (every morning, each week, hourly) and write the cron for it, with weekdays as 1-5. Choose "talk" when the agent answers people who write to it. Choose "ask" for everything else.
 Reach: choose "standard" when the agent stores or changes something of the person's (notes, records, files). Choose "readonly" when it reads and reports.
 The crew definition is what the agent runs. Use one to three agents and one to three tasks. Each task's "agent" is the "name" of one of the agents. The first task's description contains {{ctx.prompt}}, which becomes the text of each piece of work the agent is given. "context" lists the ids of earlier tasks whose results this task reads. Give each agent only the tools its role needs, from this list: ${tools.join(', ')}. For "talk", set "listen_for" to ["tasks", "messages", "dms"] and give one agent the "dm" tool.
-Write "display_name", "purpose" and "does" in the language of the person's sentence. Write the crew definition in English.`;
+The offer is how the agent's work reads on the person's list of what their agents do: say it as an invitation, in plain words.
+Write "display_name", "purpose", "does" and "offer" in the language of the person's sentence. Write the crew definition in English.`;
 }
 
 /** The first JSON object in a model's answer, with any code fence or prose around it removed. */
@@ -110,8 +116,25 @@ export function parseDraft(text) {
     when: kind === 'clock' && !cron ? 'ask' : kind,
     cron,
     reach: raw.reach === 'readonly' ? 'readonly' : 'standard',
-    crewDef: { ...def, agent_name: name },
+    // The offer the model wrote goes into the definition, where the crew runtime publishes it from
+    // when the agent starts. A draft without one is completed by the node at approval, from the
+    // agent's name and purpose (src/services/agent-default-offer.ts).
+    crewDef: { ...def, agent_name: name, ...(offerOf(raw.offer, name) ? { offers: [offerOf(raw.offer, name)] } : {}) },
   };
+}
+
+/** The model's offer as one entry of a definition's `offers`, or null when it wrote none. */
+function offerOf(raw, name) {
+  const title = String(raw?.title || '').trim().slice(0, 120);
+  const ask = String(raw?.ask || '').trim().slice(0, 500);
+  if (!title || !ask) return null;
+  return { id: name, title, ask, example: String(raw?.example || '').trim().slice(0, 1000) };
+}
+
+/** What a draft or a proposal's definition offers, for the page that shows the agent before it is made. */
+export function offerShown(crewDef) {
+  const first = Array.isArray(crewDef?.offers) ? crewDef.offers.find((o) => o && typeof o === 'object') : null;
+  return first && first.title ? { title: String(first.title), ask: String(first.ask || '') } : null;
 }
 
 /**

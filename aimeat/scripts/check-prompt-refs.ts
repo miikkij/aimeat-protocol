@@ -30,6 +30,8 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
+ *   v1.1.1 -- 2026-10-11 -- Reads builtin-skills.crew-agent.ts, where add-a-crew-agent moved from
+ *     builtin-skills.ts, so the skill's text stays checked.
  *   v1.1.0 -- 2026-10-03 -- Reads the guided-journey skill and the person help prompt too. The
  *     aimeat-first-conversation exemption is gone: that skill reads its model names from
  *     services/model-recommendation.ts now.
@@ -85,6 +87,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/skill-bundle',
     'aimeat/src/cli/connect/onboarding-prompt.ts',
     'aimeat/src/data/builtin-skills.ts',
+    'aimeat/src/data/builtin-skills.crew-agent.ts',
     'aimeat/src/data/builtin-skills.conversation.ts',
     'aimeat/src/data/builtin-skills.guided-journey.ts',
     'aimeat/src/data/builtin-skills.recurring-work.ts',

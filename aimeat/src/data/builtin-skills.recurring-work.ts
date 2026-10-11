@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.7.2 — 2026-10-11 — Section 4: one `offers` entry in the definition puts the agent on the
+ *     person's offers page; the node adds one when there is none.
  *   v1.7.1 — 2026-10-11 — Section 4: the approval gives the new agent its work once, as a task with
  *     its name and its purpose (services/agent-first-run.ts).
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -158,7 +160,9 @@ saying so wherever the connector cannot keep an agent up. The call creates nothi
 It puts one line on the person's open items, and their press on it creates the agent, gives it the
 definition and hands it to their connector to run. The answer carries \`approval_url\` and
 \`next_step\`: give the person both, so they know where to press. Send the \`crew_def\` with the
-proposal: an agent approved without one exists and cannot start.
+proposal: an agent approved without one exists and cannot start. One \`offers\` entry in the
+definition (\`id\`, \`title\`, \`ask\`) is what puts the agent on the person's "Ask your agents" page once
+it has started; the node adds one from the name and the purpose when the definition has none.
 
 The approval gives the new agent its work once, as a task with its name and its purpose, so the
 person sees a first result without waiting for the clock. Once it runs, section 2 applies: a

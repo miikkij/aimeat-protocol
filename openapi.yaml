@@ -9308,6 +9308,13 @@ paths:
         agent gives it), and scope `kind: first-run`. The owner sees that the agent works and has a
         first result. The task follows the ordinary start rules, so it waits when the agent's
         computer is away. `first_run: false` in the body asks for none.
+
+        ONE OFFER IN THE DEFINITION. The definition is seeded with one entry in `offers`: each entry
+        the proposer wrote is kept and completed with the keys the crew runtime reads (id, title,
+        ask, example, cost, latency, repeatability, verification, consequences), and a definition
+        with none gets one made from the agent's name and purpose. The runtime publishes the first
+        entry to the agent's offers when the agent starts. The entry has no price and no visibility,
+        so the published offer is the owner's own until they change it.
       tags: [Identity]
       security:
         - BearerAuth: []

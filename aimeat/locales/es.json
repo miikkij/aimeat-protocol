@@ -11196,7 +11196,9 @@
       "starting": "Iniciando…",
       "decline": "Rechazar",
       "cancel": "Cancelar",
-      "after": "Puedes cambiar o eliminar el agente cuando quieras."
+      "after": "Puedes cambiar o eliminar el agente cuando quieras.",
+      "offer": "Qué ofrece",
+      "offerHint": "Esto aparece en tu página Pide a tus agentes cuando el agente haya iniciado. No tiene precio y no está en el Exchange."
     },
     "agentPage": {
       "signInTitle": "Tu agente",
