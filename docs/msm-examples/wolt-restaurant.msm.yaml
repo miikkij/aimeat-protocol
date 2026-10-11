@@ -73,7 +73,7 @@ actions:
         description: "Kitchen closing time (ISO 8601)"
 
     pricing:
-      base_morsels: 0
+      toll_morsels: 0
 
     estimated_time_seconds: 1
 
@@ -107,7 +107,8 @@ actions:
     description: >
       Place a food order with delivery address. The restaurant agent
       confirms the order and coordinates with a delivery agent.
-      Payment is handled via AIMEAT morsel escrow.
+      This call does not take payment: the order is paid for before the
+      call, at the node's checkout, with a money price.
 
     endpoint:
       method: POST
@@ -186,7 +187,7 @@ actions:
         description: "Delivery fee"
 
     pricing:
-      base_morsels: 2
+      toll_morsels: 2
 
     estimated_time_seconds: 3
 
@@ -251,6 +252,6 @@ actions:
                 type: number
 
     pricing:
-      base_morsels: 0
+      toll_morsels: 0
 
     estimated_time_seconds: 1

@@ -107,7 +107,7 @@ ui_hints:
 
 **You say:**
 
-> "Create a marketplace for vintage electronics. Sellers list items with price, condition, and photos. Buyers can search by category. Use escrow for payments."
+> "Create a marketplace for vintage electronics. Sellers list items with price, condition, and photos. Buyers can search by category."
 
 **AI generates:**
 
@@ -116,7 +116,7 @@ csm: "1.0"
 service:
   name: "Vintage Electronics Market"
   type: "marketplace"
-  description: "Buy and sell vintage electronics with escrow protection"
+  description: "Buy and sell vintage electronics"
   locale: "en"
 
 schema_mode: "open"
@@ -161,18 +161,13 @@ moderation:
   auto_hide_threshold: 3
   appeals_enabled: true
 
-economy:
-  listing_fee_morsels: 5
-  escrow_enabled: true
-  escrow_release_on: "buyer_confirmation"
-
 ui_hints:
   list_view: ["title", "price.amount", "price.currency", "category", "condition"]
   detail_view: ["title", "description", "price", "category", "condition", "images", "location", "shipping_options", "seller_gaii"]
   search_fields: ["title", "category", "tags", "location.city"]
 ```
 
-**Why the AI chose these fields:** You asked for escrow, so the AI added the `economy` block with `escrow_enabled: true`. Categories were tailored to vintage electronics instead of the generic marketplace defaults. The `schema_mode: "open"` allows sellers to add custom fields like `year_manufactured` or `brand` without changing the CSM.
+**Why the AI chose these fields:** The price is a money amount with a currency, stored as data on the listing. The CSM does not take payment: when a buyer pays, the app sells through the node's checkout (section 4.7). Categories were tailored to vintage electronics instead of the generic marketplace defaults. The `schema_mode: "open"` allows sellers to add custom fields like `year_manufactured` or `brand` without changing the CSM.
 
 ### Example 3: Dating with strict privacy
 
@@ -462,34 +457,20 @@ moderation:
   appeals_enabled: true
 ```
 
-### 4.7 `economy` (optional)
+### 4.7 Prices and payment are not part of a CSM
 
-Marketplace and auction economics. Only relevant for `type: "marketplace"` or auction-type services. For connecting external payment providers (Stripe, MobilePay) to your marketplace, see the [MSM Manual](./msm-manual.md).
+A CSM describes data. It does not take payment, hold money or charge a fee. A price that belongs to a listing is a data field, like `price: { amount, currency }` in the marketplace template, and the node checks it like any other field.
 
-> **The node does not act on this block** (checked 3 September 2026). The CSM parser reads `service`,
-> `schema_mode`, `data_schema`, `consent_requirements`, `moderation` and `ui_hints`; an `economy`
-> block is carried along with the manifest and enforced by nothing. Write it as a statement of intent
-> for whoever builds the service, and put the fee where it is actually charged: in the app, or in an
-> EXCHANGE listing's price.
+When something is sold on the node, the sale goes through the node's checkout:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `listing_fee_morsels` | integer | What creating a listing should cost in morsels. A morsel paces how much gets written; it is not a currency and buys nothing. |
-| `escrow_enabled` | boolean | Whether payments go through escrow. |
-| `escrow_release_on` | string | When escrow releases funds. Typically `"buyer_confirmation"`. |
-| `bid_increment_minimum` | number | Minimum bid increment for auctions. |
+- A **money price** is paid with a payment provider the seller connects (for example their own Stripe account, set with `aimeat_commerce_psp_set`). The thing sold is an offer, an app tool or an extension action with that price.
+- Every offer, app tool, app, extension action and EXCHANGE listing also has a **pacing amount** in morsels per use. A morsel paces how much a person's agents do. It is never a price, a fee or a currency, so a CSM states no fee in morsels.
 
-```yaml
-economy:
-  listing_fee_morsels: 10
-  escrow_enabled: true
-  escrow_release_on: "buyer_confirmation"
-  bid_increment_minimum: 1
-```
+The parser reads no `economy` block. Earlier versions of this manual showed one with `listing_fee_morsels` and `escrow_*` fields; the node never acted on it, and the templates no longer carry it. Leave it out. For connecting an outside payment API to an integration, see the [MSM Manual](./msm-manual.md).
 
 ### 4.8 `scoring` (optional)
 
-Content ranking rules for feeds and news services. The node does not act on this block: like `economy`, it is a statement of intent for whoever builds the service.
+Content ranking rules for feeds and news services. The node does not act on this block: it is a statement of intent for whoever builds the service.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -603,14 +584,14 @@ ui_hints:
 
 ### 5.2 Marketplace -- Kirpputori (Flea Market)
 
-A general buy-and-sell marketplace with listing fees and escrow protection.
+A general buy-and-sell marketplace: listings with a money price, a condition and shipping options.
 
 ```yaml
 csm: "1.0"
 service:
   name: "marketplace"
   type: "marketplace"
-  description: "Buy and sell items with listing fees and escrow protection"
+  description: "Buy and sell items: listings with a money price, a condition and shipping options"
   locale: "en"
 
 schema_mode: "open"
@@ -655,18 +636,13 @@ moderation:
   auto_hide_threshold: 3
   appeals_enabled: true
 
-economy:
-  listing_fee_morsels: 5
-  escrow_enabled: true
-  escrow_release_on: "buyer_confirmation"
-
 ui_hints:
   list_view: ["title", "price.amount", "price.currency", "category", "condition"]
   detail_view: ["title", "description", "price", "category", "condition", "images", "location", "shipping_options", "seller_gaii"]
   search_fields: ["title", "category", "tags", "location.city"]
 ```
 
-**What makes it tick:** The `economy` block introduces morsel-based listing fees (5 morsels per listing) and escrow that releases on buyer confirmation. These fields express intended behavior. The CSM parser does not implement payment or escrow; the service extension must implement and verify it. Moderation threshold is tighter (3 flags) because financial transactions demand higher trust. Appeals are enabled so legitimate sellers can contest flags.
+**What makes it tick:** `price` is an object with an amount and a currency, so a listing states a money price as data. Selling the item goes through the node's checkout (section 4.7); the CSM itself takes no payment and charges no fee. Moderation threshold is tighter (3 flags) because financial transactions demand higher trust. Appeals are enabled so legitimate sellers can contest flags.
 
 ### 5.3 Dating -- Kohtaamispaikka (Meeting Place)
 
@@ -733,14 +709,14 @@ ui_hints:
 
 ### 5.4 Auction -- Huutokauppa
 
-Time-limited auctions with bidding, reserve prices, and escrow.
+Time-limited auctions with a starting price, an optional reserve and buy-now price, and an end time.
 
 ```yaml
 csm: "1.0"
 service:
   name: "auction"
   type: "marketplace"
-  description: "Time-limited auction listings with escrow and bidding system"
+  description: "Time-limited auction listings with a starting price, an optional reserve and buy-now price, and an end time"
   locale: "en"
 
 schema_mode: "strict"
@@ -801,19 +777,13 @@ moderation:
   auto_hide_threshold: 2
   appeals_enabled: true
 
-economy:
-  listing_fee_morsels: 10
-  escrow_enabled: true
-  escrow_release_on: "buyer_confirmation"
-  bid_increment_minimum: 1
-
 ui_hints:
   list_view: ["title", "starting_price.amount", "starting_price.currency", "category", "ends_at"]
   detail_view: ["title", "description", "starting_price", "reserve_price", "buy_now_price", "category", "condition", "images", "location", "ends_at", "provenance"]
   search_fields: ["title", "category", "location.city"]
 ```
 
-**What makes it tick:** Auctions require `ends_at` (a datetime) as a required field -- every auction has a deadline. The `economy` block adds `bid_increment_minimum` to prevent penny-bidding wars. `reserve_price` is optional so sellers can set a hidden floor. `provenance` lets art and antique sellers document item history. Higher listing fee (10 morsels) and strict schema reflect the higher-stakes nature of auctions.
+**What makes it tick:** Auctions require `ends_at` (a datetime) as a required field -- every auction has a deadline. `reserve_price` is optional so sellers can set a hidden floor. `provenance` lets art and antique sellers document item history. The strict schema reflects the higher stakes of an auction. The bidding rules (a minimum increment, who wins) and the payment belong to the app or extension that runs the auction; the CSM holds the listing.
 
 ### 5.5 News Feed
 
@@ -1057,11 +1027,13 @@ A CSM file is just a `.yaml` file. You can share it the same way you share any d
 
 - **Give it to another community.** They save it, point their AI at it, and they have the same service running in their node. A Finnish `Harrastehakemisto` CSM works identically when deployed by a Swedish node or a Japanese node -- the schema is universal, only the content language changes.
 
-- **Federation interoperability.** When two nodes run marketplace CSMs with the same base schema, their listings can appear in each other's search results (if `visibility_default` is `"federation"`). Custom fields travel along for the ride; the receiving node may not display them all, but the base fields always work.
+- **Federation.** A CSM registered with `federate: true` takes part in the catalogue sync with peer nodes that accept your catalogue: the actions tagged to the service (`csm:<name>`, or a category equal to the service type) are sent to them. The listings themselves are memory records, and each one reaches another node only as its own visibility allows. Two nodes that run the same base schema can read each other's records field for field; whether another node shows your listings in its own search is up to that node.
 
 - **Forking and customizing.** Copy a CSM, change the `service.name`, adjust the categories or fields, and you have a new service. The video directory CSM becomes a podcast library by swapping `video_url` for `audio_url` and adjusting the `allowed_formats`.
 
 - **Community libraries.** Collections of CSM files can be published and shared. An aimeat node operator might maintain a gallery of CSMs that community members can browse and activate with a single prompt to their AI assistant.
+
+**Registering on a node.** The owner registers a CSM with `POST /v1/csm` (raw YAML with `Content-Type: text/yaml`, or JSON `{ "yaml": "..." }`). The node compiles `data_schema` into a JSON Schema and locks it on the memory keys that start with `csm.<service name>`, so every record written there with `POST /v1/memory` is checked. `GET /v1/csm/templates` lists the seven built-in templates and `GET /v1/csm/templates/{type}` returns one as YAML to start from. There is no MCP tool for CSM yet; an AI connected over MCP uses these REST routes with the owner's token.
 
 For details on operating a node, managing multiple services, and federation configuration, see the [Service Owner Manual](./service-owner-manual.md).
 

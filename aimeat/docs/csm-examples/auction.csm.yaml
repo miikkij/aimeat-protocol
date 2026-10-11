@@ -2,7 +2,7 @@ csm: "1.0"
 service:
   name: "auction"
   type: "marketplace"
-  description: "Time-limited auction listings with escrow and bidding system"
+  description: "Time-limited auction listings with a starting price, an optional reserve and buy-now price, and an end time"
   locale: "en"
 
 schema_mode: "strict"
@@ -62,12 +62,6 @@ moderation:
   flags_enabled: true
   auto_hide_threshold: 2
   appeals_enabled: true
-
-economy:
-  listing_fee_morsels: 10
-  escrow_enabled: true
-  escrow_release_on: "buyer_confirmation"
-  bid_increment_minimum: 1
 
 ui_hints:
   list_view: ["title", "starting_price.amount", "starting_price.currency", "category", "ends_at"]

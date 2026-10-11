@@ -83,7 +83,7 @@ actions:
         description: "Smart lock display name"
 
     pricing:
-      base_morsels: 2
+      toll_morsels: 2
 
     estimated_time_seconds: 3
 
@@ -131,7 +131,7 @@ actions:
         description: "Revocation timestamp"
 
     pricing:
-      base_morsels: 1
+      toll_morsels: 1
 
     estimated_time_seconds: 2
 
@@ -172,7 +172,7 @@ actions:
             type: string
 
     pricing:
-      base_morsels: 0
+      toll_morsels: 0
 
     estimated_time_seconds: 1
 

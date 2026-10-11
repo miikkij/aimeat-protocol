@@ -7,7 +7,7 @@ service:
   description: "Create and manage marketplace payments between buyers and sellers via Stripe Connect"
   homepage: "https://stripe.com/connect"
   category: "utility"
-  tags: ["payment", "stripe", "marketplace", "fiat", "credit-card", "escrow"]
+  tags: ["payment", "stripe", "marketplace", "fiat", "credit-card"]
 
 auth:
   type: "bearer"
@@ -75,7 +75,7 @@ actions:
         from: "amount"
 
     pricing:
-      base_morsels: 5
+      toll_morsels: 5
 
     estimated_time_seconds: 3
 
@@ -122,7 +122,7 @@ actions:
         from: "charges.data[0].paid"
 
     pricing:
-      base_morsels: 0
+      toll_morsels: 0
 
     estimated_time_seconds: 1
 

@@ -106,7 +106,7 @@ actions:
         from: "choices[0].message.content.reasoning"
 
     pricing:
-      base_morsels: 1
+      toll_morsels: 1
 
     estimated_time_seconds: 4
 

@@ -83,7 +83,7 @@ actions:
         from: "network_id"
 
     pricing:
-      base_morsels: 8
+      toll_morsels: 8
 
     estimated_time_seconds: 15
 
@@ -122,7 +122,7 @@ actions:
         from: "data"
 
     pricing:
-      base_morsels: 0
+      toll_morsels: 0
 
     estimated_time_seconds: 2
 

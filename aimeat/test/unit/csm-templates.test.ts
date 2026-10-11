@@ -50,9 +50,22 @@ describe('CSM Templates (docs/csm-examples/)', () => {
         expect(parsed.data_schema.required.title).toBeDefined();
         expect(parsed.data_schema.required.price).toBeDefined();
         expect(parsed.data_schema.required.category).toBeDefined();
-        expect(parsed.economy).toBeDefined();
-        expect(parsed.economy.listing_fee_morsels).toBe(5);
-        expect(parsed.economy.escrow_enabled).toBe(true);
+    });
+
+    // A morsel paces use and is never a price or a fee (decision-morseli-on-tahdistus-ei-hinta-
+    // tarjouksen-kaksi-arvoa). The parser never read an `economy` block, and GET /v1/csm/templates
+    // serves each template's raw YAML, so a listing fee in morsels reached every client as advice.
+    it('no template carries an economy block or prices anything in morsels', () => {
+        const files = readdirSync(CSM_DIR).filter(f => f.endsWith('.csm.yaml'));
+
+        for (const file of files) {
+            const content = readFileSync(join(CSM_DIR, file), 'utf-8');
+            const parsed = parseYaml(content);
+
+            expect(parsed.economy, `${file}: economy block`).toBeUndefined();
+            expect(content, `${file}: mentions morsels`).not.toMatch(/morsel/i);
+            expect(content, `${file}: mentions escrow`).not.toMatch(/escrow/i);
+        }
     });
 
     it('all CSM templates have required fields (csm, service.name, service.type)', () => {
