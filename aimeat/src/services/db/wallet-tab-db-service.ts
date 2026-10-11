@@ -14,6 +14,8 @@
  * @structure WalletTabService.overview(ownerName, ownerGhii) → { wallet, transactions, checkoutSessions, orders }
  * @usage const w = await createWalletTabService(config, storage).overview(owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.3.0 — 2026-10-11 — `wallet.pacing_pack`, as GET /v1/wallet answers it: the Wallet tab mounts from
+ *     this call, so the pack chip never showed.
  *   v1.2.0 — 2026-09-26 — The escrow sum reads the person's own GHII beside their agents': a request
  *     made in person is filed under it.
  *   v1.1.0 — 2026-09-04 — `lifetime` through services/wallet-stats.ts, the same function GET /v1/wallet
@@ -27,6 +29,7 @@ import { calculateEscrow } from '../morsel.js';
 import { cached, TTL } from '../cache.js';
 import { listSessions, listOrders } from '../../commerce/session-service.js';
 import { lifetimeOf } from '../wallet-stats.js';
+import { pacingPackOffer } from '../../commerce/pacing-pack.js';
 
 export interface WalletOverview {
   wallet: Record<string, unknown> | null;
@@ -73,6 +76,8 @@ export class WalletTabService {
         in_escrow: inEscrow,
         available: balance - inEscrow,
         daily_allowance: { amount: this.config.dailyAllowance, accumulation_cap: this.config.dailyAllowanceCap },
+        // The pacing capacity the operator sells for money, as GET /v1/wallet answers it (null = none).
+        pacing_pack: pacingPackOffer(this.config),
         lifetime: lifetimeOf(allTx as WalletTransaction[], balance),
       };
 

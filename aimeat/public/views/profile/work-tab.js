@@ -6,6 +6,7 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   v1.17.1 -- 2026-10-11 -- The pacing amount is read where the work routes put it, `cost.toll` (then `cost.base_price`, then the flat fields), so a work item in the inbox and in the sent list shows "pacing N morsels" again.
  *   v1.17.0 -- 2026-10-11 -- A work item's morsels read "pacing N morsels" (toll, then the 3.x base_price mirror, then toll_morsels / price_morsels), not "Cost: N ❤️": a morsel is pacing, not a price.
  *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a work description with a quote or an ampersand showed as &quot; / &amp;.
@@ -63,8 +64,13 @@ import { Stars } from '/components/Stars.js';
 import { listInbox, listSent, getWorkOverview, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
 import { swallowed } from '/js/swallowed.js';
 
-/** A work item's pacing amount: `toll` (3.x `base_price` mirror), else the offer-style fields pacingOf reads. */
-const workToll = (w) => (typeof w.toll === 'number' ? w.toll : typeof w.base_price === 'number' ? w.base_price : pacingOf(w));
+/**
+ * A work item's pacing amount. The work routes nest it under `cost` (presentWorkCost: `cost.toll`,
+ * with `cost.total` adding the network fee, and the 3.x mirror `cost.base_price` / `cost.basePrice`);
+ * a flat `toll` / `base_price` and the offer-style fields pacingOf reads are the older shapes.
+ */
+const num = (v) => (typeof v === 'number' ? v : undefined);
+const workToll = (w) => num(w.cost?.toll) ?? num(w.cost?.base_price) ?? num(w.cost?.basePrice) ?? num(w.toll) ?? num(w.base_price) ?? pacingOf(w);
 
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);
