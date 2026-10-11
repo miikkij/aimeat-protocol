@@ -6,7 +6,7 @@
  *   (source.type 'manual') and translates them into a Dify Service API call, then maps the
  *   Dify response back into the { result } shape AIMEAT expects. This is the Direction-2
  *   ("AIMEAT calls Dify") translation layer described in
- *   docs/integrations/dify-hello-integration.md §6. Zero external dependencies (node:http +
+ *   ../README.md. Zero external dependencies (node:http +
  *   global fetch). Supports DIFY_MODE=mock for testing the full loop without a live Dify.
  * @structure handle() request handler; callDify()/mockDify(); startServer().
  * @usage

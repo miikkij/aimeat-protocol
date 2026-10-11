@@ -5,17 +5,14 @@ Start with the repository's [documentation index](../../docs/README.md).
 | Path | Purpose |
 |---|---|
 | `AIMEAT_Help_Prompt.md` | Package copy of the maintained help prompt; kept identical by `pnpm check:docs` |
+| `AIMEAT_Help_Prompt_Person.md` | Package copy of the help prompt for a person; kept identical the same way |
 | `configuration-guide.md` | Entry point to the configuration reference |
-| `aimeat-dmz-architecture.md` | Entry point to the memory-visibility reference |
-| `agent-scheduler-guide.md` | Scheduler guidance |
 | `observability-guide.md` | Stats and metrics guidance |
-| `integrations/dify-hello-integration.md` | Dated integration design |
 | `csm-examples/` | Templates loaded by the CSM routes and startup seeder |
 | `csm-bundles/` | Organism-template schemas and manifest |
 
-The build copies this directory to `dist/docs/`. Old development plans and manual
-test plans are now in [the repository archive](../../docs/archive/README.md), so
-they are not included by that copy step.
+The build copies this directory to `dist/docs/`. Guidance for an AI (scheduling, workspace
+contracts, AI in apps) is a built-in skill every node serves (`aimeat_skill_get`), not a file here.
 
 In an installed package, repository-relative links may be unavailable. Use the
 node's `/llms.txt`, `/v1/docs`, `/v1/spec` and `/v1/prompts/build-app` for served
