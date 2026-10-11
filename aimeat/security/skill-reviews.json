@@ -248,7 +248,7 @@
       "digest": "sha256:9349c9bafcf093f4dff98848"
     },
     "node:manage-my-profile-data": {
-      "reviewedOn": "2026-10-05",
+      "reviewedOn": "2026-10-11",
       "watches": [
         "aimeat/src/routes/memory/shared.ts"
       ],
@@ -315,6 +315,53 @@
         "aimeat/src/services/agent-task-rules.ts"
       ],
       "digest": "sha256:563fae06f7bc49cb4c062a2d"
+    },
+    "node:aimeat-data-ownership": {
+      "reviewedOn": "2026-10-11",
+      "watches": [
+        "aimeat/src/routes/memory/bulk.ts",
+        "aimeat/src/routes/memory/key.ts",
+        "aimeat/src/services/memory-bin.ts",
+        "aimeat/src/routes/memory-hands.ts",
+        "aimeat/src/routes/owners/export.ts",
+        "aimeat/src/services/owner-erasure.ts",
+        "aimeat/src/services/archive.ts",
+        "aimeat/src/mcp/organisms.ts"
+      ],
+      "digest": "sha256:eccb2b97edd2dc1f88bac282",
+      "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
+    },
+    "node:aimeat-mcp-servers": {
+      "reviewedOn": "2026-10-11",
+      "watches": [
+        "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
+        "aimeat/src/services/mcp-client/grants.ts",
+        "aimeat/src/services/mcp-client/registry.ts",
+        "aimeat/src/services/mcp-client/invoke.ts",
+        "aimeat/src/mcp/mcp-proxy.ts"
+      ],
+      "digest": "sha256:5832c94c8606725b00121c02"
+    },
+    "node:aimeat-workflow-decisions": {
+      "reviewedOn": "2026-10-11",
+      "watches": [
+        "aimeat/src/models/workflow-schemas.ts",
+        "aimeat/src/services/workflow/engine-human.ts",
+        "aimeat/src/services/workflow/lifecycle.ts",
+        "aimeat/src/mcp/workflows.ts"
+      ],
+      "digest": "sha256:e6c2d06870822e37c5504a28"
+    },
+    "node:aimeat-bookkeeping": {
+      "reviewedOn": "2026-10-11",
+      "watches": [
+        "aimeat/src/routes/finance.ts",
+        "aimeat/src/routes/finance-ledger.ts",
+        "aimeat/src/services/finance/invoice-service.ts",
+        "aimeat/src/routes/odata.ts"
+      ],
+      "digest": "sha256:d4ef89611917303d33e14dd7",
+      "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
       "reviewedOn": "2026-10-11",
@@ -655,6 +702,35 @@
       "aimeat/src/routes/extensions/crud.ts": "d9197a969e9160e8",
       "aimeat/src/routes/extensions/instances.ts": "a669c97da3614fa0",
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
+    },
+    "node:aimeat-data-ownership": {
+      "aimeat/src/routes/memory/bulk.ts": "420c0d483c2f513d",
+      "aimeat/src/routes/memory/key.ts": "6f7065b083ad945d",
+      "aimeat/src/services/memory-bin.ts": "7ad23070aef39bb4",
+      "aimeat/src/routes/memory-hands.ts": "deb0da289637f20c",
+      "aimeat/src/routes/owners/export.ts": "9ed397ed069b2735",
+      "aimeat/src/services/owner-erasure.ts": "18e38187bc10c89d",
+      "aimeat/src/services/archive.ts": "22dfa3a6fd862d11",
+      "aimeat/src/mcp/organisms.ts": "298d376a1ba75e2f"
+    },
+    "node:aimeat-mcp-servers": {
+      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "46e7160d2a579e7b",
+      "aimeat/src/services/mcp-client/grants.ts": "413f18f5a8a8a40b",
+      "aimeat/src/services/mcp-client/registry.ts": "522531c154dc10bd",
+      "aimeat/src/services/mcp-client/invoke.ts": "410bc48b5f6e32c6",
+      "aimeat/src/mcp/mcp-proxy.ts": "8da033aa90ec71db"
+    },
+    "node:aimeat-workflow-decisions": {
+      "aimeat/src/models/workflow-schemas.ts": "cfb4eb65eeb0d772",
+      "aimeat/src/services/workflow/engine-human.ts": "cb667ffe9ef1cc65",
+      "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f",
+      "aimeat/src/mcp/workflows.ts": "7a47bf49c4bebeb1"
+    },
+    "node:aimeat-bookkeeping": {
+      "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
+      "aimeat/src/routes/finance-ledger.ts": "c059bfae0e2db40e",
+      "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
+      "aimeat/src/routes/odata.ts": "58546d25a53d197a"
     }
   }
 }

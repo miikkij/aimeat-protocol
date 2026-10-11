@@ -11,11 +11,27 @@
  *   into a gate run, through a suite about the public skill index.
  * @usage cd aimeat && pnpm vitest run test/unit/builtin-skills-parse.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-12 — The four skills of docs audit phase 5a are named, so dropping one fails.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { BUILTIN_SKILLS } from '../../src/data/builtin-skills.js';
 import { parseSkillMd } from '../../src/services/skill-md.js';
+
+// Docs audit phase 5a (2026-10-12): the guidance an AI needs for these four families had no home on
+// any node, so each ships as a built-in skill. Listed here so a later move or rename that drops one
+// from BUILTIN_SKILLS fails here, not on a node that quietly stops serving it.
+const SHIPPED_IN_PHASE_5A = ['aimeat-data-ownership', 'aimeat-mcp-servers', 'aimeat-workflow-decisions', 'aimeat-bookkeeping'];
+
+describe('the phase 5a skills ship with every node', () => {
+  const names = new Set(BUILTIN_SKILLS.map(s => s.name));
+  for (const name of SHIPPED_IN_PHASE_5A) {
+    it(name, () => {
+      expect(names.has(name), `${name} is not in BUILTIN_SKILLS`).toBe(true);
+      expect(BUILTIN_SKILLS.find(s => s.name === name)!.visibility).toBe('public');
+    });
+  }
+});
 
 describe('every built-in skill is one the seeder can publish', () => {
   for (const skill of BUILTIN_SKILLS) {
