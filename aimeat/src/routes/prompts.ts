@@ -7,7 +7,7 @@
  *   more context to AI agents based on their authentication level.
  * @version-history
  *   v1.15.1 -- 2026-10-11 -- The openclaw prompt's integration_guide is the Hello Integration walkthrough
- *     this node serves; it named docs/integrations/openclaw-setup.md, a repository file no route serves.
+ *     this node serves; it named the OpenClaw setup page of the repository, which no route served.
  *   v1.15.0 -- 2026-10-11 -- Mounts the build instructions for an app that shows one agent's work
  *     (prompts-build-app-agent.ts).
  *   v1.14.0 -- 2026-10-11 -- GET /v1/agents/me/handbook moves to prompts-agent-handbook.ts
