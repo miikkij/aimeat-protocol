@@ -5,7 +5,8 @@
  *   node config doors mounted alongside them.
  * @version-history
  *   v1.7.0 — 2026-10-11 — A number above a recommended range is accepted and applied, and the schema
- *     says which ranges are recommendations and which are limits (rangeKind).
+ *     says which ranges are recommendations and which are limits (rangeKind). A removed database
+ *     override is reported as waiting for a restart (restartPending) until the setting is saved again.
  *   v1.6.0 — 2026-10-06 — site.store_soon_code reaches the page's site links with "soon" and leaves with
  *     the restore; a code with a space, over 40 characters or with markup is refused.
  *   v1.5.0 — 2026-10-06 — The store status: site.store_status=soon and a store note reach the page's
@@ -595,6 +596,32 @@ await test('PUT /v1/admin/config \u2192 a number above a recommended range is ac
             await put(original);
         }
     }
+});
+
+await test('DELETE /v1/admin/config/{path} \u2192 the schema says the node runs with the removed value until a restart', async () => {
+    const path = 'quota.max_apps_per_agent';
+    const entryOf = async () => (await json('/v1/admin/config', authed())).body.data.schema[path];
+    const put = (value: unknown) => json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }) }));
+    const reset = () => json(`/v1/admin/config/${encodeURIComponent(path)}`, authed({ method: 'DELETE' }));
+
+    const saved = await put(777);
+    assert(saved.status === 200, `put: ${saved.status} ${JSON.stringify(saved.body)}`);
+    const withOverride = await entryOf();
+    assert(withOverride.value === 777 && withOverride.source === 'database', `saved: ${JSON.stringify(withOverride)}`);
+    assert(withOverride.restartPending === undefined, `a saved value is not waiting for a restart: ${JSON.stringify(withOverride)}`);
+
+    const removed = await reset();
+    assert(removed.status === 200, `reset: ${removed.status} ${JSON.stringify(removed.body)}`);
+    const afterReset = await entryOf();
+    assert(afterReset.value === 777, `the node still runs with the removed value: ${JSON.stringify(afterReset)}`);
+    assert(afterReset.source !== 'database', `the source is the layer below: ${JSON.stringify(afterReset)}`);
+    assert(afterReset.restartPending === true, `the schema says a restart is pending: ${JSON.stringify(afterReset)}`);
+
+    // Saving the setting again writes the running value, so nothing waits for a restart.
+    const again = await put(778);
+    assert(again.status === 200, `put again: ${again.status}`);
+    assert((await entryOf()).restartPending === undefined, 'a new save ends the pending state');
+    await reset();
 });
 
 // \u2500\u2500\u2500 The front-page switch (site.front_page) \u2500\u2500\u2500

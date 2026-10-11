@@ -22,9 +22,10 @@
  *     indexLabel names it for a screen reader. With no group the settings are not drawn and
  *     `empty` says why (nothing matches).
  *   - children: the settings, grouped by the page (Section, SubHeading).
- *   SettingLine({ id, name, flag, flagTitle, code, desc, source, editor, end }): one setting: its name
+ *   SettingLine({ id, name, flag, flagTitle, code, desc, note, source, editor, end }): one setting: its name
  *   (with the flag after it, a mark that it is edited and not saved, and `flagTitle` its tooltip),
- *   its key in mono, what it does, where its value comes from (a status mark), the editor, and what
+ *   its key in mono, what it does, `note` (what the page says about it right now, on its own line
+ *   under that), where its value comes from (a status mark), the editor, and what
  *   stands at the end (a reset). On a phone the cells stand under each other.
  *   ChangeList({ items }): the unsaved changes, [{ key, code, was, now }], each as key, the old value
  *   struck through, →, the new value; a screen reader hears it as a status.
@@ -36,6 +37,8 @@
  *          <//>
  *        <//>`
  * @version-history
+ *   v1.3.0 — 2026-10-11 — SettingLine `note`: a line of its own under the description (the Config
+ *     page's refused value and its value that waits for a restart); additive, no new CSS.
  *   v1.2.0 — 2026-10-02 — SettingLine `help`: the question mark after a setting's name; additive.
  *   v1.1.0 — 2026-09-27 — The index is the rail's light tone, as main drew it (Jouni: the dark look
  *     belongs only to the operator menu).
@@ -88,10 +91,12 @@ export function SettingsIndex({ search, filters, status, before, index = [], ind
 }
 
 /**
- * @param {{ id?: string, name: any, help?: string, flag?: any, flagTitle?: string, code?: any, desc?: any, source?: any, editor?: any, end?: any }} props
+ * @param {{ id?: string, name: any, help?: string, flag?: any, flagTitle?: string, code?: any, desc?: any, note?: any, source?: any, editor?: any, end?: any }} props
  *   `help`: a term whose question mark (components/HelpTip.js) stands after the name.
+ *   `note`: what the page says about this setting right now, on its own line under the description
+ *   (a refused value, a value that waits for a restart).
  */
-export function SettingLine({ id, name, help, flag, flagTitle, code, desc, source, editor, end }) {
+export function SettingLine({ id, name, help, flag, flagTitle, code, desc, note, source, editor, end }) {
   return html`
     <div class="setting-line" id=${id}>
       <span class="setting-line-name">
@@ -99,6 +104,7 @@ export function SettingLine({ id, name, help, flag, flagTitle, code, desc, sourc
         ${has(flag) ? html` <span class="setting-line-flag" title=${flagTitle}>${flag}</span>` : null}
         ${has(code) ? html`<code class="setting-line-code">${code}</code>` : null}
         ${has(desc) ? html`<span class="setting-line-desc">${desc}</span>` : null}
+        ${has(note) ? html`<span class="setting-line-desc">${note}</span>` : null}
       </span>
       <span class="setting-line-source">${source}</span>
       <span class="setting-line-edit">${editor}</span>

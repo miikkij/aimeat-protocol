@@ -28454,6 +28454,10 @@ paths:
         value above the maximum. `recommended`: the range is the recommended range, and PUT accepts
         and applies a larger value. The minimum is enforced in both cases.
 
+        A field carries `restartPending: true` when its database override was removed (DELETE
+        /v1/admin/config/{path}) since the node started: `value` is still the removed value, which
+        the node runs with until a restart, and `source` names where the value comes from after it.
+
         SEALED FIELDS. On a node one party runs on behalf of another, the party that STARTED the
         node may nominate paths as read-only (`AIMEAT_SEALED_CONFIG_KEYS`). Such a field carries
         `sealed: true`, `mutable: false`, `editable: false` and `source: "sealed"`, and its VALUE is
