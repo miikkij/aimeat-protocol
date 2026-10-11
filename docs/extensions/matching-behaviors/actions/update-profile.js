@@ -13,6 +13,9 @@ export default async function (ctx, input) {
   if (input.interests !== undefined && (!Array.isArray(input.interests) || input.interests.length === 0)) {
     throw new Error('interests must be a non-empty array');
   }
+  if (input.matchable !== undefined && typeof input.matchable !== 'boolean') {
+    throw new Error('matchable must be true or false');
+  }
 
   // Merge provided fields
   const updated = {
@@ -25,11 +28,13 @@ export default async function (ctx, input) {
     country: input.country ?? existing.country,
     lat: input.lat ?? existing.lat,
     lon: input.lon ?? existing.lon,
+    matchable: input.matchable ?? existing.matchable === true,
     lastActivityAt: new Date().toISOString(),
   };
 
-  await ctx.memory.set(key, updated);
-  ctx.log.info('Profile updated', { gaii: ctx.caller.gaii });
+  // A profile is personal data: private to the extension, whatever `matchable` says.
+  await ctx.memory.set(key, updated, { visibility: 'private' });
+  ctx.log.info('Profile updated', { gaii: ctx.caller.gaii, matchable: updated.matchable });
 
-  return { updated: true };
+  return { updated: true, matchable: updated.matchable };
 }

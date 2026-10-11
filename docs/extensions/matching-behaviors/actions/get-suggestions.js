@@ -1,4 +1,8 @@
 export default async function (ctx) {
+  // Suggestions are for a person who opted in to matching; after opting out they see none.
+  const own = await ctx.memory.get('profile.' + ctx.caller.gaii);
+  if (!own || own.matchable !== true) return { suggestions: [], matchable: false };
+
   const prefix = 'suggestion.' + ctx.caller.gaii + '.';
   const results = await ctx.memory.search(prefix);
 
@@ -10,6 +14,8 @@ export default async function (ctx) {
     if (entry.status === 'dismissed' || entry.status === 'expired') continue;
 
     const profile = await ctx.memory.get('profile.' + entry.otherGaii);
+    // The other person may have opted out of matching since the round: then they are not shown.
+    if (!profile || profile.matchable !== true) continue;
     suggestions.push({
       matchId: entry.matchId,
       score: entry.score,

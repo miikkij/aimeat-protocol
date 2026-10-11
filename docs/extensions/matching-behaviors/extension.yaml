@@ -2,11 +2,11 @@ extension: "1.0"
 
 metadata:
   name: "matching-behaviors"
-  version: "1.0.1"
-  description: "Interest-based matching with geographic proximity scoring"
+  version: "1.1.0"
+  description: "Interest-based matching with geographic proximity scoring. Profiles are private; a person is matched only after opting in"
   author: "aimeat-core"
   license: "MIT"
-  aimeat: ">=1.5"
+  aimeat: ">=3.26"
 
 required_apis:
   - memory
@@ -58,6 +58,9 @@ actions:
       country: { type: string }
       lat: { type: number }
       lon: { type: number }
+      matchable:
+        type: boolean
+        description: "true to be matched with others in this pool; false (the default) keeps the profile out of every round"
     script: "actions/create-profile.js"
 
   - id: update-profile
@@ -74,6 +77,9 @@ actions:
       country: { type: string }
       lat: { type: number }
       lon: { type: number }
+      matchable:
+        type: boolean
+        description: "Opt in to matching (true) or out of it (false)"
     script: "actions/update-profile.js"
 
   - id: get-suggestions

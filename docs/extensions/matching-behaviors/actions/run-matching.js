@@ -13,8 +13,10 @@ export default async function (ctx) {
   const cooldownDays = config.cooldown_days || 7;
   let matchesCreated = 0;
 
-  // Load all profiles. search() answers [{ key, value }]; the profile is the value.
-  const profiles = (await ctx.memory.search('profile.')).map(r => r.value).filter(p => p && Array.isArray(p.interests));
+  // Load the profiles whose owners opted in to matching (`matchable: true`); nobody else is
+  // suggested to anyone or given suggestions. search() answers [{ key, value }]; the profile is the value.
+  const profiles = (await ctx.memory.search('profile.')).map(r => r.value)
+    .filter(p => p && Array.isArray(p.interests) && p.matchable === true);
   const profilesScanned = profiles.length;
   ctx.log.info('Matching round started', { profilesScanned });
 
@@ -59,7 +61,7 @@ export default async function (ctx) {
         breakdown: score.breakdown,
         status: 'suggested',
         createdAt: new Date().toISOString(),
-      });
+      }, { visibility: 'private' });   // who was suggested to whom is nobody else's business
       matchesCreated++;
     }
   }

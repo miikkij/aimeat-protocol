@@ -18,19 +18,19 @@ export default async function (ctx, input) {
   if (input.action === 'accept') {
     suggestion.status = 'accepted';
     suggestion.respondedAt = now;
-    await ctx.memory.set(key, suggestion);
+    await ctx.memory.set(key, suggestion, { visibility: 'private' });
     // Store accepted record for mutual-match lookups
     await ctx.memory.set('accepted.' + ctx.caller.gaii + '.' + input.matchId, {
       matchId: input.matchId,
       otherGaii: suggestion.otherGaii,
       acceptedAt: now,
-    });
+    }, { visibility: 'private' });
   } else {
     const cooldownDays = ctx.instance.config.cooldown_days || 7;
     suggestion.status = 'dismissed';
     suggestion.respondedAt = now;
     suggestion.cooldownUntil = new Date(Date.now() + cooldownDays * 86400000).toISOString();
-    await ctx.memory.set(key, suggestion);
+    await ctx.memory.set(key, suggestion, { visibility: 'private' });
   }
 
   ctx.log.info('Match response recorded', { gaii: ctx.caller.gaii, matchId: input.matchId, action: input.action });
