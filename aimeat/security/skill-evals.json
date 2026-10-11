@@ -8,10 +8,10 @@
       "note": "Two rows added to references/language-context.md (tie / liitos / asociación; where its work goes), no change to the skill's rules; Jouni decided 2026-10-11: 'eval voi skipata'"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:3b6f67c9a50292dd23593fda",
-      "decision": "ran",
-      "on": "2026-10-09",
-      "note": "opus, 3 runs per case, run approved by Jouni 2026-10-09 (cap 10 USD, spent 9.97). Before (both arms, 5 USD cap reached after 3 cases): image-button-app with 0.92 / without 0.25 (+0.67); large-collection-duplicates 1.00 / 1.00 (0.00); mid-collection-fits-prompt with 1.00, without partial. After (with-skill arm only; the without arm does not depend on the skill): image-button-app 0.93, large-collection-duplicates 1.00, mid-collection-fits-prompt 1.00, needs-one-model 0.78, small-collection-no-embeddings 1.00, voice-note-summary 0.92 (one grader skipped at the cost cap). No case fell; no case exercises the new error-code paragraph."
+      "digest": "sha256:a60067cbbd449303b182d67c",
+      "decision": "skipped",
+      "on": "2026-10-11",
+      "note": "New sections 0, 2c, 2d, 2e and the extension paragraph from docs/app-developer-ai-guide.md (docs audit phase 3); the sections the six cases measure are unchanged; Jouni decided 2026-10-11: 'Ohita eval'"
     }
   }
 }
