@@ -35,17 +35,14 @@
 │  requestDeepDive(id, agentName, instructions)               │
 │  listAgents()                                               │
 ├────────────────────────────────────────────────────────────┤
-│ Extension: ext:findings (thin — only for task dispatch)     │
-│  Action: createDeepDiveTask                                 │
-├────────────────────────────────────────────────────────────┤
 │ App (HTML/CSS/JS) — the dashboard the user opens            │
 │  Topic filter, findings list, detail view, review form,     │
 │  "send back to agent" button with agent picker              │
 └────────────────────────────────────────────────────────────┘
 ```
 
-Three components produced + one assumption (the agent already exists
-and has been told to use these key names).
+Two components produced + one assumption (the agent already exists
+and has been told to use these key names). There is no extension (§3).
 
 ---
 
@@ -78,84 +75,23 @@ project's README, in the agent's instructions, and inline in the cortex.
 
 ---
 
-## 3. The extension (`ext:findings`)
+## 3. Why there is no extension
 
-We only need an extension because the app dispatches tasks to agents,
-and creating a task requires calling `POST /v1/agents/{name}/tasks`
-which the cortex can do directly — but if we want server-side validation
-(does the agent exist? does the finding exist? is the requester allowed
-to assign work?), the extension is the right place.
+Earlier versions of this recipe put a small extension between the cortex
+and the agent, to create the deep-dive task. An extension cannot do that:
+the sandbox has no `ctx.api` and no `ctx.task`, and `ctx.fetch` carries no
+session, so a script cannot call `POST /v1/agents/{name}/tasks` in the
+person's name.
 
-### 3.1 `manifest.yaml`
+The cortex can, because it runs in the person's own browser session. The
+task route looks the agent's name up among the caller's own agents, so it
+already refuses work for anyone else's agent; that check needs no
+extension either.
 
-```yaml
-name: findings
-version: 0.1.0
-description: Agent-produced findings dashboard helper
-author: yourhandle
-actions:
-  - id: activate
-    script: scripts/actions/activate.js
-  - id: createDeepDiveTask
-    script: scripts/actions/create-deep-dive-task.js
-```
-
-### 3.2 `scripts/actions/activate.js`
-
-```javascript
-export default async function(ctx, input) {
-  // Nothing to seed for this minimal extension; just ack the install.
-  return { success: true };
-}
-```
-
-### 3.3 `scripts/actions/create-deep-dive-task.js`
-
-```javascript
-export default async function(ctx, input) {
-  // input: { findingId, agentName, instructions }
-  if (!input || !input.findingId || !input.agentName) {
-    return { error: 'findingId and agentName required' };
-  }
-
-  // Fetch the finding from owner namespace
-  const finding = await ctx.memory.getPublic(ctx.caller.gaii, 'findings.' + input.findingId);
-  if (!finding) return { error: 'Finding not found' };
-
-  // Verify the agent exists for this owner
-  const agents = await ctx.api.get('/v1/agents');
-  const target = (agents.items || []).find(a => a.name === input.agentName);
-  if (!target) return { error: 'Agent not in your account' };
-
-  // Create the task
-  const task = await ctx.api.post('/v1/agents/' + input.agentName + '/tasks', {
-    title: 'Deep dive: ' + (finding.title || input.findingId),
-    description: input.instructions
-      || 'Go deeper on this finding. Add new findings under the same topic when done.',
-    context: {
-      sourceFindingId: input.findingId,
-      finding: finding,
-      followUpKey: 'findings.' + finding.topic + '.' + Date.now(),
-    },
-  });
-
-  // Notify any open clients
-  await ctx.notify('findings.task-created', {
-    findingId: input.findingId, taskId: task.id,
-  });
-
-  return { success: true, taskId: task.id };
-}
-```
-
-### 3.4 Install + activate
-
-```bash
-# Bundle scripts/ + manifest.yaml into findings.zip
-aimeat_extension_install --file findings.zip
-curl -X POST -H "Authorization: Bearer $JWT" \
-  https://node/v1/extensions/findings/activate
-```
+Add an extension to this pattern only when you need what only an
+extension does: an outside API with a secret key, server-side work on a
+schedule, or data that must stay out of the browser. See
+[Building a complete Extension + Cortex + App stack](./building-extension-cortex-app-stack.md) §4.
 
 ---
 
@@ -163,12 +99,31 @@ curl -X POST -H "Authorization: Bearer $JWT" \
 
 ### 4.1 `manifest.yaml`
 
+The cortex manifest is validated strictly (`src/services/cortex-manifest.ts`);
+the shape is the one in the stack guide §5.1.
+
 ```yaml
-spec_version: "1.0.0"
-name: findings
-version: 1.0.0
-libs:
-  - findings.js
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: findings
+  namespace: findings
+  description: Browser API for the findings dashboard
+  author: yourhandle
+spec:
+  version: 1.0.0
+  components:
+    - type: lib
+      name: findings
+      filename: findings.js
+      exports:
+        - list
+        - get
+        - markReviewed
+        - requestDeepDive
+        - listAgents
+        - listTopics
+      api_surface: "AIMEAT.findings — list(topic, since); get(id); markReviewed(id, rating, comment); requestDeepDive(id, agentName, instructions); listAgents(); listTopics()"
 ```
 
 ### 4.2 `libs/findings.js`
@@ -220,13 +175,29 @@ libs:
       return await readOwnerMemory('reviews.findings.' + id);
     },
 
-    /** Dispatch a deep-dive task to an agent. Goes through extension. */
+    /**
+     * Dispatch a deep-dive task to one of the person's agents. The cortex runs in the
+     * person's session, so it creates the task itself; the route refuses any agent
+     * that is not theirs.
+     */
     async requestDeepDive(findingId, agentName, instructions) {
-      const result = await callExt('findings', 'createDeepDiveTask', {
-        findingId, agentName, instructions,
+      const finding = await readOwnerMemory('findings.' + findingId);
+      if (!finding) throw new Error('Finding not found');
+      const resp = await session.fetch(`/v1/agents/${encodeURIComponent(agentName)}/tasks`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Deep dive: ' + (finding.title || findingId),
+          description: instructions
+            || 'Go deeper on this finding. Add new findings under the same topic when done.',
+          context: {
+            sourceFindingId: findingId,
+            finding,
+            followUpKey: 'findings.' + finding.topic + '.' + Date.now(),
+          },
+        }),
       });
-      if (result.error) throw new Error(result.error);
-      return result;
+      if (!resp.ok) throw new Error(resp.error?.message || 'Could not create the task');
+      return { taskId: resp.data.task.id };   // 201 answers { task, start }
     },
 
     /** List the user's agents — used for the agent picker dropdown. */
@@ -255,9 +226,15 @@ libs:
 
 ### 4.3 Install + activate
 
+Over MCP: `aimeat_cortex_install` with `manifest` (the YAML above as a
+string) and `libs: { "findings.js": "<source>" }`, then
+`aimeat_cortex_activate` with `name: "findings"`. Over REST:
+
 ```bash
-aimeat_cortex_install --file findings-cortex.zip
-aimeat_cortex_activate --name findings
+curl -X POST https://node/v1/cortex \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{"manifest": "<manifest.yaml contents>", "libs": {"findings.js": "<source>"}}'
+curl -X POST https://node/v1/cortex/findings/activate -H "Authorization: Bearer $JWT"
 ```
 
 ---
@@ -358,13 +335,14 @@ async function boot() {
   state.agents = await AIMEAT.findings.listAgents();
   await loadAll();
 
-  // Live updates — new findings, completed tasks
-  window.addEventListener('aimeat-live-update', (ev) => {
-    const ch = ev.detail?.channel || '';
-    if (ch.startsWith('findings.') || ev.detail?.key?.startsWith('findings.')) {
-      loadAll();
-    }
-  });
+  // Live updates: the node's event stream names only which kinds of data changed.
+  // An app hears `memory` (with memory:read) and `agent-tasks` (with task:read).
+  const ticket = await session.fetch('/v1/events/ticket', { method: 'POST' });
+  const stream = new EventSource(`/v1/events?ticket=${ticket.data.ticket}`);
+  stream.onmessage = (ev) => {
+    const { domains = [] } = JSON.parse(ev.data);
+    if (domains.includes('memory') || domains.includes('agent-tasks')) loadAll();
+  };
 }
 
 async function loadAll() {
@@ -521,8 +499,8 @@ agent". A task lands in the agent's queue at
 ### Step 4: Agent completes the task, writes new findings
 
 The agent reads its task, does the work, writes new findings to memory
-under the same topic. The dashboard's SSE listener (or a manual
-refresh) picks them up.
+under the same topic. The dashboard's event-stream listener hears the
+`memory` change and re-reads.
 
 ---
 
@@ -540,14 +518,14 @@ refresh) picks them up.
   key shape, the action shape, the agent-dispatch flow. If you need to
   change the data model, change it here and update both ends.
 
-- **The extension does only what the cortex can't.** Reading memory and
-  calling other AIMEAT routes is cortex's job. The extension exists
-  specifically because creating tasks for agents benefits from
-  server-side validation (does agent exist? does finding exist? is the
-  caller authorized?).
+- **No extension until you need one.** Reading memory and calling AIMEAT
+  routes in the person's name is the cortex's job, and the task route
+  already checks that the agent is the caller's own. An extension earns
+  its place with an outside API, a secret, or work on a schedule.
 
-- **Live updates fall out for free** once you wire SSE into the loader
-  loop. Every state-changing operation already emits an event.
+- **Live updates come from one event stream.** A write to the person's
+  memory and a change to a task each raise a domain the app hears
+  (`memory`, `agent-tasks`), and the app re-reads.
 
 - **The user's mental model stays simple.** "My agents write findings
   here, I review them in this dashboard, I tell agents to follow up."
@@ -557,13 +535,14 @@ refresh) picks them up.
 
 ## 8. Variations of this pattern
 
-### 8.1 No extension at all
+### 8.1 Enriching findings from an outside API
 
-If you don't need server-side validation of the task dispatch (you
-trust whoever uses the cortex), the cortex can call
-`POST /v1/agents/{name}/tasks` directly via `session.fetch`. Skip the
-extension entirely. Three components (agent + cortex + app) becomes the
-floor.
+When a finding should be checked against an outside service with a key
+(a citation index, a paid search API), that call belongs in an
+extension: it holds the key as a `type: secret` config and calls the
+service with `ctx.fetch`. The cortex calls the extension action and
+writes the result back to the person's memory. The task dispatch stays
+in the cortex.
 
 ### 8.2 Multi-user (community dashboard)
 

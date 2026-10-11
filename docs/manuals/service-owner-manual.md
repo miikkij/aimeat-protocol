@@ -17,7 +17,7 @@ and the morsel pacing. You attach behaviour on top of it, and there are four way
 |---|---|---|---|
 | Fix the **shape** of your service's data, so bad records are refused | **CSM** manifest | Nothing. It becomes a schema lock the memory API enforces | Owner |
 | Describe an **outside API** so an AI can build against it | **MSM** manifest | Nothing. It is a description an AI reads | Owner, or operator if the node says so |
-| Run **code on the node**: an outbound call with a credential, work that outlives a browser tab, a capability you sell | **Extension** | In a QuickJS-WASM sandbox, in the owner's name | Owner, or a principal holding `ext:write` |
+| Run **code on the node**: an outbound call with a credential, work that outlives a browser tab, a capability you sell | **Extension** | In a QuickJS-WASM sandbox, in the owner's name | Owner (the role in `AIMEAT_EXT_INSTALL_ROLE`), or a principal holding `ext:write` |
 | Be **asked before** something happens on the node: a registration, a work request, a board post, a peering | **Hook** | Your own webhook, anywhere, in any language | Operator |
 
 Three things you do **not** attach here, because they have their own paths: **apps** (single HTML
@@ -46,7 +46,8 @@ code.
 5. `data_schema` becomes JSON Schema, stored as a schema lock on `csm.<name>` with `applyTo: prefix`
    and this manifest's `schema_mode`.
 6. The CSM record is stored, with `service.semantic` carried into the schema lock as its semantic
-   context, and `federate: true` (if you asked for it) distributing the manifest to peers.
+   context. With `federate: true` (if you asked for it), the catalogue sync sends peers that accept
+   your catalogue the actions tagged to this service; the manifest itself and its records stay here.
 
 `schema_mode: "open"` accepts extra fields beyond the schema; `"strict"` refuses them. Open is the
 right default for a service other people will extend; strict is right when a downstream reader must
@@ -139,8 +140,8 @@ Fuller reference: **[CSM Manual](./csm-manual.md)** for authoring, **[csm-spec.m
 ## 3. MSM: how an outside API is described
 
 A **Machine Service Manifest** describes an external API so an AI can understand it, call it, and
-build an integration around it: base URL, authentication, each action's inputs and outputs, rate
-limits, and what a call should cost.
+build an integration around it: base URL, authentication, each action's inputs and outputs, and the
+pacing amount each use should carry.
 
 **The node does not call the API for you.** Registering an MSM validates it and stores it, and that
 is all it does. The value is the description: an AI reads it once, builds the integration, and the
@@ -187,11 +188,13 @@ actions:
       payment_id: { type: string, from: "paymentId" }
       state:      { type: string, from: "state" }
     pricing:
-      base_morsels: 3
+      toll_morsels: 3
 ```
 
-`pricing` is carried with the manifest and enforced by nothing on its own. What actually charges is
-the extension or EXCHANGE listing built from it.
+`pricing.toll_morsels` is the action's pacing amount in morsels per use, the same field the action
+catalogue reads; a morsel is never a price. The node carries it with the manifest and enforces
+nothing on its own. What actually charges is the extension, offer or EXCHANGE listing built from
+it: its pacing amount, and its money price through the node's checkout.
 
 Fuller reference: **[MSM Manual](./msm-manual.md)**.
 
@@ -219,9 +222,9 @@ price. Each action script exports a default function that receives `ctx`:
 | `ctx.memory.getPublic(gaii, key)` | A public record in someone else's namespace, the caller's included |
 | `ctx.fetch(url, opts)` | Outbound HTTP, SSRF-guarded. Returns text and a status; it does not parse JSON for you. Reads at most 4 MB of one answer, and throws `RESPONSE_TOO_LARGE` past that |
 | `ctx.config` | The manifest's config, with `type: secret` fields decrypted only here |
-| `ctx.caller` | Who is calling: GAII, owner, roles. Absent on a scheduled run |
+| `ctx.caller` | Who is calling: GAII, owner, roles, scopes. On a scheduled run the role is `operator` and there are no scopes |
 | `ctx.instance` | This instance's id and per-instance config, when the extension supports instances |
-| `ctx.wallet.getBalance / consume` | Read and spend the caller's morsels |
+| `ctx.wallet.getBalance / consume` | Read the caller's morsels, and burn some. A morsel is never a price: pacing and money are declared on the action and the node charges them |
 | `ctx.consent.check / require` | Whether the caller granted what this action needs |
 | `ctx.trust.getScore` | The caller's trust score |
 | `ctx.files` | Read and write stored files |
@@ -254,14 +257,18 @@ else: not in the script, not in a return value. A buyer gets your action's resul
 **Limits**, all operator-configurable: 64 MB memory, 5000 ms CPU, 500 API calls per action, 256 kB of
 script per action, 20 extensions installed. A manifest may ask for less, never more.
 
-**Who may install:** the owner role, or a principal holding `ext:write`. An app running under an app
+**Who may install:** the role in `AIMEAT_EXT_INSTALL_ROLE` (default `owner`), or a principal holding `ext:write`. An app running under an app
 grant cannot: `ext:write` is deliberately outside the grantable scope vocabulary, because an
 extension outlives the grant that created it and can charge money in the owner's name. An app may
 *write* a manifest and hand it over; a human or an authorised agent installs it.
 
-**Selling it.** An action's `commercial` block prices it (`payMorsels`, and `payMoney` in six-decimal
-micro-units, so `50000` is 0.05 EUR) and `exchange: true` lists it. The manifest is the listing;
-there is no separate call. Both input and output schemas are required, or the listing is skipped.
+**Selling it.** An action carries two values. `tollMorsels` is its pacing amount, morsels per call,
+which the node charges the caller and credits to the installer less the burn rate's share. The
+`commercial` block's `payMoney` is its money price in six-decimal micro-units (`50000` is 0.05 EUR),
+paid through the node's checkout, and `exchange: true` lists it. A morsel is never a price:
+`commercial.payMorsels`, the 3.x name of the pacing amount, is read as pacing until 4.0.0 and refused
+from 4.0.0. The manifest is the listing; there is no separate call. Both input and output schemas are
+required, or the listing is skipped.
 
 Before writing any of it, fetch the canonical spec, which is always current and does change:
 
@@ -269,9 +276,9 @@ Before writing any of it, fetch the canonical spec, which is always current and 
 GET /v1/prompts/build-extension
 ```
 
-Fuller reference: **[Service Extensions Manual](./service-extensions-manual.md)**, the layering rules
-in **[extension-memory-architecture.md](../coding-guidelines/extension-memory-architecture.md)**, and
-the agent-facing skill `node:aimeat-extension-builder`.
+Fuller reference: **[Service Extensions Manual](./service-extensions-manual.md)** for the operator,
+the layering rules in **[extension-memory-architecture.md](../coding-guidelines/extension-memory-architecture.md)**,
+and, for the AI that writes one, the built-in skill `aimeat-extension-builder` (`aimeat_skill_get`).
 
 ---
 
@@ -394,7 +401,7 @@ The ones a service owner changes first:
 | Memory per owner, keys per principal | `AIMEAT_MEMORY_QUOTA_MB`, `AIMEAT_MEMORY_MAX_KEYS` | `10`, `1000` |
 | Files per owner, largest file | `AIMEAT_STORAGE_QUOTA_MB`, `AIMEAT_STORAGE_MAX_FILE_SIZE_MB` | `100`, `10` |
 | Who may install an MSM | `AIMEAT_MSM_INSTALL_ROLE` | `owner` |
-| Who may install an extension | `AIMEAT_EXT_INSTALL_ROLE` | `operator` |
+| Who may install an extension | `AIMEAT_EXT_INSTALL_ROLE` | `owner` |
 | Extension sandbox limits | `AIMEAT_EXT_MAX_MEMORY_MB`, `AIMEAT_EXT_TIMEOUT_MS`, `AIMEAT_EXT_MAX_API_CALLS` | `64`, `5000`, `500` |
 
 The operator block (`operator.*`) has no default on purpose: a node that has not said who runs it
@@ -427,8 +434,9 @@ a schema.
 
 ## 8. Sharing what you built
 
-- **A CSM or MSM** is one YAML file. Send it, publish it, or set `federate: true` on a CSM and let
-  peers pick it up.
+- **A CSM or MSM** is one YAML file. Send it or publish it. A CSM registered with `federate: true`
+  sends the catalogue actions tagged to its service (`csm:<name>`, or a category equal to the service
+  type) to the peers that accept your catalogue.
 - **An extension** exports as a manifest plus scripts and installs on any node with one call.
 - **Everything together** goes into a package: apps, extensions, cortex, translations and manifests
   in one installable unit, published to the template gallery.

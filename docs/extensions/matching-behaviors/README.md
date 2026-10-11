@@ -60,7 +60,7 @@ match_score = 0.40 * shared_interests_score
 
 ## Scheduled Matching
 
-The `matching-round` schedule runs `run-matching` every 6 hours via cron (`0 */6 * * *`). Operators can also trigger rounds manually.
+The `matching-round` schedule runs `run-matching` every 6 hours via cron (`0 */6 * * *`). A manifest schedule runs for the extension, not for an instance, so it scans the extension's own namespace. To run a round in an instance's pool, schedule it per instance: `POST /v1/schedules` with `{ "kind": "extension", "cron": "0 */6 * * *", "extension_name": "matching-behaviors", "action_id": "run-matching", "instance_id": "<id>" }`. Operators can also trigger rounds manually.
 
 ## Memory Key Patterns
 

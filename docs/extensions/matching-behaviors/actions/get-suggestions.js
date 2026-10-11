@@ -4,7 +4,9 @@ export default async function (ctx) {
 
   // Filter out dismissed/expired, enrich with profile data
   const suggestions = [];
-  for (const entry of results) {
+  // search() answers [{ key, value }]; the suggestion is the value.
+  for (const { value: entry } of results) {
+    if (!entry) continue;
     if (entry.status === 'dismissed' || entry.status === 'expired') continue;
 
     const profile = await ctx.memory.get('profile.' + entry.otherGaii);

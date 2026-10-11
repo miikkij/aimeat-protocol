@@ -26,8 +26,10 @@
 **Extension** runs in a server-side WASM sandbox. It owns the `ext:{name}`
 memory namespace (no one else writes there). It can fetch external APIs,
 run scheduled jobs, and read other namespaces via `ctx.memory.getPublic()`.
-It can also create tasks for agents (since v1.14). It is the only layer
-trusted to call out to the internet.
+It is the only layer trusted to call out to the internet. It does not act
+on the node in the caller's name: `ctx.fetch` carries no session, and there
+is no `ctx.api` or `ctx.task`. Work for an agent is handed over by the
+cortex, in the person's own session (§5.2).
 
 **Cortex lib** is a browser IIFE registered as a JavaScript module on the
 node. It runs as the user's authenticated browser session. It reads
@@ -38,8 +40,7 @@ business logic lives — multiple apps can share it.
 
 **Cortex appdomain** is just a special-purpose cortex lib that composes
 multiple data + feature cortex libs into one façade for a specific
-application. The naming is a generator-pipeline convention; mechanically
-it's a regular cortex lib that imports other cortex libs and re-exports
+application. Mechanically it's a regular cortex lib that imports other cortex libs and re-exports
 their composed API. Skip it for simple apps; use it when you have
 several feature cortexes that share auth, i18n, settings.
 
@@ -84,9 +85,9 @@ data and logic live one layer down.
 │  ctx.memory.get/set(key)   → owns ext:{name} namespace            │
 │  ctx.memory.getPublic(ns, key) → cross-read any public namespace  │
 │  ctx.fetch(url, opts)      → external HTTP                        │
-│  ctx.task.create(agent, t) → enqueue work for an agent (v1.14+)   │
-│  ctx.notify(channel, msg)  → SSE event to subscribed clients      │
-│  ctx.consent.check(scope)  → consent-gated operations             │
+│  ctx.workspace.*           → the caller's organism workspace      │
+│  ctx.notify(message, opts) → a notification to a person           │
+│  ctx.consent.check(gaii, purpose) → is that consent in place      │
 └──────────────────────┬───────────────────────────────────────────┘
                        │ persists to
                        ▼
@@ -152,7 +153,7 @@ List every operation. Each is either:
 | `listItems()` | cortex | pure memory read from `ext:mytool/items` |
 | `getDetail(id)` | cortex with extension fallback | memory hit if cached, extension fetches from external API on miss |
 | `addItem(payload)` | extension | needs to validate against external service before storing |
-| `assignToAgent(itemId, agentName)` | extension | creates a task for the agent via `ctx.task.create` |
+| `assignToAgent(itemId, agentName)` | cortex | creates the agent's task with `POST /v1/agents/{name}/tasks`, in the person's own session |
 | `setPrefs(json)` | cortex | writes owner namespace, no validation needed |
 
 ### 3.3 The agent contact surface
@@ -164,7 +165,11 @@ exceptions:
 - Actions that **spend money** (AI calls, external API calls with cost)
   should require explicit owner approval or a scope check
 - Actions that **change irreversible state** (delete, publish, share)
-  should be gated by `requireRole('owner')` or `requireScope('mytool:write')`
+  should check who is calling. The node runs every action for any signed-in
+  caller, so the script decides: `ctx.caller.roles` tells an owner from an
+  agent, and `ctx.caller.scopes` lists the permission words an agent's or
+  app's credential carries (an owner session carries none, because owners
+  bypass scopes). Throw when the caller may not do it.
 - **Read** actions are almost always fine for agents
 
 The agent surface is just your normal extension API; you decide which
@@ -177,9 +182,11 @@ parts are public.
 ### 4.1 Manifest (`manifest.yaml`)
 
 The server validates this shape strictly (`buildExtensionRecordFromManifest` in
-`src/routes/extensions.ts`): the identity fields live under a `metadata:` block,
-and **every action requires `id`, `method`, `path`, AND `script`** — an action
-missing `method`/`path` fails the whole install with `INVALID_MANIFEST`.
+`src/services/extension-manifest.ts`): the identity fields live under a `metadata:`
+block (`name`, `version`, `description` and `author` are all required), and **every
+action requires `id`, `method`, `path`, AND `script`**. An action missing
+`method`/`path` fails the whole install with `INVALID_MANIFEST`. The full manifest
+reference is the node's own build guide, `GET /v1/prompts/build-extension`.
 
 ```yaml
 metadata:
@@ -187,6 +194,9 @@ metadata:
   version: 0.1.0
   description: Whatever your tool does
   author: yourhandle
+capabilities: [network]          # ctx.fetch throws CAPABILITY_NOT_DECLARED without it
+network:
+  hosts: [api.example.com]       # ctx.fetch reaches only these hosts
 actions:
   - id: addItem
     method: POST
@@ -198,101 +208,68 @@ actions:
     path: /getDetail
     script: scripts/actions/get-detail.js
     description: Fetch item detail, cache it
-  - id: assignToAgent
+  - id: setup
     method: POST
-    path: /assignToAgent
-    script: scripts/actions/assign-to-agent.js
-    description: Create a task for an agent
-  - id: activate  # special name, runs on install
-    method: POST
-    path: /activate
-    script: scripts/actions/activate.js
-    description: Seed initial data, copy owner translations
-schedules:
+    path: /setup
+    script: scripts/actions/setup.js
+    description: Create the empty collections the cortex reads
   - id: refreshAll
-    cron: "0 */6 * * *"  # every 6 hours
+    method: POST
+    path: /refreshAll
     script: scripts/actions/refresh-all.js
+    description: Refresh every cached item from the outside API
+schedules:
+  - id: firstRun
+    cron: "@activate"            # runs once, each time the extension is activated
+    action: setup
+  - id: refreshAll
+    cron: "0 */6 * * *"          # every 6 hours
+    action: refreshAll
 ```
 
-### 4.2 Activate action
+An action id has no special meaning. What runs at activation is a schedule
+whose `cron` is `@activate`, and a schedule names the `action` it runs.
 
-Run-once initialization. Copies owner-namespace seed data (translations,
-settings) into the extension namespace where cortex can read them
-unauthenticated.
+### 4.2 First-run action
+
+Creates the empty collections the cortex reads, so a read never meets a
+missing key. It copies nothing from the person's own memory: translations
+and settings are the person's data, and the cortex reads them where they
+are, with `AIMEAT.data.get('mytool.i18n.fi')` (§5.2).
 
 ```javascript
-// scripts/actions/activate.js
+// scripts/actions/setup.js
 export default async function(ctx, input) {
-  // Read owner-side seed data (translations, settings authored at install)
-  const fi = await ctx.memory.getPublic(ctx.caller.gaii, 'mytool.i18n.fi');
-  const en = await ctx.memory.getPublic(ctx.caller.gaii, 'mytool.i18n.en');
-  const settings = await ctx.memory.getPublic(ctx.caller.gaii, 'mytool.settings');
-
-  // Copy to extension namespace (public, unauthenticated reads)
-  if (fi) await ctx.memory.set('i18n.fi', fi);
-  if (en) await ctx.memory.set('i18n.en', en);
-  if (settings) await ctx.memory.set('settings', settings);
-
-  // Initialize empty collections so cortex can read them safely
   if (!(await ctx.memory.get('items'))) await ctx.memory.set('items', []);
-
-  return { success: true, seeded: !!fi };
+  return { ok: true };
 }
 ```
 
-**Critical sandbox rule:** the ONLY top-level statement allowed is
-`export default async function`. No top-level `const`, `let`, `function`,
-or `class`. Helpers go INSIDE the default function. The sandbox crashes
-silently if you violate this.
+**What the sandbox gives a script.** One `export default` function per
+file, and any helpers you declare above it: the node keeps top-level
+`const` and `function` declarations (since 2026-07-18). There is no DOM,
+no Node built-ins and no network except `ctx.fetch`. On a schedule a
+normal return counts as success whatever it contains, so a failed
+precondition must `throw`.
 
-### 4.3 Action that creates a task for an agent
+### 4.3 Handing work to an agent
 
-This is how you let the cortex/app dispatch work to an agent (the
-"hallittu agenttien laajentaminen ja yhteys" the user described):
+An extension cannot create an agent's task. The sandbox has no `ctx.task`
+and no `ctx.api`, and `ctx.fetch` carries no session, so a script cannot
+call the node's routes in the caller's name. The task is created one layer
+up, by the cortex, with the person's own session: `POST /v1/agents/{name}/tasks`
+(§5.2, `assignToAgent`). The route looks the name up among the caller's own
+agents, so nobody can hand work to someone else's agent this way.
 
-```javascript
-// scripts/actions/assign-to-agent.js
-export default async function(ctx, input) {
-  // input: { itemId, agentName, instructions }
-  if (!input || !input.itemId || !input.agentName) {
-    return { error: 'itemId and agentName required' };
-  }
+When the extension itself must leave work for an agent, it writes a record
+the agent already watches: with `workspace: { read: true, write: true }` in
+the manifest, `ctx.workspace.write(...)` writes into the caller's organism
+workspace as the caller, and an agent subscribed to that workspace is woken
+by the `workspace.record` event (skill `aimeat-workspace-contracts`).
 
-  // Verify the agent belongs to the caller — without this, anyone could
-  // delegate tasks to anyone's agents.
-  const agents = await ctx.api.get('/v1/agents');  // returns owner's agents
-  const target = (agents.items || []).find(a => a.name === input.agentName);
-  if (!target) return { error: 'Agent not found in your account' };
-
-  // Read the item from our namespace
-  const items = (await ctx.memory.get('items')) || [];
-  const item = items.find(i => i.id === input.itemId);
-  if (!item) return { error: 'Item not found' };
-
-  // Create the task. ctx.task.create is the v1.14+ way; alternatively
-  // POST /v1/agents/{name}/tasks via ctx.api.post.
-  const task = await ctx.api.post(`/v1/agents/${input.agentName}/tasks`, {
-    title: 'Process item: ' + (item.title || item.id),
-    description: input.instructions || 'See attached data',
-    context: { item, source: 'mytool' },
-  });
-
-  // Record the assignment in our namespace so the UI can show it
-  const assignments = (await ctx.memory.get('assignments')) || [];
-  assignments.push({
-    itemId: input.itemId,
-    agentName: input.agentName,
-    taskId: task.id,
-    assignedAt: new Date().toISOString(),
-  });
-  await ctx.memory.set('assignments', assignments);
-
-  // Notify any connected client over SSE
-  await ctx.notify('mytool.assignment', { itemId: input.itemId, taskId: task.id });
-
-  return { success: true, taskId: task.id };
-}
-```
+`ctx.notify(message, opts)` is for telling a person something: it sends a
+notification to the caller's owner, or to another owner who has consented.
+It is not a live-update channel for apps (§7).
 
 ### 4.4 Scheduled job that refreshes data
 
@@ -303,17 +280,23 @@ export default async function(ctx, input) {
   let refreshed = 0;
   for (const item of items) {
     try {
-      const fresh = await ctx.fetch(`https://api.example.com/items/${item.id}`).then(r => r.json());
-      await ctx.memory.set(`cache.${item.id}`, fresh);
+      // ctx.fetch answers { status, ok, text, headers }; text is the body as a string.
+      const res = await ctx.fetch(`https://api.example.com/items/${item.id}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await ctx.memory.set(`cache.${item.id}`, JSON.parse(res.text));
       refreshed++;
     } catch (e) {
-      ctx.log('Failed to refresh ' + item.id + ': ' + e.message);
+      ctx.log.warn('Failed to refresh an item', { id: item.id, error: e.message });
     }
   }
-  await ctx.memory.set('lastRefresh', { at: new Date().toISOString(), count: refreshed });
+  await ctx.memory.set('lastRefresh', { at: ctx.now(), count: refreshed });
   return { refreshed };
 }
 ```
+
+A run has 500 host calls and 5 seconds by default, so a long list is
+refreshed in batches. Keep one key per period rather than one key per item
+when the list grows: the namespace holds 1000 keys by default.
 
 ### 4.5 Install + activate
 
@@ -336,7 +319,8 @@ curl -X PUT https://node/v1/extensions/mytool \
   -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
   -d '{"manifest": "...", "scripts": {...}}'
 
-# Activate (runs the activate action; extensions install inactive):
+# Activate (extensions install inactive; this registers the schedules and runs
+# the @activate ones):
 curl -X POST https://node/v1/extensions/mytool/activate -H "Authorization: Bearer $JWT"
 ```
 
@@ -424,13 +408,21 @@ The simplest pattern: write a plain IIFE that uses `AIMEAT.data` and
       return resp.data?.items || [];
     },
 
-    // Dispatch work to one of caller's agents
+    // Dispatch work to one of the caller's agents. The cortex runs in the person's
+    // session, so it creates the task itself; an extension cannot (§4.3).
     async assignToAgent(itemId, agentName, instructions) {
-      const result = await callExt('mytool', 'assignToAgent', {
-        itemId, agentName, instructions,
+      const item = ((await readExtMemory('mytool', 'items')) || []).find(i => i.id === itemId);
+      if (!item) throw new Error('Item not found');
+      const resp = await session.fetch(`/v1/agents/${encodeURIComponent(agentName)}/tasks`, {
+        method: 'POST',
+        body: JSON.stringify({
+          title: 'Process item: ' + (item.title || item.id),
+          description: instructions || 'See the item in context',
+          context: { item, source: 'mytool' },
+        }),
       });
-      if (result.error) throw new Error(result.error);
-      return result;
+      if (!resp.ok) throw new Error(resp.error?.message || 'Could not create the task');
+      return resp.data;
     },
 
     // Owner-private prefs — pure memory write
@@ -441,11 +433,10 @@ The simplest pattern: write a plain IIFE that uses `AIMEAT.data` and
       await writeOwnerMemory('mytool.preferences', prefs);
     },
 
-    // Translations — owner namespace, app loads them once at startup
+    // Translations are the person's data, read where they are (owner namespace);
+    // never copied into ext:mytool.
     async getTranslations(lang) {
-      return (await readOwnerMemory(`mytool.i18n.${lang}`))
-          || (await readExtMemory('mytool', `i18n.${lang}`))
-          || {};
+      return (await readOwnerMemory(`mytool.i18n.${lang}`)) || {};
     },
   };
 
@@ -620,36 +611,41 @@ curl -sS "https://node/v1/apps/<gaii>/mytool.html?mode=inline" | grep version
 
 ## 7. Live updates (SSE)
 
-When the extension writes new data (e.g., a scheduled job finishes),
-the app should reflect it without manual reload.
+When the extension writes new data, the app should reflect it without a
+manual reload.
 
-### 7.1 Extension emits
+### 7.1 What the node sends
 
-```javascript
-// inside an extension action or schedule
-await ctx.notify('mytool.refreshed', { count: refreshed });
-```
+The node's event stream says only **which kinds of data changed**, at most
+once a second per client: each message is `data: {"domains": [...]}`. There
+are no named events and no per-extension channels, and an extension cannot
+emit one of its own.
 
-### 7.2 App subscribes via the platform's live-update bus
+An app runs under an app grant, and the stream tells it only the domains its
+scopes cover (`src/auth/sse-domain-scopes.ts`): `memory` with `memory:read`
+(the person's own keys, which agents write), `agent-tasks` with `task:read`.
+The `extensions` domain that an action call raises reaches the owner's own
+portal session, never an app. So an app re-reads after its own action calls,
+and listens for `memory` and `agent-tasks`.
 
-```javascript
-// Browser side — works with AIMEAT's profile SSE plumbing
-window.addEventListener('aimeat-live-update', (ev) => {
-  if (ev.detail?.channel === 'mytool.refreshed') {
-    reloadItems();
-  }
-});
-```
+`ctx.notify(message, opts)` does something else: it sends a notification
+to a person (the caller's owner, or another owner who consented). Use it
+when a person should be told, not to refresh an app.
 
-If you're outside the profile (a standalone app), open SSE directly:
+### 7.2 App subscribes and re-reads
 
 ```javascript
 const ticket = await session.fetch('/v1/events/ticket', { method: 'POST' });
 const sse = new EventSource(`/v1/events?ticket=${ticket.data.ticket}`);
-sse.addEventListener('mytool.refreshed', (ev) => {
-  reloadItems(JSON.parse(ev.data));
-});
+sse.onmessage = (ev) => {
+  const { domains = [] } = JSON.parse(ev.data);
+  if (domains.includes('memory') || domains.includes('agent-tasks')) reloadItems();   // re-read through the cortex
+};
 ```
+
+A write an extension makes in its own namespace, on a schedule or in an
+action someone else called, does not reach an app's stream. An app that
+shows such data also re-reads when it regains focus or on a slow timer.
 
 ---
 
@@ -702,7 +698,7 @@ curl -X POST -H "Authorization: Bearer $AGENT_JWT" \
   https://node/v1/agents/myagent/tasks/<id>/complete
 ```
 
-The app's SSE listener picks up the task completion event and refreshes.
+The app's event-stream listener sees the change and re-reads (§7).
 
 ---
 
@@ -734,12 +730,13 @@ When the user wants to act on the data:
 1. **App calls cortex** (`AIMEAT.mydash.markReviewed(id)`).
 2. **Cortex writes back to owner memory** (`mydash.reviews.{id}`).
 3. **Cortex (optionally) creates a follow-up task** for an agent:
-   `AIMEAT.mydash.requestRework(id, agentName)` →
-   `callExt('mydash', 'createReworkTask', {...})` →
-   extension does `POST /v1/agents/{name}/tasks`.
+   `AIMEAT.mydash.requestRework(id, agentName)` → the cortex calls
+   `POST /v1/agents/{name}/tasks` with the person's session. No extension
+   is involved: an extension cannot create a task (§4.3).
 
 The user sees the action, agents see the task, both sides update the
-same memory keys, the dashboard re-renders on SSE.
+same memory keys, and the dashboard re-reads when the event stream says
+the data changed.
 
 ### 9.3 Schematic
 
@@ -763,13 +760,9 @@ same memory keys, the dashboard re-renders on SSE.
    │   assignToAgent(id, agentName)                             │
    └────────────────────────────────────────────────────────────┘
                        ▲              │
-                       │              │ assignToAgent
-                       │              ▼
-                       │   ┌──────────────────────────────┐
-                       │   │ extension: ext:mydash         │
-                       │   │   creates /v1/agents/.../tasks │
-                       │   └──────────────────────────────┘
-                       │              │
+                       │              │ assignToAgent:
+                       │              │ POST /v1/agents/{name}/tasks
+                       │              │ (the person's session)
                        │              ▼
                        │   ┌──────────────────────────────┐
                        │   │ task queue for Agent 3        │
@@ -785,16 +778,18 @@ same memory keys, the dashboard re-renders on SSE.
 
 ## 10. Gotchas and pitfalls (numbered for quick reference)
 
-1. **Sandbox top-level rule.** Extension action scripts MUST have ONLY
-   `export default async function` at top level. Top-level
-   `const`/`let`/`function` crashes silently.
+1. **What the sandbox has.** One `export default` function per action,
+   helpers above it if you like (the node keeps them), and `ctx`: there is
+   no `ctx.api`, no `ctx.task`, and `ctx.log` is `{ info, warn, error }`,
+   not a function. The full table is `GET /v1/prompts/build-extension`.
 
 2. **`ctx.caller.gaii` is the GAII, not bare username.** Use it as-is
    when calling `ctx.memory.getPublic()`.
 
-3. **Init copy.** Cortex reads `ext:{name}` namespace. Translations/settings
-   authored in owner namespace need to be copied to `ext:{name}` by the
-   activate action. Otherwise cortex sees them as missing.
+3. **Translations and settings are the person's data.** The cortex reads
+   them from the owner namespace (`AIMEAT.data.get('mytool.i18n.fi')`).
+   Never copy them into `ext:{name}`: a copy goes stale, and an `ext:` key
+   is public unless written private.
 
 4. **Re-activation is idempotent.** To deploy new cortex code:
    `cortex deactivate` → `cortex activate`. Or delete + reinstall.
@@ -871,18 +866,17 @@ When starting a new ext+cortex+app stack:
 
 - `docs/coding-guidelines/extension-memory-architecture.md` — the trust
   boundaries spelled out, with code refs
-- `docs/app-developer-ai-guide.md` — using `AIMEAT.ai.complete()` from
-  apps and cortex libs
-- `docs/app-developer-libraries-research.md` — the design rationale for
-  `AIMEAT.{auth,data,storage,social,wallet,ai}` libs
+- Built-in skill `aimeat-ai-capabilities` (`aimeat_skill_get`) — using
+  `AIMEAT.ai.complete()` from apps and cortex libs
+- `GET /v1/prompts/build-extension` (source `src/services/build-extension-prompt.ts`)
+  and the built-in skill `aimeat-extension-builder` — the full `ctx` table,
+  manifest, secrets, pacing and money price, install
 - `GET /v1/prompts/build-app` (source `src/services/build-app-prompt.ts`) —
   the node-served canonical app-building prompt (naming conventions + API rules)
-- `docs/plans/2026-05-29-comicland-ai-session-audit.md` — concrete
-  lessons from one full session of iterating on a stack like this
-- `aimeat/src/routes/agent-tasks.ts` — every task API endpoint with
-  description (line 7–17)
-- `aimeat/src/routes/extensions.ts` — extension runtime, namespace
-  ownership, `ctx.memory` implementation
+- `aimeat/src/routes/agent-tasks.ts` — every task API endpoint, listed in
+  its header
+- `aimeat/src/services/extension-ctx-contract.ts` — what `ctx` contains,
+  member by member
 
 ---
 

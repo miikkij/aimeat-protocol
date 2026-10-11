@@ -62,32 +62,52 @@ just for secrecy — it adds latency for no protection gain.
 **After — the logic runs server-side; the app just calls it:**
 
 ```yaml
-# extension.yaml
-metadata: { name: pricing, version: "1.0.0", description: "Server-side quoting" }
-required_apis: [memory]
+# extension.yaml (block style: a flow mapping with a comma inside a value breaks the YAML)
+metadata:
+  name: pricing
+  version: "1.0.0"
+  description: "Server-side quoting"
+  author: yourhandle            # required, like name, version and description
+required_apis:
+  - memory
 actions:
   - id: quote
     method: POST
     path: "/v1/ext/pricing/quote"
     script: "actions/quote.js"
-    input: { type: object }
-    output: { type: object }
+    input:
+      type: object
+    output:
+      type: object
 ```
 
 ```js
 // actions/quote.js  — runs in the server WASM sandbox; source never leaves the node
 export default async function (ctx, input) {
-  const items = input.items || [];
+  const items = Array.isArray(input.items) ? input.items : [];
   const total = items.reduce((t, i) => t + i.cost * 1.37, 0); // secret logic stays here
   return { total };
 }
 ```
 
 ```js
-// in your app — call the action; you never see (or ship) the formula
-const resp = await session.fetch('/v1/ext/pricing/quote', { method: 'POST', body: { items } });
-const { total } = resp.data;
+// in your cortex lib — the one layer that calls the extension
+async quote(items) {
+  const resp = await session.fetch('/v1/ext/pricing/quote', {
+    method: 'POST', body: JSON.stringify({ items }),
+  });
+  return resp.data.total;
+}
 ```
+
+```js
+// in your app — it calls the cortex method and never sees (or ships) the formula
+const total = await AIMEAT.pricing.quote(items);
+```
+
+The app calls the cortex, never `/v1/ext/` itself: the cortex is the one place that knows
+how the extension is called, so every app that uses the feature keeps working when the
+extension changes.
 
 Now a copied HTML shell is a dead client for this feature: the copier never received
 `quote.js`, cannot install your `pricing` extension, and calling `/v1/ext/pricing/quote`
@@ -101,7 +121,12 @@ method.
 - **Action code is never shipped.** An extension action's source lives only on the server,
   runs in a QuickJS WASM sandbox with a controlled `ctx` (no Node globals), and is reachable
   only via authenticated `POST /v1/ext/{name}/{action}` — and only if the extension is
-  installed and active on that node. There is no endpoint that returns the source to a caller.
+  installed and active on that node. No endpoint returns the source to someone who calls the
+  action. Those who manage the extension can read it: the installer and the operator with
+  `GET /v1/extensions/{name}?full=true` (an agent of the installer needs `ext:write`), the
+  operator for the bundled extensions, and a package that ships the extension carries its
+  scripts, because they are the package's content. Sell the use of an action, not a package of
+  it, when the code is the value.
 - **Secrets stay server-side.** `type: secret` config is encrypted at rest and decrypted
   only just before the VM runs; API responses show a mask, never the value.
 - **Data can be read-only-public.** Your extension writes computed results to `ext:{name}`
@@ -118,13 +143,15 @@ for the exact namespace + trust boundaries.
 ## Build it
 
 This guide is about *what to move and why*. For the full mechanics — manifest format,
-actions, the `activate` action, scheduled (cron) jobs, `ctx.memory` / `ctx.fetch` /
-`ctx.wallet`, installing + activating, and wiring the app + cortex + agents together —
-follow:
+actions, the `@activate` and cron schedules, `ctx.memory` / `ctx.fetch`, secrets, a money
+price and a pacing amount per action, installing + activating, and wiring the app + cortex +
+agents together — follow:
 
 - **[Building a complete Extension + Cortex + App stack](building-extension-cortex-app-stack.md)** — the end-to-end tutorial.
+- The node's own build guide, `GET /v1/prompts/build-extension`, and the built-in skill
+  `aimeat-extension-builder` (`aimeat_skill_get`) — the full `ctx` table and manifest reference.
 - **Reference extension:** [`docs/extensions/rest-connector/`](../extensions/rest-connector/) — a minimal, generic connector with a per-instance secret key (the bring-your-own-key pattern).
-- Building an AIMEAT app that uses AI: [`docs/app-developer-ai-guide.md`](../app-developer-ai-guide.md).
+- Building an AIMEAT app that uses AI: the built-in skill `aimeat-ai-capabilities`.
 
 ---
 

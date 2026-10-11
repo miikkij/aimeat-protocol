@@ -291,6 +291,19 @@
       ],
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
+    "node:aimeat-extension-builder": {
+      "reviewedOn": "2026-10-11",
+      "watches": [
+        "aimeat/src/services/build-extension-prompt.ts",
+        "aimeat/src/services/extension-ctx-contract.ts",
+        "aimeat/src/services/extension-manifest.ts",
+        "aimeat/src/routes/extensions/paywall.ts",
+        "aimeat/src/routes/extensions/crud.ts",
+        "aimeat/src/routes/extensions/instances.ts",
+        "aimeat/src/services/extension-schedules.ts"
+      ],
+      "digest": "sha256:fc3e6ae3e5da26ce4655f42c"
+    },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-11",
       "watches": [
@@ -633,6 +646,15 @@
       "aimeat/src/routes/organisms/workspace-access.ts": "1436f5d2337de0fd",
       "aimeat/src/services/agent-profile-write.ts": "f7c1dc7cc0193e76",
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"
+    },
+    "node:aimeat-extension-builder": {
+      "aimeat/src/services/build-extension-prompt.ts": "19764d25ea1b3d35",
+      "aimeat/src/services/extension-ctx-contract.ts": "f98490dfeca8202c",
+      "aimeat/src/services/extension-manifest.ts": "de6a421448539916",
+      "aimeat/src/routes/extensions/paywall.ts": "8924454dfe762c8a",
+      "aimeat/src/routes/extensions/crud.ts": "d9197a969e9160e8",
+      "aimeat/src/routes/extensions/instances.ts": "a669c97da3614fa0",
+      "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     }
   }
 }

@@ -4,15 +4,17 @@ export default async function (ctx) {
   }
 
   const startTime = Date.now();
-  const config = ctx.instance.config;
+  // The manifest schedule runs without an instance; a round per instance is scheduled with
+  // POST /v1/schedules and instance_id. Without an instance this reads the extension config.
+  const config = (ctx.instance && ctx.instance.config) || ctx.config || {};
   const maxDistanceKm = config.max_distance_km || 100;
   const matchThreshold = config.match_threshold || 0.3;
   const maxSuggestions = config.max_suggestions || 10;
   const cooldownDays = config.cooldown_days || 7;
   let matchesCreated = 0;
 
-  // Load all profiles
-  const profiles = await ctx.memory.search('profile.');
+  // Load all profiles. search() answers [{ key, value }]; the profile is the value.
+  const profiles = (await ctx.memory.search('profile.')).map(r => r.value).filter(p => p && Array.isArray(p.interests));
   const profilesScanned = profiles.length;
   ctx.log.info('Matching round started', { profilesScanned });
 

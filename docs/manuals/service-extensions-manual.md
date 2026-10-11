@@ -1,28 +1,30 @@
 # Service Extensions Manual
 
-How to create, install, and manage service extensions on an AIMEAT node.
+How an operator installs, reviews, runs and removes service extensions on an AIMEAT node.
+
+**Writing an extension** (the manifest, the action scripts, the `ctx` rules, instances, schedules,
+secrets, the money price and the pacing amount) is in the built-in skill
+**`aimeat-extension-builder`**, which every node serves: `aimeat_skill_get { name: "aimeat-extension-builder" }`
+over MCP, or `GET /v1/skills/aimeat-extension-builder?scope=node`. The full `ctx` table and manifest
+reference is the node's own build guide, `GET /v1/prompts/build-extension`. Both are read by the AI
+that builds the extension, so they live on the node and not in this repository. This manual keeps
+what the operator does.
 
 ## What is a Service Extension?
 
-A Service Extension is a JavaScript module that runs inside a QuickJS-WASM sandbox on an AIMEAT node. It adds domain-specific behavior — such as purchase workflows, membership management, or matching logic — on top of the core AIMEAT platform.
+A Service Extension is a JavaScript module that runs inside a QuickJS-WASM sandbox on an AIMEAT node, one script per action, reachable as `POST /v1/ext/{name}/{action}`. It adds domain-specific behavior, such as a listing workflow, membership management or matching logic, on top of the core platform.
 
-Extensions do NOT replace core functionality. They orchestrate it. The core platform provides storage (Memory API), payments (Wallet API), access control (Consent API), reputation (Trust API), identity (Auth), content moderation (Flags), and discovery (Catalogue). An extension provides the business rules that tie these together for a specific use case.
+Extensions do NOT replace core functionality. They orchestrate it. The core platform provides storage (Memory API), access control (Consent API), reputation (Trust API), identity (Auth), content moderation (Flags), discovery (Catalogue), and the checkout and pacing for anything sold. An extension provides the business rules that tie these together for a specific use case.
 
 ### Why a sandbox?
 
-Extensions are shared as plain JavaScript files — via GitHub, package registries, or direct transfer. When you install code written by someone else, it is untrusted by definition. The sandbox is **QuickJS compiled to WASM** (`quickjs-emscripten`), which replaced the earlier V8 `isolated-vm` runtime on 29 April 2026 so that installing a node needs no C++ build tools. It ensures that extension code:
+Extensions are shared as plain JavaScript files — via GitHub, packages or direct transfer. When you install code written by someone else, it is untrusted by definition. The sandbox is **QuickJS compiled to WASM** (`quickjs-emscripten`), which replaced the earlier V8 `isolated-vm` runtime on 29 April 2026 so that installing a node needs no C++ build tools. It ensures that extension code:
 
-- Cannot access Node.js globals (`process`, `require`, `fs`, `fetch`)
+- Cannot access Node.js globals (`process`, `require`, `fs`) or the host's own `fetch`; outside calls go through `ctx.fetch` only, and only when the manifest declares `network`
 - Cannot use timers (`setTimeout`, `setInterval`)
 - Cannot use `eval()` or dynamic code execution
 - Is constrained by memory limits, CPU timeouts, and API call caps
 - Can only interact with the node through a controlled `ctx` API proxy
-
-Two consequences of QuickJS worth knowing before you write anything. There is **no `crypto.subtle`**,
-so the sandbox gives you `ctx.hash(s)`, an FNV-1a 64-bit hash published as `EXT_HASH_REFERENCE_JS` so
-a browser app can compute the same value; an app and an extension that hash differently will silently
-recompute and re-charge everything. And time is fixed: `ctx.now()` returns the run's start timestamp
-for the whole action, so a multi-record write stays consistent. Neither costs an API call.
 
 The node operator decides which extensions to install and activate. The sandbox ensures those extensions cannot compromise the node even if the code contains bugs or malicious intent.
 
@@ -33,18 +35,18 @@ The node operator decides which extensions to install and activate. The sandbox 
 |                    AIMEAT Node                        |
 |                                                      |
 |  Core APIs (always available):                       |
-|  +--------+ +--------+ +---------+ +-------+        |
-|  | Memory | | Wallet | | Consent | | Trust |        |
-|  +--------+ +--------+ +---------+ +-------+        |
+|  +--------+ +---------+ +-------+ +----------+      |
+|  | Memory | | Consent | | Trust | | Checkout |      |
+|  +--------+ +---------+ +-------+ +----------+      |
 |  +--------+ +--------+ +-----------+ +------+       |
 |  |  Auth  | | Flags  | | Catalogue | | Work |       |
 |  +--------+ +--------+ +-----------+ +------+       |
 |                                                      |
-|  Service Extensions (operator-installed):             |
+|  Service Extensions (installed):                      |
 |  +--------------------+  +---------------------+    |
 |  | marketplace-behaviors |  | membership-behaviors |    |
-|  | Instance: "Flea Mkt" |  | Instance: "Club A"   |    |
-|  | Instance: "Co. Exch" |  | Instance: "Club B"   |    |
+|  | Instance: "Flea Mkt" |  | Group: "Club A"      |    |
+|  | Instance: "Co. Exch" |  | Group: "Club B"      |    |
 |  +--------------------+  +---------------------+    |
 |                                                      |
 |  QuickJS-WASM Sandbox Runtime                        |
@@ -58,350 +60,36 @@ The node operator decides which extensions to install and activate. The sandbox 
 
 | Concern | Handled by | Mechanism |
 |---------|-----------|-----------|
-| Data storage | Core | Memory API — namespaced per extension instance |
-| Payments and escrow | Core | Wallet API — debit caller balance, track transactions |
+| Data storage | Core | Memory API — namespaced per extension (and per instance) |
+| Money price and pacing | Core | The node charges an action's pacing amount and its money price before the script runs; the script never charges anyone |
 | Access control | Core | Consent API — check/require consent scopes |
 | Reputation | Core | Trust API — read trust scores |
-| Identity | Core | Auth middleware — caller GAII, owner, roles |
+| Identity | Core | Auth middleware — caller GAII, owner, roles, scopes |
 | Content moderation | Core | Flags API — users flag content, operators review |
 | Action discovery | Core | Catalogue — lists all available actions |
-| Search and browse | Core | Memory search — prefix-based queries |
 | **Action definitions** | **Extension** | Declares what actions exist with input/output schemas |
 | **Validation rules** | **Extension** | "Is this listing available?", "Does the user have access?" |
 | **State transitions** | **Extension** | Change status fields in memory records |
-| **Business rules** | **Extension** | Fee calculation, category validation, instance-specific logic |
-| **Instance config** | **Extension** | Per-instance settings (fee %, categories, visibility) |
-
-The extension is a thin choreographer — typically 50-150 lines of JavaScript per action.
-
-## Extension Manifest
-
-Every extension is defined by an `extension.yaml` manifest file. This declares the extension's metadata, required APIs, actions, resource limits, configuration schema, and federation capabilities.
-
-### Manifest Format
-
-```yaml
-extension: "1.0"
-
-metadata:
-  name: "my-extension"
-  version: "1.0.0"
-  description: "What this extension does"
-  author: "your-name"
-  license: "MIT"
-  aimeat: ">=1.5"
-
-required_apis:
-  - memory
-  - wallet
-  - consent
-  - trust
-
-actions:
-  - id: my-action
-    description: "What this action does"
-    method: POST
-    path: "/v1/ext/my-extension/my-action"
-    auth: required
-    input:
-      fieldName:
-        type: string
-        required: true
-        description: "What this field is"
-      optionalField:
-        type: integer
-        min: 1
-        max: 100
-    output:
-      resultField:
-        type: string
-    script: "actions/my-action.js"
-
-limits:
-  memory_mb: 64
-  timeout_ms: 5000
-  max_api_calls: 50
-
-config:
-  my_setting:
-    type: integer
-    default: 10
-    description: "What this setting controls"
-
-instances:
-  supported: true
-  config_per_instance:
-    name:
-      type: string
-      required: true
-      description: "Display name for this instance"
-    visibility:
-      type: string
-      enum: [public, password, invite]
-      default: public
-      description: "Who can access this instance"
-    password:
-      type: string
-      description: "Password for password-protected instances"
-    allowed_users:
-      type: array
-      items: string
-      description: "List of owner names or GHIIs allowed to access this instance"
-
-federation:
-  advertise: true
-  capabilities:
-    - "my-capability"
-```
-
-### Manifest Fields Reference
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `extension` | Yes | Manifest format version. Currently `"1.0"` |
-| `metadata.name` | Yes | Unique extension identifier. Lowercase, hyphens allowed |
-| `metadata.version` | Yes | Semantic version |
-| `metadata.description` | Yes | Human-readable description |
-| `metadata.author` | Yes | Author name or organization |
-| `metadata.license` | No | License identifier (e.g., MIT, Apache-2.0) |
-| `metadata.aimeat` | No | Minimum AIMEAT version required |
-| `required_apis` | Yes | Core APIs this extension needs: `memory`, `wallet`, `consent`, `trust` |
-| `actions` | Yes | Array of action definitions (at least one) |
-| `limits` | No | Resource limits. Capped by node-level maximums |
-| `config` | No | Extension-level configuration schema with defaults |
-| `instances.supported` | No | Whether this extension supports multiple instances |
-| `instances.config_per_instance` | No | Per-instance configuration schema |
-| `federation` | No | Cross-node capability advertising |
-| `workspace` | No | `{ read: bool, write: bool }`. Gives the sandbox `ctx.workspace`, which acts on the CALLER's organism workspace as the caller. Absent means no such capability |
-| `capabilities` | No (declare it) | `[network, ai, email, payments]`: what the scripts may do beyond their own memory. `network` gives `ctx.fetch`, `ai` gives `ctx.ai`, `email` gives `ctx.email`, `payments` gives `ctx.buy`. The installer approves this list, and the sandbox gives nothing else: without `network`, `ctx.fetch` throws `CAPABILITY_NOT_DECLARED`; without the others, those members are `undefined`. Absent, the node reads the list from the scripts' text, so a computed call such as `ctx['fe' + 'tch']` is refused |
-
-## Writing Action Scripts
-
-Each action in the manifest references a JavaScript file via the `script` field. This file exports a default async function that receives a `ctx` object and the action's `input`.
-
-### Critical Sandbox Constraint
-
-The QuickJS WASM sandbox enforces a strict rule: **the ONLY allowed top-level statement is `export default async function(ctx, input) { ... }`.** All other code -- constants, helper functions, utility variables -- MUST be placed INSIDE the default function body. Top-level `const`, `let`, `var`, `function`, or `class` declarations will crash the sandbox at runtime.
-
-```javascript
-// CORRECT -- everything inside the default function:
-export default async function(ctx, input) {
-  const CATEGORIES = ['fiction', 'non-fiction', 'reference'];
-  function validateTitle(t) { return typeof t === 'string' && t.length > 0; }
-
-  if (!validateTitle(input.title)) {
-    return { error: 'Title is required' };
-  }
-  await ctx.memory.set('item.' + input.id, { title: input.title });
-  return { ok: true };
-}
-```
-
-```javascript
-// WRONG -- top-level declarations crash the sandbox:
-const CATEGORIES = ['fiction', 'non-fiction', 'reference'];
-function validateTitle(t) { return typeof t === 'string' && t.length > 0; }
-
-export default async function(ctx, input) {
-  // This script will fail before reaching this line
-}
-```
-
-### Action Script Template
-
-```javascript
-export default async function(ctx, input) {
-  // ctx.caller   -- { gaii, owner, roles } -- who is calling
-  // ctx.config   -- extension-level config values
-  // ctx.instance -- { id, config } -- which instance (if multi-instance)
-  // ctx.memory   -- { get, set, search, delete, getPublic }
-  // ctx.workspace -- { index, get, write, writeDoc, publish, publishRecords, deleteRecords } -- the CALLER's organism workspace; only when the manifest declares `workspace:`
-  // ctx.wallet   -- { consume, getBalance }
-  // ctx.consent  -- { check, require }
-  // ctx.trust    -- { getScore }
-  // ctx.fetch    -- HTTP requests to external APIs (sandboxed)
-  // ctx.log      -- { info, warn, error }
-
-  // Your business logic here
-  return { result: "value" };
-}
-```
-
-### ctx API Reference
-
-#### ctx.memory
-
-All memory operations are scoped to the extension's namespace. For single-instance extensions, the namespace is `ext:{extensionName}`. For multi-instance extensions, the namespace is `ext:{extensionName}.{instanceId}`.
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `get` | `get(key: string): Promise<any \| null>` | Read a value from memory |
-| `set` | `set(key: string, value: any): Promise<void>` | Write a value to memory |
-| `search` | `search(prefix: string, opts?): Promise<Array<{key, value}>>` | Search by key prefix |
-| `delete` | `delete(key: string): Promise<boolean>` | Delete a memory entry |
-
-**Example — store and retrieve a listing:**
-```javascript
-// Store
-await ctx.memory.set(`listing.${id}`, {
-  title: input.title,
-  price: input.price,
-  seller: ctx.caller.owner,
-  status: 'active',
-  createdAt: new Date().toISOString(),
-});
-
-// Retrieve
-const listing = await ctx.memory.get(`listing.${id}`);
-
-// Search all active listings
-const listings = await ctx.memory.search('listing.');
-const active = listings.filter(l => l.value.status === 'active');
-```
-
-#### ctx.workspace
-
-The caller's organism workspace, acted on as the caller. It exists only when the manifest declares it at the top level, `workspace: { read: true, write: true }`; with `read` alone the three writers throw `PERMISSION`. Every method runs the same operation the MCP tool of that name runs (`aimeat_workspace_read`, `_write`, `_publish`), so the checks are the tool's checks: the caller must be an active member of the organism, a writer needs the creator's contributor grant unless they created the workspace, an agent or app token needs `memory:write` to write or publish and `organism:read` to read (an owner session needs neither), a record must pass the space's locked schema, and the publish gate is honoured. A refusal reaches the script as a thrown `CODE: message`; let it propagate and the HTTP caller receives that status and code. A scheduled run never gets `ctx.workspace`. Each call counts as one API call, and a record written this way carries provenance naming the extension.
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `index` | `index(organismId, ws): Promise<object>` | Manifest, pinned apps, locked schemas, per-space titles. No bodies |
-| `get` | `get(organismId, ws, ids: string[], { space? }): Promise<object>` | Full values of those ids; `_draftVersion` is what `ifVersion` swaps against |
-| `write` | `write(organismId, ws, space, id, value, { ifVersion? }): Promise<object>` | A DRAFT record in a records space, schema-validated. `ifVersion: 0` means "only if there is no draft yet"; a mismatch throws `VERSION_CONFLICT` and writes nothing |
-| `writeDoc` | `writeDoc(organismId, ws, space, { title, markdown }, { id?, section? }): Promise<object>` | A DRAFT document in a document space; the id is generated unless given |
-| `publish` | `publish(organismId, ws, namespace, id, { expectedVersion? }): Promise<object>` | Publish the draft: `.version.N` under the caller, `.latest` under the member |
-| `publishRecords` | `publishRecords(organismId, ws, namespace, [{ id, value, visibility? }], { expectedVersions?, createOnly?, dryRun? }): Promise<object>` | Publish up to 1000 records in ONE call. Answers `{ published, skipped, failed, results: [{ instance, ok, version?, skipped?, code?, violations? }] }`. Each record is decided alone |
-| `deleteRecords` | `deleteRecords(organismId, ws, namespace, ids): Promise<object>` | Remove up to 2000 of the caller's own records in ONE call. Answers `{ deleted: [{ id, keys }], failed: [{ id, reason }], rows_removed }` |
-
-**A batch goes in one call, never one record per call.** A run has at most 500 API calls and 5 seconds by default, and `write` + `publish` cost two calls per record, so 500 records that way cannot finish. `publishRecords` is one call and one write whatever the count; measured at 500 records, the whole action took 160 ms on SQLite and 514 ms on Postgres. It runs the same operation as `POST /v1/organisms/{id}/workspace/records/publish`, and `deleteRecords` the same as `.../workspace/records/delete`.
-
-- **Each record is decided alone.** A record the locked schema rejects fails with code `INVALID` and its `violations`; the others are published. `createOnly: true` refuses an id that already has a published version (code `EXISTS`). `expectedVersions: { id: n }` is a compare-and-swap: `0` means the record must not exist yet, `n` means it must be at version `n` (code `VERSION_CONFLICT`). An id given twice is refused the second time (`DUPLICATE_ID`).
-- **`dryRun: true` decides every record and writes nothing**, with the same answer and `dry_run: true`. Run it first so the person sees "480 new, 15 already there, 5 invalid" before anything is written, then run again without it.
-- **Undo.** Keep the ids of what you published under a batch id in your `ext:` memory; an undo is one `deleteRecords` call with them.
-- **Permissions.** An agent or app token needs `memory:write` for `publishRecords` and `memory:purge` for `deleteRecords`, which removes the records for good. An agent of a member who did not create the workspace also needs the creator's contributor grant, as for a draft write. An owner session needs none of the words.
-- **The publish gate.** When the organism reviews every publish, `publishRecords` is refused with `GATE_ENABLED`: write drafts for a reviewer, or ask an organism admin to turn the gate off for the import.
-- Every record carries the node's provenance stamp naming `ext.<name>.<action>`, as a `write` does.
-
-**Example — hold a shared claim, refusing a second claimant:**
-```javascript
-const org = ctx.config.organismId, ws = ctx.config.claimsWorkspace;
-const open = await ctx.workspace.index(org, ws);
-const held = (open.index.claim || []).some(c => c.title === input.port);
-if (held) return { refused: true, reason: 'another active claim holds this port' };
-await ctx.workspace.write(org, ws, 'claim', input.id, { id: input.id, title: input.port, by: ctx.caller.gaii }, { ifVersion: 0 });
-await ctx.workspace.publish(org, ws, 'shared.claim', input.id);
-return { claimed: input.id };
-```
-
-#### ctx.wallet
-
-Extensions can only debit the calling agent's own balance. Extensions cannot move funds between agents — that is handled by the core Work Queue escrow system.
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `consume` | `consume(amount: number, reason: string): Promise<{success, error?}>` | Debit caller's balance |
-| `getBalance` | `getBalance(): Promise<number>` | Read caller's morsel balance |
-
-**Example — charge a listing fee:**
-```javascript
-const fee = ctx.config.listing_fee_morsels || 2;
-const result = await ctx.wallet.consume(fee, 'listing-creation-fee');
-if (!result.success) {
-  return { error: 'INSUFFICIENT_BALANCE', message: `Need ${fee} morsels to create a listing` };
-}
-```
-
-#### ctx.consent
-
-Check or enforce consent scopes on any GAII.
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `check` | `check(gaii: string, scope: string): Promise<boolean>` | Check if consent is granted |
-| `require` | `require(gaii: string, scope: string): Promise<void>` | Throw if consent not granted |
-
-#### ctx.trust
-
-Read trust scores. Trust scores are system-computed and cannot be modified by extensions.
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `getScore` | `getScore(gaii: string): Promise<number>` | Read agent's trust score |
-
-#### ctx.caller
-
-Information about who is calling the action. Always available, not async.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `gaii` | `string` | Caller's GAII (agent identifier) |
-| `owner` | `string` | Caller's owner name |
-| `roles` | `string[]` | Caller's roles (`['owner']`, `['agent']`, `['operator']`) |
-| `scopes` | `string[]` | The permission words this credential carries |
-
-`scopes` is what the token was granted, the same list `requireScope` reads on an ordinary route. An
-extension action is one route for every action there will ever be, so a script that must hold a
-permission word can only do it here. Three shapes, and the order matters:
-
-- A person signed in at their own screen has `roles: ['owner']` and **no scopes at all**, because
-  owner sessions bypass them everywhere on this node. Empty is not "nothing allowed".
-- An unattended run (a schedule, a workflow step) has `roles: ['operator']` and no scopes: there is
-  no session, so there is no list anybody granted.
-- Everything else is a scoped credential — an agent token, an app grant — and is held to the word.
-
-```javascript
-const roles = ctx.caller.roles || [];
-const scopes = ctx.caller.scopes || [];
-const inPerson = roles.indexOf('owner') >= 0 && roles.indexOf('agent') < 0;
-const unattended = roles.indexOf('operator') >= 0;
-const allowed = scopes.indexOf('*') >= 0 || scopes.indexOf('memory:write') >= 0;
-if (!inPerson && !unattended && !allowed) {
-  return { error: { code: 'SCOPE_DENIED', message: 'This needs the memory:write permission.' } };
-}
-```
-
-#### ctx.config
-
-Extension-level configuration values. Set by the operator when installing or updating the extension.
-
-```javascript
-const feePercent = ctx.config.transaction_fee_percent || 5;
-```
-
-#### ctx.instance (multi-instance extensions)
-
-When the extension supports multiple instances, each action receives the instance context.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string` | Instance identifier |
-| `config` | `object` | Per-instance configuration (name, visibility, categories, etc.) |
-
-```javascript
-// Check instance access
-if (ctx.instance.config.visibility === 'password') {
-  if (input.password !== ctx.instance.config.password) {
-    return { error: 'ACCESS_DENIED', message: 'Invalid marketplace password' };
-  }
-}
-
-if (ctx.instance.config.visibility === 'invite') {
-  const allowed = ctx.instance.config.allowed_users || [];
-  if (!allowed.includes(ctx.caller.owner)) {
-    return { error: 'ACCESS_DENIED', message: 'You are not invited to this marketplace' };
-  }
-}
-```
-
-#### ctx.log
-
-Logging functions. Log output appears in the node's system log prefixed with `[ext:{name}]`. Log calls do NOT count toward the API call limit.
-
-| Method | Signature |
-|--------|-----------|
-| `info` | `info(msg: string, data?: object): void` |
-| `warn` | `warn(msg: string, data?: object): void` |
-| `error` | `error(msg: string, data?: object): void` |
+| **Instance config** | **Extension** | Per-instance settings (categories, visibility, currency) |
+
+## Reviewing a manifest before you install it
+
+Every extension is an `extension.yaml` manifest plus its scripts. Before installing someone else's, read these parts of the manifest, because they are what the extension can reach and what it costs the people who use it:
+
+| Field | What it means for your node |
+|-------|------------------------------|
+| `capabilities` | `[network, ai, email, payments]`: what the scripts may do beyond their own memory. The sandbox gives nothing that is not listed. Absent, the node infers the list from the scripts' text. |
+| `network.hosts` | The only hosts `ctx.fetch` may reach. Without it, any public host. |
+| `network.host_fields` | Hosts the installer supplies per install (a customer's own server). |
+| `workspace` | `{ read, write }`: the extension acts on the caller's organism workspace as the caller. |
+| `config` with `type: secret` | A credential you set after installing; encrypted at rest, never returned in plain text. |
+| `schedules` | Jobs the node runs on a clock once the extension is active. `cron: "@activate"` runs at every activation. |
+| `actions[].tollMorsels` | The pacing amount in morsels per call, which the node charges the caller (capped by `AIMEAT_EXT_MAX_DEBIT`, default 100). Part burns and the rest is credited to the installer. |
+| `actions[].commercial.payMoney` | A money price per call, paid through the node's checkout. |
+| `actions[].commercial.payMorsels` | The 3.x name of the pacing amount. Read as pacing until node 4.0.0 and refused from 4.0.0. A morsel is never a price. |
+| `limits` | The extension's own resource limits; the node caps each at its maximum. |
+| `instances` | Whether one installation can serve several independent copies. |
+| `federation` | `advertise` and `capabilities`: stored with the extension. Nothing on the node reads them yet. |
 
 ## Multi-Instance Model
 
@@ -409,8 +97,8 @@ Some extensions (like marketplace or matching) support multiple instances — ea
 
 ### How It Works
 
-1. Operator installs the extension (one time)
-2. Operator creates instances with different configurations
+1. The extension is installed once
+2. The installer or the operator creates instances with different configurations
 3. Each instance gets its own memory namespace: `ext:{extensionName}.{instanceId}`
 4. Actions are called with the instance ID in the URL: `POST /v1/ext/{extName}/{instanceId}/{actionId}`
 5. The same action code runs for all instances — only the config and data namespace differ
@@ -438,27 +126,27 @@ List instances
 
 Update instance config
   PATCH /v1/extensions/{name}/instances/{instanceId}
-  Body: { config: { fee_percent: 10 } }
+  Body: { config: { categories: ["books"] } }
 
 Delete instance
   DELETE /v1/extensions/{name}/instances/{instanceId}
 ```
+
+A schedule in the manifest runs for the extension, not per instance. An instance's own schedule is created with `POST /v1/schedules` (`kind: "extension"`, `extension_name`, `action_id`, `instance_id`) or `aimeat_schedule_create`.
 
 ### Memory Namespace Convention
 
 All data for an instance lives under a predictable memory prefix:
 
 ```
-ext:marketplace-behaviors.city-flea-market.listing.abc123
-ext:marketplace-behaviors.city-flea-market.categories
-ext:marketplace-behaviors.city-flea-market.config
-ext:marketplace-behaviors.company-exchange.listing.def456
+ext:marketplace-behaviors.city-flea-market  listing.abc123
+ext:marketplace-behaviors.company-exchange  listing.def456
 ```
 
 This means:
 - Instances are fully isolated from each other
-- Data can be queried with `ctx.memory.search('listing.')` within an instance (the runtime adds the namespace prefix automatically)
-- Operators can inspect extension data via the standard Memory API using the full namespaced key
+- Data can be queried with `ctx.memory.search('listing.')` within an instance (the runtime adds the namespace automatically)
+- A key the extension wrote public can be read by anyone at `GET /v1/memory/ext:{name}.{instanceId}/{key}`; a key written private cannot
 
 ## Extensions the node ships
 
@@ -530,7 +218,31 @@ anything beginning `X-Living-`.
 extension, so on a shared node the operator sets what everyone's documents may use. `allow_hosts`
 is per owner because it lives in the owner's own record, and a list of hostnames is not a secret.
 
+### The four bundled examples
+
+Four more ship as files in `docs/extensions/` (`dist/docs/extensions` in a package), installed only
+when the operator chooses: `marketplace-behaviors`, `matching-behaviors`, `membership-behaviors` and
+`rest-connector`. `GET /v1/admin/extensions/available` lists them, and one call installs and
+activates one:
+
+```
+POST /v1/admin/extensions/available/{name}/install
+Authorization: Bearer <operator-token>
+```
+
+`POST /v1/admin/extensions/available/{name}/reinstall` deploys the files on disk over an installed
+copy. An operator edit through `PUT /v1/admin/extensions/available/{name}/scripts/{actionId}` writes
+into those files, so in a development checkout it changes the repository. Each folder's README says
+what the extension does.
+
 ## Installation and Management
+
+### Who may install
+
+`POST /v1/extensions` needs the role in `AIMEAT_EXT_INSTALL_ROLE` (default `owner`; set `operator`
+to keep installs to operators), or a principal holding `ext:write`. An app under an app grant can
+never hold `ext:write`. The installing owner, their agents with `ext:write`, and the operator may
+then manage the extension.
 
 ### Installing an Extension
 
@@ -538,57 +250,69 @@ Extensions are installed by sending the YAML manifest and JavaScript action scri
 
 ```
 POST /v1/extensions
-Authorization: Bearer <operator-token>
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "manifest": "extension: \"1.0\"\nmetadata:\n  name: marketplace-behaviors\n  ...",
+  "manifest": "extension: \"1.0\"\nmetadata:\n  name: my-extension\n  ...",
   "scripts": {
-    "actions/purchase.js": "export default async function(ctx, input) { ... }",
-    "actions/deliver.js": "export default async function(ctx, input) { ... }",
-    "actions/rate.js": "export default async function(ctx, input) { ... }"
+    "actions/create.js": "export default async function(ctx, input) { ... }",
+    "actions/list.js": "export default async function(ctx, input) { ... }"
   }
 }
 ```
 
-The `scripts` object keys must match the `script` fields in the manifest's action definitions.
+The `scripts` object keys must match the `script` fields in the manifest's action definitions. Over
+MCP the same is `aimeat_extension_install` (inline, or omit `manifest` and `scripts` to get an
+`upload_url` for a ZIP).
 
 ### Activating
 
-An installed extension is inactive by default. Activate it to make its actions callable:
+An uploaded extension is inactive. Activate it to make its actions callable; this also registers its
+schedules and runs the `@activate` ones:
 
 ```
-POST /v1/extensions/marketplace-behaviors/activate
-Authorization: Bearer <operator-token>
+POST /v1/extensions/my-extension/activate
+Authorization: Bearer <token>
 ```
 
 ### Updating
 
-To update an extension's JavaScript without reinstalling:
+Redeploy in place:
 
-1. Uninstall the current version: `DELETE /v1/extensions/{name}`
-2. Install the new version: `POST /v1/extensions`
-3. Activate: `POST /v1/extensions/{name}/activate`
+```
+PUT /v1/extensions/my-extension
+Authorization: Bearer <token>
+Content-Type: application/json
 
-Instance data is stored in the Memory API under the extension's namespace and persists across reinstalls as long as the extension name remains the same.
+{ "manifest": "...", "scripts": { ... } }
+```
+
+The manifest and scripts are swapped in one write, so the next call runs the new code and the action
+never disappears mid-redeploy. The `ext:{name}` memory, the instances and the activation are kept;
+for an active extension the schedules are re-registered from the new manifest and the `@activate`
+jobs run again. Identical bytes are a no-op. Over MCP: `aimeat_extension_install` with `update: true`.
+
+Do not update by uninstalling and installing again: uninstalling deletes the extension's data.
 
 ### Deactivating
 
-Deactivating an extension stops all action execution but preserves the installation and all instance data:
+Deactivating an extension stops all action execution and its schedules, and keeps the installation and all its data:
 
 ```
-POST /v1/extensions/marketplace-behaviors/deactivate
-Authorization: Bearer <operator-token>
+POST /v1/extensions/my-extension/deactivate
+Authorization: Bearer <token>
 ```
 
 ### Uninstalling
 
-Removes the extension code. Instance data in memory is NOT automatically deleted.
+```
+DELETE /v1/extensions/my-extension
+Authorization: Bearer <token>
+```
 
-```
-DELETE /v1/extensions/marketplace-behaviors
-Authorization: Bearer <operator-token>
-```
+Uninstalling removes the extension, its scheduled jobs, its `ext:{name}` namespace and every
+instance's namespace. Export what you want to keep first.
 
 ### Resource Limits
 
@@ -599,60 +323,40 @@ Each extension declares resource limits in its manifest. The node enforces these
 | Memory | `limits.memory_mb` | 64 MB | `AIMEAT_EXT_MAX_MEMORY_MB` |
 | CPU timeout | `limits.timeout_ms` | 5000 ms | `AIMEAT_EXT_TIMEOUT_MS` |
 | API calls per action | `limits.max_api_calls` | 500 on the node, and what a manifest asks for is capped by it | `AIMEAT_EXT_MAX_API_CALLS` |
-| Script size | N/A | N/A | `AIMEAT_EXT_MAX_CODE_SIZE_KB` (256 KB) |
-| Max extensions | N/A | N/A | `AIMEAT_EXT_MAX_INSTALLED` (20) |
-| One answer read by `ctx.fetch` | N/A | 4 MB | N/A: the same on every node, for every extension |
+| Script size | N/A | 256 KB per script | `AIMEAT_EXT_MAX_CODE_SIZE_KB` |
+| Max extensions | N/A | 20 | `AIMEAT_EXT_MAX_INSTALLED` |
+| Pacing per call | `actions[].tollMorsels` | node default | `AIMEAT_EXT_MAX_DEBIT` (100) |
+| One answer read by `ctx.fetch` | `limits.fetch_max_mb` | 4 MB | 32 MB at most |
 
-If an action exceeds its timeout, the sandbox is terminated and an `EXTENSION_TIMEOUT` error is returned. If an action exceeds its API call limit, further API calls return errors. An answer longer than 4 MB makes `ctx.fetch` throw `RESPONSE_TOO_LARGE: …`: the node stops reading at 4 MB and the script gets none of the answer, so ask a large source for one page at a time. The message names the host the script called, and no other part of the address.
+If an action exceeds its timeout, the sandbox is terminated and an `EXTENSION_TIMEOUT` error is returned. If an action exceeds its API call limit, further API calls return errors. An answer longer than the read limit makes `ctx.fetch` throw `RESPONSE_TOO_LARGE: …`: the node stops reading and the script gets none of the answer. The message names the host the script called, and no other part of the address.
 
 ## Federation
 
-Extensions can advertise capabilities to federated peers. When `federation.advertise` is `true`, the node includes the extension's capabilities in federation heartbeats.
-
-Other nodes can discover capable peers:
-
-```
-GET /v1/federation/capabilities?need=escrow
-```
-
-This enables cross-node service discovery — a user on node A can find that node B has a marketplace with escrow support.
+A manifest may carry `federation: { advertise, capabilities }`. The node stores both with the
+extension. No route lists extension capabilities to peers, and nothing on the node reads the block
+yet, so it is a declaration for the future and not a way to be found.
 
 ## Example: Marketplace Extension
 
-The marketplace-behaviors extension demonstrates a complete purchase workflow with escrow. See `docs/extensions/marketplace-behaviors/` for the full manifest and README.
+`marketplace-behaviors` (in `docs/extensions/`) is a listing workflow: a seller lists an item with a
+money price, a buyer agrees to buy it, the seller confirms delivery and the buyer rates it. It takes
+no payment: the buyer pays the seller outside the extension, or through the node's checkout when the
+seller sells the item as an offer or app tool with a money price.
 
 ### Actions
 
-| Action | Purpose | Core APIs Used |
-|--------|---------|---------------|
-| `purchase` | Buy a listing with morsel escrow | Memory (read listing, write purchase), Wallet (debit buyer), Consent |
-| `deliver` | Confirm delivery, release escrow | Memory (update status), Wallet (credit seller) |
-| `rate` | Rate a completed purchase (1-5 stars) | Memory (store rating), Trust (read score) |
+| Action | Purpose | Pacing per call |
+|--------|---------|-----------------|
+| `create-listing` | A listing with a money price and a currency | 2 morsels |
+| `browse` | Listings by category and price range | none |
+| `purchase` | Agree to buy at the listing's price; the listing is reserved | 1 morsel |
+| `deliver` | The seller confirms delivery | none |
+| `rate` | The buyer rates a delivered purchase (1-5 stars) | none |
+| `update-listing`, `delist` | The seller (or an operator) changes or removes a listing | none |
 
-### Purchase Flow
-
-```
-Buyer calls POST /v1/ext/marketplace-behaviors/{instanceId}/purchase
-  1. Extension reads listing from memory — verifies status is 'active'
-  2. Extension checks buyer consent for 'marketplace-listing' scope
-  3. Extension calculates total: price + transaction_fee_percent
-  4. Extension debits buyer via ctx.wallet.consume()
-  5. Extension writes purchase record to memory with status 'purchased'
-  6. Extension updates listing status to 'reserved'
-  7. Returns { purchaseId, status: 'purchased' }
-
-Seller calls POST /v1/ext/marketplace-behaviors/{instanceId}/deliver
-  1. Extension reads purchase — verifies caller is the seller
-  2. Extension releases escrow to seller (via wallet)
-  3. Extension updates purchase status to 'delivered'
-  4. Returns { status: 'delivered' }
-
-Buyer calls POST /v1/ext/marketplace-behaviors/{instanceId}/rate
-  1. Extension reads purchase — verifies caller is buyer, status is 'delivered'
-  2. Extension stores rating in memory
-  3. Extension marks purchase as 'completed'
-  4. Returns { rated: true }
-```
+The node charges the pacing before the script runs and credits it, less the burn rate's share, to
+whoever installed the extension; the installer's own calls are free. The purchase record says who
+bought what, so it is written private.
 
 ### Instance Configuration
 
@@ -662,11 +366,9 @@ Each marketplace instance can have different settings:
 {
   "id": "city-flea-market",
   "config": {
-    "name": "City Flea Market",
     "visibility": "public",
     "categories": ["electronics", "furniture", "clothing", "sports", "other"],
-    "fee_percent": 5,
-    "listing_fee_morsels": 2
+    "currency": "EUR"
   }
 }
 ```
@@ -675,12 +377,9 @@ Each marketplace instance can have different settings:
 {
   "id": "company-exchange",
   "config": {
-    "name": "Company Internal Exchange",
     "visibility": "password",
     "password": "company-secret-2026",
-    "categories": ["office-supplies", "equipment", "furniture"],
-    "fee_percent": 0,
-    "listing_fee_morsels": 0
+    "categories": ["office-supplies", "equipment", "furniture"]
   }
 }
 ```
@@ -689,35 +388,30 @@ Each marketplace instance can have different settings:
 {
   "id": "premium-vendors",
   "config": {
-    "name": "Premium Vendors",
     "visibility": "invite",
-    "allowed_users": ["vendor-alice", "vendor-bob", "vendor-carol"],
-    "categories": ["luxury", "art", "collectibles"],
-    "fee_percent": 10,
-    "listing_fee_morsels": 5
+    "allowed_users": ["vendor-alice@your-node", "vendor-bob@your-node"],
+    "categories": ["luxury", "art", "collectibles"]
   }
 }
 ```
 
 ## Example: Matching Extension
 
-A matching extension would use the same pattern but for a different domain — connecting people based on shared interests, location, and activity.
+`matching-behaviors` connects people in a matching pool by shared interests, location and activity.
 
-### Actions
-
-| Action | Purpose | Core APIs Used |
-|--------|---------|---------------|
-| `create-profile` | Register a matching profile | Memory (store profile), Consent (require matching scope) |
-| `run-matching` | Execute matching algorithm | Memory (read all profiles, write match records) |
-| `respond` | Accept or dismiss a match | Memory (update match status) |
-
-### Instance Configuration
+| Action | Purpose |
+|--------|---------|
+| `create-profile` | Register a matching profile; needs the person's consent with purpose `matching` |
+| `update-profile` | Change a profile |
+| `run-matching` | Run a matching round (also every six hours on its schedule) |
+| `get-suggestions` | The caller's current suggestions |
+| `respond` | Accept or dismiss a suggestion |
 
 ```json
 {
-  "id": "helsinki-dating",
+  "id": "helsinki-hobbies",
   "config": {
-    "name": "Helsinki Dating",
+    "name": "Helsinki Hobbies",
     "visibility": "public",
     "max_distance_km": 50,
     "match_threshold": 0.5,
@@ -726,162 +420,14 @@ A matching extension would use the same pattern but for a different domain — c
 }
 ```
 
-```json
-{
-  "id": "company-networking",
-  "config": {
-    "name": "Company Networking",
-    "visibility": "invite",
-    "allowed_users": ["employee1", "employee2"],
-    "max_distance_km": 1000,
-    "match_threshold": 0.3,
-    "max_suggestions": 10
-  }
-}
-```
-
-## Best Practices
-
-### Keep Actions Small
-
-Each action should do one thing. A marketplace needs `create-listing`, `purchase`, `deliver`, `rate` as separate actions — not one monolithic `marketplace-operation` action. This makes actions independently discoverable, testable, and composable.
-
-### Use Memory for All State
-
-Do not try to maintain state inside the extension code. The sandbox is created fresh for each action invocation. All state must be stored in and read from memory.
-
-```javascript
-// WRONG — state is lost between invocations
-let counter = 0;
-export default async function(ctx, input) {
-  counter++; // Always 1
-}
-
-// RIGHT — state persists in memory
-export default async function(ctx, input) {
-  const counter = (await ctx.memory.get('counter')) || 0;
-  await ctx.memory.set('counter', counter + 1);
-}
-```
-
-### Validate Input Early
-
-Check required fields, types, and business rules at the top of your action before making any state changes:
-
-```javascript
-export default async function(ctx, input) {
-  // Validate input
-  if (!input.listingId) {
-    return { error: 'INVALID_INPUT', message: 'listingId is required' };
-  }
-
-  // Validate state
-  const listing = await ctx.memory.get(`listing.${input.listingId}`);
-  if (!listing) {
-    return { error: 'NOT_FOUND', message: 'Listing not found' };
-  }
-  if (listing.status !== 'active') {
-    return { error: 'INVALID_STATE', message: 'Listing is not available for purchase' };
-  }
-
-  // Now proceed with the action...
-}
-```
-
-### Return Structured Errors
-
-Return error objects with `error` (code) and `message` (human-readable) fields. Do not throw exceptions for expected business errors — throw only for unexpected failures.
-
-```javascript
-// Business error — return it
-return { error: 'INSUFFICIENT_BALANCE', message: 'Need 50 morsels, have 30' };
-
-// Unexpected error — let it throw (the runtime catches and returns EXTENSION_ERROR)
-const data = JSON.parse(invalidJson); // throws TypeError
-```
-
-### Respect the API Call Limit
-
-Each action has a limited number of API calls (default: 50). Plan your memory access patterns to minimize calls:
-
-```javascript
-// INEFFICIENT — N+1 API calls
-const listings = await ctx.memory.search('listing.');
-for (const l of listings) {
-  const detail = await ctx.memory.get(l.key); // N more calls
-}
-
-// EFFICIENT — search already returns values
-const listings = await ctx.memory.search('listing.');
-// listings already contains [{ key, value }]
-```
-
-### Use Logging for Debugging
-
-Log calls do not count toward the API limit. Use them to trace action execution:
-
-```javascript
-ctx.log.info('Purchase started', { listingId: input.listingId, buyer: ctx.caller.owner });
-// ... business logic ...
-ctx.log.info('Purchase completed', { purchaseId, total: totalCost });
-```
-
 ## Distributing Extensions
 
-Extensions are distributed as a bundle containing:
+An extension is a bundle of:
 
 1. `extension.yaml` — the manifest
 2. `actions/*.js` — the action scripts
 3. `README.md` — documentation
 
-Share via GitHub, npm, or any file hosting. The node operator downloads the bundle, reads the manifest and scripts, and POSTs them to `POST /v1/extensions`.
-
-There is no automatic package manager. This is intentional — operators should review extension code before installing it on their node.
-
-## File Storage for Extensions
-
-Extensions that need to handle files (e.g., listing images in a marketplace) should use the existing core **Storage/Files API** (`POST /v1/storage`). The extension itself does not need file access — clients upload files through the Storage API directly and pass the storage keys or URLs to extension actions.
-
-**Example — listing with images:**
-
-```javascript
-// Client-side flow:
-// 1. Upload image:  POST /v1/storage  →  returns storage key
-// 2. Create listing: POST /v1/ext/marketplace-behaviors/{instanceId}/create-listing
-//    Body: { title: "...", images: ["storage-key-1", "storage-key-2"] }
-
-// Extension action just stores the references:
-export default async function(ctx, input) {
-  await ctx.memory.set(`listing.${id}`, {
-    title: input.title,
-    images: input.images,   // Storage keys — not file data
-    // ...
-  });
-}
-```
-
-The Storage API supports raw body uploads, base64, visibility controls (`private`, `owner`, `public`), per-file size limits, total quota per agent, and chunked uploads for large files.
-
-## Scheduled Actions
-
-Extensions can declare recurring jobs in their manifest. The AIMEAT core scheduler reads these and runs them automatically on the specified cron schedule.
-
-```yaml
-schedules:
-  - id: run-matching
-    action: run-matching
-    cron: "0 */6 * * *"          # Every 6 hours
-    description: "Run matching algorithm"
-    instance_scope: true          # Runs once per instance
-```
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `id` | Yes | Unique schedule identifier within the extension |
-| `action` | Yes | Action ID to invoke |
-| `cron` | Yes | Cron expression (standard 5-field format) |
-| `description` | No | Human-readable description |
-| `instance_scope` | No | If `true`, creates one job per instance. Default: `false` |
-| `input` | No | Static input payload to pass to the action |
-
-When `instance_scope` is `true`, the scheduler automatically creates a job for each instance and cleans up when instances are deleted. Operators can view, enable/disable, and manually trigger scheduled jobs from the admin dashboard.
+It can be shared as files, or inside a package (`aimeat_package_install`). Read the manifest and the
+scripts before you install one on your node; the table under "Reviewing a manifest" lists what to
+look for.
