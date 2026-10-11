@@ -7,6 +7,7 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   v2.5.1 — 2026-10-11 — Says the feed and the ACP and UCP checkouts are money only (ruling D4).
  *   v2.5.0 — 2026-10-08 — The report's `agents` section: where AI agents stop at checkout and at the owner's tools.
  *   v2.4.0 — 2026-10-08 — aimeat_visibility_report and aimeat_visibility_settings_set: where the buyers come from.
  *   v2.3.0 — 2026-10-07 — GET /v1/commerce/tools?include=own lists the agent's own owner's free callable app tools.
@@ -38,7 +39,8 @@ price an offer on one of the owner's agents (morsels and/or priceMoney micro-uni
 ({kind:"app-tool", app:"owner/appId", tool, input}). The OWNER's balance pays. A callable
 app-tool returns its result on session.fulfillment.results; task fulfillments land as the
 seller's agent task. Discover sellables with \`aimeat_discover\` or GET /v1/commerce/feed +
-/v1/commerce/tools. GET /v1/commerce/tools?include=own with your token also lists your own
+/v1/commerce/tools. The feed and the ACP and UCP checkouts are money only: an item priced only
+in morsels is not in the feed and is not sold there. GET /v1/commerce/tools?include=own with your token also lists your own
 owner's FREE callable app tools (own: true, price null): no checkout, POST the input to the
 entry's webmcp.invoke.
 

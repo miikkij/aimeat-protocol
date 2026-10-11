@@ -292,7 +292,10 @@ Top-level metadata about the community service.
 | `name` | string | yes | Human-readable service name. Can be in any language. |
 | `type` | string | yes | A non-empty, free-form service type. Common examples follow. |
 | `description` | string | yes | One-line summary of what this service does. |
-| `locale` | string | no | Primary language code (`"en"`, `"fi"`, `"sv"`, etc.). Defaults to `"en"`. |
+| `version` | string | no | Version of this service definition. Defaults to `"1.0"`. |
+| `author` | string | no | Who wrote the definition. |
+| `semantic` | object | no | What the data means, as a JSON-LD `@context` and `@type`. Every prefix it uses must resolve; see the [CSM spec](../csm-spec.md), section 10. |
+| `locale` | string | no | Primary language code (`"en"`, `"fi"`, `"sv"`, etc.). A note for whoever builds the service: the parser does not read it. |
 
 **Common service types:**
 
@@ -351,12 +354,20 @@ data_schema:
 | Type | Description | Validation options |
 |------|-------------|-------------------|
 | `string` | Text value | `minLength`, `maxLength`, `enum`, `format` |
-| `number` | Numeric value | `minimum`, `maximum` |
-| `boolean` | True/false | `default` |
+| `number`, `integer` | Numeric value | `minimum`, `maximum` |
+| `boolean` | True/false | (none) |
 | `array` | List of values | `items` (with nested type), `minItems`, `maxItems` |
 | `object` | Nested structure | `properties`, `required` |
 
 **String formats:** `uri`, `date-time`, `email`
+
+**Every type** also takes `default` and `description`, which go into the schema as written. The node does not fill a default in when a write leaves the field out.
+
+**Short form.** `min` and `max` work on every type that has limits: on a string they mean `minLength`/`maxLength`, on a number `minimum`/`maximum`, on an array `minItems`/`maxItems`. If a field states both forms, the long one wins.
+
+**Required parts of an object.** Inside an object, a property is required unless it says `required: false` or has a `default`. To name the required properties yourself, give the object a list, as in `price` below: `required: [amount]`. The list then decides alone.
+
+The node turns these rules into a JSON Schema and checks every write against it. A key not listed here (for example `pattern`) is accepted in the file and checks nothing.
 
 **Examples of each type:**
 
@@ -418,12 +429,12 @@ Controls privacy and data governance. These fields tell AI how to handle user da
 
 | Field | Type | Values | Description |
 |-------|------|--------|-------------|
-| `visibility_default` | string | `"federation"`, `"dmz"`, `"local"` | Who can see listings. `federation` = all connected nodes. `dmz` = verified community members only. `local` = this node only. |
+| `visibility_default` | string | `"private"`, `"local"`, `"dmz"`, `"federation"`, `"public"` | Who can see listings. `private` = only the person who wrote it. `local` = this node only. `dmz` = verified community members only. `federation` = all connected nodes (the default). `public` = anyone, without signing in. |
 | `requires_consent` | boolean | `true` / `false` | Whether users must explicitly agree before their data is stored. Should be `true` for any service holding personal data. |
 | `consent_purpose` | string | free text | Human-readable label for what the data is used for. Shown to users during consent. |
 | `data_retention` | string | `"until_revoked"`, `"90d"`, `"365d"`, etc. | How long data is kept. `until_revoked` means forever until the user deletes it. Time-limited values auto-expire. |
-| `anonymous_browsing` | boolean | `true` / `false` | Whether users can browse listings without revealing their identity. Important for dating and sensitive directories. |
-| `anonymous_option` | boolean | `true` / `false` | Whether users can post content anonymously. Used in forums and opinion boards. |
+| `anonymous_browsing` | boolean | `true` / `false` | Whether users can browse listings without revealing their identity. A note for whoever builds the service: the parser does not read it. |
+| `anonymous_option` | boolean | `true` / `false` | Whether users can post content anonymously. A note for whoever builds the service: the parser does not read it. |
 
 ```yaml
 consent_requirements:
@@ -478,7 +489,7 @@ economy:
 
 ### 4.8 `scoring` (optional)
 
-Content ranking rules for feeds and news services.
+Content ranking rules for feeds and news services. The node does not act on this block: like `economy`, it is a statement of intent for whoever builds the service.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -497,7 +508,7 @@ scoring:
 
 ### 4.9 `limits` (optional)
 
-File and upload constraints for media services.
+File and upload constraints for media services. The node does not act on this block either; put an upload limit where the upload happens.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -519,8 +530,8 @@ Suggestions for how AI should render the service. These are hints, not commands 
 | `list_view` | array | Fields to show in the browse/list view (the card or row). |
 | `detail_view` | array | Fields to show on the full detail page. |
 | `search_fields` | array | Fields that should be searchable/filterable. |
-| `sort_fields` | array | Fields available for sorting. |
-| `card_image` | string | Field name to use as the card thumbnail. |
+| `sort_options` | array | Fields available for sorting. |
+| `card_image_field` | string | Field name to use as the card thumbnail. |
 
 Use dot notation for nested fields: `"price.amount"`, `"location.city"`.
 
@@ -529,7 +540,7 @@ ui_hints:
   list_view: ["title", "price.amount", "price.currency", "category"]
   detail_view: ["title", "description", "price", "images", "location"]
   search_fields: ["title", "category", "tags"]
-  card_image: "thumbnail_url"
+  card_image_field: "thumbnail_url"
 ```
 
 ---
@@ -980,7 +991,7 @@ ui_hints:
   search_fields: ["title", "description", "tags", "category", "language"]
 ```
 
-**What makes it tick:** The `limits` block enforces upload constraints (5 GB max, specific formats). `chapters` let creators mark sections with timestamps, and `transcript` enables full-text search across spoken content. The `license` field makes content rights explicit -- AI can use this to filter reusable content or warn about restricted material.
+**What makes it tick:** The `limits` block states the upload constraints (5 GB max, specific formats) for whoever builds the upload; the node does not enforce it. `chapters` let creators mark sections with timestamps, and `transcript` enables full-text search across spoken content. The `license` field makes content rights explicit -- AI can use this to filter reusable content or warn about restricted material.
 
 ---
 
@@ -992,7 +1003,7 @@ When you hand a CSM file to an AI assistant, here is what happens:
 
 **Step 2: AI asks users the right questions.** For a hobby directory, AI asks about interests and location. For a marketplace, it asks about the item title, price, and condition. The field types guide how AI asks: an `enum` becomes a multiple-choice selector, an `array` becomes a list where users can add items, a `number` with `minimum: 0` tells AI to reject negative values.
 
-**Step 3: AI validates input.** Before storing anything, AI checks every validation rule: `minLength`, `maxLength`, `minItems`, `maxItems`, `minimum`, `maximum`, `enum` values, `format` patterns. If a listing title is too short or a price is negative, AI asks the user to fix it.
+**Step 3: The node validates input.** When the service is registered, the node turns `data_schema` into a JSON Schema and locks it on the service's keys. Every write is checked against it: `minLength`, `maxLength`, `minItems`, `maxItems`, `minimum`, `maximum`, `enum` values and required fields. A title that is too short or a negative price is refused with the rule it broke, and AI asks the user to fix it.
 
 **Step 4: AI checks consent.** If `requires_consent: true`, AI presents a consent screen explaining the `consent_purpose` and `data_retention` before storing any data. Users see exactly what they are agreeing to.
 
@@ -1052,7 +1063,7 @@ A CSM file is just a `.yaml` file. You can share it the same way you share any d
 
 - **Community libraries.** Collections of CSM files can be published and shared. An aimeat node operator might maintain a gallery of CSMs that community members can browse and activate with a single prompt to their AI assistant.
 
-For details on operating a node, managing multiple services, and federation configuration, see the [Service Owner Manual](./service-owner-manual.md). To package a CSM together with external API integrations as a plugin, see the [Service Owner Manual](./service-owner-manual.md) section on YAML plugins.
+For details on operating a node, managing multiple services, and federation configuration, see the [Service Owner Manual](./service-owner-manual.md).
 
 ---
 

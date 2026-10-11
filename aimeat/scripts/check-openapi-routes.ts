@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.4 — 2026-10-11 — GET /docs/specs/{} answered as a redirect to GET /v1/specs/{name}.
  *   v1.0.3 — 2026-10-05 — GET /v1/libs/aimeat-validate.js answered by the libs family route.
  *   v1.0.2 — 2026-09-26 — GET /app-frame-core.js answered as a static asset (the module it imports).
  *   v1.0.1 — 2026-09-25 — GET /app-frame.js answered as a static asset (the isolated frame's page script).
@@ -69,6 +70,7 @@ const NOT_API: Record<string, string> = {
     'GET /v1/terms/{}': PAGE,
     'GET /{}/{}': 'On the bare app host: redirects to the app\'s own subdomain, or serves the app\'s HTML.',
     'GET /everything': REDIRECT,
+    'GET /docs/specs/{}': 'Redirects the record-contract address records carried before 2026-10-11 to GET /v1/specs/{name}.',
     'GET /start': REDIRECT,
     'GET /v1/admin/ui': REDIRECT,
     'GET /v1/pricing': REDIRECT,

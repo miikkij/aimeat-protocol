@@ -11,6 +11,8 @@
  *     3. An app-grant stream does NOT mark the owner present. Only a real owner session may.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sse.ts
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A memory delete reaches the stream as `memory`, which the live library's
+ *     description now states and used to deny.
  *   v1.0.0 — 2026-07-25 — Initial, with the SSE open-immediately fix + scope gate.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -184,6 +186,19 @@ async function main() {
             });
             assert(w.status === 200 || w.status === 201, `memory write: ${w.status}`);
             await owner!.waitFor(t => domainsSeen(t).includes('memory'), 6_000, 'the memory domain');
+        });
+
+        // The live library's description said "Deletes do not emit a change event" until 2026-10-11.
+        // It says now that a delete emits its domain as a write does, and this holds it to that for
+        // the record an app deletes most. The stream coalesces for a second, so the write's frame is
+        // let through first and the delete has to produce a frame of its own.
+        await test('a memory delete is reported as the "memory" domain too', async () => {
+            assert(!!owner, 'owner stream open');
+            await new Promise(r => setTimeout(r, 2_500));
+            const before = domainsSeen(owner!.text()).filter(d => d === 'memory').length;
+            const d = await json('/v1/memory/sse.probe.owner', { method: 'DELETE', headers: { Authorization: `Bearer ${A.token}` } });
+            assert(d.status === 200, `memory delete: ${d.status} ${JSON.stringify(d.body)}`);
+            await owner!.waitFor(t => domainsSeen(t).filter(x => x === 'memory').length > before, 6_000, 'a memory frame after the delete');
         });
 
         console.log('\nPhase 3: Scope gate — an app grant is told only what its scopes cover');

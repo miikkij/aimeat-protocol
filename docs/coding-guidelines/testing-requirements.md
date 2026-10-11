@@ -8,7 +8,7 @@
 - **PostgreSQL + Kysely** (`postgres-kysely`, `.env.test.postgres-kysely`, `src/storage/providers/postgres-kysely/`) — **the PRIMARY production backend; it MUST always pass.**
 - **SQLite** (better-sqlite3; `:memory:` via `AIMEAT_SQLITE_PATH=:memory:` for the fast-iteration role on the real prod code path) — **first-class; it MUST always pass.**
 
-MongoDB and the legacy Prisma-based `postgres` provider were **removed on 2026-07-16** (no Prisma remains in the codebase). The in-memory backend is deprecated and produces stale failures — treat `pnpm test:e2e` and `pnpm test:e2e:memory` as deprecated; do not use them for verification, and do not report their failures as findings. **Default verification = PostgreSQL+Kysely + SQLite** (both green).
+MongoDB and the legacy Prisma-based `postgres` provider were **removed on 2026-07-16** (no Prisma remains in the codebase). The in-memory backend's test commands were removed on 2026-10-11. **Default verification = PostgreSQL+Kysely + SQLite** (both green).
 
 When a feature, bugfix, or structural change is completed:
 
@@ -92,10 +92,6 @@ pnpm test:e2e:sqlite
 
 # Both backends in one go:
 pnpm test:e2e:all-backends      # SQLite + PostgreSQL+Kysely, full sweep each
-
-# DEPRECATED -- do not use:
-#   pnpm test:e2e             (memory backend, not a valid environment)
-#   pnpm test:e2e:memory      (same as above)
 
 # Run a single suite (preferred during iteration -- much faster than the full sweep):
 pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
@@ -240,7 +236,7 @@ Tests must pass on the **persistent** storage backends:
 | **PostgreSQL + Kysely** | `.env.test.postgres-kysely` | `pnpm test:e2e:postgres-kysely` | **PRIMARY / prod backend — must always pass.** Recreate the test DB before a full run (schema drops + migrations re-run on boot). |
 | **SQLite** | `.env.test.sqlite` | `pnpm test:e2e:sqlite` | **First-class — must always pass.** Fast iteration; set `AIMEAT_SQLITE_PATH=:memory:` for in-memory speed on the real SQL code path. |
 
-The in-memory backend (`pnpm test:e2e:memory`, the unsuffixed `pnpm test:e2e`) is **deprecated** and not a supported environment — its `.env.test.memory` file may not even exist in the repo. AIMEAT outgrew the pure-in-memory storage path long ago; SQLite `:memory:` covers that role using the production code path.
+There is no in-memory test backend: SQLite `:memory:` covers that role on the production code path.
 
 The CI runner (`test/run-e2e-ci.ts`) handles server lifecycle automatically — it starts the server, runs the requested suites, then shuts down.
 

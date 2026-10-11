@@ -65,6 +65,10 @@ logs/**
 *.db-shm
 *.db-wal
 
+# A node that boots with no owner writes its setup secret beside its database
+# (services/admin-setup-secret.ts). A test server whose database is under test/ leaves it there.
+aimeat/test/admin-setup-secret
+
 # `pnpm sandbox` — the session's own node: its state file holds real tokens and private keys for
 # the sandbox accounts, and the log is a running node's output. Both are per-machine, neither is
 # source. The database itself is already covered by *.db above.

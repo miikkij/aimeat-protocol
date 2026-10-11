@@ -119,7 +119,7 @@ As of **v4.0**, AIMEAT is specified as two layers, and the spec is split to matc
 2. **Memory and storage.** Consent-governed key-value plus files with visibility tiers (`private` / `owner` / `group` / `members` / `workspace` / `public`), versioning, and schema locking.
 3. **Authorization.** Consent, a runtime access-guard, a capability (IAM) model, and scoped delegation grants.
 4. **Collaboration.** Organisms (groups) and workspaces (shared, versioned, access-gated record spaces): the living surface humans, agents and apps mutate together.
-5. **Economy and metering.** Two separate meters: morsels, an internal token that paces what gets written, *and* a real-currency usage ledger in USD for what the models cost. Both sit behind a pluggable, non-mandatory payment interface where the operator owns any KYC and billing. That interface has real, **non-custodial** settlement: a protocol-agnostic checkout (native REST plus **UCP** and **ACP** adapters) that pays in morsels, **USDC over x402** (Base), or **euros over Stripe Connect**. Funds land on the seller, never the node.
+5. **Economy and metering.** Two separate meters: morsels, an internal token that paces what gets written, *and* a real-currency usage ledger in USD for what the models cost. Money moves only through a pluggable, non-mandatory payment interface where the operator owns any KYC and billing. That interface has real, **non-custodial** settlement: a protocol-agnostic checkout (native REST plus **UCP** and **ACP** adapters) that settles in **USDC over x402** (Base) or in **euros on the seller's own Stripe account**. Funds land on the seller, never the node.
 6. **Federation.** Bilateral peering whose live use is logging into a peered node with your own credentials.
 7. **Observability.** Metrics, health, telemetry.
 
@@ -160,7 +160,7 @@ A node MUST implement Identity, Data, and Authorization. Economy, Collaboration,
 
 On top of the protocol sits the application layer. Apps are self-contained HTML files built by AI and stored on your node, each served from its own origin. Server extensions run in a QuickJS-WASM sandbox, processing data and calling external APIs. Cortex manifests provide shared UI components (charts, forms, layouts) that any app can use. Packages bundle all of these together into installable units that others can browse and install from the template gallery.
 
-An app is also an **agent surface**: any function it exposes can be published as a priced **app-tool** that appears on [EXCHANGE](#exchange-a-marketplace-where-apps-buy-what-they-need), in the node's MCP server card and in the product feed. On aimeat.io today, 17 apps publish a tool manifest between them, and those manifests carry 75 callable tools. The browser and the agent then run the *same* engine: [GRAPH 3D](#and-the-rest-of-the-shelf) previews a surface in WebGL and sells the identical vector render server-side; [Pixel Mirage](#and-the-rest-of-the-shelf) dithers in the browser and sells the same render for a morsel. One implementation, two audiences.
+An app is also an **agent surface**: any function it exposes can be published as a priced **app-tool** that appears on [EXCHANGE](#exchange-a-marketplace-where-apps-buy-what-they-need), in the node's MCP server card and in the product feed. On aimeat.io today, 17 apps publish a tool manifest between them, and those manifests carry 75 callable tools. The browser and the agent then run the *same* engine: [GRAPH 3D](#and-the-rest-of-the-shelf) previews a surface in WebGL and sells the identical vector render server-side. One implementation, two audiences.
 
 ### Node types
 
@@ -232,8 +232,8 @@ write at all if it cannot parse what is there.
 
 After it runs you are talking to your own memory, apps, organisms, workspaces, tasks and the
 marketplace from that window: "what do I have in my workspace", "build me an app that does X",
-"what did my agents do today". The full toolset is 303 tools; the four surfaces above cut that to the
-part of the job you are actually doing.
+"what did my agents do today". The full toolset at `/v1/mcp` is much larger; the four surfaces above cut
+it to the part of the job you are actually doing.
 
 **Goose is the one to try if you want a chat that is not Claude, ChatGPT or Grok.** It is an open
 source terminal agent that takes its model from **OpenRouter**, so you pick the model and pay per
@@ -372,18 +372,9 @@ Every app below is a **single HTML file** living on the node, built by talking t
 
 You write a sentence; a window appears on the board and fills itself in. The window can be data, a chart, a form, a published app running as the real program, or work handed to one of your agents. Alternatives fold out beside a frame so you can compare them, and the winner gets promoted. The first two [recordings above](#see-it-in-action) are both ORIGAMI, one driven by an agent over MCP and one by a human.
 
-<p align="center">
-  <img src="assets/screenshots/origami-till-nuotta.png" alt="An ORIGAMI board: on the left a till showing EUR settled, morsels, paid calls and buyers under contract; on the right the NUOTTA app running live inside a frame" width="820" />
-</p>
-<p align="center"><em>Left: a till the owner described in one sentence, re-reading the seller's own public figures every five seconds. Right: NUOTTA, the actual app, running inside a frame on the same board.</em></p>
-
 #### EXCHANGE: a marketplace where apps buy what they need
 
-Providers list capabilities (data feeds, APIs, agent work, callable app-tools); apps and agents browse or post a need, accept a budget-capped contract, and every call is metered. Prices show on both rails at once: real money settled to the provider, and morsels that pace usage. Today the board carries 45 offerings, 5 open needs and 41 providers.
-
-<p align="center">
-  <img src="assets/screenshots/app-exchange.png" alt="EXCHANGE: 45 offerings, 5 needs, 9 contracts, settlement in USDC and EURC over x402 and in Stripe EUR/USD, with a composite listing priced at 20 morsels per call" width="820" />
-</p>
+Providers list capabilities (data feeds, APIs, agent work, callable app-tools); apps and agents browse or post a need, accept a budget-capped contract, and every call is metered. Prices are in money, settled to the provider in USDC or EURC over x402 or in EUR or USD on the provider's own Stripe account. Morsels only pace how much is used. Today the board carries 45 offerings, 5 open needs and 41 providers.
 
 #### ODPS: the descriptor a listing already speaks
 
@@ -560,7 +551,6 @@ Any priced thing on a node, an agent offer or a callable **app-tool**, is a chec
 
 Settlement is **non-custodial** and pluggable. The same session settles in:
 
-- **morsels**, the internal pacing token, on the node's own ledger;
 - **USDC over x402** (Base): an external x402-compatible agent signs an EIP-3009 authorization, a facilitator verifies and settles it on-chain, and funds move straight to the seller's wallet. The node holds nothing, proven end to end on Base Sepolia;
 - **euros over Stripe**: the charge runs on the seller's OWN Stripe secret, so they are the merchant of record and the money lands on their balance. The node holds neither key nor funds;
 - **an invoice**: nothing is captured online, the order completes and the obligation is booked for the seller to bill offline.
@@ -585,7 +575,7 @@ Knowledge packages are versioned, typed bundles (research, datasets, tutorials, 
   <img src="assets/screenshots/profile-federation.png" alt="Federation and peers: two connected peers, each shown with its address, its membership and permanence, and whether it is online" width="820" />
 </p>
 
-Nodes peer with each other through a 5-phase handshake: discover, introduce, test, approve, activate. Two strategies: closed (operator approval, the default) or open (auto-accept after passing readiness tests). Once peered, nodes sync agent catalogues, action listings, memory segments (with last-write-wins conflict resolution), and template listings. Multi-hop query routing works across the network at 1 morsel per hop. Heartbeats run every 5 minutes; 3 failures mark a peer degraded, 10 mark it offline.
+Nodes peer with each other through a 5-phase handshake: discover, introduce, test, approve, activate. Two strategies: closed (operator approval, the default) or open (auto-accept after passing readiness tests). Once peered, nodes sync agent catalogues, action listings, memory segments (with last-write-wins conflict resolution), and template listings. Heartbeats run every 5 minutes; 3 failures mark a peer degraded, 10 mark it offline.
 
 ### Anonymous and registered access
 
@@ -671,26 +661,32 @@ Server runs on port 40050. Quick test: paste this into any AI chat:
 
 If the AI reads the docs and explains the protocol, everything works. The admin dashboard URL is shown in the startup log.
 
-### Desktop app (Windows), no terminal needed
+### Desktop app (Windows, macOS, Linux), no terminal needed
 
-For a personal node without the command line, **AIMEAT Personal Node** is a one-click Windows installer that
-bundles everything (the node server, a Node.js runtime, and a persistent SQLite database), so there are **no
-prerequisites** to install. A small control panel starts and stops the node, shows status and live logs, configures
-it (port, federation role), connects a local AI (Ollama or LM Studio) to your account, and opens the web
-dashboard in your browser. Your data lives in your own app-data folder and survives restarts.
+**AIMEAT Personal Node** is a desktop app for Windows, Apple-silicon Macs and Linux. It does two things:
 
-**Download:** get the latest installer from the [GitHub Releases page](https://github.com/miikkij/aimeat-protocol/releases/latest).
+- **Attach the AI tools on this computer to your AIMEAT.** Its first screen lists Claude Code, Cursor and
+  VS Code, and attaches or detaches each one with one click. For Claude Desktop and Codex it gives you the
+  address and the lines to paste. This works whether your AIMEAT is aimeat.io or a server of your own.
+- **Run an AIMEAT of your own on this computer.** The app bundles the node server, a Node.js runtime and a
+  persistent SQLite database, so there is nothing else to install. It starts and stops the node on port
+  **41050**, lets you choose the AI that runs on this computer (LM Studio, Ollama or an address of your own),
+  changes its settings and shows its log. Everything else opens in your browser at
+  `http://localhost:41050/v1/portal`. Your data lives in your own app-data folder and survives restarts.
 
-> **Windows SmartScreen note.** The installer is not yet code-signed, so Windows may show a blue
-> *"Windows protected your PC"* SmartScreen prompt the first time you run it. This is expected for
-> new independent software and does **not** mean anything is wrong with the download. To continue,
-> click **More info → Run anyway**. If you would like to verify the file first, every release lists the
-> binaries on its [Releases page](https://github.com/miikkij/aimeat-protocol/releases/latest), and you
-> can also build it yourself from source (below). A signed installer is on our roadmap.
+**Download:** the newest installers are on the [desktop-latest release](https://github.com/miikkij/aimeat-protocol/releases/tag/desktop-latest),
+at names that do not change:
+[Windows](https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node-setup.exe) ·
+[macOS, Apple silicon](https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node.dmg) ·
+[Linux AppImage](https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node.AppImage) ·
+[Linux .deb](https://github.com/miikkij/aimeat-protocol/releases/download/desktop-latest/AIMEAT-Personal-Node.deb).
+The installed app updates itself from the same release.
 
-<p align="center">
-  <img src="assets/screenshots/aimeat-desktop.png" alt="AIMEAT Personal Node desktop app: control panel with Getting Started steps, node status (running on port 40050), and node info" width="640" />
-</p>
+> **The installers are not code-signed yet.** On Windows the first launch may show a blue
+> *"Windows protected your PC"* SmartScreen prompt: click **More info → Run anyway**. On a Mac the app is
+> refused as unverified the first time: allow it under **System Settings → Privacy & Security → Open Anyway**.
+> This is expected for unsigned software. If you want to check the files first, each version's
+> `desktop-v*` release lists them, and you can also build the app from source (below).
 
 Build the installer from source (a Rust toolchain, Node 24 and pnpm are needed to *build* it, not to *run* it):
 
@@ -698,8 +694,8 @@ Build the installer from source (a Rust toolchain, Node 24 and pnpm are needed t
 pnpm build-desktop   # installer lands in aimeat-desktop/src-tauri/target/release/bundle/
 ```
 
-Built with [Tauri](https://tauri.app). Windows is the supported target today, and macOS or Linux can follow via per-OS
-CI. Developer docs: [aimeat-desktop/README.md](aimeat-desktop/README.md).
+Built with [Tauri](https://tauri.app). CI builds Windows, macOS and Linux each on its own runner
+(`.github/workflows/release-desktop.yml`). Developer docs: [aimeat-desktop/README.md](aimeat-desktop/README.md).
 
 ---
 
@@ -718,11 +714,11 @@ aimeat-protocol/
 ├── openapi.yaml              canonical API contract (OpenAPI 3.1)
 ├── startup.prompt.md         paste-to-AI: fresh clone → running node
 ├── aimeat/                   ★ the reference implementation (Node 24 / TypeScript / Express 5)
-│   ├── src/routes/           184 route modules (one per domain)
-│   ├── src/services/         390 business-logic services
+│   ├── src/routes/           route modules, one per domain
+│   ├── src/services/         business-logic services
 │   ├── src/storage/          Storage interface + PostgreSQL(Kysely) / SQLite providers
-│   ├── src/mcp/              303 MCP tools, one definition per tool, shared by every surface
-│   ├── src/auth/  middleware/  models/  server-bootstrap/  cli/  enterprise/
+│   ├── src/mcp/              the MCP server; each tool is defined once in src/tool-catalog/definitions/
+│   ├── src/auth/  middleware/  models/  server-bootstrap/  cli/
 │   ├── src/static/sdk-libs/  browser SDK libs, ESM source → esbuild IIFE at /v1/libs/
 │   ├── public/               Preact + HTM SPA, no build (views, components, js, css, lib)
 │   ├── locales/  test/  tools/   i18n · E2E suites · dev tools (synthtraces)
@@ -778,7 +774,7 @@ Start with the [documentation index](docs/README.md). The [file catalog](docs/ca
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| v4.0 | 2026-07-12 | Two-layer Core/Platform re-baseline; GEAI ecosystem apps; organisms/workspaces, app grants, agent fleet plane, skills/capabilities, metering ledger made first-class; economy = meters not one currency; micro-memory/OTK/boards/Foundry deprecated |
+| v4.0 | 2026-07-12 | Two-layer Core/Platform re-baseline; GEAI ecosystem apps; organisms/workspaces, app grants, agent fleet plane, skills/capabilities, metering ledger made first-class; economy = meters not one currency; micro-memory/OTK/boards/Foundry deprecated (boards reinstated 2026-08-30) |
 | v3.0 | 2026-03-18 | Package system, device auth (RFC 8628), SSE, permissions |
 | v2.0 | 2026-03-08 | Node types, moderation, idempotency |
 | v1.x | 2025-2026 | Core protocol and early features |

@@ -7,16 +7,23 @@
 ## Current parser limits
 
 The [parser](../aimeat/src/services/csm-parser.ts) is the implementation authority.
-Its field constraints use `min` and `max`, including string lengths and array
-sizes. Raw JSON Schema keywords such as `minLength`, `maxLength`, `minimum`
-and `maximum` in a CSM field are not equivalent and are ignored. Nested field
-requiredness uses each property's `required` flag, not an object-level array.
-A manifest parsing successfully does not prove that every annotation is enforced.
+A field limit can be written two ways, and both reach the compiled schema:
+the short `min` and `max`, which the parser maps to the keyword the field's
+type needs, or that JSON Schema keyword itself (`minLength`, `maxLength`,
+`minimum`, `maximum`, `minItems`, `maxItems`). When a field states both, the
+JSON Schema keyword wins. `default` and `description` are copied into the
+compiled schema as written.
 
-The examples in root `docs/csm-examples` and package `aimeat/docs/csm-examples`
-are different sets. The package set is loaded at runtime and includes older
-constraint spellings. Inspect the compiled schema before relying on those limits.
-This documentation cleanup preserves their runtime content.
+A nested property is required unless it says `required: false` or states a
+`default`. An object field can instead list its required properties, as
+JSON Schema does (`required: [amount]`), and that list then decides alone.
+
+The parser reads only the keys this document lists. A key it does not read
+(for example `pattern`, or a whole `economy` block) parses without an error
+and has no effect.
+
+The package set `aimeat/docs/csm-examples` is the one the node loads at boot.
+The root `docs/csm-examples` set is not loaded by anything.
 
 ## 1. Overview
 
@@ -121,11 +128,17 @@ data_schema:
 | `type` | string | all | **Required.** One of: `string`, `number`, `integer`, `boolean`, `array`, `object`. |
 | `min` | number | string, number, integer, array | Minimum. Maps to `minLength` / `minimum` / `minItems`. |
 | `max` | number | string, number, integer, array | Maximum. Maps to `maxLength` / `maximum` / `maxItems`. |
+| `minLength`, `maxLength` | number | string | Same as `min` / `max` on a string. Wins over them when both are given. |
+| `minimum`, `maximum` | number | number, integer | Same as `min` / `max` on a number. Wins over them when both are given. |
+| `minItems`, `maxItems` | number | array | Same as `min` / `max` on an array. Wins over them when both are given. |
+| `default` | any | all | Copied into the compiled schema. A nested property with a default is optional. The node does not fill the value in on write. |
+| `description` | string | all | Copied into the compiled schema. |
 | `enum` | string[] | string | Allowed values. |
 | `format` | string | string | Format hint: `"uri"`, `"date-time"`, `"email"`. Passed to JSON Schema. |
 | `items` | string or CsmFieldDef | array | Element type. String shorthand (e.g., `"string"`) expands to `{ type: <value> }`. |
-| `properties` | Record\<string, CsmFieldDef\> | object | Nested field definitions. Each may include `required: boolean`. |
-| `required` | boolean | nested properties | Whether this property is required in its parent object. Default: `true`. |
+| `properties` | Record\<string, CsmFieldDef\> | object | Nested field definitions. |
+| `required` | boolean | nested properties | `false` makes this property optional in its parent object. Default: required, unless the property states a `default`. |
+| `required` | string[] | object | The names of this object's required properties. When present, it decides alone and the per-property flags are not read. Each name must be one of the object's properties. |
 
 ### 7.2 Type Examples
 
@@ -160,6 +173,15 @@ location:
   properties:
     city: { type: string }
     area: { type: string, required: false }
+
+# the same limits in JSON Schema names, and an object-level required list
+summary: { type: string, minLength: 10, maxLength: 500 }
+asking_price:
+  type: object
+  properties:
+    amount: { type: number, minimum: 0 }
+    currency: { type: string, default: "EUR" }
+  required: [amount]
 ```
 
 ### 7.3 JSON Schema Generation
@@ -168,9 +190,10 @@ location:
 
 1. Fields from `required` go into both `properties` and the `required` array.
 2. Fields from `optional` go into `properties` only.
-3. Each CsmFieldDef maps `min`/`max` to the appropriate JSON Schema keyword per type.
+3. Each CsmFieldDef maps `min`/`max` to the appropriate JSON Schema keyword per type. A JSON Schema keyword written on the field (`minLength` and the rest) is used as it is, and wins over `min`/`max`.
 4. `schema_mode: "strict"` adds `"additionalProperties": false`.
-5. For `object` fields, nested properties with `required !== false` are collected into a nested `required` array.
+5. For `object` fields, a `required: [names]` list becomes the nested `required` array as it is. Without a list, the nested properties that neither say `required: false` nor state a `default` are collected into it.
+6. `default` and `description` are copied into the field's schema.
 
 ---
 
@@ -254,6 +277,7 @@ data means, so a prefix that expands to nothing would be published under this no
 | `service.description` non-empty | `"service.description is required"` |
 | At least one required field | `"data_schema.required must have at least one field"` |
 | Every field has a `type` | `"data_schema field \"<name>\" is missing type"` |
+| An object's `required` list names only its own properties | `"data_schema field \"<path>\": required names \"<name>\", which is not one of its properties"` |
 | `visibility_default` is valid | `"consent_requirements.visibility_default must be one of: private, dmz, local, federation, public"` |
 | Every prefix in `service.semantic` resolves | `"service.semantic: \"@type\": \"shop:Directory\" uses the prefix \"shop:\", which no @context defines…"` |
 

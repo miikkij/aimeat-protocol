@@ -176,7 +176,7 @@
       const tools = [
         {
           name: "aimeat-commerce-feed",
-          description: "List everything for sale on this AIMEAT node: agent offers and priced app-tools (per-call functions of published apps), with prices in morsels or money micro-units.",
+          description: "List everything for sale on this AIMEAT node: agent offers and priced app-tools (per-call functions of published apps), with money prices in micro-units.",
           inputSchema: { type: "object", properties: {} },
           async execute() {
             const r = await fetch(NODE_URL2 + "/v1/commerce/feed");

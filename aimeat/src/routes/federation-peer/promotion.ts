@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Peer promotion-eligibility metrics helper (Phase B). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-11 — protocolVersion is left unstated instead of a hard-coded 'v1'; the
+ *     version comparison in utils/protocol-version.ts reads a missing value as v1.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
  */
 
@@ -30,7 +32,9 @@ export async function promotionMetrics(storage: Storage, peer: PeerInfo, allWork
         // instead structurally demotes a member back to visiting (see federation-sync.ts).
         activeFlags: 0,
         signedIntroduce: !!peer.publicKey,
-        protocolVersion: 'v1',
+        // No peer states a protocol version yet (discovery gains protocol_version with AIMEAT Core
+        // 2026-11). Unstated reads as v1 inside the comparison, so nothing here claims one for it.
+        protocolVersion: undefined,
         nodeUrl: peer.url,
     };
 }

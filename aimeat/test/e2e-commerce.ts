@@ -114,7 +114,7 @@ await test('Setup: operator-neutral + seller + buyer owners; seller publishes pr
 
 // The signed-in checkout at /ucp/v1 is written against UCP 2026-04-08, and its profile has its own
 // address since /.well-known/ucp became the 2026-08-25 profile of the guest checkout (2026-10-08).
-await test('1. GET /.well-known/ucp/2026-04-08 — profile advertises checkout + the morsel handler', async () => {
+await test('1. GET /.well-known/ucp/2026-04-08 — profile advertises checkout and money handlers only', async () => {
     const res = await fetch(`${BASE}/.well-known/ucp/2026-04-08`);
     assert(res.status === 200, `status ${res.status}`);
     const profile = await res.json() as any;
@@ -134,8 +134,11 @@ await test('1. GET /.well-known/ucp/2026-04-08 — profile advertises checkout +
     const checkout = profile.ucp.capabilities['dev.ucp.shopping.checkout']?.[0];
     assert(!!checkout?.endpoints?.create, 'missing checkout capability endpoints');
     assert(/^\d{4}-\d{2}-\d{2}$/.test(checkout.version), `capability version must be YYYY-MM-DD, got ${checkout.version}`);
-    const handlers = (profile.ucp.payment_handlers || []).map((h: any) => h.id);
-    assert(handlers.includes('io.aimeat.morsels'), `morsel handler missing: ${JSON.stringify(handlers)}`);
+    // A UCP price is money: the morsel ledger is not a payment handler here (ruling D4, 2026-10-11).
+    const handlers = profile.ucp.payment_handlers || [];
+    assert(!handlers.some((h: any) => h.id === 'io.aimeat.morsels'), `the morsel ledger is advertised: ${JSON.stringify(handlers)}`);
+    assert(!handlers.some((h: any) => (h.currencies || []).some((c: string) => c.toLowerCase() === 'morsel')),
+        `a handler lists morsel as a currency: ${JSON.stringify(handlers)}`);
     assert(Array.isArray(profile.signing_keys) && profile.signing_keys[0]?.crv === 'Ed25519', 'missing Ed25519 signing key');
 });
 
@@ -262,24 +265,28 @@ await test('13. Seller order list shows the received order; buyer\'s order list 
     assert(!buyerIds.includes(sessionId), 'the order copy belongs to the seller, not the buyer');
 });
 
-await test('14. UCP adapter: create + complete via /ucp/v1 with the ucp envelope', async () => {
+await test('14. UCP adapter: an offer priced only in morsels is not sold in morsels (MONEY_PRICE_REQUIRED)', async () => {
     const create = await json('/ucp/v1/checkout-sessions', {
         method: 'POST', headers: auth(buyer.token),
         body: JSON.stringify({ line_items: [{ item: { id: `offer:${vendorGaii}:translate-doc` }, quantity: 1 }] }),
     });
-    assert(create.status === 201, `ucp create ${create.status}: ${JSON.stringify(create.body)}`);
+    assert(create.status === 422 && create.body.error?.code === 'MONEY_PRICE_REQUIRED', `ucp create ${create.status}: ${JSON.stringify(create.body)}`);
     assert(create.body.ucp?.version === '2026-04-08', `ucp.version: ${JSON.stringify(create.body.ucp)}`);
-    assert((create.body.ucp.capabilities || []).some((c: any) => c.name === 'dev.ucp.shopping.checkout'), 'ucp.capabilities echoed');
-    const cs = create.body.checkout_session;
-    assert(cs.status === 'open' && cs.totals?.grand_total === PRICE, `ucp session: ${JSON.stringify(cs)}`);
-    assert(cs.line_items?.[0]?.item?.id === `offer:${vendorGaii}:translate-doc`, 'ucp item id round-trips');
-    const done = await json(`/ucp/v1/checkout-sessions/${cs.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
-    assert(done.status === 200, `ucp complete ${done.status}: ${JSON.stringify(done.body)}`);
-    assert(done.body.checkout_session?.status === 'completed', `ucp completed: ${done.body.checkout_session?.status}`);
-    assert(done.body.checkout_session?.payment?.receipt?.charged === PRICE, 'ucp receipt present');
+    const asMorsel = await json('/ucp/v1/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ line_items: [{ item: { id: `offer:${vendorGaii}:translate-doc` }, quantity: 1 }], currency: 'morsel' }),
+    });
+    assert(asMorsel.status === 422 && asMorsel.body.error?.code === 'MONEY_PRICE_REQUIRED', `currency morsel ${asMorsel.status}: ${JSON.stringify(asMorsel.body)}`);
+    // A morsel session opened at the node's own checkout is not shown through UCP.
+    const native = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }),
+    });
+    assert(native.status === 201, `native create ${native.status}`);
+    const read = await json(`/ucp/v1/checkout-sessions/${native.body.data.session.id}`, { headers: auth(buyer.token) });
+    assert(read.status === 422 && !JSON.stringify(read.body).includes('"currency":"morsel"'), `a morsel session through UCP: ${read.status} ${JSON.stringify(read.body)}`);
 });
 
-await test('15. ACP surface: discovery doc + feed lists the public priced offer', async () => {
+await test('15. ACP surface: discovery doc + feed lists money prices only, never MORSEL', async () => {
     const disc = await fetch(`${BASE}/.well-known/acp.json`);
     assert(disc.status === 200, `acp.json ${disc.status}`);
     const doc = await disc.json() as any;
@@ -287,26 +294,22 @@ await test('15. ACP surface: discovery doc + feed lists the public priced offer'
     const feedRes = await fetch(`${BASE}/v1/commerce/feed`);
     assert(feedRes.status === 200, `feed ${feedRes.status}`);
     const feed = await feedRes.json() as any;
-    const entry = (feed.products || []).find((p: any) => p.id === `offer:${vendorGaii}:translate-doc`);
-    assert(!!entry, `public priced offer in feed (${feed.total} products)`);
-    assert(entry.price?.amount === PRICE && entry.price?.currency === 'MORSEL', `feed price: ${JSON.stringify(entry.price)}`);
+    // translate-doc is priced only in morsels. A morsel paces writes and is not a currency, so it is
+    // not a product in a money feed (ruling D4, 2026-10-11).
+    assert(!(feed.products || []).some((p: any) => p.id === `offer:${vendorGaii}:translate-doc`), 'a morsel-priced offer is not listed');
+    assert(!(feed.products || []).some((p: any) => String(p.price?.currency).toLowerCase() === 'morsel'),
+        `no feed price is in morsels: ${JSON.stringify((feed.products || []).map((p: any) => p.price))}`);
     assert(!(feed.products || []).some((p: any) => p.id.endsWith(':secret-work')), 'private offers stay out of the feed');
+    assert(!/morsel/i.test(JSON.stringify(doc)), `the discovery document speaks of morsels: ${JSON.stringify(doc)}`);
 });
 
-await test('16. ACP checkout: create by sku + complete (morsel settlement)', async () => {
+await test('16. ACP checkout: an offer priced only in morsels is refused, not settled in morsels', async () => {
     const create = await json('/acp/v1/checkout_sessions', {
         method: 'POST', headers: auth(buyer.token),
         body: JSON.stringify({ items: [{ id: `offer:${vendorGaii}:translate-doc`, quantity: 1 }] }),
     });
-    assert(create.status === 201, `acp create ${create.status}: ${JSON.stringify(create.body)}`);
-    assert(create.body.status === 'ready_for_payment', `acp status: ${create.body.status}`);
-    const done = await json(`/acp/v1/checkout_sessions/${create.body.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
-    assert(done.status === 200 && done.body.status === 'completed', `acp complete: ${done.status} ${done.body.status}`);
-    // The stripe provider maps to a REGISTERED handler (card settlement is core), so the refusal
-    // here is about the money: this session is priced in morsels and a card cannot settle it.
-    const create2 = await json('/acp/v1/checkout_sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ id: `offer:${vendorGaii}:translate-doc` }] }) });
-    const stripe = await json(`/acp/v1/checkout_sessions/${create2.body.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment_data: { provider: 'stripe' } }) });
-    assert(stripe.status === 422 && stripe.body.error?.code === 'CURRENCY_MISMATCH', `stripe against a morsel session: ${stripe.status} ${stripe.body.error?.code}`);
+    assert(create.status === 422 && create.body.error?.code === 'MONEY_PRICE_REQUIRED', `acp create ${create.status}: ${JSON.stringify(create.body)}`);
+    assert(!JSON.stringify(create.body.accepts ?? []).includes('morsel'), 'no morsel scheme in the refusal');
 });
 
 await test('17. 402 responses carry the x402-style accepts block', async () => {
@@ -413,18 +416,19 @@ limits:
     assert(write.status === 200 || write.status === 201, `manifest write ${write.status}: ${JSON.stringify(write.body.error)}`);
 });
 
-await test('21. Feed lists priced app-tools with the fulfillment hint (call vs task)', async () => {
+await test('21. Morsel-priced app-tools stay out of the money feed; the tool catalog keeps the fulfillment hint (call vs task)', async () => {
     const feedRes = await fetch(`${BASE}/v1/commerce/feed`);
     const feed = await feedRes.json() as any;
-    const sku = `app-tool:${appRef}:echo`;
-    const entry = (feed.products || []).find((p: any) => p.id === sku);
-    assert(!!entry, `app-tool in feed: ${sku} (${feed.total} products)`);
-    assert(entry.price?.amount === 3 && entry.price?.currency === 'MORSEL', `feed price: ${JSON.stringify(entry.price)}`);
-    assert(entry.fulfillment === 'call', `callable tool fulfillment hint: ${entry.fulfillment}`);
+    for (const tool of ['echo', 'concierge', 'unpriced-echo']) {
+        assert(!(feed.products || []).some((p: any) => p.id === `app-tool:${appRef}:${tool}`), `${tool} is not in the money feed`);
+    }
+    // The node's own tool catalog still lists them, with the hint the checkout acts on.
+    const catalog = await (await fetch(`${BASE}/v1/commerce/tools`)).json() as any;
+    const entry = (catalog.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:echo`);
+    assert(entry?.fulfillment === 'call', `callable tool fulfillment hint: ${JSON.stringify(entry)}`);
     // Phase B: unbound priced tools are purchasable on the task path and list too.
-    const taskEntry = (feed.products || []).find((p: any) => p.id === `app-tool:${appRef}:concierge`);
-    assert(!!taskEntry && taskEntry.fulfillment === 'task', `task tool in feed with hint: ${JSON.stringify(taskEntry)}`);
-    assert(!(feed.products || []).some((p: any) => p.id === `app-tool:${appRef}:unpriced-echo`), 'unpriced tools stay out of the feed');
+    const taskEntry = (catalog.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:concierge`);
+    assert(!!taskEntry && taskEntry.fulfillment === 'task', `task tool with hint: ${JSON.stringify(taskEntry)}`);
 });
 
 await test('22. Buy an app-tool call → charged, capability invoked, result on fulfillment.results', async () => {
@@ -613,10 +617,11 @@ await test('32. MCP Server Card embeds the catalog inline (default mode) + keeps
     const echo = (ct.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:echo`);
     assert(!!echo && echo.inputSchema && echo.price?.morsels === 3, `echo inline on the card: ${JSON.stringify(echo)}`);
     assert(ct.total === ct.tools.length, 'total matches inline entries');
-    // The feed and the card come from the SAME enumerator — sku sets must agree.
+    // The feed and the card come from the SAME enumerator — sku sets must agree. The feed is the
+    // money surface, so it carries the card's money-priced tools (ruling D4, 2026-10-11).
     const feed = await (await fetch(`${BASE}/v1/commerce/feed`)).json() as any;
     const feedSkus = (feed.products || []).filter((p: any) => p.id.startsWith('app-tool:')).map((p: any) => p.id).sort();
-    const cardSkus = (ct.tools || []).map((t: any) => t.sku).sort();
+    const cardSkus = (ct.tools || []).filter((t: any) => t.priceMoney).map((t: any) => t.sku).sort();
     assert(JSON.stringify(feedSkus) === JSON.stringify(cardSkus), `feed/card sku drift: ${JSON.stringify({ feedSkus, cardSkus })}`);
 });
 
@@ -758,6 +763,37 @@ await test('37. The same EUR sale settles offline through the invoice rail, book
     assert(entry.currency === 'EUR' && entry.amount > 0, `the payable carries the money amount: ${JSON.stringify(entry)}`);
 });
 
+await test('37b. UCP and ACP sell the EUR offer in money: the feed lists it, the session is EUR, completion names its handler', async () => {
+    const feed = await (await fetch(`${BASE}/v1/commerce/feed`)).json() as any;
+    const listed = (feed.products || []).find((p: any) => p.id === `offer:${vendorGaii}:eur-service`);
+    assert(listed?.price?.currency === 'EUR' && listed.price.amount === 2_000_000, `EUR offer in the feed: ${JSON.stringify(listed)}`);
+
+    const ucp = await json('/ucp/v1/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ line_items: [{ item: { id: `offer:${vendorGaii}:eur-service` }, quantity: 1 }] }),
+    });
+    assert(ucp.status === 201, `ucp create ${ucp.status}: ${JSON.stringify(ucp.body)}`);
+    const cs = ucp.body.checkout_session;
+    assert(cs.currency === 'EUR' && cs.totals?.grand_total === 2_000_000, `the session is in EUR: ${JSON.stringify(cs)}`);
+    assert(!(cs.payment?.handlers || []).some((h: any) => h.id === 'io.aimeat.morsels'), `handlers: ${JSON.stringify(cs.payment?.handlers)}`);
+    const unnamed = await json(`/ucp/v1/checkout-sessions/${cs.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(unnamed.status === 422 && unnamed.body.error?.code === 'PAYMENT_HANDLER_REQUIRED' && /io\.aimeat\.invoice/.test(unnamed.body.error.message),
+        `complete with no handler: ${unnamed.status} ${JSON.stringify(unnamed.body.error)}`);
+    const done = await json(`/ucp/v1/checkout-sessions/${cs.id}/complete`, {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'io.aimeat.invoice' } }),
+    });
+    assert(done.status === 200 && done.body.checkout_session?.status === 'completed', `ucp invoice complete ${done.status}: ${JSON.stringify(done.body)}`);
+
+    const acp = await json('/acp/v1/checkout_sessions', {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ id: `offer:${vendorGaii}:eur-service` }] }),
+    });
+    assert(acp.status === 201 && acp.body.currency === 'EUR', `acp create ${acp.status}: ${JSON.stringify(acp.body)}`);
+    const acpDone = await json(`/acp/v1/checkout_sessions/${acp.body.id}/complete`, {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment_data: { handler: 'io.aimeat.invoice' } }),
+    });
+    assert(acpDone.status === 200 && acpDone.body.status === 'completed', `acp invoice complete ${acpDone.status}: ${JSON.stringify(acpDone.body)}`);
+});
+
 // ─── Web Bot Auth: outbound safeFetch traffic is signed (RFC 9421) and verifiable ───
 
 await test('33. Outbound UCP profile fetch carries a verifiable Web Bot Auth signature', async () => {
@@ -775,7 +811,7 @@ await test('33. Outbound UCP profile fetch carries a verifiable Web Bot Auth sig
     try {
         const create = await json('/ucp/v1/checkout-sessions', {
             method: 'POST', headers: { ...auth(buyer.token), 'UCP-Agent': `http://127.0.0.1:${port}/profile` },
-            body: JSON.stringify({ line_items: [{ item: { id: `offer:${vendorGaii}:translate-doc` }, quantity: 1 }] }),
+            body: JSON.stringify({ line_items: [{ item: { id: `offer:${vendorGaii}:eur-service` }, quantity: 1 }] }),
         });
         assert(create.status === 201, `ucp create ${create.status}: ${JSON.stringify(create.body)}`);
         assert(typeof captured['signature'] === 'string' && typeof captured['signature-input'] === 'string' && typeof captured['signature-agent'] === 'string',

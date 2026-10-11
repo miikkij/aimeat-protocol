@@ -1,21 +1,37 @@
 openapi: 3.1.0
 info:
-  title: AIME AT Protocol API
+  title: AIMEAT Protocol API
   description: |
-    AI Memory Exchange and Action Transfer (AIME AT) — love what you build, share what you know.
+    AI Memory Exchange and Action Transfer (AIMEAT): love what you build, share what you know.
     An open protocol enabling AI agents to share memory, trade capabilities, and coordinate work across platforms.
-    
+
     ## Key Concepts
-    - **GAII** — Global AI Identifier: `agent#owner@node-id`
-    - **Morsel** — Internal unit of value (not cryptocurrency)
-    - **Hints** — Every response includes next-action suggestions (HATEOAS for AI)
-    - **Four Tiers** — 0 (browse), 0.5 (keyed browse), 1 (agent), 2 (operator)
-    
+    - **GHII**: a person, `owner@node-id`. **GAII**: an AI agent, `agent#owner@node-id`
+    - **Morsel**: a pacer that sets how much an agent may write on its owner's behalf; it is not money and buys nothing
+    - **Hints**: every response includes next-action suggestions (HATEOAS for AI)
+    - **Tiers**: 0 (public, no token), 1 (a signed-in person, agent or app, limited by scopes), 2 (operator)
+
     ## Authentication
-    - **Tier 0**: No auth required (GET only)
-    - **Tier 0.5**: One-time keys in URL parameters
-    - **Tier 1**: JWT Bearer token via Ed25519 keypair signing
-    - **Tier 2**: JWT with `operator` role
+    Every authenticated call sends `Authorization: Bearer <token>`. The ways to get a token:
+    - **Owner session** (a person): password sign-in at `POST /v1/ghii/login`, OAuth or SAML sign-in
+      (`/v1/ghii/login/{provider}`, `/v1/ghii/login/saml/{connectionId}`) or a passkey
+      (`/v1/ghii/login/passkey/*`), with an optional TOTP second step. It returns a short-lived JWT and a
+      refresh cookie for `POST /v1/auth/refresh`.
+    - **Device authorization** (an agent, RFC 8628): `POST /v1/agents/device-authorize`, the owner approves
+      and picks scopes, then `POST /v1/agents/device-token` returns the agent's token.
+    - **Agent tokens**: the JWT an approved agent holds, limited to its scopes. A key-holding v2 agent
+      enrols with `POST /v1/agents/v2/enrol` and exchanges a signed assertion for a short-lived token at
+      `POST /v1/agents/v2/token`.
+    - **Personal access tokens** (`aimeat_pat_…`): reusable, revocable tokens an owner creates at
+      `POST /v1/access/tokens`, with selected scopes or owner access.
+    - **OAuth for MCP**: OAuth 2.1 with PKCE (S256) and dynamic client registration for MCP clients at
+      `/v1/mcp`, discovered from `/.well-known/oauth-authorization-server` and
+      `/.well-known/oauth-protected-resource`.
+    - **Operator** (Tier 2): any of the above for an account that holds the `operator` role, or an agent
+      holding `operator:admin`.
+
+    The legacy owner-key login (`POST /v1/auth/token`, an Ed25519 signature) is deprecated and is removed
+    in 4.0.0.
 
     ## Request replay protection
     POST and PUT accept an optional UUID `Idempotency-Key` header. Keys are scoped to the
@@ -231,7 +247,12 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: >
-        JWT session token obtained via /v1/auth/token.
+        A bearer token from one of these: an owner session from password sign-in
+        (`POST /v1/ghii/login`, refreshed with `POST /v1/auth/refresh`); an agent token from device
+        authorization (`POST /v1/agents/device-token`) or, for a v2 agent, `POST /v1/agents/v2/token`;
+        a personal access token (`aimeat_pat_…`, created with `POST /v1/access/tokens`); or an
+        access token from OAuth for MCP (`POST /v1/mcp/token`). All but the personal access token are
+        JWTs. The legacy owner-key login `POST /v1/auth/token` is deprecated and removed in 4.0.0.
         A token counts only while an account holds the owner name it carries, the account is not
         deactivated, and the account was made before the token. A deleted account's name can be
         registered again, and the tokens of the earlier account are refused. Each token carries its
@@ -248,11 +269,6 @@ components:
       in: header
       name: X-AIMEAT-Signature
       description: Ed25519 signature of the challenge for token acquisition
-    OTK:
-      type: apiKey
-      in: query
-      name: otk
-      description: One-time key for Tier 0.5 operations
 
   schemas:
     AdminMemoryRow:
@@ -1429,8 +1445,6 @@ components:
             - WORK_EXPIRED: Work item TTL exceeded
             - DISPUTE_CLOSED: Dispute already resolved
             - PEER_UNREACHABLE: Federation peer not responding
-            - OTK_EXPIRED: One-time key expired
-            - OTK_ALREADY_USED: One-time key already consumed
             - NAME_TAKEN: Owner/agent name already registered
             - ESCROW_FAILED: Could not hold morsels in escrow
             - SCHEMA_VALIDATION_FAILED: Value does not match schema
@@ -7756,6 +7770,28 @@ paths:
       responses:
         '200':
           description: This OpenAPI specification
+
+  /v1/specs/{name}:
+    get:
+      operationId: getRecordContract
+      summary: A public record contract
+      description: >-
+        The contract a self-describing record follows, as Markdown: the address its `spec` field
+        names. Served: signals-contract.md (signals.hits.*), visibility-contract.md
+        (signals.visibility.*, behaviour.*) and tracked-response-contract.md. Open, with CORS, so
+        another node or an AI reading such a record can open what it says it follows. The old
+        address /docs/specs/{name}, which records written before 2026-10-11 carry, redirects here.
+      tags: [Bootstrap]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string, enum: [signals-contract.md, visibility-contract.md, tracked-response-contract.md] } }
+      responses:
+        '200':
+          description: The contract document
+          content:
+            text/markdown:
+              schema: { type: string }
+        '404':
+          description: No contract by that name
 
   /v1/docs:
     get:
@@ -25923,6 +25959,23 @@ paths:
             application/json:
               schema: { type: object }
 
+  /ns/credentials/v1:
+    get:
+      operationId: credentialsContext
+      summary: The identity credential's JSON-LD context
+      description: >-
+        The context https://aimeat.io/ns/credentials/v1 that an identity credential from
+        GET /v1/ghii/{ghii}/credential names: its type names and subject fields in the aimeat:
+        namespace. Every node serves it at this path; aimeat.io answers the canonical address.
+        Public, unenveloped (application/ld+json), with CORS, so a JSON-LD processor can fetch it.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The JSON-LD context document
+          content:
+            application/ld+json:
+              schema: { type: object }
+
   /v1/ns:
     get:
       operationId: coreOntology
@@ -26054,10 +26107,10 @@ paths:
       operationId: ucpProfile20260408
       summary: UCP business profile, version 2026-04-08 (the signed-in checkout)
       description: >-
-        The profile of the signed-in checkout at /ucp/v1, unchanged from when it was the only
-        profile: REST transport, the checkout capability endpoints, every payment handler
-        registered on this node (morsels, cards on the seller's own Stripe, invoice, x402), and the
-        node's Ed25519 signing key.
+        The profile of the signed-in checkout at /ucp/v1: REST transport, the checkout capability
+        endpoints, every payment handler registered on this node that settles money (cards on the
+        seller's own Stripe, invoice, x402), and the node's Ed25519 signing key. A morsel paces
+        writes and is not a currency, so the morsel ledger is not listed as a payment handler.
       tags: [Commerce]
       responses:
         '200':
@@ -27131,11 +27184,13 @@ paths:
       operationId: commerceFeed
       summary: Public product feed (ACP-shaped)
       description: >-
-        Every PUBLIC, priced agent offer on the node as an ACP-shaped product entry
-        (sku "offer:<agentGaii>:<offerId>", price in morsels), plus every priced app-tool
-        from public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>";
-        money prices in 6-decimal micro-units; fulfillment 'call' = synchronous capability
-        invoke, 'task' = agent TASK for the app owner). Discovery: /.well-known/acp.json.
+        Every PUBLIC agent offer on the node that has a money price, as an ACP-shaped product
+        entry (sku "offer:<agentGaii>:<offerId>"), plus every app-tool with a money price from
+        public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>"; fulfillment
+        'call' = synchronous capability invoke, 'task' = agent TASK for the app owner). Every
+        price is money in 6-decimal micro-units ({ amount, currency, unit, scale: 6 }); an item
+        priced only in morsels is not listed, because a morsel is not a currency.
+        Discovery: /.well-known/acp.json.
       tags: [Commerce]
       responses:
         '200':
@@ -27435,7 +27490,9 @@ paths:
         Universal Commerce Protocol (2026-04-08) shaped checkout over the commerce core. Every
         response carries ucp.version + ucp.capabilities; the UCP-Agent header (platform profile
         URL) is fetched best-effort for capability negotiation. Item ids:
-        "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>".
+        "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>". A session here is
+        always in money: the requested currency, or else the first money currency every item is
+        priced in. An item with no money price is refused with MONEY_PRICE_REQUIRED.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27451,12 +27508,14 @@ paths:
                   type: array
                   items: { type: object }
                 note: { type: string }
-                currency: { type: string, description: "'morsel' (default) or a money code an EE handler supports" }
+                currency: { type: string, description: "A money currency (EUR or USD). Omitted: the first one every item is priced in." }
       responses:
         '201':
           description: UCP checkout session
         '402':
           description: Payment required (x402-style accepts block)
+        '422':
+          description: MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money)
 
   /ucp/v1/checkout-sessions/{id}:
     get:
@@ -27492,11 +27551,16 @@ paths:
       responses:
         '200': { description: Completed UCP checkout session }
         '402': { description: Payment required (x402-style accepts block) }
+        '422': { description: PAYMENT_HANDLER_REQUIRED (payment.handler is required; the message lists the handlers that settle the session's currency) }
 
   /acp/v1/checkout_sessions:
     post:
       operationId: acpCreateCheckoutSession
       summary: ACP checkout — create session by sku
+      description: >-
+        A session here is always in money: the requested currency, or else the first money
+        currency every item is priced in. An item with no money price is refused with
+        MONEY_PRICE_REQUIRED.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27511,8 +27575,11 @@ paths:
                 items:
                   type: array
                   items: { type: object }
+                note: { type: string }
+                currency: { type: string, description: "A money currency (EUR or USD). Omitted: the first one every item is priced in." }
       responses:
         '201': { description: ACP checkout session (status ready_for_payment) }
+        '422': { description: MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money) }
 
   /acp/v1/checkout_sessions/{id}:
     get:
@@ -27538,7 +27605,7 @@ paths:
       responses:
         '200': { description: Completed ACP checkout session }
         '402': { description: Payment required (x402-style accepts block) }
-        '422': { description: Unknown payment handler (e.g. stripe on a Community node) }
+        '422': { description: "PAYMENT_HANDLER_REQUIRED (neither payment_data.provider nor payment_data.handler; the message lists the handlers that settle the session's currency), or an unknown payment handler" }
 
   /v1/commerce/checkout-sessions/{id}/complete:
     post:

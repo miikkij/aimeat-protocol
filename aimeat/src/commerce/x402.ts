@@ -18,6 +18,8 @@
  *   const extra = await x402ExactAccepts(config, storage, session); // [] unless x402 applies
  *   res.status(402).json({ ...error(...), ...paymentChallenge(config, extra) });
  * @version-history
+ *   v1.3.0 — 2026-10-11 — paymentChallenge takes `moneyOnly` for the ACP and UCP surfaces, which no
+ *     longer offer the morsel ledger as a way to pay (ruling D4).
  *   v1.2.0 — 2026-07-25 — The exact scheme is built from the SESSION CURRENCY's settlement asset, so
  *     a EUR session is offered in EURC and a currency with no asset yields no scheme (TARGET-042)
  *   v1.1.0 — 2026-07-18 — Real x402 `exact` scheme via x402ExactAccepts + optional extraAccepts on
@@ -35,27 +37,35 @@ import { getX402Network, getX402Asset, buildExactRequirements, extractPayTo } fr
  * The x402-inspired `accepts` block appended to 402 payment-required responses. `extraAccepts` (the
  * real x402 `exact` scheme from {@link x402ExactAccepts}, when it applies) is prepended so an x402
  * client finds a scheme it can settle first; the AIMEAT-native schemes always follow.
+ *
+ * `moneyOnly` is for the ACP and UCP surfaces, where a price is money (commerce/protocol-money.ts):
+ * the morsel ledger is left out of the handlers, and the morsel top-up scheme is not offered.
  */
 export function paymentChallenge(
   config: AimeatConfig,
   extraAccepts: Array<Record<string, unknown>> = [],
+  opts: { moneyOnly?: boolean } = {},
 ): { x402Version: number; accepts: Array<Record<string, unknown>> } {
   const b = config.baseUrl;
   const accepts: Array<Record<string, unknown>> = [...extraAccepts];
   for (const h of listPaymentHandlers()) {
+    const currencies = opts.moneyOnly ? h.currencies.filter(isMoneyCurrency) : h.currencies;
+    if (currencies.length === 0) continue;
     accepts.push({
       scheme: 'aimeat-checkout',
       handler: h.id,
-      currencies: h.currencies,
+      currencies,
       description: `Complete the checkout session with POST /v1/commerce/checkout-sessions/{id}/complete using payment.handler="${h.id}"`,
       resource: `${b}/v1/commerce/checkout-sessions`,
     });
   }
-  accepts.push({
-    scheme: 'aimeat-morsel-topup',
-    description: 'Insufficient morsels: ask the node operator to mint, receive the daily allowance, or earn by selling offers',
-    resource: `${b}/v1/wallet`,
-  });
+  if (!opts.moneyOnly) {
+    accepts.push({
+      scheme: 'aimeat-morsel-topup',
+      description: 'Insufficient morsels: ask the node operator to mint, receive the daily allowance, or earn by selling offers',
+      resource: `${b}/v1/wallet`,
+    });
+  }
   return { x402Version: 1, accepts };
 }
 

@@ -23,7 +23,7 @@ The source column identifies the implementation or rule to read at the next chan
 
 | File | Status | Purpose and validity | Check against |
 |---|---|---|---|
-| [aimeat/docs/AIMEAT_Help_Prompt.md](../aimeat/docs/AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
+| [aimeat/docs/AIMEAT_Help_Prompt.md](../aimeat/docs/AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree; every route checked against openapi.yaml on 2026-10-11 | `aimeat/src/routes/bootstrap.ts` |
 | [aimeat/docs/AIMEAT_Help_Prompt_Person.md](../aimeat/docs/AIMEAT_Help_Prompt_Person.md) | runtime | Served person help prompt; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
 | [aimeat/docs/README.md](../aimeat/docs/README.md) | entry | Navigation to the maintained guide or current contract | `docs/README.md` |
 | [aimeat/docs/agent-scheduler-guide.md](../aimeat/docs/agent-scheduler-guide.md) | maintained | Agent scheduling guide; use current scheduler and constraint handlers | `aimeat/src/services/scheduler.ts` |
@@ -46,16 +46,17 @@ The source column identifies the implementation or rule to read at the next chan
 | [aimeat/docs/integrations/dify-hello-integration.md](../aimeat/docs/integrations/dify-hello-integration.md) | reference | Client integration example; verify installed client and discover current node tools | `aimeat/src/cli` |
 | [aimeat/docs/observability-guide.md](../aimeat/docs/observability-guide.md) | reference | Observability setup reference; check installed instrumentation and deployment | `aimeat/src` |
 | [docs/AIMEAT-Feature-List.md](AIMEAT-Feature-List.md) | maintained | Generated feature index; update through its generator | `aimeat/scripts/build-everything.ts` |
-| [docs/AIMEAT-RFC-v4.0-Core-full.md](AIMEAT-RFC-v4.0-Core-full.md) | maintained | Canonical Core concepts; implementation version is separate | `openapi.yaml` |
-| [docs/AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md) | maintained | Platform contract; retired scopes and directives corrected | `aimeat/src/routes` |
-| [docs/AIMEAT_Help_Prompt.md](AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
+| [docs/AIMEAT-RFC-v4.0-Core-full.md](AIMEAT-RFC-v4.0-Core-full.md) | reference | Core v4.0 as published; known errata in the errata file; replaced by AIMEAT Core 2026-11 with node 4.0.0 | `docs/AIMEAT-RFC-v4.0-errata.md` |
+| [docs/AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md) | reference | Platform v4.0 as published; known errata in the errata file; to be replaced by a Platform reference versioned with the node | `docs/AIMEAT-RFC-v4.0-errata.md` |
+| [docs/AIMEAT-RFC-v4.0-errata.md](AIMEAT-RFC-v4.0-errata.md) | maintained | Known errata and pending changes in RFC v4.0, checked against node 3.26.1 on 2026-10-11 | `openapi.yaml` |
+| [docs/AIMEAT_Help_Prompt.md](AIMEAT_Help_Prompt.md) | runtime | Served help prompt; root and packaged copies must agree; every route checked against openapi.yaml on 2026-10-11 | `aimeat/src/routes/bootstrap.ts` |
 | [docs/AIMEAT_Help_Prompt_Person.md](AIMEAT_Help_Prompt_Person.md) | runtime | Help prompt a person pastes into a consumer AI, served at /v1/help/prompt/person; root and packaged copies must agree | `aimeat/src/routes/bootstrap.ts` |
 | [docs/README.md](README.md) | entry | Navigation to the maintained guide or current contract | `docs/README.md` |
 | [docs/a-endpoints.md](a-endpoints.md) | entry | Navigation to the maintained guide or current contract | `docs/README.md` |
 | [docs/agent-workspace-contracts.md](agent-workspace-contracts.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
 | [docs/ai-transparency.md](ai-transparency.md) | maintained | Implementation disclosure; private research links removed, legal analysis not revalidated | `aimeat/src/services` |
-| [docs/aimeat-cross-federation.md](aimeat-cross-federation.md) | maintained | Actual peer routes, permissions and cache settings | `aimeat/src/routes/federation-genesis.ts` |
-| [docs/aimeat-dmz-architecture.md](aimeat-dmz-architecture.md) | maintained | Memory visibility model and consent boundaries | `aimeat/src/routes/memory.ts` |
+| [docs/aimeat-cross-federation.md](aimeat-cross-federation.md) | maintained | Actual peer routes, permissions and cache settings; settings table checked against `aimeat/src/config.ts` on 2026-10-11 | `aimeat/src/routes/federation-genesis.ts` |
+| [docs/aimeat-dmz-architecture.md](aimeat-dmz-architecture.md) | maintained | Memory visibility model and consent boundaries in node 3.26, checked on 2026-10-11; normative content moves to AIMEAT Core 2026-11 | `aimeat/src/services/consent.ts` |
 | [docs/aimeat-eudiw-integration.md](aimeat-eudiw-integration.md) | maintained | Wallet verification is blocked at startup; route existence is not support | `aimeat/src/config-eudiw-guard.ts` |
 | [docs/aimeat-interest-profile-spec.md](aimeat-interest-profile-spec.md) | reference | Interest-profile format reference; check schema before a new integration | `aimeat/src/models` |
 | [docs/aimeat-pwa-guide.md](aimeat-pwa-guide.md) | maintained | Offline fallback, share intake and push behavior | `aimeat/public/sw.js` |
@@ -190,7 +191,6 @@ The source column identifies the implementation or rule to read at the next chan
 | [docs/extensions/rest-connector/README.md](extensions/rest-connector/README.md) | runtime | Distributed extension example; validate with sandbox when changing behavior | `aimeat/scripts/copy-dist-assets.mjs` |
 | [docs/extensions/rest-connector/actions/pull.js](extensions/rest-connector/actions/pull.js) | runtime | Distributed extension example; validate with sandbox when changing behavior | `aimeat/scripts/copy-dist-assets.mjs` |
 | [docs/extensions/rest-connector/extension.yaml](extensions/rest-connector/extension.yaml) | runtime | Distributed extension example; validate with sandbox when changing behavior | `aimeat/scripts/copy-dist-assets.mjs` |
-| [docs/federation-economic-layer.md](federation-economic-layer.md) | historical | Earlier plan, draft or audit; retained as history, not current instructions | `docs/README.md` |
 | [docs/frontend-development-guide.md](frontend-development-guide.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
 | [docs/guides/agent-data-dashboard-cookbook.md](guides/agent-data-dashboard-cookbook.md) | maintained | Development guide; update when the documented platform interface changes | `aimeat/src` |
 | [docs/guides/building-extension-cortex-app-stack.md](guides/building-extension-cortex-app-stack.md) | maintained | Development guide; update when the documented platform interface changes | `aimeat/src` |
@@ -224,7 +224,7 @@ The source column identifies the implementation or rule to read at the next chan
 | [docs/msm-examples/wolt-restaurant.msm.yaml](msm-examples/wolt-restaurant.msm.yaml) | runtime | Distributed service template; external API compatibility requires a fresh check | `aimeat/scripts/copy-dist-assets.mjs` |
 | [docs/optics/ux-principles.md](optics/ux-principles.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
 | [docs/organisation-node-sign-in.md](organisation-node-sign-in.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
-| [docs/personal-node-setup-guide.md](personal-node-setup-guide.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
+| [docs/personal-node-setup-guide.md](personal-node-setup-guide.md) | maintained | Personal node anchoring with password sign-in and the ticket-authenticated tunnel; every command run against node 3.26.1 on 2026-10-11 | `aimeat/src/routes/personal.ts` |
 | [docs/pitfalls.md](pitfalls.md) | maintained | Recorded platform traps; preserve dates and evidence | `CLAUDE.md` |
 | [docs/plain-language-field-test.md](plain-language-field-test.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src` |
 | [docs/plans/sealed-config-plan.md](plans/sealed-config-plan.md) | historical | Earlier plan, draft or audit; retained as history, not current instructions | `docs/README.md` |
@@ -242,5 +242,3 @@ The source column identifies the implementation or rule to read at the next chan
 | [docs/typesafe/README.md](typesafe/README.md) | reference | What the gitignored TypeSafe snapshot folder is, and why its contents never enter git | `aimeat/src/services/decide` |
 | [docs/visitor-geography.md](visitor-geography.md) | maintained | Current feature or operating guide; verify against implementation when changing it | `aimeat/src/utils/geo-headers.ts` |
 | [docs/voice-library.md](voice-library.md) | maintained | Configurable voice sessions, adapters, streaming API and browser verification | `aimeat/src/static/sdk-libs/voice` |
-| [docs/templates/b2b-sales-hub/README.md](templates/b2b-sales-hub/README.md) | reference | Example artifact; adapt and validate before publishing | `docs/portal-developer-guide.md` |
-| [docs/templates/b2b-sales-hub/template-meta.json](templates/b2b-sales-hub/template-meta.json) | reference | Example artifact; adapt and validate before publishing | `docs/portal-developer-guide.md` |
