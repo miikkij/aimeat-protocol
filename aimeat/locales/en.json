@@ -10784,7 +10784,7 @@
     "cfgDesc_portfolio_max_images": "Max images per portfolio",
     "cfgDesc_cookies_consent_enabled": "Shows the cookie banner on every app, portfolio and company page whose owner uses their own Clarity or Google Analytics. This service's own pages show it only when the category list has more than necessary. A change applies at once.",
     "cfgDesc_cookies_consent_categories": "What the banner asks about on this service's own pages, one word per line: necessary, analytics, marketing. A page with its owner's analytics always asks about analytics.",
-    "cfgDesc_cookies_consent_policy_url": "The address of the privacy policy the banner links to.",
+    "cfgDesc_cookies_consent_policy_url": "The address of the privacy policy the banner links to. Empty: the banner links to this service's own privacy policy, in the visitor's language.",
     "cfgDesc_cors_allowed_origins": "CORS allowed origins (comma-separated, * = all)",
     "cfgDesc_realtime_enabled": "Enable realtime P2P signaling",
     "cfgDesc_realtime_max_rooms": "Max P2P rooms",
