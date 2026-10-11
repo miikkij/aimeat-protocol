@@ -13,9 +13,21 @@ real `_Api` is used with a stubbed session. No node, no network.
 """
 from __future__ import annotations
 
+import inspect
+import threading
+import time
 from typing import Any
 
-from aimeat_crewai.daemon import _Api, _note_stopped, _poll_messages, _poll_tasks, _refresh_stopped
+from aimeat_crewai.daemon import (
+    _Api,
+    _note_stopped,
+    _poll_messages,
+    _poll_tasks,
+    _refresh_stopped,
+    _StopFlag,
+    _wait_for_work,
+    run_crew_daemon,
+)
 
 
 class _Resp:
@@ -118,6 +130,37 @@ def test_an_empty_pending_list_is_no_messages_not_the_task_list():
         "pending_messages": [],
     }})})
     assert _poll_messages(api) == []
+
+
+def test_the_stop_flag_is_the_dict_the_loop_always_had():
+    stop = _StopFlag()
+    assert stop["flag"] is False
+    stop["flag"] = True  # what the signal handler writes
+    assert stop["flag"] is True
+
+
+def test_the_hosts_event_stops_the_loop_too():
+    event = threading.Event()
+    stop = _StopFlag(event)
+    assert stop["flag"] is False
+    event.set()
+    assert stop["flag"] is True
+
+
+def test_a_wait_ends_when_the_host_sets_its_event():
+    # No push (use_push False), so the wait is the plain sleep in one-second slices: a 30 s wait
+    # has to end within about one slice of the event being set.
+    event = threading.Event()
+    stop = _StopFlag(event)
+    threading.Timer(0.2, event.set).start()
+    t0 = time.monotonic()
+    assert _wait_for_work(_api({}), False, 30.0, stop) is None
+    assert time.monotonic() - t0 < 3.0
+
+
+def test_run_crew_daemon_takes_the_event_as_a_keyword():
+    param = inspect.signature(run_crew_daemon).parameters["stop_event"]
+    assert param.default is None and param.kind is inspect.Parameter.KEYWORD_ONLY
 
 
 def test_items_stands_in_only_when_the_key_is_absent():

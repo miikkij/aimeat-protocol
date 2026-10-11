@@ -22,6 +22,10 @@ Changelog:
     node restart triggers for all of them. The scan runs on the first cycle after the agent is
     started. A daemon that lists neither tasks nor messages reads the flag with one inbox read
     (`_refresh_stopped`). Work already running finishes, as before.
+    `run_crew_daemon(stop_event=...)`: a `threading.Event` the host sets to end one daemon from its
+    own code, with the clean exit a SIGTERM gives. With it the daemon also runs outside the main
+    thread, where no signal handler can be installed. Asked for by crewaimeat, which hosts several
+    agents and takes one down when its roster row says `stopped`.
     ALSO FIXED: `_poll_messages` read an EMPTY `pending_messages` as missing and fell back to the
     unified `items` list, which carries tasks. An agent listening for messages therefore got each
     of its waiting or running tasks dispatched once as an "(empty)" inbox message.
@@ -637,6 +641,25 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
         break
 
     return token, node_url
+
+
+class _StopFlag(dict):
+    """The poll loop's stop flag: `stop["flag"]`, as every helper here reads it.
+
+    It is the dict the loop always had, with one more way to become true: the host's own
+    `threading.Event` (`run_crew_daemon(stop_event=...)`). A signal handler still writes
+    `stop["flag"] = True`; a host sets its event; a reader cannot tell which one it was, and does
+    not need to.
+    """
+
+    def __init__(self, event: threading.Event | None = None) -> None:
+        super().__init__(flag=False)
+        self._event = event
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "flag" and self._event is not None and self._event.is_set():
+            return True
+        return super().__getitem__(key)
 
 
 def _note_stopped(api: _Api, data: Any) -> None:
@@ -1467,6 +1490,7 @@ def run_crew_daemon(
     on_error: Callable[[Exception], None] | None = None,
     one_shot: bool = False,
     serve_options: dict[str, Any] | None = None,
+    stop_event: threading.Event | None = None,
 ) -> None:
     """
     Run a long-lived daemon that polls AIMEAT for work and dispatches it to
@@ -1597,6 +1621,15 @@ def run_crew_daemon(
         serve_options: Extra kwargs forwarded to `ensure_serve()` /
             `serve_params()` (e.g. `aimeat_command` / `spawn_cwd` for a repo
             checkout of the AIMEAT CLI, or `start_timeout`). Usually omitted.
+        stop_event: A `threading.Event` the host sets to end this daemon
+            from its own code (0.33.0). The loop sees it within one wait
+            slice (5 s at most), starts nothing new, lets a running
+            kickoff finish, releases the liaison and returns: the same
+            clean exit a SIGTERM gives. For a host that runs several
+            agents and has to take one down, for example because its
+            roster row says `stopped`. With the event given, the daemon
+            may also run outside the main thread, where Python allows no
+            signal handler; it then installs none.
 
     The daemon traps SIGINT and SIGTERM cleanly so Ctrl+C and `kill`
     shut it down with the liaison's MCP connection properly closed.
@@ -1654,15 +1687,18 @@ def run_crew_daemon(
         n = _subscribe_records(api, record_space_list)
         print(f"[daemon:{agent_name}] subscribed {n}/{len(record_space_list)} record space(s) for push")
 
-    stop = {"flag": False}
+    stop = _StopFlag(stop_event)
 
     def _handle_signal(signum: int, _frame: Any) -> None:  # pragma: no cover -- OS signals
         print(f"[daemon:{agent_name}] received signal {signum}, shutting down...")
         stop["flag"] = True
 
-    signal.signal(signal.SIGINT, _handle_signal)
-    if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, _handle_signal)
+    # Python installs a signal handler from the main thread only. A host that runs this daemon in
+    # a thread of its own ends it with `stop_event`, so there the handlers are left out.
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGINT, _handle_signal)
+        if hasattr(signal, "SIGTERM"):
+            signal.signal(signal.SIGTERM, _handle_signal)
 
     # Server-initiated invokes (Crew tab Validate/Try) are collected by their own thread from the
     # start, because the serve daemon reports NO_HANDLER for an agent nobody has polled in 90 s and
