@@ -27,6 +27,9 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   v1.2.0 -- 2026-10-11 -- `now.test_money_handler`: AIMEAT_TEST_MONEY_HANDLER is a critical finding
+ *     whenever it is set, with whether it is in force (loopback test node) or refused
+ *     (utils/test-money-guard.ts). aimeat.io had run with it on.
  *   v1.1.1 -- 2026-10-05 -- The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.1.0 -- 2026-09-25 -- The apps line (services/app-isolation-status.ts, audit A7-1): how this node
  *     keeps an app away from the sign-in of the person who opens it, and on a node several people
@@ -42,6 +45,7 @@ import { isOperatorAccount } from '../utils/operator-account.js';
 import { listSecurityIncidents, type SecurityIncidentValue } from './security-incident.js';
 import { getStats } from './stats.js';
 import { appIsolationStatus, type AppIsolationStatus } from './app-isolation-status.js';
+import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 
 /** The rolling window the headline counts cover. */
 export const REFUSAL_WINDOW_HOURS = 24;
@@ -102,6 +106,8 @@ export interface SecurityOverview {
     counters_since: string | null;
     uptime_seconds: number | null;
     log: { enabled: boolean; path: string; bytes: number; max_bytes: number; rotated_bytes: number };
+    /** AIMEAT_TEST_MONEY_HANDLER: critical whenever it is set, in force only on a loopback test node. */
+    test_money_handler: { requested: boolean; active: boolean; zone: Zone; message: string | null };
   };
   refusals: RefusalSummary;
   incidents: { items: SecurityIncidentValue[]; open: number; total: number };
@@ -248,7 +254,12 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
     rateLimit: counterZone(rateLimitHits),
     scope: counterZone(scopeDenials),
     open: (incidents.open > 0 ? 'critical' : 'healthy') as Zone,
+    testMoney: (config.testMoneyHandler ? 'critical' : 'healthy') as Zone,
   };
+  const testMoneyActive = testMoneyHandlerActive(config);
+  const testMoneyMessage = !config.testMoneyHandler ? null : testMoneyActive
+    ? 'AIMEAT_TEST_MONEY_HANDLER=true: the test-only money handler is in force, and EUR and USD settle with no real payment. This is a loopback test node; never set it on a node people use.'
+    : `AIMEAT_TEST_MONEY_HANDLER=true is set and REFUSED: ${config.baseUrl} is not a loopback address, so test.money is not registered. Remove the variable from this node's environment.`;
 
   return {
     generated_at: now.toISOString(),
@@ -263,6 +274,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
       counters_since: snap?.started_at ?? null,
       uptime_seconds: snap?.uptime_seconds ?? null,
       log,
+      test_money_handler: { requested: config.testMoneyHandler, active: testMoneyActive, zone: zones.testMoney, message: testMoneyMessage },
     },
     refusals,
     incidents,

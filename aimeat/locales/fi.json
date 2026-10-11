@@ -1028,6 +1028,8 @@
         "lineUnknown": "Luettavaa historiaa ei ole riittävästi torjuntojen määrän arviointiin.",
         "lineOpenOne": "Yksi tapahtuma on auki ja odottaa sinua osiossa 03.",
         "lineOpenMany": "{n} tapahtumaa on auki ja odottaa sinua osiossa 03.",
+        "lineTestMoneyRefused": "Tälle palvelimelle on asetettu AIMEAT_TEST_MONEY_HANDLER. Palvelin ei käytä sitä, koska tämä ei ole testipalvelin. Poista muuttuja palvelimen ympäristöstä.",
+        "lineTestMoneyOn": "AIMEAT_TEST_MONEY_HANDLER on asetettu, joten euro- ja dollarimaksut menevät läpi ilman oikeaa rahaa. Tämä sopii vain tällä koneella toimivaan testipalvelimeen.",
         "lineWalledOne": "Yksi IP-osoite, {source}, estettiin kirjautumisen päätepisteessä {n} kertaa viimeisen vuorokauden aikana.",
         "lineWalledMany": "{sources} IP-osoitetta estettiin kirjautumisen päätepisteissä {n} kertaa viimeisen vuorokauden aikana.",
         "logOn": "Epäysloki päällä · vaihtuu {mb} MB:n kohdalla",

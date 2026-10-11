@@ -426,8 +426,8 @@ export async function mountRoutes(
   registerSellableResolver(packageSellableResolver(peers));   // a package this node sells, priced from its catalogue
   // TEST ONLY: a fake EUR/USD rail so the money chain is E2E-provable without a real PSP. Off in prod.
   if (config.testMoneyHandler) {
-    const { testMoneyPaymentHandler } = await import('../commerce/test-money-handler.js');
-    registerPaymentHandler(testMoneyPaymentHandler());
+    const { testMoneyPaymentHandler, testMoneyHandlerActive } = await import('../commerce/test-money-handler.js');
+    if (testMoneyHandlerActive(config)) registerPaymentHandler(testMoneyPaymentHandler());   // loopback test nodes only
   }
   // x402 stablecoin settlement (TARGET-042): the NON-CUSTODIAL USDC handler for money (USD) sessions.
   // The facilitator is a parameter — an off-chain double in E2E (AIMEAT_X402_TEST_FACILITATOR), the
