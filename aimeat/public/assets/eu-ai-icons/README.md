@@ -52,7 +52,7 @@ width with `aspect-ratio` or `height: auto`.
 ## Filenames
 
 Renamed from the official ones to lower-case, space-free names so they are usable in URLs without
-escaping. The official archives are kept unmodified in `docs/internal/EUAct/reference/`.
+escaping. The official archives are kept unmodified outside this repository, by the maintainer.
 
 Original → here:
 
@@ -69,8 +69,7 @@ official filenames by pattern has to allow for it; our renamed copies do not.
 
 Not kept here. The official PNGs are 7,000+ pixels wide (~1.3 MB for the set) and the web surfaces
 use SVG. If a raster is needed later (email, where SVG support is unreliable), generate it at the
-size actually used from these SVGs, or take it from the archive in
-`docs/internal/EUAct/reference/`.
+size actually used from these SVGs, or take it from the official archive.
 
 ## Placement rules that come with the icons
 
@@ -98,5 +97,6 @@ for accessibility.
 
 ## Related
 
-- Integration design: `docs/internal/EUAct/15-eu-label-icons.md`
-- Code of Practice measures: `docs/internal/EUAct/14-code-of-practice-measures.md`
+- How a person sees the label and how an AI declares it: the node skill `ai-transparency`
+  (`GET /v1/skills/ai-transparency?scope=node`), and `GET /v1/ai-transparency` for the node's own
+  statement.

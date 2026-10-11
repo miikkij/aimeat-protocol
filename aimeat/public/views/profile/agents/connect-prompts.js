@@ -7,6 +7,8 @@
  *   max-file-lines. The Hello Integration instruction is NOT here: the Agents tab fetches it
  *   from GET /v1/prompts/hello-integration, which serves the CLI's own text.
  * @version-history
+ *   v1.3.1 — 2026-10-11 — buildAgentPrompt's last line names the package README and the node skill
+ *     add-a-crew-agent; it named ${url}/docs/integrations/crewai, which no route serves.
  *   v1.3.0 — 2026-09-18 — buildAgentPrompt takes the model recommendation as a parameter (the
  *     node's one value, GET /v1/ai-tools) instead of carrying two model names of its own.
  *   v1.2.0 — 2026-09-18 — buildMcpOnboardingPrompt is gone. It was a hand copy of the CLI's Hello
@@ -223,7 +225,10 @@ common idiosyncrasies (omit-null-optionals, AUTH_REQUIRED, STEP_NOT_IN_FLOW,
 eventual-consistency on onboarding_status). Regressions there are
 aimeat-crewai bugs, not improvisation targets.
 
-Full docs: ${url}/docs/integrations/crewai (or the GitHub repo).`;
+Full docs: the package's own README
+(https://github.com/miikkij/aimeat-protocol/tree/main/python/aimeat-crewai),
+and this node's skill add-a-crew-agent (aimeat_skill_get, or
+GET ${url}/v1/skills/add-a-crew-agent?scope=node).`;
 }
 
 /* ── Platform instructions ── */

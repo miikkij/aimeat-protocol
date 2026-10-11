@@ -19,6 +19,8 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.4.1 — 2026-10-11 — The served spec's `doc` is /v1/specs/tracked-response-contract.md, the address
+ *     the node serves the contract at; it was the repository path.
  *   v1.4.0 — 2026-10-08 — An approve-mode draft is stamped when it is built, like the auto reply
  *     (stampReply), and carries its record id on the draft row and in its value, so the owner's send
  *     of the draft as it stands attaches it (aiprov D17).
@@ -411,7 +413,7 @@ export const TRACKED_RESPONSE_SPEC = {
   type: 'tracked-response',
   version: 1,
   oneLine: 'An important inbox message owed a response once a linked follow-up has been completed.',
-  doc: 'docs/specs/tracked-response-contract.md',
+  doc: '/v1/specs/tracked-response-contract.md',
   rules: [
     'Never delete the source message — it is the reply target.',
     'Only watch.key + watch.condition drive firing; advance the watched record to fulfil.',

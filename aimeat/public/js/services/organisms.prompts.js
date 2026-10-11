@@ -8,6 +8,8 @@
  * @usage import { buildAccessPrompt, buildContractAgentPrompt } from './organisms.prompts.js';
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from organisms.js (max-file-lines)
+ *   2026-10-11 — The contract-agent prompt names the skill aimeat-workspace-contracts instead of
+ *     docs/agent-workspace-contracts.md, which no route serves.
  *   v1.1.0 — 2026-08-09 — The access prompt teaches the workspace tools instead of raw memory keys,
  *     and no longer claims there are none. aimeat_workspace_* has existed since v1.1.0; the prompt
  *     handed out aimeat_memory_read/write against organism.{id}.w.{ws}.… and a raw POST to publish,
@@ -171,8 +173,8 @@ export async function buildContractAgentPrompt(orgId, orgName, wsId, ws) {
     `TASK: build an AIMEAT "contract agent" that PROCESSES this workspace — it reads requests, does the`,
     `work, and writes results back. The agent OWNS a contract: the spaces it READS (inputs), the spaces`,
     `it WRITES (outputs), and the status lifecycle. Follow the convention exactly so it appears and works`,
-    `smoothly. Full reference: ${nodeUrl}/v1/agents/me/handbook/appdev (the "Workspace contracts" section)`,
-    `and docs/agent-workspace-contracts.md.`,
+    `smoothly. Full reference: the skill aimeat-workspace-contracts on this node (aimeat_skill_get, or`,
+    `${nodeUrl}/v1/skills/aimeat-workspace-contracts?scope=node).`,
     ``,
     `CONNECTION`,
     `- Node: ${nodeUrl}`,
