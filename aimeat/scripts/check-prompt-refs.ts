@@ -30,6 +30,8 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
+ *   v1.2.1 -- 2026-10-12 -- Reads the four skills of docs audit phase 5a (data ownership, attached MCP
+ *     servers, workflow decisions, bookkeeping), each in its own file.
  *   v1.2.0 -- 2026-10-12 -- Reads the runtime examples (docs/msm-examples, docs/extensions,
  *     aimeat/docs/csm-examples), YAML included, with a manifest's `path:`/`url:` field read as a
  *     route; and the aimeat-extension-builder skill. Docs audit phase 2: the examples carried a
@@ -103,6 +105,10 @@ const SOURCES: string[] = [
     'aimeat/src/data/builtin-skills.ai-capabilities.ts',
     'aimeat/src/data/builtin-skills.workspace-contracts.ts',
     'aimeat/src/data/builtin-skills.extension-builder.ts',
+    'aimeat/src/data/builtin-skills.data-ownership.ts',
+    'aimeat/src/data/builtin-skills.mcp-servers.ts',
+    'aimeat/src/data/builtin-skills.workflow-decisions.ts',
+    'aimeat/src/data/builtin-skills.bookkeeping.ts',
     'aimeat/src/data/builtin-skills-games.ts',
     'aimeat/src/data/builtin-skills-games.boot-assets.ts',
     'aimeat/src/data/builtin-skills-games.menus-audio.ts',
