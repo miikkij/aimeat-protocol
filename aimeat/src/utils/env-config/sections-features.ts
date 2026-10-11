@@ -59,12 +59,6 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           defaultVal: '50',
         },
         {
-          envVar: 'AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS',
-          description: 'How many days to keep messages in personal node mailbox',
-          value: String(config.personalNodeMailboxRetentionDays),
-          defaultVal: '7',
-        },
-        {
           envVar: 'AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS',
           description: 'Tunnel request timeout for forwarded messages (ms)',
           value: String(config.personalNodeRequestTimeoutMs),
@@ -103,12 +97,6 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'Enable consent-based data sharing permissions',
           value: String(config.consentEnabled),
           defaultVal: 'true',
-        },
-        {
-          envVar: 'AIMEAT_CONSENT_MAX_PER_USER',
-          description: 'Maximum consent rules per user',
-          value: String(config.consentMaxPerUser),
-          defaultVal: '100',
         },
         {
           envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS',
@@ -367,22 +355,10 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           defaultVal: 'true',
         },
         {
-          envVar: 'AIMEAT_MARKETPLACE_LISTING_FEE',
-          description: 'Morsels charged to list an item',
-          value: String(config.marketplaceListingFeeMorsels),
-          defaultVal: '2',
-        },
-        {
           envVar: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT',
           description: 'Transaction fee percentage',
           value: String(config.marketplaceTransactionFeePercent),
           defaultVal: '5',
-        },
-        {
-          envVar: 'AIMEAT_MARKETPLACE_ESCROW',
-          description: 'Enable escrow for marketplace transactions',
-          value: config.marketplaceEscrowEnabled ? 'true' : 'false',
-          defaultVal: 'true',
         },
       ],
     },

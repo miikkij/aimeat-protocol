@@ -11,6 +11,9 @@
  * @structure ConfigChange · ConfigApplyResult · applyConfigChanges(deps, changes)
  * @usage const r = await applyConfigChanges({ config, storage, provenance }, [{ path, value }]);
  * @version-history
+ *   v1.4.0 — 2026-10-11 — A list setting is normalized to a list before its check and stored as
+ *     comma-separated text; it was written as the text the request sent. The rate-limit settings are
+ *     copied into the limiter tiers after a save (config-rate-limit-sync.ts).
  *   v1.3.0 — 2026-10-11 — A refused value on a setting whose range is a recommendation is answered
  *     with the minimum, not with the range as if it were a limit.
  *   v1.2.0 — 2026-10-09 — A secret row is stored encrypted with the node key (config-at-rest.ts); it
@@ -23,10 +26,11 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { ConfigProvenance } from './config-provenance.js';
-import { MUTABLE_CONFIG_MAP, serializeConfigValue, readConfigField, writeConfigField } from './config-schema.js';
+import { MUTABLE_CONFIG_MAP, serializeFieldValue, readConfigField, writeConfigField } from './config-schema.js';
 import { isSecretField } from './config-sealing.js';
 import { sealSettingForStorage } from './config-at-rest-rows.js';
-import { withinStatedRange, RANGE_ENFORCED, rangeKindOf, numericRangeOf } from './config-schema-validators.js';
+import { withinStatedRange, RANGE_ENFORCED, rangeKindOf, numericRangeOf, asList } from './config-schema-validators.js';
+import { syncRateLimitTiers } from './config-rate-limit-sync.js';
 import { logger } from '../utils/logger.js';
 
 export interface ConfigChange { path?: unknown; value?: unknown }
@@ -44,8 +48,8 @@ export async function applyConfigChanges(
     const errors: ConfigApplyResult['errors'] = [];
 
     for (const change of changes) {
-        const { path, value } = change ?? {};
-        if (typeof path !== 'string' || value === undefined) {
+        const { path, value: sent } = change ?? {};
+        if (typeof path !== 'string' || sent === undefined) {
             errors.push({ path: typeof path === 'string' ? path : '(missing)', reason: 'Each change must have "path" (string) and "value"' });
             continue;
         }
@@ -54,6 +58,12 @@ export async function applyConfigChanges(
             errors.push({ path, reason: `Unknown or immutable config path. Valid mutable paths: ${Object.keys(MUTABLE_CONFIG_MAP).join(', ')}` });
             continue;
         }
+        // A list setting is a list from here on, whether the request sent a list or a
+        // comma-separated text: the check below, the stored row and the running config all see the
+        // normalized value. The text used to be written as it came into a field the code reads as an
+        // array, so `allowed.includes(origin)` became a substring test (measured 2026-10-11: with
+        // "https://app.example.com" saved, the MCP origin check passed "https://app.example").
+        const value = mapping.list ? asList(sent) : sent;
         // `validate` checks the type and mostly only the lower bound; for the settings in
         // RANGE_ENFORCED the row's `range` is a limit, so a value outside it is refused here too.
         if (!mapping.validate(value) || (RANGE_ENFORCED.has(path) && !withinStatedRange(mapping, value))) {
@@ -76,7 +86,7 @@ export async function applyConfigChanges(
         // nobody investigates a success.
         try {
             // A secret row is stored encrypted (services/config-at-rest.ts; secrets audit 2026-10-09, S4b).
-            await storage.setConfigValue(path, sealSettingForStorage(path, serializeConfigValue(value), config));
+            await storage.setConfigValue(path, sealSettingForStorage(path, serializeFieldValue(mapping, value), config));
         } catch (e) {
             logger.error('admin-config: a change could not be persisted, so it was not applied', { path, error: String(e) });
             errors.push({
@@ -94,5 +104,7 @@ export async function applyConfigChanges(
             ? { path, old_value: { configured: !!oldValue }, new_value: { configured: !!value }, secret: true }
             : { path, old_value: oldValue, new_value: value });
     }
+    // A saved rate limit reaches the running limiters now, not at the next restart.
+    if (applied.length > 0) syncRateLimitTiers(config);
     return { applied, errors };
 }

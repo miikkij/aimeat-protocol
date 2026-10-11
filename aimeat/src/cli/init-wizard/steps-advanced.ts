@@ -391,16 +391,6 @@ export async function askAllAdvancedSettings(
   if (!consentEnabled) settings.AIMEAT_CONSENT_ENABLED = 'false';
 
   if (consentEnabled) {
-    const consentMaxPerUser = checkCancel(
-      await p.text({
-        message: t('init.consentMaxPerUser'),
-        defaultValue: String(cfg.consentMaxPerUser),
-        validate: val => validatePositiveNum(val, t),
-      }),
-      t,
-    );
-    if (consentMaxPerUser !== '100') settings.AIMEAT_CONSENT_MAX_PER_USER = consentMaxPerUser;
-
     const consentAuditDays = checkCancel(
       await p.text({
         message: t('init.consentAuditDays'),
@@ -475,16 +465,6 @@ export async function askAllAdvancedSettings(
   if (!marketplaceEnabled) settings.AIMEAT_MARKETPLACE_ENABLED = 'false';
 
   if (marketplaceEnabled) {
-    const listingFee = checkCancel(
-      await p.text({
-        message: t('init.marketplaceListingFee'),
-        defaultValue: String(cfg.marketplaceListingFeeMorsels),
-        validate: val => validatePositiveNum(val, t),
-      }),
-      t,
-    );
-    if (listingFee !== '2') settings.AIMEAT_MARKETPLACE_LISTING_FEE = listingFee;
-
     const txFee = checkCancel(
       await p.text({
         message: t('init.marketplaceTxFeePercent'),
@@ -494,15 +474,6 @@ export async function askAllAdvancedSettings(
       t,
     );
     if (txFee !== '5') settings.AIMEAT_MARKETPLACE_TX_FEE_PERCENT = txFee;
-
-    const escrow = checkCancel(
-      await p.confirm({
-        message: t('init.marketplaceEscrow'),
-        initialValue: cfg.marketplaceEscrowEnabled,
-      }),
-      t,
-    );
-    if (!escrow) settings.AIMEAT_MARKETPLACE_ESCROW = 'false';
   }
 
   // ── Realtime P2P ──

@@ -26,11 +26,11 @@ describe('rangeKindOf', () => {
         }
     });
 
-    it('says recommended for the fifteen settings that refused a larger value until 2026-10-11', () => {
+    it('says recommended for the thirteen settings that refused a larger value until 2026-10-11', () => {
         const lifted = [
-            'apps.audit_keep_default', 'account_events.window', 'consent.max_per_user', 'federation.package_peer_cap',
+            'apps.audit_keep_default', 'account_events.window', 'federation.package_peer_cap',
             'extensions.timeout_ms', 'extensions.max_installed', 'extensions.max_per_owner',
-            'cross_federation.max_genesis_peers', 'federation_sync.replication_queue_max', 'personal_nodes.max_slots',
+            'cross_federation.max_genesis_peers', 'personal_nodes.max_slots',
             'push.max_subscriptions_per_node', 'cortex.max_installed', 'ai.job_max_queued',
             'ai.job_max_queued_per_owner', 'ai.chat_max_live_threads',
         ];

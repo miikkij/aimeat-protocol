@@ -6,7 +6,11 @@
  *   authenticated, else by client IP (IPv6 aggregated to /64 so host-bit rotation
  *   can't mint fresh buckets). Role-based multipliers widen limits for owners/operators.
  * @usage app.use(rateLimit({ windowMs, max }, roleMultipliers))
+ *        const loginLimit = rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }))
  * @version-history
+ *   v1.4.0 — 2026-10-11 — The numbers are read on every request, from the object passed or from a
+ *     function that answers them, so a rate limit saved while the node runs takes effect at once. A
+ *     changed window starts a new bucket store.
  *   v1.3.0 — 2026-09-24 — The bucket counting moved to services/rate-buckets.ts, unchanged, so the
  *     per-account message limit (services/message-send-limit.ts) counts the same way. What a
  *     request is answered, its headers included, is the same.
@@ -39,15 +43,33 @@ export function ipRateKey(ip: string | undefined): string {
     return full.slice(0, 4).map(g => g || '0').join(':') + '::/64';
 }
 
-export function rateLimit(opts: Partial<RateLimitTier> & { keyBy?: 'auto' | 'ip' } = {}, roleMultipliers?: RoleMultipliers) {
-    const windowMs = opts.windowMs ?? 60_000;
-    const baseMax = opts.max ?? 100;
-    const keyBy = opts.keyBy ?? 'auto';
+/** What a limiter is built from: the window, the most requests in it, and what a request is keyed by. */
+export type RateLimitOptions = Partial<RateLimitTier> & { keyBy?: 'auto' | 'ip' };
 
-    // Each rate limiter instance has its own bucket store
-    const take = rateBuckets(windowMs);
+/**
+ * @param opts The limiter's numbers, or a function that answers them. They are read on EVERY
+ *   request: a tier of `config.rateLimits` is passed as the object it is, and a limiter whose numbers
+ *   are settings of their own is passed a function (`() => ({ max: config.loginRateLimitMax, … })`),
+ *   so a setting saved on the Config endpoint takes effect on the next request. The numbers were
+ *   copied when the limiter was built, so a saved limit waited for a restart (2026-10-11).
+ */
+export function rateLimit(opts: RateLimitOptions | (() => RateLimitOptions) = {}, roleMultipliers?: RoleMultipliers) {
+    const read = typeof opts === 'function' ? opts : () => opts;
+    const keyBy = read().keyBy ?? 'auto';
+
+    // Each rate limiter instance has its own bucket store. A store counts in one window length, so a
+    // changed window starts a new store; the old one is dropped with its counts.
+    let windowMs = read().windowMs ?? 60_000;
+    let take = rateBuckets(windowMs);
 
     return (req: Request, res: Response, next: NextFunction) => {
+        const now = read();
+        const liveWindowMs = now.windowMs ?? 60_000;
+        if (liveWindowMs !== windowMs) {
+            windowMs = liveWindowMs;
+            take = rateBuckets(windowMs);
+        }
+        const baseMax = now.max ?? 100;
         // Key by GAII if authenticated, otherwise by IP (IPv6 aggregated to /64).
         // keyBy:'ip' skips the GAII path entirely — anonymous mode injects one shared
         // identity for every visitor, which would collapse a brute-force limiter into

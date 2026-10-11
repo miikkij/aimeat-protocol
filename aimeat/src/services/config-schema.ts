@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.31.0 — 2026-10-11 — Six rows the node holds as a list are `list` rows of type object (cors.allowed_origins, scopes.default_agent_scopes, scopes.max_agent_scopes, push.notify_types, realtime.stun_servers, federation.default_scopes): they were typed string, so a save wrote text into a field the code reads as an array. serializeFieldValue() writes a list as comma-separated text. Thirteen whole-number rows refuse a fraction. The five quota descriptions say whose usage is counted.
+ *   v1.30.0 — 2026-10-11 — Seven rows removed because no code read them: consent.max_per_user, marketplace.listing_fee, marketplace.escrow_enabled, federation_sync.replication_queue_max, work.otk_ttl_ms, work.max_url_length, personal_nodes.mailbox_retention_days (Jouni, 2026-10-11).
  *   v1.29.0 — 2026-10-11 — Fifteen capacity rows lose their upper bound, so their `range` is a recommendation and a larger number is accepted (Jouni, 2026-10-11; the list is in docs/b-config.md). The rate-limit rows moved to config-schema-rate-limits.ts unchanged (max-file-lines).
  *   v1.28.1 — 2026-10-10 —The descriptions say the versions: realtime.turn_username and turn_credential are removed in 4.0.0; federation.audience_required is on by default from 3.27.0 and the older message format is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23, I22).
  *   v1.28.0 — 2026-10-09 — security.ws_query_token (AIMEAT_WS_QUERY_TOKEN), mutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, d3).
@@ -93,7 +95,7 @@ import type { AimeatConfig } from '../config.js';
 import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { OperatorConfig } from '../config-types.js';
 import type { ConfigFieldShape } from './config-field-def.js';
-import { oneOf } from './config-schema-validators.js';
+import { oneOf, isStringList, asList } from './config-schema-validators.js';
 import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
 import { VISIBILITY_CONFIG_FIELDS } from './config-schema-visibility.js';
 import { DOCSIGN_CONFIG_FIELDS } from './config-schema-docsign.js';
@@ -122,7 +124,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Node (immutable) ──
   { key: 'nodeId', dotPath: 'node.id', envVar: 'AIMEAT_NODE_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Unique node identifier' },
-  { key: 'port', dotPath: 'node.port', envVar: 'AIMEAT_PORT', type: 'number', validate: v => typeof v === 'number' && v >= 1 && v <= 65535, immutable: true, description: 'HTTP listen port', range: '1-65535' },
+  { key: 'port', dotPath: 'node.port', envVar: 'AIMEAT_PORT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 65535, immutable: true, description: 'HTTP listen port', range: '1-65535' },
   { key: 'nodeType', dotPath: 'node.type', envVar: 'AIMEAT_NODE_TYPE', type: 'string', validate: v => ['full', 'personal', 'relay'].includes(v as string), immutable: true, description: 'Node type: full, relay, or personal' },
   { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE', type: 'string', validate: v => ['sqlite', 'memory', 'postgres', 'postgresql', 'postgres-kysely'].includes(v as string), immutable: true, description: 'Storage backend type' },
   { key: 'dbUrl', dotPath: 'database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'Database connection URL', adminDisplay: 'hidden' },
@@ -232,8 +234,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'webhookMaxRetries', dotPath: 'work.webhook_max_retries', envVar: 'AIMEAT_WEBHOOK_MAX_RETRIES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Max webhook delivery retry attempts', range: '0-10' },
 
   // ── Quotas (mutable) ──
-  { key: 'memoryQuotaMb', dotPath: 'quota.memory_mb', envVar: 'AIMEAT_MEMORY_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Memory quota per agent in MB', range: '1-10000' },
-  { key: 'storageQuotaMb', dotPath: 'quota.storage_mb', envVar: 'AIMEAT_STORAGE_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Storage quota per agent in MB', range: '1-100000' },
+  { key: 'memoryQuotaMb', dotPath: 'quota.memory_mb', envVar: 'AIMEAT_MEMORY_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Memory quota in MB, for each owner and for each agent separately', range: '1-10000' },
+  { key: 'storageQuotaMb', dotPath: 'quota.storage_mb', envVar: 'AIMEAT_STORAGE_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'File storage quota in MB, for each owner and for each agent separately', range: '1-100000' },
 
   // ── Federation (mutable) ──
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
@@ -260,7 +262,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
   { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
   { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', ...oneOf('off', 'owner', 'all'), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
-  { key: 'consentMaxPerUser', dotPath: 'consent.max_per_user', envVar: 'AIMEAT_CONSENT_MAX_PER_USER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max consent records per user', range: '1-10000' },
 
   // ── TOTP (Phase 0.5, mutable) ──
   { key: 'totpEnabled', dotPath: 'totp.enabled', envVar: 'AIMEAT_TOTP_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'TOTP two-factor authentication enabled' },
@@ -298,9 +299,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Marketplace (Phase 2.6, mutable) ──
   { key: 'marketplaceEnabled', dotPath: 'marketplace.enabled', envVar: 'AIMEAT_MARKETPLACE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Marketplace feature enabled' },
-  { key: 'marketplaceListingFeeMorsels', dotPath: 'marketplace.listing_fee', envVar: 'AIMEAT_MARKETPLACE_LISTING_FEE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000, immutable: false, description: 'Morsel fee for creating a listing', range: '0-10000' },
   { key: 'marketplaceTransactionFeePercent', dotPath: 'marketplace.tx_fee_percent', envVar: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50, immutable: false, description: 'Transaction fee percentage', range: '0-50' },
-  { key: 'marketplaceEscrowEnabled', dotPath: 'marketplace.escrow_enabled', envVar: 'AIMEAT_MARKETPLACE_ESCROW', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Escrow for marketplace transactions' },
 
   // ── Commerce core + fee policy (TARGET-033, mutable) ──
   { key: 'marketplaceFeeMode', dotPath: 'commerce.fee_mode', envVar: 'AIMEAT_MARKETPLACE_FEE_MODE', type: 'string', ...oneOf('operator', 'burn'), immutable: false, description: 'Marketplace fee destination: operator (credited to node operator) or burn', range: 'operator|burn' },
@@ -365,7 +364,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'syncMode', dotPath: 'federation_sync.mode', envVar: 'AIMEAT_SYNC_MODE', type: 'string', ...oneOf('bulk', 'instant', 'hybrid'), immutable: false, description: 'Sync mode: bulk sends changes only in the scheduled round; instant and hybrid also send each change at once. The scheduled round runs in every mode, so instant and hybrid behave the same today.' },
   { key: 'syncIntervalHours', dotPath: 'federation_sync.interval_hours', envVar: 'AIMEAT_SYNC_INTERVAL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 168, immutable: false, description: 'Hours between scheduled sync rounds', range: '1-168' },
   { key: 'syncBatchDelayMs', dotPath: 'federation_sync.batch_delay_ms', envVar: 'AIMEAT_SYNC_BATCH_DELAY_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100 && (v as number) <= 60000, immutable: false, description: 'Event batching window in ms (instant/hybrid mode)', range: '100-60000' },
-  { key: 'replicationQueueMax', dotPath: 'federation_sync.replication_queue_max', envVar: 'AIMEAT_REPLICATION_QUEUE_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 100, immutable: false, description: 'Max replication queue entries', range: '100-100000' },
   { key: 'replicationQueueTtlHours', dotPath: 'federation_sync.replication_queue_ttl_hours', envVar: 'AIMEAT_REPLICATION_QUEUE_TTL_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 720, immutable: false, description: 'Max age of replication queue entries in hours', range: '1-720' },
   { key: 'maxConcurrentSyncs', dotPath: 'federation_sync.max_concurrent_syncs', envVar: 'AIMEAT_MAX_CONCURRENT_SYNCS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max parallel outbound sync operations', range: '1-50' },
   { key: 'federationTimeoutMs', dotPath: 'federation_sync.timeout_ms', envVar: 'AIMEAT_FEDERATION_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000 && (v as number) <= 60000, immutable: false, description: 'Timeout for outbound federation requests in ms', range: '1000-60000' },
@@ -395,27 +393,27 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'federationRole', dotPath: 'federation.role', envVar: 'AIMEAT_FEDERATION_ROLE', type: 'string', ...oneOf('operator', 'contributor', 'standalone'), immutable: false, description: 'Federation role: operator, contributor, or standalone' },
   { key: 'genesisUrl', dotPath: 'federation.genesis_url', envVar: 'AIMEAT_GENESIS_URL', type: 'string', validate: () => true, immutable: false, description: 'Genesis node URL for federation' },
   { key: 'federationAuthPolicy', dotPath: 'federation.auth_policy', envVar: 'AIMEAT_FEDERATION_AUTH_POLICY', type: 'string', ...oneOf('disabled', 'all_peers', 'specific_peers'), immutable: false, description: 'Federation auth policy: disabled, all_peers, or specific_peers' },
-  { key: 'federationDefaultScopes', dotPath: 'federation.default_scopes', envVar: 'AIMEAT_FEDERATION_DEFAULT_SCOPES', type: 'string', validate: () => true, immutable: false, description: 'Default scopes for federated users (comma-separated)' },
+  { key: 'federationDefaultScopes', dotPath: 'federation.default_scopes', envVar: 'AIMEAT_FEDERATION_DEFAULT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Default scopes for federated users, one per line (comma-separated in the environment)' },
   { key: 'federationOpenJoin', dotPath: 'federation.open_join', envVar: 'AIMEAT_FEDERATION_OPEN_JOIN', type: 'boolean', validate: () => true, immutable: false, description: 'Open join: a signed introduce self-admits as a low-trust visiting peer (no manual approval)' },
   { key: 'federationBookListed', dotPath: 'federation.book_listed', envVar: 'AIMEAT_FEDERATION_BOOK_LISTED', type: 'boolean', validate: () => true, immutable: false, description: 'List this node (operators + resources) in the federation book; off = privacy opt-out' },
   { key: 'federationAudienceRequired', dotPath: 'federation.audience_required', envVar: 'AIMEAT_FEDERATION_AUDIENCE_REQUIRED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Refuse a message from another node that does not name this node as the one it is for. Off: a node on an older version, which names none, is still heard; a message that names another node is refused either way. On by default from 3.27.0; the older message format, without the audience proof, is removed in 4.0.0' },
 
   // ── Security limits (mutable) ──
   { key: 'screenshotEgress', dotPath: 'security.screenshot_egress', envVar: 'AIMEAT_SCREENSHOT_EGRESS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'Exact addresses (scheme, host, port) of your own private servers that a page the node renders (a screenshot, a playtest, a Design Book bench) may reach, comma separated. Empty: public addresses and the node\'s own only', range: 'http://intranet.local:8080,http://192.168.1.20:3000' },
-  { key: 'loginRateLimitMax', dotPath: 'security.login_rate_limit_max', envVar: 'AIMEAT_LOGIN_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Max login attempts per minute per IP', range: '1-1000' },
-  { key: 'loginRateLimitWindowMs', dotPath: 'security.login_rate_limit_window_ms', envVar: 'AIMEAT_LOGIN_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1000, immutable: false, description: 'Login rate limit window in ms', range: '1000-3600000' },
-  { key: 'registrationRateLimitMax', dotPath: 'security.registration_rate_limit_max', envVar: 'AIMEAT_REGISTRATION_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Max registration attempts per minute per IP', range: '1-100' },
-  { key: 'registrationRateLimitWindowMs', dotPath: 'security.registration_rate_limit_window_ms', envVar: 'AIMEAT_REGISTRATION_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1000, immutable: false, description: 'Registration rate limit window in ms', range: '1000-3600000' },
-  { key: 'adminAuthRateLimitMax', dotPath: 'security.admin_auth_rate_limit_max', envVar: 'AIMEAT_ADMIN_AUTH_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Max admin auth attempts per minute per IP', range: '1-100' },
-  { key: 'adminAuthRateLimitWindowMs', dotPath: 'security.admin_auth_rate_limit_window_ms', envVar: 'AIMEAT_ADMIN_AUTH_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1000, immutable: false, description: 'Admin auth rate limit window in ms', range: '1000-3600000' },
-  { key: 'passwordLockoutAttempts', dotPath: 'security.password_lockout_attempts', envVar: 'AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Failed password attempts before lockout', range: '1-100' },
-  { key: 'passwordLockoutMinutes', dotPath: 'security.password_lockout_minutes', envVar: 'AIMEAT_PASSWORD_LOCKOUT_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Password lockout duration in minutes', range: '1-1440' },
-  { key: 'jsonBodyLimitMb', dotPath: 'security.json_body_limit_mb', envVar: 'AIMEAT_JSON_BODY_LIMIT_MB', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Default JSON body size limit in MB', range: '1-100' },
-  { key: 'jsonBodyLimitLargeMb', dotPath: 'security.json_body_limit_large_mb', envVar: 'AIMEAT_JSON_BODY_LIMIT_LARGE_MB', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 1, immutable: false, description: 'Large JSON body size limit in MB (apps, extensions)', range: '1-100' },
+  { key: 'loginRateLimitMax', dotPath: 'security.login_rate_limit_max', envVar: 'AIMEAT_LOGIN_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max login attempts per minute per IP', range: '1-1000' },
+  { key: 'loginRateLimitWindowMs', dotPath: 'security.login_rate_limit_window_ms', envVar: 'AIMEAT_LOGIN_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Login rate limit window in ms', range: '1000-3600000' },
+  { key: 'registrationRateLimitMax', dotPath: 'security.registration_rate_limit_max', envVar: 'AIMEAT_REGISTRATION_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max registration attempts per minute per IP', range: '1-100' },
+  { key: 'registrationRateLimitWindowMs', dotPath: 'security.registration_rate_limit_window_ms', envVar: 'AIMEAT_REGISTRATION_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Registration rate limit window in ms', range: '1000-3600000' },
+  { key: 'adminAuthRateLimitMax', dotPath: 'security.admin_auth_rate_limit_max', envVar: 'AIMEAT_ADMIN_AUTH_RATE_LIMIT_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max admin auth attempts per minute per IP', range: '1-100' },
+  { key: 'adminAuthRateLimitWindowMs', dotPath: 'security.admin_auth_rate_limit_window_ms', envVar: 'AIMEAT_ADMIN_AUTH_RATE_LIMIT_WINDOW_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Admin auth rate limit window in ms', range: '1000-3600000' },
+  { key: 'passwordLockoutAttempts', dotPath: 'security.password_lockout_attempts', envVar: 'AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Failed password attempts before lockout', range: '1-100' },
+  { key: 'passwordLockoutMinutes', dotPath: 'security.password_lockout_minutes', envVar: 'AIMEAT_PASSWORD_LOCKOUT_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Password lockout duration in minutes', range: '1-1440' },
+  { key: 'jsonBodyLimitMb', dotPath: 'security.json_body_limit_mb', envVar: 'AIMEAT_JSON_BODY_LIMIT_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Default JSON body size limit in MB', range: '1-100' },
+  { key: 'jsonBodyLimitLargeMb', dotPath: 'security.json_body_limit_large_mb', envVar: 'AIMEAT_JSON_BODY_LIMIT_LARGE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Large JSON body size limit in MB (apps, extensions)', range: '1-100' },
 
   // ── Quotas (mutable, additional) ──
   { key: 'memoryMaxValueSizeKb', dotPath: 'quota.memory_max_value_size_kb', envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory value size in KB', range: '1-10240' },
-  { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory keys per agent', range: '1-100000' },
+  { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'The most memory keys each owner and each agent may hold', range: '1-100000' },
   // How long a deleted memory record can still be taken back. 0 makes a delete immediate and
   // final, which is a legitimate choice an operator should have to make rather than inherit.
   { key: 'memoryDeleteGraceDays', dotPath: 'quota.memory_delete_grace_days', envVar: 'AIMEAT_MEMORY_DELETE_GRACE_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Days a deleted memory record stays takeable back before it is removed for good', range: '0-365' },
@@ -455,10 +453,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'wsRowsMaxRowKb', dotPath: 'quota.ws_rows_max_row_kb', envVar: 'AIMEAT_WS_ROWS_MAX_ROW_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max size of a single workspace row in KB', range: '1-1024' },
   { key: 'storageMaxFileSizeMb', dotPath: 'quota.storage_max_file_size_mb', envVar: 'AIMEAT_STORAGE_MAX_FILE_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max file size for storage in MB', range: '1-1024' },
   { key: 'storageMaxChunkedFileSizeGb', dotPath: 'quota.storage_max_chunked_file_size_gb', envVar: 'AIMEAT_STORAGE_MAX_CHUNKED_FILE_SIZE_GB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max chunked file size in GB', range: '1-100' },
-  { key: 'maxActionsPerAgent', dotPath: 'quota.max_actions_per_agent', envVar: 'AIMEAT_MAX_ACTIONS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max actions per agent', range: '1-1000' },
+  { key: 'maxActionsPerAgent', dotPath: 'quota.max_actions_per_agent', envVar: 'AIMEAT_MAX_ACTIONS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'The most actions one owner or one agent may offer', range: '1-1000' },
   { key: 'minTrustForPaidActions', dotPath: 'quota.min_trust_paid_actions', envVar: 'AIMEAT_MIN_TRUST_PAID_ACTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Min trust score for paid actions', range: '0-100' },
   { key: 'appMaxSizeMb', dotPath: 'quota.app_max_size_mb', envVar: 'AIMEAT_APP_MAX_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max app package size in MB', range: '1-100' },
-  { key: 'maxAppsPerAgent', dotPath: 'quota.max_apps_per_agent', envVar: 'AIMEAT_MAX_APPS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max apps per agent', range: '1-1000' },
+  { key: 'maxAppsPerAgent', dotPath: 'quota.max_apps_per_agent', envVar: 'AIMEAT_MAX_APPS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'The most published apps one owner may have', range: '1-1000' },
 
   // ── Morsel Policy (mutable, additional) ──
   { key: 'agentPortingFeeMorsels', dotPath: 'morsel_policy.agent_porting_fee', envVar: 'AIMEAT_AGENT_PORTING_FEE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsel fee for agent porting', range: '0-10000' },
@@ -467,9 +465,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Work (mutable, additional) ──
   { key: 'appAnnouncementBoardId', dotPath: 'work.app_announcement_board_id', envVar: 'AIMEAT_APP_ANNOUNCEMENT_BOARD_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Board ID for app announcements' },
-  { key: 'otkTtlMs', dotPath: 'work.otk_ttl_ms', envVar: 'AIMEAT_OTK_TTL_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'One-time-key TTL in milliseconds', range: '1000-3600000' },
   { key: 'otkGraceMs', dotPath: 'work.otk_grace_ms', envVar: 'AIMEAT_OTK_GRACE_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'One-time-key grace period in milliseconds', range: '0-600000' },
-  { key: 'maxUrlLength', dotPath: 'work.max_url_length', envVar: 'AIMEAT_MAX_URL_LENGTH', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 256, immutable: false, description: 'Max URL length allowed', range: '256-65536' },
 
   // ── Indexing (immutable) ──
   { key: 'indexNowKey', dotPath: 'indexing.indexnow_key', envVar: 'AIMEAT_INDEXNOW_KEY', type: 'string', validate: () => true, immutable: true, description: 'IndexNow API key for SEO', adminDisplay: 'configured' },
@@ -483,7 +479,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Personal Nodes (mutable, additional) ──
   { key: 'personalNodeMailboxQuotaMb', dotPath: 'personal_nodes.mailbox_quota_mb', envVar: 'AIMEAT_PERSONAL_MAILBOX_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Personal node mailbox quota in MB', range: '1-1000' },
-  { key: 'personalNodeMailboxRetentionDays', dotPath: 'personal_nodes.mailbox_retention_days', envVar: 'AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Personal node mailbox retention in days', range: '1-365' },
   { key: 'personalNodeHeartbeatIntervalMs', dotPath: 'personal_nodes.heartbeat_interval_ms', envVar: 'AIMEAT_PERSONAL_HEARTBEAT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Personal node heartbeat interval in ms', range: '1000-300000' },
   { key: 'personalNodeOfflineThresholdMs', dotPath: 'personal_nodes.offline_threshold_ms', envVar: 'AIMEAT_PERSONAL_OFFLINE_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10000, immutable: false, description: 'Personal node offline threshold in ms', range: '10000-3600000' },
   { key: 'personalNodeRequestTimeoutMs', dotPath: 'personal_nodes.request_timeout_ms', envVar: 'AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'Personal node request timeout in ms', range: '1000-300000' },
@@ -500,7 +495,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Push Notifications (mutable, additional) ──
   { key: 'vapidSubject', dotPath: 'push.vapid_subject', envVar: 'AIMEAT_VAPID_SUBJECT', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'VAPID subject (mailto: or https: URI)' },
-  { key: 'pushNotifyTypes', dotPath: 'push.notify_types', envVar: 'AIMEAT_PUSH_NOTIFY_TYPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Comma-separated notification types to push' },
+  { key: 'pushNotifyTypes', dotPath: 'push.notify_types', envVar: 'AIMEAT_PUSH_NOTIFY_TYPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Notification types to push, one per line (comma-separated in the environment)' },
   { key: 'pushCooldownMin', dotPath: 'push.cooldown_min', envVar: 'AIMEAT_PUSH_COOLDOWN_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Push notification cooldown in minutes', range: '1-1440' },
   { key: 'pushMaxSubscriptionsPerNode', dotPath: 'push.max_subscriptions_per_node', envVar: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max push subscriptions per node', range: '1-100' },
   { key: 'pushMaxFailures', dotPath: 'push.max_failures', envVar: 'AIMEAT_PUSH_MAX_FAILURES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max push failures before disabling', range: '1-50' },
@@ -552,14 +547,14 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── MCP sessions (mutable) ──
   { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
-  { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 250 && (v as number) <= 600000, immutable: true, description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
+  { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 250 && (v as number) <= 600000, immutable: true, description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
 
   // ── Registration (mutable) ──
   { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
 
   // ── Scoped Agent Capabilities (mutable) ──
-  { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Default agent capability scopes (comma-separated; default memory:read,memory:write,memory:delete,catalogue:read,organism:read)' },
-  { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Max available agent scopes (comma-separated, * = all)' },
+  { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Default agent capability scopes, one per line (comma-separated in the environment; default memory:read, memory:write, memory:delete, catalogue:read, organism:read)' },
+  { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'The most scopes an agent can be given, one per line (comma-separated in the environment; * = all)' },
 
   // ── Enterprise SSO (BR-04; mutable — an organisation node's host seals these) ──
   { key: 'ssoEnabled', dotPath: 'sso.enabled', envVar: 'AIMEAT_SSO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable organisation sign-in (SAML) and provisioning (SCIM) doors' },
@@ -581,7 +576,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'cookieConsentPolicyUrl', dotPath: 'cookies.consent_policy_url', envVar: 'AIMEAT_COOKIE_CONSENT_POLICY_URL', type: 'string', validate: () => true, immutable: false, description: 'Cookie consent privacy policy URL' },
 
   // ── CORS (mutable) ──
-  { key: 'corsAllowedOrigins', dotPath: 'cors.allowed_origins', envVar: 'AIMEAT_CORS_ALLOWED_ORIGINS', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'CORS allowed origins (comma-separated, * = all)' },
+  { key: 'corsAllowedOrigins', dotPath: 'cors.allowed_origins', envVar: 'AIMEAT_CORS_ALLOWED_ORIGINS', type: 'object', list: true, validate: isStringList, immutable: false, description: 'CORS allowed origins, one per line (comma-separated in the environment; * = all). An origin is matched whole: scheme, host and port' },
 
   // ── Realtime P2P (mutable) ──
   { key: 'realtimeEnabled', dotPath: 'realtime.enabled', envVar: 'AIMEAT_REALTIME_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable realtime P2P signaling' },
@@ -590,7 +585,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'realtimeRoomIdleTimeoutMs', dotPath: 'realtime.room_idle_timeout_ms', envVar: 'AIMEAT_REALTIME_ROOM_IDLE_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000, immutable: false, description: 'P2P room idle timeout in ms', range: '1000-86400000' },
   { key: 'realtimeMaxMessageSizeBytes', dotPath: 'realtime.max_message_size_bytes', envVar: 'AIMEAT_REALTIME_MAX_MESSAGE_SIZE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 256, immutable: false, description: 'Max P2P message size in bytes', range: '256-1048576' },
   { key: 'realtimeRateLimitPerSecond', dotPath: 'realtime.rate_limit_per_second', envVar: 'AIMEAT_REALTIME_RATE_LIMIT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'P2P messages per second rate limit', range: '1-1000' },
-  { key: 'stunServers', dotPath: 'realtime.stun_servers', envVar: 'AIMEAT_STUN_SERVERS', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'STUN servers for P2P (comma-separated)' },
+  { key: 'stunServers', dotPath: 'realtime.stun_servers', envVar: 'AIMEAT_STUN_SERVERS', type: 'object', list: true, validate: isStringList, immutable: false, description: 'STUN servers for P2P, one per line (comma-separated in the environment)' },
   { key: 'turnServer', dotPath: 'realtime.turn_server', envVar: 'AIMEAT_TURN_SERVER', type: 'string', validate: () => true, immutable: false, description: 'TURN server URL for P2P relay' },
   { key: 'turnUsername', dotPath: 'realtime.turn_username', envVar: 'AIMEAT_TURN_USERNAME', type: 'string', validate: () => true, immutable: false, description: 'Deprecated, removed in 4.0.0. TURN server username: set the TURN shared secret instead; served only while that is empty', adminDisplay: 'configured' },
   { key: 'turnCredential', dotPath: 'realtime.turn_credential', envVar: 'AIMEAT_TURN_CREDENTIAL', type: 'string', validate: () => true, immutable: false, description: 'Deprecated, removed in 4.0.0. TURN server credential: set the TURN shared secret instead; served only while that is empty', adminDisplay: 'configured' },
@@ -616,7 +611,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Agent Directives (Phase 1, mutable) ──
   { key: 'agentSystemPrinciples', dotPath: 'agent.system_principles', envVar: 'AIMEAT_AGENT_SYSTEM_PRINCIPLES', type: 'object', validate: (v: unknown) => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: false, description: 'System-level principles injected into all agent directives' },
-  { key: 'agentMaxTokensPerTask', dotPath: 'agent.max_tokens_per_task', envVar: 'AIMEAT_AGENT_MAX_TOKENS_PER_TASK', type: 'number', validate: (v: unknown) => typeof v === 'number' && (v as number) >= 1000 && (v as number) <= 10000000, immutable: false, description: 'Maximum token budget per agent task', range: '1000-10000000' },
+  { key: 'agentMaxTokensPerTask', dotPath: 'agent.max_tokens_per_task', envVar: 'AIMEAT_AGENT_MAX_TOKENS_PER_TASK', type: 'number', validate: (v: unknown) => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1000 && (v as number) <= 10000000, immutable: false, description: 'Maximum token budget per agent task', range: '1000-10000000' },
   { key: 'agentMandatoryLogging', dotPath: 'agent.mandatory_logging', envVar: 'AIMEAT_AGENT_MANDATORY_LOGGING', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Require agents to log all significant actions' },
   { key: 'agentAimeatFirstEnabled', dotPath: 'agent.aimeat_first', envVar: 'AIMEAT_AGENT_AIMEAT_FIRST', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Enable AIMEAT-first principle in agent directives' },
 
@@ -774,6 +769,8 @@ export function parseConfigValue(field: ConfigFieldDef, raw: string): unknown {
     case 'float':  return parseFloat(raw);
     case 'boolean': return raw === 'true';
     case 'object': {
+      // A list arrives as comma-separated text from the environment, a file, Consul or a stored row.
+      if (field.list) return asList(raw);
       // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       try { return JSON.parse(raw); } catch { return null; }
     }
@@ -787,4 +784,14 @@ export function parseConfigValue(field: ConfigFieldDef, raw: string): unknown {
 export function serializeConfigValue(value: unknown): string {
   if (typeof value === 'object' && value !== null) return JSON.stringify(value);
   return String(value);
+}
+
+/**
+ * A field's value as the raw text every reader takes: a `list` row is comma-separated, which is what
+ * its environment variable holds and what parseConfigValue splits; everything else as
+ * serializeConfigValue writes it. The env export wrote a list as a JSON array, which the config
+ * loader then read as one entry.
+ */
+export function serializeFieldValue(field: ConfigFieldDef, value: unknown): string {
+  return field.list && Array.isArray(value) ? value.join(',') : serializeConfigValue(value);
 }

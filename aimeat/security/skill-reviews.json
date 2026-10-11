@@ -215,13 +215,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-09",
+      "reviewedOn": "2026-10-11",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:888258e8f788a6d3783c7d09"
+      "digest": "sha256:f477fffef2a0fe8242a32917"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-08",
@@ -493,7 +493,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "562ec994ef35b79c",
-      "aimeat/src/routes/ghii/register-login.ts": "3d2309bb63077249",
+      "aimeat/src/routes/ghii/register-login.ts": "41f52cc635fc72f8",
       "aimeat/src/services/first-steps.ts": "8b9905de90360fa2"
     },
     "node:ai-transparency": {

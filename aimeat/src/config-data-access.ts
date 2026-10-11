@@ -14,6 +14,7 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-10-11 — consentMaxPerUser (AIMEAT_CONSENT_MAX_PER_USER) removed: no code read it.
  *   v1.0.0 — 2026-09-29 — Initial. consentEnabled, consentAuditRetentionDays, accountEventWindow,
  *     executionLogRetentionDays and consentMaxPerUser moved from config.ts unchanged;
  *     classificationMode added (AIMEAT_CLASSIFICATION, TARGET-082).
@@ -45,7 +46,6 @@ export function dataAccessDefaults() {
     consentAuditRetentionDays: parseInt(process.env.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS ?? '365', 10),
     accountEventWindow: parseInt(process.env.AIMEAT_ACCOUNT_EVENT_WINDOW ?? '100', 10),
     executionLogRetentionDays: parseInt(process.env.AIMEAT_EXECUTION_LOG_RETENTION_DAYS ?? '30', 10),
-    consentMaxPerUser: parseInt(process.env.AIMEAT_CONSENT_MAX_PER_USER ?? '100', 10),
     classificationMode: parseClassificationMode(process.env.AIMEAT_CLASSIFICATION),
   };
 }

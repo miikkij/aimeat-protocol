@@ -30,6 +30,7 @@
 
 import type { AimeatConfig } from '../config.js';
 import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue, writeConfigField } from './config-schema.js';
+import { syncRateLimitTiers } from './config-rate-limit-sync.js';
 import { isSealed } from './config-sealing.js';
 import { logger } from '../utils/logger.js';
 
@@ -173,5 +174,7 @@ export function applyConsulValues(
       // eslint-disable-next-line aimeat/no-silent-catch -- not silent: the key is reported to the caller in the returned `skipped` list
     } catch { skipped.push(dotPath); }
   }
+  // A rate limit that Consul changed reaches the running limiters (config-rate-limit-sync.ts).
+  if (applied.length > 0) syncRateLimitTiers(config);
   return { applied, skipped, sealed };
 }

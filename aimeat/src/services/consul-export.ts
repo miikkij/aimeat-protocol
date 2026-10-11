@@ -13,7 +13,7 @@
  *     out unless `includeSecrets` is true.
  */
 import type { AimeatConfig } from '../config.js';
-import { MUTABLE_CONFIG_MAP, serializeConfigValue, readConfigField } from './config-schema.js';
+import { MUTABLE_CONFIG_MAP, serializeFieldValue, readConfigField } from './config-schema.js';
 import { isSealed, isSecretField } from './config-sealing.js';
 
 export interface ConsulExportPlan {
@@ -41,7 +41,7 @@ export function planConsulExport(config: AimeatConfig, opts: { includeSecrets?: 
     if (isSecretField(field) && opts.includeSecrets !== true) { secretsSkipped++; continue; }
     const value = readConfigField(config, field);
     if (value === undefined || value === null) continue;
-    entries.push({ path, value: serializeConfigValue(value) });
+    entries.push({ path, value: serializeFieldValue(field, value) });
   }
   return { entries, sealedSkipped, secretsSkipped, total: Object.keys(MUTABLE_CONFIG_MAP).length };
 }

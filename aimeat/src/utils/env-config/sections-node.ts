@@ -109,12 +109,6 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
           defaultVal: '60000',
         },
         {
-          envVar: 'AIMEAT_OTK_TTL_MS',
-          description: 'One-time key expiry (in milliseconds)',
-          value: String(config.otkTtlMs),
-          defaultVal: '300000',
-        },
-        {
           envVar: 'AIMEAT_OTK_GRACE_MS',
           description: 'Grace period for expired one-time keys (in milliseconds)',
           value: String(config.otkGraceMs),
@@ -289,12 +283,6 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
           description: 'Morsels charged for agent porting',
           value: String(config.agentPortingFeeMorsels),
           defaultVal: '50',
-        },
-        {
-          envVar: 'AIMEAT_MAX_URL_LENGTH',
-          description: 'Maximum allowed URL length in requests',
-          value: String(config.maxUrlLength),
-          defaultVal: '8192',
         },
       ],
     },

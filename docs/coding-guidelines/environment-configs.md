@@ -71,7 +71,6 @@ copying another session's configuration can erase its test data.
 The host side reads:
 
 - `AIMEAT_PERSONAL_MAILBOX_QUOTA_MB`
-- `AIMEAT_PERSONAL_MAILBOX_RETENTION_DAYS`
 - `AIMEAT_PERSONAL_HEARTBEAT_MS`
 - `AIMEAT_PERSONAL_OFFLINE_MS`
 - `AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS`

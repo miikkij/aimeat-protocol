@@ -182,9 +182,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
       title: 'Marketplace',
       vars: [
         { key: 'AIMEAT_MARKETPLACE_ENABLED', comment: 'Enable marketplace features' },
-        { key: 'AIMEAT_MARKETPLACE_LISTING_FEE', comment: 'Morsels charged to list an item' },
         { key: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT', comment: 'Transaction fee percentage' },
-        { key: 'AIMEAT_MARKETPLACE_ESCROW', comment: 'Enable escrow for transactions' },
       ],
     },
     {

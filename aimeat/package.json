@@ -147,6 +147,7 @@
     "check:profile-tabs": "tsx scripts/check-profile-tabs.ts",
     "check:crew-defs": "tsx scripts/check-crew-defs.ts",
     "check:config-coverage": "tsx scripts/check-config-coverage.ts --strict",
+    "check:config-tab": "tsx scripts/check-config-tab.ts",
     "check:config-coverage:report": "tsx scripts/check-config-coverage.ts",
     "check:config-coverage:seed": "tsx scripts/check-config-coverage.ts --seed",
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",

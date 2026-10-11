@@ -409,9 +409,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   appAnnouncementBoardId: string;
   webhookMaxRetries: number;
   workQueueMaxPending: number;
-  otkTtlMs: number;
   otkGraceMs: number;
-  maxUrlLength: number;
   indexNowKey: string | null;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;
@@ -492,7 +490,6 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    */
   accountEventWindow: number;
   executionLogRetentionDays: number;
-  consentMaxPerUser: number;
 
   // Two-step sign-in, passkeys and the key that encrypts what they store: AccountSecurityConfig,
   // in config-types-account-security.ts.
@@ -527,7 +524,6 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   personalNodesEnabled: boolean;
   personalNodeMaxSlots: number;
   personalNodeMailboxQuotaMb: number;
-  personalNodeMailboxRetentionDays: number;
   personalNodeHeartbeatIntervalMs: number;
   personalNodeOfflineThresholdMs: number;
   personalNodeRequestTimeoutMs: number;
@@ -577,9 +573,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
 
   // Marketplace (Phase 2.6)
   marketplaceEnabled: boolean;
-  marketplaceListingFeeMorsels: number;
   marketplaceTransactionFeePercent: number;
-  marketplaceEscrowEnabled: boolean;
 
   // Commerce core + fee policy (TARGET-033)
   /** Where marketplace fees go: credited to the operator's GHII, or burned out of supply. */
@@ -638,7 +632,6 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   syncMode: 'bulk' | 'instant' | 'hybrid';
   syncIntervalHours: number;
   syncBatchDelayMs: number;
-  replicationQueueMax: number;
   replicationQueueTtlHours: number;
   maxConcurrentSyncs: number;
   federationTimeoutMs: number;

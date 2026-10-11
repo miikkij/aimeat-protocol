@@ -52,11 +52,11 @@ A recommended range does not make a larger value free. A quota multiplies with t
 and the size of one item (one memory value, one file, one app) is held by the request body limit and
 by the memory of the process before the setting is reached.
 
-Fifteen settings refused a larger value until 2026-10-11 and are recommendations since:
-`apps.audit_keep_default`, `account_events.window`, `consent.max_per_user`,
+Thirteen settings refused a larger value until 2026-10-11 and are recommendations since:
+`apps.audit_keep_default`, `account_events.window`,
 `federation.package_peer_cap`, `extensions.timeout_ms`, `extensions.max_installed`,
 `extensions.max_per_owner`, `cross_federation.max_genesis_peers`,
-`federation_sync.replication_queue_max`, `personal_nodes.max_slots`,
+`personal_nodes.max_slots`,
 `push.max_subscriptions_per_node`, `cortex.max_installed`, `ai.job_max_queued`,
 `ai.job_max_queued_per_owner`, `ai.chat_max_live_threads`.
 
@@ -130,13 +130,13 @@ The dot path's first segment is the group. The configuration schema lists the cu
 | `totp` | Two-factor: period, window, failed-attempt ceiling |
 | `extensions` | The QuickJS-WASM sandbox: memory, timeout, outbound call budget |
 | `push` | Web push and its VAPID keys |
-| `personal_nodes` | Slots, mailbox quota and retention for personal nodes anchored here |
+| `personal_nodes` | Slots and mailbox quota for personal nodes anchored here |
 | `connect_tunnel` | The connector's forward tunnel: heartbeat, offline threshold, timeouts |
-| `work` | Queue depth, webhook retries, URL length ceiling |
+| `work` | Queue depth, webhook retries |
 | `commerce` | Whether commerce is on, the fee mode, the operator's fee account |
 | `consul` | Optional fleet configuration source |
 | `auth` | JWT and agent token lifetimes, the Entra tenant allowlist |
-| `marketplace` | Listing fee, transaction fee, escrow |
+| `marketplace` | Transaction fee |
 | `agent` | System principles, per-task token ceiling, mandatory logging |
 | `consent`, `cortex`, `portfolio`, `cookies`, `cross_federation` | Consent retention; cortex install limits; portfolio size; cookie banner; genesis peers |
 | `features`, `stats`, `metrics`, `scopes`, `sso`, `tasks` | Feature switches, who may read stats and metrics, default and maximum agent scopes, organisation sign-in, task auto-archive |
@@ -163,10 +163,10 @@ Defaults as shipped in `.env.example`.
 | `morsel_policy.daily_allowance_cap` | `AIMEAT_DAILY_ALLOWANCE_CAP` | `500` | Where accrual stops |
 | `morsel_policy.burn_rate` | `AIMEAT_BURN_RATE` | `0.10` | Share of a transfer that leaves circulation |
 | `morsel_policy.pacing_toll_default` | `AIMEAT_PACING_TOLL_DEFAULT` | `0` | What a write costs by default |
-| `quota.memory_mb` | `AIMEAT_MEMORY_QUOTA_MB` | `10` | Memory per owner |
-| `quota.memory_max_keys_per_agent` | `AIMEAT_MEMORY_MAX_KEYS` | `1000` | Keys per principal; query the target node for its configured limit |
+| `quota.memory_mb` | `AIMEAT_MEMORY_QUOTA_MB` | `10` | Memory in MB, for each owner and for each agent separately |
+| `quota.memory_max_keys_per_agent` | `AIMEAT_MEMORY_MAX_KEYS` | `1000` | Memory keys, for each owner and for each agent separately; query the target node for its configured limit |
 | `quota.memory_max_value_size_kb` | `AIMEAT_MEMORY_MAX_VALUE_SIZE_KB` | `1024` | One memory value |
-| `quota.storage_mb` | `AIMEAT_STORAGE_QUOTA_MB` | `100` | Files per owner |
+| `quota.storage_mb` | `AIMEAT_STORAGE_QUOTA_MB` | `100` | Files in MB, for each owner and for each agent separately |
 | `quota.storage_max_file_size_mb` | `AIMEAT_STORAGE_MAX_FILE_SIZE_MB` | `10` | One file |
 | `quota.app_max_size_mb` | `AIMEAT_APP_MAX_SIZE_MB` | `5` | One published app |
 | `work.queue_max_pending` | `AIMEAT_WORK_QUEUE_MAX_PENDING` | `10` | Pending work items per agent |

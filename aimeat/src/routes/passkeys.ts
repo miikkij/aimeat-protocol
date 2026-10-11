@@ -64,8 +64,8 @@ export function passkeysRouter(config: AimeatConfig, storage: Storage): Router {
   // hands out a random value and does one indexed read, and it answers a name nobody has exactly
   // like a name that exists, so repeating it teaches nothing; its limit is about cost alone and
   // sits four times higher, which keeps one sign-in at one unit of the tier that matters.
-  const verifyLimit = rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs });
-  const optionsLimit = rateLimit({ max: config.loginRateLimitMax * 4, windowMs: config.loginRateLimitWindowMs });
+  const verifyLimit = rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }));
+  const optionsLimit = rateLimit(() => ({ max: config.loginRateLimitMax * 4, windowMs: config.loginRateLimitWindowMs }));
 
   // ── Adding a device to an account that is already signed in ──
 

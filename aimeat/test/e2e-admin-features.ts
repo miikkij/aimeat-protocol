@@ -624,6 +624,73 @@ await test('DELETE /v1/admin/config/{path} \u2192 the schema says the node runs 
     await reset();
 });
 
+await test('PUT /v1/admin/config \u2192 a list setting saved as text is a list, and the MCP origin check matches an origin whole', async () => {
+    // Until 2026-10-11 the text was written into a field the code reads as an array, so
+    // allowed.includes(origin) was a substring test: with "https://app.example.com" saved, the
+    // origin "https://app.example" (a prefix, and a domain anyone can register) passed.
+    const path = 'cors.allowed_origins';
+    const entryOf = async () => (await json('/v1/admin/config', authed())).body.data.schema[path];
+    const put = (value: unknown) => json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }) }));
+    const mcpWithOrigin = async (origin: string) => {
+        const r = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: { Origin: origin, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+        });
+        return { status: r.status, refusedOrigin: (await r.text()).includes('Origin not allowed') };
+    };
+    const before = await entryOf();
+    assert(before.type === 'object' && Array.isArray(before.value), `the schema serves the list as a list: ${JSON.stringify(before)}`);
+    try {
+        const saved = await put('https://app.example.com, https://second.example');
+        assert(saved.status === 200, `a comma-separated text is accepted: ${saved.status} ${JSON.stringify(saved.body)}`);
+        const after = await entryOf();
+        assert(Array.isArray(after.value) && after.value.length === 2 && after.value[0] === 'https://app.example.com' && after.value[1] === 'https://second.example',
+            `the running value is a list of two origins: ${JSON.stringify(after.value)}`);
+
+        const exact = await mcpWithOrigin('https://app.example.com');
+        assert(!exact.refusedOrigin, `the saved origin passes the origin check: ${JSON.stringify(exact)}`);
+        for (const origin of ['https://app.example', 'https://app.exam', 'https://app.example.co', 'https://other.example']) {
+            const r = await mcpWithOrigin(origin);
+            assert(r.status === 403 && r.refusedOrigin, `${origin} is not the saved origin and must be refused: ${JSON.stringify(r)}`);
+        }
+
+        const asList = await put(['https://app.example.com']);
+        assert(asList.status === 200, `a list is accepted: ${asList.status}`);
+        const empty = await put('');
+        assert(empty.status === 400, `an empty list is refused: ${empty.status} ${JSON.stringify(empty.body)}`);
+    } finally {
+        await put(before.value);
+        await json(`/v1/admin/config/${encodeURIComponent(path)}`, authed({ method: 'DELETE' }));
+    }
+    const restored = await entryOf();
+    assert(JSON.stringify(restored.value) === JSON.stringify(before.value), `restored: ${JSON.stringify(restored.value)}`);
+});
+
+await test('PUT /v1/admin/config \u2192 a saved rate limit is enforced on the next requests, without a restart', async () => {
+    const path = 'rate_limits.boards';
+    const entryOf = async () => (await json('/v1/admin/config', authed())).body.data.schema[path];
+    const put = (value: unknown) => json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }) }));
+    const burst = async () => {
+        const statuses = await Promise.all(Array.from({ length: 12 }, () => fetch(`${BASE}/v1/boards`).then(r => r.status)));
+        return statuses.filter(s => s === 429).length;
+    };
+    const before = await entryOf();
+    try {
+        assert((await put(1)).status === 200, 'the limit is saved as 1 request per second');
+        // The window is one second: twelve requests at once cannot all fit under a limit of 1,
+        // whatever multiplier the caller's role gives.
+        const refused = await burst();
+        assert(refused > 0, `with the limit saved as 1 per second, some of 12 requests at once must be answered 429; got ${refused}`);
+    } finally {
+        await put(before.value);
+        await json(`/v1/admin/config/${encodeURIComponent(path)}`, authed({ method: 'DELETE' }));
+    }
+    await new Promise(r => setTimeout(r, 1100));
+    const refusedAfter = await burst();
+    assert(refusedAfter === 0, `with the old limit of ${before.value} back, 12 requests at once all pass; ${refusedAfter} were refused`);
+});
+
 // \u2500\u2500\u2500 The front-page switch (site.front_page) \u2500\u2500\u2500
 console.log('\nFront-page switch');
 
