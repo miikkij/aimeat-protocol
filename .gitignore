@@ -65,6 +65,10 @@ logs/**
 *.db-shm
 *.db-wal
 
+# The npm package's README is the repository's README.md, copied in by `prepublishOnly`
+# (aimeat/package.json) at publish time. A tracked copy only drifted or doubled every README diff.
+aimeat/README.md
+
 # A node that boots with no owner writes its setup secret beside its database
 # (services/admin-setup-secret.ts). A test server whose database is under test/ leaves it there.
 aimeat/test/admin-setup-secret
