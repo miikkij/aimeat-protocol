@@ -11249,6 +11249,24 @@
       "taskWaiting": "en espera",
       "all": "Toda su configuración →"
     },
+    "agentWork": {
+      "back": "Volver al agente",
+      "missingTitle": "No se encontró el trabajo",
+      "missingSub": "Este agente no tiene un trabajo con ese identificador.",
+      "untitled": "Trabajo",
+      "state": "Estado",
+      "steps": "{done} de {total} pasos hechos",
+      "asked": "Pedido",
+      "finished": "Terminó",
+      "askedTitle": "Qué se le pidió",
+      "resultTitle": "Qué produjo",
+      "running": "El agente está trabajando en esto ahora. El resultado aparece aquí cuando termine.",
+      "waiting": "Este trabajo todavía no ha empezado.",
+      "says": "El agente dice",
+      "loadingResult": "Leyendo el resultado…",
+      "noOutput": "El agente no guardó un resultado aparte. Su propia descripción está arriba.",
+      "all": "Todos los detalles de este trabajo →"
+    },
     "machines": {
       "title": "Tus computadoras",
       "sub": "Una computadora es donde funcionan tus agentes: tu laptop, un servidor, una computadora en la nube o tu propio AIMEAT de la tienda. Un agente solo puede usar lo que su computadora sabe hacer y lo que tú le permitiste.",

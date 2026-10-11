@@ -9,6 +9,8 @@
  * @structure listOffers / getAgentOffers / publishOffers · ask(agentEntry, offer, inputs) · buildAskPrompt
  * @usage import * as offers from '/js/services/offers.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-11 -- getDeliverableValue(): the same read as getDeliverableContent() with
+ *     the value as stored, for a caller that draws the result (views/home/agent-work.js).
  *   v1.0.0 -- 2026-06-12 -- Initial: Do feed + mode-aware Ask (run / copy-prompt / schedule-trigger).
  *   v1.1.0 -- 2026-06-12 -- Billable offers: setOfferBilling (patch one offer's price + visibility).
  *   v1.2.0 -- 2026-06-12 -- Inbox fixes: deliverable read from the AGENT namespace (prefix + task-tag
@@ -125,7 +127,16 @@ export async function rankOffersByNeed(needText, items) {
  *  set deliverableKey — e.g. CrewAI agents that only publish to memory). Returns the
  *  deliverable value as a string, or null if nothing was found. Mirrors the proven
  *  read in agents-tasks-subtab.js. */
-export async function getDeliverableContent({ agentGaii, deliverableKey, taskId }) {
+export async function getDeliverableContent(args) {
+  const v = await getDeliverableValue(args);
+  if (v == null) return null;
+  return typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+}
+
+/** The same read, with the value as it is stored: a string, or an object such as an image
+ *  descriptor ({ url, mime }), which a caller that draws the result has to see unflattened
+ *  (components/ImageDeliverable.js DeliverableBody). Null when nothing was found. */
+export async function getDeliverableValue({ agentGaii, deliverableKey, taskId }) {
   if (!agentGaii) return null;
   const enc = encodeURIComponent;
   const reqs = [];
@@ -146,9 +157,7 @@ export async function getDeliverableContent({ agentGaii, deliverableKey, taskId 
   const pick = items.find(i => i.key === deliverableKey)
     || items.find(i => /(latest_)?output$/.test(i.key))
     || items.slice().sort((a, b) => len(b.value) - len(a.value))[0];
-  const v = pick?.value;
-  if (v == null) return null;
-  return typeof v === 'string' ? v : JSON.stringify(v, null, 2);
+  return pick?.value ?? null;
 }
 
 /** Rate a done task's deliverable via the LOCKED rate endpoint (→ agents.<agent>.statistics.*).
