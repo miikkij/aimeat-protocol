@@ -22,6 +22,8 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.1.0 — 2026-10-11 — One choice about the agent's results, "Where does its work go?": its own
+ *     memory, or a workspace of an organism the person is in. Shown only when there is a workspace.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
@@ -53,6 +55,7 @@ import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
   draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeTools, readHomeAgents,
 } from '/js/services/agent-draft.js';
+import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
 import { machineName } from '/views/home/agents-band.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -91,6 +94,8 @@ export default function AgentNewView({ navigate }) {
   const [days, setDays] = useState('weekdays');
   const [clock, setClock] = useState('07:00');
   const [machine, setMachine] = useState('');
+  const [places, setPlaces] = useState([]);
+  const [place, setPlace] = useState('own');
   const [busy, setBusy] = useState(false);
 
   const goHome = useCallback((e) => { e?.preventDefault?.(); navigate(HOME); }, [navigate]);
@@ -104,6 +109,8 @@ export default function AgentNewView({ navigate }) {
       const list = data?.connectors ?? [];
       setMachine((cur) => cur || (list.length === 1 ? list[0].id : (list.find((c) => c.online)?.id ?? '')));
     }).catch((err) => { swallowed('agent-new: machines', err); setHome({ connectors: [], workers: [] }); });
+    // The workspaces the agent's work could be shared with. None read means the choice is not shown.
+    readTieChoices().then((c) => setPlaces(c.places ?? [])).catch((err) => swallowed('agent-new: places', err));
   }, [session]);
 
   // A proposal that waits: read it whole, because the home's list carries only its name and purpose.
@@ -181,6 +188,13 @@ export default function AgentNewView({ navigate }) {
         ? await approveProposal(proposal.id, name, made, choice)
         : await startAgent(made, choice);
       const state = out?.attached ? 'running' : out?.waiting_for_connector ? 'waiting' : 'made';
+      // Where its work goes, when the person named a workspace. The agent is made either way: a
+      // place that could not be saved is logged, and the agent's page shows the place it has.
+      if (place !== 'own') {
+        const slash = place.indexOf('/');
+        await setWorkplace(name, place.slice(0, slash), place.slice(slash + 1))
+          .catch((err) => swallowed('agent-new: workplace', err));
+      }
       navigate(`${HOME}?agent=${encodeURIComponent(name)}&started=${state}${out?.schedule_problem ? '&schedule=failed' : ''}`);
     } catch (err) {
       setProblem(err?.message || String(err));
@@ -336,6 +350,19 @@ export default function AgentNewView({ navigate }) {
             ${' '}${n('noMachine', 'You can start it now: it is made, and it begins working when a computer is connected.')}
             ${' '}<${Action} tone="more" href="/v1/home?computers=1">${tr('home.agents.noMachineDoor', 'Add a computer →')}<//>
           <//>`}
+
+        ${/* The one choice about the agent's results (Jouni, 2026-10-11): its own memory unless the
+             person names a workspace. It is offered only when there is a workspace to name. */''}
+        ${places.length > 0 && html`
+          <${Choice} boxed cols=${2} label=${tr('home.agentTies.placeLabel', 'Where does its work go?')} value=${place} onChange=${setPlace}
+            options=${[
+              { value: 'own', label: tr('home.agentTies.placeOwn', 'The agent\'s own memory'), hint: tr('home.agentTies.placeOwnHint', 'Only you see it.') },
+              ...places.map((pl) => ({
+                value: `${pl.organism_id}/${pl.workspace_id}`,
+                label: pl.workspace_name,
+                hint: tr('home.agentTies.placeHint', 'Organism {organism}. Its members see the finished work.').replace('{organism}', pl.organism_name),
+              })),
+            ]} />`}
 
         ${problem && html`<${Note} kind="message" error>${problem}<//>`}
 

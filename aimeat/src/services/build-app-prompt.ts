@@ -27,6 +27,7 @@
  *   2026-09-29 — ADDITIVE, one paragraph ending Data Storage on classified content (TARGET-082 V5). To stay
  *     under 800 lines, the provenance paragraph before it and the section "Reading data your AGENTS
  *     produced" moved verbatim to build-app-prompt-content.ts; the prompt text is unchanged there.
+ *   2026-10-11 — ADDITIVE, one sentence ending the data-map section: the optional `agent` and `madeFor` on a held row.
  *   2026-09-29 — ADDITIVE, one sentence ending the data-map section: the optional `classification` on a held row (TARGET-082 V5).
  *   2026-09-29 — The publish walkthrough's first step opens /v1/appcat instead of /app-catalog.html
  *     (Jouni). The address only; the steps are the same on both pages.
@@ -369,7 +370,7 @@ function composeAppPrompt(
   body += '- **`why` is the field this exists for.** It is read at the exact moment somebody is about to move that data. Write the reason, not a restatement of the row: "campaigns belong to the customer, not to whoever sent them" stops a mistake; "campaigns are stored here" does not.\n';
   body += '- **Leave a `why` you do not know EMPTY.** An empty one shows as unfinished and somebody fills it. A plausible-sounding wrong one is believed and acted on, which is worse than the blank it replaced.\n';
   body += '- **`form` must match where the rows actually land.** An app you declare as `group` whose every row sits in `owner-memory-private` is flagged on sight — that contradiction is the single check this whole thing exists to make. If it fires, the map is not wrong; the storage is.\n';
-  body += 'A static page that stores nothing declares `"form": "static"` with an empty `held`, and that is a complete map. Nothing here can refuse a publish. A `held` row may also carry the optional `"classification"`: the label id of the classification you expect that data to have by default, such as `"luottamuksellinen"` (1 to 40 lowercase letters, digits and dashes). It labels nothing; leave it out when you do not know.\n\n';
+  body += 'A static page that stores nothing declares `"form": "static"` with an empty `held`, and that is a complete map. Nothing here can refuse a publish. A `held` row may also carry the optional `"classification"`: the label id of the classification you expect that data to have by default, such as `"luottamuksellinen"` (1 to 40 lowercase letters, digits and dashes). It labels nothing; leave it out when you do not know. A row that reads the work of one of the owner\'s own agents carries `"agent"`, that agent\'s bare name, and `"madeFor": true` when the app was built for that agent: the row is the tie that makes the agent\'s page list the app, and it grants nothing.\n\n';
 
   // An app's audit trail on the group it belongs to. Added 2026-08-29 with the two-hand rule:
   // the organism names the app, the person approves the scope, and only both open ONE space.

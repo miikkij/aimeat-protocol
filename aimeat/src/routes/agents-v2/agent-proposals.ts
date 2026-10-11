@@ -23,6 +23,8 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.7.0 — 2026-10-11 — Approval gives the new agent its work once (services/agent-first-run.ts)
+ *     and answers with `first_run`; a body `first_run: false` asks for none.
  *   v1.6.0 — 2026-10-10 — Approval takes `install_id` (else the proposal's own), offers the agent to
  *     that connector alone, records the order so a waiting agent waits for that connector, and
  *     answers with `connector`. An unknown connector is refused before anything is created.
@@ -50,12 +52,14 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
-import { buildGAII } from '../../utils/gaii.js';
+import { buildGAII, resolveIdentity } from '../../utils/gaii.js';
 import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
 import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
 import { findConnector, setWanted, clearWanted, type ConnectorView } from '../../services/connector-registry.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordAccountEvent } from '../../services/account-events.js';
+import { giveFirstRun } from '../../services/agent-first-run.js';
+import { readerFor } from '../../services/classification/reader.js';
 import {
   proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
   proposalRunModeFor, proposalScopesFor, type ProposerPrincipal,
@@ -286,6 +290,20 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
 
     await settleProposal({ config, storage }, owner, proposal, 'approved');
 
+    // ── Its work, once, now (services/agent-first-run.ts) ──
+    // Only an agent that was given something to run, and unless the caller says `first_run: false`.
+    // A failure here is reported in the answer and undoes nothing: the agent is made.
+    const firstRun = proposal.crew_def && req.body?.first_run !== false
+      ? await giveFirstRun({ storage, config }, {
+          agentGaii: gaii,
+          displayName: proposal.display_name,
+          purpose: proposal.purpose,
+          // The resolved identity of the person approving, which on this route is always the owner.
+          creator: { gaii: resolveIdentity(req.auth!, config.nodeId), sub: req.auth!.sub, owner, reader: readerFor({ storage, config }, req.auth) },
+          actor: resolveIdentity(req.auth!, config.nodeId),
+        })
+      : null;
+
     void recordAccountEvent(storage, {
       ownerGhii: `${owner}@${config.nodeId}`,
       kind: 'agent_connected',
@@ -315,6 +333,11 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       // The connector the agent was ordered to, or null when none was chosen. With a choice, a
       // waiting agent waits for THIS connector, and no other one of the owner's is offered it.
       connector: target ? { id: target.id, name: target.name } : null,
+      // The agent's work given once now: the task's id and whether it started at once; null when
+      // the caller asked for none or the agent has nothing to run; `problem` when it was not made.
+      first_run: firstRun === null ? null
+        : firstRun.ok ? { task_id: firstRun.task_id, started: firstRun.started }
+          : { task_id: null, started: false, problem: { code: firstRun.code, message: firstRun.message } },
       next_step: nextStep(proposal.display_name, !!proposal.crew_def, enrolment.ok,
         !enrolment.ok && NO_CONNECTOR.has(enrolment.code)),
     }, [

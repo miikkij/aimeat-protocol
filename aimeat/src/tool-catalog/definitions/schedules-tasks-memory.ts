@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-11 — aimeat_agent_workplace_set: where an agent's finished work goes.
  *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start, beside aimeat_agent_task_start_set.
  *   2026-10-06 — aimeat_memory_write carries the bounds the node's MCP wrote by hand (value, tags,
  *     owner_scope, expected_version) and aimeat_workflow_save the node's fuller definition text, so
@@ -359,6 +360,21 @@ export const schedulesTasksMemoryTools = [
         scope: 'agent:write',
         surfaces: ['agent'],
         input: { target_agent_name: { type: 'string', required: true, description: 'The agent to start (same owner as you, never yourself).' } },
+    },
+    {
+        name: 'aimeat_agent_workplace_set',
+        description: "Say where the finished work of one of the owner's agents goes. By default the result of a task stays in the agent's own memory, which only the owner reads. Name a workspace (organism_id and workspace_id, from aimeat_organism_list and aimeat_workspace_list) and the result of each task the agent completes from then on is shared with that workspace's members; nothing is copied or moved, and work that is already finished stays as it is. Leave both ids out to go back to the agent's own memory. Use it when the person says so (\"share the news agent's work with the team\"). The owner must be a member of the organism. The agent's page on the owner's home shows the place.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: "Say Where an Agent's Work Goes", readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Changes who reads what an agent produces: the agent:write word, like its mode and its stop.
+        scope: 'agent:write',
+        surfaces: ['agent'],
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'The agent whose work this is about (same owner as you).' },
+            organism_id: { type: 'string', description: 'The organism the workspace is in. Leave it out, with workspace_id, to keep the work in the agent\'s own memory.' },
+            workspace_id: { type: 'string', description: 'The workspace whose members read the finished work.' },
+        },
     },
     {
         name: 'aimeat_task_request_changes',

@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-11 — aimeat_datamap_get and aimeat_datamap_set move unchanged to
+ *     tool-call-defs-data-map.ts (max-file-lines), where the two tie tools join them.
  *   2026-10-08 — aimeat_memory_write sends the `ai_provenance` declaration in the POST /v1/memory body,
  *     which records it with the write (aiprov E7).
  *   2026-10-06 — aimeat_capabilities_invoke sends its arguments as body.input, which is where the
@@ -46,6 +48,7 @@
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord } from './tool-call-helpers.js';
+import { dataMapCliTools } from './tool-call-defs-data-map.js';
 import type { ApiResponse } from './api-client.js';
 
 /**
@@ -480,30 +483,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
             })}`);
         },
     },
-    {
-        // THE THIRD SURFACE. A fleet daemon calls /local/call/<tool>, which dispatches here, and a
-        // parameter that exists on the two MCP surfaces and not in this table is dropped in silence.
-        // Every published parameter is forwarded, and test/unit/cli-tool-param-forwarding.test.ts
-        // invokes this handler against a recording client to prove each one leaves the process.
-        name: 'aimeat_datamap_get',
-        handler: ({ client }, input) => {
-            const app = requiredString(input, 'app');
-            const slash = app.indexOf('/');
-            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
-            return client.get(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}`
-                + `/${encodeURIComponent(app.slice(slash + 1))}`);
-        },
-    },
-    {
-        name: 'aimeat_datamap_set',
-        handler: ({ client }, input) => {
-            const app = requiredString(input, 'app');
-            const slash = app.indexOf('/');
-            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
-            return client.put(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}`
-                + `/${encodeURIComponent(app.slice(slash + 1))}`, requiredRecord(input, 'data_map'));
-        },
-    },
+    // The data map tools: tool-call-defs-data-map.ts (max-file-lines).
+    ...dataMapCliTools,
     {
         name: 'aimeat_memory_hands',
         handler: ({ client }, input) =>

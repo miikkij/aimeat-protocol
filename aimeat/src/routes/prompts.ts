@@ -6,6 +6,8 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   v1.15.0 -- 2026-10-11 -- Mounts the build instructions for an app that shows one agent's work
+ *     (prompts-build-app-agent.ts).
  *   v1.14.0 -- 2026-10-11 -- GET /v1/agents/me/handbook moves to prompts-agent-handbook.ts
  *     (max-file-lines), where its task queue also changes: no `wait` endpoint, and nothing queued
  *     for a stopped agent.
@@ -59,6 +61,7 @@ import { registerFeaturesPrompt } from './prompts-features.js';
 import { registerSettingsPrompt } from './prompts-settings.js';
 import { registerHelloIntegrationPrompt } from './prompts-hello-integration.js';
 import { registerBuildAppLayerPrompts } from './prompts-build-app-layers.js';
+import { registerBuildAppAgentPrompt } from './prompts-build-app-agent.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
@@ -293,6 +296,8 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   registerOpenItemsPrompt(router, config, storage);
   registerHelloIntegrationPrompt(router, config);
   registerBuildAppLayerPrompts(router, config);
+  // The agent section in front of the specification, for an app that shows one agent's work.
+  registerBuildAppAgentPrompt(router, config, storage);
 
   router.get('/v1/prompts/agent-onboard', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';

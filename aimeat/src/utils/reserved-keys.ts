@@ -20,6 +20,9 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.22.0 — 2026-10-11 — `agent-workplace.` is reserved: where one agent's finished work is
+ *     shared, which the node acts on when a task completes. A new key, so nothing wrote it through
+ *     the memory API before this.
  *   v1.21.0 — 2026-10-10 — `agents.connectors.` is reserved: the owner's connectors and the orders
  *     that wait for one, which the node resolves a proposal's connector by. A new key, so nothing
  *     wrote it through the memory API before this.
@@ -148,6 +151,15 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // minted where the owner did not choose. Only the registry writes it, server-side; the owner
   // renames and forgets through /v1/agents/v2/connectors.
   'agents.connectors.',
+  // 2026-10-11: `agent-workplace.<name>` says which workspace one agent's finished work is shared
+  // with (services/agent-workplace.ts). The node ACTS on it: when a task of that agent completes,
+  // the task's result records change from private to readable by that workspace's members. A
+  // granted app that could write the key could point an agent's results at a workspace of its
+  // choosing, and the owner's private results would be shared without the owner deciding it. Only
+  // the workplace service writes it, server-side, after checking that the owner is a member of the
+  // organism; the owner sets and clears it through /v1/agents/{name}/workplace. Also in
+  // SERVICE_OWNED_KEY_PREFIXES below, so no memory route writes, restores or deletes it for anyone.
+  'agent-workplace.',
   // `ai.jobs.<id>` is a live AI job and `ai.jobs.log.<day>` is the record of what the finished ones
   // cost. Both are read by the server as fact: a job record says which model to call, whose key
   // pays, what prompt to send and which key to write the answer to. A granted app that could write
@@ -287,8 +299,15 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * from it, and it decides when `*` starts to hold an agent's tasks. An agent that could write it could
  * forge its own history: claim it used everything, or nothing. services/scope-use.ts is the one
  * writer, straight to storage.
+ *
+ * `agent-workplace.` (2026-10-11) says which workspace one agent's finished work is shared with
+ * (services/agent-workplace.ts). The node acts on it when a task completes, by making the task's
+ * private result readable to that workspace's members. Its one writer checks that the owner is an
+ * active member of the organism and that the workspace exists; a record written past it, by an
+ * owner PAT, an agent or a granted app, would skip both. The owner sets and clears it through
+ * /v1/agents/{name}/workplace.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.'];
 
 /** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
 export function isServiceOwnedKey(key: unknown): boolean {

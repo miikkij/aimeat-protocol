@@ -283,7 +283,7 @@ export function registerTaskCreateReadRoutes(
     // …and WHAT IT PRODUCED, on the same read. Both doors, because a finished task whose result
     // nobody can reach is indistinguishable from one that produced nothing, and which door the
     // caller happened to use should not decide whether they can find out.
-    const outcome = await taskOutcome(storage, task);
+    const outcome = await taskOutcome(storage, task, { withPlace: true });
     res.json(success(config.nodeId, { task: withFiles, ...(outcome ? { outcome } : {}) },
       outcome?.deliverable_url
         ? [{ description: 'The deliverable this task published', method: 'GET', url: outcome.deliverable_url }]

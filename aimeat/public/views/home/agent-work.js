@@ -24,6 +24,8 @@
  * @structure default AgentWorkView({ navigate })
  * @usage routed at /v1/home?agent=<name>&work=<task id> by spa.html
  * @version-history
+ *   v1.1.0 — 2026-10-11 — What this work is tied to: where the result is and who sees it (the
+ *     outcome's `shared_with`), and the apps that show the agent's work.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentin-ty-n-tulos-n-kyviin-yksinkertaisessa-agenttin-kym-ss).
  */
 import { h } from 'preact';
@@ -48,6 +50,9 @@ import { Markdown } from '/components/Markdown.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { getTask } from '/js/services/agent-tasks.js';
 import { getDeliverableValue } from '/js/services/offers.js';
+import { readHomeAgents } from '/js/services/agent-draft.js';
+import { LineList } from '/components/LineList.js';
+import { placeWords } from '/views/home/agent-ties-parts.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const p = (key, fallback) => tr('home.agentWork.' + key, fallback);
@@ -70,6 +75,7 @@ export default function AgentWorkView({ navigate }) {
   const name = query.get('agent') || '';
   const id = query.get('work') || '';
   const [found, setFound] = useState(null);
+  const [apps, setApps] = useState([]);
   const [result, setResult] = useState({ state: 'none' });
   const [loadError, setLoadError] = useState('');
 
@@ -79,6 +85,9 @@ export default function AgentWorkView({ navigate }) {
       const task = resp?.data?.task ?? null;
       setFound({ task, outcome: resp?.data?.outcome ?? null });
       setLoadError('');
+      // The apps that show this agent's work. The page stands without them, so a failed read is logged.
+      readHomeAgents(1, name).then((data) => setApps((data?.workers ?? [])[0]?.apps ?? []))
+        .catch((err) => swallowed('agent work: apps', err));
       if (task && task.status === 'done') {
         setResult((r) => (r.state === 'ready' ? r : { state: 'loading' }));
         const value = await getDeliverableValue({ agentGaii: task.agentGaii, deliverableKey: task.deliverableKey, taskId: task.id })
@@ -132,6 +141,7 @@ export default function AgentWorkView({ navigate }) {
   const stepsDone = todos.filter((todo) => todo.status === 'completed').length;
   const settings = `/v1/profile?tab=agents&agent=${encodeURIComponent(name)}`;
   const ended = ENDED.has(task.status);
+  const shared = outcome?.shared_with ?? [];
 
   return html`
     <${PageFrame} width="narrow">
@@ -145,6 +155,14 @@ export default function AgentWorkView({ navigate }) {
             : undefined },
         { k: p('asked', 'Asked'), v: ago(task.createdAt) },
         ended && { k: p('finished', 'Ended'), v: ago(outcome?.at || task.completedAt || task.updatedAt) },
+        // Where the result is, and who sees it: the workspaces it is shared with (the outcome's
+        // `shared_with`), or the agent's own memory.
+        task.status === 'done' && { k: p('where', 'Where the result is'),
+          v: shared.length > 0 ? shared.map(placeWords).join(' · ') : p('whereOwn', 'The agent\'s own memory') },
+        task.status === 'done' && { k: p('seenBy', 'Who sees it'),
+          v: shared.length > 0
+            ? p('seenByMembers', 'You, and the members of {organism}').replace('{organism}', [...new Set(shared.map((s) => s.organism_name))].join(', '))
+            : p('seenByYou', 'Only you') },
       ].filter(Boolean)} />
 
       ${task.description && task.description !== task.title && html`
@@ -161,6 +179,17 @@ export default function AgentWorkView({ navigate }) {
         ${result.state === 'ready' && html`<${DeliverableBody} value=${result.value} alt=${task.title || ''} />`}
         ${result.state === 'empty' && html`<${Note} kind="quiet">${p('noOutput', 'The agent saved no separate result. Its own words are above.')}<//>`}
       <//>
+
+      ${/* The apps whose data map names this agent: the places this work shows up in. */''}
+      ${task.status === 'done' && apps.length > 0 && html`
+        <${PageSection} group ends title=${p('shownTitle', 'Apps that show this work')}>
+          <${LineList} rows=${apps.map((app) => ({
+            id: app.filename,
+            name: app.name,
+            text: app.made_for ? tr('home.agentTies.madeFor', 'made for this agent') : tr('home.agentTies.uses', 'uses its work'),
+            href: app.url || `/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}?mode=inline`,
+          }))} />
+        <//>`}
 
       <${FormActions}>
         <${Action} href=${settings}>${p('all', 'All details of this work →')}<//>

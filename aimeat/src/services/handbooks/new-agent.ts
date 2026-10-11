@@ -19,6 +19,9 @@
  * @usage
  *   import { NEW_AGENT_MD } from './new-agent.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — Step 4, after the agent is made: its first run, where its work goes
+ *     (aimeat_agent_workplace_set), and an app of its work (tier "build-app/agent/<name>",
+ *     aimeat_app_agent_tie, aimeat_app_agent_untie).
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.1.0 — 2026-10-10 — Which machine: aimeat_connector_list and the proposal's `connector`.
  *   v1.0.1 — 2026-10-02 — The node adds memory:read and memory:write to a proposal itself.
@@ -43,4 +46,12 @@ runs it on the person's own connector.
    \`connector\`, and say its name to them, never its id.
 3. **Tell them where to approve.** The answer carries \`approval_url\` and \`next_step\`: give them
    both, in their words. Their own press makes the agent. Work on a clock comes after that, as a
-   schedule of kind \`agent_task\` for the new agent.`;
+   schedule of kind \`agent_task\` for the new agent.
+4. **After it is made.** The node gives the new agent its work once, so there is a first result to
+   show. Its results stay in its own memory, which only the person reads; when they want a group to
+   see them, \`aimeat_agent_workplace_set\` names one workspace, and each result it finishes from
+   then on is shared with that workspace's members. When they want an app that shows the agent's
+   work, read \`aimeat_handbook_get { tier: "build-app/agent/<name>" }\` (the agent, how to read its
+   work, the structure of its latest result, and the data map row that ties the app to it) and
+   then the build specification, tier "build-app". \`aimeat_app_agent_tie\` ties an app that
+   already exists to an agent, and \`aimeat_app_agent_untie\` takes the tie away.`;

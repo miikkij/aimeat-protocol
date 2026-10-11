@@ -16,6 +16,8 @@
  * @version-history
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
+ *   2026-10-11 — aimeat_app_agent_tie and aimeat_app_agent_untie: one row of an app's data map that names an agent, added or removed.
+ *   2026-10-11 — The `data_map` parameter of aimeat_datamap_set names the optional `agent` and `madeFor` on a held row: the tie between an app and the agent whose work it shows.
  *   2026-09-29 — The `data_map` parameter of aimeat_datamap_set names the optional `classification` on a held row (TARGET-082 V5). DATA_MAP_PARAM lists no optional fields, so it is unchanged.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v2.1.0 — 2026-09-20 — DATA_MAP_PARAM: what the `data_map` parameter says on both MCP doors,
@@ -67,7 +69,35 @@ export const dataMapTools = [
         surfaces: ['agent'],
         input: {
             app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
-            data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[]. A held row may also carry `isA`, the semantic type its records ARE — schema:Person, aimeat:Task, or a full IRI (GET /v1/ns lists the ones this node names). `kind` and `holds` say what the data is in the app\'s own words, and `isA` says the same in a word other systems already know, which is what makes the family findable with the type filter on memory search. A family that is genuinely nothing standard leaves it out rather than reaching for the nearest wrong type. A held row may also carry `classification`, the label id of the classification the app expects for that family by default, such as "luottamuksellinen" (1 to 40 lowercase letters, digits and dashes). It labels nothing and never refuses the map; an id of the wrong shape comes back as a finding. These two are the only optional fields on a row.' },
+            data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[]. A held row may also carry `isA`, the semantic type its records ARE — schema:Person, aimeat:Task, or a full IRI (GET /v1/ns lists the ones this node names). `kind` and `holds` say what the data is in the app\'s own words, and `isA` says the same in a word other systems already know, which is what makes the family findable with the type filter on memory search. A family that is genuinely nothing standard leaves it out rather than reaching for the nearest wrong type. A held row may also carry `classification`, the label id of the classification the app expects for that family by default, such as "luottamuksellinen" (1 to 40 lowercase letters, digits and dashes). It labels nothing and never refuses the map; an id of the wrong shape comes back as a finding. A held row may also carry `agent`, the bare name of one of the owner\'s own agents whose work the row reads, with `madeFor: true` when the app was built for that agent. That row is the tie between the app and the agent: the agent\'s page lists the app, and it grants nothing. `isA`, `classification`, `agent` and `madeFor` are the only optional fields on a row.' },
+        },
+    },
+    {
+        name: 'aimeat_app_agent_tie',
+        description: 'State that one of the owner\'s apps shows the work of one of the owner\'s agents. The tie is one `held` row of the app\'s data map that names the agent: this changes that row and nothing else, so you do not have to read and resend the whole map, and an app with no map gets one with only that row. With the tie, the agent\'s page on the owner\'s home lists the app and the app\'s page lists the agent. It grants nothing: what the app may read is decided by its permissions. Use it after you build an app on an agent\'s work when you did not write the row into the map yourself, or when the person says an app uses an agent\'s results. aimeat_app_agent_untie takes the tie away.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Tie an App to an Agent', destructiveHint: false, idempotentHint: true },
+        scope: 'memory:write',
+        surfaces: ['agent'],
+        input: {
+            app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
+            target_agent_name: { type: 'string', required: true, description: 'The bare name of the agent whose work the app shows (same owner as you).' },
+            made_for: { type: 'boolean', description: 'True when the app was built for this agent\'s work; false or left out when it uses that work among other things.' },
+            holds: { type: 'string', description: 'What the app holds from the agent, one short line. Used only when a row is added.' },
+        },
+    },
+    {
+        name: 'aimeat_app_agent_untie',
+        description: 'Take away the statement that one of the owner\'s apps shows the work of one of the owner\'s agents (the tie aimeat_app_agent_tie or the app\'s builder wrote into the app\'s data map). A row that exists only for the tie is removed; a row the builder wrote keeps everything except the agent\'s name. The app, the agent and the agent\'s work stay as they are. Use it when the person says an app no longer uses an agent\'s results.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Untie an App from an Agent', destructiveHint: false, idempotentHint: true },
+        scope: 'memory:write',
+        surfaces: ['agent'],
+        input: {
+            app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
+            target_agent_name: { type: 'string', required: true, description: 'The bare name of the agent the app is tied to (same owner as you).' },
         },
     },
     {
