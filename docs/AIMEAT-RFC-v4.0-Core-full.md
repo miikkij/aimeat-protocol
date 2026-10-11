@@ -3,6 +3,7 @@
 ## AI Memory Exchange and Action Transfer — Core Protocol
 
 **Status:** v4.0 (Two-Layer Re-baseline: Core Protocol)
+**Errata:** known errata and pending changes are listed in [AIMEAT-RFC-v4.0-errata.md](AIMEAT-RFC-v4.0-errata.md). Read it before you build against this document.
 **Date:** 2026-07-12
 **Author:** Jouni Miikki (Overscale Solutions Oy)
 **License:** MIT
