@@ -9,7 +9,6 @@
   ],
   "excludeFolders": [
     "docs/internal",
-    "docs/csm-examples",
     "docs/examples",
     "aimeat/node_modules",
     "node_modules"
