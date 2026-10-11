@@ -119,7 +119,7 @@
       <li><strong>Technical logs:</strong> standard request logs (IP address, user agent, requested path, HTTP status, response time). Retained 30 days.</li>
       <li><strong>Visits to published apps:</strong> when someone opens an app published here, the node counts the visit for the app's owner, including whether the visitor was signed in. In these figures the owner sees numbers and never names: how many visits, how many of them by signed-in people, and how many different people. What kind of visitor it was (a person, a named AI or another program) and where a person came from are recorded only when the app's owner turns measurement on. The place is kept as a country, a region or a city, at the precision the owner chose, and never as an address.</li>
       <li><strong>Visitors on an app's member list:</strong> an app that people can join as members shows its owner, by name, the signed-in people who opened it and are not members yet, with how many times each came and when they came first and last, so that the owner can let them in. A person leaves the list when they become a member or the owner removes them, and at the latest 13 months after their last visit.</li>
-      <li><strong>Cookies and local storage:</strong> a sign-in cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>No third-party analytics, no third-party tracking, no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
+      <li><strong>Cookies and local storage:</strong> a sign-in cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>The Service's own pages use no third-party analytics, no third-party tracking and no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
     </ul>
 
     <h2>3. Why your data is used (legal bases)</h2>
@@ -169,7 +169,7 @@
         <tr><td><a href="{{hostingUrl}}" target="_blank" rel="noopener">{{hostingName}}</a></td><td>Server hosting, network, backups</td><td>{{hostingLocation}}</td></tr>
       </tbody>
     </table>
-    <p>Email for account recovery and security alerts is sent from a mail server on the same infrastructure, and files are stored on this node itself, so neither adds a third party. There is no analytics or telemetry provider. The operator relies on {{hostingName}}'s standard Art. 28 processing terms for the hosting relationship.</p>
+    <p>Email for account recovery and security alerts is sent from a mail server on the same infrastructure, and files are stored on this node itself, so neither adds a third party. The operator uses no analytics or telemetry provider for the Service. The operator relies on {{hostingName}}'s standard Art. 28 processing terms for the hosting relationship.</p>
     <p><strong>Where this node is configured with the operator's own AI provider key</strong>, what you send to the built-in chat or to this node's AI endpoints is processed by that provider on the operator's account and under the operator's agreement with them. This is how someone can use AI here on the day they arrive without bringing anything of their own; the operator is not reselling access to a key, it is metering the use of one. Where no such key is configured, those features refuse rather than quietly falling back to something else.</p>
 
     <h3>5.2 Services you connect yourself</h3>
@@ -225,7 +225,8 @@
       <li><strong>Cookie consent record</strong> (strictly necessary): remembers your choice in the consent banner.</li>
     </ul>
     <p>Your browser also keeps a few of your own settings locally, such as the colour theme you picked. Those stay in your browser and are not sent to the server.</p>
-    <p><strong>No third-party analytics, no third-party trackers, no advertising cookies, no fingerprinting.</strong> If you want to verify this, the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
+    <p><strong>{{nodeName}}'s own pages use no third-party analytics, no third-party trackers, no advertising cookies and no fingerprinting.</strong> If you want to verify this, the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
+    {{ownerAnalyticsNotice}}
 
     <h2>9. Your rights (GDPR)</h2>
     <p>If you are in the European Economic Area, the United Kingdom, or another jurisdiction with similar protections, you have the following rights:</p>

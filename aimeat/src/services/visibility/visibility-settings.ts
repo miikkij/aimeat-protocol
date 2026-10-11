@@ -12,13 +12,17 @@
  *   THE IDS ARE CHECKED AGAINST THEIR SHAPE before they are stored, because they are written into
  *   every page the owner serves as part of a script. Only letters and digits reach the page.
  * @structure CLARITY_ID_RE · GA4_ID_RE · getVisibilitySettings · setVisibilitySettings ·
- *   cachedVisibilitySettings · VisibilitySettingsError · resetVisibilitySettingsCache (tests)
+ *   cachedVisibilitySettings · refreshTagsInUse · tagsInUseOnNode · VisibilitySettingsError ·
+ *   resetVisibilitySettingsCache (tests)
  * @usage const s = await cachedVisibilitySettings(storage, ownerGhii); if (s.enabled) …
  * @version-history
+ *   v1.1.0 — 2026-10-11 — tagsInUseOnNode: which analytics services any account holder uses, so the
+ *     privacy page shows its paragraph about them only when one does.
  *   v1.0.0 — 2026-10-08 — Moved out of visibility-counter.ts, with the tag ids of layer B.
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { VISIBILITY_SETTINGS_KEY, type VisibilitySettings } from '../../models/visibility-schemas.js';
+import { logger } from '../../utils/logger.js';
 
 /** How long settings are trusted from memory. */
 const SETTINGS_TTL_MS = 60_000;
@@ -93,7 +97,55 @@ export async function setVisibilitySettings(
     version: (existingRow?.version ?? 0) + 1, createdAt: existingRow?.createdAt ?? now, updatedAt: now,
   } as MemoryRecord);
   cache.set(ownerGhii, { settings, until: Date.now() + SETTINGS_TTL_MS });
+  // The privacy page says whether any account holder uses analytics tags; a change shows there at once.
+  void refreshTagsInUse(storage);
   return settings;
+}
+
+// ── Whether any account holder on this node uses analytics tags ───────────────────────────────
+
+/** Which analytics services at least one account holder has added to their pages. */
+export interface TagsInUse { clarity: boolean; ga4: boolean }
+
+const TAGS_IN_USE_TTL_MS = 10 * 60_000;
+let tagsInUse: TagsInUse = { clarity: false, ga4: false };
+let tagsInUseAt = 0;
+let tagsInUseStorage: Storage | null = null;
+
+/**
+ * Read every owner's settings record and note which services are in use. One key listing and one
+ * read per owner who changed a visibility setting; called at start, after a settings change, and
+ * when the answer is older than TAGS_IN_USE_TTL_MS. Never throws.
+ */
+export async function refreshTagsInUse(storage: Storage): Promise<TagsInUse> {
+  tagsInUseStorage = storage;
+  try {
+    const found: TagsInUse = { clarity: false, ga4: false };
+    for (const { ownerGaii, key } of (await storage.listMemoryKeysByPrefix?.(VISIBILITY_SETTINGS_KEY)) ?? []) {
+      if (key !== VISIBILITY_SETTINGS_KEY) continue;
+      const s = await getVisibilitySettings(storage, ownerGaii);
+      if (s.clarityProjectId) found.clarity = true;
+      if (s.ga4MeasurementId) found.ga4 = true;
+      if (found.clarity && found.ga4) break;
+    }
+    tagsInUse = found;
+    tagsInUseAt = Date.now();
+  } catch (e) {
+    logger.warn('visibility: could not read which analytics tags are in use', { error: String(e) });
+  }
+  return tagsInUse;
+}
+
+/**
+ * Which analytics services account holders use on this node, as last read. Synchronous, for a page
+ * that is rendered without waiting (the privacy page); an old answer starts a fresh read.
+ */
+export function tagsInUseOnNode(): TagsInUse {
+  if (tagsInUseStorage && Date.now() - tagsInUseAt > TAGS_IN_USE_TTL_MS) {
+    tagsInUseAt = Date.now();
+    void refreshTagsInUse(tagsInUseStorage);
+  }
+  return tagsInUse;
 }
 
 /** The owner's settings from memory when fresh, from storage otherwise. For the serve paths. */
@@ -109,4 +161,7 @@ export async function cachedVisibilitySettings(storage: Storage, ownerGhii: stri
 /** Test seam. */
 export function resetVisibilitySettingsCache(): void {
   cache.clear();
+  tagsInUse = { clarity: false, ga4: false };
+  tagsInUseAt = 0;
+  tagsInUseStorage = null;
 }

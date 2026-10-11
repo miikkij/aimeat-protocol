@@ -13,7 +13,7 @@
  *
  *   The strings are plain text: the library writes them as HTML, so every value that is not a
  *   constant of this file (a category the operator named, the policy address) is escaped here.
- * @structure CONSENT_LANGS · ConsentServices · consentTexts(lang, categories, opts)
+ * @structure CONSENT_LANGS · ConsentServices · consentSettingsLabels() · consentTexts(lang, categories, opts)
  * @usage translations[lang] = consentTexts(lang, ['necessary', 'analytics'], { services: { clarity: true, ga4: false } })
  * @version-history
  *   v1.0.0 — 2026-10-11 — Initial: the banner in en, fi and es, with the analytics services named.
@@ -111,7 +111,12 @@ const WORDS: Record<ConsentLang, Words> = {
   },
 };
 
-const joined = (parts: string[], and: string): string => (parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ${and} ${parts[parts.length - 1]}` : parts[0] ?? '');
+/** The accessible name of the cookie mark, the button that opens the choices again, per language. */
+export function consentSettingsLabels(): Record<ConsentLang, string> {
+  return { en: 'Cookie settings', fi: 'Evästeasetukset', es: 'Configuración de cookies' };
+}
+
+const joined =(parts: string[], and: string): string => (parts.length > 1 ? `${parts.slice(0, -1).join(', ')} ${and} ${parts[parts.length - 1]}` : parts[0] ?? '');
 
 /** One language's texts, in the shape vanilla-cookieconsent's `language.translations[lang]` takes. */
 export function consentTexts(

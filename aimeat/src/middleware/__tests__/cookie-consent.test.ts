@@ -28,7 +28,8 @@ import {
 function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
   return {
     cookieConsentEnabled: false,
-    cookieConsentCategories: ['necessary'],
+    // A category a visitor can refuse: with `necessary` alone the node's own pages get no banner.
+    cookieConsentCategories: ['necessary', 'analytics'],
     cookieConsentPolicyUrl: null,
     // Provide minimal defaults for other required fields so TS is happy
     port: 40050,
@@ -203,6 +204,18 @@ describe('cookieConsentMiddleware', () => {
     expect(sendHtml(middleware, html)).toContain('"analytics"');
     config.cookieConsentEnabled = false;
     expect(sendHtml(middleware, html)).toBe(html);
+  });
+
+  it('adds no banner to the node\'s own pages when necessary is the only category', () => {
+    // Home, settings, admin and chat set only the cookies they need, which need no consent: a
+    // banner there asked a question with one possible answer (Jouni, 2026-10-11).
+    const config = makeConfig({ cookieConsentEnabled: true, cookieConsentCategories: ['necessary'] });
+    const middleware = cookieConsentMiddleware(config);
+    const html = '<html><body><p>Settings</p></body></html>';
+    expect(sendHtml(middleware, html)).toBe(html);
+    // The operator lists a category a visitor can refuse: now there is something to ask.
+    config.cookieConsentCategories = ['necessary', 'analytics'];
+    expect(sendHtml(middleware, html)).toContain('data-aimeat-cookie-banner');
   });
 
   it('leaves a page that already carries the banner with one banner', () => {
@@ -540,7 +553,7 @@ describe('buildCookieConsentRunConfig', () => {
     categories: Record<string, { autoClear?: { cookies: Array<{ name: string }>; reloadPage: boolean } }>;
     language: { translations: Record<string, { consentModal: Record<string, string>; preferencesModal: { sections: Array<{ title: string; description?: string; linkedCategory?: string }> } }> };
   };
-  const config = makeConfig({ cookieConsentEnabled: true });
+  const config = makeConfig({ cookieConsentEnabled: true, cookieConsentCategories: ['necessary'] });
 
   it('carries the banner in English, Finnish and Spanish', () => {
     const run = JSON.parse(buildCookieConsentRunConfig(config)) as Run;
@@ -607,6 +620,22 @@ describe('cookieConsentSnippet', () => {
     expect(order.every((n) => n > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(snippet.match(/<\/script>/g)).toHaveLength(2);
+  });
+
+  it('with the mark, adds the cookie button that opens the choices again, on the row of marks', () => {
+    const plain = cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), {});
+    expect(plain).not.toContain('aimeat-cookie-mark');
+    const marked = cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { mark: true });
+    expect(marked).toContain("w.id='aimeat-cookie-mark'");
+    expect(marked).toContain('window.CookieConsent.showPreferences()');
+    // After the AI label, the bolt and the "Use with your AI" mark; its own room for the install button.
+    expect(marked).toContain('--aimeat-mark-cookie-w:42px');
+    expect(marked).toContain('var(--aimeat-mark-ai-w,0px) + var(--aimeat-mark-badge-w,0px) + var(--aimeat-mark-aiuse-w,0px)');
+    // Its name in three languages, with no raw non-ASCII character (an app may declare no charset).
+    expect(marked).toContain('"fi":"Ev\\u00e4steasetukset"');
+    // eslint-disable-next-line no-control-regex -- the assertion is exactly that nothing outside ASCII is there
+    expect(/[^\x00-\x7f]/.test(marked)).toBe(false);
+    expect(marked.match(/<\/script>/g)).toHaveLength(2);
   });
 
   it('carries the page\'s CSP nonce on both scripts, and no nonce of a wrong shape', () => {

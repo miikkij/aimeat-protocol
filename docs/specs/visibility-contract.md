@@ -125,7 +125,9 @@ visitors need consent. A browser that sends Global Privacy Control gets no tag. 
 against its shape before it is stored and again before it is written into a page.
 
 The banner such a page gets names the services the owner uses, in English, Finnish or Spanish, and
-says that Clarity records the visit and where the data goes. When the visitor takes the consent
+says that Clarity records the visit and where the data goes. A cookie mark on the page's row of
+marks opens the choices again. The node's privacy page carries a paragraph about account holders'
+analytics only while at least one of them has a tag set. When the visitor takes the consent
 back, the cookies the two services set on that page's host (`_clck`, `_clsk`, `_ga`, `_ga_<id>`,
 `_gid`) are removed, on that host and on every parent domain, and the page reloads without the
 tags. Both services' cookies are kept on the page's own host, so one owner's visitor id is not
