@@ -33,6 +33,8 @@ Changelog:
     records-driven agent runs on every tunnel reconnect until the agent is started. Work already
     running finishes. Works unchanged against a node without the stopped state: the flag is never
     sent, so nothing is held.
+    `run_crew_daemon(stop_event=...)` takes a `threading.Event` that ends one daemon from the
+    host's own code, with the clean exit a SIGTERM gives, also outside the main thread.
     Fixed: an agent that listens for messages no longer gets each of its tasks dispatched once as
     an "(empty)" inbox message. `_poll_messages` read an empty `pending_messages` as missing and
     fell back to the unified `items` list, which carries tasks.
