@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.28.1 -- 2026-10-11 -- The agent guide is named by its GitHub address; a repository path does not
+ *            open from a node.
  *   v1.28.0 -- 2026-10-11 -- An offer for other owners has a money price and/or a pacing amount
  *            (tollMorsels); a morsel is never a price.
  *   v1.27.1 -- 2026-10-11 -- Workspace contracts and the measurability convention point at the skill
@@ -149,7 +151,7 @@ owner's agents, so a downstream step can depend on it). Not sure how to draft on
 result. Your onboarding \`declare_offerings\` / \`make_workflow_compatible\` / \`price_offer\` steps
 auto-tick once your offers satisfy each level. Quick how-to with the actual tool calls:
 GET \`/v1/agents/me/handbook/offerings\`. Full spec + copy-paste prompt:
-\`docs/building-an-aimeat-compatible-agent.md\`.
+https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md
 
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
 \`aimeat_knowledge_get\` · \`aimeat_knowledge_contribute\` · \`aimeat_knowledge_links\`. Prefer a real

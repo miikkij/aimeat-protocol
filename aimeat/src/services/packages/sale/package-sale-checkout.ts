@@ -2,7 +2,7 @@
  * @file src/services/packages/sale/package-sale-checkout.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A package sold through this node's ordinary checkout (docs/specs/package-sale-design.md,
+ * @description A package sold through this node's ordinary checkout (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e,
  *   section 3): the `package` sellable kind, and the act that carries a paid (or granted) sale out on
  *   the package repository.
  *

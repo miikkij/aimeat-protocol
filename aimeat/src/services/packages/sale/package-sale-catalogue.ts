@@ -2,7 +2,7 @@
  * @file src/services/packages/sale/package-sale-catalogue.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The selling node's own records of a package sale (docs/specs/package-sale-design.md,
+ * @description The selling node's own records of a package sale (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e,
  *   section 3): what it sells at which price, the subscriptions its buyers hold, and the requests
  *   that wait for the seller's approval.
  *
