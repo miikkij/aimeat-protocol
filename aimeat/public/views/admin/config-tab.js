@@ -29,6 +29,10 @@
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.3.3 -- 2026-10-11 -- A boolean's box says what a tick means ("Enabled") in both states; it
+ *     said the current state, so an empty box beside "Disabled" read as "tick to disable". The
+ *     cookie consent section sits under integrations: the list named it `cookie_consent`, its
+ *     settings are `cookies.*`, so it had been landing in Other.
  *   v3.3.2 -- 2026-10-09 -- The `docsign` section (document signing and signature checks) sits under identity.
  *   v3.3.1 -- 2026-10-08 -- The `visibility` section (AI visibility switches) sits under integrations.
  *   v3.3.0 -- 2026-10-02 -- The question mark that explains a setting: a SettingLine gets `help` ('config.' + path) when the locale has explain.config.<path> (hasExplain), so far the fourteen config.* terms, ai.model_default_embed among them (components/HelpTip.js).
@@ -108,7 +112,7 @@ const DOMAINS = [
   { id: 'node', groups: ['node', 'storage', 'database_url', 'sqlite_path', 'admin_password', 'setup', 'consul', 'stats', 'metrics'] },
   { id: 'limits', groups: ['quotas', 'rate_limits', 'extensions', 'realtime'] },
   { id: 'federation', groups: ['federation', 'sync', 'personal_nodes', 'genesis', 'tunnel', 'msm'] },
-  { id: 'integrations', groups: ['email', 'push', 'indexing', 'cors', 'site', 'portal', 'cookie_consent', 'connections', 'visibility'] },
+  { id: 'integrations', groups: ['email', 'push', 'indexing', 'cors', 'site', 'portal', 'cookies', 'connections', 'visibility'] },
 ];
 
 /**
@@ -195,7 +199,9 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
     return html`<${Code}>${shownValue}<//> <${Note} kind="meta" inline>${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}<//>`;
   }
   if (e.type === 'boolean') {
-    return html`<${Check} checked=${val} onChange=${(on) => onChange(p, on)} disabled=${!editable}>${val ? t('dashboard.enabled') : t('dashboard.disabled')}<//>`;
+    // The words say what a tick means and never change. They used to say the current state, so an
+    // empty box beside "Disabled" read as "tick this to disable it" (Jouni, 2026-10-11).
+    return html`<${Check} checked=${val} onChange=${(on) => onChange(p, on)} disabled=${!editable}>${t('dashboard.enabled')}<//>`;
   }
   if (e.type === 'integer') {
     return html`<${TextField} type="number" size="short" ariaLabel=${label(p)} value=${val} onInput=${(v) => onChange(p, parseInt(v))} disabled=${!editable} />${range}`;
