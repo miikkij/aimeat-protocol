@@ -39,6 +39,13 @@ describe('ownerTagsSnippet', () => {
     expect(s).not.toContain('CookieConsent.run');
     // Google's cookie stays on the page's own host, not on the domain every owner's app shares.
     expect(s).toContain("w.gtag('config',G,{cookie_domain:'none'})");
+    // Clarity picks the widest domain itself (`_clck` on `.aimeat.io` from an app, measured on
+    // production), so a write of one of the services' cookies loses its Domain while a tag runs.
+    expect(s).toContain("if(/^\\s*(_cl|_ga|_gid)/.test(x)){x=x.replace(/;\\s*domain=[^;]*/i,'');}");
+    expect(s).toContain('function start(){if(started)return;started=true;keep();');
+    // The names a taken-back consent removes, on this host and every parent domain.
+    expect(s).toContain('N=["_clck","_clsk","_ga","_ga_ABC123XYZ9","_gid"]');
+    expect(s).toContain('else if(started){pass(false);wipe();}');
   });
 
   it('with the banner, waits for the analytics category and carries the banner with that category', () => {

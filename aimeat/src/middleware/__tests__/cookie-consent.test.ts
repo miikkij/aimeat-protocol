@@ -598,6 +598,9 @@ describe('cookieConsentSnippet', () => {
     expect(snippet).toContain('<script data-aimeat-cookie-banner>');
     // The library appends itself to document.body: started without one it throws.
     expect(snippet).toContain('if(!document.body){setTimeout(run,30);return;}');
+    // Each category is opened when the choices dialog is built: closed, it read as an empty list.
+    expect(snippet).toContain("window.addEventListener('cc:onModalReady'");
+    expect(snippet).toContain("s[i].classList.add('is-expanded')");
     // The visitor's own choice and browser come before the page's lang attribute, which the serve
     // pass writes on an app and the service's own page fixes at "en".
     const order = ["localStorage.getItem('aimeat-lang')", 'a.push(navigator.language)', 'a.push(d.documentElement.lang)'].map((s) => snippet.indexOf(s));

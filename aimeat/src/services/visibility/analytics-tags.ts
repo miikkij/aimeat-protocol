@@ -24,6 +24,9 @@
  * @structure visibilitySettingsView · nodeAllowsTags · tagsActive · ownerTagsSnippet · withOwnerTags · ownerTagsFor
  * @usage buf = withOwnerTags(buf, ownerTagsSnippet(config, settings));
  * @version-history
+ *   v1.3.0 — 2026-10-11 — The services' cookies stay on the page's own host: Clarity wrote `_clck` on
+ *     `.aimeat.io` from an app, shared by every app (measured on production). A taken-back consent
+ *     also removes the cookies on every parent domain.
  *   v1.2.0 — 2026-10-11 — The banner a page with tags gets names the services (Clarity, Google
  *     Analytics) in the visitor's language and removes their cookies when consent is taken back
  *     (middleware/cookie-consent.ts cookieConsentSnippet); Google's cookie stays on the page's own host.
@@ -82,17 +85,36 @@ export function ownerTagsSnippet(config: AimeatConfig, settings: VisibilitySetti
   const ga4 = settings.ga4MeasurementId && GA4_ID_RE.test(settings.ga4MeasurementId) ? settings.ga4MeasurementId : '';
   if (!clarity && !ga4) return '';
   const banner = config.cookieConsentEnabled === true;
+  /** The cookies the two services set, removed when the visitor takes the consent back. */
+  const cookieNames = [
+    ...(clarity ? ['_clck', '_clsk'] : []),
+    ...(ga4 ? ['_ga', `_ga_${ga4.slice(2)}`, '_gid'] : []),
+  ];
 
   const script = `<script data-aimeat-tags>(function(){`
-    + `var C=${JSON.stringify(clarity)},G=${JSON.stringify(ga4)},B=${banner ? 'true' : 'false'};`
+    + `var C=${JSON.stringify(clarity)},G=${JSON.stringify(ga4)},B=${banner ? 'true' : 'false'},N=${JSON.stringify(cookieNames)};`
     + `if(navigator.globalPrivacyControl===true)return;`
-    + `var w=window,d=document,started=false;`
+    + `var w=window,d=document,started=false,D=null;`
     + `w.dataLayer=w.dataLayer||[];if(!w.gtag){w.gtag=function(){w.dataLayer.push(arguments);};}`
     + `function v(g){return g?'granted':'denied';}`
     + `function pass(g){`
     + `if(G){w.gtag('consent','update',{analytics_storage:v(g),ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});}`
     + `if(C&&w.clarity){w.clarity('consentv2',{ad_Storage:'denied',analytics_Storage:v(g)});}}`
-    + `function start(){if(started)return;started=true;`
+    // THE SERVICES' COOKIES STAY ON THIS PAGE'S OWN HOST. Clarity writes its cookie on the widest
+    // domain the browser accepts (measured on aimeat.io 2026-10-11: `_clck` on `.aimeat.io` from an
+    // app on `prh.apps.aimeat.io`), which every other owner's app and the service itself share: one
+    // visitor id would then follow a person across all of them. So while a tag runs, a write of one
+    // of these cookies loses its Domain attribute and lands on this host alone. Other cookies are
+    // not touched.
+    + `function keep(){try{D=Object.getOwnPropertyDescriptor(Document.prototype,'cookie');if(!D||!D.set||!D.get){D=null;return;}`
+    + `Object.defineProperty(d,'cookie',{configurable:true,get:function(){return D.get.call(d);},`
+    + `set:function(x){try{x=String(x);if(/^\\s*(_cl|_ga|_gid)/.test(x)){x=x.replace(/;\\s*domain=[^;]*/i,'');}}catch(e){}D.set.call(d,x);}});}catch(e){D=null;}}`
+    // A taken-back consent removes the cookies on this host and on every parent domain (a visit
+    // before the rule above may have left one there).
+    + `function wipe(){try{var h=location.hostname.split('.');for(var i=0;i<N.length;i++){for(var j=0;j<h.length;j++){`
+    + `var c=N[i]+'=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'+(j?'; domain=.'+h.slice(j).join('.'):'');`
+    + `if(D){D.set.call(d,c);}else{d.cookie=c;}}}}catch(e){}}`
+    + `function start(){if(started)return;started=true;keep();`
     + `if(G){w.gtag('consent','default',{analytics_storage:'granted',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});`
     + `var s=d.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(G);d.head.appendChild(s);`
     // cookie_domain 'none' keeps Google's cookie on this page's own host. Its default is the widest
@@ -103,7 +125,7 @@ export function ownerTagsSnippet(config: AimeatConfig, settings: VisibilitySetti
     + `w.clarity('consentv2',{ad_Storage:'denied',analytics_Storage:'granted'});}}`
     + `if(!B){start();return;}`
     + `function check(){var cc=w.CookieConsent;var ok=!!(cc&&cc.acceptedCategory&&cc.acceptedCategory('analytics'));`
-    + `if(ok){start();pass(true);}else if(started){pass(false);}}`
+    + `if(ok){start();pass(true);}else if(started){pass(false);wipe();}}`
     + `w.addEventListener('cc:onConsent',check);w.addEventListener('cc:onChange',check);`
     + `if(d.readyState==='loading'){d.addEventListener('DOMContentLoaded',check);}else{check();}`
     + `})();</script>`;
@@ -116,10 +138,7 @@ export function ownerTagsSnippet(config: AimeatConfig, settings: VisibilitySetti
   return script + cookieConsentSnippet(config, {
     ensure: ['analytics'],
     services: { clarity: !!clarity, ga4: !!ga4 },
-    clearOnRevoke: [
-      ...(clarity ? ['_clck', '_clsk'] : []),
-      ...(ga4 ? ['_ga', `_ga_${ga4.slice(2)}`, '_gid'] : []),
-    ],
+    clearOnRevoke: cookieNames,
     assetBase: config.baseUrl,
   });
 }
