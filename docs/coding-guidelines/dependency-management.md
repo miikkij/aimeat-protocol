@@ -6,10 +6,10 @@
 
 1. **Check if it's actually needed.** Can Node.js built-ins or existing dependencies handle this?
 2. **Check the license.** Permissive and no decision needed: MIT, MIT-0, ISC, Apache-2.0,
-   BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0, Unlicense, CC0-1.0. Anything else — GPL, AGPL,
-   LGPL, MPL, SSPL, BUSL, a source-available licence — needs the developer's approval and an entry
+   BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0, Unlicense, CC0-1.0. Anything else (GPL, AGPL,
+   LGPL, MPL, SSPL, BUSL, a source-available licence) needs the developer's approval and an entry
    in `EXCEPTIONS` in `aimeat/scripts/check-licenses.ts` saying what the obligation costs an
-   operator. `pnpm check:licenses` refuses the commit otherwise.
+   operator. `pnpm check:licenses` fails `pnpm gate` and CI otherwise.
 3. **Evaluate the package:**
    - Active maintenance (commits in last 6 months)
    - Reasonable download count / community adoption
@@ -53,8 +53,8 @@ a list anybody maintains by hand.
 
 | Command | What it does |
 |---|---|
-| `pnpm check:licenses` | Refuses a licence outside the allowlist, a served file with no licence entry, a copyleft component with no source offer, and a GPL asset that is tracked or unmarked. Pre-commit hook, CI and `prepublishOnly`. |
-| `pnpm gen:notices` | Regenerates `THIRD-PARTY-NOTICES.md` — every component, its copyright holder and its licence text in full. `pnpm check:notices` proves it is current. |
+| `pnpm check:licenses` | Refuses a licence outside the allowlist, a served file with no licence entry, a copyleft component with no source offer, and a GPL asset that is tracked or unmarked. Runs in `check:fast` (`FAST_CHECKS` in `aimeat/scripts/lib/check-registry.mjs`), so in `pnpm gate` and CI, and in `prepublishOnly` in `aimeat/package.json`. The pre-commit hook does not run it. |
+| `pnpm gen:notices` | Regenerates `THIRD-PARTY-NOTICES.md`: every component, its copyright holder and its licence text in full. `pnpm check:notices` proves it is current; the pre-commit hook runs it when that file is in the commit. |
 | `pnpm sbom` | Writes `sbom.cdx.json`, a CycloneDX 1.6 bill of materials. This is what a company's security review asks for. Generated on demand, not committed. |
 
 **This section used to be a table of every dependency and its licence, and that is why it is not
@@ -116,7 +116,7 @@ that cuts a release. `-- --json` is the CI shape.
 
 **The gap is not theoretical.** On 2026-08-31, `pnpm audit` reported zero vulnerabilities across
 730 packages while the served libraries carried six: a HIGH-severity arbitrary JavaScript execution
-in PDF.js 6.1.200 (opening a malicious PDF), and five in Mermaid 11.15.0 — prototype pollution twice,
+in PDF.js 6.1.200 (opening a malicious PDF), and five in Mermaid 11.15.0: prototype pollution twice,
 CSS injection reaching outside the diagram, and two denial-of-service paths. Nothing had ever
 scanned them, because they are committed files with no manifest above them and every dependency
 tool in the ecosystem reads manifests. `licenses.json` gives each one a real package URL, which is
@@ -141,17 +141,17 @@ what a vulnerability feed matches on, so the licence work is what made the scan 
   that; do not add either on a whim.
 - **By hand, when you want to look:** `pnpm outdated` for the list, `pnpm update` for everything the
   ranges already allow, `pnpm add <pkg>@latest` for a deliberate major.
-- **After any of them:** `pnpm check:licenses && pnpm gen:notices`, then the guard tier on both
-  backends. A dependency bump is a change to what users run.
+- **After any of them:** `pnpm check:licenses && pnpm gen:notices`, then `pnpm gate --postgres`,
+  which adds the production backend to the guard tier. A dependency bump is a change to what users run.
 
 ### The one outbound call that must not use safeFetch
 
 `src/services/consul-config.ts` talks to the Consul agent with plain `fetch`, and that is deliberate:
 `safeFetch` refuses private and loopback addresses unless `AIMEAT_ALLOW_PRIVATE_EGRESS` is set, and a
 Consul agent is on one in every real deployment, so routing it through there would break the feature
-for everyone who uses it. The URL is `AIMEAT_CONSUL_URL` read from config at boot — no request,
-principal or stored record can influence it — which is the carve-out
-`security/outbound-fetch-exemptions.json` exists for, and the entry there says so.
+for everyone who uses it. The URL is `AIMEAT_CONSUL_URL` read from config at boot, and no request,
+principal or stored record can influence it. That is the carve-out
+`aimeat/security/outbound-fetch-exemptions.json` exists for, and the entry there says so.
 
 This came up when the deprecated `consul` package was removed (npm: "no longer supported", no
 successor named). Three calls were all it was used for. **The way to verify a rewrite like this
@@ -187,7 +187,7 @@ apps means "retiring this is a decision rather than a risk", never "delete it".
 
 ### Updating a browser library under public/lib/
 
-No dependency tool does this one — not Dependabot, not `pnpm update`, not `pnpm audit`. The reason
+No dependency tool does this one: not Dependabot, not `pnpm update`, not `pnpm audit`. The reason
 is not that these files are fetched at install time; almost all of them are committed to the
 repository like any other source file. It is that **they have no manifest above them.** Every
 dependency tool in the ecosystem starts from a package.json or a lockfile and walks down;
@@ -196,7 +196,7 @@ That is what `licenses.json` fixes: it gives each file a real package URL, which
 `pnpm scan:vulns` matches against a vulnerability feed. An update is four steps, and they must all
 happen together.
 
-**A minor or patch — it lands in place, same filename, no app changes:**
+**A minor or patch lands in place, same filename, no app changes:**
 
 1. Fetch the new build over the old path.
 2. Update the version in `public/lib/VENDORED.md`, in `public/lib/licenses.json` (version **and**
@@ -206,12 +206,12 @@ happen together.
 4. Verify in a real browser that the library still does its job, then `pnpm gen:notices` and
    `pnpm check:licenses`.
 
-**A major — it ships beside the old file, which is never touched again.** This is the path that
+**A major ships beside the old file, which is never touched again.** This is the path that
 keeps published apps alive, and it was first walked on 2026-08-31 for p5 2, Phaser 4 and ffmpeg
 0.12.10. Steps 1 to 4 as above, writing to a NEW path (`p5@2.min.js`, `ffmpeg-core@0.12.10/`), then:
 
 5. Add a NEW component in `licenses.json` for the new file. The old entry stays, and gets
-   `supersededBy: '<new component id>'` — that is what makes `pnpm outdated:libs` print it as
+   `supersededBy: '<new component id>'`. That is what makes `pnpm outdated:libs` print it as
    `frozen` with its successor named, instead of nagging as "a major behind" forever.
 6. Add a NEW pack in `src/data/library-packs/`, and set the old pack to `status: 'deprecated'` with
    `supersededBy: '<new pack id>'`. The old pack then disappears from the build-app prompt while
@@ -228,7 +228,7 @@ keeps published apps alive, and it was first walked on 2026-08-31 for p5 2, Phas
   hooks from another gave two different `options` objects, every hook ran outside a render, and the
   SPA died with "AIMEAT failed to start". The library was fine; the fetch was wrong.
 - **A file that imports a sibling relatively cannot work here.** `portal.ts` stamps `?v=<build>` on
-  every importmap entry, and a relative `./preact.mjs` does not carry that query — the same file
+  every importmap entry, and a relative `./preact.mjs` does not carry that query, so the same file
   arrives twice under two URLs, as two modules. The vendored build must import the bare specifier.
 
 And the reason step 4 says a real browser: every one of those failures compiles, typechecks and
@@ -238,22 +238,13 @@ passes the unit suite.
 
 ## Security Overrides
 
-The `package.json` contains `pnpm.overrides` to patch known vulnerabilities in transitive dependencies:
-
-```json
-"overrides": {
-  "hono": ">=4.12.4",
-  "@hono/node-server": ">=1.19.10",
-  "express-rate-limit": ">=8.3.0",
-  "minimatch@>=5.0.0 <5.1.8": "5.1.8",
-  "js-yaml@>=4.0.0 <4.1.1": "4.1.1"
-}
-```
+`pnpm.overrides` in [`aimeat/package.json`](../../aimeat/package.json) patches known vulnerabilities in transitive dependencies. Read the list there; it is not copied here, for the same reason the licence table above is gone.
 
 When adding new overrides:
 1. Document which vulnerability (CVE) it fixes
 2. Test that the override doesn't break functionality
 3. Plan to remove once the direct dependency updates
+4. Keep the range inside the major the dependents asked for (`^2.1.4`, never `>=2.1.4`); see `docs/pitfalls.md` §59
 
 ---
 

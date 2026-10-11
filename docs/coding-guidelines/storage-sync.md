@@ -2,191 +2,225 @@
 
 ## Overview
 
-AIMEAT has **two** storage provider dirs that MUST stay in sync (post Phase 5 — the Postgres+Kysely cutover):
+AIMEAT has **two** storage providers, and they MUST stay in sync:
 
-| Backend | Priority | Implementation | Files |
-|---------|----------|---------------|-------|
-| **PostgreSQL + Kysely** | **PRIMARY (prod)** — must always pass | `pg` + Kysely (async, raw SQL) | `src/storage/providers/postgres-kysely/` + SQL migrations in `providers/postgres-kysely/migrations/*.sql` (run on boot) + `providers/postgres-kysely/db-types.ts` (Kysely `DB` interface) |
-| **SQLite** | first-class — must always pass | `better-sqlite3` (sync API) | `src/storage/providers/sqlite/` |
+| Backend | Role | Implementation | Files |
+|---------|------|----------------|-------|
+| **PostgreSQL + Kysely** | production; must always pass | `pg` + Kysely (async) | `src/storage/providers/postgres-kysely/`: numbered SQL migrations in `migrations/*.sql` (applied on boot by `migrate.ts`), the Kysely `DB` interface in `db-types.ts`, method groups in `methods/*.ts` |
+| **SQLite** | first-class; must always pass | `better-sqlite3` (sync API) | `src/storage/providers/sqlite/`: schema files `schema*.ts`, method groups in `methods/*.ts`, row-level helpers in `repos/*.ts` |
 
-> The Prisma-era backends (MongoDB + the legacy Prisma `postgres` provider) were **removed on 2026-07-16** — no Prisma remains in the codebase. Every schema change lands in **both** remaining backends in the same commit.
+The Prisma-era backends (MongoDB and the Prisma `postgres` provider) were removed on 2026-07-16. Every schema change lands in **both** remaining providers in the same commit.
 
-The in-memory mode is SQLite with `:memory:` path — same code, no persistence. (The old pure in-memory provider is deprecated.)
+`AIMEAT_STORAGE=memory` opens SQLite on `:memory:` (`src/storage/storage-factory.ts`): the same code, no persistence.
 
-Both implement the `Storage` interface defined in `src/storage/interface.ts` (24 repository interfaces, 60+ record types, 650+ methods).
+### Where the storage contract lives
+
+| What | File |
+|------|------|
+| Record and value types (`MemoryRecord`, `AgentRecord`, …) | `src/storage/types/<domain>.ts`, re-exported by `src/storage/interface.ts` |
+| One repository interface per domain | `src/storage/repositories/<domain>.repository.ts` |
+| The `Storage` composite that extends every repository interface | `src/storage/interface.ts` |
+| SQLite fresh-install DDL (`CREATE TABLE/INDEX IF NOT EXISTS`) | `providers/sqlite/schema-tables-1.ts` … `schema-tables-4.ts` |
+| SQLite added columns for existing databases (`safeAddColumn`) | `providers/sqlite/schema.ts` (`initializeSchema`), plus the per-table blocks moved out of it: `schema-columns-agents.ts`, `schema-columns-extensions.ts`, `schema-columns-scheduler.ts` |
+| SQLite table rebuilds that `ALTER TABLE` cannot express | `providers/sqlite/schema-rebuilds.ts` |
+| Method bodies | `providers/<provider>/methods/<group>.ts`, merged onto the provider class with `Object.assign(prototype, …)` in `providers/<provider>/index.ts` |
+| The owner deletion cascade | `providers/sqlite/methods/owner-cascade.ts`; `providers/postgres-kysely/methods/owner-cascade.ts` and `identity-erasure.ts` |
+
+To find which file holds a record type, grep: `grep -rn "export interface AgentRecord" aimeat/src/storage/types`.
+
+Three checks hold the two providers together. All three run in `pnpm check:fast`, so in `pnpm gate` and CI:
+
+- `pnpm check:storage-file-parity`: a method lives in the methods file **of the same name** in both providers, and each provider defines the same methods. A method one provider needs alone is declared in its internals interface (`SqliteInternals` in `providers/sqlite/methods/internal.ts`).
+- `pnpm check:storage-parity`: every table with an owner column on its list (`OWNER_COLUMNS` in `scripts/check-storage-parity.ts`) is cleared by both deletion cascades, or has a written reason in `aimeat/security/storage-parity-exemptions.json`.
+- `pnpm check:migration-hashes`: a Postgres migration file on `main` never changes, and a new one is listed in `aimeat/security/migration-hashes.json` in the same commit.
+
+`pnpm typecheck` does not catch a method that one provider lacks: each provider class declares `interface … extends Storage` and merges its methods at runtime, so the compiler assumes every method is there. A missing method throws when it is called. `check:storage-file-parity` is the check that finds it.
+
+`test/unit/storage-conformance.test.ts` is the behavioural half: it runs the same scenarios (delete cascade, listing order, one-time spends) against both providers and requires the same result. Without `DATABASE_URL` it checks SQLite only.
 
 ---
 
 ## Adding a New Field to an Existing Record
 
-**This is the most common change.** Follow this checklist exactly:
+**This is the most common change.** Commit `c8fccc245` (`StorageFileRecord.aiProvenanceId`, migration 0096) is a small, complete example: run `git show --stat c8fccc245` to see every file it touched.
 
-### Step 1: Update the Interface
+### Step 1: Update the record type
 
-File: `src/storage/interface.ts`
+File: the `src/storage/types/<domain>.ts` that declares the record (for example `AgentRecord` in `types/identity.ts`).
 
 ```typescript
-export interface MemoryRecord {
+export interface AgentRecord {
   // ... existing fields ...
-  myNewField?: string;  // Add as optional with clear comment
+  /** What the field means and who sets it. */
+  stoppedAt?: string | null;
 }
 ```
 
-### Step 2: Update SQLite Schema
+If the repository gains or changes a method, update `src/storage/repositories/<domain>.repository.ts` too.
 
-File: `src/storage/providers/sqlite/schema.ts`
+### Step 2: Update the SQLite schema
 
-1. Add the column to the `CREATE TABLE` statement:
+Add a `safeAddColumn` call in `initializeSchema` (`providers/sqlite/schema.ts`), or in the `schema-columns-*.ts` block that already holds that table's columns:
+
+```typescript
+// One line on why the column exists. Mirrors Postgres 0096.
+safeAddColumn('storage_files', 'aiProvenanceId', 'TEXT');
+```
+
+`safeAddColumn` runs on every start, after the `CREATE TABLE` blocks, so it reaches a fresh database and an old one alike. An index on the new column goes after the `safeAddColumn` call, never in the `schema-tables-*.ts` block: on an upgraded database the column does not exist yet when that block runs. Adding the column to the table's `CREATE TABLE` in `schema-tables-*.ts` as well is allowed and some tables do it; it is not required.
+
+### Step 3: Update the SQLite methods
+
+File: `providers/sqlite/methods/<group>.ts`, the group that reads and writes the table.
+
+Update every statement that touches the table:
+- `INSERT`: the column list and the value
+- `UPDATE`: if the field is mutable
+- the row mapper: from the DB row to the record (JSON columns go through `JSON.parse`)
+
+### Step 4: Update PostgreSQL + Kysely (production)
+
+Files under `providers/postgres-kysely/`:
+
+1. **Migration.** Add the next numbered file `migrations/NNNN_<desc>.sql`. Start it with a comment that says why the column exists and that it mirrors the SQLite change. Keep the DDL idempotent:
    ```sql
-   CREATE TABLE IF NOT EXISTS memory (
-     -- ... existing columns ...
-     myNewField TEXT,
-   );
+   ALTER TABLE "StorageFile" ADD COLUMN IF NOT EXISTS "aiProvenanceId" TEXT;
    ```
+2. **Hash lock.** Run `pnpm check:migration-hashes --add` (from `aimeat/`) to add the new file's line to `aimeat/security/migration-hashes.json`. Commit both together.
+3. **`db-types.ts`.** Add the column to the table's Kysely interface (`aiProvenanceId: string | null`).
+4. **Methods.** Update the methods file with the same name as the SQLite one: `insertInto(...).values(...)`, the select, `updateTable(...).set(...)`, and the row mapper. jsonb columns go through the `jsonb()` helper, and **PG jsonb does not preserve key order**, so do not compare `JSON.stringify` output for dedup.
 
-2. Add a migration for existing databases (at the end of the schema file):
-   ```typescript
-   safeAddColumn('memory', 'myNewField', 'TEXT');
-   ```
+### Step 5: Check what else carries the record
 
-### Step 3: Update SQLite Implementation
+- A field that reaches the API goes into `openapi.yaml` in the same commit (`.claude/rules/backend.md`).
+- A field on `OwnerRecord` or `AgentRecord` stays out of `GET /v1/admin/backup` until it is named in `OWNER_FIELDS` or `AGENT_FIELDS` in `src/services/admin-backup-projection.ts`. That list is an allowlist on purpose.
 
-File: `src/storage/providers/sqlite/index.ts`
-
-Update ALL SQL queries that touch the table:
-- `INSERT` — include the new column
-- `SELECT` — include in result mapping
-- `UPDATE` — include if mutable
-- Deserialization — map from DB row to TypeScript record
-
-### Step 4: Update the PRIMARY backend — PostgreSQL + Kysely
-
-Files: `src/storage/providers/postgres-kysely/`.
-1. **Migration** — add a new numbered SQL file `migrations/NNNN_<desc>.sql` with the `ALTER TABLE ... ADD COLUMN` (idempotent; applied on boot, tracked in `_kysely_migrations`). For a brand-new column on an existing table:
-   ```sql
-   ALTER TABLE "Memory" ADD COLUMN IF NOT EXISTS "myNewField" text;
-   ```
-2. **`db-types.ts`** — add the column to the table's Kysely interface (`myNewField: string | null`).
-3. **Methods** — update the method group under `providers/postgres-kysely/methods/*.ts` that touches the table: `insertInto(...).values(...)`, `selectAll()`/select column, `updateTable(...).set(...)`, and the `row → record` mapper. jsonb columns wrap via the `jsonb()` helper; remember **PG jsonb does not preserve key order** (don't rely on `JSON.stringify` order for dedup).
-
-### Step 5: Type-Check and Test
+### Step 6: Type-check and test
 
 ```bash
 cd aimeat
+pnpm typecheck
 
-# Verify compilation
-npx tsc --noEmit
+# The suite that exercises the record, on both backends (.env.test.* come from `pnpm test:env:init`):
+pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=<suite>
+pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=<suite>
 
-# Both backends must be green:
-pnpm test:e2e:postgres-kysely   # recreate the postgres-kysely test DB first for a full run
-pnpm test:e2e:sqlite
+# When the work is finished:
+pnpm gate --postgres
 ```
+
+`pnpm gate --postgres` runs the static checks above, the unit tests the change reaches (the storage conformance test among them) and, because the change is under `src/storage/`, the guard tier on both backends. The full E2E sweep is not a routine step; see [testing-requirements.md](testing-requirements.md).
 
 ---
 
 ## Adding a New Record Type / Table
 
-### Step 1: Define the Record and Repository
+Commit `da1f2215f` (content labels, migration 0090) added a table end to end; `git show --stat da1f2215f` lists the storage files it touched.
 
-File: `src/storage/interface.ts`
+### Step 1: Define the record type
+
+File: a new `src/storage/types/<domain>.ts`, re-exported from `src/storage/interface.ts`:
 
 ```typescript
-// Define the record
+// src/storage/types/my-new.ts
 export interface MyNewRecord {
   id: string;
+  ownerGhii: string;
   name: string;
   createdAt: string;
-  // ...
 }
 
-// Define the repository interface
+// src/storage/interface.ts
+export * from './types/my-new.js';
+```
+
+### Step 2: Define the repository interface
+
+File: a new `src/storage/repositories/my-new.repository.ts`:
+
+```typescript
+import type { MyNewRecord } from '../types/my-new.js';
+
 export interface MyNewRepository {
   createMyNew(record: MyNewRecord): Promise<void>;
   getMyNew(id: string): Promise<MyNewRecord | undefined>;
-  listMyNew(filter?: { owner?: string }): Promise<MyNewRecord[]>;
-  updateMyNew(id: string, updates: Partial<MyNewRecord>): Promise<void>;
+  listMyNew(filter?: { ownerGhii?: string }): Promise<MyNewRecord[]>;
   deleteMyNew(id: string): Promise<boolean>;
 }
+```
 
-// Add to the Storage composite interface
+### Step 3: Add it to the `Storage` composite
+
+File: `src/storage/interface.ts`. Import the interface type and add it to the list `Storage` extends:
+
+```typescript
+import type { MyNewRepository } from './repositories/my-new.repository.js';
+
 export interface Storage extends
-  // ... existing repos ...
-  MyNewRepository { }
+  // ... existing repositories ...
+  MyNewRepository { /* ... */ }
 ```
 
-### Step 2: Create Repository File
+There is no repository barrel file; `interface.ts` is the one place repositories are collected.
 
-File: `src/storage/repositories/my-new.repository.ts`
+### Step 4: SQLite: table and methods
 
-```typescript
-export type { MyNewRepository } from '../interface.js';
-```
+1. Add the `CREATE TABLE IF NOT EXISTS` and its indexes to the last `schema-tables-*.ts` block (or the one that holds related tables):
+   ```sql
+   CREATE TABLE IF NOT EXISTS my_new (
+     id        TEXT PRIMARY KEY,
+     ownerGhii TEXT NOT NULL,
+     name      TEXT NOT NULL,
+     createdAt TEXT NOT NULL
+   );
+   ```
+2. Add `providers/sqlite/methods/my-new.ts` exporting `export const myNewMethods = { … }` (method shorthand, `this: SqliteStorage`).
+3. Import it in `providers/sqlite/index.ts` and add it to the `Object.assign(prototype, …)` list.
 
-### Step 3: Add to Repository Index
+### Step 5: PostgreSQL + Kysely: table and methods (production)
 
-File: `src/storage/repositories/index.ts`
+1. **Migration.** New `migrations/NNNN_<desc>.sql` with `CREATE TABLE IF NOT EXISTS "MyNew" (...)` and its indexes, then `pnpm check:migration-hashes --add`. The build already copies the whole migrations folder into `dist/` (`scripts/copy-dist-assets.mjs`); there is nothing to add there.
+2. **`db-types.ts`.** Add the `MyNew` table interface and register it on the `DB` interface.
+3. **Methods.** Add `providers/postgres-kysely/methods/my-new.ts` with the same file name and the same method names as the SQLite one, import it in `providers/postgres-kysely/index.ts` and add it to the `Object.assign(prototype, …)` list.
 
-```typescript
-export type { MyNewRepository } from './my-new.repository.js';
-```
+### Step 6: The deletion cascade
 
-### Step 4: SQLite — Add Table + Implementation
+If the table holds data that belongs to one person, add it to both cascades: `providers/sqlite/methods/owner-cascade.ts` and the Postgres `owner-cascade.ts` or `identity-erasure.ts`. If a row must outlive its owner, record why in `aimeat/security/storage-parity-exemptions.json`. `pnpm check:storage-parity` fails until one of the two is done, but only for the owner columns on its `OWNER_COLUMNS` list. `ownerGhii` is not on that list yet (the script says why), so for an `ownerGhii` table nothing fails and the cascade is your job. Extend `test/unit/storage-conformance.test.ts` when the table has behaviour both providers must agree on.
 
-Schema file: `src/storage/providers/sqlite/schema.ts`
-```sql
-CREATE TABLE IF NOT EXISTS my_new (
-  id        TEXT PRIMARY KEY,
-  name      TEXT NOT NULL,
-  createdAt TEXT NOT NULL
-);
-```
+### Step 7: Type-check and test both backends
 
-Implementation: Add all CRUD methods to `src/storage/providers/sqlite/index.ts`
-
-### Step 5: PostgreSQL + Kysely — Add Table + Implementation (PRIMARY)
-
-1. **Migration** — new `providers/postgres-kysely/migrations/NNNN_<desc>.sql` with `CREATE TABLE IF NOT EXISTS "MyNew" (...)` (+ any indexes; applied on boot). **Also add the SQL migrations copy step to the build** — `providers/postgres-kysely/migrations` must be copied into `dist/` or `pnpm start` can't find them.
-2. **`db-types.ts`** — add the `MyNew` table interface + register it on the `DB` interface.
-3. **Methods** — add the CRUD method group under `providers/postgres-kysely/methods/*.ts`, bound to `PostgresKyselyStorage` via the prototype merge in `providers/postgres-kysely/index.ts`.
-
-### Step 6: Type-Check and Test both backends (PostgreSQL+Kysely + SQLite)
+The same commands as Step 6 of the field procedure: `pnpm typecheck`, the suites that exercise the new table with `--test=<suite>` on both `.env.test.*` files, and `pnpm gate --postgres` when the work is finished. A new table usually comes with a new route and a new E2E suite; [testing-requirements.md](testing-requirements.md) says how to register one.
 
 ---
 
 ## SQLite Migration Pattern
 
-SQLite uses `safeAddColumn()` for schema evolution on existing databases:
-
-```typescript
-const safeAddColumn = (table: string, column: string, type: string) => {
-  try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); } catch { /* column already exists */ }
-};
-```
+SQLite evolves through `safeAddColumn()`, defined inside `initializeSchema` in `providers/sqlite/schema.ts`. It runs `ALTER TABLE … ADD COLUMN` and ignores only the "duplicate column name" error. Any other error (a missing table, a locked database, a bad type) stops the start with `schema migration failed: …`, because a node that boots without a column the code expects fails later and far away.
 
 **Rules:**
-- Migrations accumulate — never remove a `safeAddColumn()` call
-- Always add to the `CREATE TABLE` AND as a migration (both needed)
-- `CREATE TABLE IF NOT EXISTS` handles fresh databases
-- `safeAddColumn` handles existing databases
-- Only supports adding columns — complex changes (rename, type change) require manual migration
+- Calls accumulate. Never remove a `safeAddColumn()` call.
+- `CREATE TABLE IF NOT EXISTS` in `schema-tables-*.ts` handles fresh databases; `safeAddColumn` handles every database.
+- An index on an added column is created after its `safeAddColumn` call.
+- `safeAddColumn` only adds columns. A primary-key change or a relaxed `NOT NULL` needs a table rebuild in `schema-rebuilds.ts`, gated on `PRAGMA table_info` so a fresh database skips it.
+- A data migration that can destroy or hide data follows the positive-evidence rule below, and its SQLite half writes its own `migration:<file>` row in `system_settings` in the same transaction (see `schema-identity-backfill.ts`).
 
-**For breaking changes** (rename column, change type):
-1. Add new column with `safeAddColumn`
-2. Write a migration function that copies data from old to new column
-3. Keep old column for backwards compatibility (or coordinate a major version bump)
+**For a rename or a type change:**
+1. Add the new column with `safeAddColumn`.
+2. Copy the data from the old column to the new one, once.
+3. Keep the old column (SQLite cannot drop it cheaply), or coordinate a major version.
 
 ---
 
 ## PostgreSQL (Kysely) Migration Pattern
 
-The Kysely backend evolves via numbered SQL files in `providers/postgres-kysely/migrations/*.sql`, applied on boot and tracked in `_kysely_migrations`:
+The Kysely backend evolves through numbered SQL files in `providers/postgres-kysely/migrations/*.sql`. `migrate.ts` applies each file once on boot, in order, and records it in `_kysely_migrations`:
 
-- Migrations are **append-only** — never edit an already-shipped migration file; add a new numbered one. `pnpm check:migration-hashes` (in `check:fast`) holds this: every file is listed with its sha256 in `aimeat/security/migration-hashes.json`, a new file gets its line in the same commit (`pnpm check:migration-hashes --add`), and a file or a line that is on origin/main does not change.
-- A file that must not run any more is **superseded**, not edited: add the replacement and name the pair in `SUPERSEDED` in `providers/postgres-kysely/migrate.ts`. On a database that has not applied the old file, the runner records it with `superseded_by` and never runs it; the replacement brings a database that did apply it to the same end state. 0085 → 0086 is the first pair.
+- Migrations are **append-only**. Never edit a shipped migration file; add a new numbered one. `pnpm check:migration-hashes` holds this: every file is listed with its sha256 in `aimeat/security/migration-hashes.json`, a new file gets its line in the same commit (`pnpm check:migration-hashes --add`), and a file or a line that is on `origin/main` does not change.
+- A file that must not run any more is **superseded**, not edited: add the replacement and name the pair in `SUPERSEDED` in `migrate.ts`. On a database that has not applied the old file, the runner records it with `superseded_by` and never runs it; the replacement brings a database that did apply it to the same end state. 0085 → 0086 is the first pair.
 - **A migration that can destroy or hide data acts only on positive evidence.** What it cannot decide stays as it is and goes to the operator's page (one incident, `services/security-incident.ts`), never to a script somebody has to remember to run. Nothing in it throws on data: the node always starts. The SQLite half of such a migration writes its own `migration:<file>` row in `system_settings` in the same transaction as the change.
-- Make DDL idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`) so a partially-applied environment recovers cleanly.
-- Keep `db-types.ts` in lockstep with the migration in the same commit.
-- Remember **PG jsonb does not preserve key order** — don't rely on `JSON.stringify` equality for dedup.
+- Make DDL idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`) so a partially-applied environment recovers.
+- Keep `db-types.ts` in step with the migration in the same commit.
+- **PG jsonb does not preserve key order.** Do not rely on `JSON.stringify` equality for dedup.
 
 ---
 
@@ -210,30 +244,30 @@ The Kysely backend evolves via numbered SQL files in `providers/postgres-kysely/
 
 ---
 
-## Validation Strategy
+## Validation
 
-Until a formal migration framework is adopted, validation comes from E2E tests:
+What proves a storage change, from fastest to slowest:
 
-- `pnpm test:e2e:sqlite` — validates SQLite, disk or `:memory:` (with migrations); fast-iteration default
-- `pnpm test:e2e:postgres-kysely` — validates PostgreSQL via Kysely (**primary / prod backend**)
-- `pnpm test:e2e:all-backends` — both of the above in one go
+| Check | What it catches |
+|-------|-----------------|
+| `pnpm typecheck` | a wrong record type or method signature |
+| `pnpm check:storage-file-parity` | a method in a different file, or in one provider only |
+| `pnpm check:storage-parity` | an owner-scoped table that one cascade leaves behind |
+| `pnpm check:migration-hashes` | an edited migration, or a new one without its hash line |
+| `test/unit/storage-conformance.test.ts` | the two providers returning different results for the same scenario |
+| `--test=<suite>` on both `.env.test.*` files | the feature's own behaviour on each backend |
+| `pnpm gate --postgres` | all of the above that the change reaches, plus the guard tier on both backends |
 
-**Both backends (PostgreSQL+Kysely and SQLite) must pass.** If either fails after a schema change, the change is incomplete.
+**Both backends must pass.** If either fails after a schema change, the change is incomplete.
 
 ---
 
-## Future Considerations
+## Known limits
 
-The current manual sync approach works but has scaling concerns:
+| Concern | Impact | What holds it today |
+|---------|--------|---------------------|
+| A field written by one provider and not the other | silent data loss on one backend | E2E on both backends; `storage-conformance.test.ts` for the scenarios it covers |
+| Growing `safeAddColumn` list | slower SQLite start | the per-table `schema-columns-*.ts` blocks; periodic consolidation |
+| No down migrations | an upgrade cannot be rolled back in place | back up before a release that changes the schema |
 
-| Concern | Impact | Mitigation |
-|---------|--------|------------|
-| Missed field in one backend | Silent data loss | E2E tests on all backends |
-| Growing migration list | Slower startup | Periodic schema consolidation |
-| Type mismatch between backends | Runtime errors | TypeScript strict mode + tests |
-| No rollback capability | Risk during upgrades | Backup before schema changes |
-
-**Potential future improvements:**
-- Shared repository implementation with driver abstraction
-- Schema validation test that compares interface vs implementations
-- Automated migration generation from interface changes
+Two providers are implemented by hand. There is no shared repository implementation and no migration generated from the type definitions.

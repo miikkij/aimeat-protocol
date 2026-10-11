@@ -1,18 +1,22 @@
 <!--
 @file docs/coding-guidelines/prompt-writing.md
 @description How we write prompts in AIMEAT: positive framing (say what TO do) and the wider prompt
-  framework. Applies to every prompt string in the codebase — LLM system/user prompts, prompts the app
+  framework. Applies to every prompt string in the codebase: LLM system/user prompts, prompts the app
   generates for the user to paste into an AI chat (e.g. the Secretary setup interview), re-plan prompts,
   etc. The rule of thumb: an instruction describes the behaviour we want, affirmatively.
 @usage Read before writing or editing any prompt string. Check a prompt against §6 before shipping it.
 @version-history
-  v1.0.0 — 2026-06-29 — Initial: positive framing rule + conversion move + framework + checklist.
+  v1.0.0 - 2026-06-29 - Initial: positive framing rule + conversion move + framework + checklist.
 -->
 
-# Prompt Writing — Positive Framing & Framework
+# Prompt Writing: Positive Framing & Framework
 
 How we write prompts in this project. This is the standard to follow when writing or editing any prompt
 string (LLM prompts, prompts the app hands the user to paste into an AI chat, re-plan prompts, …).
+
+This standard does not license rewriting a prompt that already works. CLAUDE.md: "Do not rewrite
+prompts that work: additive changes only, and only when asked." Apply §6 to a new prompt and to the
+lines you add, not to working text around them.
 
 Core rule source: Anthropic prompt engineering, "Be clear and direct"
 (<https://platform.claude.com/docs/en/docs/build-with-claude/prompt-engineering/be-clear-and-direct>):
@@ -21,7 +25,7 @@ Core rule source: Anthropic prompt engineering, "Be clear and direct"
 > - Instead of: "Do not use markdown in your response"
 > - Try: "Your response should be composed of smoothly flowing prose paragraphs."
 
-## 1. The core rule — say what TO do
+## 1. The core rule: say what TO do
 
 Every instruction is written affirmatively: it describes the behaviour we **want**. A negative
 instruction ("don't / never / avoid / no …") makes the model fixate on the forbidden thing and leaves
@@ -46,20 +50,20 @@ Real examples from the Secretary setup prompt:
 
 ## 3. The wider framework (anatomy of a good prompt)
 
-1. **Identity stated positively** — "You are a warm, curious colleague who…", describing what it IS.
-2. **Goal as a destination** — describe what the finished state looks like, so the model steers there.
-3. **Behaviour as affirmative directives** — the whole body is "do this", "lead with that".
+1. **Identity stated positively:** "You are a warm, curious colleague who…", describing what it IS.
+2. **Goal as a destination:** describe what the finished state looks like, so the model steers there.
+3. **Behaviour as affirmative directives:** the whole body is "do this", "lead with that".
 4. **Give it what it needs to succeed** (context, the tools it has, an example) over a list of pitfalls.
-5. **Match the prompt's voice to the output you want** — want plain, warm, human replies? Write the
+5. **Match the prompt's voice to the output you want.** Want plain, warm, human replies? Write the
    prompt plain, warm, and human (Anthropic: matching style steers style).
-6. **Quality modifiers when you want more** — e.g. "go beyond the basics", "be thorough and specific".
+6. **Quality modifiers when you want more:** e.g. "go beyond the basics", "be thorough and specific".
 7. **Describe the ideal end-state and let the model reason**, over micromanaging steps.
 8. **End with the one concrete next action** you want the person to take.
 
 ## 4. Language & voice conventions
 
 - **Prompt source is ALWAYS English.** The prompt instructs the model to converse with the user in the
-  user's own language, so a Finnish user still gets Finnish replies — the source stays English.
+  user's own language, so a Finnish user still gets Finnish replies; the source stays English.
 - Plain, everyday language. Skip corporate filler. Match the voice you want back.
 
 ## 5. Before / after (the Secretary interview, condensed)
