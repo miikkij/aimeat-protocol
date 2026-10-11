@@ -25827,10 +25827,10 @@ paths:
       operationId: ucpProfile20260408
       summary: UCP business profile, version 2026-04-08 (the signed-in checkout)
       description: >-
-        The profile of the signed-in checkout at /ucp/v1, unchanged from when it was the only
-        profile: REST transport, the checkout capability endpoints, every payment handler
-        registered on this node (morsels, cards on the seller's own Stripe, invoice, x402), and the
-        node's Ed25519 signing key.
+        The profile of the signed-in checkout at /ucp/v1: REST transport, the checkout capability
+        endpoints, every payment handler registered on this node that settles money (cards on the
+        seller's own Stripe, invoice, x402), and the node's Ed25519 signing key. A morsel paces
+        writes and is not a currency, so the morsel ledger is not listed as a payment handler.
       tags: [Commerce]
       responses:
         '200':
@@ -26904,11 +26904,13 @@ paths:
       operationId: commerceFeed
       summary: Public product feed (ACP-shaped)
       description: >-
-        Every PUBLIC, priced agent offer on the node as an ACP-shaped product entry
-        (sku "offer:<agentGaii>:<offerId>", price in morsels), plus every priced app-tool
-        from public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>";
-        money prices in 6-decimal micro-units; fulfillment 'call' = synchronous capability
-        invoke, 'task' = agent TASK for the app owner). Discovery: /.well-known/acp.json.
+        Every PUBLIC agent offer on the node that has a money price, as an ACP-shaped product
+        entry (sku "offer:<agentGaii>:<offerId>"), plus every app-tool with a money price from
+        public apps.{appId}.tools manifests (sku "app-tool:<owner>/<appId>:<tool>"; fulfillment
+        'call' = synchronous capability invoke, 'task' = agent TASK for the app owner). Every
+        price is money in 6-decimal micro-units ({ amount, currency, unit, scale: 6 }); an item
+        priced only in morsels is not listed, because a morsel is not a currency.
+        Discovery: /.well-known/acp.json.
       tags: [Commerce]
       responses:
         '200':
@@ -27208,7 +27210,9 @@ paths:
         Universal Commerce Protocol (2026-04-08) shaped checkout over the commerce core. Every
         response carries ucp.version + ucp.capabilities; the UCP-Agent header (platform profile
         URL) is fetched best-effort for capability negotiation. Item ids:
-        "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>".
+        "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>". A session here is
+        always in money: the requested currency, or else the first money currency every item is
+        priced in. An item with no money price is refused with MONEY_PRICE_REQUIRED.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27224,12 +27228,14 @@ paths:
                   type: array
                   items: { type: object }
                 note: { type: string }
-                currency: { type: string, description: "'morsel' (default) or a money code an EE handler supports" }
+                currency: { type: string, description: "A money currency (EUR or USD). Omitted: the first one every item is priced in." }
       responses:
         '201':
           description: UCP checkout session
         '402':
           description: Payment required (x402-style accepts block)
+        '422':
+          description: MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money)
 
   /ucp/v1/checkout-sessions/{id}:
     get:
@@ -27265,11 +27271,16 @@ paths:
       responses:
         '200': { description: Completed UCP checkout session }
         '402': { description: Payment required (x402-style accepts block) }
+        '422': { description: PAYMENT_HANDLER_REQUIRED (payment.handler is required; the message lists the handlers that settle the session's currency) }
 
   /acp/v1/checkout_sessions:
     post:
       operationId: acpCreateCheckoutSession
       summary: ACP checkout — create session by sku
+      description: >-
+        A session here is always in money: the requested currency, or else the first money
+        currency every item is priced in. An item with no money price is refused with
+        MONEY_PRICE_REQUIRED.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -27284,8 +27295,11 @@ paths:
                 items:
                   type: array
                   items: { type: object }
+                note: { type: string }
+                currency: { type: string, description: "A money currency (EUR or USD). Omitted: the first one every item is priced in." }
       responses:
         '201': { description: ACP checkout session (status ready_for_payment) }
+        '422': { description: MONEY_PRICE_REQUIRED (an item has no money price, or the currency asked for is not money) }
 
   /acp/v1/checkout_sessions/{id}:
     get:
@@ -27311,7 +27325,7 @@ paths:
       responses:
         '200': { description: Completed ACP checkout session }
         '402': { description: Payment required (x402-style accepts block) }
-        '422': { description: Unknown payment handler (e.g. stripe on a Community node) }
+        '422': { description: "PAYMENT_HANDLER_REQUIRED (neither payment_data.provider nor payment_data.handler; the message lists the handlers that settle the session's currency), or an unknown payment handler" }
 
   /v1/commerce/checkout-sessions/{id}/complete:
     post:
