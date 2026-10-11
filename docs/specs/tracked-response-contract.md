@@ -4,6 +4,8 @@
   state machine, and the rules any human/AI system must honor when reading or advancing one. A
   Tracked Response's `spec` field points here so external agents know how to handle the structure.
 @version-history
+  v1.0.1 - 2026-10-12 - The example uses made-up identities (example-node, helper#bob) instead of a
+    real peer node and a real bug title. No change to the contract.
   v1.0.0 — 2026-06-21 — Initial spec (Tracked Response = first Memory Contract instance).
 -->
 
@@ -24,17 +26,17 @@ Owner-scoped memory key: `tracked-response.{id}.latest`, `visibility: 'private'`
   "specVersion": 1,
   "id": "tr_ab12cd",
   "ownerGaii": "alice@node",            // the human who owes the reply (the reply sender)
-  "title": "googleSub self-host migration bug",
+  "title": "Sign-in fails after the upgrade",
   "state": "watching",                  // see state machine
 
   "source": {                            // the SINGLE message we reply to
     "kind": "message",
     "messageId": "<direct_messages.id>",
     "conversationId": "<conversationId>",
-    "peerGhii": "omnituinen-agent#omnituinen@aimeat-ogmiskate-001-prod",  // reply recipient
+    "peerGhii": "helper#bob@example-node",  // reply recipient
     "ownerGhii": "alice@node",          // reply sender (= ownerGaii here)
-    "originNodeId": "aimeat-ogmiskate-001-prod",
-    "preview": "Self-host node crashes: no such column: googleSub..."
+    "originNodeId": "example-node",
+    "preview": "After the upgrade my node refuses every sign-in..."
   },
 
   "watch": {                             // the memory key tracked + the completion test

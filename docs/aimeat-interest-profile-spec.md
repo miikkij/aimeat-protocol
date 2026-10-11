@@ -1,15 +1,14 @@
 # AIMEAT Interest Profile Specification
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Active
-**Phase:** 0.4 (Foundation)
-**Date:** 2026-03-03
+**Date:** 2026-03-03, checked against the code on 2026-10-12
 
 ---
 
 ## 1. Overview
 
-The AIMEAT Interest Profile is a standardized set of memory fields that describe human users on an AIMEAT node. Each field is stored as a regular memory entry under a well-known key pattern and validated by the Schema Locking system (Phase 0.1).
+The AIMEAT Interest Profile is a standardized set of memory fields that describe human users on an AIMEAT node. Each field is stored as a regular memory entry under a well-known key pattern and validated by the Schema Locking system.
 
 **Purpose:**
 
@@ -21,7 +20,7 @@ The AIMEAT Interest Profile is a standardized set of memory fields that describe
 
 - No new API endpoints. Profiles are read and written through the existing Memory API (`POST /v1/memory`, `GET /v1/memory/:key`, `GET /v1/memory?prefix=`).
 - Schema enforcement via the Schema Locking system ensures all nodes validate profile data identically.
-- Consent Layer (Phase 0.3) controls who can see which profile fields.
+- A field's visibility, and the Consent Layer for anything that is not public, control who can see which profile fields.
 
 ---
 
@@ -268,7 +267,7 @@ An array of language codes the user speaks or understands, using ISO 639-1 codes
 
 ## 4. Schema Enforcement
 
-Profile schemas are enforced through the Schema Locking system (Phase 0.1). At server startup, the `seedProfileSchemas()` function in `src/services/profile-schemas.ts` registers one schema per profile field.
+Profile schemas are enforced through the Schema Locking system. At server startup, the `seedProfileSchemas()` function in `src/services/profile-schemas.ts` registers one schema per profile field.
 
 ### 4.1 Seeding Process
 
@@ -283,7 +282,7 @@ Profile schemas are enforced through the Schema Locking system (Phase 0.1). At s
 
 ### 4.2 Startup Integration
 
-In `src/server.ts`, the seed function is called after storage is initialized:
+The node's start-up sequence (`seedProfileSchemas` in `aimeat/src/server-bootstrap/service-init.ts`) calls the seed function after storage is initialized:
 
 ```typescript
 seedProfileSchemas(storage, `system@${config.nodeId}`)
@@ -307,13 +306,18 @@ When an agent writes a memory entry with a key like `profile.alice.interests`, t
 
 ### 4.4 Operator Customization
 
-An operator may replace or extend the default schemas after startup via the Schema Locking API (`PUT /v1/schemas`). Because `seedProfileSchemas()` checks for existing schemas before writing, operator customizations survive server restarts.
+An operator may replace or extend the default schemas after startup through the Schema Locking API: `PUT /v1/memory/{key}/schema` locks a schema on a key or a prefix (`apply_to: "exact" | "prefix"`, `schema_mode: "open" | "strict"`), and `GET /v1/schemas` lists the locked schemas. Because `seedProfileSchemas()` checks for existing schemas before writing, operator customizations survive server restarts.
 
 ---
 
 ## 5. Consent Model
 
-Profile data visibility is controlled by the Consent Layer (Phase 0.3). By default, memory entries are private. To make profile fields visible to others, the data owner must grant explicit consent.
+Who can read a profile field is decided first by the field's `visibility`, then by consent:
+
+- A field written with `"visibility": "public"` is readable by anyone, with no consent at all. The examples in section 6 write every field this way, so the profile is open for discovery as soon as it is written.
+- A field written with any other visibility (the default is `private`) is read by another identity only under an active consent that the data owner grants, as described below. `owner` visibility also lets the owner's own agents read it.
+
+Use a narrower visibility and the consents below when only some fields, or only some readers, should see the profile.
 
 ### 5.1 Full Profile Consent
 
@@ -334,7 +338,7 @@ To share an entire profile with all users across the federation:
 | `data_pattern` | Glob pattern matching all of alice's profile fields. |
 | `recipient`    | `"*"` means any authenticated agent or user. |
 | `purpose`      | Free-form label. `"discovery"` indicates the data is shared for matching and directory use. |
-| `scope`        | `"federation"` makes the data available to federated peer nodes. Other options: `"dmz"` (accessible from outside the node boundary but not federated) or `"private"` (local node only). |
+| `scope`        | `"federation"` (the default) makes the data available to federated peer nodes and the federated directory. The other values keep the consent on this node: `"dmz"`, `"private"` and `"auth"` (section 5.4). |
 | `expires`      | `null` for indefinite consent. Set an ISO 8601 timestamp for time-limited sharing. |
 
 ### 5.2 Granular Consent
@@ -373,11 +377,14 @@ The `recipient` field supports several forms:
 
 ### 5.4 Scope Options
 
-| Scope        | Visibility |
-|--------------|------------|
-| `private`    | Only accessible within the local node. |
-| `dmz`        | Accessible from outside the node boundary (e.g. via public portal) but not replicated to federation peers. |
-| `federation` | Replicated and searchable across all federated peer nodes. |
+A consent's `scope` is one of four values (`ConsentCreateSchema` in `aimeat/src/models/schemas.ts`). Only `federation` changes what leaves the node: the federated directory and genesis peering read consents with that scope and nothing else. The other three keep the grant on this node.
+
+| Scope        | Meaning |
+|--------------|---------|
+| `private`    | The consent applies on this node only. |
+| `dmz`        | The node-local zone: the zone of records whose visibility is `owner`, `group`, `workspace` or `members` (`visibilityToZone` in `aimeat/src/routes/memory/shared.ts`). Readable on this node by the recipients the consent names, never replicated to federation peers. It does not open anything to the public internet; `public` visibility does that. |
+| `auth`       | Accepted and stored with the consent; no read path treats it differently from a node-local scope today. |
+| `federation` | The default. The consented fields are offered to federated peer nodes and their directory search. |
 
 ### 5.5 Consent Without Profile Data
 
@@ -542,7 +549,7 @@ Profile data aligns with [Schema.org](https://schema.org/) ontologies to enable 
 
 ### 8.1 Top-level type
 
-An AIMEAT interest profile maps to `schema:Person`. When the Directory Service (Phase 1.4) builds semantic annotations for profile search results, it uses:
+An AIMEAT interest profile maps to `schema:Person`. When the Directory Service builds semantic annotations for profile search results, it uses:
 
 ```json
 {
@@ -562,7 +569,7 @@ An AIMEAT interest profile maps to `schema:Person`. When the Directory Service (
 | `location.geo` | `schema:geo` → `schema:GeoCoordinates` | `geo[0]` → `schema:latitude`, `geo[1]` → `schema:longitude`. |
 | `bio`          | `schema:description` | Free-text description of the person. |
 | `seeking`      | `schema:seeks` | Array of strings. The `schema:seeks` property expects a `Demand` object, but for simplicity AIMEAT uses plain strings. |
-| `availability` | `schema:availability` | Enum string. Not a direct Schema.org match — custom extension under the `aimeat` namespace. |
+| `availability` | `schema:availability` | Enum string. Not a direct Schema.org match: a custom extension under the `aimeat` namespace. |
 | `languages`    | `schema:knowsLanguage` | ISO 639-1 codes map to Schema.org `Language` type identifiers. |
 
 ### 8.3 Composite semantic annotation

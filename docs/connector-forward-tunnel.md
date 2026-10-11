@@ -238,8 +238,11 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
 
 ## Discovery file & operations
 
-- **Endpoint:** `GET /v1/connect/tunnel?token=<agentJWT>` (WS upgrade; agent JWT,
-  preferred via `Authorization` header). Opt-in via
+- **Endpoint:** `GET /v1/connect/tunnel` (WS upgrade). The agent JWT goes in the
+  `Authorization` header, which the connector sends. A client that cannot set a
+  header (a browser) asks `POST /v1/ws/ticket` for a single-use ticket for this
+  socket kind and connects with `?ticket=`. The old `?token=<agentJWT>` still works
+  in 3.x behind `AIMEAT_WS_QUERY_TOKEN` and is removed in 4.0.0. Opt-in via
   `AIMEAT_CONNECT_TUNNEL_ENABLED=true`.
 - **Discovery file:** `<AIMEAT_HOME or ~/.aimeat>/serve.json` —
   `{ schema_version, port, pid, secret, agents:[{agent, gaii, owner, node_url,
@@ -318,11 +321,13 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
 | Concern | File |
 |---|---|
 | Server tunnel manager | `aimeat/src/services/connect-tunnel.ts` |
-| WS upgrade + auth | `aimeat/src/index.ts` |
+| WS upgrade + auth | `aimeat/src/auth/ws-upgrade.ts` (the credential reader), `aimeat/src/index-start.ts` (the upgrade code paths) |
 | Agent-scoped push | `aimeat/src/services/event-bus.ts`, `aimeat/src/routes/agent-tasks.ts` |
 | Node tunnel client | `aimeat/src/cli/connect/tunnel-client.ts` |
 | Transport seam | `aimeat/src/cli/connect/api-client.ts` |
 | Loopback daemon | `aimeat/src/cli/connect/mcp/local-server.ts` |
 | Daemon stats + terminal view | `aimeat/src/cli/connect/mcp/local-stats.ts`, `aimeat/src/cli/connect/tunnel-traffic.ts`, `aimeat/src/cli/connect/tui/` |
 | Python integration | `python/aimeat-crewai/src/aimeat_crewai/mcp_client.py`, `daemon.py` |
-| Design + phases | `docs/plans/2026-06-10-connector-forward-tunnel.md` |
+
+The design plan that preceded this page was deleted on 2026-07-12 (commit `64a59885c`); git history
+keeps it, and this page is the current description of the wire protocol.

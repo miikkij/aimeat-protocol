@@ -48,9 +48,10 @@ and the node's admin settings for resolved values.
 | POST | `/v1/push/subscribe` | Register a browser subscription |
 | DELETE | `/v1/push/subscribe` | Remove a subscription |
 | GET | `/v1/push/subscriptions` | List the owner's devices |
+| POST | `/v1/push/test` | Send a test notification to every device the owner registered; 404 when none is registered or the send failed |
 
 Use [OpenAPI](../openapi.yaml) for body fields and errors. Subscription management
-uses `push:manage`. Hosted apps can request `push:receive` to register and remove
+and the test send use `push:manage`. Hosted apps can request `push:receive` to register and remove
 their own subscription. An app cannot remove all of an owner's subscriptions.
 
 ## Hosted apps

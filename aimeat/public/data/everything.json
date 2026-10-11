@@ -2961,10 +2961,10 @@
      "slug": "g-16-record-contracts-at-an-address",
      "cells": [
       "<strong>Record contracts at an address</strong>",
-      "A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. The old <code>/docs/specs/</code> addresses redirect there.",
+      "A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. A record written before 2026-10-11 names the old address, which redirects there.",
       "<code>GET /v1/specs/{name}</code> (<code>signals-contract.md</code>, <code>visibility-contract.md</code>, <code>tracked-response-contract.md</code>)"
      ],
-     "plain": "Record contracts at an address A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. The old /docs/specs/ addresses redirect there. GET /v1/specs/{name} (signals-contract.md, visibility-contract.md, tracked-response-contract.md)"
+     "plain": "Record contracts at an address A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. A record written before 2026-10-11 names the old address, which redirects there. GET /v1/specs/{name} (signals-contract.md, visibility-contract.md, tracked-response-contract.md)"
     },
     {
      "slug": "g-16-search-engine-setup",
