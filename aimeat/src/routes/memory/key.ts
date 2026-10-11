@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.5 — 2026-10-11 — The `memory` change of a record only its owner reads goes to that owner's
+ *     streams (event-bus.ts emitRecordChange). DELETE and restore no longer emit a second, global
+ *     event after the one their service sends.
  *   v1.11.4 — 2026-10-08 — PUT stamps the caller (resolve(req)) as the writer; the agent namespace an
  *     owner's edit lands in is only where it is stored. An owner correcting an agent's record was
  *     stamped model-written under the agent's name (aiprov E6).
@@ -62,7 +65,7 @@ import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
-import { emitChange } from '../../services/event-bus.js';
+import { emitRecordChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
@@ -300,7 +303,8 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       { description: 'See everything waiting to be removed', method: 'GET', url: '/v1/memory/deleted' },
       { description: 'List remaining memory keys', method: 'GET', url: '/v1/memory' },
     ]));
-    emitChange('memory');
+    // No change event from here: deleteMemoryRecord tells the streams, scoped to the record's owner
+    // when nobody else read it. A second, global one from this route would undo that.
   });
 
   // POST /v1/memory/:key/restore — take it back.
@@ -339,7 +343,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
     emitResourceListChanged(gaii);
-    emitChange('memory');
+    // The change event is restoreMemoryRecord's, scoped as the delete's is.
     res.json(success(config.nodeId, { restored: true, key }, [
       { description: 'Read it', method: 'GET', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
@@ -394,6 +398,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         if (found) { existing = found; effectiveGaii = agent.gaii; break; }
       }
     }
+    // Read now, before anything below builds the new record: who is told about this update
+    // depends on who could read the record before it as well as after it.
+    const priorVisibility = existing?.visibility;
     if (!existing) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
@@ -557,7 +564,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }, [
       { description: 'Read this memory entry', method: 'GET', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
-    emitChange('memory');
+    emitRecordChange('memory', record.ownerGaii, record.visibility, priorVisibility);
   });
 
   // ── CORS per-memory-key management ──
@@ -651,7 +658,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       key: record.key,
       allowed_origins: record.allowedOrigins ?? null,
     }));
-    emitChange('memory');
+    emitRecordChange('memory', record.ownerGaii, record.visibility);
   });
 
   // GET /v1/memory/:gaii/:key, the cross-owner read: routes/memory/public-read.ts (max-file-lines).

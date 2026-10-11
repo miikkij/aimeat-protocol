@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.11.4 — 2026-10-11 — The `memory` change of a record only its owner reads goes to that
+ *     owner's streams. It was a global event, and one owner's private write woke every open page.
  *   v1.11.3 — 2026-10-08 — A declaration the caller may not make is answered as a refusal (403
  *     SCOPE_DENIED, nothing written) instead of an exception, now that POST /v1/memory takes a
  *     declaration inline (aiprov E7).
@@ -90,7 +92,7 @@ import { isKeyArchived } from './archive.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance } from './ai-provenance.js';
 import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, emitRecordChange } from './event-bus.js';
 import { enqueueMemoryReplication } from './memory-replication.js';
 import { emitMemoryWritten } from './event-bus.js';
 import { reconcileAfterSourceWrite } from './exchange-projection.js';
@@ -499,10 +501,10 @@ export async function writeMemoryRecord(
     }
 
     // 6. The live update. A write over MCP used to reach storage with nobody hearing about it, so an
-    //    app watching its owner's memory saw the agent's work only after a reload. No ownerGaii
-    //    argument, matching every REST path: an omitted owner is a global broadcast and the SSE
-    //    layer's own scope check decides who is entitled to hear it.
-    emitChange('memory');
+    //    app watching its owner's memory saw the agent's work only after a reload. A record only
+    //    its owner reads is told to that owner's streams; one other people read, or one that was
+    //    theirs to read until this write, is told to everybody (event-bus.ts emitRecordChange).
+    emitRecordChange('memory', caller.targetGaii, input.visibility, ...(existing ? [existing.visibility] : []));
 
     // 6a. Write-time classification (TARGET-082 V3). Scheduled, never awaited, and nothing at all
     //     while classification is off (services/classify-on-write.ts).
