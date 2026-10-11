@@ -26,7 +26,7 @@ The unsigned payload has this shape:
 {
   "@context": [
     "https://www.w3.org/ns/credentials/v2",
-    "https://aimeat.spechops.com/ns/credentials/v1"
+    "https://aimeat.io/ns/credentials/v1"
   ],
   "type": ["VerifiableCredential", "AIMEATIdentityCredential"],
   "issuer": "did:web:example.com",
@@ -41,8 +41,23 @@ The unsigned payload has this shape:
 }
 ```
 
-The context URLs above are the strings the implementation emits. This documentation
-check does not verify that an external resolver can fetch or use those contexts.
+The second context is the node's own namespace, `https://aimeat.io/ns/`
+([vc-context.ts](../aimeat/src/services/vc-context.ts)). It defines the credential's
+type names and the subject fields `verificationLevel`, `memberSince` and `displayName`.
+Every node serves the context document at `GET /ns/credentials/v1` as
+`application/ld+json`, with CORS, and aimeat.io answers the canonical address.
+
+Releases up to 3.26.1 issued the credential with the context
+`https://aimeat.spechops.com/ns/credentials/v1`. A signed credential is valid for 365 days,
+so the node still accepts that context when it verifies a credential it issued. Nothing
+serves that old address, so an external JSON-LD processor cannot fetch it.
+
+## Verifying a credential
+
+The issuer's `verifyIdentityCredential(jwt)` checks a signed credential this node issued: the
+Ed25519 signature against the node key, `typ: vc+ld+jwt`, the issuer DID, the type
+`AIMEATIdentityCredential`, and a context list of exactly the W3C context followed by one of
+the two AIMEAT contexts above. Any other context is refused. No HTTP route exposes it yet.
 
 ## Issuer configuration
 
