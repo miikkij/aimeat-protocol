@@ -24,12 +24,15 @@
  * @structure visibilitySettingsView · nodeAllowsTags · tagsActive · ownerTagsSnippet · withOwnerTags · ownerTagsFor
  * @usage buf = withOwnerTags(buf, ownerTagsSnippet(config, settings));
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The banner a page with tags gets names the services (Clarity, Google
+ *     Analytics) in the visitor's language and removes their cookies when consent is taken back
+ *     (middleware/cookie-consent.ts cookieConsentSnippet); Google's cookie stays on the page's own host.
  *   v1.1.0 — 2026-10-08 — ownerTagsFor takes the app's filename and adds the behaviour script (layer D).
  *   v1.0.0 — 2026-10-08 — Initial (layer B).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { VisibilitySettings } from '../../models/visibility-schemas.js';
-import { buildCookieConsentRunConfig } from '../../middleware/cookie-consent.js';
+import { cookieConsentSnippet } from '../../middleware/cookie-consent.js';
 import { CLARITY_ID_RE, GA4_ID_RE, cachedVisibilitySettings } from './visibility-settings.js';
 import type { Storage } from '../../storage/interface.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
@@ -92,7 +95,9 @@ export function ownerTagsSnippet(config: AimeatConfig, settings: VisibilitySetti
     + `function start(){if(started)return;started=true;`
     + `if(G){w.gtag('consent','default',{analytics_storage:'granted',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});`
     + `var s=d.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(G);d.head.appendChild(s);`
-    + `w.gtag('js',new Date());w.gtag('config',G);}`
+    // cookie_domain 'none' keeps Google's cookie on this page's own host. Its default is the widest
+    // domain it can write, which for an app is the address every other owner's app shares.
+    + `w.gtag('js',new Date());w.gtag('config',G,{cookie_domain:'none'});}`
     + `if(C){w.clarity=w.clarity||function(){(w.clarity.q=w.clarity.q||[]).push(arguments);};`
     + `var t=d.createElement('script');t.async=true;t.src='https://www.clarity.ms/tag/'+encodeURIComponent(C);d.head.appendChild(t);`
     + `w.clarity('consentv2',{ad_Storage:'denied',analytics_Storage:'granted'});}}`
@@ -104,19 +109,19 @@ export function ownerTagsSnippet(config: AimeatConfig, settings: VisibilitySetti
     + `})();</script>`;
 
   if (!banner) return script;
-  const categories = config.cookieConsentCategories.includes('analytics')
-    ? config.cookieConsentCategories
-    : [...config.cookieConsentCategories, 'analytics'];
-  const base = config.baseUrl.replace(/\/$/, '');
-  const runConfig = buildCookieConsentRunConfig({ ...config, cookieConsentCategories: categories });
-  // The banner's own assets come from the apex: an app origin does not serve them.
-  return script
-    + `<link rel="stylesheet" href="${base}/cookieconsent.css">`
-    + `<script src="${base}/cookieconsent.umd.js"></script>`
-    // After the document is parsed: in the head, the banner has no body to attach to yet (measured:
-    // "Cannot read properties of null (reading 'appendChild')" and no banner at all).
-    + `<script>(function(){function r(){CookieConsent.run(${runConfig});}`
-    + `if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',r);}else{r();}})();</script>`;
+  // The banner asks about `analytics` whatever the operator's list says (a tag that waits for a
+  // category nobody can accept would never load), names the services this owner uses, and removes
+  // their cookies on this host when the visitor takes the consent back. Its assets come from the
+  // service's own address: an app origin does not serve them.
+  return script + cookieConsentSnippet(config, {
+    ensure: ['analytics'],
+    services: { clarity: !!clarity, ga4: !!ga4 },
+    clearOnRevoke: [
+      ...(clarity ? ['_clck', '_clsk'] : []),
+      ...(ga4 ? ['_ga', `_ga_${ga4.slice(2)}`, '_gid'] : []),
+    ],
+    assetBase: config.baseUrl,
+  });
 }
 
 /**

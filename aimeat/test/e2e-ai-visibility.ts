@@ -14,6 +14,9 @@
  *   The refusals are measured: a second owner sees none of the first owner's counts, an agent
  *   holding the wrong scope is refused on REST and has no such tool on MCP, and no token is 401.
  * @version-history
+ *   v1.2.0 — 2026-10-11 — The cookie banner: it names the owner's analytics in three languages and
+ *     clears their cookies on a taken-back consent (18); switched on in Config it reaches the
+ *     service's own page at once with the page's CSP nonce (18b); the category list is a list (18c).
  *   v1.1.0 — 2026-10-08 — Phase 7 (layer C): an agent's completed, abandoned and failed checkouts
  *     land in the seller's report by stage, by error code and as one readable line.
  *   v1.0.0 — 2026-10-08 — Initial.
@@ -395,6 +398,19 @@ const setBanner = (on: boolean) => json('/v1/admin/config', {
   body: JSON.stringify({ changes: [{ path: 'cookies.consent_enabled', value: on }] }),
 });
 
+/** The cookie banner's run configuration as the page carries it (`var c={...};` in the start script). */
+function bannerConfig(html: string): any {
+  const at = html.indexOf('<script data-aimeat-cookie-banner');
+  const start = at < 0 ? -1 : html.indexOf('var c=', at);
+  if (start < 0) return null;
+  let depth = 0;
+  for (let i = start + 6; i < html.length; i++) {
+    if (html[i] === '{') depth++;
+    else if (html[i] === '}' && --depth === 0) return JSON.parse(html.slice(start + 6, i + 1));
+  }
+  return null;
+}
+
 await test('15. an id of the wrong shape is refused on REST and on MCP, and nothing is stored', async () => {
   const bad = await setTags(S.token, { clarity_project_id: '"><script>alert(1)</script>' });
   assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${bad.status} ${JSON.stringify(bad.body)}`);
@@ -436,13 +452,71 @@ await test('18. with the cookie banner on, the tag waits for consent to analytic
   try {
     const html = await page(appPath);
     assert(html.includes('B=true') && html.includes("acceptedCategory('analytics')"), 'the tag waits for the analytics category');
-    assert(/CookieConsent\.run\(.*"analytics"/s.test(html), 'the banner offers analytics to accept');
+    const run = bannerConfig(html);
+    assert(run && Object.keys(run.categories).join(',') === 'necessary,analytics', `the banner offers analytics to accept, got ${run && Object.keys(run.categories)}`);
     assert(!/<script[^>]+(clarity\.ms|googletagmanager)/.test(html), 'no Clarity or Google script element is in the page before consent');
+    // The banner says what it asks for, in three languages, and what it removes on a taken-back consent.
+    assert(Object.keys(run.language.translations).join(',') === 'en,fi,es', 'the banner is in English, Finnish and Spanish');
+    assert(run.language.translations.en.consentModal.description.includes('Microsoft Clarity and Google Analytics'), 'it names both services');
+    assert(run.language.translations.fi.consentModal.description.includes('Microsoft Clarity ja Google Analytics'), 'in Finnish too');
+    const clear = run.categories.analytics.autoClear;
+    assert(clear?.reloadPage === true && clear.cookies.map((c: any) => c.name).join(',') === '_clck,_clsk,_ga,_ga_ABC123XYZ9,_gid', `it removes the two services' cookies, got ${JSON.stringify(clear)}`);
+    assert(html.includes("{cookie_domain:'none'}"), 'Google\'s cookie stays on the page\'s own host');
     const r = await report(S.token);
     assert(r.tags.consent_banner === true && r.tags.warning === null, `no warning with the banner: ${JSON.stringify(r.tags)}`);
   } finally {
     const off = await setBanner(false);
     assert(off.status === 200, 'banner back off');
+  }
+});
+
+await test('18b. the banner switched on in Config reaches the service\'s own page at once, with the page\'s nonce', async () => {
+  const front = async () => {
+    const res = await fetch(`${BASE}/`, { headers: { Accept: 'text/html' } });
+    return { html: await res.text(), csp: res.headers.get('content-security-policy') ?? '' };
+  };
+  const before = await front();
+  assert(!before.html.includes('data-aimeat-cookie-banner'), 'no banner while the switch is off');
+  const on = await setBanner(true);
+  assert(on.status === 200, `banner on: ${on.status}`);
+  try {
+    // No restart between the switch and this request: the switch used to be read once at start.
+    const after = await front();
+    const m = /<script data-aimeat-cookie-banner nonce="([^"]+)">/.exec(after.html);
+    assert(m, 'the front page carries the banner\'s start script with a nonce');
+    // Without the page's own nonce the browser blocks the inline script and no banner shows.
+    assert(after.csp.includes(`'nonce-${m[1]}'`), `the nonce is the one this response's CSP allows: ${after.csp.slice(0, 160)}`);
+    const run = bannerConfig(after.html);
+    assert(run && Object.keys(run.categories).join(',') === 'necessary', `the operator's list, got ${run && Object.keys(run.categories)}`);
+    assert((after.html.match(/cookieconsent\.umd\.js/g) ?? []).length === 1, 'one banner, not two');
+  } finally {
+    const off = await setBanner(false);
+    assert(off.status === 200, 'banner back off');
+  }
+});
+
+await test('18c. the category list is a list: text is refused, and a list gives whole categories', async () => {
+  const setCategories = (value: unknown) => json('/v1/admin/config', {
+    method: 'PUT', headers: authed(OP.token), body: JSON.stringify({ changes: [{ path: 'cookies.consent_categories', value }] }),
+  });
+  // The row took the typed text until 2026-10-11, and the banner then showed one category per letter.
+  const text = await setCategories('necessary,analytics,marketing');
+  assert(text.status === 400, `a text value is refused, got ${text.status} ${JSON.stringify(text.body).slice(0, 200)}`);
+  const bad = await setCategories(['necessary', '<script>']);
+  assert(bad.status === 400, `a word that is not a category is refused, got ${bad.status}`);
+  const list = await setCategories(['necessary', 'marketing']);
+  assert(list.status === 200, `a list is taken: ${list.status} ${JSON.stringify(list.body).slice(0, 200)}`);
+  await setTags(S.token, { clarity_project_id: 'k7x2m9qp1a' });
+  await setBanner(true);
+  try {
+    const run = bannerConfig(await page(appPath));
+    assert(run && Object.keys(run.categories).join(',') === 'necessary,marketing,analytics', `whole categories, got ${run && Object.keys(run.categories)}`);
+    const titles = run.language.translations.en.preferencesModal.sections.map((s: any) => s.title).join('|');
+    assert(titles === 'What cookies are used for|Necessary|Marketing|Analytics', `the sections are the categories, got ${titles}`);
+  } finally {
+    await setBanner(false);
+    const reset = await setCategories(['necessary']);
+    assert(reset.status === 200, 'the list is back to necessary');
   }
 });
 

@@ -51,6 +51,8 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.3.1 — 2026-10-11 — The cookie banner's start script carries the node's attribute now; a copy
+ *     with either generation of it strips.
  *   v1.3.0 — 2026-10-09 — The "Use with your AI" mark (utils/app-ai-use-badge.ts), `ai-use`.
  *   v1.2.0 — 2026-10-08 — The owner's analytics tags with their cookie banner (AI visibility layer B)
  *     and the on-page behaviour script (layer D) are marks too: a served copy republished by another
@@ -123,8 +125,13 @@ const FRAME_SUPPORT_OPEN = `<script ${FRAME_SUPPORT_MARK}>`;
  * test/unit/app-serve-marks-strip.test.ts goes red if the snippet's opening tag changes.
  */
 const OWNER_TAGS_OPEN = '<script data-aimeat-tags>';
-/** The cookie banner the tags bring when the node shows one: a stylesheet, the library and its start. */
-const OWNER_TAGS_BANNER = /<link rel="stylesheet" href="[^"<>]*\/cookieconsent\.css"><script src="[^"<>]*\/cookieconsent\.umd\.js"><\/script><script>\(function\(\)\{function r\(\)\{CookieConsent\.run\(/y;
+/**
+ * The cookie banner the tags bring when the node shows one: a stylesheet, the library and its start
+ * script. The start script carries the node's attribute since 2026-10-11 (middleware/cookie-consent.ts
+ * COOKIE_BANNER_MARK, spelled here for the same reason as the tag above); copies served from
+ * 2026-10-08 to 2026-10-10 have the bare one, and both strip.
+ */
+const OWNER_TAGS_BANNER = /<link rel="stylesheet" href="[^"<>]*\/cookieconsent\.css"><script src="[^"<>]*\/cookieconsent\.umd\.js"><\/script>(?:<script data-aimeat-cookie-banner>|<script>\(function\(\)\{function r\(\)\{CookieConsent\.run\()/y;
 const BEHAVIOUR_OPEN = `<script ${BEHAVIOUR_MARK}>`;
 
 /** The order removals are reported in, so one upload always reads the same way. */

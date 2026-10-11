@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Indexing, personal-node, site, consent, push, email, TOTP, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.1 — 2026-10-11 — The cookie categories are read through consentCategories(): the value could
+ *     be text typed in Config, which has no join().
  *   v1.3.0 — 2026-08-01 — AI Transparency section gains AIMEAT_AI_LABEL_PUBLIC and
  *     AIMEAT_AI_SUPERVISORY_NAME/_URL (TARGET-058 Phase 3)
  *   v1.2.0 — 2026-08-01 — AI Transparency section: AIMEAT_AI_PROVENANCE + _DETAIL (TARGET-058)
@@ -14,6 +16,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { ConfigSection } from './shared.js';
 import { mask } from './shared.js';
+import { consentCategories } from '../../middleware/cookie-consent.js';
 
 export function featureSections(config: AimeatConfig): ConfigSection[] {
   return [
@@ -127,7 +130,7 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
         {
           envVar: 'AIMEAT_COOKIE_CONSENT_CATEGORIES',
           description: 'Consent categories (comma-separated)',
-          value: config.cookieConsentCategories.join(','),
+          value: consentCategories(config).join(','),
           defaultVal: 'necessary',
         },
         {

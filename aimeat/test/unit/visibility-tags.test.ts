@@ -4,6 +4,8 @@
  *   what the snippet loads with the cookie banner off and on, the ids it accepts, where it lands in a
  *   document, and the warning an owner gets without a banner.
  * @version-history
+ *   v1.1.0 — 2026-10-11 — The banner a page with tags gets names the service and clears its cookies
+ *     on a taken-back consent; Google's cookie stays on the page's own host.
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer B).
  */
 import { describe, it, expect } from 'vitest';
@@ -35,6 +37,8 @@ describe('ownerTagsSnippet', () => {
     expect(s).toContain('navigator.globalPrivacyControl===true)return');
     expect(s).toContain("'https://www.clarity.ms/tag/'");
     expect(s).not.toContain('CookieConsent.run');
+    // Google's cookie stays on the page's own host, not on the domain every owner's app shares.
+    expect(s).toContain("w.gtag('config',G,{cookie_domain:'none'})");
   });
 
   it('with the banner, waits for the analytics category and carries the banner with that category', () => {
@@ -43,7 +47,10 @@ describe('ownerTagsSnippet', () => {
     expect(s).toContain("acceptedCategory('analytics')");
     expect(s).toContain("clarity('consentv2'");
     expect(s).toContain('https://place.example/cookieconsent.umd.js');
-    expect(s).toMatch(/CookieConsent\.run\(.*"analytics"/s);
+    // The banner's run config offers the analytics category, names the service, and clears its cookies on a taken-back consent.
+    expect(s).toMatch(/<script data-aimeat-cookie-banner>\(function\(\)\{var c=\{"categories":\{"necessary":\{[^}]*\},"analytics":/);
+    expect(s).toContain('With your permission it also uses analytics: Microsoft Clarity.');
+    expect(s).toContain('"autoClear":{"cookies":[{"name":"_clck"},{"name":"_clsk"}],"reloadPage":true}');
     // No script element from Clarity in the markup: it is created only after acceptance.
     expect(s).not.toMatch(/<script[^>]+clarity\.ms/);
   });

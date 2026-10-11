@@ -587,7 +587,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Cookie Consent (mutable) ──
   { key: 'cookieConsentEnabled', dotPath: 'cookies.consent_enabled', envVar: 'AIMEAT_COOKIE_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable cookie consent banner' },
-  { key: 'cookieConsentCategories', dotPath: 'cookies.consent_categories', envVar: 'AIMEAT_COOKIE_CONSENT_CATEGORIES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Cookie consent categories (comma-separated)' },
+  { key: 'cookieConsentCategories', dotPath: 'cookies.consent_categories', envVar: 'AIMEAT_COOKIE_CONSENT_CATEGORIES', type: 'object', validate: v => Array.isArray(v) && v.length > 0 && v.every(c => typeof c === 'string' && /^[a-z][a-z0-9_-]{0,30}$/.test(c)), immutable: false, description: 'The categories the cookie banner asks about, one word each (necessary, analytics, marketing). A list: until 2026-10-11 this row took the typed text, and the banner then showed one category per letter. A page with its owner\'s analytics always asks about analytics' },
   { key: 'cookieConsentPolicyUrl', dotPath: 'cookies.consent_policy_url', envVar: 'AIMEAT_COOKIE_CONSENT_POLICY_URL', type: 'string', validate: () => true, immutable: false, description: 'Cookie consent privacy policy URL' },
 
   // ── CORS (mutable) ──
