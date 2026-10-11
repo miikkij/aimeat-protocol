@@ -12,6 +12,7 @@
  *   WHAT IS NEW IS A DIFF. The stub's change log carries one entry this node already has (the newest
  *   of its own public/changelog.json) and one it does not; only the second may come back.
  * @version-history
+ *   v1.1.0 — 2026-10-11 — GET /v1/build and GET /v1/health say which commit runs.
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=node-update
@@ -125,6 +126,21 @@ await test('A newer version: the version, the date, only what is new, and the pr
     assert(d.setting === 'node.update_check', `setting: ${d.setting}`);
     assert(typeof d.prompt === 'string' && d.prompt.includes(`from version ${current} to ${newer}`), 'the prompt names both versions');
     assert(d.prompt.includes('/v1/build') && d.prompt.includes('aimeat_admin_node_update'), 'the prompt says how to check the result, with and without MCP');
+});
+
+await test('GET /v1/build and GET /v1/health say which code runs: the commit, and when the process started', async () => {
+    // "Is the fix deployed" is read from here. Until 2026-10-11 /v1/build gave the restart time
+    // only, and a live proof failed twice on inferring the commit from it.
+    const b = await json('/v1/build');
+    assert(b.status === 200 && typeof b.body.build === 'string' && b.body.version === current, `build ${b.status}: ${short(b.body)}`);
+    assert(new Date(parseInt(b.body.build, 36)).toISOString() === b.body.started_at, `started_at ${b.body.started_at} is the build id as a time`);
+    assert(Date.now() - Date.parse(b.body.started_at) < 60 * 60_000, `started within the hour: ${b.body.started_at}`);
+    // This server runs from source in a checkout, so the commit is the checkout's HEAD.
+    assert(/^[0-9a-f]{40}$/.test(b.body.commit ?? ''), `commit: ${b.body.commit}`);
+    assert(b.body.commit_source === 'git' && b.body.state === 'source' && b.body.dirty === null, `source ${b.body.commit_source}, state ${b.body.state}, dirty ${b.body.dirty}`);
+    const h = await json('/v1/health');
+    const hb = h.body?.data?.build;
+    assert(h.status === 200 && hb?.commit === b.body.commit && hb?.version === current && hb?.state === 'source', `health build: ${short(hb)}`);
 });
 
 await test('The same version on npm: no update and no prompt', async () => {

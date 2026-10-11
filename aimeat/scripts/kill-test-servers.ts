@@ -12,12 +12,17 @@
  * @usage Prepended to the `test:e2e:*` package scripts (mirrors how `pnpm dev` prepends kill-port.ts).
  *   Override the port with AIMEAT_TEST_PORT. Best-effort: every failure is swallowed.
  * @version-history
+ *   v1.1.0 — 2026-10-11 — Also clears the session's own lane ports, which are now computed from
+ *     its base port and so belong to it alone (lib/e2e-ports.ts). Stops, and stops nothing, when
+ *     the base port is held by a run in progress: two worktree names can hash to one port, and
+ *     this script used to end the other worktree's run by stopping its server.
  *   v1.0.0 — 2026-07-16 — Initial: stop leftover E2E servers + stale test DB between runs.
  */
 import { execSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { platform } from 'node:os';
 import { resolve } from 'node:path';
+import { basePortHolder, sessionLanePorts } from './lib/e2e-ports.js';
 
 // THE PORT THIS SESSION'S SERVER ACTUALLY BINDS, not the one the default assumes.
 //
@@ -65,6 +70,15 @@ function killOnPort(p: string): void {
   }
 }
 
+/** Every TCP port something on this machine listens on, or null when the listing cannot be had. */
+function listeningPorts(): Set<number> | null {
+  try {
+    const cmd = platform() === 'win32' ? 'netstat -ano -p TCP | findstr LISTENING' : 'lsof -nP -iTCP -sTCP:LISTEN';
+    const out = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 });
+    return new Set([...out.matchAll(/[:.](\d{4,5})\b/g)].map(m => Number(m[1])));
+  } catch { return null; } // no netstat or lsof, or nothing listens: the caller asks port by port
+}
+
 /**
  * Remove the SQLite test DB + its WAL/SHM sidecars. A run killed mid-flight can leave the -wal/-shm
  * files WITHOUT the main .db, which makes the next better-sqlite3 open hang → "server failed to start".
@@ -83,5 +97,29 @@ function cleanStaleSqlite(): void {
   }
 }
 
+// A port with a live holder is a run in progress, of another worktree whose name hashed to the same
+// port or of this one. Stopping its server would end that run in the middle of a suite, so this
+// script stops here and the runner after it never starts (lib/e2e-ports.ts holdBasePort).
+const running = Number.isInteger(Number(port)) ? basePortHolder(Number(port)) : null;
+if (running) {
+  console.error(`\n  STOP: port ${port} is the base port of a test run in progress: ${running.session}`
+    + `${running.worktree ? ` in ${running.worktree}` : ''} (pid ${running.pid}, since ${running.at}).`
+    + `\n  Nothing was stopped. Wait for that run, or give this worktree a port of its own:`
+    + `\n    AIMEAT_E2E_PORT=<port> pnpm test:env:init   (40251 to 40499, one no claim on the board names)\n`);
+  process.exit(1);
+}
+
 killOnPort(port);
+// The session's own lane ports as well. They are computed from the base port (lib/e2e-ports.ts),
+// so they belong to this session and to nobody else, and a lane server that outlived a killed run
+// is exactly what the next run would otherwise stop on. Until 2026-10-11 lanes shared one range
+// with every session on the machine, which is why this script could not touch them.
+const base = Number(port);
+if (Number.isInteger(base) && base > 0 && base < 65536) {
+  // One listing for all fifteen, so a clean machine pays for one command and not fifteen.
+  const busy = listeningPorts();
+  for (const lane of sessionLanePorts(base)) {
+    if (busy === null || busy.has(lane)) killOnPort(String(lane));
+  }
+}
 cleanStaleSqlite();

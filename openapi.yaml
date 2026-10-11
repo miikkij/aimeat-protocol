@@ -4635,6 +4635,34 @@ components:
           description: Who pays when the node is used, as a call planned now would find it.
         why: { type: string, description: One sentence on which case applied. }
 
+    RunningBuild:
+      type: object
+      description: Which code a node process runs, as GET /v1/build and GET /v1/health report it.
+      properties:
+        commit:
+          type: string
+          nullable: true
+          description: The full commit id. Null on an install that has neither a build stamp with a commit nor a git checkout (a package from the registry built outside git, or a container image whose build had no `.git`).
+        commit_source:
+          type: string
+          nullable: true
+          enum: [stamp, git, null]
+          description: >
+            `stamp`: the commit the running `dist/` was built from. `git`: the commit the checkout is
+            on, for a node that runs from source.
+        dirty:
+          type: boolean
+          nullable: true
+          description: Whether the tree had uncommitted changes when it was built. Null when the node runs from source, where only git itself could say.
+        built_at: { type: string, format: date-time, nullable: true, description: When the running `dist/` was built. Null from source. }
+        state:
+          type: string
+          enum: [fresh, stale, source, unknown]
+          description: >
+            `fresh`: built from the source on disk. `stale`: the source on disk is newer than the
+            build, so the process runs older code than the checkout holds. `source`: running from
+            source, nothing to compare. `unknown`: a built install with no source beside it.
+
     AgentStoppedState:
       type: object
       description: Whether an agent is stopped, as POST /v1/agents/{name}/stop and .../start answer.
@@ -28648,7 +28676,10 @@ paths:
     get:
       operationId: getHealth
       summary: Health check
-      description: Liveness/readiness endpoint. No auth required.
+      description: >
+        Liveness/readiness endpoint. No auth required. `data.build` says which code answers: the
+        software `version` and the RunningBuild fields (`commit`, `commit_source`, `dirty`,
+        `built_at`, `state`), the same as GET /v1/build.
       tags: [Bootstrap]
       responses:
         '200':
@@ -66486,16 +66517,28 @@ paths:
         Return the running build identifier and software version. Used by the SPA auto-reload
         watchdog to detect deploys. Response is a bare JSON object (not the AIMEAT envelope) and
         is served with `Cache-Control: no-store`.
+
+        It also answers "which code runs here": `commit` and `state`. A node started from a built
+        `dist/` reports the commit that build was made from (`commit_source: stamp`). A node started
+        from source reports the commit its checkout is on (`commit_source: git`). `state: stale`
+        means the source on disk is newer than the build that runs, which is what a `git pull`
+        without a rebuild looks like. To ask whether a fix is deployed, compare `commit` with the
+        fix's commit (`git merge-base --is-ancestor <fix> <commit>`).
       responses:
         '200':
           description: Build metadata
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  build: { type: string }
-                  version: { type: string }
+                allOf:
+                  - $ref: '#/components/schemas/RunningBuild'
+                  - type: object
+                    properties:
+                      build:
+                        type: string
+                        description: The process start time in base 36. It changes on every start.
+                      version: { type: string }
+                      started_at: { type: string, format: date-time, description: When this process started. The same instant as `build`. }
   /v1/data-wallet:
     get:
       operationId: getDataWallet

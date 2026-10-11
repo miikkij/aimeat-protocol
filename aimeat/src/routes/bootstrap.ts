@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.6.0 — 2026-10-11 — GET /v1/health carries `build`: the commit the node runs and whether the
+ *     build is behind its source.
  *   v1.5.0 — 2026-10-03 — GET /v1/help/prompt/person: the help prompt a person pastes into a consumer
  *     AI (docs/AIMEAT_Help_Prompt_Person.md). /v1/help/prompt stays the builder's manual.
  *   v1.4.3 — 2026-10-02 — The surfaces list names `chat`, the node chat's small starting set.
@@ -89,6 +91,8 @@ import { livePageMarkdown } from '../services/page-body-live.js';
 import { SurfaceLayoutService } from '../services/surface-layout/service.js';
 import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';
+import { runningBuild } from '../utils/build-stamp.js';
+import { getSoftwareVersion } from '../utils/version.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -737,6 +741,14 @@ export function bootstrapRouter(
     if (degraded) {
       healthData.status = 'degraded';
     }
+
+    // Which code answers, so "is the fix deployed" is read here and not inferred from the uptime
+    // (utils/build-stamp.ts runningBuild; GET /v1/build carries the same with the build id).
+    const running = runningBuild();
+    healthData.build = {
+      version: getSoftwareVersion(), commit: running.commit, commit_source: running.commit_source,
+      dirty: running.dirty, built_at: running.built_at, state: running.state,
+    };
 
     res.json(success(config.nodeId, healthData));
   });

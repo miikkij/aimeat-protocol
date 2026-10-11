@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-11 — GET /v1/build also says which commit runs, when the process started and whether
+ *     the build is behind its source (utils/build-stamp.ts runningBuild).
  *   2026-10-11 — The page for a policy that cannot be shown yet moved to portal-policy-not-set.ts
  *     and sends the operator to the Config page (it said to set environment variables and restart).
  *   2026-10-11 — The privacy page's {{ownerAnalyticsNotice}}: the paragraph about account holders'
@@ -88,6 +90,7 @@ import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { runningBuild } from '../utils/build-stamp.js';
 import { injectAgentFooter } from '../utils/agent-footer.js';
 import { findPublicPage } from '../data/public-pages.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
@@ -340,9 +343,18 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // with new code (BUILD_ID changes on every process start) — so you never serve stale ES modules
   // and never need a manual hard refresh. Public, uncached, tiny. See the auto-reload script
   // injected by serveSpa().
+  //
+  // It also says WHICH CODE runs: the commit, and whether the build is behind the source on disk
+  // (utils/build-stamp.ts runningBuild). Until 2026-10-11 it gave only the restart time, and "is
+  // the fix deployed yet" was inferred from that time against the commit's; a live proof failed
+  // twice on that inference.
   router.get('/v1/build', (_req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ build: BUILD_ID, version: getSoftwareVersion() });
+    res.json({
+      build: BUILD_ID, version: getSoftwareVersion(),
+      started_at: new Date(parseInt(BUILD_ID, 36)).toISOString(),
+      ...runningBuild(),
+    });
   });
 
   // Cookie consent standalone JS snippet — for manual integration by service builders
