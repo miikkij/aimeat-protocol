@@ -13,6 +13,7 @@
  * @structure renderOffer · SellingEditor · askWord
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
+ *   v2.2.1 — 2026-10-11 — The strip's selling figure carries the money price with its currency (or Free), and the line under it is the pacing amount alone; the visibility and the currency in that line cut it with an ellipsis at every width.
  *   v2.2.0 — 2026-10-11 — The selling editor asks for the offer's two values: the money price (empty = free) and the pacing amount (tollMorsels, empty = the node's default, question mark commerce.pacing_toll); the morsel price field is gone and the strip says Free and the pacing (ruling "morseli on tahdistus, ei hinta").
  *   v2.1.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
  *   v2.0.0 —2026-09-26 — Every part is a component call that gets data (page group G6): the frame
@@ -161,7 +162,10 @@ export function renderOffer(ctx, it) {
       : { key: 'latest', n: '·', label: c('stripLatest'), sub: t('profile.offers.noRunsYet') },
     { key: 'runs', n: runs.length, label: c('stripRuns'), sub: runs.length ? c('stripRatedOf', { n: runs.filter(d => d.rating).length }) : '' },
     { key: 'mode', n: aw.mode, tone: 'coral', label: c('stripMode'), sub: aw.sub },
-    { key: 'sell', n: forSale ? (o.priceMoney ? fmtMoney(o.priceMoney.amount) : t('pacing.free')) : '·', label: c('sell'), sub: forSale ? [t('profile.offers.visibility.' + o.visibility), o.priceMoney ? o.priceMoney.currency : '', pacingOf(o) > 0 ? t('pacing.amount', { n: pacingOf(o) }) : ''].filter(Boolean).join(' · ') : c('sellPrivate') },
+    // The figure is the money price (its currency the small part after it) or Free; the line under it
+    // is the pacing amount alone, so it fits the strip's narrow column (146 px at 390). With no pacing
+    // amount the line says who sees the offer.
+    { key: 'sell', n: forSale ? (o.priceMoney ? fmtMoney(o.priceMoney.amount) : t('pacing.free')) : '·', of: forSale && o.priceMoney ? ` ${o.priceMoney.currency}` : undefined, label: c('sell'), sub: forSale ? (pacingOf(o) > 0 ? t('pacing.amount', { n: pacingOf(o) }) : t('profile.offers.visibility.' + o.visibility)) : c('sellPrivate') },
   ]} />`;
   const rail = [
     sameNeed.length ? { label: c('railSameNeed', { g: needLabel(it.need) }), items: sameNeed.map(x => ({ key: x.key, mark: '→', label: x.offer.title, count: x.agent, onClick: openOther(x) })) } : null,

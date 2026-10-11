@@ -12,6 +12,7 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v2.1.1 -- 2026-10-11 -- The selling register's price-and-pacing cell wraps instead of ending in an ellipsis, and on a phone the rows stack with each cell's column name before it (List labels instead of keepCols), so the pacing amount shows at every width. Its column head is colPricePacing ("Price and pacing"); colPrice stays the selling editor's money field label.
  *   v2.1.0 -- 2026-10-11 -- The selling register's price column says the money price (or Free) and the pacing amount (tollMorsels, 3.x price.morsels as fallback); a morsel amount is no longer a price.
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip; the production
@@ -247,12 +248,12 @@ function sellPage(ctx) {
     marks: [{ label: c('chipSelling', { n: m.selling.length }) }, { label: c('chipOffers', { n: m.items.length }), tone: 'dim' }],
     desc: c('sellDesc'),
     children: html`
-      <${List} cols="name-state-price-doors" keepCols head=${[c('colOffer'), c('colVisibility'), c('colPrice'), '']}
+      <${List} cols="name-state-price-doors" labels head=${[c('colOffer'), c('colVisibility'), c('colPricePacing'), '']}
         rows=${list} render=${it => html`
           <${Row} key=${it.key}>
             <${Name} clip onOpen=${() => openOffer(ctx, it)} meta=${agentMark(it)}>${it.offer.title}<//>
             <${Desc} clip>${t('profile.offers.visibility.' + (it.offer.visibility || 'private'))}<//>
-            <${Desc} clip>${price(it.offer)}<//>
+            <${Desc}>${price(it.offer)}<//>
             <${Doors}><${Action} small row onClick=${() => ctx.pickView({ kind: 'offer', key: it.key, sell: true })}>${c('setPrice')}<//><//>
           <//>`} />`,
   });

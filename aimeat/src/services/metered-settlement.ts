@@ -25,6 +25,8 @@
  *   contract from opposite ends: the door calls one of them, never both.
  * @structure settleMeteredCharge · resolvePacingToll · chargePacing · SettlementResult · BeneficiaryAccrual
  * @version-history
+ *   v1.2.2 — 2026-10-11 — The provider's `pacing_earn` row names no initiator: the caller is another
+ *     owner's principal, and the provider's wallet showed it as "your agent …".
  *   v1.2.1 — 2026-10-11 — A pacing charge's tracking code says "granted" only when somebody other than
  *     the caller's owner pays; an ordinary checkout passed its own buyer as the payer and read "granted".
  *   v1.2.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
@@ -149,7 +151,9 @@ export async function chargePacing(args: {
       await storage.addTransaction({ id: `pacing-burn-${randomUUID()}`, gaii: payerGhii, type: 'pacing_burn', amount: -burned, trackingCode, initiatorGaii: caller, timestamp: ts });
     }
     if (providerEarned > 0) {
-      await storage.addTransaction({ id: `pacing-earn-${randomUUID()}`, gaii: providerGhii!, type: 'pacing_earn', amount: providerEarned, counterpartyGaii: payerGhii, trackingCode, initiatorGaii: caller, timestamp: ts });
+      // No initiator on the provider's row: the caller belongs to another owner, and a ledger reads the
+      // initiator as one of the row owner's own principals ("your agent …"). The counterparty names the payer.
+      await storage.addTransaction({ id: `pacing-earn-${randomUUID()}`, gaii: providerGhii!, type: 'pacing_earn', amount: providerEarned, counterpartyGaii: payerGhii, trackingCode, timestamp: ts });
     }
     if (fee > 0) {
       await storage.addTransaction({ id: `pacing-fee-${randomUUID()}`, gaii: operatorGhii!, type: 'marketplace_fee', amount: fee, counterpartyGaii: payerGhii, trackingCode, timestamp: ts });

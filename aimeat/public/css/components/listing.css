@@ -12,6 +12,7 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.30.0 — 2026-10-11 — The cut name-state-price-doors (the Offers selling register) keeps its price-and-pacing column under 1100px and drops only who sees it; on a phone its rows stack with their column names (List labels), so it no longer shows its heading row there.
  *   v1.29.0 — 2026-09-29 — The cut name-desc-count-when-doors (the Data Wallet's trail and its
  *     classification log): the words under a count break at a space, so they no longer push the
  *     count over the time beside it; folded under 860px, the count stands beside the name (dense
@@ -387,8 +388,10 @@
 }
 /* Offers: the deliveries (when, what came back, the agent, how it went, a door), the catalogue (the
    offer, what you get, cost and time, trust, a door), the selling register (the offer, who sees it,
-   the price, a door). At 1100px the middle columns went; each keeps its heading row on a phone. What
-   the AI found: a hit's name with its words under it, and a door, at every width. */
+   the price and pacing, a door). At 1100px the middle columns went, except the register's price and
+   pacing; the deliveries and the catalogue keep their heading row on a phone, and the register's rows
+   stack there with each cell's column name before it (List labels). What the AI found: a hit's name
+   with its words under it, and a door, at every width. */
 .listing--when-name-who-state-doors { grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 10rem) minmax(0, 7rem) 3.5rem; }
 .listing--name-get-cost-trust-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 11rem) minmax(0, 9rem) minmax(0, 8rem) 3.5rem; }
 .listing--name-state-price-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 11rem) minmax(0, 11rem) 6rem; }
@@ -396,11 +399,11 @@
 @media (max-width: 1100px) {
   .listing--when-name-who-state-doors { grid-template-columns: 5rem minmax(0, 1fr) 3.5rem; }
   .listing--name-get-cost-trust-doors { grid-template-columns: minmax(0, 1fr) 3.5rem; }
-  .listing--name-state-price-doors { grid-template-columns: minmax(0, 1fr) 5rem; }
-  .listing--when-name-who-state-doors > .listing-row > :is(:nth-child(3), :nth-child(4)), .listing--name-get-cost-trust-doors > .listing-row > :is(:nth-child(2), :nth-child(3), :nth-child(4)), .listing--name-state-price-doors > .listing-row > :is(:nth-child(2), :nth-child(3)) { display: none; }
+  .listing--name-state-price-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 10rem) 5rem; }
+  .listing--when-name-who-state-doors > .listing-row > :is(:nth-child(3), :nth-child(4)), .listing--name-get-cost-trust-doors > .listing-row > :is(:nth-child(2), :nth-child(3), :nth-child(4)), .listing--name-state-price-doors > .listing-row > :nth-child(2) { display: none; }
 }
 @media (max-width: 860px) {
-  :is(.listing--when-name-who-state-doors, .listing--name-get-cost-trust-doors, .listing--name-state-price-doors) > .listing-row--head > div { display: grid; }
+  :is(.listing--when-name-who-state-doors, .listing--name-get-cost-trust-doors) > .listing-row--head > div { display: grid; }
 }
 /* Scheduler: what fires next and the rarer ones (when, the schedule, who runs it, how soon), what is
    coming (when, the zone), the register (the schedule, when, who, the last run, the runs, a door),

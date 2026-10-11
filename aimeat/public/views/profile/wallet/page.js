@@ -13,6 +13,7 @@
  *   secRoads
  * @usage import { renderPage } from './wallet/page.js';
  * @version-history
+ *   v1.23.1 — 2026-10-11 — A checkout at money total 0 (a free item that only took pacing) is not listed as a €0.00 purchase or sale.
  *   v1.23.0 — 2026-10-11 — The mast names the pacing pack when the operator sells one ("pacing capacity: 500 morsels for 5,00 €", GET /v1/wallet pacing_pack); a 3.x session in currency 'morsel' is never counted as money.
  *   v1.22.0 — 2026-10-03 — The page's start (components/PageStart.js: the first prompt asks the person's AI about their morsels, its button opens the history) and the title's question mark, concept.morsel (guidance part B).
  *   v1.21.0 — 2026-09-26 — On the component kit (page group G7): the frame, crumb, head, rail and
@@ -76,7 +77,9 @@ import { x, money, morsels, signed, dateWord, sourcesOf, crumb, pageLinks, openT
 import { txRow, railRow, shareRow, moneyRow } from './rows.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
-const isMoney = (item) => item.currency && !/^morsels?$/i.test(String(item.currency));
+// A money trade has a money currency and a money total above 0. A use of a free item is a session at
+// total 0 that only took pacing; it shows in the pacing rows, never as a €0.00 purchase or sale.
+const isMoney = (item) => item.currency && !/^morsels?$/i.test(String(item.currency)) && Number(item.total) > 0;
 
 export function renderPage(ctx) {
   if (ctx.federated) return federated(ctx);
