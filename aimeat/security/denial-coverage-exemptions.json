@@ -2,8 +2,8 @@
   "note": "Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on 2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
   "exempt": {
     "test/e2e-record-spec-pointers.ts": {
-      "reason": "REVIEWED 2026-10-11 — the suite has no principal. It opens the record contracts a `spec` field names (GET /v1/specs/{name}, the /docs/specs/ redirect, /v1/spec, /v1/tracked-responses/spec) with no credentials, because a node or an AI reading someone's record must be able to open what it follows. The documents are the same for every caller by design, so there is no second principal whose answer could differ. The fence it does assert is that a name outside the three public contracts answers 404.",
-      "sha": "73852f10e8b607cf"
+      "reason": "REVIEWED 2026-10-11 — the suite has no principal. It opens the record contracts a `spec` field names (GET /v1/specs/{name}, the /docs/specs/ redirect, /v1/spec, /v1/tracked-responses/spec) with no credentials, because a node or an AI reading someone's record must be able to open what it follows. The documents are the same for every caller by design, so there is no second principal whose answer could differ. The fence it does assert is that a name outside the public contracts (PUBLIC_CONTRACTS in services/contract-docs.ts, five since 2026-10-11) answers 404, and that a path climbing out of docs/specs does too.",
+      "sha": "c88af40ebf88abe0"
     },
     "test/e2e-seo-noindex.ts": {
       "reason": "REVIEWED 2026-09-30 — the suite has no principal. It reads the node the way an anonymous crawler does (HEAD and GET with the bingbot user agent, no credentials) and asserts the X-Robots-Tag and the robots meta each response carries. The header is the same for every caller by design, so there is no second principal whose answer could differ, and no refusal to assert.",
