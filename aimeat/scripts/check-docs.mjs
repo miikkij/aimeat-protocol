@@ -33,16 +33,10 @@ const pendingSeen = new Set();
 /**
  * Dead backtick references in files another live session owns, fixed in that session's change.
  * Each entry says whose; an entry whose reference is gone is reported, so the list only shrinks.
+ * Shape: { '<doc path>': { '<path as written>': '<whose, and why it waits>' } }. Empty since phase 2
+ * of the docs audit fixed its three references (2026-10-12).
  */
-const PENDING_ELSEWHERE = {
-  'docs/guides/building-extension-cortex-app-stack.md': {
-    'docs/app-developer-libraries-research.md': 'docs audit phase 2 (cc-joumii-docs-v2) rewrites this guide; the file was deleted before 2026-10-11',
-    'docs/plans/2026-05-29-comicland-ai-session-audit.md': 'docs audit phase 2 (cc-joumii-docs-v2) rewrites this guide; docs/plans/ was removed (ruling D6)',
-  },
-  'docs/extensions/matching-behaviors/README.md': {
-    'src/services/matching.ts': 'docs audit phase 2 (cc-joumii-docs-v2) holds docs/extensions/; the built-in matching service was removed',
-  },
-};
+const PENDING_ELSEWHERE = {};
 let tracked = null;
 /** Every file git tracks, read once: a backtick path must name one, or a directory above one. */
 function trackedFiles() {
