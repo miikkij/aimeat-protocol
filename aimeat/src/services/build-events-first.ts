@@ -24,12 +24,18 @@
  *   src/auth/sse-domain-scopes.ts (DOMAIN_SCOPE); the mosaic's `domains` field and its interval
  *   floor from src/static/sdk-libs/atelier/mosaic-bind.js (wireLive); subscribe, minIntervalMs and
  *   keyPrefix from src/static/sdk-libs/live/index.js; watch from src/static/sdk-libs/agents/index.js;
- *   the ticket that opens the stream needs a signed-in session (routes/sse.ts). One sentence was
- *   left out on that reading: the live library's registry text says a delete emits no change event,
- *   and DELETE /v1/memory/:key emits `memory` (routes/memory/key.ts).
+ *   the ticket that opens the stream needs a signed-in session (routes/sse.ts). The sentence on
+ *   deletes was read from the 148 DELETE routes: 79 emit in the handler, and of the 25 services
+ *   read behind the others 18 emit. In the eleven domains named here a record's delete emits
+ *   (memory-bin.ts, storage-file-write.ts, agent-tasks/lifecycle.ts, schedule-write.ts,
+ *   workflows.ts, board-write.ts, direct-message-delete.ts, workspace-rows/row-service.ts,
+ *   packages.ts, knowledge/); the live library's registry text names five of the seven read that do not.
  * @structure EVENTS_FIRST_DOMAINS · atelierEventsFirst() · classicLiveUpdatesSection()
  * @usage import { atelierEventsFirst, classicLiveUpdatesSection } from './build-events-first.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — Both specifications say a delete emits its domain as a write does. The
+ *     first version left the subject out, because the registry text denied it and the routes had
+ *     not all been read.
  *   v1.0.0 — 2026-10-11 — Initial creation: the rule, the domain list, and the Classic section
  *     "Live updates without a firehose" moved from build-app-prompt.ts.
  */
@@ -52,7 +58,8 @@ const TIMER_CASES =
 const EVENT_SHAPE =
   'An event names the domain and never the record, so every change in that domain on the account '
   + 'wakes the page: read while your app has something under way, and re-read the one source that '
-  + 'moved. ';
+  + 'moved. A delete emits its domain as a write does; the aimeat-live description names the few '
+  + 'that emit nothing. ';
 
 /**
  * The paragraph that follows LIVE BY DECLARATION in the Atelier specification's mosaic section.
