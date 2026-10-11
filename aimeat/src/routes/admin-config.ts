@@ -19,7 +19,9 @@
  *
  * @version-history
  *   v1.9.0 -- 2026-10-11 -- GET serves `rangeKind` on a number field with a range: `limit` when a
- *     larger value is refused, `recommended` when it is accepted (rangeKindOf).
+ *     larger value is refused, `recommended` when it is accepted (rangeKindOf). GET serves
+ *     `restartPending` on a field whose database override was removed since start: its value is
+ *     still the removed one until a restart.
  *   v1.8.0 -- 2026-10-09 -- POST /v1/admin/consul/export leaves the secret rows out unless the body
  *     says include_secrets: true, and answers secrets_skipped (services/consul-export.ts, shared with
  *     the CLI); the Consul import stores a secret row encrypted (secrets audit 2026-10-09, S3, S4b).
@@ -82,7 +84,7 @@ export function adminConfigRouter(
         type SchemaEntry = {
             value: unknown; type: string; description: string; range?: string; rangeKind?: 'limit' | 'recommended'; choices?: readonly string[];
             mutable: boolean; editable: boolean; path: string;
-            source?: string; canReset?: boolean; sealed?: boolean;
+            source?: string; canReset?: boolean; sealed?: boolean; restartPending?: boolean;
         };
         const schema: Record<string, SchemaEntry> = {};
 
@@ -132,6 +134,9 @@ export function adminConfigRouter(
                 source: src,
                 canReset: src === 'database',
                 ...(sealed ? { sealed: true } : {}),
+                // The override was removed since start: `value` is still the removed one, and
+                // `source` is where the value comes from after the next restart.
+                ...(provenance?.awaitsRestart(field.dotPath) ? { restartPending: true } : {}),
             };
         }
 

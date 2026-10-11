@@ -27,9 +27,16 @@
  *   - DOMAINS / domainOf — the grouping behind the index
  *   - choiceLabel / shownIn — a fixed value in words
  *   - rangeWords — a number's range as "recommended …" or "allowed …"
+ *   - rangeMin / refusalWords — why the node did not save a value, in the page's language
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
  *   - ConfigTab (default)
  * @version-history
+ *   v3.5.0 -- 2026-10-11 -- A refused save says which setting and why, where the operator is: on the
+ *     setting's own line (the field marked, the reason under the description) and in the pinned row.
+ *     It said "No valid changes applied" in a box at the top of the page, out of sight, and a save
+ *     where the node took some settings and refused others said "Changes saved" for all of them.
+ *     Reset says that the node runs with the removed value until it restarts, in its message and on
+ *     the setting's line (the API's `restartPending`) (Jouni, 2026-10-11).
  *   v3.4.0 -- 2026-10-11 -- The range beside a number says what the node does with a larger value:
  *     "recommended 1-10000" when it accepts one, "allowed 1-100" when it refuses one (the API's
  *     `rangeKind`). It showed the bare range for both (Jouni, 2026-10-11).
@@ -199,8 +206,32 @@ function rangeWords(e) {
   return e.range;
 }
 
+/** The minimum a "min-max" range states (the node reads the same text: numericRangeOf), or null. */
+function rangeMin(e) {
+  const m = /^\s*(-?\d+(?:\.\d+)?)\s*-\s*-?\d+(?:\.\d+)?\s*$/.exec((e && e.range) || '');
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Why the node did not save a value, in the page's language. A number names the bound it can have
+ * missed: the minimum of a recommended range (it has no maximum), the whole range of a limit. The
+ * node's own reason follows when it says more than "invalid value" (the database refused the write).
+ */
+function refusalWords(p, e, value, reason) {
+  const v = typeof value === 'number' && Number.isNaN(value) ? shown('') : shownIn(p, e, value);
+  const min = rangeMin(e);
+  if (min !== null && e.rangeKind === 'recommended') {
+    return tr('dashboard.cfgRefusedMin', 'Not saved: {value} is not accepted. The minimum is {min}.').replace('{value}', v).replace('{min}', min);
+  }
+  if (min !== null && e.rangeKind === 'limit') {
+    return tr('dashboard.cfgRefusedRange', 'Not saved: {value} is not accepted. The allowed range is {range}.').replace('{value}', v).replace('{range}', e.range);
+  }
+  const own = reason && !/^Invalid value for /.test(reason) ? ' ' + reason : '';
+  return tr('dashboard.cfgRefusedOther', 'Not saved: {value} is not accepted.').replace('{value}', v) + own;
+}
+
 /** One field's editor, by its type; a field the node does not let this page change says why. */
-function fieldEditor(p, e, val, editable, pending, onChange) {
+function fieldEditor(p, e, val, editable, pending, onChange, bad) {
   const range = e.range ? html`<${Note} kind="meta" inline mono>${rangeWords(e)}<//>` : null;
   if (!e.mutable) {
     if (typeof e.value === 'boolean') {
@@ -218,10 +249,10 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
     return html`<${Check} checked=${val} onChange=${(on) => onChange(p, on)} disabled=${!editable}>${t('dashboard.enabled')}<//>`;
   }
   if (e.type === 'integer') {
-    return html`<${TextField} type="number" size="short" ariaLabel=${label(p)} value=${val} onInput=${(v) => onChange(p, parseInt(v))} disabled=${!editable} />${range}`;
+    return html`<${TextField} type="number" size="short" ariaLabel=${label(p)} value=${val} invalid=${bad} onInput=${(v) => onChange(p, parseInt(v))} disabled=${!editable} />${range}`;
   }
   if (e.type === 'float') {
-    return html`<${TextField} type="number" size="short" step="0.01" ariaLabel=${label(p)} value=${val} onInput=${(v) => onChange(p, parseFloat(v))} disabled=${!editable} />${range}`;
+    return html`<${TextField} type="number" size="short" step="0.01" ariaLabel=${label(p)} value=${val} invalid=${bad} onInput=${(v) => onChange(p, parseFloat(v))} disabled=${!editable} />${range}`;
   }
   if (e.type === 'string' && hasChoices(e)) {
     // The pick shows each value in words and stores the raw value. A stored value the list does not
@@ -234,7 +265,7 @@ function fieldEditor(p, e, val, editable, pending, onChange) {
       options=${values.map(v => [v, choiceLabel(p, v)])} onChange=${(v) => onChange(p, v)} />`;
   }
   if (e.type === 'string') {
-    return html`<${TextField} size="medium" ariaLabel=${label(p)} value=${val || ''} onInput=${(v) => onChange(p, v)} disabled=${!editable} />`;
+    return html`<${TextField} size="medium" ariaLabel=${label(p)} value=${val || ''} invalid=${bad} onInput=${(v) => onChange(p, v)} disabled=${!editable} />`;
   }
   if (e.type === 'object') {
     return Array.isArray(e.value)
@@ -258,6 +289,9 @@ export default function ConfigTab({ data, reload }) {
   const [q, setQ] = useState(() => new URLSearchParams(location.search).get('q') || '');
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
+  // The settings the node did not save, path → why, in words. A refused setting stays unsaved and
+  // marked on its own line and in the pinned row until it is edited again or the edit is cancelled.
+  const [refused, setRefused] = useState({});
 
   const s = data.configSchema;
   if (!s || !s.schema) return html`<${Empty} text=${t('dashboard.configNotAvailable')} />`;
@@ -305,6 +339,16 @@ export default function ConfigTab({ data, reload }) {
 
   function onChange(path, value) {
     setPending(prev => ({ ...prev, [path]: value }));
+    setRefused(prev => { if (!(path in prev)) return prev; const next = { ...prev }; delete next[path]; return next; });
+  }
+
+  /** The node's refusals ([{ path, reason }]) as path → words, with the value that was sent. */
+  function refusalsOf(errors, sent) {
+    const out = {};
+    for (const er of errors || []) {
+      if (er && typeof er.path === 'string' && schema[er.path]) out[er.path] = refusalWords(er.path, schema[er.path], sent[er.path], er.reason);
+    }
+    return out;
   }
 
   async function save() {
@@ -320,13 +364,22 @@ export default function ConfigTab({ data, reload }) {
     });
     if (!changes.length) return;
     setSaving(true);
+    const sent = Object.fromEntries(changes.map(c => [c.path, c.value]));
     try {
+      // The node saves what it accepts and names what it refuses. A refused setting stays unsaved
+      // here; it used to leave the list with the saved ones under "Changes saved".
       const r = await saveConfig(changes);
-      setResult({ ok: true, msg: t('dashboard.savedChanges').replace('{count}', r.data.applied.length) });
-      setPending({});
+      const saved = new Set((r.data.applied || []).map(a => a.path));
+      setRefused(refusalsOf(r.data.errors, sent));
+      setResult({ ok: true, msg: t('dashboard.savedChanges').replace('{count}', saved.size) });
+      setPending(prev => Object.fromEntries(Object.entries(prev).filter(([p]) => !saved.has(p))));
       reload();
     } catch (err) {
-      setResult({ ok: false, msg: err.message });
+      // Nothing was saved. When the node says which setting and why, each line says it and the
+      // pinned row names them; the box at the top of the page is out of sight while editing.
+      const named = refusalsOf(err.response?.error?.details?.errors, sent);
+      setRefused(named);
+      setResult(Object.keys(named).length > 0 ? null : { ok: false, msg: err.message });
     } finally {
       setSaving(false);
     }
@@ -334,8 +387,11 @@ export default function ConfigTab({ data, reload }) {
 
   async function resetConfig(path) {
     try {
-      await deleteConfig(path);
-      setResult({ ok: true, msg: t('dashboard.cfgResetDone').replace('{path}', path) });
+      const r = await deleteConfig(path);
+      // Removing the saved value does not change the running one: the node keeps it until a restart.
+      setResult({ ok: true, msg: tr('dashboard.cfgResetDoneRestart', 'The value saved here for {name} is removed. This server runs with {value} until it restarts. After the restart the value comes from: {source}.')
+        .replace('{name}', label(path)).replace('{value}', shownIn(path, schema[path], schema[path] && schema[path].value))
+        .replace('{source}', sourceWord((r.data && r.data.newSource) || 'default')) });
       reload();
     } catch (err) {
       setResult({ ok: false, msg: err.message });
@@ -344,14 +400,19 @@ export default function ConfigTab({ data, reload }) {
 
   function cancel() {
     setPending({});
+    setRefused({});
     setResult(null);
   }
 
   const pendingKeys = Object.keys(pending);
   const editedIn = (items) => items.filter(({ path }) => path in pending).length;
+  const refusedKeys = Object.keys(refused).filter(p => p in pending);
+  const refusedNames = refusedKeys.slice(0, 3).map(label).join(', ') + (refusedKeys.length > 3 ? ', …' : '');
 
-  // The pinned row's unsaved status: the count, save, cancel, and the word that opens the list.
+  // The pinned row's unsaved status: what the node refused (the row stays in sight wherever the
+  // operator is editing), the count, save, cancel, and the word that opens the list.
   const status = editable && pendingKeys.length > 0 ? html`
+    ${refusedKeys.length > 0 && html`<${Tinted} tone="danger" strong>${tr('dashboard.cfgRefusedPinned', 'Not saved: {names}').replace('{names}', refusedNames)}<//>`}
     <${Tinted} tone="notice" strong>${tr('dashboard.cfgUnsaved', '{n} unsaved change(s)').replace('{n}', pendingKeys.length)}<//>
     <${Loud} control onClick=${save} disabled=${saving}>${t('dashboard.saveChanges')}<//>
     <${Action} small onClick=${cancel} disabled=${saving}>${t('dashboard.cancelLabel')}<//>
@@ -420,8 +481,10 @@ export default function ConfigTab({ data, reload }) {
                   return html`<${SettingLine} key=${p} id=${'cfgf-' + p.replace(/\./g, '-')}
                     name=${label(p)} help=${hasExplain(p) ? 'config.' + p : undefined} flag=${edited ? '●' : null} flagTitle=${tr('dashboard.cfgEdited', 'Edited, not saved')}
                     code=${p} desc=${descOf(p, e)}
+                    note=${(p in refused && edited) || e.restartPending ? html`${p in refused && edited ? html`<${Note} kind="message" error>${refused[p]}<//>` : null}${e.restartPending
+                      ? html`<${Tinted} tone="warn" strong>${tr('dashboard.cfgRestartPending', 'This server runs with {value} until it restarts.').replace('{value}', shownIn(p, e, e.value))}<//>` : null}` : null}
                     source=${e.source && html`<${Badge} type=${SOURCE_BADGE[e.source] || 'idle'} label=${sourceWord(e.source)} />`}
-                    editor=${fieldEditor(p, e, val, editable, pending, onChange)}
+                    editor=${fieldEditor(p, e, val, editable, pending, onChange, p in refused && edited)}
                     end=${e.canReset && editable && e.mutable ? html`<${Action} small onClick=${() => resetConfig(p)}>${t('dashboard.cfgReset')}<//>` : null} />`;
                 })}
                 ${SectionAction && html`<${SectionAction} />`}

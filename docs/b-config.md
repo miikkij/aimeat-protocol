@@ -83,6 +83,11 @@ value, type, range, description, whether it is mutable, whether this node can ed
 value came from** (`default` · `file` · `env` · `consul` · `database` · `sealed`), and whether it can
 be reset. Secrets never appear as values: an API key shows up as `<path>_configured: true|false`.
 
+A reset (`DELETE /v1/admin/config/{path}`, the Reset control on the Config page) removes the value
+saved in the database. It does not change the running value: the node keeps the removed value until
+it restarts, and then reads the layer below. Until then the field carries `restartPending: true`,
+its `source` names that layer, and the Config page says so on the setting's line.
+
 ### Changing it
 
 **From the environment or a file** for anything, including the immutable fields. `aimeat/.env.example`
