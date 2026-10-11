@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft
  * @version-history
+ *   v1.2.1 — 2026-10-11 — The paywall read is signed in as owner B: an anonymous read of a paid
+ *     app answers 401 since secaudit 2026-10-10 C1, and the 402 that names the price needs a caller.
  *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit (e2e-app-draft:178): "drafts are
  *     owner-scoped" was proved only by asking about owner B's OWN path, so owner B's token had never
  *     been sent at /v1/apps/{ownerA}/…. Phase 3 now does exactly that on the write, the preview-token
@@ -351,9 +353,10 @@ await test('Promoting a draft keeps the price, the licence and the translations'
 
 await test('The paywall agrees: reading the promoted version still costs 5 morsels', async () => {
     // The live paywall is the strongest evidence available that the price survived the promotion:
-    // it is computed from the stored manifest on every read. (The 402 answers the owner too — a
-    // pre-existing quirk of the read route, unrelated to this path.)
-    const { status, body } = await json(`/v1/apps/${ownerAName}/${PAID}`);
+    // it is computed from the stored manifest on every read. Read as owner B, a signed-in caller with
+    // no licence: an anonymous read is refused with 401 before the price is looked at (secaudit
+    // 2026-10-10 C1), so only a signed-in read reaches the 402 that names the price.
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${PAID}`, bAuthed());
     assert(status === 402, `a priced app answers 402 — got ${status}: ${JSON.stringify(body)}`);
     assert(String(body.error?.message ?? '').includes('5 morsels'),
         `the paywall still names the price — got "${body.error?.message}"`);
