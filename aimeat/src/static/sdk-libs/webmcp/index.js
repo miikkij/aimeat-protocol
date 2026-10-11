@@ -13,6 +13,8 @@
  * @usage <script src="/v1/libs/aimeat-webmcp.js"></script>
  *   await AIMEAT.webmcp.exposeAppTools({ owner: 'alice', appId: 'shop.html' });
  * @version-history
+ *   v1.1.1 — 2026-10-11 — The feed tool's description says money prices: the feed no longer lists
+ *     morsel prices (ruling D4).
  *   v1.1.0 — 2026-07-28 — `?expose=app` auto-activation (owner/app from the script tag's data-*, else
  *     the injected #aimeat-app-ref block) and an `about-this-app` tool built from the listing's
  *     app_surface — bound SKILL.md packs, bundled crews, declared scopes, EXCHANGE listings — so an
@@ -189,7 +191,7 @@ const webmcp = {
     const tools = [
       {
         name: 'aimeat-commerce-feed',
-        description: 'List everything for sale on this AIMEAT node: agent offers and priced app-tools (per-call functions of published apps), with prices in morsels or money micro-units.',
+        description: 'List everything for sale on this AIMEAT node: agent offers and priced app-tools (per-call functions of published apps), with money prices in micro-units.',
         inputSchema: { type: 'object', properties: {} },
         async execute() {
           const r = await fetch(NODE_URL + '/v1/commerce/feed');
