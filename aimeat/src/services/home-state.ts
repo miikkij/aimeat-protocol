@@ -42,7 +42,7 @@ import {
     ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingTrack, type OnboardingBranch,
     type OnboardingRoom,
 } from './onboarding-funnel.js';
-import { resolveAiClient, decideBranch } from './ai-tool-setup.js';
+import { resolveAiClient, decideBranch } from './ai-tool-branch.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY, portfolioStandaloneUrl } from '../routes/portfolio.js';
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
