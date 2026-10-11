@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.aimeat/aimeat",
   "title": "AIMEAT",
-  "description": "AIMEAT - the Linux of AI. An open, federated, self-hosted AI operating system you own. MIT.",
-  "version": "3.3.0",
+  "description": "Your knowledge, agents and apps on a node you own, reached from the AI you already use.",
+  "version": "3.26.1",
   "websiteUrl": "https://aimeat.io",
   "repository": {
     "url": "https://github.com/miikkij/aimeat-protocol",

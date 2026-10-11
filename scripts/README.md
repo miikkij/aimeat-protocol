@@ -1,11 +1,19 @@
 # `scripts/`
 
 Local developer utilities for the AIMEAT repo. Standalone and dependency-free: stdlib-only Python
-(no `pip install`, no venv) and plain Node scripts.
+(no `pip install`, no venv), plain Node scripts and two shell scripts.
 
-## `gen_image.py` — the AIMEAT image generator
+| Script | What it does |
+|---|---|
+| `gen_image.py` | Generates an image in the AIMEAT house style and can upload it to AIMEAT storage |
+| `upload_existing_image.py` | Uploads an image `gen_image.py` already made, without generating it again |
+| `eval-skill.mjs` | Measures what a skill changes, with its eval suite (`pnpm eval:skill`) |
+| `git-commit.sh` | Commits with a message read from a file, so no shell quoting touches it |
+| `pack-connector.sh` | Builds the npm tarball that `npm publish` would send, without publishing it |
 
-Whenever an image is needed — an app icon, a banner, a hero graphic, an illustration, an og-image —
+## `gen_image.py`: the AIMEAT image generator
+
+Whenever an image is needed (an app icon, a banner, a hero graphic, an illustration, an og-image),
 generate a proper **AIMEAT-quality** one instead of shipping a bland placeholder. The project skill
 `aimeat-imagery` (`.claude/skills/aimeat-imagery/SKILL.md`) is the rule: no stock, clip-art or
 placeholder art, ever. Python is not on PATH on the developer's machine, so run the script with
@@ -29,7 +37,7 @@ cp scripts/.env.example scripts/.env
 # then edit scripts/.env and set OPENROUTER_API_KEY (+ optionally IMAGE_MODEL)
 ```
 
-`scripts/.env` is **gitignored** — it holds secrets, never commit it. The generator's capability is
+`scripts/.env` is **gitignored**: it holds secrets, never commit it. The generator's capability is
 **inactive until `OPENROUTER_API_KEY` is set**; with no key it exits with a clear message rather
 than producing anything.
 
@@ -49,26 +57,26 @@ Run from the **repo root**:
 
 ```bash
 # single image → genimages/icons/agent-badge.png
-python scripts/gen_image.py --out icons/agent-badge "a glowing AI agent badge, coral-red accent"
+uv run python scripts/gen_image.py --out icons/agent-badge "a glowing AI agent badge, coral-red accent"
 
 # wide banner (falls back to 1024x1024 if the model rejects the size)
-python scripts/gen_image.py --out banners/hero --size 1344x576 "wide hero banner for the CADENCE CRM app"
+uv run python scripts/gen_image.py --out banners/hero --size 1344x576 "wide hero banner for the CADENCE CRM app"
 
 # skip the house style for a specific look
-python scripts/gen_image.py --out misc/thing --no-style "a photorealistic ..."
+uv run python scripts/gen_image.py --out misc/thing --no-style "a photorealistic ..."
 
 # generate AND upload public to AIMEAT storage → prints the /v1/pub URL, logs it to the manifest
-python scripts/gen_image.py --out app/logo --upload "the DROP app logo, minimal geometric mark"
+uv run python scripts/gen_image.py --out app/logo --upload "the DROP app logo, minimal geometric mark"
 
 # batch: one 'relative/path=prompt' per line
-python scripts/gen_image.py --file scripts/my-images.txt
+uv run python scripts/gen_image.py --file scripts/my-images.txt
 ```
 
 ### Flags
 
 | Flag | Meaning |
 |------|---------|
-| `--out PATH` | Relative path under `genimages/`, **no extension** (e.g. `icons/agent-badge`). The subfolder is yours to choose — pick it by where the image is headed. Required with a positional prompt. |
+| `--out PATH` | Relative path under `genimages/`, **no extension** (e.g. `icons/agent-badge`). The subfolder is yours to choose: pick it by where the image is headed. Required with a positional prompt. |
 | `--file FILE` | Batch file, one `relative/path=prompt` per line (`#` comments allowed). |
 | `--size` | Preferred size (default `1024x1024`); non-square sizes fall back to `1024x1024` automatically. |
 | `--model` | Force one OpenRouter model id (overrides `IMAGE_MODEL`). |
@@ -79,16 +87,16 @@ python scripts/gen_image.py --file scripts/my-images.txt
 ### Where images go
 
 - **Local:** `genimages/<--out>.<ext>` (png/jpg/webp per what the model returns). The whole
-  `genimages/` tree is gitignored — it's a scratch area, not committed.
+  `genimages/` tree is gitignored: it is a scratch area, not committed.
 - **Into the project:** copy the file you want into its real home (`public/`, an app bundle,
   `aimeat-desktop/.../icons`, …). Those tracked locations are committed as normal.
 - **For apps:** `--upload` PUTs the image to AIMEAT storage as a public file and prints a
   `https://aimeat.io/v1/pub/<ghii>/<key>` URL the app can reference directly.
 
-### The upload manifest — `genimages/uploads.json`
+### The upload manifest: `genimages/uploads.json`
 
 Every `--upload` appends a record so a later session knows exactly what exists, where it lives, and
-how to reference it — **read it before regenerating** so an already-uploaded image is reused instead
+how to reference it. **Read it before regenerating**, so an already-uploaded image is reused instead
 of paid for twice.
 
 ```json
@@ -115,13 +123,27 @@ OpenRouter bills per image at generation time (FLUX.2 Pro has roughly a `$0.03` 
 Gemini flash-image is cheaper). Each run prints the billed cost reported by OpenRouter. Generate
 deliberately, not in bulk-speculation.
 
+## `upload_existing_image.py`: upload an image you already have
+
+`gen_image.py` uploads only as part of a generation run. This script uploads a file that is already
+under `genimages/`, with the same owner login, presigned upload and manifest record, so nobody pays
+to generate a picture again only to upload it.
+
+```bash
+uv run python scripts/upload_existing_image.py odps/hero
+uv run python scripts/upload_existing_image.py odps/hero --key gen.img.odps-hero
+```
+
+It prints the public `/v1/pub/` URL. It reads `scripts/.env` and needs
+`AIMEAT_APP_LOGIN_USER` and `AIMEAT_APP_LOGIN_PASSWORD`.
+
 ## `eval-skill.mjs`: measure what a skill changes
 
 Runs a skill's eval suite from `.claude/evals/<skill>/` with `claude plugin eval`: every case
 several times with the skill and without it, then the score in each arm and the difference.
 
 ```bash
-pnpm eval:skill aimeat-writing --model sonnet --max-cost-usd 5
+pnpm eval:skill aimeat-writing --model opus --max-cost-usd 5
 pnpm eval:skill aimeat-writing --case finnish-ui-copy --runs 1 --ablation none   # one cheap look
 ```
 
@@ -133,5 +155,27 @@ temp copy. Any `claude plugin eval` option passes through; the report stays loca
 
 Written and measured with Claude Code 2.1.270 on the PATH (`claude --version`). The runs use your own
 login and count against your plan; set `--max-cost-usd`. The first `aimeat-writing` run cost
-$1.13 on Sonnet and $3.11 on Opus for three cases, three runs, two arms. When to run it and how to
-read the result: `.claude/rules/skills.md`.
+$1.13 on Sonnet and $3.11 on Opus for three cases, three runs, two arms. This project runs model
+evaluations on Opus only. When to run it and how to read the result: `.claude/rules/skills.md`.
+
+## `git-commit.sh`: a multi-line commit message from a file
+
+```bash
+bash scripts/git-commit.sh <message-file> [git commit args…]
+```
+
+It runs `git commit -F <file>`. A multi-line message given as a shell argument has to survive
+whichever shell runs it, and this repository is used from both PowerShell and Bash, whose multi-line
+string syntaxes differ. A message written to a file and passed by path needs no quoting at all. The
+`commit-msg` hook checks the result either way. A one-line message can still use `-m`.
+
+## `pack-connector.sh`: the npm tarball, without publishing
+
+```bash
+bash scripts/pack-connector.sh              # build and pack, print the path
+bash scripts/pack-connector.sh --verify     # and check what is inside it
+```
+
+It builds `aimeat/` first and then runs `pnpm pack`, which uses the same `files` list as
+`npm publish`. The result lands in `dist-pack/`. Use it to try a connector fix on real machines
+before a version number is spent on it: a version published to npm cannot be taken back.
