@@ -25,6 +25,8 @@
  *   contract from opposite ends: the door calls one of them, never both.
  * @structure settleMeteredCharge · resolvePacingToll · chargePacing · SettlementResult · BeneficiaryAccrual
  * @version-history
+ *   v1.2.3 — 2026-10-12 — The payer's rows name an initiator only when someone other than the payer
+ *     made the call; a person's own use was counted on their wallet as "your agent did".
  *   v1.2.2 — 2026-10-11 — The provider's `pacing_earn` row names no initiator: the caller is another
  *     owner's principal, and the provider's wallet showed it as "your agent …".
  *   v1.2.1 — 2026-10-11 — A pacing charge's tracking code says "granted" only when somebody other than
@@ -135,6 +137,9 @@ export async function chargePacing(args: {
   const providerEarned = amount - burned - fee;
   // "granted" only when somebody other than the caller's owner pays (a provider carrying a member).
   const granted = !!args.payer && payerGhii !== ownerGhiiOf(caller);
+  // The payer's rows name an initiator only when someone other than the payer made the call (an
+  // agent, an app): a wallet reads the initiator as "your agent …", and a person paying in person is not one.
+  const initiator = caller !== payerGhii ? caller : undefined;
   const trackingCode = `${granted ? 'pacing:granted' : 'pacing'}:${label}:${randomUUID().slice(0, 8)}`;
   const ts = new Date().toISOString();
 
@@ -145,10 +150,10 @@ export async function chargePacing(args: {
     if (fee > 0) await storage.creditBalance(operatorGhii!, fee);
     // The payer's rows add up to what left their balance: what went on, and what burned.
     if (amount - burned > 0) {
-      await storage.addTransaction({ id: `pacing-${randomUUID()}`, gaii: payerGhii, type: 'pacing_charge', amount: -(amount - burned), counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: caller, timestamp: ts });
+      await storage.addTransaction({ id: `pacing-${randomUUID()}`, gaii: payerGhii, type: 'pacing_charge', amount: -(amount - burned), counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: initiator, timestamp: ts });
     }
     if (burned > 0) {
-      await storage.addTransaction({ id: `pacing-burn-${randomUUID()}`, gaii: payerGhii, type: 'pacing_burn', amount: -burned, trackingCode, initiatorGaii: caller, timestamp: ts });
+      await storage.addTransaction({ id: `pacing-burn-${randomUUID()}`, gaii: payerGhii, type: 'pacing_burn', amount: -burned, trackingCode, initiatorGaii: initiator, timestamp: ts });
     }
     if (providerEarned > 0) {
       // No initiator on the provider's row: the caller belongs to another owner, and a ledger reads the
@@ -172,7 +177,7 @@ export async function chargePacing(args: {
         if (providerEarned > 0) await storage.debitBalance(providerGhii!, providerEarned);
         if (fee > 0) await storage.debitBalance(operatorGhii!, fee);
         await storage.creditBalance(from, amount);
-        await storage.addTransaction({ id: `pacing-refund-${randomUUID()}`, gaii: payerGhii, type: 'pacing_refund', amount, counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: caller, timestamp: new Date().toISOString() });
+        await storage.addTransaction({ id: `pacing-refund-${randomUUID()}`, gaii: payerGhii, type: 'pacing_refund', amount, counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: initiator, timestamp: new Date().toISOString() });
       });
       logger.warn(`[metered-settlement] reversed a ${amount}-morsel pacing charge (the use failed after the charge)`, { label });
     },
