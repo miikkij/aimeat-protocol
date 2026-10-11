@@ -253,6 +253,7 @@ is nothing to re-enrol. What your runtime sees while it is stopped:
 |---|---|
 | lists its own tasks (`GET /v1/agents/{name}/tasks`) | no `queued` task, and `agent_stopped: true`; tasks it is already doing are listed |
 | reads its inbox (`GET .../inbox`, `GET .../messages/inbox`) | no waiting task and no unread message, and `agent_stopped: true` |
+| reads its handbook (`GET /v1/agents/me/handbook`) | `task_queue.queued` is empty and `task_queue.agent_stopped` is true; its active tasks are listed |
 | holds a connector socket | no `task_assigned`, `dm.inbound`, `v2.message`, `v2.task.assigned` or `workspace.record` delivery; the backlog on connect carries only its active tasks |
 | has a webhook | no `task.queued`, `task.approved` or `message.inbound` event |
 | reads the roster (`GET /v1/agents`, `aimeat_agents_list`) | `stopped: true`, `stopped_at`, `stopped_by` on its row |

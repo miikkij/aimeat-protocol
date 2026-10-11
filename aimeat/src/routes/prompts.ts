@@ -6,6 +6,9 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   v1.14.0 -- 2026-10-11 -- GET /v1/agents/me/handbook moves to prompts-agent-handbook.ts
+ *     (max-file-lines), where its task queue also changes: no `wait` endpoint, and nothing queued
+ *     for a stopped agent.
  *   v1.13.0 -- 2026-10-02 -- Mounts the setting explanations in parts (prompts-settings.ts).
  *   v1.12.0 -- 2026-10-01 -- Mounts the feature map in parts (prompts-features.ts).
  *   v1.11.0 -- 2026-09-18 -- Mounts the layered build specification (prompts-build-app-layers.ts).
@@ -61,6 +64,7 @@ import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
 import { MODEL_RECOMMENDATION } from '../services/model-recommendation.js';
 import { logger } from '../utils/logger.js';
+import { registerAgentHandbook } from './prompts-agent-handbook.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -147,80 +151,8 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     }));
   });
 
-  // GET /v1/agents/me/handbook -- Agent operating handbook
-  router.get('/v1/agents/me/handbook', async (req, res) => {
-    const gaii = req.auth?.sub ?? 'unknown';
-    const agent = req.auth?.sub ? await storage.getAgent(req.auth.sub) : null;
-    const record = await storage.getSystemPrompt('tier-1');
-    if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Handbook not available')); return; }
-    const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
-    const parsedSelf = parseGaiiLoose(gaii);
-    const selfAgentName = parsedSelf.agent || 'unknown';
-    const system_prompt = substituteVariables(promptContent, {
-      node_url: config.baseUrl,
-      node_id: config.nodeId,
-      gaii,
-      agent_name: selfAgentName,
-      owner_name: req.auth?.owner ?? 'unknown',
-      trust_score: agent?.trustScore ?? 50,
-      morsel_balance: agent?.morselBalance ?? 0,
-      daily_allowance: config.dailyAllowance,
-    });
-    const directives = gaii !== 'unknown' ? await storage.getAgentDirectives(gaii) : null;
-    const ownerGhii = req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : '';
-    const ownerDefaults = ownerGhii ? await storage.getOwnerAgentDefaults(ownerGhii) : null;
-    const queuedTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'queued' }) : { tasks: [], total: 0 };
-    const activeTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'active' }) : { tasks: [], total: 0 };
-    const parsed = parseGaiiLoose(gaii);
-    const agentName = parsed.agent || '{name}';
-
-    res.json(success(config.nodeId, {
-      tier: '1',
-      agent_name: selfAgentName,
-      system_prompt,
-      available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
-      economics: {
-        note: 'Agents share the owner\'s wallet. This balance belongs to your owner, not you individually.',
-        daily_allowance: config.dailyAllowance,
-        current_balance: ownerGhii ? (await storage.getGHIIByOwner(req.auth?.owner as string))?.morselBalance ?? 0 : 0,
-      },
-      directives: {
-        purpose: directives?.purpose ?? '',
-        system_rules: config.agentSystemPrinciples.map((desc, i) => ({ id: `system-${i + 1}`, description: desc })),
-        owner_rules: (ownerDefaults?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
-        agent_rules: (directives?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
-        memory_areas: directives?.memoryAreas ?? [],
-        resources: directives?.resources ?? [],
-        max_tokens_per_task: config.agentMaxTokensPerTask,
-        mandatory_logging: config.agentMandatoryLogging,
-        aimeat_first: config.agentAimeatFirstEnabled,
-      },
-      task_queue: {
-        queued: queuedTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
-        active: activeTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
-        endpoints: {
-          inbox: `/v1/agents/${encodeURIComponent(agentName)}/inbox`,
-          event: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/event`,
-          complete: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/complete`,
-          fail: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/fail`,
-          wait: `/v1/agents/${encodeURIComponent(agentName)}/tasks/wait`,
-        },
-      },
-      capabilities: {
-        report_endpoint: `/v1/agents/${encodeURIComponent(agentName)}/capabilities`,
-        current: {
-          technical: agent?.technicalCapabilities ?? [],
-          domain: agent?.domainCapabilities ?? [],
-        },
-        instructions: 'Report your capabilities on first connect and when they change. PUT to the report_endpoint with: { technical: [{ name, type }], domain: [string], languages: [string] }',
-      },
-      messages: {
-        inbox_endpoint: `GET ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages/inbox`,
-        send_endpoint: `POST ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages`,
-        instructions: 'Poll inbox for pending messages. For each: read content, process, send response as outbound message. If user asks you to do something, include proposedTask in metadata.',
-      },
-    }));
-  });
+  // GET /v1/agents/me/handbook -- Agent operating handbook (prompts-agent-handbook.ts)
+  registerAgentHandbook(router, config, storage);
 
   // ── 301 Redirects from old tier1 paths ──
 

@@ -11,7 +11,7 @@
  *        without the permission, or another account;
  *     3. what waits: a new task stays queued with reason `stopped` and nobody can start it, a
  *        scheduled run is skipped with outcome `stopped`, and the agent's own reads (task list,
- *        inbox, pending messages, long poll) hand it nothing new and say why;
+ *        inbox, pending messages, handbook) hand it nothing new and say why;
  *     4. the runtime is not woken: no push over its connector socket for a new task or a message,
  *        and a backlog with only the work it is already doing;
  *     5. a start releases the tasks that would have started on their own, wakes the runtime and
@@ -19,6 +19,8 @@
  *     6. the same over MCP, as the person's chat AI.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-stop
  * @version-history
+ *   v1.1.0 — 2026-10-11 — 3f: the agent's handbook lists no waiting task, names no wait endpoint, and
+ *     GET .../tasks/wait is gone (the long poll was removed).
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -245,12 +247,21 @@ await test('3e. A message is stored and waits: the agent\'s own inbox and pendin
   assert(asOwner.body.data.queued_tasks.some((t: any) => t.id === waitingId) && asOwner.body.data.agent_stopped === undefined, 'the owner sees the waiting task, and no flag');
 });
 
-// The long poll (GET .../tasks/wait) is not asserted here: on 2026-10-11 it answers 404 for every
-// agent, because GET .../tasks/:id is registered first and takes `wait` for a task id. Its handler
-// holds a stopped agent the same way, for the day the route is reachable.
+await test('3f. The agent\'s handbook, its first read, lists no waiting task and says why', async () => {
+  const own = await json('/v1/agents/me/handbook', { headers: auth(worker.token) });
+  assert(own.status === 200, `own handbook ${own.status}`);
+  const q = own.body.data.task_queue;
+  assert(q.agent_stopped === true && q.queued.length === 0, `own handbook queue ${JSON.stringify({ s: q.agent_stopped, n: q.queued.length })}`);
+  assert(q.active.some((t: any) => t.id === runningId), 'the running task is listed');
+  // The long poll GET .../tasks/wait was removed on 2026-10-11 (it had answered 404 since it was
+  // written): the handbook names no such endpoint, and the path is a task id nobody has.
+  assert(q.endpoints.wait === undefined, `the handbook still names a wait endpoint: ${q.endpoints.wait}`);
+  const gone = await json('/v1/agents/worker/tasks/wait?timeout=1', { headers: auth(worker.token) });
+  assert(gone.status === 404, `tasks/wait ${gone.status}`);
+});
 
 let scheduleId = '';
-await test('3f. A scheduled run is skipped with outcome stopped, and makes no task', async () => {
+await test('3g. A scheduled run is skipped with outcome stopped, and makes no task', async () => {
   const made = await json('/v1/agents/worker/schedules', {
     method: 'POST', headers: auth(owner.token),
     body: JSON.stringify({
