@@ -15,9 +15,19 @@ POST /v1/admin/extensions/available/matching-behaviors/install
 Authorization: Bearer <operator-token>
 ```
 
-Then create an instance: `POST /v1/extensions/matching-behaviors/instances` with `{ "id": "hobbies", "config": { ... } }`, and call the actions at `POST /v1/ext/matching-behaviors/<instanceId>/<action>`.
+Then create an instance: `POST /v1/extensions/matching-behaviors/instances` with `{ "id": "hobbies", "config": { ... } }`, and call the actions at `POST /v1/ext/matching-behaviors/{instanceId}/{action}`.
 
 **Consent first.** `create-profile` refuses with `CONSENT_REQUIRED: matching` until the person holds an active consent whose purpose is `matching` (`POST /v1/consent` with `"purpose": "matching"`, or `aimeat_consent_grant` over MCP).
+
+## Privacy and opting in
+
+A profile holds personal data (a name, interests, a city), so the extension writes it **private**: no other owner and no anonymous caller can read it through the memory API, whatever the profile says. Suggestions and accepted matches are private too.
+
+Being matched is a separate choice, the profile's `matchable` field, **off by default**. Pass `"matchable": true` to `create-profile`, or later to `update-profile`, to join the rounds; `false` leaves them again. A round pairs only profiles with `matchable: true`, so a person who did not opt in is never suggested to anyone and gets no suggestions. `get-suggestions` answers only the caller's own suggestions, shows another person only while they are still opted in, and answers an empty list with `matchable: false` to a caller who is not.
+
+Opting in does not publish the profile: another person learns the display name, interests and place of someone who opted in only as a suggestion made to them.
+
+Version 1.1.0 made this change. Profiles written by 1.0.x are public keys with no `matchable` field, so they take part in no round until their owner updates them, and an update rewrites them private.
 
 ## Multi-Instance Support
 
@@ -38,11 +48,11 @@ Each instance runs an independent matching pool with its own configuration. Crea
 
 | Action | Auth | Description |
 |--------|------|-------------|
-| `create-profile` | required | Register a matching profile with display name, interests, location |
-| `update-profile` | required | Update fields on an existing profile |
-| `get-suggestions` | required | Retrieve current match suggestions sorted by score |
+| `create-profile` | required | Register a private matching profile with display name, interests, location, and `matchable` (default `false`) |
+| `update-profile` | required | Update fields on an existing profile, `matchable` included |
+| `get-suggestions` | required | The caller's own suggestions, sorted by score; empty while the caller is not opted in |
 | `respond` | required | Accept or dismiss a suggestion |
-| `run-matching` | operator | Execute a matching algorithm round across all profiles |
+| `run-matching` | operator | Execute a matching round across the profiles that opted in |
 
 ## Scoring Formula
 
@@ -66,9 +76,11 @@ The `matching-round` schedule runs `run-matching` every 6 hours via cron (`0 */6
 
 | Pattern | Content |
 |---------|---------|
-| `profile.{gaii}` | User matching profile |
-| `suggestion.{gaii}.{otherGaii}` | Match suggestion for a user |
-| `accepted.{gaii}.{otherGaii}` | Accepted match record |
+| `profile.{gaii}` | User matching profile, with `matchable`. Private |
+| `suggestion.{gaii}.{otherGaii}` | Match suggestion for a user. Private |
+| `accepted.{gaii}.{otherGaii}` | Accepted match record. Private |
+
+All keys live in the instance's namespace, `ext:matching-behaviors.{instanceId}`.
 
 ## Required APIs
 

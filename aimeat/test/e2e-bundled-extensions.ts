@@ -19,6 +19,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-bundled-extensions
  * @version-history
+ *   v1.1.0 — 2026-10-12 — matching-behaviors 1.1.0: a profile is private and another owner cannot
+ *     read it; a round pairs only opted-in (`matchable`) profiles. On 1.0.1 both cases failed (the
+ *     profile answered 200 to another owner).
  *   v1.0.0 — 2026-10-11 — Initial (docs audit phase 2). On the code before: the installer was credited
  *     nothing for a listing, and the purchase debited the buyer price + fee in morsels.
  */
@@ -211,22 +214,51 @@ await test('installs; create-profile refuses without the matching consent and ru
     assert(status === 200, `create-profile ${status}: ${JSON.stringify(body.error ?? body)}`);
 });
 
-await test('a matching round pairs two profiles, and each sees the other as a suggestion', async () => {
-    const consent = await json('/v1/consent', as(buyerName, {
-        method: 'POST', body: JSON.stringify({ data_pattern: 'matching.*', recipient: `node:${NODE_ID}`, purpose: 'matching' }),
-    }));
-    assert(consent.status === 201, `consent ${consent.status}`);
-    const p = await call(buyerName, '/v1/ext/matching-behaviors/hobbies/create-profile', { displayName: 'Buyer', interests: ['chess'], city: 'Helsinki' });
+// A profile holds personal data (name, interests, city), so it is private to the extension, and
+// a person is matched only after opting in with `matchable: true`. Until 1.0.1 every profile was
+// a public key anybody could read, and every profile in a pool was matched.
+const profileKey = (owner: string) =>
+    `/v1/memory/${encodeURIComponent('ext:matching-behaviors.hobbies')}/${encodeURIComponent(`profile.${owner}@${NODE_ID}`)}`;
+
+await test('a profile that was not opted in is not readable by another owner', async () => {
+    const asOther = await json(profileKey(sellerName), as(buyerName));
+    assert(asOther.status === 403 || asOther.status === 404, `another owner read the profile: ${asOther.status} ${JSON.stringify(asOther.body).slice(0, 200)}`);
+    const anonymous = await json(profileKey(sellerName));
+    assert(anonymous.status === 403 || anonymous.status === 404, `an anonymous caller read the profile: ${anonymous.status}`);
+});
+
+await test('a matching round pairs only opted-in profiles, and each sees only the other', async () => {
+    for (const who of [buyerName, operatorName]) {
+        const consent = await json('/v1/consent', as(who, {
+            method: 'POST', body: JSON.stringify({ data_pattern: 'matching.*', recipient: `node:${NODE_ID}`, purpose: 'matching' }),
+        }));
+        assert(consent.status === 201, `consent ${consent.status}`);
+    }
+    const p = await call(buyerName, '/v1/ext/matching-behaviors/hobbies/create-profile', { displayName: 'Buyer', interests: ['chess'], city: 'Helsinki', matchable: true });
     assert(p.status === 200, `create-profile ${p.status}: ${JSON.stringify(p.body.error)}`);
-    // run-matching read search() entries as profiles and crashed on `interests` of undefined.
+    // The operator shares the interest but does not opt in: never a suggestion for anybody.
+    const q = await call(operatorName, '/v1/ext/matching-behaviors/hobbies/create-profile', { displayName: 'Hidden', interests: ['chess', 'hiking'], city: 'Helsinki' });
+    assert(q.status === 200, `create-profile ${q.status}: ${JSON.stringify(q.body.error)}`);
+    // The seller opts in later, with update-profile.
+    const u = await call(sellerName, '/v1/ext/matching-behaviors/hobbies/update-profile', { matchable: true });
+    assert(u.status === 200, `update-profile ${u.status}: ${JSON.stringify(u.body.error)}`);
+    const opted = await json(profileKey(sellerName), as(buyerName));
+    assert(opted.status === 403 || opted.status === 404, `opting in to matching does not publish the profile: ${opted.status}`);
+
     const round = await call(operatorName, '/v1/ext/matching-behaviors/hobbies/run-matching', {});
     assert(round.status === 200, `run-matching ${round.status}: ${JSON.stringify(round.body.error ?? round.body)}`);
     const r = round.body.data.result ?? round.body.data;
-    assert(r.profilesScanned === 2 && r.matchesCreated >= 2, `round: ${JSON.stringify(r)}`);
+    assert(r.profilesScanned === 2 && r.matchesCreated === 2, `round over the two opted-in profiles: ${JSON.stringify(r)}`);
     const s = await call(sellerName, '/v1/ext/matching-behaviors/hobbies/get-suggestions', {});
     assert(s.status === 200, `get-suggestions ${s.status}`);
     const list = (s.body.data.result ?? s.body.data).suggestions as any[];
-    assert(list.length === 1 && list[0].profile?.displayName === 'Buyer', `suggestions: ${JSON.stringify(list)}`);
+    assert(list.length === 1 && list[0].profile?.displayName === 'Buyer', `seller's suggestions: ${JSON.stringify(list)}`);
+    const h = await call(operatorName, '/v1/ext/matching-behaviors/hobbies/get-suggestions', {});
+    const hidden = (h.body.data.result ?? h.body.data).suggestions as any[];
+    assert(Array.isArray(hidden) && hidden.length === 0, `a profile that did not opt in gets no suggestions: ${JSON.stringify(hidden)}`);
+    const suggestionKey = `/v1/memory/${encodeURIComponent('ext:matching-behaviors.hobbies')}/${encodeURIComponent(`suggestion.${sellerName}@${NODE_ID}.${buyerName}@${NODE_ID}`)}`;
+    const sk = await json(suggestionKey, as(operatorName));
+    assert(sk.status === 403 || sk.status === 404, `a suggestion is private to the extension: ${sk.status}`);
 });
 
 console.log('\nmembership-behaviors');
