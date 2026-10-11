@@ -229,7 +229,7 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 |-------|---------|
 | [Shell and Git](docs/coding-guidelines/shell-and-git.md) | Two shells, one quoting trap; committing a multi-line message safely |
 | [Testing Requirements](docs/coding-guidelines/testing-requirements.md) | E2E rules, multi-backend testing, writing tests |
-| [Security DNA](docs/coding-guidelines/security-development-dna.md) | Trust model, ten invariants, per-change checklist |
+| [Security DNA](docs/coding-guidelines/security-development-dna.md) | Trust model, the security invariants, per-change checklist |
 | [Security](docs/coding-guidelines/security.md) | Auth, validation, XSS, rate limiting, GDPR |
 | [Identity Model](docs/coding-guidelines/identity-model.md) | GHII/GAII reference, aggregation, morsel pacing |
 | [Storage Sync](docs/coding-guidelines/storage-sync.md) | Adding fields and tables across both providers |
