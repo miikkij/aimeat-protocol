@@ -22,6 +22,8 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.4.0 — 2026-10-11 — An instance's public offers carry `toll_morsels` (the pacing amount) and the old
+ *     `price` as its deprecated mirror: a morsel is pacing, never a price.
  *   v1.3.1 — 2026-10-11 — A task for a stopped runner is not activated on deploy; it waits (agent-stop-rules.ts).
  *   v1.3.0 — 2026-10-02 — The `proposed` answer names the proposal's `scopes` and `scopes_left_out`.
  *   v1.2.0 — 2026-10-01 — A deploy that names no runner, from a caller who has no crew-forge, becomes
@@ -41,7 +43,8 @@ import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { deployedAgentName } from '../models/crew-def-schemas.js';
-import type { Offer } from '../models/offer-schemas.js';
+import { presentOfferPacing, type Offer } from '../models/offer-schemas.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { buildGAII, validateAgentName, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { proposeBundledAgent } from './app-agent-propose.js';
@@ -334,7 +337,10 @@ export interface AppAgentInstance {
     ask: Offer['ask'];
     cost: Offer['cost'];
     deliverable: Offer['deliverable'];
-    price: NonNullable<Offer['price']> | null;
+    /** The pacing amount per use in morsels (0 = none). */
+    toll_morsels: number;
+    /** Deprecated mirror of toll_morsels until 4.0.0, marked `deprecated`; null when there is no pacing. */
+    price: { morsels: number; unit: string; deprecated: string } | null;
     price_money: NonNullable<Offer['priceMoney']> | null;
     callable: boolean;
   }>;
@@ -376,16 +382,21 @@ export async function appAgentInstances(
     const rec = await storage.getMemory(a.gaii, `agents.${a.name}.offers`);
     const offers = (((rec?.value as { offers?: Offer[] } | undefined)?.offers) ?? [])
       .filter(o => o.visibility === 'public')
-      .map(o => ({
-        id: o.id,
-        title: o.title,
-        ask: o.ask,
-        cost: o.cost,
-        deliverable: o.deliverable,
-        price: o.price ?? null,
-        price_money: o.priceMoney ?? null,
-        callable: !!o.callable,
-      }));
+      .map(o => {
+        // A morsel amount is pacing, never a price: `toll_morsels`, with the old `price` as its mirror.
+        const paced = presentOfferPacing(o, legacyMorselFieldsLive(), MORSEL_PRICE_DEPRECATION);
+        return {
+          id: o.id,
+          title: o.title,
+          ask: o.ask,
+          cost: o.cost,
+          deliverable: o.deliverable,
+          toll_morsels: paced.tollMorsels ?? 0,
+          price: paced.price ?? null,
+          price_money: o.priceMoney ?? null,
+          callable: !!o.callable,
+        };
+      });
     return {
       gaii: a.gaii,
       name: a.name,

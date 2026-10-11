@@ -18,6 +18,10 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.6.0 — 2026-10-11 — Selling section: an action has a money price and a pacing amount
+ *     (`tollMorsels`); `commercial.payMorsels` is the deprecated 3.x name of the pacing amount until
+ *     4.0.0, and ctx.wallet.consume debits pacing (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
+ *     kaksi-arvoa).
  *   v1.5.11 — 2026-10-09 — ADDITIVE: `ctx.fetch(url, { gunzip: true })` and `limits.fetch_max_mb`,
  *     the extension's own read ceiling up to the node's (wish-tv-opas).
  *   v1.5.10 — 2026-10-09 — ADDITIVE: `network.host_fields`, a host the installer gives per install.
@@ -138,7 +142,7 @@ function sandboxSection(): string {
     '| `ctx.workspace.readRows(orgId, ws, space, {where, since, until, changedSince, limit, cursor, order})` | One page of such a row space, newest first: `{rows, cursor, indexed}`. `where` takes only the space\'s `indexOn` fields |',
     '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
     '| `ctx.buy(appRef, tool, input)` | Buy one call of another owner\'s app tool, billed to this extension\'s owner. Needs a contract they already hold, else `{ok: false, code: \'NO_CONTRACT\'}` |',
-    '| `ctx.wallet.consume(amount, reason)` | Spend the CALLER\'s morsels; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
+    '| `ctx.wallet.consume(amount, reason)` | Debit morsels of pacing from the CALLER; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
     '| `ctx.wallet.getBalance()` | The caller\'s morsel balance |',
     '| `ctx.consent.check(gaii, purpose)` | True when that principal holds an active consent with this purpose |',
     '| `ctx.consent.require(gaii, purpose)` | The same, throwing `CONSENT_REQUIRED: purpose` when not |',
@@ -414,15 +418,17 @@ function commerceSection(url: string): string {
     '## Selling it: the block that turns an action into a product',
     '',
     'This is the part most extensions are missing, and without it nothing you build can ever appear',
-    'on the market. Price the ACTION, in the manifest:',
+    'on the market. An action has two values, both in the manifest: an optional money price, and a',
+    'pacing amount in morsels per call. Morsels pace how fast an action is used; a morsel is never a',
+    'price, so describe it as "2 morsels of pacing per call". Each call debits the pacing amount from',
+    'the caller\'s owner: part burns and the rest is credited to you.',
     '',
     '```yaml',
     '  - id: lookup',
     '    # ... method, path, script, input, output as above',
-    '    tollMorsels: 0             # optional anti-abuse burn, charged even on a money contract',
+    '    tollMorsels: 2             # the pacing amount: whole morsels per call, 0-100, charged on a money contract too',
     '    commercial:',
-    '      payMorsels: 2            # whole morsels per call, non-negative integer',
-    '      payMoney:',
+    '      payMoney:                # optional money price; leave it out and the call is free',
     '        amount: 50000          # 6-decimal MICRO-units. 50000 = 0.05 EUR. 1 EUR = 1000000',
     '        currency: EUR          # EUR or USD',
     '      exchange: true           # list it on the open market',
@@ -434,16 +440,18 @@ function commerceSection(url: string): string {
     '',
     'Rules the node enforces, so get them right the first time:',
     '',
-    '- At least ONE real channel. `payMorsels: 0` with no `payMoney` is refused: an action with no',
-    '  price is not contractable.',
+    '- At least ONE of the two values: a `payMoney` price or a `tollMorsels` pacing amount. An action',
+    '  with neither is not contractable.',
+    '- `commercial.payMorsels` is the 3.x name of the pacing amount. It is read as `tollMorsels` until',
+    '  4.0.0; write `tollMorsels`.',
     '- `payMoney.amount` is an integer in micro-units and must be positive. Writing `0.05` is a',
     '  five-cent price expressed as zero, and it will be rejected.',
-    '- `exchange: true` is what LISTS it. Priced but unflagged means callable under a contract you',
-    '  arrange yourself, and invisible on the market.',
-    '- A flagged action still needs both schemas and a price, or the projection skips it and says',
-    '  why (`SCHEMA_REQUIRED`, `NOT_PRICED`).',
-    '- Money takes precedence over morsels when both are present, so a consumer who accepts a',
-    '  money listing is metered in money.',
+    '- `exchange: true` is what LISTS it. Priced or paced but unflagged means callable under a contract',
+    '  you arrange yourself, and invisible on the market.',
+    '- A flagged action still needs both schemas and a money price or a pacing amount, or the',
+    '  projection skips it and says why (`SCHEMA_REQUIRED`, `NOT_PRICED`).',
+    '- A contract is metered in money when the action has a money price; the pacing amount applies',
+    '  to every call beside it.',
     '',
     'You do not call a listing endpoint. The manifest IS the listing: write the price, and the',
     'market follows on the next write. Change the price later and the same card updates rather',

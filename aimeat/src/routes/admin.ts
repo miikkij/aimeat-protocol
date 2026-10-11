@@ -11,6 +11,9 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.12.0 — 2026-10-11 — The dashboard's commerce block names the morsel volume pacing_volume_*,
+ *     counting the pacing ledger legs too; sales_volume_* mirror it, marked deprecated, until 4.0.0
+ *     (a morsel is pacing, not a price).
  *   v1.11.0 — 2026-10-09 — POST /v1/admin/setup/register answers 410 SETUP_CLOSED, before any write,
  *     once an owner holds the operator role, unless AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR is on
  *     (test nodes). A successful register deletes the boot's admin-setup-secret file. The admin
@@ -71,6 +74,7 @@ import { logger } from '../utils/logger.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../services/admin-setup-secret.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -366,10 +370,14 @@ export function adminRouter(
         let networkFeesToday = 0;
         let burnedToday = 0;
         let dailyAllowancesIssuedToday = 0;
-        // Commerce / marketplace sales (TARGET-033): every morsel sale flow's spend leg + the fee leg.
-        const SALE_SPEND_TYPES = new Set(['commerce_spend', 'offer_spend', 'org_offer_spend', 'app_purchase']);
-        let salesVolumeAllTime = 0;
-        let salesVolumeToday = 0;
+        // Pacing volume: what users' owners were debited in morsels for uses. A morsel is pacing, not a
+        // price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa), so this is not a
+        // sales figure. It counts the pacing legs (pacing_charge + pacing_burn) and the spend legs the
+        // 3.26.x morsel-price flows wrote, so history before the ruling stays in the total. The fee leg
+        // (marketplace_fee) is the operator's share of that pacing.
+        const PACING_SPEND_TYPES = new Set(['pacing_charge', 'pacing_burn', 'commerce_spend', 'offer_spend', 'org_offer_spend', 'app_purchase']);
+        let pacingVolumeAllTime = 0;
+        let pacingVolumeToday = 0;
         let operatorFeesAllTime = 0;
         let operatorFeesToday = 0;
 
@@ -385,9 +393,9 @@ export function adminRouter(
                 totalBurned += Math.abs(tx.amount);
                 if (txDate >= thirtyDaysAgo) burned30d += Math.abs(tx.amount);
             }
-            if (SALE_SPEND_TYPES.has(tx.type)) {
-                salesVolumeAllTime += Math.abs(tx.amount);
-                if (isToday) salesVolumeToday += Math.abs(tx.amount);
+            if (PACING_SPEND_TYPES.has(tx.type)) {
+                pacingVolumeAllTime += Math.abs(tx.amount);
+                if (isToday) pacingVolumeToday += Math.abs(tx.amount);
             }
             if (tx.type === 'marketplace_fee') {
                 operatorFeesAllTime += tx.amount;
@@ -416,6 +424,7 @@ export function adminRouter(
                 const status = v?.status ?? 'open';
                 if (status in sessionCounts) sessionCounts[status as keyof typeof sessionCounts]++;
                 sessionCounts.total++;
+                // A 3.26.x session could be in 'morsel'; morsels are pacing and never money volume.
                 if (status === 'completed' && v?.currency && v.currency !== 'morsel') {
                     moneyVolume[v.currency] = (moneyVolume[v.currency] ?? 0) + (v.total ?? 0);
                 }
@@ -534,8 +543,14 @@ export function adminRouter(
                     fee_mode: config.marketplaceFeeMode,
                     fee_percent: config.commerceFeePercent ?? config.marketplaceTransactionFeePercent,
                     checkout_sessions: sessionCounts,
-                    sales_volume_all_time: salesVolumeAllTime,
-                    sales_volume_today: salesVolumeToday,
+                    pacing_volume_all_time: pacingVolumeAllTime,
+                    pacing_volume_today: pacingVolumeToday,
+                    // The 3.x names, mirroring the pacing volume until 4.0.0: morsels are not sales.
+                    ...(legacyMorselFieldsLive() ? {
+                        sales_volume_all_time: pacingVolumeAllTime,
+                        sales_volume_today: pacingVolumeToday,
+                        deprecated: { sales_volume_all_time: MORSEL_PRICE_DEPRECATION, sales_volume_today: MORSEL_PRICE_DEPRECATION },
+                    } : {}),
                     operator_fees_all_time: operatorFeesAllTime,
                     operator_fees_today: operatorFeesToday,
                     // Real-money commerce (minor units per ISO currency), separate from morsels.

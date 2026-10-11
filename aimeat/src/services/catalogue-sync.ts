@@ -13,6 +13,8 @@
  *   - syncCatalogueToPeer(peer, config, storage): diff, hash, sign, and push to one peer
  *
  * @version-history
+ *   v1.3.0 — 2026-10-11 — An action's pricing goes out as toll_morsels, the pacing amount, with
+ *     base_morsels as a deprecated mirror for a 3.x peer until 4.0.0 (a morsel is pacing, not a price).
  *   v1.2.0 — 2026-10-06 — The sync carries a delivery proof: the peer it is for and the send time
  *     (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.1.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -28,6 +30,7 @@ import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { logger } from '../utils/logger.js';
+import { presentActionPricing } from './action-pacing.js';
 
 /** Per-peer sync metadata. */
 export interface PeerSyncState {
@@ -128,10 +131,8 @@ export async function syncCatalogueToPeer(
         category: a.category,
         input_schema: a.inputSchema,
         output_schema: a.outputSchema,
-        pricing: {
-          base_morsels: a.pricing.baseMorsels,
-          per_unit: a.pricing.perUnit,
-        },
+        // toll_morsels is the pacing amount; base_morsels mirrors it for a 3.x peer until 4.0.0.
+        pricing: presentActionPricing(a.pricing),
         tags: a.tags,
         semantic: a.semantic,
         created_at: a.createdAt,

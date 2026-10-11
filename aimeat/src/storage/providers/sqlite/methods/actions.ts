@@ -8,13 +8,15 @@
  * @structure actionMethods
  * @usage Object.assign(SqliteStorage.prototype, actionMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-11 — deserializeAction reads the pricing JSON through readStoredActionPricing, so a
+ *     stored `baseMorsels` is the pacing amount `tollMorsels` (a morsel is pacing, not a price).
  *   v1.0.0 — 2026-10-05 — createAction, getAction, listActions, deleteAction, listActionsByProvider,
  *     countActionsForProviders, updateAction, deserializeAction moved here from work.ts so the file mirrors
  *     postgres-kysely/methods/actions.ts (secaudit 2026-10, M8).
  */
 import type { ActionRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
-import { countActionsForProviders as countActionsForProvidersRepo } from '../repos/action.js';
+import { countActionsForProviders as countActionsForProvidersRepo, readStoredActionPricing } from '../repos/action.js';
 
 export const actionMethods = {
   // ── Actions ──
@@ -110,7 +112,8 @@ export const actionMethods = {
       description: row.description as string,
       inputSchema: JSON.parse(row.inputSchema as string),
       outputSchema: JSON.parse(row.outputSchema as string),
-      pricing: JSON.parse(row.pricing as string),
+      // A 3.26.x row carries `baseMorsels`; it reads as the pacing amount `tollMorsels`.
+      pricing: readStoredActionPricing(row.pricing as string),
       tags: JSON.parse(row.tags as string) as string[],
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,

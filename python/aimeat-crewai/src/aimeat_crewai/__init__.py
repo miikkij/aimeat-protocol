@@ -26,6 +26,11 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.34.0 -- 2026-10-11 -- An offer has two values: a money price (`build_offer(price_money=...)`,
+    `priceMoney`) and a pacing amount in morsels per use (`toll_morsels=`, `tollMorsels`). A morsel
+    paces use and is never a price. `build_offer(price={"morsels": n})` is deprecated: it warns and
+    writes `tollMorsels`, because the node reads the old field as pacing until 4.0.0 and refuses it
+    after. The "priced" level reads a money price or a pacing amount (offers.py, workflow_spec.py).
   0.33.0 -- 2026-10-11 -- The owner can stop an agent, and the daemon knows (daemon.py has the
     detail). The node holds a stopped agent's new work: its own task list and inbox carry no
     waiting task and no message and say `agent_stopped: true`, and nothing that would wake it is
@@ -228,7 +233,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.33.0"
+__version__ = "0.34.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

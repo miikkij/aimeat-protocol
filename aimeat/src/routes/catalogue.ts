@@ -18,6 +18,11 @@
  *   v1.4.0 — 2026-09-08 — The six `@context` blocks read DEFAULT_CONTEXT (utils/onto-context.ts)
  *     instead of each carrying its own two-prefix copy. The copies were what a consumer resolved
  *     against, and they had drifted from what the node itself accepts.
+ *   v1.5.0 — 2026-10-11 — An action's morsel amount is pacing, not a price (ruling
+ *     decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Every listing's pricing carries
+ *     toll_morsels and, until 4.0.0, base_morsels as a deprecated mirror. POST /v1/catalogue takes
+ *     toll_morsels; the old price_morsels is read as pacing until 4.0.0 and refused after
+ *     (MORSEL_PRICE_REMOVED).
  */
 import { Router } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
@@ -30,6 +35,8 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
 import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
+import { actionPricingFromRequest, presentActionPricing } from '../services/action-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 
 /** Shape of a stored knowledge-package manifest value (memory record `value`). */
 interface KnowledgePackageManifest {
@@ -86,13 +93,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         description: a.description,
         provider_gaii: a.providerGaii,
         category: a.category,
-        pricing: {
-          base_morsels: a.pricing.baseMorsels,
-          per_unit: a.pricing.perUnit ? {
-            unit: a.pricing.perUnit.unit,
-            morsels_per_1000: a.pricing.perUnit.morselsPer1000,
-          } : undefined,
-        },
+        pricing: presentActionPricing(a.pricing, 'snake'),
         tags: a.tags,
         semantic: a.semantic,
         source_node: a.tags.find(t => t.startsWith('federated:'))?.replace('federated:', '') ?? config.nodeId,
@@ -129,7 +130,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         description: a.description,
         provider_gaii: a.providerGaii,
         category: a.category,
-        pricing: { base_morsels: a.pricing.baseMorsels },
+        pricing: presentActionPricing(a.pricing, 'none'),
         tags: a.tags,
         semantic: a.semantic,
         source_node: a.tags.find(t => t.startsWith('federated:'))?.replace('federated:', '') ?? config.nodeId,
@@ -371,12 +372,26 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     // invariant 1). resolveIdentity keeps an agent AS the agent (attribution) and only lifts an
     // owner session to its GHII.
     const gaii = resolveIdentity(req.auth!, config.nodeId);
-    const { display_name, description, category, price_morsels, unit, webhook_url } = req.body ?? {};
+    const { display_name, description, category, toll_morsels, price_morsels, unit, webhook_url } = req.body ?? {};
 
     if (!display_name || !description) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'display_name and description are required'));
       return;
     }
+    // The pacing amount per use: toll_morsels, or the 3.x price_morsels read as pacing until 4.0.0.
+    // A morsel is pacing, not a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+    if (price_morsels !== undefined && !legacyMorselFieldsLive()) {
+      res.status(400).json(error(config.nodeId, 'MORSEL_PRICE_REMOVED',
+        'This server no longer takes a price in morsels. Morsels set the pace of use and are not a price: send the pacing amount per use instead.',
+        400, { field: 'price_morsels', use_instead: 'toll_morsels', removed_in: MORSEL_PRICE_FIELDS_REMOVED_IN }));
+      return;
+    }
+    const asWhole = (v: unknown): number | undefined => {
+      const n = Number(v);
+      return v !== undefined && v !== null && v !== '' && Number.isInteger(n) && n >= 0 ? n : undefined;
+    };
+    const priced = actionPricingFromRequest(config, { toll_morsels: asWhole(toll_morsels), base_morsels: asWhole(price_morsels) });
+    if ('code' in priced) { res.status(400).json(error(config.nodeId, priced.code, priced.message)); return; }
 
     const id = randomUUID();
     const now = new Date().toISOString();
@@ -388,7 +403,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       category: category || 'general',
       inputSchema: {},
       outputSchema: {},
-      pricing: { baseMorsels: Number(price_morsels) || 0, perUnit: unit ? { unit, morselsPer1000: 0 } : undefined },
+      pricing: unit ? { ...priced.pricing, perUnit: { unit, morselsPer1000: 0 } } : priced.pricing,
       tags: [],
       webhookUrl: webhook_url,
       createdAt: now,
@@ -400,7 +415,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       display_name: action.displayName,
       description: action.description,
       category: action.category,
-      pricing: action.pricing,
+      pricing: presentActionPricing(action.pricing),
       created_at: action.createdAt,
     }));
     emitChange('catalogue');
@@ -441,10 +456,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       category: action.category,
       input_schema: action.inputSchema,
       output_schema: action.outputSchema,
-      pricing: {
-        base_morsels: action.pricing.baseMorsels,
-        per_unit: action.pricing.perUnit,
-      },
+      pricing: presentActionPricing(action.pricing),
       estimated_time_seconds: action.estimatedTimeSeconds,
       tags: action.tags,
       semantic: action.semantic,

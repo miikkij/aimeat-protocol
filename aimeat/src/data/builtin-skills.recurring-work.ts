@@ -31,6 +31,11 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.8.0 — 2026-10-11 — Section 5, putting the work on a clock: the schedule kinds and fields, the
+ *     REST routes for an agent with no model, steps joined by memory keys, who starts a task a fire
+ *     gives (the agent's task-start answer, not its mode alone) and the edge cases. Folded in from
+ *     the Finnish scheduler guide of the package docs, a file the node never served, now deleted
+ *     (docs audit 2026-10-11, D7).
  *   v1.7.2 — 2026-10-11 — Section 4: one `offers` entry in the definition puts the agent on the
  *     person's offers page; the node adds one when there is none.
  *   v1.7.3 — 2026-10-11 — Section 4: the first run's task text is the offer's example.
@@ -69,7 +74,7 @@ const RECURRING_WORK_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-recurring-work
-description: What to do when someone asks for something to happen regularly ("every morning", "each week", "keep an eye on"). Find out whether they already have an agent that could do it and give the work to that agent, rather than building a fourth parallel implementation they will never find again. Covers how to look, how to hand work over, and the two token-free options when there is nobody to hand it to, and how to propose a new agent when the work needs one. Use before creating any schedule or installing any extension that runs on a clock.
+description: What to do when someone asks for something to happen regularly ("every morning", "each week", "keep an eye on"). Find out whether they already have an agent that could do it and give the work to that agent, rather than building a fourth parallel implementation they will never find again. Covers how to look, how to hand work over, and the two token-free options when there is nobody to hand it to, and how to propose a new agent when the work needs one. Then how to put the work on a clock, with the schedule kinds and their fields, the REST routes for an agent with no model in the loop, steps joined by memory keys, who starts a task the clock gives, and what a fire does when an agent is offline or the last run is still going. Use before creating any schedule or installing any extension that runs on a clock.
 license: MIT
 metadata:
   audience: agent
@@ -176,6 +181,57 @@ answer to the approval says so; when their connector next connects, the node giv
 key and the connector starts it, with nothing for them to press. A person with more than one
 connector says which computer: \`aimeat_connector_list\` names them, and the proposal's
 \`connector\` carries the choice, so the agent waits for that computer and no other.
+
+## 5. Putting the work on a clock
+
+The node holds the clock. A schedule fires while the agent that made it is offline, and the owner
+sees every schedule and can pause or delete any of them.
+
+\`aimeat_schedule_create\` takes \`kind\`, \`cron\` (five fields: \`"0 7 * * *"\` is 07:00 every day),
+\`display_name\`, \`purpose\` (the owner reads it) and \`timezone\`. Give an IANA timezone
+(\`"Europe/Helsinki"\`) to every daily schedule, or summer time moves it by an hour. Then, by kind:
+
+| kind | Fields | The caller needs |
+|---|---|---|
+| \`ai\` | \`prompt\`, \`input_keys\` (the owner's memory keys given to the model), \`output_key\` (where the result is written, private) | \`ai:use\` |
+| \`agent_task\` | \`target_agent\` (an agent of the same owner; yourself when left out), \`task_title\`, \`task_description\` | \`task:write\` |
+| \`extension\` | \`extension_name\`, \`action_id\`, \`input\` (the action's parameters on every fire), \`instance_id\` | |
+| \`refinery\` | \`input: { prefix }\` | \`connections:read-through\`, \`ai:use\`, \`organism:rows\`, \`memory:write\` |
+
+It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you made (\`detail: true\` adds
+each one's prompt), \`aimeat_schedule_update\` pauses (\`enabled: false\`), resumes, or changes the
+cron, the timezone, the name or the prompt, \`aimeat_schedule_trigger\` runs one now, and
+\`aimeat_schedule_delete\` removes it. A clock you run yourself, outside the node, can still be shown
+to the owner: \`aimeat_schedule_report_internal\` lists it beside theirs, and the node does not run it.
+
+**Over REST, for an agent with no model in the loop.** \`POST /v1/agents/{name}/schedules\` puts a
+schedule on the named agent, and any token of the same owner may call it: the target is the path, not
+the token. \`POST /v1/schedules\` takes the target in the body as \`agent_name\` (or \`target_agent\`,
+or \`agent\`). An \`agent_task\` schedule needs the task, either \`task_template: { title,
+description }\` or \`task_title\` and \`task_description\`. An agent of another owner answers 404
+AGENT_NOT_FOUND. The rest is \`GET /v1/schedules\`, \`GET\`, \`PATCH\` and \`DELETE
+/v1/schedules/{id}\`, and \`POST /v1/schedules/{id}/trigger\`.
+
+**Steps are joined by memory keys, not by order.** No schedule waits for another to finish. Put the
+steps at different times (fetch at 06:00, write at 07:00), and name the exact memory key each step
+reads and writes, in \`task_description\` and in \`input_keys\`, so each step finds what the one before
+it left.
+
+**Who starts a task the clock gives.** An \`agent_task\` fire queues a task. It starts on its own only
+when the agent's owner lets that agent start tasks by itself (\`aimeat_agent_task_start_set\`, or an
+agent in \`task-runner\` mode when the owner has said nothing); otherwise it waits for the owner's OK
+on each one. An agent that can spend money, send mail or delete as the owner always waits. The
+\`ai\`, \`extension\` and \`refinery\` kinds need no agent at all, which makes them the choice for work
+nobody should have to approve every morning.
+
+**What a fire does when things are not ready.**
+
+- The target agent is offline: the task waits in its queue and is picked up when it connects.
+- The previous run is still going, or its task is still open: this fire is skipped.
+- A fire missed while the node was down is not made up later. A "every morning" job skips that
+  morning; it does not run at noon.
+- The owner can cap a schedule: \`max_runs\` turns it off after that many runs, and \`daily_limit\`
+  caps the day's AI spend in US dollars.
 
 ## The rule underneath all of this
 

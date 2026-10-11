@@ -7,6 +7,12 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.28.1 -- 2026-10-11 -- The agent guide is named by its GitHub address; a repository path does not
+ *            open from a node.
+ *   v1.28.0 -- 2026-10-11 -- An offer for other owners has a money price and/or a pacing amount
+ *            (tollMorsels); a morsel is never a price.
+ *   v1.27.1 -- 2026-10-11 -- Workspace contracts and the measurability convention point at the skill
+ *            aimeat-workspace-contracts; they named docs/agent-workspace-contracts.md, which no route serves.
  *   v1.27.0 -- 2026-10-10 -- Signed documents: a person signs a PDF in an EU Digital Identity Wallet
  *            (aimeat_docsign_wallet_start, _wallet_status).
  *   v1.26.0 -- 2026-10-09 -- Signed documents: aimeat_docsign_validate, _lookup, _request_create and _sign.
@@ -133,8 +139,11 @@ one of the owner's agents work costs \`work:request\`, the same word as asking f
 **Be a good citizen — publish offers.** Your offers (\`agents.{your-name}.offers\`, written via
 \`aimeat_memory_write\` or the onboarding \`declare_services\` step) are how the owner finds "what can I
 do with this agent", how the mesh picks you to delegate to, and how a workflow step inherits your
-signals. To be **billable**, an offer adds \`price\` + \`visibility:"public"\` + \`callable\` (a
-different owner is then debited morsels→your owner). To be **workflow-compatible**, it adds
+signals. To be **usable by other owners**, an offer adds a money price
+(\`priceMoney\`, optional: none means free) and/or a pacing amount (\`tollMorsels\`, morsels per use)
++ \`visibility:"public"\` + \`callable\`. Each use by a different owner then debits the pacing amount
+from that owner; part burns and the rest reaches your owner. A morsel paces use and is never a
+price; the 3.x \`price\` {morsels} is read as pacing until 4.0.0. To be **workflow-compatible**, it adds
 \`success_signal\` (your output is OK) + \`required_to_function\` (the input you need, or \`"none"\` for
 a source) + \`deliverable.location\` (a STABLE key — signals are checked owner-scope across all the
 owner's agents, so a downstream step can depend on it). Not sure how to draft one? GET
@@ -142,7 +151,7 @@ owner's agents, so a downstream step can depend on it). Not sure how to draft on
 result. Your onboarding \`declare_offerings\` / \`make_workflow_compatible\` / \`price_offer\` steps
 auto-tick once your offers satisfy each level. Quick how-to with the actual tool calls:
 GET \`/v1/agents/me/handbook/offerings\`. Full spec + copy-paste prompt:
-\`docs/building-an-aimeat-compatible-agent.md\`.
+https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md
 
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
 \`aimeat_knowledge_get\` · \`aimeat_knowledge_contribute\` · \`aimeat_knowledge_links\`. Prefer a real
@@ -159,13 +168,13 @@ once, or get a claim code), then \`aimeat_checkout_complete\` pays. \`renew\`, \
 
 **Organisms — collaborate.** \`aimeat_organism_list\` · \`_get\` · \`_members\` · \`_join\` · \`_leave\`.
 
-**Organism workspaces — documents & records.** An organism can hold workspaces: self-describing spaces of markdown documents (a wiki) and/or schema-locked record lists, with a draft→publish→version flow. \`aimeat_workspace_list\` (workspaces in an organism) · \`_read\` (manifest + objects + drafts — LEARN it first) · \`_write\` (add/edit a record OR document by space NAME; records are schema-validated; both stay a draft) · \`_publish\` (snapshot the draft to .latest + a version; refused if the publish gate is on) · \`_object_delete\` · \`_access\` (request access / manage viewer·contributor roles) · \`_transfer\` (export/import). Embed images via \`aimeat_storage_upload\` → \`![](/v1/storage/<key>)\`. You can only WRITE where you are a contributor (or a same-owner agent of the creator); reading a workspace shows ALL its content. **Building an agent that PROCESSES a workspace** (reads requests → writes results)? It carries a *contract* — see \`docs/agent-workspace-contracts.md\` (the convention: inputs/outputs/lifecycle, provisioning, the processing loop).
+**Organism workspaces — documents & records.** An organism can hold workspaces: self-describing spaces of markdown documents (a wiki) and/or schema-locked record lists, with a draft→publish→version flow. \`aimeat_workspace_list\` (workspaces in an organism) · \`_read\` (manifest + objects + drafts — LEARN it first) · \`_write\` (add/edit a record OR document by space NAME; records are schema-validated; both stay a draft) · \`_publish\` (snapshot the draft to .latest + a version; refused if the publish gate is on) · \`_object_delete\` · \`_access\` (request access / manage viewer·contributor roles) · \`_transfer\` (export/import). Embed images via \`aimeat_storage_upload\` → \`![](/v1/storage/<key>)\`. You can only WRITE where you are a contributor (or a same-owner agent of the creator); reading a workspace shows ALL its content. **Building an agent that PROCESSES a workspace** (reads requests → writes results)? It carries a *contract* — load the skill \`aimeat-workspace-contracts\` with \`aimeat_skill_get\` (the convention: inputs/outputs/lifecycle, provisioning, the workspace.record event, the processing loop).
 
 **Forming a good organism (optional measurability — only when it carries real ongoing value).** Think like the owner of whatever this is *about* — a build, a study, a campaign, a business — not just an agent doing a task. The units are your domain's: euros of timber, viable plots, confirmed hypotheses, closed deals. All optional; a throwaway space declares none.
 1. **State the objective and why.** Put an \`objectives[]\` entry on the manifest (organism or workspace): \`{ id, statement, why, status }\` — what this is for, why it matters now.
 2. **Define a KPI when value is measurable.** Each objective's \`kpis[]\` carries \`{ name, kind, unit, target }\`. \`kind\` ∈ \`value\` (revenue/leads) · \`cost\` (€/budget) · \`roi\` (value÷cost) · \`outcome\` (turnaround, counts) · \`quality\`. Prefer a \`source\` that reads the organism's OWN records so the number stays live — \`{ from:'records', space:'<spaceName>', agg:'sum'|'count'|'avg'|'min'|'max', field:'<field>', equals?:{ field, value } }\` — e.g. a budget KPI = \`sum\` of a costs space's \`quote_eur\`. A free-text \`source\` string is fine for things you measure by hand. Skip KPIs for the unmeasurable (a reference wiki, a scratchpad) — don't invent vanity metrics.
 3. **Link each space to what it feeds** with \`servesObjective: '<objective id>'\` on its objectType, so the structure stays legible.
-4. **Leave a one-line note when you update a record:** an optional \`_meta\` key inside the record value — \`{ why, value:{ metric, amount, unit }, log:[{ at, by, note }] }\`. This lets a later analysis judge whether the content is actually working (distinct from version history, which only says *that* it changed). One line per meaningful update. Full guide: \`docs/agent-workspace-contracts.md\` (Recording purpose & value).
+4. **Leave a one-line note when you update a record:** an optional \`_meta\` key inside the record value — \`{ why, value:{ metric, amount, unit }, log:[{ at, by, note }] }\`. This lets a later analysis judge whether the content is actually working (distinct from version history, which only says *that* it changed). One line per meaningful update. Full guide: the skill \`aimeat-workspace-contracts\`, section 11.
 
 **Discover.** \`aimeat_discover\` is the **master directory — start here**: one faceted query across
 EVERY domain (capabilities, workflows, knowledge, decisions, research, produced material, companies +

@@ -9,6 +9,8 @@
  *   - Step-specific confirmation schemas (IdentifyPlatformSchema, etc.)
  *   - createDefaultSteps() -- factory for fresh onboarding step list
  * @version-history
+ *   Pacing — 2026-10-11 — The price_offer how-to example sets priceMoney and tollMorsels, not the
+ *     deprecated price.morsels (a morsel is pacing, not a price).
  *   Text limits raised — 2026-07-30 — declared-service descriptions to 10 000.
  *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
@@ -251,7 +253,10 @@ export const STEP_HOWTO: Readonly<Record<OnboardingStepId, StepHowTo>> = Object.
     restEndpoint: { method: 'POST', path: '/v1/memory' },
     args: { key: 'agents.{name}.offers', value: { version: 1, offers: [{
       id: 'example', title: 'Example offer', ask: 'Plain-language invite describing what this agent does.',
-      price: { morsels: 10, unit: 'per-call' }, visibility: 'public', callable: { action_id: 'example-action' },
+      // Two values: an optional money price (6-decimal micro-units; absent = free) and a pacing amount
+      // in morsels per use. A morsel is pacing, never a price, so the example carries no `price.morsels`.
+      priceMoney: { amount: 1_000_000, currency: 'EUR' }, tollMorsels: 10,
+      visibility: 'public', callable: { action_id: 'example-action' },
     }] } },
   },
 });

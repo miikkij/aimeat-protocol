@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.19.0 (2026-10-11): check:doc-links, a served string never sends its reader to a repository docs/ file.
  *  - 1.18.0 (2026-10-11): lint, the pre-commit hook's cached ESLint, so the 800-line file limit refuses the gate and not only the commit after it.
  *  - 1.17.0 (2026-10-11): check:package-scripts, every package.json script points at a tracked file and an existing script.
  *  - 1.16.0 (2026-10-11): check:config-tab, the admin Config tab against the schema, the English locale and the code that reads the settings.
@@ -100,6 +101,9 @@ export const FAST_CHECKS = [
     // From the instruction review of 2026-09-18: production's manual documented routes deleted
     // three weeks earlier, and every structural check was green because none reads the prose.
     { script: 'check:prompt-refs', label: 'What an agent is told names only tools and routes that exist' },
+    // From the docs audit of 2026-10-11: the handbooks, a tool description, the Boards page and the
+    // connect prompt sent their reader to repository docs/ files no route serves.
+    { script: 'check:doc-links', label: 'Served text links no repository file the node does not serve' },
     // Built on 2026-09-03 for exactly this axis and wired into nothing until 2026-09-14, when an
     // agent's company update dropped organism_id in silence: REST took the field and MCP did not.
     { script: 'check:field-reach', label: 'A record field REST can set, an agent can set too' },

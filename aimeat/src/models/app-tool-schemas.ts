@@ -6,13 +6,21 @@
  *   PRICED TOOLS in the public memory record `apps.{appId}.tools` under the app owner's GHII.
  *   The commerce app-tool sellable resolver validates the record against these schemas at
  *   resolve time — a malformed manifest fails the checkout loudly (422), never silently.
- *   Prices follow the node-wide convention: morsels are plain integers, money is 6-decimal
- *   micro-units (offer-schemas precedent).
- * @structure AppToolSchema · AppToolPlanSchema · AppToolsDocSchema · appToolsKey · AppTool · AppToolsDoc
+ *   Each tool has two values (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): an
+ *   optional money price in 6-decimal micro-units, and a pacing amount in whole morsels per call. A
+ *   morsel is never a price.
+ * @structure AppToolSchema · AppToolPlanSchema · AppToolsDocSchema · appToolsKey · AppTool · AppToolsDoc ·
+ *   isToolPriced · toolTollMorsels · isToolOffered · normalizeToolPacing · legacyToolPriceRefusal ·
+ *   presentToolPacing · toolMoneyPrices · applyLockedInput
  * @usage
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
+ *   const pacing = toolTollMorsels(tool);   // tollMorsels + a deprecated price.morsels
  * @version-history
+ *   v1.7.0 — 2026-10-11 — A morsel is pacing, never a price. isToolPriced is money only; a tool's
+ *     `price.morsels` is deprecated and read as pacing (toolTollMorsels, isToolOffered,
+ *     normalizeToolPacing, presentToolPacing), refused from 4.0.0 (legacyToolPriceRefusal). A `price`
+ *     that carries `deprecated` is the read mirror sent back, and is not added twice.
  *   v1.6.0 — 2026-10-07 — `toolMoneyPrices`: every money price a tool is sold at, read from both
  *     `priceMoney` and `pricesMoney`, for the catalog, the WebMCP payment block and the checkout.
  *   Comment only — 2026-09-13 — `exchange` states the developer's two decisions: a tool and the flagged
@@ -45,6 +53,8 @@
 import { z } from 'zod';
 import { MONEY_CURRENCIES, moneyPricesOf } from '../commerce/money.js';
 import { ProvenanceSchema, OdpsExtrasSchema } from './odps-schemas.js';
+import { TOLL_MORSELS_MAX } from './offer-schemas.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 
 /** A provider pricing plan on a sellable tool — mirrors exchange-market OfferingPlan so a tool can carry
  *  per-call / volume-bundle / subscription pricing surfaced on its EXCHANGE offering. */
@@ -95,16 +105,24 @@ export const AppToolSchema = z.object({
    */
   agent: z.string().max(100).optional(),
   /**
-   * Morsels burned per call to bound the RATE this tool can be consumed at — a brake, never revenue
-   * (invariant M1: the burn is not credited to anyone). Independent of `price`/`priceMoney`: a tool sold
-   * for money is still paced when this is set, which is the only way a money-priced capability gets a
-   * ceiling that a budget alone cannot give it. Absent = the node's default (shipped at 0).
+   * The pacing amount: morsels per call that bound the RATE this tool can be consumed at. Never a
+   * price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): a share burns, the
+   * operator share follows the fee policy, and the rest is credited to the app owner. Independent of
+   * `priceMoney`: a tool sold for money is still paced when this is set, and a tool with no money price
+   * is free and paced. Absent = the node's default (shipped at 0). Read it with toolTollMorsels, which
+   * adds a deprecated `price.morsels`.
    */
   tollMorsels: z.number().int().min(0).max(100).optional(),
-  /** Morsel price per call. Absent/0 = not for sale cross-owner in morsels. */
+  /**
+   * Deprecated (3.x): an old morsel "price", read as pacing and added to `tollMorsels`
+   * (toolTollMorsels). Accepted until MORSEL_PRICE_FIELDS_REMOVED_IN (legacyToolPriceRefusal).
+   */
   price: z.object({
     morsels: z.number().int().nonnegative(),
     unit: z.string().max(40).optional(),
+    // Present on the mirror a read answers with (presentToolPacing). A client that sends the mirror
+    // back has sent the pacing amount it already holds, so a marked price is not added again.
+    deprecated: z.string().max(400).optional(),
   }).optional(),
   /** Money price per call: amount in 6-decimal MICRO-UNITS (1 EUR = 1_000_000) + ISO code. */
   priceMoney: z.object({
@@ -186,14 +204,6 @@ export const appIdFromToolsKey = (key: string): string | null => {
 };
 
 /**
- * Does this tool carry a price, in ANY of the three places a manifest may state one?
- *
- * One definition, because there were two and they disagreed: the app-tool route ignored `pricesMoney`,
- * so a tool sold only in USD reached the free invoke path and was then billed in morsels against an
- * unrelated contract. "Is this priced" is a property of the manifest, so it belongs beside the schema
- * rather than in each route that happens to ask.
- */
-/**
  * The input a tool actually runs with: what the caller sent, with the tool's own fixed fields laid
  * over the top. Locked LAST on purpose — a caller must not be able to talk their way into a
  * neighbouring product by sending the field themselves.
@@ -205,14 +215,84 @@ export function applyLockedInput(
   return tool.lockedInput ? { ...input, ...tool.lockedInput } : input;
 }
 
+/**
+ * Does this tool carry a MONEY price, in either place a manifest may state one?
+ *
+ * One definition, because there were two and they disagreed: the app-tool route ignored `pricesMoney`,
+ * so a tool sold only in USD reached the free invoke path and was then billed in morsels against an
+ * unrelated contract. "Is this priced" is a property of the manifest, so it belongs beside the schema
+ * rather than in each route that happens to ask.
+ *
+ * Money only since 2026-10-11 (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa):
+ * a morsel is pacing, never a price, so a tool with only `price.morsels` or `tollMorsels` is FREE and
+ * paced (toolTollMorsels). Whether a tool is offered to other owners at all is isToolOffered.
+ */
 export function isToolPriced(t: {
-  price?: { morsels?: number } | null;
   priceMoney?: { amount?: number } | null;
   pricesMoney?: Array<{ amount?: number }> | null;
 }): boolean {
-  if (t.price && typeof t.price.morsels === 'number' && t.price.morsels > 0) return true;
   if (t.priceMoney && typeof t.priceMoney.amount === 'number' && t.priceMoney.amount > 0) return true;
   return (t.pricesMoney ?? []).some(m => typeof m?.amount === 'number' && m.amount > 0);
+}
+
+/**
+ * The pacing amount a tool declares, in morsels per call: `tollMorsels` plus a deprecated
+ * `price.morsels`, capped at TOLL_MORSELS_MAX (the node's per-use ceiling still applies when it is
+ * charged). 0 when it declares neither; the node's default then applies where the call is metered.
+ */
+export function toolTollMorsels(t: { tollMorsels?: number | null; price?: { morsels?: number; deprecated?: string } | null }): number {
+  const declared = typeof t.tollMorsels === 'number' && Number.isInteger(t.tollMorsels) && t.tollMorsels > 0 ? t.tollMorsels : 0;
+  // A price marked `deprecated` is the read mirror of the pacing amount, sent back: it is not added again.
+  if (t.price?.deprecated) return Math.min(declared || (t.price.morsels ?? 0), TOLL_MORSELS_MAX);
+  const legacy = t.price && typeof t.price.morsels === 'number' && Number.isInteger(t.price.morsels) && t.price.morsels > 0 ? t.price.morsels : 0;
+  return Math.min(declared + legacy, TOLL_MORSELS_MAX);
+}
+
+/**
+ * Is this tool offered to other owners: a money price, or a pacing amount on a free tool. A tool with
+ * neither belongs to its owner, as it always did, and lists only as the owner's own.
+ */
+export function isToolOffered(t: Parameters<typeof isToolPriced>[0] & Parameters<typeof toolTollMorsels>[0]): boolean {
+  return isToolPriced(t) || toolTollMorsels(t) > 0;
+}
+
+/**
+ * A tool as the pacing model stores it: a deprecated `price.morsels` folded into `tollMorsels` and
+ * `price` dropped, like normalizeOfferPacing. For the writes that store a manifest (they live outside
+ * this file); a tool with no old price comes back unchanged.
+ */
+export function normalizeToolPacing<T extends { tollMorsels?: number; price?: { morsels: number; unit?: string } }>(tool: T): T {
+  if (tool.price === undefined) return tool;
+  const toll = toolTollMorsels(tool);
+  const rest: Partial<T> = { ...tool };
+  delete rest.price;
+  delete rest.tollMorsels;
+  return (toll > 0 ? { ...rest, tollMorsels: toll } : rest) as T;
+}
+
+/**
+ * The write-side refusal for a manifest from MORSEL_PRICE_FIELDS_REMOVED_IN on: null while the old
+ * field is accepted (it is read as pacing), else the 400 MORSEL_PRICE_REMOVED to answer when any tool
+ * still sends `price.morsels`.
+ */
+export function legacyToolPriceRefusal(doc: { tools?: Array<{ name?: string; price?: { morsels?: number } | null }> }):
+  { status: 400; code: 'MORSEL_PRICE_REMOVED'; message: string } | null {
+  if (legacyMorselFieldsLive()) return null;
+  const named = (doc.tools ?? []).filter(t => t.price && typeof t.price.morsels === 'number').map(t => t.name ?? '?');
+  if (!named.length) return null;
+  return {
+    status: 400, code: 'MORSEL_PRICE_REMOVED',
+    message: `price.morsels was removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}: a morsel is pacing, not a price. `
+      + `Set tollMorsels (the pacing amount per use) and priceMoney on: ${named.join(', ')}.`,
+  };
+}
+
+/** A tool's pacing as a response shows it: `toll_morsels`, and the deprecated `price` mirror until 4.0.0. */
+export function presentToolPacing(t: Parameters<typeof toolTollMorsels>[0] & { price?: { unit?: string } | null }):
+  { toll_morsels: number; price?: { morsels: number; unit: string; deprecated: string } } {
+  const toll = toolTollMorsels(t);
+  if (toll <= 0 || !legacyMorselFieldsLive()) return { toll_morsels: toll };
+  return { toll_morsels: toll, price: { morsels: toll, unit: t.price?.unit ?? 'per-call', deprecated: MORSEL_PRICE_DEPRECATION } };
 }
 
 /**

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   v1.19.0 -- 2026-10-11 -- A service shows its money price (or Free) and its pacing amount, "Free · pacing
+ *     5 morsels", read from toll_morsels with price_morsels / pricing.base_morsels as the 3.x fallback; the
+ *     publish form's number is the pacing amount (sent as toll_morsels), never a price.
  *   v1.18.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a service name or description with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.18.0 -- 2026-09-26 -- Every part is a component that gets data (component plan, page group G4): the page frame
@@ -66,7 +69,7 @@ import { Space } from '/components/Layout.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { dateTime as fmtDateTime } from '/js/format.js';
+import { dateTime as fmtDateTime, priceAndPacing } from '/js/format.js';
 
 const SERVICE_CATEGORIES = ['language','translation','analysis','generation','coding','data','image','audio','video','search','utility','other'];
 
@@ -93,7 +96,6 @@ function schemaRow(schema, label) {
 function ServiceCard({ svc, expanded, onToggle, actions }) {
   const displayName = svc.display_name || svc.displayName || svc.name || '';
   const category = svc.category || '';
-  const priceMorsels = svc.price_morsels ?? svc.pricing?.base_morsels ?? svc.pricing?.baseMorsels ?? 0;
 
   return html`
     <${Row} open=${expanded} onToggle=${onToggle}>
@@ -102,7 +104,7 @@ function ServiceCard({ svc, expanded, onToggle, actions }) {
       <${Doors}>
         <${Marks}>
           ${category && html`<${Mark}>${category}<//>`}
-          <${Mark}>${priceMorsels ? priceMorsels + ' ❤️' : t('profile.services.free')}<//>
+          <${Mark}>${priceAndPacing(svc, t)}<//>
         <//>
         <${Icon} small expanded=${!!expanded}>${expanded ? '▼' : '▶'}<//>
       <//>
@@ -143,7 +145,6 @@ function ServiceDetail({ svc }) {
 
   const description = d.description || '';
   const webhookUrl = d.webhook_url || d.webhookUrl || '';
-  const priceMorsels = d.price_morsels ?? d.pricing?.base_morsels ?? d.pricing?.baseMorsels ?? 0;
   const priceUnit = d.unit || d.pricing?.per_unit?.unit || '';
   const tags = d.tags || [];
   const inputSchema = d.input_schema || d.inputSchema || null;
@@ -155,7 +156,7 @@ function ServiceDetail({ svc }) {
   return html`<${Facts} rows=${[
     description && { k: t('profile.services.descLabel'), v: description },
     providerGaii && { k: t('profile.services.provider'), v: providerGaii, mono: true },
-    { k: t('profile.services.priceLabel'), v: `${priceMorsels} morsels${priceUnit ? ' / ' + priceUnit : ''}` },
+    { k: t('profile.services.priceLabel'), v: `${priceAndPacing(d, t)}${priceUnit ? ' / ' + priceUnit : ''}` },
     webhookUrl && { k: t('profile.services.webhookLabel'), v: webhookUrl, mono: true },
     estimatedTime && { k: t('profile.services.estTime'), v: `${estimatedTime}s` },
     tags.length > 0 && { k: 'Tags', v: html`<${Marks}>${tags.map(tag => html`<${Mark} key=${tag}>${tag}<//>`)}<//>` },
@@ -300,7 +301,7 @@ function PublishForm({ onPublish, onCancel }) {
         <${TextField} label=${t('profile.services.nameLabel')} placeholder=${t('profile.services.namePlaceholder')} value=${name} onInput=${setName} />
         <${TextArea} label=${t('profile.services.descLabel')} rows=${3} placeholder=${t('profile.services.descPlaceholder')} value=${desc} onInput=${setDesc} />
         <${Select} label=${t('profile.services.categoryLabel')} value=${cat} onChange=${setCat} options=${SERVICE_CATEGORIES} />
-        <${TextField} type="number" label=${t('profile.services.priceLabel')} value=${price} min="0" onInput=${setPrice} />
+        <${TextField} type="number" label=${t('profile.services.pacingLabel')} help="commerce.pacing_toll" value=${price} min="0" max="100" onInput=${setPrice} />
         <${Select} label=${t('profile.services.unitLabel')} value=${unit} onChange=${setUnit} options=${[
           ['call', t('profile.services.unitPerCall')], ['minute', t('profile.services.unitPerMinute')],
           ['token', t('profile.services.unitPerToken')], ['task', t('profile.services.unitPerTask')],

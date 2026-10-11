@@ -18,6 +18,7 @@
  * @structure noDistributePaths() → the deny list from the manifest; copy() → cpSync with a filter
  * @usage  node scripts/copy-dist-assets.mjs   (run by `pnpm build`)
  * @version-history
+ *   v1.3.1 — 2026-10-11 — package-sale.md and datamap.md join the served contracts (contract-docs.ts).
  *   v1.3.0 — 2026-10-11 — Copies the three public record contracts from the repo-root docs/specs to
  *     dist/docs/specs, so GET /v1/specs/:name answers on a packaged node.
  *   v1.2.0 — 2026-09-28 — Copies the repo-root openapi.yaml to dist/openapi.yaml, so /v1/spec answers
@@ -80,7 +81,7 @@ copy('../docs/msm-examples', 'dist/docs/msm-examples', { recursive: true });
 copy('../docs/extensions', 'dist/docs/extensions', { recursive: true });
 // The public record contracts GET /v1/specs/:name serves (src/services/contract-docs.ts), one by
 // one: the rest of docs/specs is design notes, not something a node publishes.
-for (const name of ['signals-contract.md', 'visibility-contract.md', 'tracked-response-contract.md']) {
+for (const name of ['signals-contract.md', 'visibility-contract.md', 'tracked-response-contract.md', 'package-sale.md', 'datamap.md']) {
   copy(`../docs/specs/${name}`, `dist/docs/specs/${name}`);
 }
 // The API contract, for the same reason: it sits at the repo root, and GET /v1/spec, GET /openapi.json

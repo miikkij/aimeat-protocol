@@ -10,9 +10,11 @@
  *   (listOfferings/matchOfferings/offeringStats/needs/bids) and the metered-entitlement primitive
  *   (createEntitlement, list/pause/revoke) — mirroring the REST routes in src/routes/exchange*.ts, so
  *   pricing is always AUTHORITATIVE from the provider action (a consumer can never undercut it).
- *   Morsels are plain integers; money is 6-decimal micro-units. The two never mix.
+ *   Money is 6-decimal micro-units; morsels are whole units of pacing, never a price. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-10-11 — Texts call a morsel amount pacing, never a price (decision-morseli-on-tahdistus-ei-
+ *     hinta-tarjouksen-kaksi-arvoa).
  *   2026-10-06 — App-tool invocation documents unpriced access and the remaining paid-action checks.
  *   2026-10-06 — aimeat_exchange_accept takes offering_id (ext and action become the other way in), and
  *     aimeat_exchange_need_post takes usage_intent and requires app_id, as their routes do; both carry
@@ -87,7 +89,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_exchange_accept',
-        description: 'Accept a contract on an offering → mint a durable METERED ENTITLEMENT for YOU (the caller\'s own identity is the consumer — you can never accept on someone else\'s behalf). The per-call PRICE is read AUTHORITATIVELY from the provider\'s extension action, so you cannot undercut the provider or be charged a price you did not accept; you choose only your BUDGET cap (your own spend ceiling) and a contract ref. Re-accepting the same capability carries prior spend forward (renegotiation, not a meter reset). Morsels are integers; money is 6-decimal micro-units. After this, calling /v1/ext/{ext}/{action} is metered against the budget.',
+        description: 'Accept a contract on an offering → mint a durable METERED ENTITLEMENT for YOU (the caller\'s own identity is the consumer — you can never accept on someone else\'s behalf). The per-call PRICE is read AUTHORITATIVELY from the provider\'s extension action, so you cannot undercut the provider or be charged a price you did not accept; you choose only your BUDGET cap (your own spend ceiling) and a contract ref. Re-accepting the same capability carries prior spend forward (renegotiation, not a meter reset). Money is 6-decimal micro-units; a contract in morsels counts whole morsels of pacing, which pace use and are never a price. After this, calling /v1/ext/{ext}/{action} is metered against the budget.',
         caller: 'agent',
         visibility: agentEverywhere,
         // accept mints a durable metered entitlement (idempotent per (consumer, ext, action): re-accepting
@@ -103,7 +105,7 @@ export const exchangeTools = [
             ext: { type: 'string', required: false, description: 'The provider extension name, with action, when you accept a raw extension action instead of an offering.', zod: z.string().min(1).max(120) },
             action: { type: 'string', required: false, description: 'The action id on that extension (must be priced). Pair with ext.', zod: z.string().min(1).max(120) },
             contract_ref: { type: 'string', required: false, description: 'Your reference for this contract. Omit to auto-generate one.', zod: z.string().min(1).max(200) },
-            cap_units: { type: 'number', required: false, description: 'Budget ceiling in the action\'s unit (morsels or money micro-units). Must cover one charge. Omit = uncapped.', zod: z.number().int().nonnegative() },
+            cap_units: { type: 'number', required: false, description: 'Budget ceiling in the action\'s unit (money micro-units, or whole morsels of pacing). Must cover one charge. Omit = uncapped.', zod: z.number().int().nonnegative() },
             plan_id: { type: 'string', required: false, description: 'A provider-declared plan id (bundle/subscription). Omit = per_call.', zod: z.string().min(1).max(120) },
             app_id: { type: 'string', required: false, description: 'The consuming app id ("owner/filename") when this contract powers an app — shown on the per-app cost view.', zod: z.string().min(1).max(300) },
         },
@@ -162,7 +164,7 @@ export const exchangeTools = [
             // POST /v1/exchange/needs and the node's MCP read it; the catalog left it out (secaudit 2026-10 follow-up, Part B).
             usage_intent: { type: 'string', required: false, description: 'What you will do with the data, so a provider can judge whether its terms allow it.', zod: z.string().max(2000) },
             budget_unit: { type: 'string', required: false, description: 'Budget unit for `budget_cap`.', enum: ['morsels', 'money'] },
-            budget_cap: { type: 'number', required: false, description: 'Budget ceiling (integer; morsels or money micro-units).', zod: z.number().int().nonnegative() },
+            budget_cap: { type: 'number', required: false, description: 'Budget ceiling (integer; money micro-units, or whole morsels of pacing).', zod: z.number().int().nonnegative() },
             // The node's MCP has always required it, and the need is filed under it.
             app_id: { type: 'string', required: true, description: 'The app this need belongs to ("owner/filename").', zod: z.string().min(1).max(300) },
             autonomy: { type: 'string', required: false, description: 'supervised (default) or auto.', enum: ['supervised', 'auto'] },
@@ -213,7 +215,7 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_app_tool_invoke',
-        description: 'CALL a published app tool (a method like getCompanyBrief). Unpriced tools need no contract; priced tools require your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Read inputSchema with aimeat_app_tools_get first: invalid input is refused before charging, with every missing field named.',
+        description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Read inputSchema with aimeat_app_tools_get first: invalid input is refused before charging, with every missing field named.',
         caller: 'agent',
         visibility: agentMcp,
         annotations: { title: 'Invoke App Tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

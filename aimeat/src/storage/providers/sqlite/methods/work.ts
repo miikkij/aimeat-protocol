@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge. The board
  *   history below now belongs to methods/boards.ts.
  * @version-history
+ *   v1.9.0 — 2026-10-11 — deserializeWork reads a stored `cost.basePrice` as `cost.toll`, the escrowed
+ *     pacing amount (a morsel is pacing, not a price).
  *   v1.8.0 — 2026-10-08 — Work round-trips aiProvenanceId, the record of the delivered output
  *     (migration 0098, aiprov D8).
  *   v1.7.0 — 2026-10-05 — createAction, getAction, listActions, deleteAction, listActionsByProvider,
@@ -41,6 +43,16 @@
  */
 import type { WorkRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+
+/**
+ * The `cost` JSON column as a WorkRecord reads it. A row written by 3.26.x names the escrowed pacing
+ * amount `basePrice`; it reads as `toll` (a morsel is pacing, not a price). No migration.
+ */
+function readStoredWorkCost(json: string): WorkRecord['cost'] {
+  const raw = (JSON.parse(json) ?? {}) as Partial<WorkRecord['cost']> & { basePrice?: number };
+  const { basePrice, ...rest } = raw;
+  return { networkFee: 0, total: 0, inEscrow: 0, ...rest, toll: rest.toll ?? basePrice ?? 0 };
+}
 
 export const workMethods = {
 
@@ -137,7 +149,7 @@ export const workMethods = {
       providerGaii: row.providerGaii as string,
       requesterGaii: row.requesterGaii as string,
       input: JSON.parse(row.input as string),
-      cost: JSON.parse(row.cost as string),
+      cost: readStoredWorkCost(row.cost as string),
       ttlExpiresAt: row.ttlExpiresAt as string,
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,

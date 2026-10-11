@@ -13,6 +13,7 @@
  * @structure renderOffer · SellingEditor · askWord
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
+ *   v2.2.0 — 2026-10-11 — The selling editor asks for the offer's two values: the money price (empty = free) and the pacing amount (tollMorsels, empty = the node's default, question mark commerce.pacing_toll); the morsel price field is gone and the strip says Free and the pacing (ruling "morseli on tahdistus, ei hinta").
  *   v2.1.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
  *   v2.0.0 —2026-09-26 — Every part is a component call that gets data (page group G6): the frame
  *     is renderPage (SettingsPage), the tags data (the data handling and the format the dim Tag
@@ -56,6 +57,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { fmtMoney, microsFromInput } from '/js/utils.js';
+import { pacingOf } from '/js/format.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -84,19 +86,23 @@ export function askWord(it) {
   return { btn: t('profile.offers.copyPrompt').replace(/^[^\p{L}]+/u, ''), mode: c('modePrompt'), sub: c('modePromptSub') };
 }
 
-/** Visibility and price, saved with setOfferBilling. Its state is its own; the page around it is a render function. */
+/**
+ * Visibility and the offer's two values, saved with setOfferBilling: the money price (empty = free)
+ * and the pacing amount (empty = the node's default). Its state is its own; the page around it is a
+ * render function.
+ */
 function SellingEditor({ it, ctx }) {
   const o = it.offer;
   const [vis, setVis] = useState(o.visibility || 'private');
-  const [morsels, setMorsels] = useState(o.price?.morsels ?? 0);
+  const [toll, setToll] = useState(typeof o.tollMorsels === 'number' ? String(o.tollMorsels) : (pacingOf(o) > 0 ? String(pacingOf(o)) : ''));
   const [moneyAmt, setMoneyAmt] = useState(o.priceMoney ? fmtMoney(o.priceMoney.amount) : '');
   const [moneyCur, setMoneyCur] = useState(o.priceMoney?.currency ?? 'EUR');
   const [saving, setSaving] = useState(false);
   const save = async () => {
     setSaving(true);
-    const price = Number(morsels) > 0 ? { morsels: Number(morsels), unit: 'per-call' } : null;
+    const n = String(toll).trim() === '' ? null : Math.max(0, Math.min(100, Math.trunc(Number(toll) || 0)));
     const amt = microsFromInput(moneyAmt);
-    await ctx.saveBilling(it, { price, priceMoney: amt ? { amount: amt, currency: moneyCur } : null, visibility: vis });
+    await ctx.saveBilling(it, { tollMorsels: n, priceMoney: amt ? { amount: amt, currency: moneyCur } : null, visibility: vis });
     setSaving(false);
   };
   const money = microsFromInput(moneyAmt) !== null;
@@ -104,15 +110,15 @@ function SellingEditor({ it, ctx }) {
     <${Fields} cols=${4}>
       <${Select} label=${c('colVisibility')} value=${vis} onChange=${setVis}
         options=${['private', 'unlisted', 'public'].map(v => [v, t('profile.offers.visibility.' + v)])} />
-      <${TextField} label=${`${t('profile.offers.morsels')} / ${t('profile.offers.perCall')}`} help="commerce.morsels" type="number" min="0" value=${morsels} onInput=${setMorsels} />
       <${TextField} label=${c('colPrice')} inputMode="decimal" value=${moneyAmt} placeholder="0.00" onInput=${setMoneyAmt} />
       <${Select} label="EUR / USD" value=${moneyCur} onChange=${setMoneyCur} options=${['EUR', 'USD']} />
+      <${TextField} label=${t('profile.offers.pacingLabel')} help="commerce.pacing_toll" type="number" min="0" max="100" value=${toll} placeholder="0" onInput=${setToll} />
     <//>
     <${Space} above="medium">
       <${FormActions}><${Loud} control disabled=${saving} onClick=${save}>${t('profile.offers.saveBilling')}<//><//>
     <//>
     ${money ? html`<${Note}>${t('profile.offers.moneyHint')}<//>` : null}
-    ${vis !== 'private' && Number(morsels) > 0 ? html`<${Note}>${t('profile.offers.billHint').replace('{n}', morsels)}<//>` : null}
+    ${vis !== 'private' && Number(toll) > 0 ? html`<${Note}>${t('profile.offers.billHint', { n: toll })}<//>` : null}
     ${vis !== 'private' && !o.callable ? html`<${Note}><${Tinted} tone="notice">${t('profile.offers.notCallableHint')}<//><//>` : null}`;
 }
 
@@ -155,7 +161,7 @@ export function renderOffer(ctx, it) {
       : { key: 'latest', n: '·', label: c('stripLatest'), sub: t('profile.offers.noRunsYet') },
     { key: 'runs', n: runs.length, label: c('stripRuns'), sub: runs.length ? c('stripRatedOf', { n: runs.filter(d => d.rating).length }) : '' },
     { key: 'mode', n: aw.mode, tone: 'coral', label: c('stripMode'), sub: aw.sub },
-    { key: 'sell', n: forSale ? (o.price?.morsels || (o.priceMoney ? fmtMoney(o.priceMoney.amount) : '·')) : '·', label: c('sell'), sub: forSale ? `${t('profile.offers.visibility.' + o.visibility)}${o.priceMoney ? ` · ${o.priceMoney.currency}` : ''}` : c('sellPrivate') },
+    { key: 'sell', n: forSale ? (o.priceMoney ? fmtMoney(o.priceMoney.amount) : t('pacing.free')) : '·', label: c('sell'), sub: forSale ? [t('profile.offers.visibility.' + o.visibility), o.priceMoney ? o.priceMoney.currency : '', pacingOf(o) > 0 ? t('pacing.amount', { n: pacingOf(o) }) : ''].filter(Boolean).join(' · ') : c('sellPrivate') },
   ]} />`;
   const rail = [
     sameNeed.length ? { label: c('railSameNeed', { g: needLabel(it.need) }), items: sameNeed.map(x => ({ key: x.key, mark: '→', label: x.offer.title, count: x.agent, onClick: openOther(x) })) } : null,

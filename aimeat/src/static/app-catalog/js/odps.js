@@ -19,6 +19,7 @@
  *   readOdpsToolFields · readOdpsAppDefaults · odpsSuggestForTool · odpsToggleDefaults · odpsToggleTool
  * @usage import { odpsStatusInner, odpsToolFieldsHtml, readOdpsToolFields } from './odps.js'
  * @version-history
+ *   v1.0.2 — 2026-10-11 — A tool with a pacing amount (tollMorsels) and no money price is not blocked as unpriced.
  *   v1.0.1 — 2026-08-31 — The odps.yaml link escapes the node address before it goes in the href.
  *     It comes from the Settings field, so it was DOM text reinterpreted as markup, and it reached
  *     the page through the Monetize editor and the whole detail view (CodeQL js/xss-through-dom).
@@ -130,7 +131,8 @@ export function odpsBlockedReason(tool) {
   var hasOut = tool.outputSchema && Object.keys(tool.outputSchema).length;
   if (!hasIn || !hasOut) return t('odps.blockedSchema');
   if (!tool.action_id) return t('odps.blockedBinding');
-  var priced = (tool.price && tool.price.morsels > 0) || (tool.priceMoney && tool.priceMoney.amount > 0);
+  // On the market with a money price, a pacing amount (tollMorsels; 3.x price.morsels), or both.
+  var priced = tool.tollMorsels > 0 || (tool.price && tool.price.morsels > 0) || (tool.priceMoney && tool.priceMoney.amount > 0);
   if (!priced) return t('odps.blockedPrice');
   return '';
 }

@@ -223,6 +223,7 @@
     "check:doc-counts": "tsx scripts/check-doc-counts.ts",
     "check:instructions": "tsx scripts/check-instructions.ts",
     "check:prompt-refs": "tsx scripts/check-prompt-refs.ts",
+    "check:doc-links": "tsx scripts/check-doc-links.ts",
     "check:scope-parity": "tsx scripts/check-scope-parity.ts --strict",
     "check:scope-parity:report": "tsx scripts/check-scope-parity.ts",
     "check:scope-parity:seed": "tsx scripts/check-scope-parity.ts --seed",

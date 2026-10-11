@@ -24,7 +24,7 @@
  *     sealed path was the whole reason sealing had to exist: an operator's write survived a restart
  *     and an image swap because this function re-applied it at every boot, so an environment value
  *     the host set could be overridden permanently from inside the node.
- *     docs/plans/sealed-config-plan.md
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  */
 import type { AimeatConfig } from './config-types.js';
 import { MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable, writeConfigField } from './services/config-schema.js';

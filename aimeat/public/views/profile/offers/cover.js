@@ -12,6 +12,7 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v2.1.0 -- 2026-10-11 -- The selling register's price column says the money price (or Free) and the pacing amount (tollMorsels, 3.x price.morsels as fallback); a morsel amount is no longer a price.
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip; the production
  *     lines the List with the StepStrip under each line (a special view, components/StepStrip.js);
@@ -49,6 +50,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { priceAndPacing } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -238,7 +240,8 @@ function secSelling(ctx) {
 function sellPage(ctx) {
   const m = ctx.model;
   const list = [...m.items].sort((a, b) => (m.selling.includes(b) ? 1 : 0) - (m.selling.includes(a) ? 1 : 0) || a.offer.title.localeCompare(b.offer.title));
-  const price = (o) => [o.price?.morsels > 0 ? `${o.price.morsels} ${t('profile.offers.morsels')}` : '', o.priceMoney ? `${(o.priceMoney.amount / 1e6).toFixed(2)} ${o.priceMoney.currency}` : ''].filter(Boolean).join(' · ') || c('noPrice');
+  // The money price (or Free) and the pacing amount: "Free · pacing 5 morsels". A morsel is never a price.
+  const price = (o) => priceAndPacing(o, t);
   return renderPage(ctx, {
     id: 'sell', crumbs: [c('sell')], title: c('sell'),
     marks: [{ label: c('chipSelling', { n: m.selling.length }) }, { label: c('chipOffers', { n: m.items.length }), tone: 'dim' }],

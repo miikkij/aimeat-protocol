@@ -6,6 +6,7 @@
  *   src/storage/types/apps.ts, which had passed the 800-line limit; re-exported from
  *   src/storage/interface.ts like every other types file.
  * @version-history
+ *   v1.3.0 — 2026-10-11 — Comment only: an app's `priceMorsels` is its pacing amount, not a price.
  *   v1.2.0 — 2026-10-02 — PackageRecord status gains `withdrawn` (package sale design, phase 5: T6).
  *   v1.1.0 — 2026-09-30 — PackageComponentType gains `skill`: a package carries the skills bound to its
  *     apps (wish-a-package-carries-the-skills-bound-to-its-apps).
@@ -32,7 +33,8 @@ export type PackageComponentType = 'csm' | 'extension' | 'cortex' | 'app' | 'msm
  * who answers for the app — carrying them puts one person's name and legal statements on another
  * person's copy), `aiPosture`/`track`/`specCheck` (re-derived from the bytes at publish),
  * `protection`/`priceMorsels`/`licenseType`/`forkedFrom`/`aiProvenanceId` (the source owner's own
- * commercial decisions and the provenance of the version published THERE).
+ * commercial decisions and the provenance of the version published THERE; `priceMorsels` is the 3.x
+ * name of the app's pacing amount, never a price, and the installer sets its own).
  *
  * THE DATA MAP IS THE ONE THAT TRAVELS AS A DOCUMENT RATHER THAN A STAMP. `AppManifest.dataMap` is
  * a summary whose `docKey` addresses `apps.<id>.datamap`, and the installed copy's id is not the

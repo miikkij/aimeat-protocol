@@ -10,6 +10,7 @@
  * @structure ASK_AI_PROMPT · buildLandingAgentPrompt(nodeUrl) · BuildAgentPrompt() · AskYourAI()
  * @usage import { BuildAgentPrompt, AskYourAI } from './landing-prompts.js';
  * @version-history
+ *   v1.0.1 — 2026-10-11 — The offer line in the liaison prompt no longer says others "pay morsels": an offer is free or has a money price, and morsels are its pacing amount.
  *   v1.0.0 — 2026-08-07 — Extracted from landing.js (max-file-lines) when the chat-first
  *     connect door landed on the page (UX-remake v3, P1/P11). Render output unchanged.
  *   v1.1.0 — 2026-08-08 — Both copy buttons are now the shared <CopyButton> instead of two
@@ -124,7 +125,7 @@ function buildLandingAgentPrompt(nodeUrl) {
   p += '```\n';
   p += 'I can queue work from the browser: ' + base + '/v1/profile → Agents → <name> → Tasks → + New Task.\n\n';
   p += '## Step 7 — Make it AIMEAT-compatible and shareable\n';
-  p += 'Have the liaison publish an OFFER so others can discover (and optionally pay morsels to use) my agent. Fetch the guided prompt from my node and follow it as the connected agent:\n';
+  p += 'Have the liaison publish an OFFER so others can discover (and use, free or for an optional money price, with a pacing amount in morsels per use) my agent. Fetch the guided prompt from my node and follow it as the connected agent:\n';
   p += '```\n';
   p += 'GET ' + base + '/v1/prompts/draft-offer\n';
   p += '```\n';

@@ -36,6 +36,8 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.1.2 — 2026-10-11 — `gated` reads the app's pacing amount (`tollMorsels`); a morsel is pacing,
+ *     not a price, and the owner's note no longer calls it one.
  *   v1.1.1 — 2026-09-11 — The notice goes through announceApp, which sends each host under its own
  *     key and stamps seo.announcedAt on the app.
  *   v1.1.0 — 2026-08-25 — applyOwnerSeoUpdate() and ownerAppSeo(): the WRITE, in one place, so the
@@ -52,6 +54,7 @@ import type { AppSeo, AppSummaryRecord } from '../storage/types/apps.js';
 import { announceApp } from './indexnow.js';
 import { resolveAppOwnerScope } from './app-lifecycle.js';
 import { emitChange } from './event-bus.js';
+import { appToll } from './app-pacing.js';
 
 /**
  * Why an app is or is not search-visible, in terms an operator can act on. `appSeoIndexable` is the
@@ -59,7 +62,7 @@ import { emitChange } from './event-bus.js';
  * operator staring at a list needs to know which one they are looking at.
  */
 export type AppSeoState =
-  /** Gated: access-coded or priced. Never eligible, and not the owner's switch to change. */
+  /** Gated: access-coded, or taken first for its pacing amount. Never eligible, and not the owner's switch to change. */
   | 'gated'
   /** Removed from every public surface by an operator. Search visibility is moot. */
   | 'hidden'
@@ -85,7 +88,7 @@ export function appSeoState(app: AppSummaryRecord, config: AimeatConfig): AppSeo
   // agent-facing documents of its own: its origin answers with the NODE's llms.txt and card, which
   // e2e-app-origin asserts. Advertising its sitemap would send a crawler to a host that refuses to
   // describe the thing we just advertised.
-  if (app.accessCode || (app.manifest?.priceMorsels ?? 0) > 0) return 'gated';
+  if (app.accessCode || appToll(app.manifest) > 0) return 'gated';
   if (app.parked || app.operatorHidden) return 'hidden';
   if (app.operatorSeoBlocked) return 'blocked';
 
@@ -277,7 +280,7 @@ export function seoNote(state: AppSeoState): string {
     case 'hidden':
       return 'Search visibility is switched on, but the app is hidden, so nothing is findable until it is visible again.';
     case 'gated':
-      return 'Search visibility is switched on, but an app behind an access code or a price is never listed in search engines.';
+      return 'Search visibility is switched on, but an app behind an access code, or one that has to be taken first for its morsels of pacing, is never listed in search engines.';
     case 'off':
     default:
       return 'This app will not be found in search engines. It still works and can be shared by link.';

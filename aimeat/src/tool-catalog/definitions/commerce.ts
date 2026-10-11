@@ -7,9 +7,15 @@
  *   pricing, agent-offer money pricing, and buyer-side checkout sessions. Every tool wraps an
  *   EXISTING commerce mechanism (commerce.psp / apps.{appId}.tools memory records, the offers
  *   document, src/commerce/session-service.ts) — no new business logic. Money amounts are integer
- *   6-decimal MICRO-UNITS (1 EUR = 1_000_000), morsels are plain integers; the two never mix.
+ *   6-decimal MICRO-UNITS (1 EUR = 1_000_000); the pacing amount is whole morsels per use and is
+ *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
+ *     kaksi-arvoa): aimeat_offer_price_set sets the money price and `toll_morsels` (price_morsels and
+ *     clear_morsels stay as deprecated 3.x names until 4.0.0); the checkout tools describe the money
+ *     total, the session's pacing, the 'pacing-pack' item and what to do on INSUFFICIENT_MORSELS; the
+ *     checkout handler has no morsel default.
  *   2026-10-07 — aimeat_app_tools_publish says where an unpriced callable tool lists: for the
  *     owner's own principals in /v1/commerce/tools?include=own.
  *   2026-10-06 —aimeat_app_tools_publish and aimeat_offer_price_set carry the bounds the node's MCP wrote
@@ -181,7 +187,7 @@ export const commerceTools = [
     },
     {
         name: 'aimeat_commerce_psp_set',
-        description: 'SCREEN ONLY: refuses for an agent, and returns the link to the Wallet page where the owner enters their payment-provider secret themselves (a key that moves money never passes through a chat). Call it only to get that link; do not ask the owner for the key. Money sales always settle on the SELLER\'s own PSP account, never the node\'s. aimeat_commerce_psp_status shows whether one is set, as a masked hint. Morsel-only selling needs no PSP.',
+        description: 'SCREEN ONLY: refuses for an agent, and returns the link to the Wallet page where the owner enters their payment-provider secret themselves (a key that moves money never passes through a chat). Call it only to get that link; do not ask the owner for the key. Money sales always settle on the SELLER\'s own PSP account, never the node\'s. aimeat_commerce_psp_status shows whether one is set, as a masked hint. An offer or tool with no money price (free, with or without a pacing amount) needs no PSP.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set Seller PSP Credentials', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -214,7 +220,7 @@ export const commerceTools = [
     },
     {
         name: 'aimeat_commerce_psp_delete',
-        description: 'Delete YOUR OWNER\'s stored PSP credentials (commerce.psp). Money-currency checkouts of your offers/app-tools stop working until new credentials are set; morsel selling is unaffected.',
+        description: 'Delete YOUR OWNER\'s stored PSP credentials (commerce.psp). Money-currency checkouts of your offers/app-tools stop working until new credentials are set; free offers and their pacing are unaffected.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Delete Seller PSP Credentials', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -224,7 +230,7 @@ export const commerceTools = [
     },
     {
         name: 'aimeat_app_tools_publish',
-        description: 'Publish or replace the sellable TOOL MANIFEST of one of your owner\'s apps (the public memory record apps.{app_id}.tools) so agents can buy tool calls through the commerce checkout. Each tool: name (sku segment), description, inputSchema, price {morsels} and/or priceMoney {amount in 6-decimal MICRO-UNITS (1 EUR = 1000000), currency EUR|USD}, and a fulfillment binding — action_id (a capability id, runs instantly on purchase) or agent (bare name of your owner\'s agent that receives the order TASK; neither = the task lands in the owner\'s task space). Set `exchange: true` on a tool to list it on the EXCHANGE marketplace: it lists when it has a non-empty inputSchema AND outputSchema, a price, and either action_id (sold per call) or agent (sold per delivered task). The answer\'s `exchange` block says what became of every flagged tool: `listed` with the offering id, `skipped` with the reason (SCHEMA_REQUIRED, NOT_PRICED, NO_ASSIGNEE, ASSIGNEE_NOT_FOUND, DUPLICATE_OF), and `warnings`. One call is listed ONCE: when a tool calls an extension action that is flagged for EXCHANGE too, the tool lists and the action\'s own listing is withdrawn (it appears in `skipped` as DUPLICATE_OF {app}/{tool}, and contracts already signed on it keep their agreed price), unless the tool fixes part of its input with `lockedInput`, which makes it a different product: then both list and each carries an ALSO_LISTED_AS warning. Read that block before saying a tool is on the market. PUBLISHING AN APP: fill the ODPS descriptor in the same call — per-tool `odps` (valueProposition, categories, standards, useCases, contentSample URL, productType, SLA + dataQuality commitments) plus app-level `odps`/`provenance` defaults inherited by every tool (dataHolder legal entity, logoURL, brandSlogan, governanceProfile, portfolioPriority, licence jurisdiction). Those become the tool\'s Open Data Product Specification v4.1 document at /v1/exchange/offerings/{id}/odps.yaml, which is how outside catalogues and negotiating agents read the listing. ODPS caps some of it: valueProposition 512 characters, the other licence texts and dataHolder description 512, dataHolder legalName and slogan 256, and license restrictions 255, which holds the node\'s own usage-terms sentences (up to 120 characters) followed by usageTerms.note and odps.license.restrictions. A publish that makes one of those too long is REFUSED with ODPS_FIELD_TOO_LONG and nothing is saved; the refusal names the field you wrote, the ODPS field, its length, the cap and the room you have, and the node never shortens the text for you. Text already stored that way keeps publishing, with an ODPS_FIELD_TOO_LONG warning, until you change it. SLA units come from the ODPS list (percent, milliseconds, seconds, minutes, days, weeks, months, years, never, date) and it has no hours unit, so 3 hours is written as 180 minutes. State provenance from what you KNOW about the data; where a legal basis or a legal entity is not established, leave it out for the owner to state. Priced tools list in /v1/commerce/feed, /v1/commerce/tools, the MCP Server Card, and the WebMCP interface. An unpriced tool with an action_id lists for your own owner\'s agents and apps in /v1/commerce/tools?include=own (price null, own: true), and never for another owner. Replaces the whole manifest — read it first (aimeat_app_tools_get) to edit incrementally.',
+        description: 'Publish or replace the sellable TOOL MANIFEST of one of your owner\'s apps (the public memory record apps.{app_id}.tools) so agents can buy tool calls through the commerce checkout. Each tool: name (sku segment), description, inputSchema, its two values, and a fulfillment binding. The two values: priceMoney {amount in 6-decimal MICRO-UNITS (1 EUR = 1000000), currency EUR|USD} (or pricesMoney, one per currency; none means the call is free), and tollMorsels, the pacing amount: whole morsels per use, 0 to 100, which each use debits from the calling user\'s owner, part burned and the rest credited to your owner. A morsel paces use and is never a price. The 3.x field price {morsels} is accepted until 4.0.0 and read as pacing; write tollMorsels instead. The fulfillment binding — action_id (a capability id, runs instantly on purchase) or agent (bare name of your owner\'s agent that receives the order TASK; neither = the task lands in the owner\'s task space). Set `exchange: true` on a tool to list it on the EXCHANGE marketplace: it lists when it has a non-empty inputSchema AND outputSchema, a money price or a pacing amount, and either action_id (sold per call) or agent (sold per delivered task). The answer\'s `exchange` block says what became of every flagged tool: `listed` with the offering id, `skipped` with the reason (SCHEMA_REQUIRED, NOT_PRICED, NO_ASSIGNEE, ASSIGNEE_NOT_FOUND, DUPLICATE_OF), and `warnings`. One call is listed ONCE: when a tool calls an extension action that is flagged for EXCHANGE too, the tool lists and the action\'s own listing is withdrawn (it appears in `skipped` as DUPLICATE_OF {app}/{tool}, and contracts already signed on it keep their agreed price), unless the tool fixes part of its input with `lockedInput`, which makes it a different product: then both list and each carries an ALSO_LISTED_AS warning. Read that block before saying a tool is on the market. PUBLISHING AN APP: fill the ODPS descriptor in the same call — per-tool `odps` (valueProposition, categories, standards, useCases, contentSample URL, productType, SLA + dataQuality commitments) plus app-level `odps`/`provenance` defaults inherited by every tool (dataHolder legal entity, logoURL, brandSlogan, governanceProfile, portfolioPriority, licence jurisdiction). Those become the tool\'s Open Data Product Specification v4.1 document at /v1/exchange/offerings/{id}/odps.yaml, which is how outside catalogues and negotiating agents read the listing. ODPS caps some of it: valueProposition 512 characters, the other licence texts and dataHolder description 512, dataHolder legalName and slogan 256, and license restrictions 255, which holds the node\'s own usage-terms sentences (up to 120 characters) followed by usageTerms.note and odps.license.restrictions. A publish that makes one of those too long is REFUSED with ODPS_FIELD_TOO_LONG and nothing is saved; the refusal names the field you wrote, the ODPS field, its length, the cap and the room you have, and the node never shortens the text for you. Text already stored that way keeps publishing, with an ODPS_FIELD_TOO_LONG warning, until you change it. SLA units come from the ODPS list (percent, milliseconds, seconds, minutes, days, weeks, months, years, never, date) and it has no hours unit, so 3 hours is written as 180 minutes. State provenance from what you KNOW about the data; where a legal basis or a legal entity is not established, leave it out for the owner to state. Tools offered to other owners (a money price or a pacing amount) list in /v1/commerce/feed, /v1/commerce/tools, the MCP Server Card, and the WebMCP interface. A tool with neither value and an action_id lists for your own owner\'s agents and apps in /v1/commerce/tools?include=own (price null, own: true), and never for another owner. Replaces the whole manifest — read it first (aimeat_app_tools_get) to edit incrementally.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish App Tool Manifest', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -233,14 +239,14 @@ export const commerceTools = [
         surfaces: ['service', 'commerce'],
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s published filename (e.g. "shop.html") — the manifest key is apps.{app_id}.tools. A name without the extension ("shop") is stored under your app "shop.html" when you have one, and the answer names the filename.', zod: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/) },
-            tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, outputSchema?, action_id?, agent?, exchange?, price?: {morsels, unit?}, priceMoney?: {amount /* micro-units */, currency}, usageTerms?, provenance?, odps? }]', zod: z.array(z.record(z.string(), z.unknown())).max(200) },
+            tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, outputSchema?, action_id?, agent?, exchange?, priceMoney?: {amount /* micro-units */, currency}, pricesMoney?: [{amount, currency}], tollMorsels? /* pacing morsels per use, 0-100 */, usageTerms?, provenance?, odps? }]', zod: z.array(z.record(z.string(), z.unknown())).max(200) },
             odps: { type: 'object', required: false, description: 'APP-LEVEL ODPS defaults inherited by every tool: { language, dataHolder: {legalName, businessID, email, URL, addressCountry}, logoURL, brandSlogan, governanceProfile, portfolioPriority, license: {geographicalArea, applicableLaws} }. A tool\'s own `odps` overrides these field by field.' },
             provenance: { type: 'object', required: false, description: 'APP-LEVEL provenance defaults inherited by every tool: { source, legalBasis, consentStatus, retention, transformations, snapshotHash (SHA-256 hex), lineage: [{source, transform, at}] }. State only what you know.' },
         },
     },
     {
         name: 'aimeat_app_tools_get',
-        description: 'Read an app\'s sellable tool manifest (apps.{app_id}.tools). Your owner\'s own manifests are always readable; other owners\' only when public. Returns the tools with prices (morsels; money in 6-decimal micro-units), fulfillment mode (call | task), and the checkout skus.',
+        description: 'Read an app\'s sellable tool manifest (apps.{app_id}.tools). Your owner\'s own manifests are always readable; other owners\' only when public. Returns the tools with money prices in 6-decimal micro-units (none means free) and each tool\'s pacing amount (toll_morsels), fulfillment mode (call | task), and the checkout skus.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read App Tool Manifest', readOnlyHint: true },
@@ -253,50 +259,52 @@ export const commerceTools = [
     },
     {
         name: 'aimeat_offer_price_set',
-        description: 'Set or clear the price of one offer on YOUR OWNER\'s agent (the agents.{name}.offers document): morsel price (integer) and/or money price (amount in 6-decimal MICRO-UNITS — 1 EUR = 1000000, 0.002 EUR = 2000 — plus currency EUR|USD; needs the seller\'s PSP configured to actually settle), and optionally the offer\'s visibility (public = listed in the commerce feed). Cross-owner purchase requires a price; your owner\'s own use stays free.',
+        description: 'Set the two values of one offer on YOUR OWNER\'s agent (the agents.{name}.offers document). (1) The money price: money_amount_micros in 6-decimal MICRO-UNITS (1 EUR = 1000000, 0.002 EUR = 2000) plus money_currency EUR|USD. It settles on the seller\'s own payment account, so the seller\'s PSP has to be configured (aimeat_commerce_psp_status). An offer with no money price is free. (2) The pacing amount: toll_morsels, whole morsels per use from 0 to 100. Each use by another owner debits it from that user\'s owner; part burns and the rest is credited to your owner. A morsel paces how fast an offer is used and is never a price, so describe it to people as "N morsels of pacing per use". Optionally set the offer\'s visibility too (public = listed in the commerce feed). Another owner can use the offer once it has a money price or a pacing amount; your owner\'s own use stays free. price_morsels and clear_morsels are the 3.x names of toll_morsels and clear_toll, accepted until 4.0.0. The answer carries tollMorsels, priceMoney and visibility.',
         caller: 'agent',
         visibility: agentEverywhere,
-        annotations: { title: 'Price an Agent Offer', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        annotations: { title: 'Set an Offer\'s Price and Pacing', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'commerce:sell',
         surfaces: ['service', 'commerce'],
         input: {
             agent_name: { type: 'string', required: true, description: 'Bare name of your owner\'s agent that publishes the offer', zod: z.string().min(1).max(100) },
             offer_id: { type: 'string', required: true, description: 'The offer id inside agents.{agent_name}.offers', zod: z.string().min(1).max(100) },
-            price_morsels: { type: 'number', required: false, description: 'Morsel price per call (integer, >0). Omit to leave unchanged', zod: z.number().int().positive() },
+            toll_morsels: { type: 'number', required: false, description: 'The pacing amount: whole morsels per use, 0 to 100 (0 removes it; the node\'s own ceiling also applies). Omit to leave unchanged', zod: z.number().int().min(0).max(100) },
+            price_morsels: { type: 'number', required: false, description: 'Deprecated, removed in 4.0.0: the 3.x name of toll_morsels. Stored as the pacing amount (added to toll_morsels when both are sent); use toll_morsels', zod: z.number().int().positive() },
             money_amount_micros: { type: 'number', required: false, description: 'Money price in integer 6-decimal MICRO-UNITS (never cents/floats). Omit to leave unchanged', zod: z.number().int().positive() },
             money_currency: { type: 'string', required: false, description: 'ISO code for money_amount_micros: EUR or USD', enum: ['EUR', 'USD'] },
-            clear_morsels: { type: 'boolean', required: false, description: 'Remove the morsel price' },
-            clear_money: { type: 'boolean', required: false, description: 'Remove the money price' },
+            clear_toll: { type: 'boolean', required: false, description: 'Remove the pacing amount' },
+            clear_morsels: { type: 'boolean', required: false, description: 'Deprecated, removed in 4.0.0: the 3.x name of clear_toll' },
+            clear_money: { type: 'boolean', required: false, description: 'Remove the money price, which makes the offer free' },
             visibility: { type: 'string', required: false, description: 'Offer visibility: private | unlisted | public', enum: ['private', 'unlisted', 'public'] },
         },
     },
     {
         name: 'aimeat_checkout_open',
-        description: 'Open a checkout session as a BUYER (your owner\'s balance pays — one morsel balance per human). Line items: agent offers ({agent: GAII or bare own name, offer_id}) or app-tools ({kind: "app-tool", app: "ownerName/appId", tool, input? — one call per line item}). All items must share one seller. currency: omit for morsels, or EUR/USD when the item has a money price and the node has a settling handler. Returns the open session with the quoted total; complete it with aimeat_checkout_complete.',
+        description: 'Open a checkout session as a BUYER. Every item has two values: a money price (6-decimal micro-units; 0 means free) and a pacing amount (whole morsels per use, debited from your owner\'s morsel balance when the session completes; a morsel paces use and is never a price). Line items: agent offers ({agent: GAII or bare own name, offer_id}), app-tools ({kind: "app-tool", app: "ownerName/appId", tool, input? — one call per line item}), or pacing capacity from the node\'s operator ({kind: "pacing-pack", quantity}, sold for money; GET /v1/wallet names the pack as data.pacing_pack, which is null when the node sells none). All items share one seller. currency: EUR or USD; omit it and the node uses the first money currency every item is priced in, and a cart of free items is priced at 0. Returns the open session: total (money micro-units, 0 = free), currency, and pacingMorsels (the morsels of pacing completion debits). Complete it with aimeat_checkout_complete.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Open Checkout Session', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'commerce:buy',
         surfaces: ['agent', 'service', 'commerce'],
         input: {
-            items: { type: 'array', required: true, description: '[{ kind?, agent?, offer_id?, app?, tool?, input?, quantity? }] — offer items need agent+offer_id; app-tool items need kind:"app-tool"+app+tool', zod: itemShape },
+            items: { type: 'array', required: true, description: '[{ kind?, agent?, offer_id?, app?, tool?, input?, quantity? }] — offer items need agent+offer_id; app-tool items need kind:"app-tool"+app+tool; the pacing pack is kind:"pacing-pack"+quantity', zod: itemShape },
             note: { type: 'string', required: false, description: 'Buyer note delivered with the order', zod: z.string().max(2000) },
-            currency: { type: 'string', required: false, description: '"morsel" (default) or a money code (EUR/USD)', zod: z.string().min(3).max(10) },
+            currency: { type: 'string', required: false, description: 'A money code: EUR or USD. Omit it to use the first currency every item is priced in. "morsel" is the 3.x value, accepted until 4.0.0 and read as omitted', zod: z.string().min(3).max(10) },
         },
     },
     {
         name: 'aimeat_checkout_complete',
-        description: 'Pay + fulfill an open checkout session. Charges your owner\'s balance (or a money handler when specified), then fulfills: offers and unbound app-tools queue a TASK for the seller; a callable app-tool runs instantly and its result returns on fulfillment.results. A failed callable invoke refunds automatically and leaves the session open. Returns the completed session with the receipt {charged, earned, fee, trackingCode}.',
+        description: 'Pay + fulfill an open checkout session. A session with a money total (total > 0) names its payment `handler`; when it is missing, the refusal PAYMENT_HANDLER_REQUIRED lists the handlers that settle the session\'s currency, so call again with one of them. A free session (total 0) needs no handler. Completion first debits the session\'s pacing (pacingMorsels) from your owner\'s morsel balance: part burns and the rest goes to the seller. When the balance is short, the call is refused with INSUFFICIENT_MORSELS before any money moves; get more morsels with the daily allowance (POST /v1/wallet/request) or, when the node sells one, the pacing pack (open a checkout with {kind: "pacing-pack", quantity: 1}), then complete again. Fulfillment: offers and unbound app-tools queue a TASK for the seller; a callable app-tool runs instantly and its result returns on fulfillment.results. A failed callable invoke refunds the money and the pacing and leaves the session open. Returns the completed session with the receipt {handler, charged (money micro-units), earned, fee, trackingCode, pacing?: {morsels, burned, fee, providerEarned, trackingCode}}.',
         caller: 'agent',
         visibility: agentEverywhere,
-        // destructiveHint: spends the owner's balance (irreversible financial action); openWorldHint:
+        // destructiveHint: pays the money total and debits the pacing (irreversible); openWorldHint:
         // a callable app-tool's fulfillment may invoke sandboxed/third-party capability code.
         annotations: { title: 'Complete Checkout (pay + fulfill)', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
         scope: 'commerce:buy',
         surfaces: ['agent', 'service', 'commerce'],
         input: {
             session_id: { type: 'string', required: true, description: 'The open session id from aimeat_checkout_open', zod: z.string().min(1).max(120) },
-            handler: { type: 'string', required: false, description: 'Payment handler id (default io.aimeat.morsels)', zod: z.string().max(100) },
+            handler: { type: 'string', required: false, description: 'Payment handler id for a session with a money total (PAYMENT_HANDLER_REQUIRED names the ones that settle its currency). Omit it for a free session. io.aimeat.morsels is the 3.x value, ignored on a free session until 4.0.0', zod: z.string().max(100) },
         },
     },
     {

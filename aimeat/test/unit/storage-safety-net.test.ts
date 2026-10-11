@@ -85,7 +85,7 @@ function makeWork(providerGaii: string, requesterGaii: string, overrides?: Parti
     providerGaii,
     requesterGaii,
     input: { prompt: 'test input' },
-    cost: { basePrice: 10, networkFee: 1, total: 11, inEscrow: 11 },
+    cost: { toll:10, networkFee: 1, total: 11, inEscrow: 11 },
     ttlExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
     createdAt: now(),
     updatedAt: now(),

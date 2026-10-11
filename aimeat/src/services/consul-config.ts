@@ -24,7 +24,7 @@
  *   v1.1.0 — 2026-08-18 — applyConsulValues skips a path the node's host sealed. One edit covers
  *     three callers, and the third is the one nobody had listed: the boot-time load, the import
  *     route, and the LIVE WATCH LOOP, which re-applies whatever the KV store says on every change
- *     without anybody asking. docs/plans/sealed-config-plan.md
+ *     without anybody asking. https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 

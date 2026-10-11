@@ -10,6 +10,7 @@
  *   router, the builder, billing, rating, and a delivery's content.
  * @structure default OffersTab({ session, showToast }) — state, loads, handlers, the ctx bag, render
  * @version-history
+ *   v2.4.0 -- 2026-10-11 -- saveBilling passes the offer's pacing amount (tollMorsels) and money price, not a morsel price.
  *   v2.3.0 -- 2026-09-26 -- The line while the feed loads is the Note's loading kind; the tab writes no
  *     class (page group G6).
  *   v2.2.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -163,9 +164,9 @@ export default function OffersTab({ session, showToast }) {
     }
   };
   const clearAi = () => setAiResult(null);
-  const saveBilling = async (it, { price, priceMoney, visibility }) => {
+  const saveBilling = async (it, { tollMorsels, priceMoney, visibility }) => {
     try {
-      const r = await offersService.setOfferBilling(it.agent, it.offer.id, { price, priceMoney, visibility });
+      const r = await offersService.setOfferBilling(it.agent, it.offer.id, { tollMorsels, priceMoney, visibility });
       if (r?.ok === false) showToast(r?.error?.message || t('profile.offers.billSaveFailed'));
       else { showToast(t('profile.offers.billSaved')); load(); }
     } catch (e) { showToast((e && e.message) || t('profile.offers.billSaveFailed')); }

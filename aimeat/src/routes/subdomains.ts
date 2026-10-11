@@ -14,6 +14,7 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.28.1 — 2026-10-11 — appIsRestricted reads the app's pacing amount (appIsPaced); a morsel is pacing, not a price.
  *   v1.28.0 — 2026-10-09 — A served app carries the "Use with your AI" mark when it has public app tools or skills.
  *   v1.27.0 — 2026-10-08 — The portfolio and the company page are served with their AI-provenance marks.
  *   v1.26.0 — 2026-10-08 — An app carries the on-page behaviour script unless its owner switched it off (layer D).
@@ -155,6 +156,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { registerAppOriginWebmcp } from './subdomain-webmcp.js';
 import { registerAppOriginDocs, appOriginFor } from './subdomain-origin-docs.js';
 import { detectLocale, type Locale } from '../i18n.js';
+import { appIsPaced } from '../services/app-pacing.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -243,7 +245,7 @@ export async function resolveAppTarget(storage: Storage, target: string): Promis
 /** True when the app must not be served openly at a subdomain root. */
 export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
   if (app.accessCode) return true;
-  if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) return true;
+  if (appIsPaced(config, app.manifest)) return true;
   return false;
 }
 
@@ -259,7 +261,7 @@ export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
  * It only points a human at the door.
  *
  * Three conditions, each load-bearing:
- *   - An ACCESS CODE, never a price. A paid app refuses anything without a Bearer, which is the one
+ *   - An ACCESS CODE, never a pacing amount. An app taken first for its pacing refuses anything without a Bearer, which is the one
  *     credential a browser navigation cannot carry, so a form would only dead-end more slowly.
  *   - A browser NAVIGATION (`Accept: text/html`), the same test the apex unlock page uses. An API
  *     caller, an agent and a script's own request keep the uniform 404 they contract for.

@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description The checkout-session lifecycle of the commerce core (TARGET-033): resolve line
  *   items through the sellable-resolver registry (agent offers in core, org offerings in EE),
- *   create/read/update/cancel sessions, and complete a session — collect the gross from the buyer
- *   → fulfill each line item as an agent TASK on the offer-ask path → pay out per item (default
- *   seller payout, or the sellable's custom distribute e.g. EE commission split) → route the fee
- *   leg (operator | burn) → close. A fulfillment failure after collect refunds and rethrows,
+ *   create/read/update/cancel sessions, and complete a session — charge the pacing amount in
+ *   morsels → collect the money total from the buyer through a money handler (none when free) →
+ *   fulfill each line item as an agent TASK on the offer-ask path → pay out per item (default
+ *   seller payout, or the sellable's custom distribute e.g. EE commission split) → record the
+ *   operator's money fee → close. A fulfillment failure after collect refunds and rethrows,
  *   leaving the session open for retry. Sessions are memory records — `commerce.session.{id}`
  *   under the buyer owner's GHII, `commerce.order.{id}` under the seller owner's GHII — no
  *   storage-schema changes.
@@ -15,6 +16,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v3.0.0 — 2026-10-11 — Money price and pacing amount (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): a session is always in a money currency (0 = free) and carries `pacingMorsels`; completion charges the pacing first (chargePacing: burn share, operator share, provider credit), needs a money handler only for a money total, and puts `pacing` on the receipt. No morsel handler; an open 'morsel' session from before is refused with SESSION_REPRICED.
  *   v2.10.0 — 2026-10-09 — The seller's order copy carries each line's sellerResult where a fulfilment
  *     gives one, so an ext-call's one-time pay token stays with the buyer (secrets audit 2026-10-09, S-3).
  *   v2.9.0 — 2026-10-08 — A session carries its attribution (where the checkout came from), and a
@@ -54,14 +56,17 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, CheckoutAttribution } from './types.js';
-import { getPaymentHandler, MORSEL_HANDLER_ID } from './payment-handlers.js';
+import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, PaymentHandler, CheckoutAttribution } from './types.js';
+import { getPaymentHandler, listPaymentHandlers, LEGACY_MORSEL_HANDLER_ID } from './payment-handlers.js';
+import { chargePacing, pacingReceipt } from '../services/metered-settlement.js';
+import { insufficientMorselsMessage } from './pacing-pack.js';
+import { putRecord, recordMoneyPlatformFee } from './platform-fee.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { createFulfillmentTask } from './fulfillment.js';
-import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
+import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { appSpendRefusal } from '../services/metered-access.js';
-import { isMoneyCurrency, percentFee } from './money.js';
+import { isMoneyCurrency, percentFee, MONEY_CURRENCIES } from './money.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { logger } from '../utils/logger.js';
 import { readSplit, computeSplit, type DynamicDesignation } from './beneficiary-split.js';
@@ -73,22 +78,14 @@ import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from
 import { recordPurchase, recordCheckoutStage } from '../services/visibility/visibility-counter.js';
 
 export { CommerceError } from './errors.js';
+// Moved to platform-fee.ts (2026-10-11); re-exported for the callers that import it from here.
+export { recordMoneyPlatformFee } from './platform-fee.js';
 
 /** Lifetime of an open session (lazy expiry — checked on read and on complete). */
 const sessionTtlMs = (config: AimeatConfig) => (config.commerceSessionTtlMinutes || 60) * 60 * 1000;
 
 const sessionKey = (id: string) => `commerce.session.${id}`;
 const orderKey = (id: string) => `commerce.order.${id}`;
-
-/** Upsert one memory record (the same shape every service-side writer in the codebase uses). */
-async function putRecord(storage: Storage, ownerGaii: string, key: string, value: unknown): Promise<void> {
-  const existing = await storage.getMemory(ownerGaii, key);
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key, ownerGaii, value: value as Record<string, unknown>, visibility: 'owner', tags: ['commerce'], ttlHours: null,
-    version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-  });
-}
 
 /** Resolve one raw ref through the registry (kind defaults to 'offer'). */
 async function resolveOne(storage: Storage, config: AimeatConfig, ref: SellableRef, buyerOwner: string): Promise<Sellable> {
@@ -105,12 +102,13 @@ async function resolveItems(
   rawItems: SellableRef[],
   buyerOwner: string,
   currency: string,
-): Promise<{ items: CheckoutLineItem[]; sellerOwner: string; sellerGhii: string; total: number }> {
+): Promise<{ items: CheckoutLineItem[]; sellerOwner: string; sellerGhii: string; total: number; pacing: number }> {
   if (!rawItems.length) throw new CommerceError('EMPTY_CART', 400, 'A checkout session needs at least one line item');
   const items: CheckoutLineItem[] = [];
   let sellerOwner = '';
   let sellerGhii = '';
   let total = 0;
+  let pacing = 0;
   for (const raw of rawItems) {
     const quantity = Math.max(1, Math.trunc(raw.quantity ?? 1));
     const sellable = await resolveOne(storage, config, { ...raw, currency }, buyerOwner);
@@ -121,20 +119,44 @@ async function resolveItems(
     items.push({
       kind: sellable.kind, agent: sellable.agentGaii, offerId: sellable.offerId,
       app: raw.app, input: raw.input,
-      quantity, title: sellable.title, unitPrice: sellable.priceMorsels,
+      quantity, title: sellable.title, unitPrice: sellable.unitPrice, tollMorsels: sellable.tollMorsels,
     });
-    total += sellable.priceMorsels * quantity;
+    total += sellable.unitPrice * quantity;
+    pacing += sellable.tollMorsels * quantity;
   }
-  return { items, sellerOwner, sellerGhii, total };
+  return { items, sellerOwner, sellerGhii, total, pacing };
 }
 
 /**
- * The amount as a feed row shows it. Money is 6-decimal micros here and morsels are whole units, and
- * a row that said "24900000" would be worse than no row.
+ * The amount as a feed row shows it. Money is 6-decimal micros here, and a row that said "24900000"
+ * would be worse than no row. A free session says so, with its pacing.
  */
-function formatCheckoutAmount(total: number, currency: string): string {
-  if (!isMoneyCurrency(currency)) return `${Math.round(total)} morsels`;
-  return `${(total / 1_000_000).toFixed(2)} ${currency.toUpperCase()}`;
+function formatCheckoutAmount(total: number, currency: string, pacing: number): string {
+  const paced = pacing > 0 ? ` · pacing ${pacing} morsels` : '';
+  if (total <= 0) return `free${paced}`;
+  return `${(total / 1_000_000).toFixed(2)} ${currency.toUpperCase()}${paced}`;
+}
+
+/**
+ * Price the cart in the requested money currency, or, when none was named (or the deprecated
+ * 'morsel'), in the first money currency every line can be priced in. Free lines price at 0 in any.
+ */
+async function resolveInSomeCurrency(
+  storage: Storage, config: AimeatConfig, rawItems: SellableRef[], buyerOwner: string, requested: string | undefined,
+): Promise<Awaited<ReturnType<typeof resolveItems>> & { currency: string }> {
+  if (requested && requested.toLowerCase() !== 'morsel') {
+    return { ...await resolveItems(storage, config, rawItems, buyerOwner, requested), currency: requested };
+  }
+  let lastErr: unknown = null;
+  for (const currency of MONEY_CURRENCIES) {
+    try {
+      return { ...await resolveItems(storage, config, rawItems, buyerOwner, currency), currency };
+    } catch (err) {
+      if (!(err instanceof CommerceError) || err.code !== 'CURRENCY_NOT_SUPPORTED') throw err;
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new CommerceError('CURRENCY_NOT_SUPPORTED', 422, 'These items share no money currency');
 }
 
 export async function createSession(
@@ -145,14 +167,23 @@ export async function createSession(
     buyerIdentity: string;
     items: SellableRef[];
     note?: string;
-    /** 'morsel' (default) or a money code an EE handler + KYB-verified seller supports. */
+    /**
+     * A money code. Absent, or the 'morsel' a 3.x client may still send (deprecated until 4.0.0):
+     * the first money currency every line can be priced in; a cart of free items is priced at 0 EUR.
+     */
     currency?: string;
     /** Where the checkout came from (services/visibility/attribution.ts). */
     attribution?: CheckoutAttribution;
+    /** Refuse, before anything is stored, a line with no money price (the ACP and UCP surfaces). */
+    requireMoney?: boolean;
   },
 ): Promise<CheckoutSessionRecord> {
-  const currency = args.currency ?? 'morsel';
-  const { items, sellerOwner, sellerGhii, total } = await resolveItems(storage, config, args.items, args.buyerOwner, currency);
+  const resolved = await resolveInSomeCurrency(storage, config, args.items, args.buyerOwner, args.currency);
+  const { items, sellerOwner, sellerGhii, total, pacing, currency } = resolved;
+  if (args.requireMoney && items.some(i => i.unitPrice <= 0)) {
+    throw new CommerceError('MONEY_PRICE_REQUIRED', 422,
+      'ACP and UCP sell in money, and a morsel is not a currency. These items have no money price, so they are not sold through this checkout.');
+  }
   const now = new Date();
   const session: CheckoutSessionRecord = {
     id: `cs_${randomUUID()}`,
@@ -162,6 +193,7 @@ export async function createSession(
     buyerIdentity: args.buyerIdentity,
     sellerOwner, sellerGhii,
     items, currency, total,
+    ...(pacing > 0 ? { pacingMorsels: pacing } : {}),
     note: args.note,
     ...(args.attribution ? { attribution: args.attribution } : {}),
     createdAt: now.toISOString(),
@@ -223,34 +255,6 @@ export async function listOrders(storage: Storage, sellerGhii: string, limit = 5
     .map((r) => r.value as unknown as CheckoutSessionRecord)
     .filter((s) => s && s.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-/**
- * Record the operator's platform fee on a MONEY sale (never touches the morsel ledger). Stored as
- * a memory record under the operator's GHII (or the seller's, if no operator resolves) so the admin
- * dashboard can total the operator's real-money cut per currency.
- *
- * `mode` says whether the fee has been COLLECTED or is still OWED, and on this node every money fee
- * is owed. It read `connect` for the Stripe handler, which described the removed EE Connect platform
- * that routed an application fee out of the card charge. That platform went with the 2026-07-28
- * refactor: there is no node-level Stripe key and the seller is merchant of record, so the fee is
- * never deducted from the charge (see `commerce/stripe-handler.ts`). The label survived and told the
- * dashboard the money had been taken when nobody had invoiced it. A fee that has to be collected out
- * of band is a `receivable` whichever rail carried the sale.
- */
-export async function recordMoneyPlatformFee(
-  storage: Storage,
-  config: AimeatConfig,
-  args: { fee: number; currency: string; sellerGhii: string; buyerGhii: string; trackingCode: string; handler: string },
-): Promise<void> {
-  const operatorGhii = await resolveOperatorFeeGhii(storage, config);
-  const ownerGhii = operatorGhii ?? args.sellerGhii;
-  const mode = 'receivable';
-  await putRecord(storage, ownerGhii, `commerce.platform-fee.${args.trackingCode}`, {
-    fee: args.fee, currency: args.currency, mode, handler: args.handler,
-    sellerGhii: args.sellerGhii, buyerGhii: args.buyerGhii, trackingCode: args.trackingCode,
-    at: new Date().toISOString(),
-  });
 }
 
 /**
@@ -325,6 +329,33 @@ export async function bookSessionlessSale(
   return { fee, net };
 }
 
+/** The money handler that completes a session with a money total: the one named, settling its currency. */
+function moneyHandler(session: CheckoutSessionRecord, handlerId: string | undefined): PaymentHandler {
+  if (!handlerId || handlerId === LEGACY_MORSEL_HANDLER_ID) {
+    const choices = listPaymentHandlers().filter(h => h.currencies.includes(session.currency)).map(h => h.id);
+    throw new CommerceError('PAYMENT_HANDLER_REQUIRED', 422,
+      `Name the payment handler for this ${session.currency} session (payment.handler)${choices.length ? `: ${choices.join(', ')}` : ''}.`);
+  }
+  const handler = getPaymentHandler(handlerId);
+  if (!handler) throw new CommerceError('UNKNOWN_PAYMENT_HANDLER', 422, `Payment handler not available on this node: ${handlerId}`);
+  if (!handler.currencies.includes(session.currency)) {
+    throw new CommerceError('CURRENCY_MISMATCH', 422, `Handler ${handler.id} does not settle ${session.currency}`);
+  }
+  return handler;
+}
+
+/**
+ * An open session stored before 2026-10-11 in currency 'morsel' quotes a morsel PRICE, which no longer
+ * exists. It cannot be completed or changed as it stands; the buyer opens a new one, priced as money
+ * and pacing. Such a session lives an hour at most, so this is a short window, not a migration.
+ */
+function legacyMorselSessionRefusal(session: CheckoutSessionRecord): void {
+  if (session.currency === 'morsel') {
+    throw new CommerceError('SESSION_REPRICED', 409,
+      'This checkout was opened when morsels were a price. A morsel is pacing now, not a price: open a new checkout for the same items.');
+  }
+}
+
 function requireOpen(session: CheckoutSessionRecord): void {
   if (session.status !== 'open') {
     throw new CommerceError('SESSION_NOT_OPEN', 409, `Checkout session is ${session.status}; only open sessions can change`);
@@ -338,9 +369,10 @@ export async function updateSessionItems(
   rawItems: SellableRef[],
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
-  const { items, sellerOwner, sellerGhii, total } = await resolveItems(storage, config, rawItems, session.buyerOwner, session.currency);
+  legacyMorselSessionRefusal(session);
+  const { items, sellerOwner, sellerGhii, total, pacing } = await resolveItems(storage, config, rawItems, session.buyerOwner, session.currency);
   const updated: CheckoutSessionRecord = {
-    ...session, items, sellerOwner, sellerGhii, total, updatedAt: new Date().toISOString(),
+    ...session, items, sellerOwner, sellerGhii, total, pacingMorsels: pacing, updatedAt: new Date().toISOString(),
   };
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), updated);
   agentStage(storage, config, updated, 'updated');
@@ -509,11 +541,12 @@ async function completeSessionInner(
     throw new CommerceError('SESSION_EXPIRED', 409, 'Checkout session has expired; create a new one');
   }
 
-  const handler = getPaymentHandler(handlerId ?? MORSEL_HANDLER_ID);
-  if (!handler) throw new CommerceError('UNKNOWN_PAYMENT_HANDLER', 422, `Payment handler not available on this node: ${handlerId}`);
-  if (!handler.currencies.includes(session.currency)) {
-    throw new CommerceError('CURRENCY_MISMATCH', 422, `Handler ${handler.id} does not settle ${session.currency}`);
-  }
+  legacyMorselSessionRefusal(session);
+  // A session with nothing to pay in money needs no handler. A money session names one: there is no
+  // morsel handler to fall back to, because a morsel is not a payment (ruling decision-morseli-on-
+  // tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). The morsel handler id a 3.x client may still send is
+  // accepted and ignored on a free session until 4.0.0 (config-pacing.ts).
+  const handler = session.total > 0 ? moneyHandler(session, handlerId) : null;
 
   const ctx: PaymentContext = { config, storage };
 
@@ -548,12 +581,25 @@ async function completeSessionInner(
   // PKG-6). The early check above stays: it refuses before the session is read further.
   const reserved = await reserveAgentPurchase(storage, config, session, caller);
   if (reserved) throw reserved;
+  // Pacing first, before any money moves: a buyer who cannot cover it is refused having paid nothing.
+  // The quoted amount, like the quoted prices. Part burns, the checkout's existing operator share is
+  // kept, the rest goes to the seller (services/metered-settlement.ts chargePacing).
+  const paced = await chargePacing({
+    config, storage, caller: session.buyerIdentity || session.buyerGhii, payer: session.buyerGhii,
+    providerGhii: session.sellerGhii, amount: session.pacingMorsels ?? 0,
+    label: `checkout:${session.id}`, feePercent: feePct,
+  });
+  if (!paced) {
+    await releaseAgentPurchase(storage, session, caller);
+    throw new CommerceError('INSUFFICIENT_MORSELS', 402, insufficientMorselsMessage(config, session.pacingMorsels ?? 0));
+  }
   let collected: { trackingCode: string; saved?: import('./types.js').SavedPayment };
   try {
-    collected = session.total > 0
+    collected = handler && session.total > 0
       ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller, ...(saveForLater ? { saveForLater } : {}) })
       : { trackingCode: `comtx_free_${session.id}` };
   } catch (err) {
+    await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
     throw err;
   }
@@ -573,7 +619,7 @@ async function completeSessionInner(
       const item = session.items[i]!;
       const sellable = sellables[i]!;
       if (sellable.fulfill) {
-        const outcome = await sellable.fulfill(ctx, { session, item, callerJwt, payment: { handler: handler.id, ...(collected.saved ? { saved: collected.saved } : {}) } });
+        const outcome = await sellable.fulfill(ctx, { session, item, callerJwt, payment: { handler: handler?.id ?? 'none', ...(collected.saved ? { saved: collected.saved } : {}) } });
         if (outcome.taskId) taskIds.push(outcome.taskId);
         if (outcome.result !== undefined) {
           // The capability may name who shares this sale, the same way it does on a contracted
@@ -590,9 +636,10 @@ async function completeSessionInner(
       }
     }
   } catch (err) {
-    if (session.total > 0) {
+    if (handler && session.total > 0) {
       await handler.refund(ctx, { buyerGhii: session.buyerGhii, amount: session.total, trackingCode: collected.trackingCode, seller });
     }
+    await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
     const e = err as { message?: string };
     throw new CommerceError('FULFILLMENT_FAILED', 502, `Payment refunded — fulfillment task creation failed: ${e.message ?? 'unknown error'}`);
@@ -600,10 +647,11 @@ async function completeSessionInner(
 
   // 3) Payouts: the sellable's custom distribution (EE commission splits) or the default
   //    seller payout. 4) Then the fee leg (operator | burn).
-  if (session.total > 0) {
+  if (handler && session.total > 0) {
     for (let i = 0; i < lines.length; i++) {
       const { item, gross, fee, net } = lines[i]!;
       const sellable = sellables[i]!;
+      if (gross <= 0) continue;   // a free line in a money session: nothing to pay out
       if (sellable.distribute) {
         await sellable.distribute(ctx, { session, item, gross, fee, net, trackingCode: collected.trackingCode });
       } else {
@@ -616,13 +664,11 @@ async function completeSessionInner(
         designations: lineDesignations[i] ?? [],
       });
     }
-    // Fee leg. Morsels: route to operator|burn on the ledger. Money: no ledger movement — record
-    // the operator's platform-fee entry as a receivable, so the cut is ACCOUNTED and shows in the
-    // dashboard as OWED. No rail collects it here: the seller charges on their own account and the
-    // fee is invoiced out of band.
-    if (!isMoneyCurrency(session.currency)) {
-      await settleMarketplaceFee(storage, config, { fee: totalFee, payerGhii: session.buyerGhii, trackingCode: collected.trackingCode, source: 'commerce' });
-    } else if (totalFee > 0) {
+    // Fee leg. No ledger movement — record the operator's platform-fee entry as a receivable, so the
+    // cut is ACCOUNTED and shows in the dashboard as OWED. No rail collects it here: the seller charges
+    // on their own account and the fee is invoiced out of band. (The pacing's operator share moved on
+    // the morsel ledger above, in chargePacing.)
+    if (totalFee > 0) {
       await recordMoneyPlatformFee(storage, config, {
         fee: totalFee, currency: session.currency, sellerGhii: session.sellerGhii,
         buyerGhii: session.buyerGhii, trackingCode: collected.trackingCode, handler: handler.id,
@@ -633,7 +679,10 @@ async function completeSessionInner(
   const completed: CheckoutSessionRecord = {
     ...session,
     status: 'completed',
-    receipt: { handler: handler.id, charged: session.total, earned: totalNet, fee: totalFee, trackingCode: collected.trackingCode },
+    receipt: {
+      handler: handler?.id ?? 'none', charged: session.total, earned: totalNet, fee: totalFee, trackingCode: collected.trackingCode,
+      ...(paced.morsels > 0 ? { pacing: pacingReceipt(paced) } : {}),
+    },
     fulfillment: { taskIds, ...(results.length ? { results } : {}) },
     updatedAt: new Date().toISOString(),
   };
@@ -656,7 +705,7 @@ async function completeSessionInner(
   // event: one paid, one was paid. A single row on the buyer's feed would leave the seller — the
   // person whose income it is — to find out by looking.
   const what = session.items.map(i => i.title).filter(Boolean).join(', ').slice(0, 120);
-  const amount = formatCheckoutAmount(session.total, session.currency);
+  const amount = formatCheckoutAmount(session.total, session.currency, paced.morsels);
   void recordAccountEvent(storage, {
     ownerGhii: session.buyerGhii, kind: 'payment_sent', actorGaii: session.buyerGhii,
     subject: session.id, link: `/v1/profile?tab=wallet&checkout=${encodeURIComponent(session.id)}`,

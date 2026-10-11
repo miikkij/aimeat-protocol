@@ -12,12 +12,17 @@
  * @structure commerceCliTools[] — the handler table, spread by tool-call.ts
  * @usage import { commerceCliTools } from './tool-call-defs-commerce.js';
  * @version-history
+ *   v1.2.0 — 2026-10-11 — aimeat_offer_price_set writes the pacing amount (`toll_morsels`, `clear_toll`)
+ *     and drops the deprecated `price` mirror the GET returns before writing back, so the pacing is not
+ *     counted twice; price_morsels / clear_morsels are the 3.x names until 4.0.0. The checkout texts
+ *     name the money total, the pacing and the pacing pack; the handler has no morsel default.
  *   v1.1.0 — 2026-09-16 — The three PSP tools call /v1/commerce/payout. Through the generic memory
  *     routes psp_set stored the Stripe key in plain text and psp_status returned it.
  *   v1.0.0 — 2026-08-25 — Extracted from tool-call-defs-apps.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalRecord } from './tool-call-helpers.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 
 export const commerceCliTools: ConnectCliToolDefinition[] = [
     {
@@ -111,29 +116,46 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
         // (GET /v1/agents/:name/offers), patches the one offer, and writes it back (PUT — the same
         // whole-doc contract the server MCP uses), so agent-role authz is unchanged.
         name: 'aimeat_offer_price_set',
-        description: 'Set or clear the price (morsels and/or money micro-units) and visibility of one offer on your agent.',
+        description: 'Set the money price (micro-units; none means free), the pacing amount (toll_morsels: morsels per use, never a price) and the visibility of one offer on your agent.',
         input: {
             agent_name: { type: 'string', required: true, description: 'Bare name of your agent that publishes the offer.' },
             offer_id: { type: 'string', required: true, description: 'The offer id inside agents.{agent_name}.offers.' },
-            price_morsels: { type: 'number', description: 'Morsel price per call (integer, >0).' },
+            toll_morsels: { type: 'number', description: 'The pacing amount: whole morsels per use, 0 to 100 (0 removes it).' },
+            price_morsels: { type: 'number', description: 'Deprecated, removed in 4.0.0: the 3.x name of toll_morsels, stored as the pacing amount.' },
             money_amount_micros: { type: 'number', description: 'Money price in integer 6-decimal micro-units.' },
             money_currency: { type: 'string', enum: ['EUR', 'USD'], description: 'Currency for money_amount_micros.' },
-            clear_morsels: { type: 'boolean', description: 'Remove the morsel price.' },
-            clear_money: { type: 'boolean', description: 'Remove the money price.' },
+            clear_toll: { type: 'boolean', description: 'Remove the pacing amount.' },
+            clear_morsels: { type: 'boolean', description: 'Deprecated, removed in 4.0.0: the 3.x name of clear_toll.' },
+            clear_money: { type: 'boolean', description: 'Remove the money price, which makes the offer free.' },
             visibility: { type: 'string', enum: ['private', 'unlisted', 'public'], description: 'Offer visibility.' },
         },
         handler: async ({ client }, input) => {
             const agentName = requiredString(input, 'agent_name');
             const offerId = requiredString(input, 'offer_id');
+            const tollIn = optionalNumber(input, 'toll_morsels');
+            const priceMorsels = optionalNumber(input, 'price_morsels');
+            const clearToll = optionalBoolean(input, 'clear_toll') || optionalBoolean(input, 'clear_morsels');
+            if (!legacyMorselFieldsLive() && (priceMorsels !== undefined || optionalBoolean(input, 'clear_morsels'))) {
+                return { ok: false as const, error: { code: 'MORSEL_PRICE_REMOVED', message: `price_morsels and clear_morsels were removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}; a morsel is pacing, not a price. Use toll_morsels or clear_toll.` } };
+            }
             const current = await client.get(`/v1/agents/${encodeURIComponent(agentName)}/offers`);
             if (current.ok === false) return current;
             const data = current.data as { offers?: Array<Record<string, unknown>> } | undefined;
-            const offers = Array.isArray(data?.offers) ? data!.offers : [];
+            // The GET answers each offer with its pacing amount in tollMorsels and, until 4.0.0, the old
+            // `price` as a mirror of the same number. Writing the mirror back would add it to the pacing
+            // amount a second time, so every offer goes back without it.
+            const offers = (Array.isArray(data?.offers) ? data!.offers : []).map((o) => {
+                const rest: Record<string, unknown> = { ...o };
+                delete rest.price;
+                return rest;
+            });
             const offer = offers.find(o => o.id === offerId);
             if (!offer) return { ok: false as const, error: { code: 'OFFER_NOT_FOUND', message: `No offer "${offerId}" on agent "${agentName}"` } };
-            const priceMorsels = optionalNumber(input, 'price_morsels');
-            if (priceMorsels !== undefined) offer.price = { morsels: priceMorsels, unit: (offer.price as { unit?: string } | undefined)?.unit ?? 'per-call' };
-            if (optionalBoolean(input, 'clear_morsels')) offer.price = null;
+            if (tollIn !== undefined || priceMorsels !== undefined) {
+                const toll = Math.min(Math.max(0, (tollIn ?? 0) + (priceMorsels ?? 0)), 100);
+                if (toll > 0) offer.tollMorsels = toll; else delete offer.tollMorsels;
+            }
+            if (clearToll) delete offer.tollMorsels;
             const moneyMicros = optionalNumber(input, 'money_amount_micros');
             if (moneyMicros !== undefined) offer.priceMoney = { amount: moneyMicros, currency: optionalString(input, 'money_currency') ?? 'EUR' };
             if (optionalBoolean(input, 'clear_money')) offer.priceMoney = null;
@@ -144,11 +166,11 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
     {
         // → POST /v1/commerce/checkout-sessions — open a buyer checkout session.
         name: 'aimeat_checkout_open',
-        description: 'Open a checkout session as a buyer (your owner\'s balance pays). Items reference agent offers or app-tools.',
+        description: 'Open a checkout session as a buyer. Items reference agent offers, app-tools or the operator\'s pacing pack; the session quotes a money total (0 = free) and its pacing in morsels.',
         input: {
-            items: { type: 'array', required: true, description: '[{ kind?, agent?, offer_id?, app?, tool?, input?, quantity? }].' },
+            items: { type: 'array', required: true, description: '[{ kind?, agent?, offer_id?, app?, tool?, input?, quantity? }]; kind is offer, app-tool, ext-call, package or pacing-pack.' },
             note: { type: 'string', description: 'Buyer note delivered with the order.' },
-            currency: { type: 'string', description: '"morsel" (default) or a money code (EUR/USD).' },
+            currency: { type: 'string', description: 'A money code (EUR/USD). Omit it to use the first currency every item is priced in; "morsel" is the deprecated 3.x value, read as omitted until 4.0.0.' },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = { items: requiredArray(input, 'items') };
@@ -160,10 +182,10 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
     {
         // → POST /v1/commerce/checkout-sessions/:id/complete — pay + fulfill an open session.
         name: 'aimeat_checkout_complete',
-        description: 'Pay + fulfill an open checkout session (charges your owner\'s balance or a money handler).',
+        description: 'Pay + fulfill an open checkout session: the money total through the named handler, and the pacing from your owner\'s morsel balance. On INSUFFICIENT_MORSELS, request the daily allowance (POST /v1/wallet/request) or buy the pacing pack, then complete again.',
         input: {
             session_id: { type: 'string', required: true, description: 'The open session id from aimeat_checkout_open.' },
-            handler: { type: 'string', description: 'Payment handler id (default io.aimeat.morsels).' },
+            handler: { type: 'string', description: 'Payment handler id for a session with a money total; omit it for a free session.' },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = {};

@@ -95,6 +95,8 @@ const SOURCES: string[] = [
     'aimeat/src/data/builtin-skills.workstation.ts',
     'aimeat/src/data/builtin-skills.app-builder.ts',
     'aimeat/src/data/builtin-skills.app-builder-atelier.ts',
+    'aimeat/src/data/builtin-skills.ai-capabilities.ts',
+    'aimeat/src/data/builtin-skills.workspace-contracts.ts',
     'aimeat/src/data/builtin-skills-games.ts',
     'aimeat/src/data/builtin-skills-games.boot-assets.ts',
     'aimeat/src/data/builtin-skills-games.menus-audio.ts',

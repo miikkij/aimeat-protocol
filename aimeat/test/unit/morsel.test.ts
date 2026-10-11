@@ -38,7 +38,7 @@ function makeWork(overrides: Partial<WorkRecord> = {}): WorkRecord {
         providerGaii: 'provider#owner@node',
         requesterGaii: 'requester#owner@node',
         input: {},
-        cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+        cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         ttlExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -88,7 +88,7 @@ async function balOf(storage: SqliteStorage, identity: string): Promise<number> 
 describe('calculateWorkCost', () => {
     it('calculates 10% network fee', () => {
         const result = calculateWorkCost(100, 0.1);
-        expect(result.basePrice).toBe(100);
+        expect(result.toll).toBe(100);
         expect(result.networkFee).toBe(10);
         expect(result.total).toBe(110);
         expect(result.inEscrow).toBe(110);
@@ -103,14 +103,14 @@ describe('calculateWorkCost', () => {
 
     it('handles zero base morsels', () => {
         const result = calculateWorkCost(0, 0.1);
-        expect(result.basePrice).toBe(0);
+        expect(result.toll).toBe(0);
         expect(result.networkFee).toBe(0);
         expect(result.total).toBe(0);
     });
 
     it('handles large amounts', () => {
         const result = calculateWorkCost(10000, 0.2);
-        expect(result.basePrice).toBe(10000);
+        expect(result.toll).toBe(10000);
         expect(result.networkFee).toBe(1000);
         expect(result.total).toBe(11000);
     });
@@ -178,7 +178,7 @@ describe('Escrow flows (morsel service)', () => {
         expect(await balOf(storage, REQUESTER)).toBe(1000);
     });
 
-    it('settlePayment credits provider with base price', async () => {
+    it('settlePayment credits provider with the escrowed pacing amount', async () => {
         const config = makeConfig({ burnRate: 0.10 });
 
         // First hold escrow
@@ -188,7 +188,7 @@ describe('Escrow flows (morsel service)', () => {
             trackingCode: 'wk-001',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -207,7 +207,7 @@ describe('Escrow flows (morsel service)', () => {
             trackingCode: 'wk-001',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -226,7 +226,7 @@ describe('Escrow flows (morsel service)', () => {
             trackingCode: 'wk-001',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -248,7 +248,7 @@ describe('Escrow flows (morsel service)', () => {
             trackingCode: 'wk-cancel',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -264,7 +264,7 @@ describe('Escrow flows (morsel service)', () => {
             trackingCode: 'wk-return',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -284,7 +284,7 @@ describe('Escrow flows (morsel service)', () => {
             trackingCode: 'wk-partial',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -303,7 +303,7 @@ describe('Escrow flows (morsel service)', () => {
             trackingCode: 'wk-acct',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -313,7 +313,7 @@ describe('Escrow flows (morsel service)', () => {
         const providerBal = await balOf(storage, PROVIDER);
 
         // Requester started at 1000, paid 110 in escrow
-        // Provider got 100 (basePrice) credited
+        // Provider got 100 (the escrowed pacing amount, toll) credited
         // Network fees (10) go to nodes/registry but are not agent balances
         expect(requesterBal).toBe(890);
         expect(providerBal).toBe(100);
@@ -426,21 +426,21 @@ describe('calculateEscrow', () => {
             status: 'pending',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         }));
         await storage.createWork(makeWork({
             trackingCode: 'wk-2',
             status: 'accepted',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 200, networkFee: 20, total: 220, inEscrow: 220 },
+            cost: { toll:200, networkFee: 20, total: 220, inEscrow: 220 },
         }));
         await storage.createWork(makeWork({
             trackingCode: 'wk-3',
             status: 'in_progress',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 50, networkFee: 5, total: 55, inEscrow: 55 },
+            cost: { toll:50, networkFee: 5, total: 55, inEscrow: 55 },
         }));
 
         const escrow = await calculateEscrow(storage, REQUESTER);
@@ -453,21 +453,21 @@ describe('calculateEscrow', () => {
             status: 'pending',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         }));
         await storage.createWork(makeWork({
             trackingCode: 'wk-done',
             status: 'completed',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 200, networkFee: 20, total: 220, inEscrow: 220 },
+            cost: { toll:200, networkFee: 20, total: 220, inEscrow: 220 },
         }));
         await storage.createWork(makeWork({
             trackingCode: 'wk-rejected',
             status: 'rejected',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 300, networkFee: 30, total: 330, inEscrow: 330 },
+            cost: { toll:300, networkFee: 30, total: 330, inEscrow: 330 },
         }));
 
         const escrow = await calculateEscrow(storage, REQUESTER);
@@ -574,7 +574,7 @@ describe('settlePayment with relay nodes', () => {
             trackingCode: 'wk-relay',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+            cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         });
         await storage.createWork(work);
 
@@ -591,7 +591,7 @@ describe('settlePayment with relay nodes', () => {
             trackingCode: 'wk-relay2',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 1000, networkFee: 100, total: 1100, inEscrow: 1100 },
+            cost: { toll:1000, networkFee: 100, total: 1100, inEscrow: 1100 },
         });
         await storage.createWork(work);
 
@@ -611,7 +611,7 @@ describe('settlePayment with relay nodes', () => {
             trackingCode: 'wk-no-relay',
             requesterGaii: REQUESTER,
             providerGaii: PROVIDER,
-            cost: { basePrice: 1000, networkFee: 100, total: 1100, inEscrow: 1100 },
+            cost: { toll:1000, networkFee: 100, total: 1100, inEscrow: 1100 },
         });
         await storage.createWork(work);
 

@@ -15,6 +15,10 @@
  *   - moneyHandlerFor(session, handlerId?): the handler a protocol completion uses, or PAYMENT_HANDLER_REQUIRED
  *
  * @version-history
+ *   v1.1.0 — 2026-10-11 — createSession picks the money currency itself; this module asks it to refuse
+ *     a line with no money price (a free item paced in morsels), because a protocol checkout sells money
+ *     items only (wish-tarjouksella-rahahinta-ja-tahdistus-morselhinnat-tahdistukse). assertMoneySession
+ *     also refuses a free session opened at the node's own checkout.
  *   v1.0.0 — 2026-10-11 — The ACP feed listed morsel prices as currency "MORSEL", and ACP and UCP
  *     checkouts defaulted to morsel sessions (wish-acp-reitti-ei-k-yt-morseleita-valuuttana-morsel).
  */
@@ -44,25 +48,28 @@ export function moneyPaymentHandlers(): Array<{ id: string; title: string; curre
 export async function createMoneySession(
   storage: Storage, config: AimeatConfig, args: CreateArgs, requested?: string,
 ): Promise<CheckoutSessionRecord> {
-  if (requested !== undefined) {
-    if (!isMoneyCurrency(requested)) throw new CommerceError('MONEY_PRICE_REQUIRED', 422, `${NOT_SOLD_HERE} Name a money currency (${MONEY_CURRENCIES.join(' or ')}).`);
-    return createSession(storage, config, { ...args, currency: requested });
+  if (requested !== undefined && !isMoneyCurrency(requested)) {
+    throw new CommerceError('MONEY_PRICE_REQUIRED', 422, `${NOT_SOLD_HERE} Name a money currency (${MONEY_CURRENCIES.join(' or ')}).`);
   }
-  for (const currency of MONEY_CURRENCIES) {
-    try {
-      return await createSession(storage, config, { ...args, currency });
-    } catch (err) {
-      if (!(err instanceof CommerceError) || err.code !== 'CURRENCY_NOT_SUPPORTED') throw err;
+  try {
+    // requireMoney: a free item (money price 0, pacing only) is not sold on a protocol surface.
+    return await createSession(storage, config, { ...args, currency: requested, requireMoney: true });
+  } catch (err) {
+    if (requested === undefined && err instanceof CommerceError && err.code === 'CURRENCY_NOT_SUPPORTED') {
+      throw new CommerceError('MONEY_PRICE_REQUIRED', 422,
+        `${NOT_SOLD_HERE} These items have no money price this node can settle, so they are not sold through this checkout.`);
     }
+    throw err;
   }
-  throw new CommerceError('MONEY_PRICE_REQUIRED', 422,
-    `${NOT_SOLD_HERE} These items have no money price this node can settle, so they are not sold through this checkout.`);
 }
 
-/** A session opened in morsels elsewhere is not shown or settled on a protocol surface. */
+/**
+ * A session opened in morsels elsewhere, or a free one (money price 0, pacing only) opened at the
+ * node's own checkout, is not shown or settled on a protocol surface.
+ */
 export function assertMoneySession(session: CheckoutSessionRecord): void {
-  if (!isMoneyCurrency(session.currency)) {
-    throw new CommerceError('MONEY_PRICE_REQUIRED', 422, `${NOT_SOLD_HERE} This session is not in money; read it at /v1/commerce/checkout-sessions/${session.id}.`);
+  if (!isMoneyCurrency(session.currency) || session.total <= 0) {
+    throw new CommerceError('MONEY_PRICE_REQUIRED', 422, `${NOT_SOLD_HERE} This session has no money price; read it at /v1/commerce/checkout-sessions/${session.id}.`);
   }
 }
 

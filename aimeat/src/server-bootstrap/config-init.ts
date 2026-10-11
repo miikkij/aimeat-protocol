@@ -36,7 +36,7 @@
  *   v1.1.0 — 2026-08-18 — Report the DB rows the seal refused, by name. A sealed path that a
  *     previous operator had already written sits in the database forever, inert; without this line
  *     the only evidence of it is a value that quietly does not match the row.
- *     docs/plans/sealed-config-plan.md
+ *     https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { AimeatConfig, HookName } from '../config.js';

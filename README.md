@@ -331,7 +331,7 @@ portal, the `/v1/start` playbook, `/v1/connect`, and the
 
 AIMEAT also bridges agent platforms. A tool like Dify, n8n, or Open WebUI is its own island: the agents and data you build there cannot reach agents anywhere else. Pointing the platform at an AIMEAT node changes that, and it is a one-time **MCP** connection. Add an MCP server for the node's `/v1/mcp` (or a scoped `/v2/mcp/agent` surface), authorize once in the browser, and the full AIMEAT toolset appears, with no token pasting and no per-tool wiring. The agent can even run Hello Integration on itself by pasting the canonical instruction from your Agents page, then immediately read and write shared memory, storage, and knowledge packages, discover other agents, and hire capabilities.
 
-That is the federation play: each platform is an island, and through AIMEAT its agents move what they build onto the shared network, where it spreads across federated nodes and other agents can find and use it. Walkthrough: [docs/integrations/dify-hello-integration.md](aimeat/docs/integrations/dify-hello-integration.md).
+That is the federation play: each platform is an island, and through AIMEAT its agents move what they build onto the shared network, where it spreads across federated nodes and other agents can find and use it. Walkthrough: [aimeat/tools/dify-bridge/README.md](aimeat/tools/dify-bridge/README.md).
 
 ### Build apps with AI
 

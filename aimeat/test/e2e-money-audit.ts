@@ -13,6 +13,10 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   v1.3.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). The economics cases read the pacing ledger (pacing_charge, pacing_burn,
+ *     pacing_earn), the paced contract states 6 morsels, and an uncontracted call of a tool with only
+ *     `price.morsels` runs at its own pacing rather than answering 402. Every refusal stays.
  *   v1.2.0 — 2026-08-30 — The owner-free rule on BOTH app-tool doors, side by side. RAW had it and
  *     the two app-tool doors did not, so the MCP twin refused a provider their own tool with
  *     NO_CONTRACT while the REST twin served it — the same defect the REST door had already been
@@ -729,19 +733,38 @@ await test('AMBIGUITY · and holding one product is never read as consent to be 
     const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: cheapOff.offeringId, cap_units: 30 }) });
     assert(acc.status === 201, `accept ${acc.status}`);
     const bb = await balance(buyer.token);
-    // `brief` is a DIFFERENT product on the same capability. They never bought it.
+    // `brief` is a DIFFERENT product on the same capability. They never bought it. Its 3.x
+    // `price.morsels: 8` is pacing now (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+    // arvoa), so `brief` is free with 8 morsels of pacing: the call runs and is charged ITS pacing, 8,
+    // and never settles on the `cheap` contract they hold. This asserted a 402, the old price model.
+    const cExt = `apptool:${provider.name}/${APP}`;
+    const held = await contract(buyer.token, cExt, 'cheap');
     const r = await toolInvoke(buyer.token, 'brief');
-    assert(r.status === 402, `an uncontracted product owes them 402, got ${r.status}`);
-    assert(await balance(buyer.token) === bb, `and takes nothing — moved ${bb - await balance(buyer.token)}`);
+    assert(r.status === 200 && r.body.data?.pacing?.morsels === 8, `the free product runs at its own pacing, got ${r.status} ${JSON.stringify(r.body?.data?.pacing ?? r.body?.error)}`);
+    assert(bb - await balance(buyer.token) === 8, `and takes its 8 morsels of pacing — moved ${bb - await balance(buyer.token)}`);
+    const after = await contract(buyer.token, cExt, 'cheap');
+    assert(after.budget.calls === held.budget.calls, `the held 'cheap' contract is not touched: ${held.budget.calls} → ${after.budget.calls}`);
 });
 
-await test('PACING · the toll a contract froze at accept is a BURN, never revenue (M1)', async () => {
-    const all = await txns(consumer.token);
-    const tolls = all.filter(t => t.type === 'extension_toll');
-    const provTolls = (await txns(provider.token)).filter(t => t.type === 'extension_toll' && t.amount > 0);
-    assert(provTolls.length === 0, `a toll never credits the provider, found ${provTolls.length}`);
-    // With AIMEAT_PACING_TOLL_DEFAULT unset (the shipped default of 0) and no declared toll, nothing burns.
-    assert(tolls.every(t => t.amount < 0), 'every toll transaction is a debit');
+// A morsel is pacing, never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+// arvoa, 2026-10-11). This asserted the old model, "a toll is a burn and never credits the provider"
+// on `extension_toll` rows. Pacing is charged through chargePacing now: the payer's rows are debits
+// (`pacing_charge`, `pacing_burn`), the provider's `pacing_earn` rows are credits, and the provider is
+// never credited more than the payer was charged.
+await test('PACING · the payer is debited the pacing, and the provider is credited at most what it was charged', async () => {
+    const mine = (await txns(consumer.token)).filter(t => t.type === 'pacing_charge' || t.type === 'pacing_burn');
+    assert(mine.length > 0, `the consumer's contracted calls are on the ledger as pacing: ${JSON.stringify((await txns(consumer.token)).map(t => t.type))}`);
+    assert(mine.every(t => Number(t.amount) < 0), 'every pacing row of the payer is a debit');
+    const page = await json('/v1/wallet/transactions?limit=200', { headers: auth(provider.token) });
+    const earned = ((page.body.data.transactions ?? page.body.data.items ?? []) as any[]).filter(t => t.type === 'pacing_earn');
+    assert(earned.every(t => Number(t.amount) > 0), 'every pacing_earn row of the provider is a credit');
+    // Paired by tracking code: one charge, and the provider's share of exactly that charge.
+    const code = (t: any) => String(t.tracking_code ?? t.trackingCode ?? '');
+    const charges = new Map(mine.filter(t => t.type === 'pacing_charge').map(t => [code(t), -Number(t.amount)]));
+    const paired = earned.filter(t => charges.has(code(t)));
+    assert(paired.length > 0, 'the provider was credited for the consumer\'s calls');
+    assert(paired.every(t => Number(t.amount) <= charges.get(code(t))!),
+        `the provider is never credited more than that call charged: ${JSON.stringify(paired.map(t => [code(t), t.amount, charges.get(code(t))]))}`);
 });
 
 await test('PROJECTION · every listing carries the price its source declares, and only that', async () => {
@@ -1014,18 +1037,26 @@ await test('GRANT · an approval issued for an app role is withdrawn with that r
     assert((await rawInvoke(b2.token, 'solo')).status === 402, 'and neither is served after it');
 });
 
-await test('PACING · a paying consumer burns the toll themselves, and it credits nobody', async () => {
+// The tool's 3.x `price.morsels: 4` and its `tollMorsels: 2` are both pacing (ruling decision-morseli-
+// on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). This asserted the old model: toll_morsels 2, and the
+// provider credited "the price only, never the burn". Now the contract states 6 morsels of pacing, and
+// each part is charged through chargePacing: a share burns, the rake goes to the operator, the rest to
+// the provider.
+await test('PACING · a paying consumer is charged the 6 morsels of pacing, part burns, the rest reaches the provider', async () => {
     const buyer = await setupOwner('pac');
     const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: offeringPaced, cap_units: 40 }) });
     assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
-    assert(acc.body.data.entitlement.toll_morsels === 2, `the contract froze the declared toll: ${acc.body.data.entitlement.toll_morsels}`);
+    assert(acc.body.data.entitlement.toll_morsels === 6, `the contract states its pacing, 4 + 2: ${acc.body.data.entitlement.toll_morsels}`);
     const bb = await balance(buyer.token), pb = await balance(provider.token);
     const r = await rawInvoke(buyer.token, 'paced');
     assert(r.status === 200, `paced call ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    // 4 morsels of price + 2 of burn: the buyer is out 6, the provider is up by their cut of 4 only.
-    assert(bb - await balance(buyer.token) === 6, `price + toll leaves the buyer 6 down, moved ${bb - await balance(buyer.token)}`);
+    assert(bb - await balance(buyer.token) === 6, `the buyer is out the 6 morsels of pacing, moved ${bb - await balance(buyer.token)}`);
     const gained = await balance(provider.token) - pb;
-    assert(gained > 0 && gained <= 4, `the provider is credited the price only, never the burn: +${gained}`);
+    assert(gained > 0 && gained < 6, `the provider is credited the pacing less its burn and rake: +${gained}`);
+    const burnRate = Number((await json('/v1/exchange/info')).body.data?.pacing?.burn_rate ?? 0);
+    const burned = (await txns(buyer.token)).filter(t => t.type === 'pacing_burn');
+    assert((burnRate === 0 || burned.length > 0) && burned.every(t => Number(t.amount) < 0),
+        `and the burn is on the buyer's ledger as a pacing_burn (burn rate ${burnRate})`);
 });
 
 await test('PACING · on a GRANT the burn comes out of the PROVIDER, because they carry the whole price', async () => {
@@ -1044,7 +1075,9 @@ await test('PACING · on a GRANT the burn comes out of the PROVIDER, because the
     assert(r.status === 200, `the carried call is served: ${r.status} ${JSON.stringify(r.body?.error)}`);
     assert(await balance(guest.token) === gb, `the guest pays neither half — ${gb - await balance(guest.token)} morsels moved`);
     assert(pb - await balance(provider.token) === 2, `the provider burns the 2-morsel toll, moved ${pb - await balance(provider.token)}`);
-    const burns = (await txns(provider.token)).filter(t => t.type === 'extension_toll'
+    // Under a grant the provider pays the pacing and, with nobody else to credit, all of it burns
+    // (chargePacing with no provider). The row was `extension_toll` before the pacing ledger rows.
+    const burns = (await txns(provider.token)).filter(t => t.type === 'pacing_burn'
         && String(t.tracking_code ?? t.trackingCode ?? '').includes('granted'));
     assert(burns.length > 0 && burns.every(t => t.amount < 0), 'and it is recorded as a burn on the provider, not as revenue to anyone');
 });
@@ -1118,7 +1151,8 @@ await test('LEDGER · a transaction names who made the call, not only who paid f
     await rawInvoke(bot.token, 'solo');
 
     const rows = await txns(buyer.token);
-    const pay = rows.find(t => t.type === 'extension_pay');
+    // A morsel-rail contract is charged as pacing (chargePacing); the row was `extension_pay` before.
+    const pay = rows.find(t => t.type === 'pacing_charge');
     assert(!!pay, `the charge is on the ledger: ${JSON.stringify(rows.map(t => t.type))}`);
     // The balance is the human's — that is the whole point of one wallet — but the ledger now says
     // which principal caused the movement, which is what nobody could answer before.

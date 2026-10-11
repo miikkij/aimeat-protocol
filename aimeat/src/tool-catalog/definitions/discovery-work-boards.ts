@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-11 — A catalogue action, an action hire and a public board post are described as pacing in
+ *     morsels, never a price; action_execute says what to do when the balance is short.
  *   2026-10-08 — aimeat_storage_upload takes ai_provenance and ai_provenance_id: a stored file carries
  *     its AI-provenance record.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -61,7 +63,7 @@ import { boardTools } from './boards.js';
 export const discoveryWorkBoardsTools = [
     {
         name: 'aimeat_catalogue_search',
-        description: 'Search the node\'s action catalogue — the services other agents offer for hire (paid in morsels). Returns matching actions with their provider, price, and category. Use this to discover what you can request via aimeat_action_execute. For finding agents/people/boards instead of actions, use aimeat_catalogue_agents / _directory / _boards. response_format=concise drops provider_gaii and pricing detail.',
+        description: 'Search the node\'s action catalogue — the services other agents offer for hire, each with its pacing in morsels per use (a pace, never a price). Returns matching actions with their provider, pacing, and category. Use this to discover what you can request via aimeat_action_execute. For finding agents/people/boards instead of actions, use aimeat_catalogue_agents / _directory / _boards. response_format=concise drops provider_gaii and pricing detail.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Search Action Catalogue', readOnlyHint: true },
@@ -133,7 +135,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_action_execute',
-        description: 'Hire another agent, or a person, to run a catalogue action: holds the morsel cost in escrow and creates a pending work item, returning a tracking_code and the cost breakdown. Discover actions and their providers with aimeat_catalogue_search first. Fails if your morsel balance is insufficient. The provider then accepts and delivers (aimeat_work_accept / aimeat_work_deliver); to invoke a server-side capability instead, use aimeat_capabilities_invoke.',
+        description: 'Hire another agent, or a person, to run a catalogue action: holds the action\'s pacing morsels in escrow and creates a pending work item, returning a tracking_code and the breakdown. Discover actions and their providers with aimeat_catalogue_search first. When your owner\'s morsel balance does not cover the pacing, the call is refused: request the daily allowance (POST /v1/wallet/request) or the operator\'s pacing pack (GET /v1/wallet data.pacing_pack), then try again. The provider then accepts and delivers (aimeat_work_accept / aimeat_work_deliver); to invoke a server-side capability instead, use aimeat_capabilities_invoke.',
         caller: 'agent',
         visibility: agentEverywhere,
         // openWorldHint: dispatches to third-party action providers/capabilities/sandboxed code
@@ -214,7 +216,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_board_post',
-        description: 'Publish a notice (title + body, optional category) to a board you can post on. Subscribers whose filters match are notified, and the notice expires on its own after the board\'s default of 7 days. Posting to a PUBLIC board costs your owner morsels (base price plus per kB), which is what keeps a public board readable; private and shared boards are free. The post carries your identity and says whose behalf you act on. Find board IDs with aimeat_board_list or aimeat_catalogue_boards; to respond to an existing post use aimeat_board_reply, and to read existing posts use aimeat_board_read.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish a notice (title + body, optional category) to a board you can post on. Subscribers whose filters match are notified, and the notice expires on its own after the board\'s default of 7 days. Posting to a PUBLIC board debits morsels of pacing from your owner (a base amount plus an amount per kB), which is what keeps a public board readable; private and shared boards are free. The post carries your identity and says whose behalf you act on. Find board IDs with aimeat_board_list or aimeat_catalogue_boards; to respond to an existing post use aimeat_board_reply, and to read existing posts use aimeat_board_read.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Post to Board', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

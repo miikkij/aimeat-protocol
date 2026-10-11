@@ -25,6 +25,8 @@
  * @structure mountMemberAdmin(iam, target, opts) · mountJoinPanel(iam, target, opts)
  * @usage AIMEAT.iam.MemberAdmin({ target: '#members', appId: 'me/app.html', sections: [...] })
  * @version-history
+ *   v1.1.1 — 2026-10-11 — Morsels carried for a member read as pacing ("pacing 5 morsels"), never as
+ *     a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.1.0 — 2026-10-01 — One click on Approve grants the role with the least power (or the panel's
  *     `approveRole`), shown in a role select beside the button; it granted the last role listed,
  *     which was admin in the IAM template. A refused action shows the node's reason at the top of
@@ -112,7 +114,8 @@ export function mountMemberAdmin(iam, opts) {
     const key = String(id).toLowerCase().split('@')[0].split('#').pop();
     const g = grants[key];
     if (!g || !g.calls) return null;
-    const cost = g.unit === 'morsels' ? `${g.units} ${g.unit}` : `${(g.units / 1000000).toFixed(2)} ${g.unit}`;
+    // Morsels carried are pacing, never a price; money is micro-units in its currency.
+    const cost = g.unit === 'morsels' ? `pacing ${g.units} ${g.units === 1 ? 'morsel' : 'morsels'}` : `${(g.units / 1000000).toFixed(2)} ${g.unit}`;
     return el('span', { cls: cls('aim-iam-muted'), text: S('usage', { n: g.calls, cost: cost }) });
   }
 

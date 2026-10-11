@@ -10,6 +10,9 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   v1.4.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa): a declared toll and a 3.x morsel figure on a money-priced tool add up
+ *     to the listing's toll (3 + 11 = 14). The case asserted the old "declared toll wins" model.
  *   v1.3.0 — 2026-09-13 — The developer's two decisions. LIST ONCE: a tool and the flagged extension
  *     action it calls list once (the action is skipped DUPLICATE_OF and its listing withdrawn, a contract
  *     on it keeps settling at 3), a lockedInput tool brings the action back under the same id with
@@ -216,11 +219,15 @@ await test('COMBINED PRICE: money + morsels declared together = ONE listing, mor
     `a morsels-only tool still lists in morsels: ${JSON.stringify(plain.map(o => `${o.unit}/${o.currency}`))}`);
 });
 
-await test('An explicit tollMorsels still wins over the combined-price figure', async () => {
+// A 3.x morsel figure is pacing and ADDS to the declared toll (ruling decision-morseli-on-tahdistus-ei-
+// hinta-tarjouksen-kaksi-arvoa: toll = declared + legacy). This asserted "the explicit 3 wins and the
+// 11 is dropped", the old combined-price model; a use now carries the same morsels it did, 3 + 11.
+await test('An explicit tollMorsels and the 3.x morsel figure add up to the pacing toll', async () => {
   const w = await writeManifest(provider.token, [tool({ price: { morsels: 11 } }), paidTool({ tollMorsels: 3 })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
   const mine = forTool(await myOfferings(provider.token), 'paid');
-  assert(mine.length === 1 && mine[0].tollMorsels === 3, `declared toll kept, got ${JSON.stringify(mine.map(o => o.tollMorsels))}`);
+  assert(mine.length === 1 && mine[0].tollMorsels === 14 && mine[0].toll_morsels === 14,
+    `declared toll plus the legacy figure, got ${JSON.stringify(mine.map(o => [o.tollMorsels, o.toll_morsels]))}`);
 });
 
 await test('EUR + USD on one tool → one listing per currency, all sharing the tool coordinate', async () => {

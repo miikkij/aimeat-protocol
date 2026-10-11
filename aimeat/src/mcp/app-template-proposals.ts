@@ -10,6 +10,8 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-11 — _get's source_app carries `toll_morsels` (the app's pacing amount; a morsel is pacing,
+ *     not a price), `price_morsels` as its deprecated mirror until 4.0.0, and how_to_start names the take.
  *   2026-10-06 — A memory ceiling refusal reads `QUOTA_EXCEEDED: ...` (secaudit 2026-10 last items, F3).
  *   2026-10-06 — aimeat_app_template_propose takes the catalog's schema, which now carries the bounds
  *     this file held; POST /v1/appdev/templates validates with the same one (secaudit 2026-10 follow-up, Part B).
@@ -35,6 +37,8 @@ import {
 import { templateAnswer, templateIndex, unknownTemplateMessage } from '../services/node-templates.js';
 import { toolError } from './tool-error.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { appToll } from '../services/app-pacing.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const errText = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });
@@ -105,25 +109,29 @@ export function registerAppTemplateProposalTools(
             // Live commerce/fork state of the source app so the next builder knows how to start.
             const sourceOwnerGhii = `${m.derivedFrom.owner}@${config.nodeId}`;
             const app = await storage.getApp(sourceOwnerGhii, m.derivedFrom.filename).catch(err => { logger.warn('proofs: continuing after a suppressed failure', { error: String(err) }); return null; });
-            const priceMorsels = (app?.manifest as { priceMorsels?: number } | undefined)?.priceMorsels ?? 0;
+            // The source's pacing amount: morsels taking the app once moves, never a price.
+            const tollMorsels = appToll(app?.manifest);
             const source_app = app ? {
                 exists: true,
                 forkable: app.forkable ?? false,
-                price_morsels: priceMorsels,
+                toll_morsels: tollMorsels,
+                ...(legacyMorselFieldsLive()
+                    ? { price_morsels: tollMorsels, deprecated: { price_morsels: MORSEL_PRICE_DEPRECATION } }
+                    : {}),
                 license_type: (app.manifest as { licenseType?: string } | undefined)?.licenseType ?? null,
                 version: app.versionNumber,
                 download_url: `/v1/apps/${encodeURIComponent(m.derivedFrom.owner)}/${encodeURIComponent(m.derivedFrom.filename)}`,
             } : { exists: false };
 
             // v1 proposals are owner-scoped, so the reader IS the source owner (same-owner fork
-            // always passes the gate). The commerce note covers future/other-party readers:
-            // a priced app is bought through the checkout rails, never with morsels directly.
+            // always passes the gate). The note covers future/other-party readers: an app with a
+            // pacing amount is taken once (POST /v1/app-store/purchase) before the fork gate opens.
             const how_to_start = !app
                 ? 'Source app is gone — scaffold from reuse_notes.'
                 : m.startMode === 'scaffold'
                     ? 'Scaffold a fresh app from reuse_notes (do not fork).'
-                    : priceMorsels > 0
-                        ? 'Fork the source app (aimeat_app_fork) and adapt per reuse_notes. Non-owner buyers: open a checkout (aimeat_checkout_open, pays via x402/UCP/card) for the license first — the fork gate enforces it.'
+                    : tollMorsels > 0
+                        ? `Fork the source app (aimeat_app_fork) and adapt per reuse_notes. Another owner takes the app first (POST /v1/app-store/purchase, ${tollMorsels} morsels of pacing) — the fork gate enforces it.`
                         : 'Fork the source app (aimeat_app_fork) and adapt per reuse_notes.';
 
             return text({ ...m, source_app, how_to_start });

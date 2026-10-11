@@ -11,6 +11,9 @@
  *   const taskId = await createFulfillmentTask(storage, session, item);            // seller agent
  *   const taskId = await createFulfillmentTask(storage, session, item, assignee);  // explicit target
  * @version-history
+ *   v1.0.1 — 2026-10-11 — The order text names money only: no session is in morsels, which are
+ *     pacing, never a currency (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). A free
+ *     item says it had no money price.
  *   v1.0.0 — 2026-07-14 — Extracted from session-service.ts; optional assignee override +
  *     app-tool wording (TARGET-034 phase B)
  */
@@ -41,7 +44,10 @@ export async function createFulfillmentTask(
     title: `Order: ${item.title}${item.quantity > 1 ? ` ×${item.quantity}` : ''}`,
     description: [
       `Commerce order from checkout session ${session.id}.`,
-      `Buyer: ${session.buyerIdentity} (paid ${item.unitPrice * item.quantity} ${session.currency === 'morsel' ? 'morsels' : `${session.currency} micro-units`}).`,
+      // A session is always in money (a morsel is pacing, never a currency), and a free item says so.
+      item.unitPrice > 0
+        ? `Buyer: ${session.buyerIdentity} (paid ${item.unitPrice * item.quantity} ${session.currency} micro-units).`
+        : `Buyer: ${session.buyerIdentity} (free: no money price).`,
       session.note ? `Buyer note: ${session.note}` : '',
       isTool
         ? `Run the tool "${item.offerId}" of app ${item.app ?? ''} and deliver the result to the buyer.`

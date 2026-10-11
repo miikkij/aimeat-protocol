@@ -5,14 +5,20 @@
  * @description Per-call paywall for raw extension invokes (design: dev-organism notes doc-r6tyr3o,
  *   roadmap rm-commercial-raw-calls). Enforced by the NODE (not the sandbox) before the action runs,
  *   because only the node sees both wallets + the PSP handlers. Governing invariants:
- *     M1 — morsels are REVENUE (credited to owner) ONLY via `commercial.payMorsels`; `tollMorsels`
- *          and ctx.wallet.consume are burns (never credit the owner).
+ *     M1 — morsels are pacing, never a price: `tollMorsels` and a legacy `commercial.payMorsels` are
+ *          one pacing charge per use, of which the burn rate's share burns and the rest is credited
+ *          to the owner (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+ *          ctx.wallet.consume is a burn.
  *     Owner-free — the ext owner (caller.owner === ext.installedBy) always calls free, no toll.
  *     No-mint — every debit/credit is a positive finite integer; atomic ops; refund on script throw.
  *   Money (`commercial.payMoney`): the caller settles a checkout (kind 'ext-call'), receives a
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v2.0.0 — 2026-10-11 — The morsel payment channel is gone: `commercial.payMorsels` joins the toll as
+ *     pacing (step 3.1), so an action with only a morsel price is not commercial any more. The pacing
+ *     is given back when the call is refused later for money or for the app's spend permission, and
+ *     when the script throws.
  *   v1.9.1 — 2026-10-09 — The SETTLEMENT_FAILED sentence ("you were not charged") passes the 500 text
  *     filter through keepErrorMessage (middleware/internal-error-text.ts; secrets audit d4).
  *   v1.9.0 — 2026-10-01 — The members-only question is services/members-only.ts, asked by every route
@@ -46,13 +52,11 @@
  *   v1.1.0 — 2026-07-17 — Money channel: consume the one-time ext-pay token (D1/D3) instead of 402-stub
  *   v1.0.0 — 2026-07-17 — Initial (Phase 2: owner-free + toll + morsel payment; money → 402)
  */
-import { randomUUID } from 'node:crypto';
 import type { PaywallResponder } from './metered-response.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
-import { keepErrorMessage } from '../../middleware/internal-error-text.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
@@ -68,7 +72,7 @@ import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { resolveGatedApp } from './permissions.js';
 import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../../services/members-only.js';
-import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
@@ -374,10 +378,11 @@ export async function enforcePaywall(args: {
   const viaEntitlement = await settleViaEntitlement({ config, storage, ext, action, callerGaii, res, session });
   if (viaEntitlement) return viaEntitlement;
 
-  // 3.1 Uncontracted call: pace it here. Same burn, same rule — a burn, never revenue (M1).
+  // 3.1 Uncontracted call: pace it here. A legacy morsel price (`commercial.payMorsels`) is pacing
+  //     now and joins the toll in this one charge: part burns, the rest is credited to the owner (M1).
   const paced = await burnPacingToll({
     config, storage, callerGaii, providerOwner: ownerName,
-    label: `ext:${ext.name}:${action.id}`, toll: resolvePacingToll(config, toll), res,
+    label: `ext:${ext.name}:${action.id}`, toll: resolvePacingToll(config, toll, action.commercial?.payMorsels), res,
   });
   if (!paced.ok) return { ok: false };
 
@@ -389,10 +394,13 @@ export async function enforcePaywall(args: {
   //     Charged on the APP-TOOL's coordinate, not this action's, because that is the coordinate the
   //     product is sold under: a contract holder settles once at the price they agreed, whichever
   //     door they came through, and anyone else is told which listing to contract.
-  if (!action.commercial) {
-    if (soldFreeUpstream) return { ok: true, upstream: true };  // the door the caller used prices it at nothing
+  // A morsel price alone is pacing (charged above), so only a money price makes an action commercial.
+  if (!action.commercial?.payMoney) {
+    // When the script throws, the pacing comes back: a failed use costs nothing.
+    const giveBack = paced.charge ? { refund: paced.charge.reverse } : {};
+    if (soldFreeUpstream) return { ok: true, upstream: true, ...giveBack };  // the door the caller used prices it at nothing
     const sold = await pricedAppToolsFor(storage, `${ownerName}@${config.nodeId}`, ext.name, action.id);
-    if (!sold.length) return { ok: true };                  // genuinely free: nothing sells it
+    if (!sold.length) return { ok: true, ...giveBack };     // free: nothing sells it, only the pacing was charged
 
     // WHICH product is this? The route sees an action; a price belongs to a product, and one action
     // can be sold as several. Resolved in the order a buyer would expect to be treated:
@@ -457,64 +465,24 @@ export async function enforcePaywall(args: {
   //     action is answered above and must not need a money permission at all.
   const spendRefusal = await appSpendRefusal(storage, session);
   if (spendRefusal) {
+    await paced.charge?.reverse();
     respondMeteredRefusal(config, res, spendRefusal, `${ext.name}/${action.id}`);
     return { ok: false };
   }
 
-  // 4. Money channel (D1/D3): require a one-time token minted by a settled ext-call checkout.
-  //    Checked BEFORE the morsel debit so a combo-2 caller without money is never charged morsels.
-  if (action.commercial.payMoney) {
-    const consumed = await consumeExtPayToken(storage, payToken, { buyerOwner: callerOwner, ext: ext.name, action: action.id });
-    if (!consumed.ok) {
-      const m = action.commercial.payMoney;
-      res.status(402).json({ ...error(config.nodeId, 'PAYMENT_REQUIRED',
-        `This call costs ${m.amount / 1_000_000} ${m.currency}. Settle it with a checkout `
-        + `{ kind:'ext-call', app:'${ext.name}', tool:'${action.id}', currency:'${m.currency}' }, then retry `
-        + `this call with header 'x-aimeat-pay-token: <token>'.${payToken ? ` (token ${consumed.reason})` : ''}`),
-        ...paymentChallenge(config) });
-      return { ok: false };
-    }
-    // Token valid + consumed — money settled. Fall through (combo 2 also charges morsels below).
+  // 4. Money channel (D1/D3): require a one-time token minted by a settled ext-call checkout. The
+  //    pacing charged at 3.1 is given back when the money is missing, so a refused call costs nothing.
+  const consumed = await consumeExtPayToken(storage, payToken, { buyerOwner: callerOwner, ext: ext.name, action: action.id });
+  if (!consumed.ok) {
+    await paced.charge?.reverse();
+    const m = action.commercial.payMoney;
+    res.status(402).json({ ...error(config.nodeId, 'PAYMENT_REQUIRED',
+      `This call costs ${m.amount / 1_000_000} ${m.currency}. Settle it with a checkout `
+      + `{ kind:'ext-call', app:'${ext.name}', tool:'${action.id}', currency:'${m.currency}' }, then retry `
+      + `this call with header 'x-aimeat-pay-token: <token>'.${payToken ? ` (token ${consumed.reason})` : ''}`),
+      ...paymentChallenge(config) });
+    return { ok: false };
   }
-
-  // 5. Morsel payment — REVENUE (M1): atomic debit caller + credit owner. Refund on script throw.
-  //
-  //    NO BENEFICIARY SPLIT HERE, deliberately. This is the uncontracted per-call channel and it
-  //    settles on its own, not through `settleMeteredCharge`; splitting it would mean a second copy of
-  //    the split arithmetic, which is the shape metered-access.ts exists to prevent. A provider who
-  //    declares a split gets it on every contracted call at that coordinate (step 3) and not on this
-  //    one — so a capability meant to share revenue should be sold through EXCHANGE, where it is.
-  const payMorsels = action.commercial.payMorsels;
-  if (isPosInt(payMorsels)) {
-    const ownerGhii = `${ownerName}@${config.nodeId}`;
-    const debited = await storage.debitBalance(callerGaii, payMorsels);
-    if (!debited) {
-      res.status(402).json({ ...error(config.nodeId, 'INSUFFICIENT_MORSELS',
-        `This call costs ${payMorsels} morsels and your balance does not cover it`), ...paymentChallenge(config) });
-      return { ok: false };
-    }
-    const credited = await storage.creditBalance(ownerGhii, payMorsels);
-    if (!credited) {
-      // Never keep a debit we couldn't pay out — refund the caller and fail loudly.
-      await storage.creditBalance(callerGaii, payMorsels);
-      logger.error(`[paywall] credit to owner failed; refunded caller`, { ext: ext.name, action: action.id, ownerGhii });
-      res.status(500).json(keepErrorMessage(error(config.nodeId, 'SETTLEMENT_FAILED', 'Payment could not be settled to the seller; you were not charged')));
-      return { ok: false };
-    }
-    const track = `ext:${ext.name}:${action.id}:pay`;
-    const ts = new Date().toISOString();
-    await storage.addTransaction({ id: `ext-pay-${randomUUID()}`, gaii: ownerGhiiOf(callerGaii), type: 'extension_pay', amount: -payMorsels, trackingCode: track, initiatorGaii: callerGaii, timestamp: ts });
-    await storage.addTransaction({ id: `ext-earn-${randomUUID()}`, gaii: ownerGhii, type: 'extension_earn', amount: payMorsels, trackingCode: track, initiatorGaii: callerGaii, timestamp: ts });
-    return {
-      ok: true,
-      refund: async () => {
-        await storage.debitBalance(ownerGhii, payMorsels);
-        await storage.creditBalance(callerGaii, payMorsels);
-        logger.warn(`[paywall] refunded ${payMorsels} morsels (script threw after payment)`, { ext: ext.name, action: action.id });
-      },
-    };
-  }
-
-  // commercial present but no chargeable channel here (shouldn't happen — C1 validated at install).
-  return { ok: true };
+  // Token valid and consumed: money settled. When the script throws, the pacing comes back.
+  return { ok: true, ...(paced.charge ? { refund: paced.charge.reverse } : {}) };
 }

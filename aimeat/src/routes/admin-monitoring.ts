@@ -13,6 +13,8 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Work cost — 2026-10-11 — The admin work list's `cost` carries `toll` (the escrowed pacing amount) and
+ *     the deprecated `base_price` mirror, through presentWorkCost (services/morsel.ts).
  *   Backup — 2026-10-09 — GET /v1/admin/backup writes owners and agents through an allowlist and
  *     leaves credential memory records out, and says what it omitted; the webhook secret was in the
  *     file (secrets audit 2026-10-09, finding 1.9).
@@ -58,6 +60,7 @@ import { performKeyExchange } from '../services/federation-helpers.js';
 import { logger } from '../utils/logger.js';
 import { ROOMS } from '../services/home-rooms.js';
 import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED } from '../services/admin-backup-projection.js';
+import { presentWorkCost } from '../services/morsel.js';
 
 const POLL_INTERVAL_MS = 10_000;
 const MAX_POLL_DURATION_MS = 30 * 60_000;
@@ -83,12 +86,10 @@ export function adminMonitoringRouter(
                 // already spells the same object. It went out as the raw record, so one object in
                 // the middle of a snake_case row answered in camelCase and a reader folding
                 // `in_escrow` over it silently counted nothing.
-                cost: {
-                    base_price: w.cost?.basePrice ?? 0,
-                    network_fee: w.cost?.networkFee ?? 0,
-                    total: w.cost?.total ?? 0,
-                    in_escrow: w.cost?.inEscrow ?? 0,
-                },
+                cost: presentWorkCost({
+                    toll: w.cost?.toll ?? 0, networkFee: w.cost?.networkFee ?? 0,
+                    total: w.cost?.total ?? 0, inEscrow: w.cost?.inEscrow ?? 0,
+                }, 'snake'),
                 created_at: w.createdAt,
                 updated_at: w.updatedAt,
                 ttl_expires_at: w.ttlExpiresAt,

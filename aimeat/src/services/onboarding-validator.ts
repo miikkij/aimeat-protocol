@@ -13,6 +13,8 @@
  *   v1.1.0 -- 2026-05-28 -- Add validators for publish_commands and publish_config
  *                            (machine-validated by reading agents.{name}.commands and
  *                            agents.config.{name}.* memory keys).
+ *   v1.2.0 -- 2026-10-11 -- price_offer passes on a money price or a pacing amount (tollMorsels), not
+ *                            only the old morsel `price` (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  */
 
 import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../storage/interface.js';
@@ -317,7 +319,7 @@ async function validateDeclareOfferings(agentGaii: string, storage: Storage): Pr
     validationMethod: 'automatic',
     details: { key, offerCount: count },
     failureReason: count > 0 ? undefined
-      : `Publish at least one offer to ${key} (each with id, title, ask) so the owner can find what this agent does. Optional — see docs/building-an-aimeat-compatible-agent.md.`,
+      : `Publish at least one offer to ${key} (each with id, title, ask) so the owner can find what this agent does. Optional — see https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md.`,
   };
 }
 
@@ -336,7 +338,7 @@ async function validateMakeWorkflowCompatible(agentGaii: string, storage: Storag
     validationMethod: 'automatic',
     details: { workflowCompatibleCount: compatible.length, ids: compatible.map(o => o.id) },
     failureReason: compatible.length > 0 ? undefined
-      : 'Add success_signal + required_to_function (or "none") + deliverable.location to at least one offer so it can be a workflow step. Optional — see docs/building-an-aimeat-compatible-agent.md §4.',
+      : 'Add success_signal + required_to_function (or "none") + deliverable.location to at least one offer so it can be a workflow step. Optional — see https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md §4.',
   };
 }
 
@@ -346,8 +348,10 @@ async function validateMakeWorkflowCompatible(agentGaii: string, storage: Storag
  */
 async function validatePriceOffer(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
   const offers = await readPublishedOffers(agentGaii, storage);
+  // An offer is set up for other owners when it has a money price, a pacing amount, or (stored by a
+  // 3.x node) the old morsel price that is read as pacing.
   const priced = (offers ?? []).filter(o =>
-    o.price != null && o.visibility === 'public'
+    (o.priceMoney != null || (o.tollMorsels ?? 0) > 0 || o.price != null) && o.visibility === 'public'
     && !!(o.callable && (o.callable.action_id || o.callable.webhook_url)),
   );
   return {
@@ -355,7 +359,7 @@ async function validatePriceOffer(agentGaii: string, storage: Storage): Promise<
     validationMethod: 'automatic',
     details: { pricedCount: priced.length, ids: priced.map(o => o.id) },
     failureReason: priced.length > 0 ? undefined
-      : 'Add price + visibility:"public" + callable (action_id or webhook_url) to at least one offer to sell it to other owners. Optional — see docs/building-an-aimeat-compatible-agent.md §3.',
+      : 'Add priceMoney and/or tollMorsels + visibility:"public" + callable (action_id or webhook_url) to at least one offer to offer it to other owners. Optional — see https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md §3.',
   };
 }
 

@@ -9,6 +9,10 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.8.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). Assertions that read the old morsel-price model now read pacing: the
+ *     provider is credited the amount less the burn and the rake, an offering states `toll_morsels`,
+ *     a free paced tool runs for an uncontracted caller who pays its pacing, and the ODPS plan is free.
  *   v1.7.0 — 2026-10-08 — aiprov D2, D6: REST delivery records how the answer was made. A declaration
  *     the provider's agent may not make is 403 SCOPE_DENIED with the buyer uncharged and the work
  *     open; the same agent saying nothing is stamped model-written; the owner's declaration reaches
@@ -143,14 +147,27 @@ await test('Consumer accepts a contract → price is authoritative (10), budget 
   assert(rakePerCall >= 1, `a positive price must carry a rake, got ${rakePerCall}`);
 });
 
-await test('Metered call #1: caller −10, provider +(10−rake), budget spent=10', async () => {
+// A morsel is pacing, never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
+// arvoa, 2026-10-11). A 3.x `payMorsels: 10` is 10 morsels of pacing per call, charged through
+// chargePacing: the burn rate's share burns, the contract's rake goes to the operator, and the provider
+// is credited the rest. This assertion was `provider +(10−rake)`, the old morsel-price model.
+await test('Metered call #1: caller −10 of pacing, provider +(10−burn−rake), budget spent=10', async () => {
+  const info = await json('/v1/exchange/info');
+  const burnRate = Number(info.body.data.pacing?.burn_rate ?? 0);
+  // chargePacing's own rounding: percentFee(amount, rate as a percent) ceils.
+  const burn = Math.min(10, Math.ceil(10 * (Math.round(burnRate * 10_000) / 100) / 100));
   const cb = await balance(consumer.token);
   const pb = await balance(provider.token);
   const ob = await balance(operator.token);
   const r = await invoke(consumer.token, 'validate');
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(await balance(consumer.token) === cb - 10, 'consumer debited the 10-morsel price');
-  assert(await balance(provider.token) === pb + (10 - rakePerCall), `provider credited its cut (10−${rakePerCall})`);
+  assert(await balance(consumer.token) === cb - 10, 'consumer debited the 10 morsels of pacing');
+  assert(await balance(provider.token) === pb + (10 - burn - rakePerCall),
+    `provider credited the pacing less the burn (${burn}) and the rake (${rakePerCall})`);
+  const ctx = await json('/v1/wallet/transactions?limit=20', { headers: auth(consumer.token) });
+  const crows = (ctx.body.data.transactions ?? ctx.body.data.items ?? []) as any[];
+  assert(crows.some(t => t.type === 'pacing_charge') && (burn === 0 || crows.some(t => t.type === 'pacing_burn' && Number(t.amount) === -burn)),
+    `the consumer's ledger names the pacing charge and its burn: ${JSON.stringify(crows.slice(0, 4).map(t => ({ type: t.type, amount: t.amount })))}`);
 
   // WHERE THE RAKE LANDS. Every assertion above reads the two ENDS of the transfer, and the rake
   // itself only ever came out of the accept response body — the node's own arithmetic, echoed back.
@@ -269,7 +286,9 @@ await test('Provider lists an OFFERING for its priced action (authoritative pric
     body: JSON.stringify({ ext: EXT, action: 'validate', title: 'Y-tunnus validation', description: 'PRH company lookup', tags: ['prh', 'finland'], usage_terms: validTerms }) });
   assert(r.status === 201, `list offering ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const o = r.body.data.offering;
-  assert(o.unit === 'morsels' && o.basePrice === 10, `offering price authoritative: ${JSON.stringify(o)}`);
+  // The action's 3.x morsel figure is the pacing amount; `unit`/`basePrice` are its deprecated mirrors.
+  assert(o.toll_morsels === 10 && o.unit === 'morsels' && o.basePrice === 10 && !!o.deprecated?.basePrice,
+    `offering pacing authoritative: ${JSON.stringify(o)}`);
   offeringId = o.offeringId;
 });
 
@@ -555,9 +574,17 @@ await test('Offering DETAIL exposes the PINNED interface schema + the WebMCP cal
   assert(d.call_recipe?.url === `/v1/apps/${provider.name}/${APP_ID}/webmcp/tools/getbrief`, `call recipe url: ${d.call_recipe?.url}`);
 });
 
-await test('A non-contracted caller hitting the priced tool → 402 (payment required), not a free call', async () => {
-  const r = await callTool(consumer.token);
-  assert(r.status === 402, `expected 402 without a contract, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+// A tool with only a 3.x `price.morsels` is FREE with that much pacing (ruling decision-morseli-on-
+// tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). It asserted a 402 before, the old morsel-price model; the
+// uncontracted call now runs and is charged its 8 morsels of pacing, never handed over for nothing.
+await test('A non-contracted caller of the free, paced tool is charged its pacing, and the tool runs', async () => {
+  // A caller of its own, so the consumer's balance stays as the budget tests below count it.
+  const walkIn = await setupOwner('walk');
+  const cb = await balance(walkIn.token);
+  const r = await callTool(walkIn.token);
+  assert(r.status === 200, `expected 200 without a contract, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.pacing?.morsels === 8, `the receipt names the pacing: ${JSON.stringify(r.body.data.pacing)}`);
+  assert(await balance(walkIn.token) === cb - 8, 'the caller paid the 8 morsels of pacing');
 });
 
 await test('Consumer contracts the app-tool offering (by offering_id) → entitlement pinned to v1', async () => {
@@ -569,20 +596,25 @@ await test('Consumer contracts the app-tool offering (by offering_id) → entitl
   assert(e.surface?.kind === 'app-tool' && e.surface.ifaceVersion === 1, `pinned surface: ${JSON.stringify(e.surface)}`);
 });
 
-await test('Metered app-tool call: caller −8, provider +(8−rake), routed to pinned v1, budget spent=8', async () => {
+// The provider's credit was `8 − rake` (the old morsel-price model); the 8 is pacing now, so the burn
+// rate's share burns as well (chargePacing).
+await test('Metered app-tool call: caller −8 of pacing, provider +(8−burn−rake), routed to pinned v1, budget spent=8', async () => {
+  const info = await json('/v1/exchange/info');
+  const burnRate = Number(info.body.data.pacing?.burn_rate ?? 0);
+  const burn = Math.min(8, Math.ceil(8 * (Math.round(burnRate * 10_000) / 100) / 100));
   const cb = await balance(consumer.token);
   const pb = await balance(provider.token);
   const r = await callTool(consumer.token);
   assert(r.status === 200, `metered call ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.metered === true && r.body.data.iface_version === 1, `metered/pinned in response: ${JSON.stringify({ metered: r.body.data.metered, v: r.body.data.iface_version })}`);
-  const fee = Math.ceil(8 * 5 / 100); // default 5% rake, ceils
-  assert(await balance(consumer.token) === cb - 8, 'consumer debited the 8-morsel app-tool price');
-  assert(await balance(provider.token) === pb + (8 - fee), `provider credited its cut (8−${fee})`);
+  const fee = Math.min(8 - burn, Math.ceil(8 * 5 / 100)); // default 5% rake, ceils
+  assert(await balance(consumer.token) === cb - 8, 'consumer debited the 8 morsels of pacing');
+  assert(await balance(provider.token) === pb + (8 - burn - fee), `provider credited the pacing less burn ${burn} and rake ${fee}`);
 });
 
 await test('App-tool budget CAP hard-stops: after 2 calls (16/20), the 3rd → 402 BUDGET_EXHAUSTED', async () => {
   const two = await callTool(consumer.token);       // spent → 16, under 20
-  assert(two.status === 200, `2nd app-tool call ${two.status}`);
+  assert(two.status === 200, `2nd app-tool call ${two.status}: ${JSON.stringify(two.body?.error)}`);
   const cb = await balance(consumer.token);
   const three = await callTool(consumer.token);      // 24 > 20 cap → denied, no debit
   assert(three.status === 402 && three.body?.error?.code === 'BUDGET_EXHAUSTED', `expected BUDGET_EXHAUSTED, got ${three.status}/${JSON.stringify(three.body?.error)}`);
@@ -758,14 +790,19 @@ await test('A non-provider cannot deliver the work → 404', async () => {
   assert(r.status === 404, `a non-provider must not deliver, got ${r.status}`);
 });
 
-await test('Provider DELIVERS → consumer charged 12 ON DELIVERY, provider +(12−rake), output stored', async () => {
+// `price_morsels: 12` is 12 morsels of pacing per task (ruling decision-morseli-on-tahdistus-ei-hinta-
+// tarjouksen-kaksi-arvoa). The provider's credit was `12 − rake`, the old morsel-price model; the burn
+// rate's share now burns as well (chargePacing).
+await test('Provider DELIVERS → consumer charged 12 of pacing ON DELIVERY, provider +(12−burn−rake), output stored', async () => {
+  const burnRate = Number((await json('/v1/exchange/info')).body.data.pacing?.burn_rate ?? 0);
+  const burn = Math.min(12, Math.ceil(12 * (Math.round(burnRate * 10_000) / 100) / 100));
   const cb = await balance(buyer.token), pb = await balance(provider.token);
   const r = await json(`/v1/exchange/work/${awWorkId}/deliver`, { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ output: { summary: 'A short summary.' } }) });
   assert(r.status === 200 && r.body.data.work.state === 'delivered', `deliver ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.work.charged_units === 12, `charged 12 on delivery, got ${r.body.data.work.charged_units}`);
-  const fee = Math.ceil(12 * awRake / 100);
-  assert(await balance(buyer.token) === cb - 12, 'consumer charged the 12-morsel task price on delivery');
-  assert(await balance(provider.token) === pb + (12 - fee), `provider credited its cut (12−${fee})`);
+  const fee = Math.min(12 - burn, Math.ceil(12 * awRake / 100));
+  assert(await balance(buyer.token) === cb - 12, 'consumer charged the 12 morsels of pacing on delivery');
+  assert(await balance(provider.token) === pb + (12 - burn - fee), `provider credited the pacing less burn ${burn} and rake ${fee}`);
   assert(JSON.stringify(r.body.data.work.output).includes('A short summary'), `delivered output stored: ${JSON.stringify(r.body.data.work.output)}`);
 });
 
@@ -965,7 +1002,10 @@ await test('The ODPS document carries the AIMEAT truth: pricing, licence rights,
   assert(det.standards.includes('ODPS v4.1') && det.useCases[0].useCase.useCaseTitle === 'KYB onboarding', `details standards/useCases: ${JSON.stringify(det.standards)}`);
   assert(det.governanceProfile === 'audit_ready' && det.portfolioPriority === 'high', `v4.1 governance fields: ${JSON.stringify({ g: det.governanceProfile, p: det.portfolioPriority })}`);
   const plan = p.pricingPlans.declarative.en[0];
-  assert(plan.unit === 'Pay-per-use' && plan.price === '10', `base plan should mirror the authoritative price, got ${JSON.stringify(plan)}`);
+  // A morsel figure is pacing, never a price: the plan is free ("0") and its note names the 10 morsels
+  // of pacing. It asserted price "10", the old morsel-price model.
+  assert(plan.unit === 'Pay-per-use' && plan.price === '0' && String(plan.notes).includes('10 morsels of pacing'),
+    `base plan should be free with the pacing in its note, got ${JSON.stringify(plan)}`);
   // usage_terms: derivatives yes → Adaptation granted; resale no → not resellable; attribution → a restriction.
   assert(p.license.scope.rights.includes('Adaptation') && !p.license.scope.rights.includes('Reselling'),
     `licence rights from usage terms: ${JSON.stringify(p.license.scope.rights)}`);
@@ -977,12 +1017,14 @@ await test('The ODPS document carries the AIMEAT truth: pricing, licence rights,
     `data access ports: ${JSON.stringify(Object.keys(p.dataAccess))}`);
   // v4.1: access-port and gateway labels are language maps, not bare strings.
   assert(p.dataAccess.default.name.en === 'Metered AIMEAT call', `access name should be a language map: ${JSON.stringify(p.dataAccess.default.name)}`);
-  assert(p.paymentGateways.default.type === 'Custom' && String(p.paymentGateways.default.description.en).includes('Morsel'),
-    `morsel-priced offering settles on the morsel meter: ${JSON.stringify(p.paymentGateways)}`);
+  // No money moves on a morsel-rail offering; its gateway names pacing (was "Morsel meter", a price model).
+  assert(p.paymentGateways.default.type === 'Custom' && String(p.paymentGateways.default.description.en).includes('pacing'),
+    `a free, paced offering moves no money and names its pacing: ${JSON.stringify(p.paymentGateways)}`);
   const x = p['x-aimeat'];
   assert(String(x.provenance.legalBasis).startsWith('Public register') && x.provenance.odpsVersion === '4.1', `x-aimeat provenance: ${JSON.stringify(x.provenance)}`);
   assert(x.capability.ext === EXT && typeof x.interface.output_schema === 'object', `x-aimeat capability + interface: ${JSON.stringify(x.capability)}`);
-  assert(typeof x.observed.total_calls === 'number' && x.economics.rake_percent >= 0, `x-aimeat observed + economics: ${JSON.stringify(x.economics)}`);
+  assert(typeof x.observed.total_calls === 'number' && x.economics.rake_percent >= 0 && x.economics.toll_morsels === 10,
+    `x-aimeat observed + economics with the pacing: ${JSON.stringify(x.economics)}`);
 });
 
 await test('GET /odps returns the same document as JSON in the envelope; unknown offering → 404', async () => {

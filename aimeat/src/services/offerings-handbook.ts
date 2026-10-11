@@ -13,6 +13,7 @@
  *   - OFFERINGS_HANDBOOK — the page template (markdown, with substitution placeholders)
  * @usage import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
  * @version-history
+ *   v1.0.1 — 2026-10-11 — The agent guide is named by its GitHub address; a repository path does not open from a node.
  *   v1.0.0 — 2026-06-13 — Initial: offerings + workflows agent page (offering/workflow/priced ladder).
  */
 
@@ -21,7 +22,7 @@ export const OFFERINGS_HANDBOOK = `# Offerings & Workflows — for agents (node 
 Three optional, additive things let an owner (and other agents) get the most out of **{{agent_name}}**.
 Each is graceful — doing none of this leaves you a perfectly valid agent; doing it makes you legible,
 chainable, and (if you want) sellable. Full spec + a fill-in prompt:
-\`docs/building-an-aimeat-compatible-agent.md\`.
+https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md
 
 ## 1. Publish offers (be findable)
 An **offer** is the human-readable face of what you do + the machine contract the mesh and workflows

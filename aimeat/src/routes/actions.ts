@@ -3,14 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Express routes for the action marketplace — agents publish/update/list callable
- *   actions with category, JSON schemas, and morsel pricing; enforces trust, quota, and category rules.
+ *   actions with category, JSON schemas, and a pacing amount per use; enforces trust, quota, and
+ *   category rules.
  *
  * @structure
  *   - actionsRouter(config, storage): mounts /v1/actions CRUD + discovery endpoints
- *   - POST /v1/actions: publish (agent scope work:publish); min-trust gate for paid actions, per-agent cap
+ *   - POST /v1/actions: publish (agent scope work:publish); min-trust gate for actions with pacing, per-agent cap
  *   - ALLOWED_CATEGORIES: whitelist validated on publish/update
  *
  * @version-history
+ *   v1.5.0 -- 2026-10-11 -- An action's morsel amount is pacing, not a price (ruling
+ *     decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Publish and update take
+ *     pricing.toll_morsels; the old base_morsels is read as pacing until 4.0.0 and refused after
+ *     (MORSEL_PRICE_REMOVED). Responses carry toll_morsels and, until 4.0.0, base_morsels as a
+ *     deprecated mirror. An update that sends pricing without either field keeps the stored amount.
  *   v1.4.0 -- 2026-09-26 -- Publish, update and delete key the action on the caller's resolved
  *     identity (resolveIdentity): a person's GHII, an agent's GAII. The work doors use the same one,
  *     so the person who published an action takes the work on it (secaudit 2026-09: N6, F-1).
@@ -28,6 +34,7 @@ import { calculateTrustScore } from '../services/trust.js';
 import { ActionPublishSchema, ActionUpdateSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { actionPricingFromRequest, presentActionPricing } from '../services/action-pacing.js';
 
 const ALLOWED_CATEGORIES = [
   'language', 'translation', 'analysis', 'generation', 'coding',
@@ -53,12 +60,17 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     // published an action is the one who takes the work on it.
     const gaii = resolveIdentity(req.auth!, config.nodeId);
 
-    // Min trust enforcement for paid actions
-    if (pricing.base_morsels > 0) {
+    // The pacing amount per use: toll_morsels, or the 3.x base_morsels read as pacing until 4.0.0.
+    const priced = actionPricingFromRequest(config, pricing ?? {});
+    if ('code' in priced) { res.status(400).json(error(config.nodeId, priced.code, priced.message)); return; }
+
+    // Min trust enforcement for an action that earns pacing: the provider is credited the escrowed
+    // pacing amount on every accepted request, so the floor that guarded morsel-priced actions holds.
+    if (priced.pricing.tollMorsels > 0) {
       const trust = await calculateTrustScore(gaii, storage);
       if (trust.score < config.minTrustForPaidActions) {
         res.status(403).json(error(config.nodeId, 'TRUST_TOO_LOW',
-          `Trust score ${trust.score} is below minimum ${config.minTrustForPaidActions} for paid actions`));
+          `Trust score ${trust.score} is below minimum ${config.minTrustForPaidActions} for an action with pacing`));
         return;
       }
     }
@@ -82,13 +94,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         category,
         inputSchema: input_schema,
         outputSchema: output_schema,
-        pricing: {
-          baseMorsels: pricing.base_morsels,
-          perUnit: pricing.per_unit ? {
-            unit: pricing.per_unit.unit,
-            morselsPer1000: pricing.per_unit.morsels_per_1000,
-          } : undefined,
-        },
+        pricing: priced.pricing,
         estimatedTimeSeconds: estimated_time_seconds,
         maxInputSizeBytes: max_input_size_bytes,
         tags: tags ?? [],
@@ -153,13 +159,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         description: a.description,
         provider_gaii: a.providerGaii,
         category: a.category,
-        pricing: {
-          base_morsels: a.pricing.baseMorsels,
-          per_unit: a.pricing.perUnit ? {
-            unit: a.pricing.perUnit.unit,
-            morsels_per_1000: a.pricing.perUnit.morselsPer1000,
-          } : undefined,
-        },
+        pricing: presentActionPricing(a.pricing, 'snake'),
         tags: a.tags,
         semantic: a.semantic,
         federate: a.federate ?? false,
@@ -188,14 +188,22 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         `category must be one of: ${ALLOWED_CATEGORIES.join(', ')}`));
       return;
     }
-    // Only when this update WRITES a paid price. An edit that does not touch pricing leaves a
+    // Only when this update WRITES a pacing amount. An edit that does not touch pricing leaves a
     // listing that already cleared the floor alone: a trust score that has since drifted should make
     // a listing unlisted by some other decision, not make it uneditable by this one.
-    if (pricing !== undefined && pricing.base_morsels > 0) {
+    let nextPricing: ActionRecord['pricing'] | undefined;
+    if (pricing !== undefined) {
+      // Neither toll_morsels nor base_morsels sent: the stored pacing amount stays.
+      const current = await storage.getAction(id, gaii);
+      const priced = actionPricingFromRequest(config, pricing, current?.pricing.tollMorsels);
+      if ('code' in priced) { res.status(400).json(error(config.nodeId, priced.code, priced.message)); return; }
+      nextPricing = priced.pricing;
+    }
+    if (nextPricing && nextPricing.tollMorsels > 0) {
       const trust = await calculateTrustScore(gaii, storage);
       if (trust.score < config.minTrustForPaidActions) {
         res.status(403).json(error(config.nodeId, 'TRUST_TOO_LOW',
-          `Trust score ${trust.score} is below minimum ${config.minTrustForPaidActions} for paid actions`));
+          `Trust score ${trust.score} is below minimum ${config.minTrustForPaidActions} for an action with pacing`));
         return;
       }
     }
@@ -206,12 +214,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     if (category !== undefined) updates.category = category;
     if (input_schema !== undefined) updates.inputSchema = input_schema;
     if (output_schema !== undefined) updates.outputSchema = output_schema;
-    if (pricing !== undefined) {
-      updates.pricing = {
-        baseMorsels: pricing.base_morsels,
-        perUnit: pricing.per_unit ? { unit: pricing.per_unit.unit, morselsPer1000: pricing.per_unit.morsels_per_1000 } : undefined,
-      };
-    }
+    if (nextPricing !== undefined) updates.pricing = nextPricing;
     if (estimated_time_seconds !== undefined) updates.estimatedTimeSeconds = estimated_time_seconds;
     if (max_input_size_bytes !== undefined) updates.maxInputSizeBytes = max_input_size_bytes;
     if (tags !== undefined) updates.tags = tags;
@@ -253,10 +256,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
       category: action.category,
       input_schema: action.inputSchema,
       output_schema: action.outputSchema,
-      pricing: {
-        base_morsels: action.pricing.baseMorsels,
-        per_unit: action.pricing.perUnit,
-      },
+      pricing: presentActionPricing(action.pricing),
       estimated_time_seconds: action.estimatedTimeSeconds,
       tags: action.tags,
       semantic: action.semantic,

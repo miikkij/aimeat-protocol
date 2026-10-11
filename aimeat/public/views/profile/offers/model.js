@@ -10,9 +10,11 @@
  * @structure buildModel · needOf · groupItems · runsOf
  * @usage import { buildModel, groupItems } from './model.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — An offer counts as on offer by its pacing amount (tollMorsels, 3.x price.morsels as fallback) or its money price.
  *   v1.0.0 — 2026-08-30 — Initial, for the Offers page in the poster face.
  */
 import { classifyNeed, isAuto, sortOffers, NEED_DISPLAY_ORDER } from '/js/services/offers-grouping.js';
+import { pacingOf } from '/js/format.js';
 
 const DAY = 864e5;
 export const keyOf = (it) => it.agent + '/' + it.offer.id;
@@ -71,7 +73,7 @@ export function buildModel({ feed = [], deliverables = [], now }) {
   const askable = items.filter(it => !it.auto);
   const offline = items.filter(it => !it.online);
   const offlineAgents = new Set(offline.map(it => it.agent));
-  const selling = items.filter(it => (it.offer.visibility && it.offer.visibility !== 'private') || it.offer.price?.morsels > 0 || it.offer.priceMoney);
+  const selling = items.filter(it => (it.offer.visibility && it.offer.visibility !== 'private') || pacingOf(it.offer) > 0 || it.offer.priceMoney);
 
   const nowMs = now.getTime();
   const today = new Date(now); today.setHours(0, 0, 0, 0);

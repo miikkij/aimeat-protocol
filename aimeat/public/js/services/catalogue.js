@@ -8,10 +8,12 @@
  * @structure
  *   - listMyServices(owner): GET services owned by a given owner
  *   - browse(category): GET the catalogue, optionally category-filtered
- *   - publish(...): POST a new service (display name, price, unit, optional webhook)
+ *   - publish(...): POST a new service (display name, pacing amount, unit, optional webhook)
  *   - unpublish(serviceId): DELETE a service
  *
  * @version-history
+ *   v1.1.0 — 2026-10-11 — publish() sends the pacing amount as toll_morsels, not price_morsels: a
+ *     morsel is pacing, not a price (ruling 2026-10-11).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
@@ -29,13 +31,16 @@ export async function browse(category) {
   return data?.data?.actions || data?.data || [];
 }
 
-/** Publish a new service to the catalogue. */
-export async function publish(name, description, category, priceMorsels, unit, webhookUrl) {
+/**
+ * Publish a new service to the catalogue. `tollMorsels` is the pacing amount: the morsels one use
+ * takes from the user's balance. It is not a price and goes out as `toll_morsels` (3.x `price_morsels`).
+ */
+export async function publish(name, description, category, tollMorsels, unit, webhookUrl) {
   const body = {
     display_name: name,
     description,
     category,
-    price_morsels: Number(priceMorsels) || 0,
+    toll_morsels: Math.max(0, Math.trunc(Number(tollMorsels) || 0)),
     unit: unit || 'call',
   };
   if (webhookUrl) body.webhook_url = webhookUrl;

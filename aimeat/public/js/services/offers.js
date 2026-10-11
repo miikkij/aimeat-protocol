@@ -9,6 +9,9 @@
  * @structure listOffers / getAgentOffers / publishOffers · ask(agentEntry, offer, inputs) · buildAskPrompt
  * @usage import * as offers from '/js/services/offers.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-11 -- An offer's two values (ruling "morseli on tahdistus, ei hinta"): setOfferBilling
+ *     takes tollMorsels (the pacing amount) and priceMoney, not a morsel price; publishOffers drops the
+ *     deprecated price mirror a GET returns, so a save does not add it to the pacing a second time.
  *   v1.1.0 -- 2026-10-11 -- getDeliverableValue(): the same read as getDeliverableContent() with
  *     the value as stored, for a caller that draws the result (views/home/agent-work.js).
  *   v1.0.0 -- 2026-06-12 -- Initial: Do feed + mode-aware Ask (run / copy-prompt / schedule-trigger).
@@ -38,24 +41,34 @@ export async function getAgentOffers(name) {
   return apiGet(`/v1/agents/${encodeURIComponent(name)}/offers`);
 }
 
-/** Publish/replace an agent's offers (agent self or owner). */
+/**
+ * Publish/replace an agent's offers (agent self or owner). The old `price` field is dropped from
+ * every offer: a GET returns it as a deprecated mirror of `tollMorsels` (until 4.0.0), and the node
+ * adds a written `price.morsels` to the toll, so sending the mirror back would double the pacing.
+ */
 export async function publishOffers(name, doc) {
-  return apiPut(`/v1/agents/${encodeURIComponent(name)}/offers`, doc);
+  const offers = Array.isArray(doc?.offers) ? doc.offers.map(({ price: _mirror, ...o }) => o) : doc?.offers;
+  return apiPut(`/v1/agents/${encodeURIComponent(name)}/offers`, { ...doc, offers });
 }
 
-/** Owner edits ONE offer's billing fields (price + visibility), preserving the rest of the doc.
- *  Re-reads the agent's current offers first (avoid clobbering a stale feed), patches, re-publishes.
- *  `price` is `{ morsels, unit }` or `null` (not for sale); `visibility` is private|unlisted|public. */
 /**
+ * Owner edits ONE offer's billing fields, preserving the rest of the doc. Re-reads the agent's
+ * current offers first (avoid clobbering a stale feed), patches, re-publishes. The two values of an
+ * offer: `priceMoney` `{ amount, currency }` in micro-units or `null` (free), and `tollMorsels`, the
+ * pacing amount per use (`null` = the node's default). `visibility` is private|unlisted|public.
  * @param {string} name
  * @param {string} offerId
- * @param {{ price?: any, priceMoney?: any, visibility?: string }} billing
+ * @param {{ tollMorsels?: number|null, priceMoney?: any, visibility?: string }} billing
  */
-export async function setOfferBilling(name, offerId, { price, priceMoney, visibility } = {}) {
+export async function setOfferBilling(name, offerId, { tollMorsels, priceMoney, visibility } = {}) {
   const cur = await getAgentOffers(name);
-  const offers = (cur?.data?.offers || []).map(o => o.id === offerId
-    ? { ...o, ...(price !== undefined ? { price } : {}), ...(priceMoney !== undefined ? { priceMoney } : {}), ...(visibility !== undefined ? { visibility } : {}) }
-    : o);
+  const offers = (cur?.data?.offers || []).map((o) => {
+    if (o.id !== offerId) return o;
+    const next = { ...o, ...(priceMoney !== undefined ? { priceMoney } : {}), ...(visibility !== undefined ? { visibility } : {}) };
+    if (tollMorsels === null) delete next.tollMorsels;
+    else if (tollMorsels !== undefined) next.tollMorsels = tollMorsels;
+    return next;
+  });
   return publishOffers(name, { offers });
 }
 

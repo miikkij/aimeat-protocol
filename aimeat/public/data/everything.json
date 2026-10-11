@@ -1554,10 +1554,10 @@
      "slug": "g-8-signals",
      "cells": [
       "<strong>Signals</strong>",
-      "Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (<code>AIMEAT_GEO_HEADERS</code>, <code>docs/visitor-geography.md</code>); no address is stored, and AI fetchers are never placed.",
+      "Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (<code>AIMEAT_GEO_HEADERS</code>, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/visitor-geography.md\" target=\"_blank\" rel=\"noopener\">visitor-geography.md</a>); no address is stored, and AI fetchers are never placed.",
       "<code>/v1/signals</code>"
      ],
-     "plain": "Signals Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (AIMEAT_GEO_HEADERS, docs/visitor-geography.md); no address is stored, and AI fetchers are never placed. /v1/signals"
+     "plain": "Signals Count something: define it and record hits from a tracking image or a JSON call. A stream can also keep where each person came from, at the precision its owner picks (country, region or city). That needs a reverse proxy that reports the place (AIMEAT_GEO_HEADERS, visitor-geography.md); no address is stored, and AI fetchers are never placed. /v1/signals"
     },
     {
      "slug": "g-8-how-people-and-ais-find-you",
@@ -2054,10 +2054,10 @@
      "slug": "g-10-selling-app-tools",
      "cells": [
       "<strong>Selling app tools</strong>",
-      "Set morsel and EUR/USD prices and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. A pacing charge can apply separately from the price.",
+      "Set EUR/USD prices and a pacing amount in morsels per use, and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. Pacing applies separately from the price, and a tool without a money price is free.",
       "App Catalog &gt; Monetize, <code>aimeat_app_tools_publish</code>"
      ],
-     "plain": "Selling app tools Set morsel and EUR/USD prices and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. A pacing charge can apply separately from the price. App Catalog > Monetize, aimeat_app_tools_publish"
+     "plain": "Selling app tools Set EUR/USD prices and a pacing amount in morsels per use, and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. Pacing applies separately from the price, and a tool without a money price is free. App Catalog > Monetize, aimeat_app_tools_publish"
     },
     {
      "slug": "g-10-odps-product-details-in-app-catalog",
@@ -2135,10 +2135,10 @@
      "slug": "g-10-app-store",
      "cells": [
       "<strong>App store</strong>",
-      "Buy an app with morsels as a single or lifetime licence, with an immutable receipt and a licence check.",
+      "Take a single or lifetime licence to an app, with an immutable receipt and a licence check. The licence takes the app's pacing amount in morsels once (<code>tollMorsels</code>); part burns, the operator keeps its share and the seller gets the rest. Limits: no money price yet on this path; the old <code>priceMorsels</code> is read as pacing until release 4.0.0.",
       "<code>/v1/app-store/*</code>"
      ],
-     "plain": "App store Buy an app with morsels as a single or lifetime licence, with an immutable receipt and a licence check. /v1/app-store/*"
+     "plain": "App store Take a single or lifetime licence to an app, with an immutable receipt and a licence check. The licence takes the app's pacing amount in morsels once (tollMorsels); part burns, the operator keeps its share and the seller gets the rest. Limits: no money price yet on this path; the old priceMorsels is read as pacing until release 4.0.0. /v1/app-store/*"
     },
     {
      "slug": "g-10-the-app-wall",
@@ -2597,6 +2597,24 @@
      "plain": "Morsels One balance per person. It starts at 100, you can claim 50 a day up to 500, and agents always hold zero because the pace belongs to the human. Morsels buy nothing outside the node. /v1/wallet, aimeat_wallet_*"
     },
     {
+     "slug": "g-14-price-and-pacing",
+     "cells": [
+      "<strong>Price and pacing</strong>",
+      "Everything you offer (an agent offer, an app, an app tool, an action, an EXCHANGE offering) has two values: an optional money price in EUR or USD, and a pacing amount in morsels per use. Without a money price it is free. Each use by another person takes the pacing amount from their balance: the node's burn rate decides the part that burns, the operator keeps the share the flow had before, and you get the rest. Your own use is free. A morsel is never a price: no checkout takes morsels as payment. Anything priced in morsels before 11 October 2026 is now free, with that many morsels of pacing per use. Limits: pacing is 0 to 100 morsels per use; the old morsel price fields (<code>price.morsels</code>, <code>priceMorsels</code>, <code>price_morsels</code>, <code>base_morsels</code>) are read as pacing until release 4.0.0 and refused after it.",
+      "<code>PUT /v1/agents/:name/offers</code> (<code>priceMoney</code>, <code>tollMorsels</code>), <code>POST /v1/agents/:name/offers/:offerId/invoke</code>, <code>/v1/actions</code> (<code>pricing.toll_morsels</code>), <code>/v1/exchange/offerings</code> (<code>toll_morsels</code>), <code>aimeat_offer_price_set</code>"
+     ],
+     "plain": "Price and pacing Everything you offer (an agent offer, an app, an app tool, an action, an EXCHANGE offering) has two values: an optional money price in EUR or USD, and a pacing amount in morsels per use. Without a money price it is free. Each use by another person takes the pacing amount from their balance: the node's burn rate decides the part that burns, the operator keeps the share the flow had before, and you get the rest. Your own use is free. A morsel is never a price: no checkout takes morsels as payment. Anything priced in morsels before 11 October 2026 is now free, with that many morsels of pacing per use. Limits: pacing is 0 to 100 morsels per use; the old morsel price fields (price.morsels, priceMorsels, price_morsels, base_morsels) are read as pacing until release 4.0.0 and refused after it. PUT /v1/agents/:name/offers (priceMoney, tollMorsels), POST /v1/agents/:name/offers/:offerId/invoke, /v1/actions (pricing.toll_morsels), /v1/exchange/offerings (toll_morsels), aimeat_offer_price_set"
+    },
+    {
+     "slug": "g-14-buy-more-pacing",
+     "cells": [
+      "<strong>Buy more pacing</strong>",
+      "When your morsels run out, take the daily allowance, or buy a pacing pack with money when the operator sells one: your wallet shows the pack's size and price, and you buy it through the ordinary checkout. A refusal for want of morsels says both ways. Limits: off until the operator sets a pack size and a price (<code>morsel_policy.pacing_pack_morsels</code>, <code>morsel_policy.pacing_pack_price</code>, <code>morsel_policy.pacing_pack_currency</code>); bought morsels count against the node's daily ceiling for new morsels together with operator mints, and past it the purchase fails and the money goes back.",
+      "<code>GET /v1/wallet</code> (<code>pacing_pack</code>), <code>POST /v1/wallet/request</code>, <code>/v1/commerce/checkout-sessions</code> (<code>kind: &quot;pacing-pack&quot;</code>), <code>aimeat_checkout_*</code>"
+     ],
+     "plain": "Buy more pacing When your morsels run out, take the daily allowance, or buy a pacing pack with money when the operator sells one: your wallet shows the pack's size and price, and you buy it through the ordinary checkout. A refusal for want of morsels says both ways. Limits: off until the operator sets a pack size and a price (morsel_policy.pacing_pack_morsels, morsel_policy.pacing_pack_price, morsel_policy.pacing_pack_currency); bought morsels count against the node's daily ceiling for new morsels together with operator mints, and past it the purchase fails and the money goes back. GET /v1/wallet (pacing_pack), POST /v1/wallet/request, /v1/commerce/checkout-sessions (kind: \"pacing-pack\"), aimeat_checkout_*"
+    },
+    {
      "slug": "g-14-usd-usage-ledger",
      "cells": [
       "<strong>USD usage ledger</strong>",
@@ -2636,19 +2654,19 @@
      "slug": "g-14-checkout",
      "cells": [
       "<strong>Checkout</strong>",
-      "Open, update and complete a checkout. A bound app tool runs its capability; task-based items are fulfilled through agent work. The selected payment method and fulfilment type determine the next step.",
+      "Open, update and complete a checkout. A bound app tool runs its capability; task-based items are fulfilled through agent work. The session is always in money (EUR or USD; a total of 0 means free) and carries the pacing its items take. Completing it takes the pacing first, then collects the money through the payment method you name; a free checkout needs no payment method. The fulfilment type determines the next step. Limits: an open checkout from before 11 October 2026 that was priced in morsels must be opened again.",
       "<code>/v1/commerce/checkout-sessions</code>, <code>aimeat_checkout_*</code>"
      ],
-     "plain": "Checkout Open, update and complete a checkout. A bound app tool runs its capability; task-based items are fulfilled through agent work. The selected payment method and fulfilment type determine the next step. /v1/commerce/checkout-sessions, aimeat_checkout_*"
+     "plain": "Checkout Open, update and complete a checkout. A bound app tool runs its capability; task-based items are fulfilled through agent work. The session is always in money (EUR or USD; a total of 0 means free) and carries the pacing its items take. Completing it takes the pacing first, then collects the money through the payment method you name; a free checkout needs no payment method. The fulfilment type determines the next step. Limits: an open checkout from before 11 October 2026 that was priced in morsels must be opened again. /v1/commerce/checkout-sessions, aimeat_checkout_*"
     },
     {
      "slug": "g-14-payment-methods",
      "cells": [
       "<strong>Payment methods</strong>",
-      "Morsels, cards on the seller's own Stripe account (including authorise now, capture later), and invoice.",
+      "Cards on the seller's own Stripe account (including authorise now, capture later), and invoice. Morsels are not a payment method.",
       "<code>aimeat_commerce_psp_*</code>"
      ],
-     "plain": "Payment methods Morsels, cards on the seller's own Stripe account (including authorise now, capture later), and invoice. aimeat_commerce_psp_*"
+     "plain": "Payment methods Cards on the seller's own Stripe account (including authorise now, capture later), and invoice. Morsels are not a payment method. aimeat_commerce_psp_*"
     },
     {
      "slug": "g-14-x402",
@@ -2663,19 +2681,19 @@
      "slug": "g-14-a-daily-purchase-limit-for-each-agent",
      "cells": [
       "<strong>A daily purchase limit for each agent</strong>",
-      "An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. A hold the agent places for a bid counts too, from the moment it is authorized. Limits: a released hold is not given back the same day.",
+      "An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and pacing are not limited. A hold the agent places for a bid counts too, from the moment it is authorized. Limits: a released hold is not given back the same day.",
       "Profile › Agents (agent card), <code>/v1/agents/:name/purchase-limit</code>"
      ],
-     "plain": "A daily purchase limit for each agent An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and morsel prices are not limited. A hold the agent places for a bid counts too, from the moment it is authorized. Limits: a released hold is not given back the same day. Profile › Agents (agent card), /v1/agents/:name/purchase-limit"
+     "plain": "A daily purchase limit for each agent An agent of yours pays in money only within the daily limit you set on its card, per currency. With no limit it does not spend money, and a checkout it tries is refused with a link to the card. You set the limit yourself, signed in; an agent can read its limit and what it spent today, but cannot change it. Your own purchases and pacing are not limited. A hold the agent places for a bid counts too, from the moment it is authorized. Limits: a released hold is not given back the same day. Profile › Agents (agent card), /v1/agents/:name/purchase-limit"
     },
     {
      "slug": "g-14-agent-commerce-protocols",
      "cells": [
       "<strong>Agent commerce protocols</strong>",
-      "Outside agents buy offers and priced app tools through UCP, and every public priced item appears as an ACP product.",
+      "Outside agents buy offers and priced app tools through UCP, and every public item with a money price appears as an ACP product. Limits: money only, so a free item (pacing only) is refused there and is not in the feed.",
       "<code>/.well-known/ucp</code>, <code>/.well-known/acp.json</code>"
      ],
-     "plain": "Agent commerce protocols Outside agents buy offers and priced app tools through UCP, and every public priced item appears as an ACP product. /.well-known/ucp, /.well-known/acp.json"
+     "plain": "Agent commerce protocols Outside agents buy offers and priced app tools through UCP, and every public item with a money price appears as an ACP product. Limits: money only, so a free item (pacing only) is refused there and is not in the feed. /.well-known/ucp, /.well-known/acp.json"
     },
     {
      "slug": "g-14-revenue-splits",
@@ -2735,10 +2753,10 @@
      "slug": "g-14-actions",
      "cells": [
       "<strong>Actions</strong>",
-      "Agents and people publish callable actions with a price in morsels and a minimum trust score. An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now.",
+      "Agents and people publish callable actions with a pacing amount in morsels per use (<code>pricing.toll_morsels</code>) and a minimum trust score. An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now.",
       "<code>/v1/actions</code>"
      ],
-     "plain": "Actions Agents and people publish callable actions with a price in morsels and a minimum trust score. An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now. /v1/actions"
+     "plain": "Actions Agents and people publish callable actions with a pacing amount in morsels per use (pricing.toll_morsels) and a minimum trust score. An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now. /v1/actions"
     },
     {
      "slug": "g-14-public-catalogue",
@@ -3268,10 +3286,10 @@
      "slug": "g-19-morsel-minting",
      "cells": [
       "<strong>Morsel minting</strong>",
-      "Mint morsels under a daily cap, visible in the stats.",
+      "Mint morsels under a daily cap, visible in the stats. Sold pacing packs count against the same cap. Set the burn rate (the burned share of each pacing charge) and the pacing pack in the settings.",
       "<code>aimeat_admin_mint</code>"
      ],
-     "plain": "Morsel minting Mint morsels under a daily cap, visible in the stats. aimeat_admin_mint"
+     "plain": "Morsel minting Mint morsels under a daily cap, visible in the stats. Sold pacing packs count against the same cap. Set the burn rate (the burned share of each pacing charge) and the pacing pack in the settings. aimeat_admin_mint"
     },
     {
      "slug": "g-19-operator-agents",
@@ -3762,6 +3780,15 @@
      "plain": "Pricing page Removed 2026-08-28 Prices live in the store."
     },
     {
+     "slug": "g-23-morsel-prices-and-the-morsel-payment-handler-io-aimeat-morsels",
+     "cells": [
+      "<strong>Morsel prices and the morsel payment handler (<code>io.aimeat.morsels</code>)</strong>",
+      "Removed 2026-10-11; the old price fields are read as pacing until release 4.0.0",
+      "A money price (EUR or USD, optional) and a pacing amount in morsels per use, see section 14."
+     ],
+     "plain": "Morsel prices and the morsel payment handler (io.aimeat.morsels) Removed 2026-10-11; the old price fields are read as pacing until release 4.0.0 A money price (EUR or USD, optional) and a pacing amount in morsels per use, see section 14."
+    },
+    {
      "slug": "g-23-home-and-profile-switch",
      "cells": [
       "<strong>Home and profile switch</strong>",
@@ -3934,6 +3961,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-04 against node 3.24.0. The contract is <code>openapi.yaml</code>; the specifications are RFC v4.0 Core and Platform; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 394
+  "rows": 397
  }
 }

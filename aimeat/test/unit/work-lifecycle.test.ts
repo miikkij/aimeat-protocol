@@ -34,7 +34,7 @@ function makeWork(overrides: Partial<WorkRecord> = {}): WorkRecord {
         providerGaii: PROVIDER,
         requesterGaii: REQUESTER,
         input: { q: 'hello' },
-        cost: { basePrice: 100, networkFee: 10, total: 110, inEscrow: 110 },
+        cost: { toll:100, networkFee: 10, total: 110, inEscrow: 110 },
         ttlExpiresAt: new Date(Date.now() + 3600_000).toISOString(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

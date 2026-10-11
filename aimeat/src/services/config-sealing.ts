@@ -49,7 +49,7 @@
  *   v1.1.0 — 2026-09-16 — isSecretField, and sealedView shows a sealed secret as `configured` only.
  *     A host could seal ai.chat_agent_key to lock it, and the view then gave the key to the
  *     operator it was locked against.
- *   v1.0.0 — 2026-08-18 — Initial. docs/plans/sealed-config-plan.md
+ *   v1.0.0 — 2026-08-18 — Initial. https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm
  */
 import { ALL_CONFIG_MAP } from './config-schema.js';
 

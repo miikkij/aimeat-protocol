@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Withdrawing a bad version of a package from the nodes that have it (T6 of
- *   docs/specs/package-sale-design.md, section 5; phase 5).
+ *   https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, section 5; phase 5).
  *
  *   WHAT A WITHDRAWAL IS. The package's author or an operator marks one version `withdrawn`, with a
  *   reason. From then on nothing serves it: install, the repository's channel and every pull read only

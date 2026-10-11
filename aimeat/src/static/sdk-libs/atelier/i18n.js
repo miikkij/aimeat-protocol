@@ -18,6 +18,8 @@
  * @usage  AIMEAT.atelier.i18n.use({ fi: { addTask: 'Lisää tehtävä' }, en: { addTask: 'Add task' } });
  *         AIMEAT.atelier.i18n.t('addTask');
  * @version-history
+ *   v0.14.0 — 2026-10-11 — pacingAmount (en/fi/es): an amount in morsels where a price would stand,
+ *     "pacing {amount}" / "tahdistus {amount}" / "{amount} de ritmo". A morsel paces use; it is not a price.
  *   v0.13.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v0.13.0 — 2026-10-05 — fillFirst and formIncomplete (en/fi/es): the line under a held button
  *     that names the fields still missing (form gate).
@@ -143,7 +145,7 @@ const BASE = {
     promptNoJson: 'The answer has no JSON object in it. Paste the whole answer.',
     working: 'Working…',
     done: 'Done',
-    morsels: '{n} morsels', morsel1: '1 morsel',
+    morsels: '{n} morsels', morsel1: '1 morsel', pacingAmount: 'pacing {amount}',
     yesterday: 'Yesterday',
     earlier: 'Earlier',
     wd0: 'Sun', wd1: 'Mon', wd2: 'Tue', wd3: 'Wed', wd4: 'Thu', wd5: 'Fri', wd6: 'Sat',
@@ -287,7 +289,7 @@ const BASE = {
     promptNoJson: 'Vastauksessa ei ole JSON-oliota. Liitä koko vastaus.',
     working: 'Käsitellään…',
     done: 'Valmis',
-    morsels: '{n} murusta', morsel1: '1 murunen',
+    morsels: '{n} murusta', morsel1: '1 murunen', pacingAmount: 'tahdistus {amount}',
     yesterday: 'Eilen',
     earlier: 'Aiemmin',
     wd0: 'Su', wd1: 'Ma', wd2: 'Ti', wd3: 'Ke', wd4: 'To', wd5: 'Pe', wd6: 'La',
@@ -431,7 +433,7 @@ const BASE = {
     promptNoJson: 'La respuesta no contiene ningún objeto JSON. Pega la respuesta entera.',
     working: 'Procesando…',
     done: 'Hecho',
-    morsels: '{n} morsels', morsel1: '1 morsel',
+    morsels: '{n} morsels', morsel1: '1 morsel', pacingAmount: '{amount} de ritmo',
     yesterday: 'Ayer',
     earlier: 'Antes',
     wd0: 'Dom', wd1: 'Lun', wd2: 'Mar', wd3: 'Mié', wd4: 'Jue', wd5: 'Vie', wd6: 'Sáb',

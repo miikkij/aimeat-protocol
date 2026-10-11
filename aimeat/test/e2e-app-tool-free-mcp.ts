@@ -4,6 +4,9 @@
  * @structure Authenticated fixtures; free calls and caller identity; refusal paths; cleanup.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tool-free-mcp
  * @version-history
+ *   2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
+ *     kaksi-arvoa): the `priced` tool (price.morsels 5) is free with 5 morsels of pacing on both
+ *     surfaces; only the money-priced `usd` tool still needs a contract.
  *   2026-10-06 — Regression: the MCP adapter refused an unpriced public tool that REST could invoke.
  */
 import * as ed from '@noble/ed25519';
@@ -148,10 +151,19 @@ try {
     const result = await invoke(limitedSession, seller!, 'free', { query: 'limited' });
     assert(result.isError && !result.data?.result, 'scope-limited agent must be refused');
   });
-  for (const name of ['priced', 'usd']) await test(name + ' still requires a contract', async () => {
-    const http = await rest(name, { query: 'paid' }), mcp = await invoke(agentSession, seller!, name, { query: 'paid' });
+  // Only a MONEY price needs a contract. `priced` carries a 3.x `price.morsels: 5`, which is pacing
+  // (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): the tool is free with 5
+  // morsels of pacing per use, charged on both surfaces. It asserted 402 / NO_CONTRACT before, the old
+  // morsel-price model.
+  await test('usd still requires a contract', async () => {
+    const http = await rest('usd', { query: 'paid' }), mcp = await invoke(agentSession, seller!, 'usd', { query: 'paid' });
     assert(http.status === 402, 'REST paid refusal ' + http.status);
     assert(mcp.isError && mcp.text.startsWith('NO_CONTRACT:'), 'MCP paid refusal ' + mcp.text);
+  });
+  await test('priced (a 3.x morsel figure) is free with pacing, charged on both surfaces', async () => {
+    const http = await rest('priced', { query: 'paced' }), mcp = await invoke(agentSession, seller!, 'priced', { query: 'paced' });
+    assert(http.status === 200 && http.body.data?.pacing?.morsels === 5, 'REST paced run ' + http.status + ' ' + JSON.stringify(http.body.data?.pacing ?? http.body.error));
+    assert(!mcp.isError && mcp.data?.pacing?.morsels === 5, 'MCP paced run: ' + mcp.text);
   });
   await test('a free tool cannot remove the backing action money price', async () => {
     const http = await rest('action-paid', { query: 'paid' }), mcp = await invoke(agentSession, seller!, 'action-paid', { query: 'paid' });

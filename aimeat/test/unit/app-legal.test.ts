@@ -69,9 +69,9 @@ describe('readiness, state, links, strip', () => {
 
   it('a plain app ought to have terms and privacy; MONEY brings the whole set, morsels never do', () => {
     expect(legalReadiness(app())).toMatchObject({ recommended: ['terms', 'privacy'], missing: ['terms', 'privacy'] });
-    // Morsels pace what agents push into the store and buy nothing: a morsel price, a morsel
-    // licence or a morsel-priced tool makes no shop and creates no consumer-law duty.
-    expect(legalReadiness(app({ priceMorsels: 500, licenseType: 'lifetime' })).recommended).toEqual(['terms', 'privacy']);
+    // Morsels pace what agents push into the store and buy nothing: a pacing amount, a licence taken
+    // with morsels or a paced tool makes no shop and creates no consumer-law duty.
+    expect(legalReadiness(app({ tollMorsels: 500, licenseType: 'lifetime' })).recommended).toEqual(['terms', 'privacy']);
     const selling = legalReadiness(app({ legal: { terms: doc } }), { sellsForMoney: true });
     expect(selling.recommended).toEqual(['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'support']);
     expect(selling.missing).toEqual(['privacy', 'imprint', 'refunds', 'accessibility', 'support']);

@@ -14,6 +14,8 @@
  *   AIMEAT.atelier.cart({ target, data: { lines, currency: '€' }, onChange(id, qty) {},
  *     onCheckout(lines) {} });   // commerce micro-units: unit: 'micros' or priceMicros per line
  * @version-history
+ *   v0.66.2 — 2026-10-11 — A 'morsels' cart shows its amounts as pacing, never as a price
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v0.62.1 — 2026-10-01 — Moved out of flow-parts.js unchanged (that file was at its line limit),
  *     then: the words come from ./i18n.js (en/fi/es), and a line with qty over 1 shows its unit
  *     price in the sub line, after the line's own `sub` text when it has one.
@@ -26,7 +28,7 @@ import { emptyState } from './state.js';
 import { odometer } from './materials.js';
 import { t } from './i18n.js';
 import { num, money as fmtMoney } from '../_core/format.js';
-import { isMorsels, speaksMicros, readAmount, roundMicros, fractionDigits, morselText } from './money-units.js';
+import { isMorsels, speaksMicros, readAmount, roundMicros, fractionDigits, pacingText } from './money-units.js';
 
 /** One beat of the look's own pace (the same reading flow-parts.js makes for its travels). */
 function pace(node, multiple) {
@@ -44,9 +46,9 @@ function pictureOf(url) {
   return 'url("' + v.replace(/"/g, '%22') + '")';
 }
 
-/** Money in the viewer's conventions; from micro-units 2 to 6 decimals; morsels are never money. */
+/** Money in the viewer's conventions; from micro-units 2 to 6 decimals; morsels read as pacing, never money. */
 function money(amount, currency, micros) {
-  if (isMorsels(currency)) return morselText(amount);
+  if (isMorsels(currency)) return pacingText(amount);
   const unit = currency || '€';
   const n = micros ? roundMicros(amount) : Number(amount) || 0;
   const d = micros ? fractionDigits(n) : 2;

@@ -5,6 +5,9 @@
  *   joins each agent's offers with its mode + online state. Covers the happy path + invalid-descriptor
  *   rejection + owner-scoping.
  * @version-history
+ *   v1.4.0 — 2026-10-11 — 14c and 14d asserted the old model, where a morsel amount was a price. 14c
+ *     invokes a free offer with 25 morsels of pacing and reads the pacing rows back; 14d invokes a
+ *     money-priced offer and is sent to the checkout (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.3.0 — 2026-08-16 — E2E quality, agent-offers :116, :82 and :207. The money had never moved in this
  *     suite: all three invokes stopped at a refusal, the last of them at the missing-capability 404, so
  *     the price, the debit, the 402, the refund, the fee, the provider's credit, both ledger rows and
@@ -304,7 +307,10 @@ await test('14b. A callable capability of A, backed by a real extension action',
     paidOfferReady = true;
 });
 
-await test('14c. A pays for an invoke: the buyer is debited, the provider credited, both rows written', async () => {
+// 2026-10-11: these two asserted the old model, where a morsel amount was a price the buyer paid
+// (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). A morsel amount is pacing now: the
+// offer is free, the buyer's owner is debited the pacing, part burns, the rest goes to the provider.
+await test('14c. B invokes a free offer with 25 morsels of pacing: the buyer is debited the pacing, the provider credited the rest, every row written', async () => {
     assert(paidOfferReady, 'the capability fixture must exist');
     const pub = await json(`/v1/agents/${agentName}/offers`, {
         method: 'PUT', headers: auth(A.token),
@@ -313,7 +319,7 @@ await test('14c. A pays for an invoke: the buyer is debited, the provider credit
             {
                 id: 'summarize', title: 'Summarize a URL', ask: 'Give me a URL; I return a summary.',
                 deliverable: { format: 'document', sample: 'untested' },
-                price: { morsels: 25, unit: 'per-call' }, visibility: 'public',
+                tollMorsels: 25, visibility: 'public',
                 callable: { action_id: capId },
             },
         ] }),
@@ -335,10 +341,12 @@ await test('14c. A pays for an invoke: the buyer is debited, the provider credit
     assert(r.status === 200, `invoke ${r.status}: ${JSON.stringify(r.body.error)}`);
 
     const receipt = r.body.data?.receipt ?? {};
-    assert(receipt.charged === 25, `the buyer must be charged the asking price, got ${JSON.stringify(receipt)}`);
-    assert(typeof receipt.earned === 'number' && typeof receipt.fee === 'number', `receipt shape: ${JSON.stringify(receipt)}`);
-    assert(receipt.earned + receipt.fee === 25, `the fee comes out of the price, not on top: ${JSON.stringify(receipt)}`);
-    assert(typeof receipt.trackingCode === 'string' && receipt.trackingCode.length > 0, 'the receipt must carry a tracking code');
+    assert(receipt.charged === 0, `a free offer charges no money, got ${JSON.stringify(receipt)}`);
+    const pacing = receipt.pacing ?? {};
+    assert(pacing.morsels === 25, `the pacing amount is charged, got ${JSON.stringify(receipt)}`);
+    assert(pacing.burned + pacing.fee + pacing.providerEarned === 25, `burn, operator share and provider credit add up to the pacing: ${JSON.stringify(pacing)}`);
+    assert(pacing.burned > 0 || pacing.providerEarned === 25, `the burn rate's share burns: ${JSON.stringify(pacing)}`);
+    assert(typeof pacing.trackingCode === 'string' && pacing.trackingCode.length > 0, 'the receipt must carry a tracking code');
 
     const buyerAfter = await balance(B.token);
     const providerAfter = await balance(A.token);
@@ -351,17 +359,16 @@ await test('14c. A pays for an invoke: the buyer is debited, the provider credit
         assert(t.status === 200, `transactions ${t.status}`);
         return (t.body.data.transactions ?? []) as any[];
     };
-    // The fee leg is filed under the same code with a ':<source>' suffix (services/marketplace-fee.ts),
-    // so the family is what has to be summed, not the exact string.
-    const family = (x: any) => String(x.tracking_code ?? '').startsWith(receipt.trackingCode);
+    // Every row of one pacing charge carries the same tracking code (services/metered-settlement.ts).
+    const family = (x: any) => String(x.tracking_code ?? '').startsWith(pacing.trackingCode);
     const buyerRows = (await rows(B.token)).filter(family);
-    const spend = buyerRows.find(x => x.type === 'offer_spend');
-    assert(!!spend, `the buyer's row is missing for ${receipt.trackingCode}`);
-    assert(Number(spend.amount) === -25, `buyer row: ${JSON.stringify(spend)}`);
+    const paid = buyerRows.filter(x => x.type === 'pacing_charge' || x.type === 'pacing_burn');
+    assert(paid.length > 0, `the buyer's rows are missing for ${pacing.trackingCode}`);
+    assert(paid.reduce((n, x) => n + Number(x.amount), 0) === -25, `buyer rows: ${JSON.stringify(buyerRows)}`);
     const providerRows = (await rows(A.token)).filter(family);
-    const earn = providerRows.find(x => x.type === 'offer_earn');
-    assert(!!earn, `the provider's row is missing for ${receipt.trackingCode}`);
-    assert(Number(earn.amount) === receipt.earned, `provider row: ${JSON.stringify(earn)}`);
+    const earn = providerRows.find(x => x.type === 'pacing_earn');
+    assert(!!earn, `the provider's row is missing for ${pacing.trackingCode}`);
+    assert(Number(earn.amount) === pacing.providerEarned, `provider row: ${JSON.stringify(earn)}`);
 
     // EVERY MORSEL THAT MOVED IS EXPLAINED BY A ROW, which is the statement worth making and the one
     // that does not depend on who the node operator happens to be. The marketplace fee routes to the
@@ -375,7 +382,7 @@ await test('14c. A pays for an invoke: the buyer is debited, the provider credit
         `the buyer's balance moved by ${buyerAfter - buyerBefore} but its rows explain ${sum(buyerRows)}: ${JSON.stringify(buyerRows)}`);
 });
 
-await test('14d. A price beyond the buyer\'s balance is refused, and nothing moves', async () => {
+await test('14d. A money-priced offer is not settled by a direct invoke: 402 points to the checkout, and nothing moves', async () => {
     assert(paidOfferReady, 'the capability fixture must exist');
     const pub = await json(`/v1/agents/${agentName}/offers`, {
         method: 'PUT', headers: auth(A.token),
@@ -384,7 +391,7 @@ await test('14d. A price beyond the buyer\'s balance is refused, and nothing mov
             {
                 id: 'expensive', title: 'Cost the earth', ask: 'Anything, for a lot.',
                 deliverable: { format: 'document', sample: 'untested' },
-                price: { morsels: 10_000_000, unit: 'per-call' }, visibility: 'public',
+                priceMoney: { amount: 10_000_000, currency: 'EUR' }, tollMorsels: 5, visibility: 'public',
                 callable: { action_id: capId },
             },
         ] }),
@@ -400,7 +407,8 @@ await test('14d. A price beyond the buyer\'s balance is refused, and nothing mov
         method: 'POST', headers: auth(B.token), body: JSON.stringify({ input: { message: 'hello' } }),
     });
     assert(r.status === 402, `expected 402, got ${r.status}: ${JSON.stringify(r.body.error)}`);
-    assert(r.body.error?.code === 'INSUFFICIENT_BALANCE', `expected INSUFFICIENT_BALANCE, got ${r.body.error?.code}`);
+    assert(r.body.error?.code === 'PAYMENT_REQUIRED', `expected PAYMENT_REQUIRED, got ${r.body.error?.code}`);
+    assert(/checkout/i.test(String(r.body.error?.message)), `the refusal names the checkout: ${r.body.error?.message}`);
 
     // The refusal happens before the work, so neither side's balance may move by a single morsel.
     assert(await balance(B.token) === buyerBefore, 'the refused buyer was charged');

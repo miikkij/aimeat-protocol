@@ -1,7 +1,7 @@
 /**
  * @file e2e-package-guards.ts
  * @description A package does not take over what belongs to somebody else (package sale design,
- *   phase 1, docs/specs/package-sale-design.md T3, T4, T8 and section 7):
+ *   phase 1, https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e T3, T4, T8 and section 7):
  *   - a memory component does not overwrite a record the installer already has; another install of
  *     the same package may rewrite what the package wrote;
  *   - a cortex schema part does not replace another person's structure lock, and the uninstall

@@ -17,7 +17,7 @@
  * @version-history
  *   v2.1.0 — 2026-08-26 — `organism-rows` in the where vocabulary and in the organism test. Kept
  *     byte-identical to src/static/app-catalog/js/data-map-model.js, which a unit test enforces.
- *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2 per docs/datakartta-maaritelma.md.
+ *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2 per its definition (docs/specs/datamap.md).
  */
 
 /**

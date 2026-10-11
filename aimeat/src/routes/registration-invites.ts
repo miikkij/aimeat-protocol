@@ -36,7 +36,7 @@ import { logger } from '../utils/logger.js';
 import { InvitationError } from '../services/invitations.js';
 import { createRegistrationInvitation } from '../services/invitations-agent-door.js';
 import { registrationRefusal } from '../services/owner-provisioning.js';
-import { resolveAiClient } from '../services/ai-tool-setup.js';
+import { resolveAiClient } from '../services/ai-tool-branch.js';
 
 /** Trim a claimed field to something loggable. The AI supplies these; none is trusted. */
 const claim = (v: unknown): string | null =>

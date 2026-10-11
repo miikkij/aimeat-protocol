@@ -20,7 +20,7 @@
  *
  *   THE CARRY-FORWARD RULE, IN ONE PLACE. `undefined` in `requested` means "the caller did not
  *   mention this", and every such field is taken from the live app. It never means "clear it".
- *   Clearing is explicit: `price_morsels: 0`, `cortex: { agents: [] }`. That rule was written out
+ *   Clearing is explicit: `toll_morsels: 0`, `cortex: { agents: [] }`. That rule was written out
  *   three times with three different field lists, which is how an update came to rename five live
  *   apps to their own filenames in the public catalogue.
  *
@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-11 — requested.priceMorsels is tollMorsels, the app's pacing amount, carried forward the same way.
  *   2026-10-10 — nextSteps is told how the data map and the design spec stand (app-publish-next-steps.ts).
  *   2026-10-08 — The board announcement post carries a provenance record of its own text (aiprov D13).
  *   2026-10-08 — The app's provenance record states `mediaKind: code` and the app's MIME type.
@@ -163,8 +164,8 @@ export interface RequestedManifest {
   usesCortex?: string[];
   /** Already validated against CrewDefSchema by the door. `[]` clears the section explicitly. */
   cortexAgents?: Record<string, unknown>[];
-  /** `0` unprices explicitly; `undefined` carries the live price forward. */
-  priceMorsels?: number;
+  /** The pacing amount: `0` clears it explicitly; `undefined` carries the live one forward. */
+  tollMorsels?: number;
   licenseType?: AppManifest['licenseType'];
   /** Already run through sanitizeProtection() by the door. */
   protection?: AppProtection;
@@ -384,7 +385,7 @@ export async function publishApp(
     if (managed) return { refusal: managed };
   }
   if (delegated) {
-    const forbidden = (requested.priceMorsels !== undefined && requested.priceMorsels !== (prev?.priceMorsels ?? 0))
+    const forbidden = (requested.tollMorsels !== undefined && requested.tollMorsels !== (prev?.tollMorsels ?? 0))
       || (requested.licenseType !== undefined && requested.licenseType !== prev?.licenseType)
       || (!mayAct(delegate!.level, 'operate') && (
         (requested.protection !== undefined && !isDeepStrictEqual(requested.protection, prev?.protection ?? {}))
@@ -476,11 +477,11 @@ export async function publishApp(
   if (workspaceDecl && 'workspaces' in workspaceDecl) manifest.workspaces = workspaceDecl.workspaces;
   // And the ?format=md handler: a version that stops declaring it stops having it.
   if (formatMdDecl) manifest.formatMd = formatMdDecl;
-  // Pricing: `0` unprices explicitly, silence keeps the price. An update that omits the field must
-  // never silently turn a paid app free — which is what publishing a DRAFT used to do, because a
-  // draft manifest cannot carry a price and the draft door published it verbatim.
-  const priceMorsels = requested.priceMorsels ?? prev?.priceMorsels;
-  if (typeof priceMorsels === 'number' && priceMorsels > 0) manifest.priceMorsels = priceMorsels;
+  // Pacing amount: `0` clears it explicitly, silence keeps it. An update that omits the field must
+  // never silently drop it — which is what publishing a DRAFT used to do, because a draft manifest
+  // cannot carry one and the draft door published it verbatim.
+  const tollMorsels = requested.tollMorsels ?? prev?.tollMorsels;
+  if (typeof tollMorsels === 'number' && tollMorsels > 0) manifest.tollMorsels = tollMorsels;
   const licenseType = requested.licenseType ?? prev?.licenseType;
   if (licenseType) manifest.licenseType = licenseType;
   const protection = requested.protection ?? prev?.protection;

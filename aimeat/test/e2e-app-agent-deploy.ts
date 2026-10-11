@@ -9,6 +9,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.3.2 — 2026-10-11 — An instance's offer reads its pacing as `toll_morsels`, with the old `price` as a deprecated mirror.
  *   v1.3.1 — 2026-10-03 — The sibling's 32-character name is trimmed of a trailing hyphen; with a
  *     three-digit owner suffix the cut ended in one and the node refused it (1 run in about 100).
  *   v1.3.0 — 2026-10-01 —A deploy with no crew-forge becomes an agent proposal on the deployer's
@@ -445,7 +446,9 @@ async function main() {
         const r = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/instances`);
         const dep = r.body.data.instances.find((x: any) => x.source === 'deployed');
         assert(dep.offers.length === 1 && dep.offers[0].id === 'joke-daily', `offers: ${JSON.stringify(dep.offers)}`);
-        assert(dep.offers[0].price?.morsels === 5 && dep.offers[0].price?.unit === 'per-call', 'price surfaced');
+        // The 3.x morsel price is the pacing amount now, with the old field as its deprecated mirror.
+        assert(dep.offers[0].toll_morsels === 5, `pacing surfaced: ${JSON.stringify(dep.offers[0])}`);
+        assert(dep.offers[0].price?.morsels === 5 && dep.offers[0].price?.unit === 'per-call' && typeof dep.offers[0].price?.deprecated === 'string', 'deprecated mirror surfaced');
         assert(!dep.offers.some((o: any) => o.id === 'joke-secret'), 'private offer never listed');
     });
 

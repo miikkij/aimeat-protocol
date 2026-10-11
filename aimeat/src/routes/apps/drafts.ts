@@ -6,6 +6,9 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.8.1 -- 2026-10-11 -- The publish-draft answer's manifest carries the deprecated `priceMorsels`
+ *     mirror of the app's pacing amount `tollMorsels` (services/app-pacing.ts). The draft still carries
+ *     the live pacing amount forward and accepts none of its own.
  *   v2.8.0 -- 2026-10-02 -- design_spec_hint in the publish-draft answer (services/app-design-spec.ts).
  *   v2.7.2 -- 2026-09-27 -- POST .../draft/preview-token calls mintDraftPreview
  *     (services/app-draft-preview.ts), shared with aimeat_app_draft_save. The answer is unchanged.
@@ -72,6 +75,7 @@ import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
 import { isSharedApp } from '../../services/app-dev-grant.js';
 import { roadmapGate } from '../../services/app-roadmap.js';
+import { presentAppManifest } from '../../services/app-pacing.js';
 
 export function registerDraftRoutes(
     router: Router,
@@ -470,7 +474,7 @@ export function registerDraftRoutes(
         // The promotion — the draft manifest mapped onto the publish input, publishApp, and the slot
         // cleared afterwards — is services/app-lifecycle.ts, shared with aimeat_app_draft_publish.
         // The draft manifest IS the caller's statement, so every field it can express is passed as
-        // stated; what it CANNOT express (pricing, licence, per-locale descriptions) is left
+        // stated; what it CANNOT express (the pacing amount, licence, per-locale descriptions) is left
         // unmentioned and carried from the live app.
         const out = await publishAppDraft(storage, config, {
             ownerName: owner,
@@ -498,7 +502,7 @@ export function registerDraftRoutes(
             ... (out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
             ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
             version_number: out.versionNumber,
-            manifest: out.manifest,
+            manifest: presentAppManifest(out.manifest),
             size: out.size,
             parked: out.parked,
             forkable: out.forkable,

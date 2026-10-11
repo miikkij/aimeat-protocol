@@ -2,7 +2,7 @@
  * @file src/routes/work.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Work-queue routes — the agent-to-agent paid work lifecycle: request/batch submission,
+ * @description Work-queue routes — the agent-to-agent paced work lifecycle: request/batch submission,
  *   inbox/sent listing, accept/progress/reject/deliver/rate, plus escrow holds and settlement, webhook
  *   delivery with exponential-backoff retries, cross-node work resolution, and a work→task bridge.
  *
@@ -12,6 +12,9 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.7.0 — 2026-10-11 — The escrow holds the action's pacing amount (`toll`, was `basePrice`) plus
+ *     the network fee; a morsel is pacing, not a price. Every response's `cost` carries `toll` and,
+ *     until 4.0.0, the old `base_price` / `basePrice` as a deprecated mirror (presentWorkCost).
  *   v1.6.0 — 2026-10-08 — GET /v1/work/:tc and POST /v1/work/:tc/deliver carry the output's
  *     provenance record (ai_provenance_id and the ai_provenance block), which the node now stamps on
  *     delivery (aiprov D8).
@@ -62,7 +65,7 @@ import { refuseWorkBetween } from '../services/work-parties.js';
 import { isIdentityShaped } from '../services/local-identity.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
-import { calculateWorkCost, holdEscrow, routingFee } from '../services/morsel.js';
+import { calculateWorkCost, holdEscrow, presentWorkCost, routingFee } from '../services/morsel.js';
 import { logger } from '../utils/logger.js';
 import { createWorkTabService } from '../services/db/work-tab-db-service.js';
 import { executeHooks } from '../services/hooks.js';
@@ -220,10 +223,13 @@ export async function createWorkItem(
     };
   }
 
-  const baseMorsels = action?.pricing.baseMorsels ?? 0;
-  // §15: priority 'high' costs 2x base price
-  const effectiveBase = priority === 'high' ? baseMorsels * 2 : baseMorsels;
-  const cost = calculateWorkCost(effectiveBase, config.burnRate);
+  // The action's PACING amount, not a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
+  // kaksi-arvoa). The escrow holds it plus the network fee; acceptance releases it to the provider and
+  // burns or splits the network fee per the burn rate (services/morsel.ts settlePayment).
+  const tollMorsels = action?.pricing.tollMorsels ?? 0;
+  // §15: priority 'high' doubles the pacing amount
+  const effectiveToll = priority === 'high' ? tollMorsels * 2 : tollMorsels;
+  const cost = calculateWorkCost(effectiveToll, config.burnRate);
 
   // Hold escrow
   const held = await holdEscrow(storage, requesterGaii, provider_gaii, trackingCode, cost.total);
@@ -307,7 +313,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       action_id: work.actionId,
       provider_gaii: work.providerGaii,
       requester_gaii: work.requesterGaii,
-      cost: { base_price: work.cost.basePrice, network_fee: work.cost.networkFee, total: work.cost.total, in_escrow: work.cost.inEscrow },
+      cost: presentWorkCost(work.cost, 'snake'),
       ttl_expires_at: work.ttlExpiresAt,
       created_at: work.createdAt,
     }, [
@@ -335,7 +341,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       action_id: work.actionId,
       provider_gaii: work.providerGaii,
       requester_gaii: work.requesterGaii,
-      cost: { base_price: work.cost.basePrice, network_fee: work.cost.networkFee, total: work.cost.total, in_escrow: work.cost.inEscrow },
+      cost: presentWorkCost(work.cost, 'snake'),
       ttl_expires_at: work.ttlExpiresAt,
       created_at: work.createdAt,
     }, [
@@ -391,7 +397,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         status: w.status,
         action_id: w.actionId,
         requester_gaii: w.requesterGaii,
-        cost: w.cost,
+        cost: presentWorkCost(w.cost, 'camel'),
         ttl_expires_at: w.ttlExpiresAt,
         created_at: w.createdAt,
       })),
@@ -424,7 +430,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         status: w.status,
         action_id: w.actionId,
         provider_gaii: w.providerGaii,
-        cost: w.cost,
+        cost: presentWorkCost(w.cost, 'camel'),
         rating: w.rating,
         ttl_expires_at: w.ttlExpiresAt,
         created_at: w.createdAt,
@@ -467,7 +473,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       requester_gaii: work.requesterGaii,
       input: work.input,
       output: work.output,
-      cost: work.cost,
+      cost: presentWorkCost(work.cost, 'camel'),
       rating: work.rating,
       ttl_expires_at: work.ttlExpiresAt,
       created_at: work.createdAt,

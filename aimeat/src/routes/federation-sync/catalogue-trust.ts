@@ -5,6 +5,7 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-11 — A synced action's pricing is its pacing amount: toll_morsels from a 4.x peer, base_morsels from a 3.x peer (actionPricingFromPeer). A morsel is pacing, not a price.
  *   v1.3.0 — 2026-10-10 — A peer that has once sent a verified delivery proof is held to it: a catalogue-sync without one is refused from it whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal; secaudit 2026-10-10 I21).
  *   v1.2.0 — 2026-10-06 — catalogue-sync checks a delivery proof: this node named, sent inside five minutes, heard once (deliveryRefusal; secaudit 2026-10 last items, D3).
  *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
@@ -24,6 +25,7 @@ import { deliveryRefusal, pinnedRefusal, federationPeerProofPin } from '../../se
 import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation-tiers.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { emitChange } from '../../services/event-bus.js';
+import { actionPricingFromPeer } from '../../services/action-pacing.js';
 
 export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer
@@ -84,10 +86,9 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
                 category: action.category,
                 inputSchema: action.input_schema ?? {},
                 outputSchema: action.output_schema ?? {},
-                pricing: {
-                    baseMorsels: action.pricing?.base_morsels ?? 0,
-                    perUnit: action.pricing?.per_unit,
-                },
+                // The pacing amount per use: toll_morsels from a 4.x peer, base_morsels from a 3.x
+                // peer. A morsel is pacing, not a price.
+                pricing: actionPricingFromPeer(action.pricing),
                 tags: [...(action.tags ?? []), `federated:${source_node}`],
                 semantic: action.semantic,
                 createdAt: action.created_at ?? now,

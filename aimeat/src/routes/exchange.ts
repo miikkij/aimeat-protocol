@@ -6,14 +6,16 @@
  *   entitlement. When a negotiation concludes (a human in an MCP chat, or a closed negotiation agent),
  *   the CONSUMER's owner accepts the contract here, which mints the durable entitlement the G2 gateway
  *   then honours on every call. Safety by construction: the consumer chooses only the BUDGET (their own
- *   spend cap) and the contract ref — the per-call PRICE is read authoritatively from the provider's
- *   extension action (`commercial.payMorsels`), so a consumer can neither undercut the provider nor be
- *   charged a price they did not accept. The entitlement's consumer is always the caller's own owner
- *   (strictly cross-owner via resolveIdentity), so accepting a contract authorises only one's own spend.
+ *   spend cap) and the contract ref — the per-call terms are read authoritatively from the provider's
+ *   source (the extension action's `commercial`, or the offering), so a consumer can neither undercut the
+ *   provider nor be charged terms they did not accept. The entitlement's consumer is always the caller's
+ *   own owner (strictly cross-owner via resolveIdentity), so accepting a contract authorises only one's
+ *   own spend.
  *
- *   Slice-1 covers the `morsels` unit (fully in-repo); the money unit rides the same acceptance flow once
- *   the Stripe/EE drawdown is wired. Dynamic agent-negotiated pricing (a signed price quote that differs
- *   from the list price) is a later addition — slice-1 accepts the provider's listed price + a budget.
+ *   Two values per contract (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): a
+ *   money price on the money rail, and the pacing every call is charged (`toll_morsels`). A morsel-rail
+ *   contract is free; its per-call amount is pacing. Dynamic agent-negotiated pricing (a signed price
+ *   quote that differs from the list price) is a later addition.
  * @structure exchangeRouter — POST /v1/exchange/entitlements · GET /v1/exchange/entitlements ·
  *   POST /v1/exchange/entitlements/off · GET /v1/exchange/earnings · the agent-work routes, which
  *   routes/exchange-agent-work.ts registers on this router
@@ -21,6 +23,11 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.9.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
+ *     tarjouksen-kaksi-arvoa). A contract's `toll_morsels` is the pacing every call is charged (on the
+ *     morsel rail the per-call amount plus the toll); on a morsel-rail contract `unit`, `currency` and
+ *     `price_per_call` are deprecated mirrors until 4.0.0. The budget floor and the proposal notice
+ *     name pacing, not a morsel price.
  *   v1.8.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.7.2 — 2026-09-26 — The agent-work routes (POST /v1/exchange/work, its deliver and the list) moved
  *     as they were to routes/exchange-agent-work.ts, which this router calls, to keep the file under
@@ -67,7 +74,9 @@ import {
 } from '../services/metered-entitlements.js';
 import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services/entitlement-merge.js';
 import { listPayables } from '../commerce/payable-book.js';
-import { resolveActionPricing, resolveOfferingPricing, getOffering, type ActionCommercial } from '../services/exchange-market.js';
+import {
+  resolveActionPricing, resolveOfferingPricing, getOffering, budgetFloorText, presentContractTerms, type ActionCommercial,
+} from '../services/exchange-market.js';
 import {
   type ContractProposal, newProposalId, putProposal, getProposal, listProposalsForOwner,
   supersedeWithProposal, ownerOfGaii,
@@ -113,12 +122,8 @@ function view(config: AimeatConfig, e: MeteredEntitlement) {
     action: e.action,
     surface: e.surface ?? null,
     capability: e.capabilityLabel,
-    unit: e.unit,
-    currency: e.currency,
-    price_per_call: e.pricePerCall,
-    // The pacing burn this contract was signed at — a cost to the consumer that is not a payment, so it
-    // belongs beside the price rather than inside it.
-    toll_morsels: e.tollMorsels ?? null,
+    // The money price and, beside it rather than inside it, the pacing every call is charged.
+    ...presentContractTerms(config, e),
     pricing: e.pricing ?? { model: 'per_call' },
     rake_percent: rakePct,
     rake_per_call: percentFee(e.pricePerCall, rakePct),
@@ -168,7 +173,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       const minCharge = priced.pricing?.model === 'bundle' ? priced.pricing.blockPrice : priced.pricing?.model === 'subscription' ? priced.pricing.periodPrice : priced.pricePerCall;
       if (capUnits !== null && capUnits < minCharge) {
         return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW',
-          `Budget cap (${capUnits}) is below the ${minCharge}-${priced.unit === 'money' ? priced.currency : 'morsel'} minimum charge`));
+          budgetFloorText(capUnits, minCharge, priced.unit, priced.currency)));
       }
       const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
       const ent = await createEntitlement(storage, {
@@ -204,8 +209,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     // Budget floor: the cap must cover a single charge (per-call price, or a bundle block / subscription period).
     const minCharge = pricing?.model === 'bundle' ? pricing.blockPrice : pricing?.model === 'subscription' ? pricing.periodPrice : pricePerCall;
     if (capUnits !== null && capUnits < minCharge) {
-      return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW',
-        `Budget cap (${capUnits}) is below the ${minCharge}-${unit === 'money' ? currency : 'morsel'} minimum charge`));
+      return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW', budgetFloorText(capUnits, minCharge, unit, currency)));
     }
     const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
@@ -569,7 +573,8 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       status: 'pending', createdAt: now, resolvedAt: null,
     };
     await putProposal(storage, proposal);
-    const priceLine = newPrice !== null ? `price → ${newPrice} ${ent.unit === 'money' ? (ent.currency ?? '') : 'morsels'}/call` : '';
+    const priceLine = newPrice === null ? ''
+      : ent.unit === 'money' ? `price → ${newPrice} ${ent.currency ?? ''}/call` : `pacing → ${newPrice} morsels/call`;
     const capLine = newCap !== null ? `budget cap → ${newCap}` : '';
     await notify(owner, proposal.counterpartyOwner, 'EXCHANGE — contract change proposed',
       `${owner} proposed a change to your contract for ${ent.capabilityLabel}: ${[priceLine, capLine].filter(Boolean).join(', ')}. ${proposal.note ? `Note: ${proposal.note}. ` : ''}Review it in the EXCHANGE app (Proposals) to accept or decline.`);

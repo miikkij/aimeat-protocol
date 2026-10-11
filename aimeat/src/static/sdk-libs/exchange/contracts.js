@@ -11,6 +11,8 @@
  *   startWork(spec) · deliverWork(id, spec) · work(opts) · coordinateOf
  * @usage const c = await AIMEAT.exchange.accept('off-abc123', { capUnits: 500 });
  * @version-history
+ *   v1.0.1 — 2026-10-11 — Docs: a morsel figure on a contract is pacing, never a price
+ *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). No code change.
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 02 — the EXCHANGE browser library, gap G19).
  */
 import { authed, send, qs, exchangeError } from './client.js';
@@ -44,7 +46,8 @@ export function contracts() {
  * @param {string} offeringId
  * @param {{ capUnits?: number|null, appId?: string, planId?: string, contractRef?: string,
  *           escrowParty?: 'consumer'|'provider' }} [opts]
- *   `capUnits` is YOUR spend ceiling in the offering's unit (money micro-units or morsels); omit for
+ *   `capUnits` is YOUR ceiling in the offering's unit (money micro-units, or whole morsels of pacing
+ *   on a free offering, which is a pace and never a price); omit for
  *   uncapped. Below one charge it is refused with `BUDGET_TOO_LOW` rather than minted unusable.
  *   `planId` picks a provider-declared bundle/subscription plan.
  * @returns {Promise<any>}  The minted contract.
@@ -112,7 +115,8 @@ export function history() {
  * aggregates the SELLER's side (offering stats, consumer lineage, earnings) and exposes the buyer's
  * side only per app (`GET /v1/apps/cost?app_id=…`), so this folds the caller's own contracts — the
  * same records the per-app view reads — into one figure. It therefore counts exactly what the
- * caller's OWNER holds a contract for, and nothing about another of their accounts.
+ * caller's OWNER holds a contract for, and nothing about another of their accounts. The `morsels`
+ * key counts pacing used on free offerings, never money spent; show it with fmtUnit(n, 'morsels').
  * @returns {Promise<{ byProvider: any[], byUnit: Record<string, { spentUnits: number, calls: number, contracts: number }>,
  *                     totalCalls: number, totalContracts: number }>}
  */

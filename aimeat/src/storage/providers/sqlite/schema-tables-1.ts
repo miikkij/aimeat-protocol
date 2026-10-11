@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.6.0 — 2026-10-11 — Comments only: actions.pricing and work.cost hold pacing amounts, not prices
+ *     (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). No schema change.
  *   v1.5.0 — 2026-08-30 — boards.rules (migration 0057): the board's own rules as JSON.
  *   v1.4.0 — 2026-08-13 — agents.registeredBy (migration 0035).
  *   v1.3.0 — 2026-08-13 — agents.consoleUrl (see migration 0034 for why). schema.ts adds it to an
@@ -122,6 +124,8 @@ export function applySchemaTables1(db: Database.Database): void {
       category           TEXT,
       inputSchema        TEXT NOT NULL DEFAULT '{}',
       outputSchema       TEXT NOT NULL DEFAULT '{}',
+      -- JSON { tollMorsels, perUnit }: tollMorsels is the PACING amount per use, not a price. A
+      -- 3.26.x row says baseMorsels; repos/action.ts readStoredActionPricing reads it as tollMorsels.
       pricing            TEXT NOT NULL DEFAULT '{}',
       estimatedTimeSeconds INTEGER,
       maxInputSizeBytes  INTEGER,
@@ -142,6 +146,8 @@ export function applySchemaTables1(db: Database.Database): void {
       requesterGaii  TEXT NOT NULL,
       input          TEXT NOT NULL DEFAULT '{}',
       output         TEXT,
+      -- JSON { toll, networkFee, total, inEscrow }: toll is the escrowed PACING amount, not a price.
+      -- A 3.26.x row says basePrice; methods/work.ts readStoredWorkCost reads it as toll.
       cost           TEXT NOT NULL DEFAULT '{}',
       ttlExpiresAt   TEXT NOT NULL,
       callbackUrl    TEXT,

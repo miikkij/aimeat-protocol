@@ -13,11 +13,12 @@
  * @usage const lifetime = lifetimeOf(rows, ghii.morselBalance ?? 0);
  * @version-history
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Lompakko-sivu", direction A).
+ *   v1.1.0 — 2026-10-11 — A `pacing_pack` row (pacing capacity bought with money) is not earned.
  */
 import type { WalletTransaction } from '../storage/interface.js';
 
-/** Row kinds that are the pace or a gift rather than something earned from somebody. */
-const GRANTED = new Set(['allowance', 'daily_allowance', 'welcome_bonus', 'mint']);
+/** Row kinds that are the pace, a gift or a purchase rather than something earned from somebody. */
+const GRANTED = new Set(['allowance', 'daily_allowance', 'welcome_bonus', 'mint', 'pacing_pack']);
 
 export interface WalletLifetime {
   /** Positive rows that came from somebody: work, tool calls, sales, offers, fees. */

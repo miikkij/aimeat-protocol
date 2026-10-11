@@ -16,6 +16,8 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.9.0 — 2026-10-11 — A line item may be `{ kind: 'pacing-pack', quantity }`, pacing capacity the
+ *     operator sells for money (commerce/pacing-pack.ts); it needs no offer_id or tool.
  *   v1.8.1 — 2026-10-09 — A typed commerce or payment error keeps its sentence through the 500 text
  *     filter (keepErrorMessage); an untyped one answers with the filter's sentence (secrets audit d4, d5).
  *   v1.8.0 — 2026-10-08 — A checkout may carry `attribution` (the page's Referer and utm_source); the
@@ -66,7 +68,7 @@ import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package']).optional(),
+  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack']).optional(),
   agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100).optional(),
   /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */
@@ -76,7 +78,7 @@ const ItemsSchema = z.array(z.object({
   /** app-tool: the buyer's tool input, forwarded to the capability invoke at completion. */
   input: z.record(z.string(), z.unknown()).optional(),
   quantity: z.number().int().positive().max(1000).optional(),
-}).refine((i) => !!(i.offer_id || i.tool), { message: 'Each line item needs offer_id (offers) or tool (app-tools)' }))
+}).refine((i) => i.kind === 'pacing-pack' || !!(i.offer_id || i.tool), { message: 'Each line item needs offer_id (offers) or tool (app-tools); a pacing pack needs neither' }))
   .min(1).max(20);
 
 const CreateSchema = z.object({

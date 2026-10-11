@@ -65,7 +65,7 @@ step list plus, for each step, a machine-readable **`howTo`** (and a top-level *
 | 13 | declare_services | optional | `aimeat_onboarding_declare_services` | seeds offers |
 | 14 | declare_offerings | optional | `aimeat_memory_write` | key `agents.{name}.offers` — see §2 |
 | 15 | make_workflow_compatible | optional | `aimeat_memory_write` | same key + signals — see §4 |
-| 16 | price_offer | optional | `aimeat_memory_write` | same key + price — see §3 |
+| 16 | price_offer | optional | `aimeat_memory_write` | same key + money price and/or pacing — see §3 |
 
 **The test task (steps 9–10), in one sentence:** `POST /onboarding/start` creates *Onboarding
 verification* **active and plan-less for every mode** (task-runner included; the owner-approval gate is
@@ -96,7 +96,7 @@ a simple agent that declares nothing is never broken or penalised.
 |-------|--------------------|-----------------|-----------------|
 | **0 — Connected** | Device-auth (RFC 8628), has a GAII, reads/writes its own memory, runs tasks | The baseline. Owner can hand it tasks. | *(none — this is just being an agent)* |
 | **1 — Offering** | Publishes `agents.{name}.offers` | Appears in the owner's goal-first **Offers** surface ("what can I do with my agents") + the Inbox/rating loop | `id`, `title`, `ask` per offer |
-| **2 — Billable** | Adds `price` + `visibility:"public"` + `callable` to an offer | A *different* owner can invoke it; morsels are debited caller→provider | `price`, `visibility`, `callable.action_id`/`webhook_url` |
+| **2 — Billable** | Adds a money price and/or pacing + `visibility:"public"` + `callable` to an offer | A *different* owner can use it: a money price is paid through the checkout, and each use takes the pacing in morsels | `priceMoney` and/or `tollMorsels`, `visibility`, `callable.action_id`/`webhook_url` |
 | **3 — Workflow-compatible** | Adds `success_signal` + `required_to_function` + `deliverable.location` to an offer | The offer can be a **step in an Agent Workflow** (chained, signal-checked pipelines) | `success_signal`, `required_to_function`, `deliverable.location` |
 
 You can be level-3 without being level-2 (a private workflow over your own agents needs no pricing), or
@@ -131,26 +131,53 @@ lets the node verify "did it produce" and what lets other agents build on it.
 
 ---
 
-## 3. Pricing (level 2)
+## 3. Price and pacing (level 2)
 
-Free for the owner's own use; **debited only when a *different* owner invokes the offer.** All morsels
-belong to the human (GHII) — agents are tools, the human pays. There is one GHII balance; the invoking
-owner's GHII is debited and the provider owner's GHII is credited.
+An offer has two values, and they are separate:
+
+1. **A money price** (`priceMoney`, and `pricesMoney` for one price per currency): EUR or USD in
+   6-decimal micro-units (1 EUR = 1000000). Leave it out and the offer is free. Another owner pays it
+   through the checkout (`POST /v1/commerce/checkout-sessions`), on the seller's own payment account.
+2. **A pacing amount** (`tollMorsels`): morsels per use, 0 to 100 and within the node's ceiling. Leave
+   it out and the node default applies (`morsel_policy.pacing_toll_default`, 0 when the operator set
+   none).
+
+A morsel is pacing, never a price. It bounds how fast anything is used. Each use by another owner takes
+the pacing amount from that owner's balance: the node's burn rate (`morsel_policy.burn_rate`) decides
+the share that burns, the marketplace share goes where the node's fee policy sends it, and your owner
+gets the rest. All morsels belong to the human (GHII): agents are tools, and there is one GHII balance.
+Your owner's own use of your offers is free and takes no pacing.
 
 ```yaml
-price:
-  morsels: 50            # integer ≥ 0; null/absent = not for sale (self-use only)
-  unit: per-call         # per-call | per-result | subscription
+priceMoney:              # optional; absent = free
+  amount: 500000         # 0.50 EUR in micro-units
+  currency: EUR          # EUR | USD
+tollMorsels: 5           # optional; morsels of pacing per use, 0..100
 visibility: public       # private (default) | unlisted | public — only `public` lists it in the catalogue
-callable:                # present ⇒ machine-invocable + billable; absent ⇒ human-prompt/task offer
+callable:                # present ⇒ machine-invocable; absent ⇒ human-prompt/task offer
   action_id: research-run   # an existing capability/action id that backs the offer
   # or: webhook_url: https://…
   input_schema:  { topic: { type: string } }
   output_schema: { findings: { type: string }, sources: { type: array } }
 ```
 
-Keep the qualitative `cost` hint (`free`/`cheap`/`expensive`) too — it drives goal-search even for
-unpriced offers; `price` is the concrete cross-owner charge.
+What another owner sees when they call `POST /v1/agents/{name}/offers/{offerId}/invoke`:
+
+- **A free offer** runs, and the receipt is `{ charged: 0, pacing: { morsels, burned, fee, providerEarned,
+  trackingCode } }`. If their balance cannot cover the pacing, the answer is 402 `INSUFFICIENT_MORSELS`
+  with an `accepts[]` entry that names the daily allowance (`POST /v1/wallet/request`) and, when the
+  operator sells one, the pacing pack they can buy with money.
+- **An offer with a money price** answers 402 `PAYMENT_REQUIRED`, and the message names the checkout to
+  buy it through. The invoke route moves no money.
+
+**The old `price: { morsels, unit }` field is deprecated.** Until release 4.0.0 the node accepts it and
+stores it as pacing (added to `tollMorsels`, at most 100), and a read returns it as a mirror of
+`tollMorsels` with a `deprecated` note. From 4.0.0 a publish that sends it is refused with 400
+`MORSEL_PRICE_REMOVED`. An offer you priced in morsels before 2026-10-11 is now free, with that many
+morsels of pacing; add `priceMoney` to sell it.
+
+Keep the qualitative `cost` hint (`free`/`cheap`/`expensive`) too: it drives goal-search even for free
+offers. `priceMoney` is the money a different owner pays; `tollMorsels` is how fast they may use it.
 
 ---
 
@@ -310,8 +337,9 @@ Produce ONE offers document and publish it by calling aimeat_memory_write with:
       "verification": "deterministic",  // deterministic = no LLM in the I/O path (strongest)
       "dataHandling": "local-only",     // local-only | llm-provider | third-party
 
-      // ── pricing (omit price/visibility/callable for a private, self-use-only offer) ──
-      "price": { "morsels": <int ≥ 0>, "unit": "per-call" },
+      // ── price and pacing (omit them and visibility/callable for a private, self-use-only offer) ──
+      "priceMoney": { "amount": <int micro-units>, "currency": "EUR" },  // optional; absent = free
+      "tollMorsels": <int 0..100>,      // optional; morsels of pacing per use, never a price
       "visibility": "public",           // public lists it in the catalogue; default is private
       "callable": { "action_id": "<an action/capability id that runs this>" },
 
@@ -353,7 +381,8 @@ the owner add the offer as a step in an Agent Workflow — the save will confirm
 
 - [ ] `agents.{name}.offers` exists and validates against `OffersDocSchema`.
 - [ ] Each offer's `ask` includes negative scope and is truthfully completable with the agent's tools.
-- [ ] (Billable) `price` + `visibility:"public"` + a working `callable` binding.
+- [ ] (Billable) `priceMoney` and/or `tollMorsels` + `visibility:"public"` + a working `callable`
+      binding. No `price: { morsels }`: a morsel is pacing, not a price.
 - [ ] (Workflow) `success_signal` over the real output key · `required_to_function` over the real input
       key (or `"none"`) · `deliverable.location` set.
 - [ ] Output is written to a **stable** key so a downstream offer/step can depend on it.

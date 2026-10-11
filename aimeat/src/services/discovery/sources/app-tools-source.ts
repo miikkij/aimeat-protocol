@@ -25,6 +25,7 @@
  * @usage registry.register(createAppToolsSource(storage, config));
  * @version-history
  *   v1.0.0 — 2026-08-31 — Initial: `tool` becomes a first-class discovery type.
+ *   v1.0.1 — 2026-10-11 — A tool reads as priced only with a money price; its pacing amount is not a price.
  */
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
@@ -70,7 +71,8 @@ export function createAppToolsSource(storage: Storage, config: AimeatConfig): Di
 
     toEntry(raw: RawHit, ctx: DiscoveryContext): DiscoveryEntry {
       const tool = raw.record as PricedAppTool;
-      const priced = Boolean(tool.price || tool.priceMoney);
+      // A money price only: `price` is now the deprecated mirror of a free tool's pacing amount.
+      const priced = Boolean(tool.priceMoney);
       return {
         type: 'tool',
         // The app is the coarse area, so a person can ask for one app's tools the way they ask for

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description A sale whose customer node does not exist yet: the seller asks the repository for a
  *   one-time claim code, and the node redeems it later with a request signed by its own key
- *   (docs/specs/package-sale-design.md, section 3, "The person pays first").
+ *   (https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44ppuzmw8e, section 3, "The person pays first").
  *
  *   WHO ASKS. A seller node of the package's author, by the signed sale request
  *   (routes/package-sales.ts sellerAct). The claim records the seller, the end of updates the sale
