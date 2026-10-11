@@ -57,6 +57,16 @@ goose takes its model from OpenRouter, so you pick the model per session and pay
 (`GOOSE_MODEL=<model> ~/.aimeat-goose/launch-goose.sh`, or the `.ps1` launcher on Windows), or with
 `/model <model>` inside a running session.
 
+## Client configuration from the desktop app
+
+A person who does not want a terminal uses the aimeat-desktop app instead of the CLI. It lists the
+AI tools installed on the computer and attaches Claude Code, Cursor and VS Code to their AIMEAT with
+one click, by editing each tool's own MCP settings; nothing it writes holds a secret, because the
+node signs the tool in over OAuth. Codex keeps its servers in a TOML file, so the app gives the lines
+to paste. Claude Desktop takes a remote MCP server in its own settings (Settings, Connectors, Add
+custom connector), so the app gives the address to paste; Anthropic's cloud makes that connection,
+so it works only with an AIMEAT the internet can reach. See `aimeat-desktop/README.md`.
+
 Read `GET /v1/ai-tools` for each client's setup and
 [the agent guide](building-an-aimeat-compatible-agent.md) for onboarding.
 For other clients, read the node's `/.well-known/mcp.json` and the client's own MCP setup guide.

@@ -1,5 +1,18 @@
 # Building an AIMEAT-compatible agent
 
+**Audience:** anyone building an AIMEAT agent (a crew like crewaimeat, a single autonomous agent, an
+interactive workstation agent), and the AI you hand the build to.
+
+**What it answers:** what we expect from an agent so that it is AIMEAT-compatible, can be priced and
+paced, and can take part in Agent Workflows, how it talks to the other principals of its account and
+how it receives work, plus a copy-paste prompt that produces a correct declaration.
+
+The source of truth for the data shape is **`aimeat/src/models/offer-schemas.ts`** (the offer
+descriptor) and **`aimeat/src/models/workflow-schemas.ts`** (the signal grammar). This document
+explains the intent and the minimum bar; if the two disagree, the schema wins. What the owner sees
+of offers, workflows and the agent fleet is in the [Feature List](AIMEAT-Feature-List.md), sections
+7, 8 and 14.
+
 ## Connection and identity versions
 
 Two agent identity paths exist in the current node:
@@ -20,52 +33,41 @@ the owner's authority; a token exchange does not create an agent.
 
 For a client using MCP, start with the node's MCP server card and discover the
 available tools. For a daemon integration, select its identity path before building
-authentication, token renewal or task delivery.
-
-**Audience:** anyone building an AIMEAT agent (a crew like crewaimeat, a single autonomous agent, an
-interactive workstation agent) — and the AI you hand the build to.
-**What it answers:** *what do we expect from an agent so it is "AIMEAT-compatible", can be priced, and
-can take part in Agent Workflows* — plus a copy-paste prompt that produces a correct declaration.
-**No time/effort estimates** anywhere.
-
-The single source of truth for the data shape is **`aimeat/src/models/offer-schemas.ts`** (the offer
-descriptor) and **`aimeat/src/models/workflow-schemas.ts`** (the signal grammar). This doc explains the
-*intent* and the *minimum bar*; if the two disagree, the schema wins. Companion docs:
-`docs/plans/2026-06-12-agent-offers-surface.md` (the offers surface) and
-`docs/plans/2026-06-13-agent-workflows-node-plan.md` (workflows).
+authentication, token renewal or task delivery. Section 5d covers the v2 messages and task handles,
+and section 5e the webhook that delivers work to an agent with no live connection.
 
 ---
 
-## 0. Hello Integration (onboarding) — the step → tool contract
+## 0. Hello Integration (onboarding): which tool completes each step
 
 Every newly connected agent runs **Hello Integration** first. `aimeat_onboarding_status` returns the
 step list plus, for each step, a machine-readable **`howTo`** (and a top-level **`step_guide`** map and
 **`summary`**). Drive it deterministically: for each pending step call the tool named in its
 `howTo.tool` with `howTo.args`; **stop as soon as `summary.completable` is true.**
 
-> **There are only five `aimeat_onboarding_*` tools** — `status`, `identify_platform`,
+> **There are only five `aimeat_onboarding_*` tools:** `status`, `identify_platform`,
 > `confirm_skill_installed`, `confirm_directives_read`, `declare_services`. There is **no**
-> `aimeat_onboarding_<stepId>` tool for any other step. Never construct one — every other step is
+> `aimeat_onboarding_<stepId>` tool for any other step. Never construct one: every other step is
 > completed by calling its mapped real tool below (the server then verifies the real state).
 
 | # | step id | required? | tool to call | note |
 |---|---------|-----------|--------------|------|
-| 1 | authenticate | required | — | auto-passed at `/onboarding/start` |
+| 1 | authenticate | required | (none) | auto-passed at `/onboarding/start` |
 | 2 | identify_platform | required | `aimeat_onboarding_identify_platform` | `{ platform, platform_version }` |
 | 3 | install_skill | required | `aimeat_onboarding_confirm_skill_installed` | `{ platform, version }` |
 | 4 | report_capabilities | required | `aimeat_agent_capabilities_report` | technical/domain capabilities |
 | 5 | read_directives | required | `aimeat_onboarding_confirm_directives_read` | `{ confirmed: true }` |
 | 6 | send_test_message | required | `aimeat_message_send` | any outbound message |
-| 7 | configure_delivery | required | — | auto-passes once active/polling (or register a webhook) |
+| 7 | configure_delivery | required | (none) | auto-passes once active/polling (or register a webhook) |
 | 8 | report_telemetry | required | `aimeat_agent_telemetry_report` | one `agent_report` event |
 | 9 | accept_test_task | required | `aimeat_task_propose_todos` | task id from `hints.test_task_id` |
 | 10 | complete_test_task | required | `aimeat_task_complete` | finish the test task |
 | 11 | publish_commands | required | `aimeat_memory_write` | key `agents.{name}.commands` (array of `{name,description,category}`) |
 | 12 | publish_config | required | `aimeat_memory_write` | key `agents.config.{name}.*` |
 | 13 | declare_services | optional | `aimeat_onboarding_declare_services` | seeds offers |
-| 14 | declare_offerings | optional | `aimeat_memory_write` | key `agents.{name}.offers` — see §2 |
-| 15 | make_workflow_compatible | optional | `aimeat_memory_write` | same key + signals — see §4 |
-| 16 | price_offer | optional | `aimeat_memory_write` | same key + money price and/or pacing — see §3 |
+| 14 | declare_offerings | optional | `aimeat_memory_write` | key `agents.{name}.offers`, see §2 |
+| 15 | make_workflow_compatible | optional | `aimeat_memory_write` | same key + signals, see §4 |
+| 16 | price_offer | optional | `aimeat_memory_write` | same key + money price and/or pacing, see §3 |
 
 **The test task (steps 9–10), in one sentence:** `POST /onboarding/start` creates *Onboarding
 verification* **active and plan-less for every mode** (task-runner included; the owner-approval gate is
@@ -75,12 +77,12 @@ without a plan; passes the moment the task carries todos, whoever proposed them)
 `complete_test_task` passes when the task is `done`. The status answer says where it stands:
 `hints.test_task_status` and `hints.test_task_has_plan`. Never look the task up by title: a re-run of
 `/start` makes a new one (and removes the previous one if it is still open), and the id in the hints
-is the only current one. A tool answers a refusal as a value, not an exception — read it; the node's
+is the only current one. A tool answers a refusal as a value, not an exception, so read it: the node's
 message (`INVALID_STATE: TODOs can only be proposed on …`) names both what went wrong and what would
 have been accepted.
 
 **Completion gates only on the 12 required steps.** The optional offers-ladder steps (14–16) and
-`declare_services` (13) auto-mark `skipped` once the required set passes — they never block completion.
+`declare_services` (13) auto-mark `skipped` once the required set passes; they never block completion.
 This table is the human form of `STEP_HOWTO` in `aimeat/src/models/agent-onboarding-schemas.ts`; the
 code is the source of truth. The 16 step ids and the five tool names are a frozen contract (pinned by
 `test/e2e-agent-onboarding.ts`); coordinate any rename so connectors update in lockstep.
@@ -89,21 +91,21 @@ code is the source of truth. The 16 step ids and the five tool names are a froze
 
 ## 1. The compatibility levels (each is additive, optional, and graceful)
 
-A plain connected agent already works. Compatibility is something you *opt into*, one level at a time —
-a simple agent that declares nothing is never broken or penalised.
+A plain connected agent already works. Compatibility is something you *opt into*, one level at a time,
+and a simple agent that declares nothing is never broken or penalised.
 
 | Level | What the agent does | What it unlocks | Required fields |
 |-------|--------------------|-----------------|-----------------|
-| **0 — Connected** | Device-auth (RFC 8628), has a GAII, reads/writes its own memory, runs tasks | The baseline. Owner can hand it tasks. | *(none — this is just being an agent)* |
-| **1 — Offering** | Publishes `agents.{name}.offers` | Appears in the owner's goal-first **Offers** surface ("what can I do with my agents") + the Inbox/rating loop | `id`, `title`, `ask` per offer |
-| **2 — Billable** | Adds a money price and/or pacing + `visibility:"public"` + `callable` to an offer | A *different* owner can use it: a money price is paid through the checkout, and each use takes the pacing in morsels | `priceMoney` and/or `tollMorsels`, `visibility`, `callable.action_id`/`webhook_url` |
-| **3 — Workflow-compatible** | Adds `success_signal` + `required_to_function` + `deliverable.location` to an offer | The offer can be a **step in an Agent Workflow** (chained, signal-checked pipelines) | `success_signal`, `required_to_function`, `deliverable.location` |
+| **0, Connected** | Device-auth (RFC 8628) or Agent v2 keys, has a GAII, reads/writes its own memory, runs tasks | The baseline. Owner can hand it tasks. | *(none: this is just being an agent)* |
+| **1, Offering** | Publishes `agents.{name}.offers` | Appears in the owner's goal-first **Offers** surface ("what can I do with my agents") + the Inbox/rating loop | `id`, `title`, `ask` per offer |
+| **2, Billable** | Adds a money price and/or pacing + `visibility:"public"` + `callable` to an offer | A *different* owner can use it: a money price is paid through the checkout, and each use takes the pacing in morsels | `priceMoney` and/or `tollMorsels`, `visibility`, `callable.action_id`/`webhook_url` |
+| **3, Workflow-compatible** | Adds `success_signal` + `required_to_function` + `deliverable.location` to an offer | The offer can be a **step in an Agent Workflow** (chained, signal-checked pipelines) | `success_signal`, `required_to_function`, `deliverable.location` |
 
 You can be level-3 without being level-2 (a private workflow over your own agents needs no pricing), or
 level-2 without level-3 (a billable one-shot offer that isn't part of a pipeline). They're independent
 axes that happen to live on the same descriptor.
 
-**An agent is "AIMEAT-compatible" in the full sense when it reaches level 3 on at least one offer** —
+**An agent is "AIMEAT-compatible" in the full sense when it reaches level 3 on at least one offer**:
 it's legible (level 1), and its output is *machine-checkable* and *locatable*, which is exactly what
 lets the node verify "did it produce" and what lets other agents build on it.
 
@@ -111,7 +113,7 @@ lets the node verify "did it produce" and what lets other agents build on it.
 
 ## 2. Where offers live + how to publish
 
-- **Memory key:** `agents.{name}.offers` (where `{name}` is the agent's bare name — the part before
+- **Memory key:** `agents.{name}.offers` (where `{name}` is the agent's bare name, the part before
   `#` in its GAII). Value = `{ version, updatedAt, offers: Offer[] }` (see `OffersDocSchema`).
   The same holds for every key under `agents.`: a write to `agents.{full GAII}.…` is refused with
   400 `AGENT_KEY_NOT_A_NAME`, because nothing reads a record stored there.
@@ -120,12 +122,12 @@ lets the node verify "did it produce" and what lets other agents build on it.
   - During onboarding: `aimeat_onboarding_declare_services` (the onboarding step that seeds offers).
 - **Who reads it:** the owner's **Offers** profile surface (human-facing), the **mesh** for delegate
   selection, and the **Workflow** save/validate path (which inherits each step's signals from the
-  named offer). One record, three consumers — never a human-only storefront.
+  named offer). One record, three consumers, never a human-only storefront.
 - **Not sure how to draft one?** `GET /v1/prompts/draft-offer` returns a guided, node-filled prompt
   your own LLM uses to draft a valid offer (offering → workflow signals → optional pricing) before you
   publish it. Prompt-driven: the node hands you the prompt, you publish the result yourself.
 - **Onboarding ladder:** the Hello Integration steps `declare_offerings`, `make_workflow_compatible`,
-  and `price_offer` (all optional) **auto-tick** the moment your published offers satisfy each level —
+  and `price_offer` (all optional) **auto-tick** the moment your published offers satisfy each level,
   on the next `aimeat_onboarding_status` / `GET …/onboarding`. They never block readiness; they're a
   legible progress marker for the levels in §1.
 
@@ -153,7 +155,7 @@ priceMoney:              # optional; absent = free
   amount: 500000         # 0.50 EUR in micro-units
   currency: EUR          # EUR | USD
 tollMorsels: 5           # optional; morsels of pacing per use, 0..100
-visibility: public       # private (default) | unlisted | public — only `public` lists it in the catalogue
+visibility: public       # private (default) | unlisted | public; only `public` lists it in the catalogue
 callable:                # present ⇒ machine-invocable; absent ⇒ human-prompt/task offer
   action_id: research-run   # an existing capability/action id that backs the offer
   # or: webhook_url: https://…
@@ -179,24 +181,43 @@ morsels of pacing; add `priceMoney` to sell it.
 Keep the qualitative `cost` hint (`free`/`cheap`/`expensive`) too: it drives goal-search even for free
 offers. `priceMoney` is the money a different owner pays; `tollMorsels` is how fast they may use it.
 
+### Selling the offer as agent work on EXCHANGE
+
+A public offer reaches other owners through the offers feed and the invoke route above. To sell it on
+the EXCHANGE marketplace, where a buyer takes a contract, each call is metered against the buyer's
+budget and the work is paid on delivery, add these fields to the same offer:
+
+- `exchange: true` (separate from `visibility`, which must still be `public`);
+- `inputSchema` and `outputSchema`: what the buyer sends and what the agent delivers;
+- `usageTerms`: `{ derivatives?, resale?, attribution?, note? }`;
+- optionally `pricesMoney` (one price per currency, EUR and USD), `provenance` and `odps`.
+
+The offer stays the one source: writing `agents.{name}.offers` lists, updates or removes the EXCHANGE
+offering, and the write's answer says under `exchange` what was listed, what was removed and what was
+skipped and why (a missing schema or missing usage terms). `POST /v1/exchange/reconcile` with
+`{"dry_run": true}` shows the same without changing anything. A buyer finds the offering with
+`aimeat_exchange_offerings`, takes a contract with `aimeat_exchange_accept` and starts a piece of work
+with `aimeat_exchange_work`; your agent delivers it with `aimeat_exchange_work_deliver`, and the buyer
+is charged on delivery.
+
 ---
 
-## 4. Workflow support (level 3) — the part most agents skip
+## 4. Workflow support (level 3): the part most agents skip
 
-A workflow chains steps; after each step the node checks a **signal** — so the owner sees *"did it
+A workflow chains steps; after each step the node checks a **signal**, so the owner sees *"did it
 produce"*, not just *"did it fire"*. A step names an `agent` + an `offer` and **inherits that offer's
 signals + deliverable location** (overridable per step). So the work of being workflow-compatible is
 done once, on the offer:
 
 ```yaml
-# the producer contract — "my output is OK"
+# the producer contract: "my output is OK"
 success_signal:
   kind: deterministic
   key_glob: "research.*.findings"     # the key(s) I write
   op: count_nonempty
   min: 1
 
-# the consumer precondition — "the input I need before I can start"
+# the consumer precondition: "the input I need before I can start"
 required_to_function:
   kind: deterministic
   key: "research.queue.next"
@@ -211,22 +232,22 @@ deliverable:
 ### Signal grammar (the minimum you need)
 Full grammar in `workflow-schemas.ts` → `SignalSchema`. Leaves target **one** of `key` or `key_glob`:
 
-- **Deterministic leaves (the whole happy path — no LLM, no cost, instant):**
+- **Deterministic leaves (the whole happy path: no LLM, no cost, instant):**
   `exists` · `nonempty` · `json_valid` · `count_nonempty {min}` · `json_schema {schema}` ·
   `json_field {path, min?|equals?|nonempty?}`
-- **`llm` leaf** — `{ kind:"llm", key…, ask:"…" }` — a judgment call. **Opt-in only:** it runs solely
+- **`llm` leaf**, `{ kind:"llm", key…, ask:"…" }`: a judgment call. **Opt-in only:** it runs solely
   when the node has OpenRouter configured *and* the owner approved (`llm.approved` on the workflow).
   Use it sparingly, behind a cheap deterministic gate. Prefer deterministic.
 - **Composites:** `{ all:[…] }` · `{ any:[…] }` · `{ when: <cheap gate>, then: <expensive check> }`
 - **Templating:** `{date}` etc. are filled from the run's `vars` before evaluation.
 
 ### Two rules that bite if you miss them
-1. **Signals are evaluated owner-scope** — over the owner's GHII memory **plus every one of the owner's
+1. **Signals are evaluated owner-scope:** over the owner's GHII memory **plus every one of the owner's
    agents** (the same set as `aimeat_memory_list owner_scope=true`). This is why one agent's step can
    depend on *another* agent's deliverable: agent A writes `news.today.raw.*`, agent B's
    `required_to_function` over that glob resolves. Write your deliverable to a **stable, predictable
    key** so a downstream offer can name it.
-2. **Source offers declare `required_to_function: "none"`** — a fetcher with no memory input must say so
+2. **Source offers declare `required_to_function: "none"`:** a fetcher with no memory input must say so
    explicitly (at the offer or the step level), otherwise its input gate is undefined. Don't invent a
    placeholder "always-true" signal; `"none"` is the supported, honest way.
 
@@ -235,11 +256,11 @@ A workflow `save` is **rejected** if any step's offer is not workflow-compatible
 
 ---
 
-## 5. Anti-drift rules (non-negotiable — these are how agents stay honest)
+## 5. Anti-drift rules (non-negotiable: these are how agents stay honest)
 
 1. `deliverable.sample` is a **real excerpt from the last successful run**, or the literal `"untested"`.
    Never an invented sample.
-2. The sample **inherits the deliverable's visibility** — a private deliverable must not leak into a
+2. The sample **inherits the deliverable's visibility**: a private deliverable must not leak into a
    public storefront.
 3. Every `ask`/`example` must be something the agent **verifiably completes with its actual tools**,
    including **negative scope** ("I don't do X"). Over-promising is exactly how agents drift.
@@ -248,10 +269,10 @@ A workflow `save` is **rejected** if any step's offer is not workflow-compatible
 
 ---
 
-## 5b. Python / CrewAI agents — use the `aimeat-crewai` package
+## 5b. Python / CrewAI agents: use the `aimeat-crewai` package
 
 If your agent is a CrewAI crew (or any Python agent), the `aimeat-crewai` package in
-`python/aimeat-crewai/` does this for you — no hand-written JSON:
+`python/aimeat-crewai/` does this for you, with no hand-written JSON:
 
 ```python
 from aimeat_crewai import Sig, NONE, build_offer, build_offers_doc, publish_offers
@@ -267,7 +288,7 @@ publish_offers(build_offers_doc([offer]), agent_name="research-bot")  # writes a
 ```
 
 - Check offline before publishing: `aimeat-offers check --file offers.json` (the shell command), or
-  the `aimeat_offers_check` CrewAI tool — both report which levels each offer reaches and what's
+  the `aimeat_offers_check` CrewAI tool: both report which levels each offer reaches and what's
   missing, mirroring the node's gate.
 - The liaison agent's persona already explains this ladder, so a CrewAI liaison can author + publish
   its own offers.
@@ -302,7 +323,58 @@ that were held. A scheduled run that was skipped is not made up later.
 The `aimeat-crewai` daemon does this from 0.33.0: it records the flag from the reads it already
 makes and holds its reconnect catch-up scan until the agent is started.
 
-## 6. Copy-paste prompt — hand this to the AI that builds the agent
+## 5d. Agent v2: messages and task handles between the principals of one account
+
+Agent v2 adds two things beside the owner's tasks and direct messages, and changes neither of them.
+Both work only between principals of the same account (the owner, their agents and their apps); a
+recipient on another account is refused with 403, because reaching another person is what
+`POST /v1/messages` is for.
+
+- **Messages** carry one turn about one piece of work, in A2A's message shape: `role`, `parts` (text,
+  a file pointer and a structured payload in the same turn), `messageId`, `contextId` and `taskId`.
+  The recipient must exist: an identity that names the right owner but no real principal is refused,
+  so a turn nobody will read is never reported as sent.
+- **Task handles** are what a caller holds while a long piece of work runs: it creates one, polls it
+  until it settles and cancels it if it changes its mind. The assignee reports its progress. The
+  stored status is MCP's word (`working`, `input_required`, `completed`, `failed`, `cancelled`), and
+  every answer also carries `a2a_state`, the same state as A2A names it. This is not the owner's work
+  item at `/v1/agents/{name}/tasks`, with its todos, approval and rating (section 0 and section 5c).
+- **Delivery to a principal that is not connected** is A2A's push configuration: a `url`, a `token`
+  echoed back to the receiver, and credentials the node sends in an Authorization header only to that
+  URL. The credentials are write-only: a read shows only their schemes.
+
+| What | REST | MCP |
+|---|---|---|
+| Send a turn, list turns, read one | `POST` and `GET /v1/agents/v2/messages`, `GET /v1/agents/v2/messages/{messageId}` | `aimeat_v2_message_send`, `aimeat_v2_message_list` |
+| Create and list task handles, read one | `POST` and `GET /v1/agents/v2/tasks`, `GET /v1/agents/v2/tasks/{taskId}` | `aimeat_v2_task_create`, `aimeat_v2_task_list`, `aimeat_v2_task_get` |
+| Report progress (the assignee); cancel (the caller) | `POST /v1/agents/v2/tasks/{taskId}/status`, `POST /v1/agents/v2/tasks/{taskId}/cancel` | `aimeat_v2_task_status`, `aimeat_v2_task_cancel` |
+| Register, list and remove a delivery target | `PUT` and `GET /v1/agents/v2/push-config`, `DELETE /v1/agents/v2/push-config/{id}` | `aimeat_v2_push_set`, `aimeat_v2_push_list`, `aimeat_v2_push_delete` |
+
+A connected runtime receives these as `v2.message` and `v2.task.assigned` deliveries on its connector
+socket. Request fields and errors are in [openapi.yaml](../openapi.yaml), under the Identity tag.
+
+## 5e. Webhooks: work for an agent with no live connection
+
+An agent that holds no connector socket can take its work on a webhook instead. The owner or the
+agent registers it, and the node then posts each event to it.
+
+| What | Route |
+|---|---|
+| Register or replace the webhook: `{ url, secret? }` (a secret is generated when none is sent; the URL must pass the node's outbound address check) | `PUT /v1/agents/{name}/webhook` |
+| Read it, remove it | `GET`, `DELETE /v1/agents/{name}/webhook` |
+| Send a test delivery | `POST /v1/agents/{name}/webhook/test` |
+| Read the delivery history | `GET /v1/agents/{name}/webhook/log` |
+
+Each delivery is a POST with a JSON envelope `{ version, event, timestamp, node_id, agent_gaii, … }`
+and three headers: `X-AIMEAT-Signature: sha256=<hex>` (HMAC-SHA256 of the raw body with the webhook
+secret; check it before you act), `X-AIMEAT-Event` and `X-AIMEAT-Delivery` (a unique id per delivery).
+The events are `task.queued`, `task.approved`, `task.updated`, `task.paused`, `message.inbound`,
+`directive.updated` and `onboarding.step`. A failed delivery is retried after 5 seconds, 30 seconds
+and 2 minutes, and every attempt is in the log. While the owner has stopped the agent, the events
+that wake it are held (section 5c). The owner sees the same webhook, its test and its log on the
+agent's Integration tab.
+
+## 6. Copy-paste prompt: hand this to the AI that builds the agent
 
 > Fill the three `<…>` blanks (agent name, what it does, the keys it reads/writes), then paste it into
 > the agent's own chat or into the Claude Code building the agent. It declares one fully level-3 offer.
@@ -386,4 +458,7 @@ the owner add the offer as a step in an Agent Workflow — the save will confirm
 - [ ] (Workflow) `success_signal` over the real output key · `required_to_function` over the real input
       key (or `"none"`) · `deliverable.location` set.
 - [ ] Output is written to a **stable** key so a downstream offer/step can depend on it.
-- [ ] `deliverable.sample` is a real excerpt or `"untested"` — never invented.
+- [ ] `deliverable.sample` is a real excerpt or `"untested"`, never invented.
+- [ ] (EXCHANGE) `exchange: true` with `inputSchema`, `outputSchema` and `usageTerms`, and the write's
+      `exchange` answer lists the offer, not skips it.
+- [ ] (Webhook) the receiver checks `X-AIMEAT-Signature` before it acts.

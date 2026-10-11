@@ -4,10 +4,10 @@
 
 - [ ] Set `AIMEAT_DEV_MODE=false` (never enable in production)
 - [ ] Set `AIMEAT_STORAGE=postgres-kysely` or `AIMEAT_STORAGE=sqlite` (never use `memory` in production)
-- [ ] Set a strong `AIMEAT_ADMIN_PASSWORD` (minimum 8 chars, mixed case + numbers)
+- [ ] Set a strong `AIMEAT_ADMIN_PASSWORD`, or leave it unset and the node generates a random one at start. The node itself checks no strength rule: `aimeat init` asks for at least 8 characters, and anything longer and random is better
 - [ ] Set `AIMEAT_BASE_URL` to your HTTPS URL
 - [ ] Set `AIMEAT_ENCRYPTION_KEY` for stored secrets and the separate `AIMEAT_TOTP_ENCRYPTION_KEY` where required; follow `.env.example` for their formats
-- [ ] Set and verify the public security profile for a public deployment
+- [ ] Set `AIMEAT_SECURITY_PROFILE=public` for a public deployment (otherwise the node infers `local` or `public` from the base URL host and node type), and read the startup self-check's warnings
 - [ ] Confirm app-origin isolation, wildcard DNS and TLS for hosted apps
 - [ ] Set `AIMEAT_KEY_PASSPHRASE` to encrypt node keys at rest
 - [ ] Run `pnpm audit` to check for known vulnerabilities
@@ -30,7 +30,7 @@
 ## Authentication
 
 - [ ] First registered owner automatically gets `operator` role
-- [ ] Private keys are shown only once during registration - store securely
+- [ ] Owners sign in with a password (`POST /v1/ghii/login`), a passkey or a configured identity provider. Registration at `POST /v1/owners` still returns an Ed25519 private key once; signing in with that key (`POST /v1/auth/token` with `owner`) is the legacy owner-key login, deprecated and removed in 4.0.0, and `AIMEAT_OWNER_KEY_LOGIN=false` switches it off now
 - [ ] Enable TOTP for operator accounts
 - [ ] Set `AIMEAT_JWT_TTL` to appropriate value (default: 3600s)
 - [ ] Token revocation persists across restarts (requires sqlite/postgres-kysely)
@@ -47,7 +47,7 @@
 
 - [ ] Global rate limit is configured (`AIMEAT_RL_GLOBAL`, default 300 requests per second before role multipliers)
 - [ ] Critical endpoints have dedicated stricter limits
-- [ ] Monitor `rate_limit_hits_total` metric for abuse detection
+- [ ] Monitor the `aimeat_rate_limit_hits_total` metric (`/v1/metrics`, when metrics are on) for abuse detection
 
 ## Data Protection
 

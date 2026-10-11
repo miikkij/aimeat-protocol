@@ -160,15 +160,18 @@ A JSON crew definition (`crew_def.py` contract) carries skills declaratively:
 - An app-driving crew should additionally fetch `?binding=app:{owner}/{file}` for the app it
   operates and inject those skills for the driving agent.
 
-## aimeat-agency (desktop appliance)
+## Crews on a person's own computer
 
-aimeat-agency runs local crews through the same crewaimeat runtime, so **everything above
-applies unchanged**: its local agents authenticate to the node (connector/daemon token),
-`fetch_agent_skills()` pulls their linked refs, `workspace_skills` opt-in pulls the target
-workspace's packs, and pins behave identically. The appliance needs no skill-specific code —
-the owner curates skills on the node (profile/admin/workspace UIs) and every agency crew
-picks them up on its next build. Offline/unreachable node degrades loudly to repo-local
-skills only (the standard failure boundary).
+A crew that runs on a person's own computer goes through the connector (`aimeat connect serve`)
+and the same crewaimeat runtime, so **everything above applies unchanged**: its agents
+authenticate to the node with the connector's token, `fetch_agent_skills()` pulls their linked
+refs, the `workspace_skills` opt-in pulls the target workspace's packs, and pins behave the same.
+The owner curates skills on the node and every crew picks them up on its next build. An offline
+or unreachable node degrades loudly to repo-local skills only (the standard failure boundary).
+
+The desktop appliance that once ran such crews (aimeat-agency) is gone: the aimeat-desktop app
+removed its local agent runner on 2026-09-29 and now attaches AI tools to an AIMEAT and can run a
+local node (`aimeat-desktop/README.md`).
 
 ## Installing skills into Claude (Code / Desktop / claude.ai)
 
