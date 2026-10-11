@@ -8,6 +8,7 @@
  * @structure dispatchInspector() — the only export; called by engine-steps.ts onStepFail()
  * @usage  imported by engine-steps.ts onStepFail(), best-effort: null when no inspector is installed
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A stopped agent is not chosen as the inspector (agent-stop-rules.ts).
  *   v1.0.0 — 2026-09-08 — Pure extraction from engine-steps.ts, which passed the 800-line cap.
  *     Body verbatim, same single caller. The one difference from engine-ai-step.ts, the sibling
  *     this follows: it names its own deps type instead of importing StepDeps back, because that
@@ -43,6 +44,9 @@ export async function dispatchInspector(deps: InspectorDeps, ownerGhii: string, 
   const inspectorGaii = buildGAII('workflow-inspector', ownerName, deps.config.nodeId);
   const inspector = await deps.storage.getAgent(inspectorGaii);
   if (!inspector) return null;
+  // A stopped inspector inspects nothing, the same answer as no inspector: the task below is born
+  // active, and a stopped agent starts no work (services/agent-stop-rules.ts).
+  if (inspector.stoppedAt) return null;
 
   const rk = runKey(run.workflowId, run.runId);
   const failing = run.steps[stepId];

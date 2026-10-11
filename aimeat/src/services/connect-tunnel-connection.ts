@@ -10,6 +10,7 @@
  * @structure ConnectConnection
  * @usage import type { ConnectConnection } from './connect-tunnel-connection.js';
  * @version-history
+ *   v1.1.0 — 2026-10-11 — `stopped`, for an agent that is stopped.
  *   v1.0.0 — 2026-10-02 — Extracted from connect-tunnel.ts, with the `runModes` field added there.
  */
 import type { WebSocket } from 'ws';
@@ -41,6 +42,12 @@ export interface ConnectConnection {
   installName: string | null;
   /** The run modes the connector presented at upgrade (X-AIMEAT-Run-Modes), or null when it did not say. */
   runModes: string[] | null;
+  /**
+   * Whether the agent behind this identity is stopped (services/agent-stop-rules.ts). Read from its
+   * record when the backlog is sent, at connect and at attach, and written by the stop and start
+   * writes after that, so the synchronous delivery fan-out can hold a wake without a storage read.
+   */
+  stopped?: boolean;
   /** The raw agent JWT verified at upgrade, reused verbatim as the forward bearer. */
   rawToken: string;
   lastHeartbeat: number;

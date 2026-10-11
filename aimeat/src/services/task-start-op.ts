@@ -20,6 +20,7 @@
  *   const out = await startWaitingTask({ storage, config, webhook }, caller, req.auth!.owner, id);
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A start on a stopped agent's task is refused for every caller, 409 AGENT_STOPPED.
  *   v1.0.0 — 2026-10-02 — Extracted from routes/agent-tasks/lifecycle.ts, with the agent caller and
  *     the per-transition wake id added.
  */
@@ -66,6 +67,14 @@ export async function startWaitingTask(
     // lost its tokens. The owner can re-start a stalled task to give the agent another chance.
     if (task.status !== 'queued' && task.status !== 'paused' && task.status !== 'stalled') {
         return { ok: false, status: 409, code: 'INVALID_STATE', message: `Only queued, paused, or stalled tasks can be started (current: ${task.status})` };
+    }
+
+    // A STOPPED AGENT STARTS NOTHING, whoever asks, the owner in person included. The task is not
+    // refused for good: it stays where it is, and starting the agent releases it (services/agent-stop.ts).
+    const runner = await storage.getAgent(task.agentGaii);
+    if (runner?.stoppedAt) {
+        return { ok: false, status: 409, code: 'AGENT_STOPPED',
+            message: `${runner.displayName ?? runner.name} is stopped, so this task waits. Start the agent, and the task starts with it.` };
     }
 
     const delegate = !caller.ownerInPerson && !caller.app;

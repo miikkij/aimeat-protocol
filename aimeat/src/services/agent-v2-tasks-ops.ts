@@ -23,6 +23,8 @@
  * @structure createTask() · listTasks() · getTask() · setTaskStatus() · cancelTask()
  * @usage const out = await createTask(storage, config, req.auth!, req.body);
  * @version-history
+ *   v1.2.0 — 2026-10-11 — createTask() refuses a task for a stopped agent, AGENT_STOPPED: a v2 task
+ *     has no state to wait in (agent-stop-rules.ts).
  *   v1.1.0 — 2026-10-08 — setTaskStatus() stamps the result and closing message of a task that settles
  *     completed or failed, held until the settle wins, and stores the id on the task (migration
  *     0098, aiprov D8). An A2A caller reads the same task.
@@ -42,6 +44,7 @@ import { emitDelivery, emitTaskMoved } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
+import { isStopped } from './agent-stop-rules.js';
 
 /** The tunnel `deliver` kinds for task news. Additive: the wire's `kind` is an open string. */
 export const TASK_ASSIGNED_KIND = 'v2.task.assigned';
@@ -87,6 +90,15 @@ export async function createTask(
   const input = parsed.task;
   const assignee = await resolveRecipient(storage, config.nodeId, auth.owner, input.assignedTo);
   if (!assignee.ok) return assignee;
+  // A v2 task is born `working` and has no state to wait in, so one for a STOPPED agent is refused
+  // and not stored: the caller learns now, where a task nobody picks up would say nothing
+  // (services/agent-stop-rules.ts). A classic agent task (routes/agent-tasks) is held in `queued` instead.
+  if (assignee.value.includes('#') && isStopped(await storage.getAgent(assignee.value))) {
+    return {
+      ok: false, status: 409, code: 'AGENT_STOPPED',
+      message: `${assignee.value.split('#')[0]} is stopped and takes no new work. Start the agent, then send the task again.`,
+    };
+  }
 
   const now = new Date().toISOString();
   const taskId = randomUUID();

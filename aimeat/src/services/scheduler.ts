@@ -7,6 +7,7 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   v2.19.0 — 2026-10-11 — An agent_task run for a stopped agent is skipped, outcome `stopped` (agent-stop-rules.ts).
  *   v2.18.0 — 2026-10-04 — A cron fire is claimed in the database before it runs (scheduler-fire-claim.ts).
  *   v2.17.1 — 2026-10-04 — A declined occurrence no longer blocks the next fire (isTerminalTaskStatus).
  *   v2.17.0 — 2026-10-02 — Both task makers read the start decision (services/agent-task-rules.ts)
@@ -97,6 +98,7 @@ import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
+import { isStopped } from './agent-stop-rules.js';
 import { withWildcardFacts } from './scope-use.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
@@ -411,7 +413,7 @@ export class Scheduler {
     if (run.skipped) {
       logger.info(`Scheduler job skipped: ${job.id} [${trigger}] — ${run.skipReason ?? 'no-op'}`);
       await this.writeLog(job, trigger, 'skipped', { errorMessage: run.skipReason, durationMs, reads: run.reads, writes: run.writes });
-      return { code: 'busy', detail: run.skipReason };
+      return { code: run.skipCode ?? 'busy', detail: run.skipReason };
     }
 
     const cron = this.cronJobs.get(job.id);
@@ -562,6 +564,15 @@ export class Scheduler {
     const tmpl = cfg.taskTemplate;
     if (!tmpl?.title) throw new Error(`agent_task job "${job.id}" missing taskTemplate.title`);
 
+    // A STOPPED AGENT'S RUN IS SKIPPED, NOT QUEUED (Jouni, 2026-10-11). An agent stopped for a week with
+    // an hourly schedule must not find 168 runs waiting when it is started. Before the overlap guard,
+    // so a "Run now" on a stopped agent says the agent is stopped and not that a run is still going.
+    const agent = await this.storage.getAgent(agentGaii);
+    if (isStopped(agent)) {
+      return { reads: [], writes: [], skipped: true, skipCode: 'stopped',
+        skipReason: `${agent?.displayName ?? agentName} is stopped, so this run was skipped. Start the agent, and the next run happens at its time.` };
+    }
+
     // Overlap guard: don't pile up occurrences of the same schedule. A task the
     // owner has set aside — `paused` (manual only) or any `archived` task — never
     // blocks, which fixes the trap where a paused/archived occurrence silently
@@ -584,7 +595,6 @@ export class Scheduler {
       };
     }
 
-    const agent = await this.storage.getAgent(agentGaii);
     // The same start decision every created task gets (services/agent-task-rules.ts): the agent's
     // own answer, never past the permission floor. It read `mode === 'task-runner'` inline until
     // 2026-10-02, a copy of the old rule that would have kept a concierge's schedules waiting.

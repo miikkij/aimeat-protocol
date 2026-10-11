@@ -45,6 +45,8 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.2.0 — 2026-10-11 — `waitsBecause: 'stopped'`, ahead of every other reason: no task of a stopped
+ *     agent starts, and nobody may start one by hand (mayStartWaitingTask). See agent-stop-rules.ts.
  *   v2.1.0 — 2026-10-02 — Rulings B and C: `memory:purge` (deleting shared records for good) is on the
  *     floor, and `*` counts once the agent's usage record is ready (services/scope-use.ts).
  *   v2.0.0 — 2026-10-02 — The start decision leaves `mode`: the agent's `taskStart`, the task's
@@ -94,7 +96,7 @@ export const TASK_START_FLOOR: ReadonlyArray<{ scope: string; kind: TaskEffect }
  * The agent as the start rules read it. `wildcardReady` is filled by services/scope-use.ts
  * withWildcardFacts(): the agent holds `*` and its usage record is old enough to offer a narrowing.
  */
-type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes'>> & { wildcardReady?: boolean };
+type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'stoppedAt'>> & { wildcardReady?: boolean };
 
 /**
  * The floor permissions this agent's record grants BY NAME: the word itself or its domain wildcard
@@ -137,16 +139,19 @@ export interface TaskStartDecision {
     source: 'task' | 'agent' | 'mode';
     startsNow: boolean;
     /**
-     * Why it waits, when it waits. `setting`: the owner asked to confirm. `floor`: the agent can spend,
-     * send or delete as the owner. `effects`: the plan says it will. Only `setting` may be lifted by
-     * another of the owner's agents; the other two wait for the owner in person.
+     * Why it waits, when it waits. `stopped`: the agent itself is stopped (services/agent-stop.ts),
+     * and nothing starts until it is started again; it comes before every other reason, because no
+     * setting and no OK makes a stopped agent work. `setting`: the owner asked to confirm. `floor`:
+     * the agent can spend, send or delete as the owner. `effects`: the plan says it will. Only
+     * `setting` may be lifted by another of the owner's agents; `floor` and `effects` wait for the
+     * owner in person, and `stopped` is lifted by starting the agent, never by starting the task.
      */
-    waitsBecause: null | 'setting' | 'floor' | 'effects';
+    waitsBecause: null | 'stopped' | 'setting' | 'floor' | 'effects';
     floorScopes: string[];
     effects: TaskEffect[];
 }
 
-/** Does this task start now, and if not, why. Precedence: floor, effects, task, agent, mode. */
+/** Does this task start now, and if not, why. Precedence: stopped, floor, effects, task, agent, mode. */
 export function decideTaskStart(
     agent: StartAgent | null | undefined,
     opts: { policy?: TaskStartPolicy | null; todos?: ReadonlyArray<Pick<AgentTaskTodo, 'status'> & { effects?: string[] }> } = {},
@@ -156,7 +161,8 @@ export function decideTaskStart(
     const source = fromTask ? 'task' : (agent?.taskStart === 'automatic' || agent?.taskStart === 'confirm') ? 'agent' : 'mode';
     const floorScopes = floorScopesOf(agent);
     const effects = declaredEffects(opts.todos);
-    const waitsBecause = floorScopes.length > 0 ? 'floor'
+    const waitsBecause = agent?.stoppedAt ? 'stopped'
+        : floorScopes.length > 0 ? 'floor'
         : effects.length > 0 ? 'effects'
         : policy === 'confirm' ? 'setting'
         : null;
@@ -198,6 +204,8 @@ export function mayLoosenStart(caller: StartCaller, targetGaii: string): boolean
  * or a declared effect holds; those wait for the owner in person.
  */
 export function mayStartWaitingTask(caller: StartCaller, targetGaii: string, decision: Pick<TaskStartDecision, 'waitsBecause'>): boolean {
+    // Nobody starts a task of a stopped agent: the agent is started, and its waiting tasks follow.
+    if (decision.waitsBecause === 'stopped') return false;
     if (caller.ownerInPerson || caller.app) return true;
     if (caller.principal === targetGaii || !scopeIsCovered(caller.scopes, 'task:write')) return false;
     return !isHeldForOwner(decision);

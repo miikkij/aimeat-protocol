@@ -24,6 +24,7 @@
  * @structure sendAgentV2Message() · deliverToPushTargets() · MESSAGE_DELIVERY_KIND
  * @usage const msg = await sendAgentV2Message(storage, { owner, from, to, role, parts, ... });
  * @version-history
+ *   v1.1.0 — 2026-10-11 — A stopped recipient's push targets are not called; the turn is stored (agent-stop-rules.ts).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  */
 import { randomUUID } from 'node:crypto';
@@ -33,6 +34,7 @@ import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { emitDelivery } from './event-bus.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
+import { isStopped } from './agent-stop-rules.js';
 
 /**
  * The tunnel `deliver` kind for a v2 turn. The frame's `kind` is an open string on the wire and the
@@ -133,6 +135,9 @@ function envelope(message: AgentV2MessageRecord, token?: string | null): Record<
 export async function deliverToPushTargets(storage: Storage, message: AgentV2MessageRecord): Promise<void> {
   let targets: AgentV2PushConfigRecord[];
   try {
+    // The turn is stored either way. A stopped agent is not woken for it over its push targets,
+    // as it is not over the tunnel (services/agent-stop-rules.ts); it reads it after a start.
+    if (message.to.includes('#') && isStopped(await storage.getAgent(message.to))) return;
     targets = await storage.listAgentV2PushConfigs(message.owner, message.to);
   } catch (err) {
     logger.warn('v2 message: could not read the recipient push targets', { messageId: message.messageId, error: String(err) });

@@ -26,6 +26,16 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.33.0 -- 2026-10-11 -- The owner can stop an agent, and the daemon knows (daemon.py has the
+    detail). The node holds a stopped agent's new work: its own task list and inbox carry no
+    waiting task and no message and say `agent_stopped: true`, and nothing that would wake it is
+    pushed. The daemon records the flag, prints the change once, and holds the catch-up scan a
+    records-driven agent runs on every tunnel reconnect until the agent is started. Work already
+    running finishes. Works unchanged against a node without the stopped state: the flag is never
+    sent, so nothing is held.
+    Fixed: an agent that listens for messages no longer gets each of its tasks dispatched once as
+    an "(empty)" inbox message. `_poll_messages` read an empty `pending_messages` as missing and
+    fell back to the unified `items` list, which carries tasks.
   0.32.1 -- 2026-10-04 -- An optional field the model left out is no longer sent as null inside a
     list item. CrewAI's MCP tool adapter gives every optional field the default None, nested ones
     included, and the top-level None strip did not reach them, so the node refused a todo with
@@ -216,7 +226,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.32.1"
+__version__ = "0.33.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

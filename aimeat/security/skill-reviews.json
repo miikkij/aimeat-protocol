@@ -244,7 +244,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:b519edb73aec1b28eed44d45"
+      "digest": "sha256:0601fbeaec0ea1b84c66752c"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-05",
@@ -315,14 +315,14 @@
       "digest": "sha256:cec4c74bb67ae7d2b7990016"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-11",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:258501641b532df168169e17"
+      "digest": "sha256:d981e8c3d2124722665e425d"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -504,7 +504,7 @@
       "aimeat/src/mcp/core-admin.ts": "fd3a6da1b1490f40"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "2553620cd34667a9",
+      "aimeat/src/mcp/core.ts": "6b7ec8e58e6c2156",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "7fb43be4e737c2dc"
     },
     "node:manage-my-profile-data": {
@@ -535,7 +535,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "cfb4eb65eeb0d772",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
-      "aimeat/src/services/scheduler.ts": "3fb3a96d2a3bf98a",
+      "aimeat/src/services/scheduler.ts": "a21ee931b11fae98",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
     "node:aimeat-game-apps": {

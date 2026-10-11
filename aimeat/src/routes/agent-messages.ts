@@ -10,6 +10,7 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.8.0 -- 2026-10-11 -- A stopped agent's own GET .../messages/inbox answers no message and `agent_stopped`.
  *   v1.7.0 -- 2026-10-08 -- POST /v1/agents/:name/messages takes ai_provenance and ai_provenance_id,
  *     as aimeat_message_send does, with the session's scopes: 400 INVALID_PROVENANCE for a malformed
  *     block, 403 SCOPE_DENIED for a declaration the caller may not make, and the stored message
@@ -54,6 +55,7 @@ import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
 import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { sendAgentMessage } from '../services/agent-message-send.js';
+import { agentIsStopped } from '../services/agent-stop.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
@@ -170,6 +172,13 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     }
 
     const agentGaii = resolveAgentGaii(req, agentName);
+    // A stopped agent reading its OWN pending messages gets none, and is told why: they wait until
+    // it is started (services/agent-stop-rules.ts). The owner's read of the same list, and a
+    // sibling agent's, are unchanged.
+    if (resolveIdentity(req.auth!, config.nodeId) === agentGaii && await agentIsStopped(storage, agentGaii)) {
+      res.json(success(config.nodeId, { messages: [], agent_stopped: true }));
+      return;
+    }
     const messages = await storage.listPendingMessages(agentGaii);
 
     res.json(success(config.nodeId, { messages: await withProvenance(messages) }));

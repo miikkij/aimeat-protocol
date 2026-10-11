@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-10-11 — `stopped`, `stopped_at` and `stopped_by` on the agent list.
  *   v1.15.0 — 2026-10-11 — `install_id` on the agent list: the connector that holds the agent, or
  *     the one it waits for. A fleet runtime read the agent list and the connector list every 30 s
  *     to learn which agents were its own.
@@ -78,6 +79,7 @@ import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
 import { portRedirectFor } from '../../services/agent-port-redirect.js';
 import { agentInstalls } from '../../services/connector-registry.js';
+import { stoppedView } from '../../services/agent-stop-rules.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -303,6 +305,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // Whether its tasks start on their own: the owner's setting, what applies, and the permissions
         // that make every task wait whatever the setting (services/agent-task-start-write.ts).
         ...taskStartView(a, useOf(a)),
+        // Whether the owner stopped it, when and who did (services/agent-stop-rules.ts). A stopped
+        // agent starts no new work until it is started again; a runtime reads its roster here.
+        ...stoppedView(a),
         // What code backs it, as the runtime last said. The only answer this node has to "what was
         // running when this ran" for a crew whose definition lives on someone else's disk.
         runtime_source: a.runtimeSource ?? null,

@@ -10,6 +10,7 @@
  *   visible from the file doing it.
  * @usage pnpm test -- agent-health
  * @version-history
+ *   v1.2.0 — 2026-10-11 — A stopped agent is not a problem for being quiet, and a stop hides no real fault.
  *   v1.1.0 — 2026-09-06 — The held-connection cases: a spawn agent parked between jobs is available,
  *     and the same agent with nothing holding it open is still the problem it was.
  *   v1.0.0 — 2026-08-09 — Initial, with V1.
@@ -307,6 +308,25 @@ describe('a home is not ready on the strength of a record (V3)', () => {
 
     it('a system agent does not make a home ready either — it is node machinery, not the fleet', () => {
         expect(isLiveState('system')).toBe(false);
+    });
+
+    it('a stopped agent is not a problem for being quiet: stale and never-seen read as idle', () => {
+        const stoppedAt = ago(48 * HOUR);
+        expect(computeAgentHealth(agent({ lastSeen: ago(40 * HOUR) }), done, NOW).state).toBe('problem');
+        const stale = computeAgentHealth(agent({ lastSeen: ago(40 * HOUR), stoppedAt }), done, NOW);
+        expect(stale).toMatchObject({ state: 'idle', reasons: [] });
+        expect(computeAgentHealth(agent({ lastSeen: undefined, stoppedAt }), done, NOW).state).toBe('idle');
+        expect(isLiveState(stale.state)).toBe(true);
+    });
+
+    it('stopping an agent does not hide a failing webhook or a failed onboarding', () => {
+        const stoppedAt = ago(HOUR);
+        const hook = computeAgentHealth(agent({
+            stoppedAt, webhookUrl: 'https://x.example/hook', webhookEnabled: true, webhookFailCount: AGENT_WEBHOOK_DOWN_THRESHOLD,
+        }), done, NOW);
+        expect(hook).toMatchObject({ state: 'problem', reasons: ['webhook-down'] });
+        const failed = computeAgentHealth(agent({ stoppedAt }), { ...done, status: 'failed' }, NOW);
+        expect(failed.reasons).toContain('onboarding-failed');
     });
 
     it('an account whose only agent is dead has no live agent', () => {

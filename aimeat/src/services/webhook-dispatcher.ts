@@ -58,6 +58,8 @@
  *   See: docs/superpowers/specs/2026-05-23-agent-integration-architecture-design.md, Appendix A
  *
  * @version-history
+ *   v1.3.0 -- 2026-10-11 -- A stopped agent gets no task.queued, task.approved or message.inbound
+ *     (./agent-stop-rules.ts); events about work in flight still go out.
  *   v1.2.0 -- 2026-09-06 -- Review item 4.2: dispatchWebhookEvent never rejects, and the delivery
  *     chain's own bookkeeping has a terminal catch. Fifteen call sites, one of which awaits.
  *   v1.0.0 -- 2026-05-23 -- Initial creation with retry, HMAC signing, auto-disable
@@ -69,6 +71,7 @@ import type { AimeatConfig } from '../config.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { type WebhookEventType, buildWebhookEnvelope } from '../models/webhook-schemas.js';
+import { isStopped, isWakeWebhookEvent } from './agent-stop-rules.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -142,6 +145,13 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
       logger.warn('Webhook dispatch: agent not found', { agentGaii, event });
+      return;
+    }
+
+    // A stopped agent is not woken for new work over its webhook either (services/agent-stop-rules.ts).
+    // Events about work it is already doing still go out.
+    if (isStopped(agent) && isWakeWebhookEvent(event)) {
+      logger.debug('Webhook dispatch: skipped (the agent is stopped)', { agentGaii, event });
       return;
     }
 

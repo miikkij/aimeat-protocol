@@ -9,6 +9,7 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start (services/agent-stop.ts).
  *   2026-10-08 — aimeat_task_complete hands the session's scopes to completeTask(), so a declaration
  *     needs provenance:write in the session as well as on the grant (aiprov D5).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -89,6 +90,8 @@ import { startAnswer } from '../services/task-start-notice.js';
 import { startWaitingTask } from '../services/task-start-op.js';
 import { setAgentTaskStart, taskStartView } from '../services/agent-task-start-write.js';
 import { narrowAgent } from '../services/scope-narrowing.js';
+import { setAgentStopped } from '../services/agent-stop.js';
+import { stoppedView } from '../services/agent-stop-rules.js';
 import { toolError } from './tool-error.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -415,6 +418,26 @@ export function registerAgentTaskTools(
             return { content: [{ type: 'text' as const, text: JSON.stringify({ name: out.agent.name, ...taskStartView(out.agent) }, null, 2) }] };
         },
     );
+
+    // ── Tools 3b-2 and 3b-3: aimeat_agent_stop, aimeat_agent_start ──
+    // The owner's AI stopping an agent on the person's word, and starting it again. Same
+    // implementation as POST /v1/agents/:name/stop and /start (services/agent-stop.ts); never the
+    // calling agent's own state.
+    for (const [tool, stop] of [['aimeat_agent_stop', true], ['aimeat_agent_start', false]] as const) {
+        mcp.tool(
+            tool,
+            descriptionFor(tool),
+            zodShapeFor(tool),
+            annotationsFor(tool),
+            async ({ target_agent_name }) => {
+                const out = await setAgentStopped({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, stop);
+                if (!out.ok) return { ...toolError(out.code, out.message) };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({
+                    name: out.agent.name, ...stoppedView(out.agent), changed: out.changed, released: out.released,
+                }, null, 2) }] };
+            },
+        );
+    }
 
     // ── Tool 3c: aimeat_agent_scope_narrow ──
     // The owner's AI accepting, on the person's word, the narrowing of a `*` agent to the permissions

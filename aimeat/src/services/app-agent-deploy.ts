@@ -22,6 +22,7 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.3.1 — 2026-10-11 — A task for a stopped runner is not activated on deploy; it waits (agent-stop-rules.ts).
  *   v1.3.0 — 2026-10-02 — The `proposed` answer names the proposal's `scopes` and `scopes_left_out`.
  *   v1.2.0 — 2026-10-01 — A deploy that names no runner, from a caller who has no crew-forge, becomes
  *     an agent proposal the owner approves (kind `proposed`), when the caller passed its principal.
@@ -111,7 +112,9 @@ export async function createAppAgentTask(
   // Task-runner mode = the owner pre-authorized this agent's daemon to start work without
   // per-task gating, so the deploy is one click end-to-end. Other modes keep the standard
   // queued → owner-start gate.
-  const autoActivated = runner.mode === 'task-runner';
+  // A stopped runner starts nothing: the task waits in the queue and starts with the agent
+  // (services/agent-stop.ts releaseWaitingTasks).
+  const autoActivated = runner.mode === 'task-runner' && !runner.stoppedAt;
 
   const task: AgentTaskRecord = {
     id: randomUUID(),

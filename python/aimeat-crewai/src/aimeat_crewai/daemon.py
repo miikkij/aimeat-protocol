@@ -14,6 +14,17 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.33.0 -- 2026-10-11 -- The owner can stop an agent (a node built after 2026-10-11), and the daemon knows. The
+    node does the holding: a stopped agent's own task list and inbox carry no waiting task and no
+    message and say `agent_stopped: true`, and nothing that would wake it is pushed. The daemon
+    records that flag (`_note_stopped`), prints the change once, and holds the one thing the node
+    cannot see: the catch-up scan a records-driven agent runs on every tunnel reconnect, which a
+    node restart triggers for all of them. The scan runs on the first cycle after the agent is
+    started. A daemon that lists neither tasks nor messages reads the flag with one inbox read
+    (`_refresh_stopped`). Work already running finishes, as before.
+    ALSO FIXED: `_poll_messages` read an EMPTY `pending_messages` as missing and fell back to the
+    unified `items` list, which carries tasks. An agent listening for messages therefore got each
+    of its waiting or running tasks dispatched once as an "(empty)" inbox message.
   0.31.0 -- 2026-09-30 -- A run the node refused is not reported as a success. After each task
     kickoff the daemon asks the node which of this agent's calls it refused for a missing permission
     since the run started (GET /v1/agents/{name}/refusals?since=...). The run starts before the crew
@@ -375,6 +386,9 @@ class _Api:
         # Permission refusals this credential has collected, newest wins: {call label: error code}.
         # Kept rather than counted -- a refusal is a standing fact, not an event rate.
         self.refusals: dict[str, str] = {}
+        # Whether the owner has stopped this agent, as the node last said in a task list or an inbox
+        # read (`agent_stopped`). None until the node has been asked once.
+        self.agent_stopped: bool | None = None
 
     def refused(self, r: Any, call: str) -> bool:
         """True when the node refused `call` because this credential may not make it.
@@ -625,6 +639,39 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     return token, node_url
 
 
+def _note_stopped(api: _Api, data: Any) -> None:
+    """Record what the node just said about whether the owner has stopped this agent.
+
+    A stopped agent starts no new work (POST /v1/agents/{name}/stop): the node hands it no waiting task and no
+    message, pushes nothing that would wake it, and marks its own task list and inbox with
+    `agent_stopped: true`. Work it is already doing finishes. The node does the holding; this
+    records the state so the loop can hold the one thing the node cannot see, the catch-up scan a
+    reconnect triggers, and so the log says why an idle agent is idle. Printed when it changes.
+    """
+    stopped = isinstance(data, dict) and data.get("agent_stopped") is True
+    if stopped != bool(getattr(api, "agent_stopped", None)):
+        print(
+            f"[daemon:{api.agent_name}] the owner stopped this agent: no new work starts until it is started again"
+            if stopped else
+            f"[daemon:{api.agent_name}] the owner started this agent again"
+        )
+    api.agent_stopped = stopped
+
+
+def _refresh_stopped(api: _Api) -> None:
+    """Ask the node whether this agent is stopped, for a daemon that lists neither tasks nor
+    messages (a records- or DM-driven one) and so never sees the flag on a read of its own. One
+    inbox read; a failed read leaves the last known state as it is."""
+    try:
+        r = api.get(f"/v1/agents/{api.agent_name}/inbox", params={"limit": 1})
+        if r.status_code != 200:
+            api.refused(r, "inbox")
+            return
+        _note_stopped(api, r.json().get("data", {}))
+    except Exception:  # noqa: BLE001, S110 -- the node did not answer; the last known state stands until the next read
+        pass
+
+
 def _poll_tasks(api: _Api, status: str = "queued") -> list[dict[str, Any]]:
     """Return list of tasks for the agent in the given status, or [] on error.
 
@@ -637,6 +684,7 @@ def _poll_tasks(api: _Api, status: str = "queued") -> list[dict[str, Any]]:
             api.refused(r, f"tasks (status={status})")
             return []
         body = r.json()
+        _note_stopped(api, body.get("data", {}))
         return body.get("data", {}).get("tasks", []) or []
     except Exception:  # noqa: BLE001 -- the node did not answer; an empty task list is the honest reading
         return []
@@ -876,9 +924,14 @@ def _poll_messages(api: _Api) -> list[dict[str, Any]]:
             api.refused(r, "inbox")
             return []
         data = r.json().get("data", {})
-        # The node returns inbox items under `pending_messages` (and a unified
-        # `items`); there is no `messages` key. Fall back to `items` for safety.
-        stubs = data.get("pending_messages") or data.get("items") or []
+        _note_stopped(api, data)
+        # The node returns inbox messages under `pending_messages`. `items` is the unified list,
+        # tasks included, so it stands in ONLY when the answer has no `pending_messages` key at
+        # all. Until 0.33.0 an EMPTY `pending_messages` fell through to `items` as well, and every
+        # waiting or running task of an agent that listens for messages was dispatched once as an
+        # "(empty)" inbox message: one crew kickoff per task for nothing.
+        stubs = data["pending_messages"] if "pending_messages" in data else data.get("items")
+        stubs = stubs or []
         out: list[dict[str, Any]] = []
         for s in stubs:
             msg_id = s.get("id")
@@ -2112,8 +2165,17 @@ def run_crew_daemon(
                     # Catch-up on (re)connect: a change in the tunnel connect count (or the very first
                     # cycle, last_reconnects = -1) fires one synthetic catch-up event per subscribed
                     # space so the handler re-scans for writes missed while the socket was down.
+                    #
+                    # A STOPPED AGENT'S CATCH-UP WAITS. The scan is this daemon's own decision, so
+                    # the node cannot hold it the way it holds pushes, and a node restart reconnects
+                    # every tunnel: without this, each deploy would run one scan per stopped agent.
+                    # `last_reconnects` is left as it is, so the scan runs on the first cycle after
+                    # the owner starts the agent. The state is read at the moment it decides
+                    # something, and again on each poll cycle while the agent is stopped.
                     cur_reconnects = int(agent_status.get("reconnects", 0))
-                    if cur_reconnects != last_reconnects:
+                    if cur_reconnects != last_reconnects and (should_poll or not api.agent_stopped):
+                        _refresh_stopped(api)
+                    if cur_reconnects != last_reconnects and not api.agent_stopped:
                         last_reconnects = cur_reconnects
                         for sp in record_space_list:
                             if stop["flag"]:

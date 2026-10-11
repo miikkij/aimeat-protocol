@@ -42,6 +42,8 @@
  *   const r = await createTask({ storage, config, webhook }, { agent, agentGaii, agentName, creator, body, actor });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-11 — A task that waits because its agent is stopped sends no "waiting for your OK" notice:
+ *     the owner stopped the agent, and there is nothing to approve (agent-stop-rules.ts).
  *   2026-10-02 — The start decision (services/agent-task-rules.ts): createTask stamps `startPolicy`,
  *     takes `start` from a caller allowed to ask for it, and answers with the decision; a plan's
  *     declared `effects` can hold a task back for the owner, who is notified when a plan waits
@@ -498,8 +500,10 @@ export async function applyProposedPlan(
     }
     // The plan is in and the task waits: the one moment the owner is owed a word, whether or not
     // they ever opened the Tasks view.
-    // An owner who wrote the plan themselves is not told about it.
-    if (waits && updated && actor !== task.ownerGaii) void notifyTaskWaiting(storage, updated, decision);
+    // An owner who wrote the plan themselves is not told about it. Neither is the owner of a stopped
+    // agent: the notice offers a Start button for the task, and a stopped agent's task does not
+    // start until the agent does, so the button would answer AGENT_STOPPED.
+    if (waits && updated && actor !== task.ownerGaii && decision?.waitsBecause !== 'stopped') void notifyTaskWaiting(storage, updated, decision);
 
     deps.webhook?.dispatchWebhookEvent(task.agentGaii, 'task.updated', {
         task_id: task.id,

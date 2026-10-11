@@ -24,6 +24,7 @@
  * @structure HomeWorker · HomeAgentsView · readHomeAgents(deps, owner, limit, only?)
  * @usage const view = await readHomeAgents({ config, storage }, owner, 5);
  * @version-history
+ *   v1.2.0 — 2026-10-11 — `stopped` and `stopped_at` on a worker.
  *   v1.1.0 — 2026-10-10 — `hears_messages` on a worker, for the agent page's conversation.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
@@ -54,6 +55,9 @@ export interface HomeWorker {
   connector: { id: string; name: string | null; online: boolean } | null;
   /** False while it has no key yet: approved, and waiting for a machine to take it. */
   has_key: boolean;
+  /** True while the owner has stopped it: it starts no new work, and what it is given waits. */
+  stopped: boolean;
+  stopped_at: string | null;
   queued: number;
   active: number;
   /** When one of its tasks last changed, and when one last failed. */
@@ -143,6 +147,8 @@ export async function readHomeAgents(
       schedule: job ? { id: job.id, cron: job.cron, timezone: job.timezone || zone, next_run_at: job.nextRunAt ?? null } : null,
       connector: connectorOf(a.name),
       has_key: !waits(a),
+      stopped: !!a.stoppedAt,
+      stopped_at: a.stoppedAt ?? null,
       queued: c?.queued ?? 0,
       active: c?.active ?? 0,
       last_at: c?.lastTaskUpdateAt ?? null,

@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-11 -- e2e-agent-stop.ts joins the list (not the guard tier): the owner stops an agent
+ *     and starts it again.
  *   2026-10-10 -- e2e-agent-connectors.ts joins the list (not the guard tier): connectors as named,
  *     remembered machines, and an agent ordered to one.
  *   2026-10-09 -- e2e-secret-canary-sweep.ts joins the list (not the guard tier): every contract GET
@@ -968,6 +970,9 @@ const ALL_SUITES = [
     // A task starts on its own or waits for the owner's OK: the agent's setting and the task's word,
     // the notice with a Start button, the owner's own AI starting on their word, and the floor.
     'test/e2e-task-start.ts',
+    // The owner stops an agent and starts it again: new work waits and nobody can start it, a
+    // scheduled run is skipped, the runtime is not woken, and a start releases what waited.
+    'test/e2e-agent-stop.ts',
     'test/e2e-connect-tunnel-records.ts',
     'test/e2e-agent-crew.ts',
     'test/e2e-connect-serve-loopback.ts',

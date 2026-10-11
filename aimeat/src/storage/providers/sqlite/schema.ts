@@ -12,6 +12,9 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-11 — agents.stoppedAt and agents.stoppedBy: an agent can be stopped (migration 0101 says
+ *     why). The agents table's column block from the push layer to the v2 identity moves to
+ *     schema-columns-agents.ts unchanged (max-file-lines).
  *   2026-10-10 — federation_peers.deliveryProofAt and genesis_peers.deliveryProofAt (migration 0100).
  *   2026-10-09 — The extension_instances and secrets column block moves to schema-columns-extensions.ts
  *     unchanged (max-file-lines), and gains secrets.hostBinding (migration 0099).
@@ -80,6 +83,7 @@ import { splitPushSubscriptionsPerDevice, relaxPushLastUsedAt, relaxInvitationsO
 import { moveActionsAndWorkToFullIdentity } from './schema-identity-backfill.js';
 import { applySchedulerColumns } from './schema-columns-scheduler.js';
 import { applyExtensionColumns } from './schema-columns-extensions.js';
+import { applyAgentRuntimeColumns } from './schema-columns-agents.js';
 
 export function initializeSchema(db: Database.Database): void {
   // CREATE TABLE/INDEX DDL, applied in numeric order (same order as the original single
@@ -227,6 +231,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agent_tasks', 'createdBy', 'TEXT');
   safeAddColumn('agent_tasks', 'startPolicy', 'TEXT');
   safeAddColumn('agents', 'taskStart', 'TEXT');
+  // An agent can be stopped and started again (migration 0101 says why).
+  safeAddColumn('agents', 'stoppedAt', 'TEXT');
+  safeAddColumn('agents', 'stoppedBy', 'TEXT');
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_agent_tasks_live_dedupe ON agent_tasks(agentGaii, dedupeKey)
            WHERE dedupeKey IS NOT NULL AND status IN ('draft','queued','revision_requested','active','paused')`);
 
@@ -432,56 +439,8 @@ export function initializeSchema(db: Database.Database): void {
   // Agent Scheduler columns, and the claimed cron fire (schema-columns-scheduler.ts).
   applySchedulerColumns(safeAddColumn);
 
-  // Push Layer Phase A — webhook delivery fields
-  safeAddColumn('agents', 'webhookUrl', 'TEXT');
-  safeAddColumn('agents', 'webhookSecret', 'TEXT');
-  safeAddColumn('agents', 'webhookEnabled', 'INTEGER NOT NULL DEFAULT 0');
-  safeAddColumn('agents', 'webhookLastSuccess', 'TEXT');
-  safeAddColumn('agents', 'webhookLastFailure', 'TEXT');
-  safeAddColumn('agents', 'webhookFailCount', 'INTEGER NOT NULL DEFAULT 0');
-  safeAddColumn('agents', 'platform', 'TEXT');
-  safeAddColumn('agents', 'platformVersion', 'TEXT');
-  safeAddColumn('agents', 'platformDetectedBy', 'TEXT');
-  safeAddColumn('agents', 'model', 'TEXT');
-  safeAddColumn('agents', 'modelDetectedBy', 'TEXT');
-  safeAddColumn('agents', 'tags', 'TEXT');
-
-  // Agent operational mode (autonomous | interactive | task-runner | coordinator | workstation)
-  // Default 'interactive' = backward-compatible: all existing agents went through
-  // the full 13-step Hello Integration which matches interactive semantics.
-  safeAddColumn('agents', 'mode', "TEXT DEFAULT 'interactive'");
-
-  // Max concurrent tasks the agent's runner may process. Default 1 = serial
-  // (backward-compatible). >1 requires a concurrency-capable engine (read by the
-  // runner; not enforced server-side).
-  safeAddColumn('agents', 'maxConcurrentTasks', 'INTEGER NOT NULL DEFAULT 1');
-
-  // Where the agent's HOST manages it (a cockpit settings page). Reported by the owner or a
-  // same-owner sibling; the node stores and links it and never fetches it.
-  safeAddColumn('agents', 'consoleUrl', 'TEXT');
-
-  // Who authorized this agent's registration: the owner's name, or the approving sibling's GAII.
-  // The creation ledger, and the fence on agent-initiated deletion. See migration 0035.
-  safeAddColumn('agents', 'registeredBy', 'TEXT');
-
-  // ── Agent v2 identity (migration 0058) ──
-  // How the agent is meant to be run: 'spawn' (data here until work arrives) or 'resident'. Stored
-  // and shown, never enforced — the runtime is the only party that can honour it, same rule as
-  // maxConcurrentTasks. NULL = nobody has said, which is not the same as 'spawn'.
-  safeAddColumn('agents', 'runMode', 'TEXT');
-  // What code backs the agent, as its runtime reports it. JSON in a TEXT column, like every
-  // other structured field here: it is read whole and never queried into.
-  safeAddColumn('agents', 'runtimeSource', 'TEXT');
-  // 1 (or NULL) = device-authorization agent with a long-lived JWT; 2 = brings its own Ed25519 key,
-  // pinned at enrolment, and exchanges a signed assertion for a short-lived token per use.
-  safeAddColumn('agents', 'identityVersion', 'INTEGER');
-  // The agent's own JWS-signed card, verifiable against the published JWKS without asking this node.
-  safeAddColumn('agents', 'cardJws', 'TEXT');
-  safeAddColumn('agents', 'cardIssuedAt', 'TEXT');
-  safeAddColumn('agents', 'enrolledAt', 'TEXT');
-  // Which AI tool the agent last spoke from over MCP, and when (migration 0063 on Postgres).
-  safeAddColumn('agents', 'mcpClient', 'TEXT');
-  safeAddColumn('agents', 'mcpLastSeen', 'TEXT');
+  // The agents table's columns from the push layer to the v2 identity (schema-columns-agents.ts).
+  applyAgentRuntimeColumns(safeAddColumn);
 
   // device_auth.mode -- mode the CLI passed to /v1/agents/device-authorize.
   // verify-route reads this when the owner approves, and propagates it to

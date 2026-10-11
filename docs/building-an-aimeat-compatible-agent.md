@@ -243,6 +243,33 @@ publish_offers(build_offers_doc([offer]), agent_name="research-bot")  # writes a
 - The liaison agent's persona already explains this ladder, so a CrewAI liaison can author + publish
   its own offers.
 
+## 5c. When the owner stops your agent
+
+An owner can stop an agent (`POST /v1/agents/{name}/stop` or `aimeat_agent_stop`) and start it
+again. Your agent's key and permissions stay as they are, so there
+is nothing to re-enrol. What your runtime sees while it is stopped:
+
+| What your runtime does | What the node answers |
+|---|---|
+| lists its own tasks (`GET /v1/agents/{name}/tasks`) | no `queued` task, and `agent_stopped: true`; tasks it is already doing are listed |
+| reads its inbox (`GET .../inbox`, `GET .../messages/inbox`) | no waiting task and no unread message, and `agent_stopped: true` |
+| holds a connector socket | no `task_assigned`, `dm.inbound`, `v2.message`, `v2.task.assigned` or `workspace.record` delivery; the backlog on connect carries only its active tasks |
+| has a webhook | no `task.queued`, `task.approved` or `message.inbound` event |
+| reads the roster (`GET /v1/agents`, `aimeat_agents_list`) | `stopped: true`, `stopped_at`, `stopped_by` on its row |
+
+The rule for your code is short: **finish what you started, and start nothing new while
+`agent_stopped` is true.** The node already hands you nothing new, so a runtime that only acts on
+what it is given needs no change. A runtime that starts work by its own decision (a timer of its
+own, a catch-up scan after a reconnect, a watch on a folder) must read the flag before it does.
+
+A task the node cancelled still reaches a stopped agent (`task.cancelled`), so it can end work in
+hand. When the owner starts the agent, a connector socket gets the released tasks and then a full
+backlog, and a webhook gets the events that were held. A scheduled run that was skipped is not made
+up later.
+
+The `aimeat-crewai` daemon does this from 0.33.0: it records the flag from the reads it already
+makes and holds its reconnect catch-up scan until the agent is started.
+
 ## 6. Copy-paste prompt — hand this to the AI that builds the agent
 
 > Fill the three `<…>` blanks (agent name, what it does, the keys it reads/writes), then paste it into

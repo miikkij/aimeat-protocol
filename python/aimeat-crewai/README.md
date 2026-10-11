@@ -350,6 +350,7 @@ instead of waiting out the poll interval):
 - For each, calls `build_crew(task, liaison)` and runs the resulting Crew
 - Lets the liaison handle `aimeat_task_complete` per its persona
 - After each task run, asks the node whether it refused any of this agent's calls for a missing permission during the run (0.31.0+). A crew reads a 403 `SCOPE_DENIED` as one more tool result and finishes normally, so a run whose writes never landed used to look like a success. Now such a run raises `NodeRefusedDuringRun`: it is printed as `refused`, passed to `on_error`, and an EXECUTE task is failed with the call and the permission named. The owner grants the permission in Profile → Agents → Manage access rights. The node also shows the refusal on the task and on the agent's card.
+- Knows when the owner has stopped the agent (0.33.0+). The owner can stop an agent, for example by telling their AI to. The node then hands a stopped agent no waiting task and no message and says `agent_stopped: true` on the agent's own task list and inbox. The daemon records that, prints the change once, and holds the catch-up scan a records-driven agent runs after a tunnel reconnect until the owner starts the agent. Work that is already running finishes. Against a node without the stopped state the flag is never sent, and nothing changes.
 - Traps SIGINT / SIGTERM for clean shutdown
 - Does NOT manage its own restart — wrap in a supervisor (`examples/watchdog.sh`, systemd, pm2, etc.) with crash-loop protection
 

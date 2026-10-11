@@ -25,6 +25,7 @@
  *   const out = await crewPublish({ storage, config }, caller, 'json-demo', doc);
  *   if (!out.ok) return renderRefusal(out);
  * @version-history
+ *   v1.2.0 — 2026-10-11 — A trial on a stopped agent is refused, AGENT_STOPPED (agent-stop-rules.ts).
  *   v1.1.0 — 2026-10-11 — Publish, restore and seed answer with `warnings` for the definition
  *     (crew-def-warnings.ts).
  *   v1.0.0 — 2026-08-28 — Extracted from routes/agent-crew.ts so the MCP tools call the same code.
@@ -40,6 +41,7 @@ import {
 } from './crew-def-store.js';
 import { logger } from '../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
+import { isStopped } from './agent-stop-rules.js';
 
 export interface CrewDeps { storage: Storage; config: AimeatConfig }
 
@@ -223,6 +225,10 @@ export async function crewTryStart(deps: CrewDeps, caller: CrewCaller, identifie
   const target = await resolveCrewAgent(deps, caller, identifier);
   if (!target.ok) return target;
   const { agent } = target;
+  // A trial is work: it runs the crew and spends on a model. A stopped agent starts none.
+  if (isStopped(agent)) {
+    return { ok: false, status: 409, code: 'AGENT_STOPPED', message: `${agent.displayName ?? agent.name} is stopped, so it does not run a trial. Start the agent, then try again.` };
+  }
   const mgr = getActiveConnectTunnelManager();
   if (!mgr || !mgr.isConnected(agent.gaii)) {
     return { ok: false, status: 409, code: 'AGENT_OFFLINE', message: `${agent.name} is not connected right now, so it cannot run a trial. Start its runtime (aimeat connect serve) and try again.` };
