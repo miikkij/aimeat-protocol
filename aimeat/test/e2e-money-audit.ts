@@ -13,6 +13,12 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   v1.3.1 — 2026-10-12 — The tool manifests carry their morsel amounts as tollMorsels instead of
+ *     price.morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED on POST /v1/memory; 57 tests
+ *     had failed in a cascade from that one setup. The `paced` tool's 3.x `price.morsels: 4` plus
+ *     `tollMorsels: 2` is written as the sum, tollMorsels: 6, which is what 3.x stored. The app grants
+ *     that call POST /v1/ext/:name/:action also hold ext:invoke, the word that route asks from 4.0.0,
+ *     so each APP GRANT and APP CAP test is refused or served for the reason its name gives.
  *   v1.3.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). The economics cases read the pacing ledger (pacing_charge, pacing_burn,
  *     pacing_earn), the paced contract states 6 morsels, and an uncontracted call of a tool with only
@@ -34,6 +40,8 @@ import { loadConfig } from '../src/config.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -175,6 +183,10 @@ let offeringBrief = '';
 let offeringSolo = '';
 let offeringPaced = '';
 
+/** Whether the node under test runs 4.0.0 or later, where a morsel-rail listing or contract carries
+ *  toll_morsels only and no `unit` / `basePrice` / `price_per_call` mirror. */
+const mirrorsGone = () => removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
+
 const rawInvoke = (token: string | null, action = 'work') =>
     json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: token ? auth(token) : {}, body: JSON.stringify({ q: 'hi' }) });
 const toolInvoke = (token: string | null, tool = 'brief') =>
@@ -216,22 +228,23 @@ await test('Setup: the manifest prices those actions — one action sold three w
     const base = { action_id: CAP, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, usageTerms: TERMS };
     const tools = [
         // `ext:X:work` — the SHARED capability: three products at three prices in two units.
-        { ...base, name: 'brief', description: 'The product', price: { morsels: 8 }, exchange: true },
-        { ...base, name: 'cheap', description: 'Same capability, second listing', price: { morsels: 3 }, exchange: true },
+        { ...base, name: 'brief', description: 'The product', tollMorsels: 8, exchange: true },
+        { ...base, name: 'cheap', description: 'Same capability, second listing', tollMorsels: 3, exchange: true },
         { ...base, name: 'open', description: 'Declares no price at all' },
         // Two products, one capability, told apart by a field. `pinned` fixes it; `loose` leaves it to
         // the caller — which is the shape production sells `search` and `budget-leads` in.
-        { ...base, name: 'pinned', description: 'Same capability, discriminator FIXED', price: { morsels: 5 }, lockedInput: { q: 'locked-by-the-tool' }, exchange: true },
+        { ...base, name: 'pinned', description: 'Same capability, discriminator FIXED', tollMorsels: 5, lockedInput: { q: 'locked-by-the-tool' }, exchange: true },
         { ...base, name: 'usdonly', description: 'Priced ONLY through pricesMoney', pricesMoney: [{ amount: 250000, currency: 'USD' }] },
         // `ext:X:solo` — one capability, one product, so every door can name the price without asking.
-        { ...base, name: 'solo', description: 'The only tool selling its action', action_id: SOLO, price: { morsels: 8 }, exchange: true },
+        { ...base, name: 'solo', description: 'The only tool selling its action', action_id: SOLO, tollMorsels: 8, exchange: true },
         // ONE tool sold in TWO currencies. Two listings, but one metered coordinate — which is exactly
         // where a spend ceiling could be walked around by re-taking the other one.
         { ...base, name: 'dual', description: 'One tool, EUR and USD', action_id: `ext:${EXT}:dual`,
           priceMoney: { amount: 100000, currency: 'EUR' }, pricesMoney: [{ amount: 100000, currency: 'EUR' }, { amount: 120000, currency: 'USD' }], exchange: true },
-        { ...base, name: 'throws', description: 'Priced; the script throws', action_id: BOOM, price: { morsels: 8 }, exchange: true },
-        // The morsel half of a combined price: 4 morsels revenue AND a 2-morsel burn that credits nobody.
-        { ...base, name: 'paced', description: 'Priced and paced', action_id: PACED, price: { morsels: 4 }, tollMorsels: 2, exchange: true },
+        { ...base, name: 'throws', description: 'Priced; the script throws', action_id: BOOM, tollMorsels: 8, exchange: true },
+        // 6 morsels of pacing: on 3.x this tool was written as `price.morsels: 4` plus `tollMorsels: 2`,
+        // which the node sums into one pacing amount; 4.0.0 refuses the old field, so it is written summed.
+        { ...base, name: 'paced', description: 'Priced and paced', action_id: PACED, tollMorsels: 6, exchange: true },
     ];
     const put = await json('/v1/memory', {
         method: 'POST', headers: auth(provider.token),
@@ -289,7 +302,14 @@ await test('CONTRACT · the consumer takes both contracts at exactly the declare
         const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ offering_id: id, cap_units: 400 }) });
         assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
         const e = acc.body.data.entitlement;
-        assert(e.unit === 'morsels' && e.price_per_call === 8, `contract unit/price: ${e.unit}/${e.price_per_call} (source says 8 morsels)`);
+        assert(e.toll_morsels === 8, `contract pacing: ${e.toll_morsels} (source says 8 morsels)`);
+        // A morsel-rail contract's `unit` and `price_per_call` are deprecated mirrors of toll_morsels on
+        // 3.x; 4.0.0 leaves them out (services/exchange-market.ts presentContractTerms).
+        if (await mirrorsGone()) {
+            assert(e.unit === undefined && e.price_per_call === undefined, `4.0.0 answers no unit/price_per_call mirror: ${e.unit}/${e.price_per_call}`);
+        } else {
+            assert(e.unit === 'morsels' && e.price_per_call === 8, `contract unit/price: ${e.unit}/${e.price_per_call} (source says 8 morsels)`);
+        }
         assert(e.provider === provider.gaii, `provider is the seller: ${e.provider}`);
     }
 });
@@ -513,12 +533,14 @@ await test('APP GRANT · an app the consumer connected cannot spend a contract i
     });
     assert(pub.status === 201 || pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
 
-    // A grant for the narrowest scope there is — nothing about money, nothing about extensions.
+    // A grant with nothing about money. It holds ext:invoke, the word POST /v1/ext/:name/:action asks
+    // from 4.0.0 (REST_SCOPE_GATES_ENFORCED_IN), so the refusal below is the missing spend permission
+    // and not the missing extension word.
     const verifier = randomBytes(32).toString('base64url');
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     const REDIRECT = 'http://localhost:9/cb';
     const q = new URLSearchParams({
-        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read',
+        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read ext:invoke',
         redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
     });
     const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
@@ -560,11 +582,12 @@ await test('APP GRANT · without the money permission, a FREE action still answe
     });
     assert(pub.status === 201 || pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
 
+    // No spend permission. ext:invoke is the word the extension route asks from 4.0.0.
     const verifier = randomBytes(32).toString('base64url');
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     const REDIRECT = 'http://localhost:9/cb';
     const q = new URLSearchParams({
-        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read',
+        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read ext:invoke',
         redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
     });
     const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
@@ -611,7 +634,7 @@ await test('APP GRANT · with the permission, it spends — and the app is NAMED
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     const REDIRECT = 'http://localhost:9/cb';
     const q = new URLSearchParams({
-        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read contract:spend',
+        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read contract:spend ext:invoke',
         redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
     });
     const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
@@ -717,7 +740,8 @@ await test('AMBIGUITY · the buyer of the 3-morsel product is charged 3, and nev
     const buyer = await setupOwner('amb');
     const off = await json('/v1/exchange/offerings', { headers: auth(buyer.token) });
     const cheapOff = (off.body.data.offerings as any[]).find(x => x.providerOwner === provider.name && x.action === 'cheap');
-    assert(!!cheapOff && cheapOff.basePrice === 3, `the second listing is the source's 3: ${JSON.stringify(cheapOff?.basePrice)}`);
+    // toll_morsels is the listing's per-call figure on both releases; basePrice is its 3.x mirror.
+    assert(!!cheapOff && cheapOff.toll_morsels === 3, `the second listing is the source's 3: ${JSON.stringify(cheapOff?.toll_morsels)}`);
     const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: cheapOff.offeringId, cap_units: 30 }) });
     assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
     const bb = await balance(buyer.token);
@@ -772,14 +796,23 @@ await test('PROJECTION · every listing carries the price its source declares, a
     const mine = (r.body.data.offerings as any[]).filter(o => o.providerOwner === provider.name);
     const byTool = new Map(mine.map(o => [o.action, o]));
     // Straight from the manifest written in setup — the listing may not invent a figure of its own.
+    // toll_morsels is the figure on both releases; on 3.x `unit` and `basePrice` mirror it, and 4.0.0
+    // leaves them out (services/exchange-market.ts presentOffering).
+    const gone = await mirrorsGone();
     for (const [tool, unit, price, currency] of [
         ['brief', 'morsels', 8, null], ['cheap', 'morsels', 3, null],
         ['solo', 'morsels', 8, null], ['throws', 'morsels', 8, null],
     ] as const) {
         const o = byTool.get(tool);
         assert(!!o, `${tool} is listed`);
-        assert(o.unit === unit && o.basePrice === price && (o.currency ?? null) === currency,
-            `${tool}: listing says ${o.basePrice} ${o.currency ?? o.unit}, the manifest says ${price} ${currency ?? unit}`);
+        assert(o.toll_morsels === price && (o.currency ?? null) === currency,
+            `${tool}: listing says ${o.toll_morsels} ${o.currency ?? 'morsels'}, the manifest says ${price} ${currency ?? unit}`);
+        if (gone) {
+            assert(o.unit === undefined && o.basePrice === undefined, `${tool}: 4.0.0 answers no unit/basePrice mirror: ${o.unit}/${o.basePrice}`);
+        } else {
+            assert(o.unit === unit && o.basePrice === price,
+                `${tool}: listing mirror says ${o.basePrice} ${o.unit}, the manifest says ${price} ${unit}`);
+        }
     }
     // A tool the manifest never flagged for EXCHANGE has no listing to reprice.
     assert(!byTool.has('open') && !byTool.has('usdonly'), `unflagged tools stay off the market: ${JSON.stringify([...byTool.keys()])}`);
@@ -789,7 +822,7 @@ await test('PROJECTION · reconciling twice changes nothing — the source is th
     const snap = async () => {
         const r = await json('/v1/exchange/offerings', { headers: auth(consumer.token) });
         return (r.body.data.offerings as any[]).filter(o => o.providerOwner === provider.name)
-            .map(o => `${o.ext}|${o.action}|${o.unit}|${o.currency ?? ''}|${o.basePrice}|${o.tollMorsels ?? ''}|${o.state}`).sort();
+            .map(o => `${o.ext}|${o.action}|${o.unit}|${o.currency ?? ''}|${o.basePrice}|${o.toll_morsels}|${o.tollMorsels ?? ''}|${o.state}`).sort();
     };
     const first = await snap();
     assert(first.length > 0, 'there is something to reconcile');
@@ -844,7 +877,13 @@ await test('GRANT · the provider approves the member, and the member is billed 
         body: JSON.stringify({ consumer: member.name, offering_id: offeringSolo, note: 'approved in the app' }),
     });
     assert(g.status === 201, `grant ${g.status}: ${JSON.stringify(g.body?.error)}`);
-    assert(g.body.data.grant.price_per_call === 0, `a grant prices at nothing, got ${g.body.data.grant.price_per_call}`);
+    // toll_morsels is what the member pays per call on both releases; price_per_call is its 3.x mirror.
+    assert(g.body.data.grant.toll_morsels === 0, `a grant prices at nothing, got ${g.body.data.grant.toll_morsels}`);
+    if (await mirrorsGone()) {
+        assert(g.body.data.grant.price_per_call === undefined, `4.0.0 answers no price_per_call mirror, got ${g.body.data.grant.price_per_call}`);
+    } else {
+        assert(g.body.data.grant.price_per_call === 0, `the 3.x mirror prices at nothing too, got ${g.body.data.grant.price_per_call}`);
+    }
     assert(g.body.data.grant.list_price_per_call === 8, `and remembers what it is worth: ${g.body.data.grant.list_price_per_call}`);
 
     const mb = await balance(member.token), pb = await balance(provider.token);
@@ -992,7 +1031,7 @@ await test('GRANT · a gift never overwrites a purchase, and withdrawing it retu
     // The consumer BOUGHT the solo product earlier in this run. Granting over it must not touch that.
     const cExt = `apptool:${provider.name}/${APP}`;
     const bought = await contract(consumer.token, cExt, 'solo');
-    assert(bought && bought.price_per_call === 8, `the paid contract is in place first: ${JSON.stringify(bought?.price_per_call)}`);
+    assert(bought && bought.toll_morsels === 8, `the paid contract is in place first: ${JSON.stringify(bought?.toll_morsels)}`);
 
     const g = await json('/v1/exchange/grants', {
         method: 'POST', headers: auth(provider.token),
@@ -1011,7 +1050,7 @@ await test('GRANT · a gift never overwrites a purchase, and withdrawing it retu
         body: JSON.stringify({ consumer: consumer.name, offering_id: offeringSolo }),
     });
     const after = await contract(consumer.token, cExt, 'solo');
-    assert(after && after.price_per_call === 8, `the purchase survived the gift: ${JSON.stringify(after?.price_per_call)}`);
+    assert(after && after.toll_morsels === 8, `the purchase survived the gift: ${JSON.stringify(after?.toll_morsels)}`);
     const cb2 = await balance(consumer.token);
     assert((await rawInvoke(consumer.token, 'solo')).status === 200, 'and they are served again, as a customer');
     assert(cb2 - await balance(consumer.token) === 8, `at the price they bought — moved ${cb2 - await balance(consumer.token)}`);
@@ -1037,8 +1076,8 @@ await test('GRANT · an approval issued for an app role is withdrawn with that r
     assert((await rawInvoke(b2.token, 'solo')).status === 402, 'and neither is served after it');
 });
 
-// The tool's 3.x `price.morsels: 4` and its `tollMorsels: 2` are both pacing (ruling decision-morseli-
-// on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). This asserted the old model: toll_morsels 2, and the
+// The tool's 6 morsels of pacing were its 3.x `price.morsels: 4` and its `tollMorsels: 2`, both pacing
+// (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa); the fixture writes them summed. This asserted the old model: toll_morsels 2, and the
 // provider credited "the price only, never the burn". Now the contract states 6 morsels of pacing, and
 // each part is charged through chargePacing: a share burns, the rake goes to the operator, the rest to
 // the provider.
@@ -1046,7 +1085,7 @@ await test('PACING · a paying consumer is charged the 6 morsels of pacing, part
     const buyer = await setupOwner('pac');
     const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: offeringPaced, cap_units: 40 }) });
     assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
-    assert(acc.body.data.entitlement.toll_morsels === 6, `the contract states its pacing, 4 + 2: ${acc.body.data.entitlement.toll_morsels}`);
+    assert(acc.body.data.entitlement.toll_morsels === 6, `the contract states its pacing, 6: ${acc.body.data.entitlement.toll_morsels}`);
     const bb = await balance(buyer.token), pb = await balance(provider.token);
     const r = await rawInvoke(buyer.token, 'paced');
     assert(r.status === 200, `paced call ${r.status}: ${JSON.stringify(r.body?.error)}`);
@@ -1256,7 +1295,7 @@ await test('APP CAP · a ceiling on what an app may spend of your money holds, a
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     const REDIRECT = 'http://localhost:9/cb';
     const q = new URLSearchParams({
-        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read contract:spend',
+        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read contract:spend ext:invoke',
         redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
     });
     const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
@@ -1399,7 +1438,7 @@ await test('CHAIN · a reseller buys from a supplier on ITS OWN account, and its
             value: { version: 1, tools: [{
                 name: 'refine', description: 'Refines what it buys upstream', action_id: `ext:${RESELL_EXT}:compose`,
                 inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, usageTerms: TERMS,
-                price: { morsels: 20 }, exchange: true,
+                tollMorsels: 20, exchange: true,
             }] },
         }),
     });
