@@ -29,11 +29,19 @@
  *
  *   No imports, so a unit test can run it (test/unit/agent-draft-known.test.ts).
  * @structure DEFAULT_TOOL_MENU · clipLine(text, max) · knownBlock(menu, known) · namedIn(crewDef, known) ·
- *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef)
+ *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef) ·
+ *   RECORDS_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
+ *   withRecordSpaces(crewDef, watch)
  * @usage
- *   const prompt = base + knownBlock(menu, { apps, places });
+ *   const prompt = base + knownBlock(menu, { apps, places }) + recordsBlock({ places }, features);
  *   const named = namedIn(draft.crewDef, { apps, places });
+ *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.1.0 — 2026-10-12 — An agent that works when a record is published in a workspace: the text
+ *     the draft prompt gets for it (only for a runtime whose menu names the feature), the workspace
+ *     a draft names, and the definition's `record_spaces` with "records" in `listen_for`. A
+ *     definition that names such spaces asks organism:read
+ *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.0.1 — 2026-10-12 — extraScopes: a definition that calls an app tool asks ext:invoke, the
  *     word the extension action route checks and refuses without from node 4.0.0.
  *   v1.0.0 — 2026-10-12 — Initial (wish-kodin-agenttiluonnos-tuntee-ty-kalujen-kuvaukset-omistajan-s).
@@ -276,7 +284,94 @@ export function readOnlyTools(crewDef) {
  */
 export function extraScopes(crewDef) {
   return [
-    ...(anyMemberHas(crewDef, ['workspace', 'workspace_write']) ? ['organism:read'] : []),
+    ...(anyMemberHas(crewDef, ['workspace', 'workspace_write']) || recordSpacesOf(crewDef).length > 0 ? ['organism:read'] : []),
     ...(anyMemberHas(crewDef, ['app_tools']) ? ['ext:invoke'] : []),
   ];
+}
+
+/**
+ * The name a runtime's menu carries in `features` when it subscribes the spaces a definition names
+ * in `record_spaces` and makes a task of each record published there (GET /v1/agents/:name/crew/menu).
+ * A runtime that does not name it ignores the field, so the kind is offered only when it is named.
+ */
+export const RECORDS_FEATURE = 'record_spaces';
+
+/** The most spaces one definition names; the crew runtime refuses a longer list. */
+const RECORD_SPACES_MAX = 20;
+
+/**
+ * The text added to the draft prompt for an agent that works when a record is published in a
+ * workspace. Empty unless the runtime names the feature and the person has a workspace: the model
+ * is then not told about a kind the page could not offer.
+ *
+ * WHAT THE TASK CARRIES is the crew runtime's own text (crewaimeat, agreed 2026-10-12): it reads
+ * the record and creates a task for the agent whose description holds the workspace, the organism,
+ * the space, the record's id and the record as published.
+ *
+ * A TASK WITHOUT A RECORD is real: the node gives a new agent one task when it is approved, and
+ * that run is what subscribes the spaces. A definition written for records only would invent a
+ * record for it, so the prompt says what the agent does then.
+ */
+export function recordsBlock(known, features) {
+  if (!Array.isArray(features) || !features.includes(RECORDS_FEATURE)) return '';
+  if (!(known?.places ?? []).length) return '';
+  return '\n\n' + [
+    'One more kind of "when" is "records": the agent is given one task each time a record is published in a workspace. Choose it when the sentence says the agent acts on what arrives or is added in one of the workspaces listed above (a new request, a new order, a filled form). Write it as "when": { "kind": "records", "workspace": "the workspace id" }, add "organism": "the organism id" when the list above gives one for that workspace, and set "listen_for" to ["tasks", "records"]. The person chooses on the page which parts of the workspace the agent watches.',
+    'For such a task {{ctx.prompt}} is the record itself: the workspace and its id, the organism id, the part of the workspace, the record\'s id, and the record as it was published.',
+    'The agent is also given tasks with no record in them: one when it is made, and any the person writes by hand. Write the first task\'s description so that for a task with no record the agent says in one sentence what it does when a record arrives, and writes nothing.',
+  ].join('\n');
+}
+
+/**
+ * The workspace a draft's "when" names, as { organism_id, workspace_id }, or null. It is one of
+ * the person's workspaces, found by its id; an id two of their organisms share counts only with
+ * the organism's id beside it. `when` is the model's answer: { kind, workspace, organism }.
+ */
+export function watchedPlace(when, known) {
+  if (when?.kind !== 'records' || typeof when.workspace !== 'string' || !when.workspace) return null;
+  const same = (known?.places ?? []).filter((pl) => pl.workspace_id === when.workspace);
+  const found = same.length === 1 && (!when.organism || when.organism === same[0].organism_id)
+    ? same[0]
+    : same.find((pl) => pl.organism_id === when.organism);
+  return found ? { organism_id: found.organism_id, workspace_id: found.workspace_id } : null;
+}
+
+/**
+ * The spaces a definition watches: the whole items of `record_spaces`, when the definition also
+ * listens for records. Each is { organism_id, ws, space }, where `space` is the space's namespace.
+ */
+export function recordSpacesOf(crewDef) {
+  const hears = crewDef?.listen_for;
+  if (!Array.isArray(hears) || !hears.includes('records') || !Array.isArray(crewDef.record_spaces)) return [];
+  const text = (v) => typeof v === 'string' && v.length > 0;
+  return crewDef.record_spaces
+    .filter((s) => s && typeof s === 'object' && text(s.organism_id) && text(s.ws) && text(s.space))
+    .map((s) => ({ organism_id: s.organism_id, ws: s.ws, space: s.space }));
+}
+
+/**
+ * A definition that watches what the person chose, and nothing else.
+ *
+ * `watch` is { organism_id, workspace_id, spaces }, where `spaces` are namespaces of that
+ * workspace's record spaces. With one, the definition names them in `record_spaces` and listens
+ * for "tasks" and "records": the runtime refuses the field without both, because a record reaches
+ * the agent as a task it creates for itself. Without one (the person chose another "when", or no
+ * space), the field and the "records" kind are taken out: a model may have written them, and the
+ * runtime refuses "records" with no space named. Returns the same object when nothing changes.
+ */
+export function withRecordSpaces(crewDef, watch) {
+  if (!crewDef || typeof crewDef !== 'object') return crewDef;
+  const hears = Array.isArray(crewDef.listen_for) ? crewDef.listen_for : [];
+  const spaces = [...new Set((Array.isArray(watch?.spaces) ? watch.spaces : []).map((s) => String(s ?? '').trim()).filter(Boolean))].slice(0, RECORD_SPACES_MAX);
+  if (watch?.organism_id && watch?.workspace_id && spaces.length > 0) {
+    return {
+      ...crewDef,
+      listen_for: [...new Set([...hears, 'tasks', 'records'])],
+      record_spaces: spaces.map((space) => ({ organism_id: watch.organism_id, ws: watch.workspace_id, space })),
+    };
+  }
+  if (!('record_spaces' in crewDef) && !hears.includes('records')) return crewDef;
+  const rest = Object.fromEntries(Object.entries(crewDef).filter(([key]) => key !== 'record_spaces'));
+  const left = hears.filter((x) => x !== 'records');
+  return { ...rest, listen_for: left.length ? left : ['tasks'] };
 }

@@ -18,6 +18,8 @@
  *     - "Toimiston palvelin", which connected once and is now away, holding one agent that works
  *       every hour, and one more agent that was ordered to it afterwards and waits for it
  *     - one proposal from the sandbox's agent, waiting for the owner
+ *     - the organism "Asiakaspalvelu" with the workspace "Tukipyynnöt", whose two record spaces an
+ *       agent can watch
  *   Run again, it reuses what is there and connects the first machine again. `pnpm sandbox --reset`
  *   throws all of it away with the rest.
  *
@@ -26,12 +28,18 @@
  * @usage
  *   cd aimeat && pnpm sandbox && pnpm sandbox:machines     # leave it running; Ctrl+C stops the machine
  * @version-history
+ *   v1.1.0 — 2026-10-12 — A stand-in computer answers `crew.menu` with a tool list and the feature
+ *     `record_spaces`. The agents enrolled on the first machine are attached to its socket with
+ *     their own keys (kept in .sandbox-machines.json), because the node asks an agent only while
+ *     that agent is connected. The first owner gets the organism "Asiakaspalvelu" with a workspace
+ *     "Tukipyynnöt" that has two record spaces, a row space and a document space, so the choice
+ *     "when something new arrives in a workspace" can be looked at.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
 import { CompactSign, importJWK, exportJWK, generateKeyPair, calculateJwkThumbprint } from 'jose';
 import * as ed from '@noble/ed25519';
@@ -45,6 +53,26 @@ const STATE_FILE = join(AIMEAT, '.sandbox.json');
 const SEAT_FILE = join(AIMEAT, '.sandbox-machines.json');
 const NODE_ID = 'aimeat-local-001-dev';
 const ENROL_CAPABILITY = 'aimeat.agents.enrol';
+const MENU_CAPABILITY = 'crew.menu';
+
+/**
+ * What a stand-in computer answers when the node asks an agent on it what its runtime offers
+ * (GET /v1/agents/:name/crew/menu): the tool ids the home's draft falls back to, and the feature
+ * a crew runtime names when it wakes an agent on a workspace's records. It lets the "new agent"
+ * page be looked at with its fifth choice open. Nothing here runs a tool or watches a workspace.
+ */
+const MENU = {
+  tools: [
+    { id: 'web', purpose: 'search the live web' },
+    { id: 'memory', purpose: 'read and write the person\'s AIMEAT memory at exact keys' },
+    { id: 'dm', purpose: 'read the messages sent to the agent and answer them' },
+    { id: 'app_tools', purpose: 'find and call the tools that apps on AIMEAT publish' },
+    { id: 'workspace', purpose: 'read the person\'s organisms and workspaces. Read-only' },
+    { id: 'workspace_write', purpose: 'everything "workspace" reads, and create or update a record and append rows' },
+  ],
+  features: ['record_spaces'],
+  llm: { profiles: [], models: [] },
+};
 
 const HOME = { id: 'sandbox-home', name: 'Kotikone' };
 const OFFICE = { id: 'sandbox-office', name: 'Toimiston palvelin' };
@@ -63,6 +91,44 @@ async function call(base: string, path: string, token: string, method = 'GET', b
   return { status: res.status, data: json?.data, error: json?.error };
 }
 
+/** An enrolled agent's key, kept between runs so the stand-in can hold the agent on its socket again. */
+interface AgentKey { d: string; x: string; kid: string; machine: string }
+/** What SEAT_FILE holds for one sandbox: the second machine's own agent, and the keys of the agents enrolled here. */
+interface Kept { base: string; gaii?: string; privateKey?: string; keys?: Record<string, AgentKey> }
+
+/** What was kept for this sandbox; a file written for another one (a reset moves nothing, a new port does) reads as empty. */
+function readKept(base: string): Kept {
+  const kept = existsSync(SEAT_FILE) ? JSON.parse(readFileSync(SEAT_FILE, 'utf-8')) as Kept : null;
+  return kept && kept.base === base ? kept : { base };
+}
+function writeKept(next: Kept): void { writeFileSync(SEAT_FILE, JSON.stringify(next, null, 2)); }
+
+const KEY_GRANT = 'urn:aimeat:params:oauth:grant-type:agent-key';
+const attachedHere = new Set<string>();
+
+/**
+ * Hold on a machine's socket every agent this script enrolled on it, the way a connector does:
+ * a credential minted with the agent's key, then one `attach` frame. An attached agent is
+ * connected for the node, so the node can ask it what its runtime offers (`crew.menu`). An agent
+ * whose key is gone (the sandbox was reset, or it was enrolled by an older version of this
+ * script) is skipped: it stays on the machine's list and answers nothing.
+ */
+async function attachKept(ws: WebSocket, base: string, machine: { id: string }): Promise<void> {
+  for (const [gaii, key] of Object.entries(readKept(base).keys ?? {})) {
+    if (key.machine !== machine.id || attachedHere.has(gaii)) continue;
+    const now = Math.floor(Date.now() / 1000);
+    const jwk = await importJWK({ kty: 'OKP', crv: 'Ed25519', d: key.d, x: key.x }, 'EdDSA');
+    const assertion = await new CompactSign(new TextEncoder().encode(JSON.stringify({ sub: gaii, aud: NODE_ID, iat: now, exp: now + 60, jti: randomUUID() })))
+      .setProtectedHeader({ alg: 'EdDSA', kid: key.kid }).sign(jwk);
+    const res = await fetch(`${base}/v1/agents/v2/token`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
+    const body = await res.json().catch(() => null) as { access_token?: string; data?: { access_token?: string } } | null;
+    const token = body?.access_token ?? body?.data?.access_token;
+    if (!token) continue;
+    ws.send(JSON.stringify({ type: 'attach', id: randomUUID(), agent: gaii, token }));
+    attachedHere.add(gaii);
+  }
+}
+
 /** One machine: a tunnel socket that answers the enrolment offer the way a connector does. */
 function openMachine(base: string, token: string, owner: string, machine: { id: string; name: string }): Promise<WebSocket> {
   return new Promise((done, fail) => {
@@ -77,9 +143,12 @@ function openMachine(base: string, token: string, owner: string, machine: { id: 
       if (frame.type === 'welcome') { clearTimeout(timer); done(ws); return; }
       if (frame.type !== 'invoke') return;
       const answer = frame.capability === ENROL_CAPABILITY
-        ? enrol(base, token, owner, frame.input)
-        : Promise.resolve({ ok: false, result: { code: 'NO_HANDLER', message: 'a stand-in machine runs nothing' } });
-      void answer.then((r) => ws.send(JSON.stringify({ type: 'invoke_result', id: frame.id, ok: r.ok, result: r.result })));
+        ? enrol(base, token, owner, frame.input, machine.id)
+        : frame.capability === MENU_CAPABILITY
+          ? Promise.resolve({ ok: true, result: MENU })
+          : Promise.resolve({ ok: false, result: { code: 'NO_HANDLER', message: 'a stand-in machine runs nothing' } });
+      // A call for an agent held on this socket names it, and the answer names it back.
+      void answer.then((r) => ws.send(JSON.stringify({ type: 'invoke_result', id: frame.id, ...(frame.agent ? { agent: frame.agent } : {}), ok: r.ok, result: r.result })));
     });
     // The node drops a socket that goes quiet; a connector sends this on a timer.
     const beat = setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'heartbeat' })); }, 20_000);
@@ -88,13 +157,15 @@ function openMachine(base: string, token: string, owner: string, machine: { id: 
 }
 
 /** The connector's half of an enrolment: a key per agent, a card signed with it, one submit. */
-async function enrol(base: string, token: string, owner: string, offer: any) {
+async function enrol(base: string, token: string, owner: string, offer: any, machineId: string) {
   const cards: string[] = [];
   for (const offered of offer.agents as any[]) {
     const pair = await generateKeyPair('EdDSA', { crv: 'Ed25519', extractable: true });
     const priv = await exportJWK(pair.privateKey);
     const pub = await exportJWK(pair.publicKey);
     const kid = await calculateJwkThumbprint({ kty: 'OKP', crv: 'Ed25519', x: pub.x! }, 'sha256');
+    const kept = readKept(base);
+    writeKept({ ...kept, keys: { ...(kept.keys ?? {}), [offered.gaii as string]: { d: priv.d!, x: pub.x!, kid, machine: machineId } } });
     const card = {
       spec: 'aimeat.agent-card/v1', gaii: offered.gaii, name: offered.name, owner, node: NODE_ID,
       displayName: offered.display_name ?? offered.name, description: offered.description ?? '',
@@ -112,13 +183,13 @@ async function enrol(base: string, token: string, owner: string, offer: any) {
 
 /** The second machine needs an agent of its own to hold its tunnel; made once, its key kept. */
 async function officeSeat(base: string, owner: string, ownerToken: string): Promise<string> {
-  const kept = existsSync(SEAT_FILE) ? JSON.parse(readFileSync(SEAT_FILE, 'utf-8')) as { base: string; gaii: string; privateKey: string } : null;
-  let seat = kept && kept.base === base ? kept : null;
+  const kept = readKept(base);
+  let seat = kept.gaii && kept.privateKey ? { gaii: kept.gaii, privateKey: kept.privateKey } : null;
   if (!seat) {
     const made = await call(base, '/v1/agents', ownerToken, 'POST', { name: `office-seat-${Date.now().toString(36)}`, owner, capabilities: [], mode: 'workstation', scopes: ['*'] });
     if (made.status !== 201) die(`could not make the second machine's own agent: ${made.error?.message ?? made.status}`);
-    seat = { base, gaii: made.data.agent.gaii, privateKey: made.data.private_key };
-    writeFileSync(SEAT_FILE, JSON.stringify(seat, null, 2));
+    seat = { gaii: made.data.agent.gaii as string, privateKey: made.data.private_key as string };
+    writeKept({ ...readKept(base), ...seat });
   }
   const ts = new Date().toISOString();
   const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(seat.gaii + ts), Buffer.from(seat.privateKey, 'base64'))).toString('base64');
@@ -150,6 +221,41 @@ async function make(base: string, ownerToken: string, a: { name: string; display
   return approved.data?.attached === true;
 }
 
+const SUPPORT = { organism: 'Asiakaspalvelu', workspace: 'Tukipyynnöt' };
+
+/**
+ * One organism of the first owner with a workspace an agent can watch, made once: two record
+ * spaces (a published record in one gives a watching agent a task), and a row space and a document
+ * space, which the page leaves out because neither wakes an agent.
+ */
+async function seedSupport(base: string, owner: string, ownerToken: string): Promise<void> {
+  // `member` asks for the organisms this owner is in; without it the list holds public ones only,
+  // and this organism is private.
+  const mine = await call(base, `/v1/organisms?member=${encodeURIComponent(owner)}`, ownerToken);
+  if (mine.status !== 200) die(`could not read the owner's organisms: ${mine.error?.message ?? mine.status}`);
+  const names = ((mine.data?.organisms ?? []) as Array<{ name?: string }>).map((o) => o.name);
+  if (names.includes(SUPPORT.organism)) return;
+  const org = await call(base, '/v1/organisms', ownerToken, 'POST', {
+    name: SUPPORT.organism, description: 'Asiakkaiden pyynnöt ja niiden vastaukset.', type: 'project', join_policy: 'invite', visibility: 'private',
+  });
+  if (org.status !== 201) die(`could not make the organism ${SUPPORT.organism}: ${org.error?.message ?? org.status}`);
+  const space = (name: string, description: string, namespace: string, more: Record<string, unknown>) =>
+    ({ name, description, schemaRef: `schema:${name}@1`, namespace, writeRole: 'member', ...more });
+  const ws = await call(base, `/v1/organisms/${org.data.organism.id}/workspaces`, ownerToken, 'POST', {
+    name: SUPPORT.workspace,
+    manifest: {
+      manifestVersion: '1.0', name: SUPPORT.workspace, kind: 'project', status: 'active',
+      objectTypes: [
+        space('pyynto', 'Asiakkaan lähettämä tukipyyntö.', 'shared.support-requests', { backing: 'memory', cardinality: 'many', versioned: false, mode: 'records' }),
+        space('tilaus', 'Verkkokaupasta tullut tilaus.', 'shared.orders', { backing: 'memory', cardinality: 'many', versioned: false, mode: 'records' }),
+        space('tapahtuma', 'Loki siitä, mitä pyynnöille on tehty.', 'shared.events', { backing: 'rows', mode: 'records' }),
+        space('ohjeet', 'Vastausohjeet.', 'shared.guides', { backing: 'memory', mode: 'document' }),
+      ],
+    },
+  });
+  if (ws.status !== 201) die(`could not make the workspace ${SUPPORT.workspace}: ${ws.error?.message ?? ws.status}`);
+}
+
 async function main(): Promise<void> {
   if (!existsSync(STATE_FILE)) die('no sandbox here. Run pnpm sandbox first.');
   const box = JSON.parse(readFileSync(STATE_FILE, 'utf-8')) as Sandbox;
@@ -161,11 +267,16 @@ async function main(): Promise<void> {
   // the owner's AI has proved its MCP connection. The stand-in writes that proof record, so the
   // owner lands on the finished home rather than on the onboarding one. A second run answers 409.
   await call(base, '/v1/memory', owner.token, 'POST', { key: 'onboarding.hello_mcp', value: { ok: true, by: 'sandbox-machines' } });
+  await seedSupport(base, owner.name, owner.token);
 
   const home = await openMachine(base, box.agent.token, owner.name, HOME);
   const have = new Set(((await call(base, '/v1/agents', owner.token)).data?.agents ?? []).map((a: any) => a.name as string));
 
   if (!have.has('aamukatsaus')) {
+    // No agent of this script exists, so the sandbox's data is new (a reset keeps the port, and
+    // with it the address the kept file is matched by). What was kept belongs to the data that is
+    // gone: the second machine's agent and every enrolled key.
+    writeKept({ base });
     const office = await openMachine(base, await officeSeat(base, owner.name, owner.token), owner.name, OFFICE);
     // The node records a machine two seconds after its first socket; a proposal can name it at once.
     await make(base, owner.token, { name: 'aamukatsaus', display: 'Aamukatsaus', purpose: 'Kerää joka arkiaamu alan uutiset ja kirjoittaa niistä tiivistelmän.', machine: HOME.id, cron: '0 7 * * 1-5' });
@@ -184,6 +295,10 @@ async function main(): Promise<void> {
       crew_def: crew('laskujen-tarkistaja', ['tasks'], 'Compare incoming invoices with their orders and report every mismatch.'),
     });
   }
+
+  // The agents enrolled on the first machine are held on its socket, so one of them can be asked
+  // what its runtime offers. Run again, the kept keys attach them again.
+  await attachKept(home, base, HOME);
 
   console.log(`\n  Stand-in machines on ${base}`);
   console.log(`  ─────────────────────────────────────────────────────────────`);

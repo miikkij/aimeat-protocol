@@ -521,6 +521,26 @@ async function run() {
         assert(w?.hears_messages === true && w?.when === 'talk', `it hears messages and works when written to, got ${JSON.stringify({ hears: w?.hears_messages, when: w?.when })}`);
     });
 
+    await test('an agent whose definition names the spaces it watches reads as one that works on records', async () => {
+        const watched = { organism_id: 'org-of-the-test', ws: 'ws-support', space: 'shared.support-requests' };
+        const p = await propose('record-watcher', { connector: SERVER, crew_def: { ...DEF, listen_for: ['tasks', 'records'], record_spaces: [watched] } });
+        assert(p.status === 201 || p.status === 200, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+        const r = await approve(p.body.data.proposal.id);
+        assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const one = await homeAgents(authA, '?agent=record-watcher');
+        const w = (one.body.data.workers as any[])[0];
+        assert(w?.when === 'records', `it works when a record arrives, got ${JSON.stringify(w?.when)}`);
+        assert(JSON.stringify(w?.watches) === JSON.stringify([watched]), `and the answer names the spaces, got ${JSON.stringify(w?.watches)}`);
+        // "records" in listen_for with no space named wakes on nothing: the runtime subscribes the
+        // spaces the definition names, so such an agent works when asked.
+        const q = await propose('record-nowhere', { connector: SERVER, crew_def: { ...DEF, listen_for: ['tasks', 'records'] } });
+        assert(q.status === 201 || q.status === 200, `propose ${q.status}: ${JSON.stringify(q.body?.error)}`);
+        const s = await approve(q.body.data.proposal.id);
+        assert(s.status === 200, `approve ${s.status}: ${JSON.stringify(s.body?.error)}`);
+        const bare = ((await homeAgents(authA, '?agent=record-nowhere')).body.data.workers as any[])[0];
+        assert(bare?.when === 'ask' && JSON.stringify(bare?.watches) === '[]', `no space named, so it works when asked, got ${JSON.stringify({ when: bare?.when, watches: bare?.watches })}`);
+    });
+
     await test('the home\'s agents are the owner\'s in person, and never another account\'s', async () => {
         const asAgent = await homeAgents({ Authorization: `Bearer ${seatServer.token}` });
         assert(asAgent.status === 403, `an agent carrying the owner's name is not the owner: got ${asAgent.status}`);

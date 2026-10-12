@@ -22,10 +22,13 @@
  *
  *   A TIE IS A STATEMENT, NOT A PERMISSION. What an app may read is decided by its grant, and who
  *   may read a workspace by its members, exactly as before.
- * @structure AgentApp · AgentWorkplace · AgentTies · readAgentTies · readTieChoices · readWorkplace ·
- *   placeNames · workplaceKey
+ * @structure AgentApp · AgentWorkplace · AgentTies · readAgentTies · readTieChoices · WatchableSpace ·
+ *   readWatchableSpaces · readWorkplace · placeNames · workplaceKey
  * @usage const ties = await readAgentTies({ config, storage }, owner);
  * @version-history
+ *   v1.2.0 — 2026-10-12 — readWatchableSpaces: the record spaces of one workspace whose published
+ *     records wake an agent, for the page that makes a contract agent
+ *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.1.0 — 2026-10-12 — readTieChoices takes `tools`: each of the person's apps then carries the
  *     tools an agent of theirs can call on it, for the home's agent draft
  *     (wish-kodin-agenttiluonnos-tuntee-ty-kalujen-kuvaukset-omistajan-s).
@@ -39,6 +42,8 @@ import { isValidAgentName } from '../utils/gaii.js';
 import { resolveAppUrls } from './app-urls.js';
 import { listWorkspaces } from './structure-overview.js';
 import { listOwnerAppToolNames, type OwnerAppToolName } from '../commerce/app-tool-catalog.js';
+import { decideWorkspaceRead } from './workspace-access.js';
+import { isMemoryBackedSpace, type WorkspaceManifest } from './workspace-meta.js';
 import { DATA_MAP_SPEC, type DataMap } from './data-map/data-map-types.js';
 
 /** One app that shows an agent's work. */
@@ -170,6 +175,47 @@ export async function readTieChoices(
     .map(a => ({ filename: a.filename, name: a.manifest?.name || a.filename, ...(toolsByApp ? { tools: toolsOf(a.filename) } : {}) }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return { places, apps };
+}
+
+/** One space of a workspace whose published records wake an agent that watches it. */
+export interface WatchableSpace {
+  /** The space's name, as the workspace's structure and its tools call it. */
+  name: string;
+  /** The namespace a record subscription names (`record_spaces[].space` in a crew definition). */
+  namespace: string;
+  description: string;
+}
+
+/**
+ * The spaces of one workspace an agent can watch, for the owner in person: the record spaces whose
+ * data lives in memory keys. A published record there is a memory write, and that write is what the
+ * node pushes to a subscribed agent as `workspace.record` (services/connect-tunnel-push.ts). A row
+ * space also says `mode: "records"`, and an appended row is no memory write, so it is left out by
+ * the shared predicate isMemoryBackedSpace. A document space is left out: the crew runtime
+ * subscribes record spaces only.
+ *
+ * Null when the organism or the workspace does not exist or the person may not read the workspace.
+ * The decision is decideWorkspaceRead, the one place a workspace read is decided, and the manifest
+ * is the copy it read.
+ */
+export async function readWatchableSpaces(
+  deps: { config: AimeatConfig; storage: Storage }, owner: string, organismId: string, workspaceId: string,
+): Promise<WatchableSpace[] | null> {
+  const { config, storage } = deps;
+  const organism = await storage.getOrganism(organismId);
+  if (!organism) return null;
+  const decision = await decideWorkspaceRead(storage, config, organism, owner, owner, `${owner}@${config.nodeId}`, workspaceId);
+  if (!decision.canRead || !decision.manRec) return null;
+  const objectTypes = (decision.manRec.value as WorkspaceManifest | null)?.objectTypes ?? [];
+  const spaces: WatchableSpace[] = [];
+  for (const ot of objectTypes) {
+    const name = typeof ot.name === 'string' ? ot.name : '';
+    const namespace = typeof ot.namespace === 'string' ? ot.namespace : '';
+    // A manifest that names no mode is a records space (services/manifest-schema.ts).
+    if (!name || !namespace || !isMemoryBackedSpace(ot) || (ot.mode ?? 'records') !== 'records') continue;
+    spaces.push({ name, namespace, description: typeof ot.description === 'string' ? ot.description : '' });
+  }
+  return spaces;
 }
 
 /** One agent's workplace record, or null when its work stays in its own memory. */

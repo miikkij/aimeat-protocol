@@ -12849,7 +12849,8 @@
         "clock": "Kellon mukaan",
         "clockAt": "Kellon mukaan, {words}",
         "talk": "Kun joku kirjoittaa sille",
-        "always": "Aina päällä"
+        "always": "Aina päällä",
+        "records": "Kun työtilaan tulee jotain uutta"
       },
       "state": {
         "waits": "odottaa tietokonetta",
@@ -12919,7 +12920,26 @@
       "usesApps": "Sovellukset, joiden työkaluja se käyttää",
       "readsPlaces": "Työtilat, joista se lukee",
       "writesPlaces": "Työtilat, joista se lukee ja joihin se kirjoittaa",
-      "inOrganism": "Organismissa {organism}"
+      "inOrganism": "Organismissa {organism}",
+      "whenRecordsHint": "Se saa tehtävän aina, kun valitsemaasi työtilan tilaan julkaistaan tietue.",
+      "whenRecordsHintProposal": "Se saa tehtävän aina, kun ehdotuksen nimeämiin työtilan tiloihin julkaistaan tietue.",
+      "whenRecordsOff": "Tämän tietokoneen agentteja ajava ohjelma ei vielä osaa tätä, tai yksikään sen agenteista ei ole nyt yhteydessä.",
+      "whenRecordsOffPlaces": "Et ole vielä organismissa, jossa on työtila.",
+      "whenRecordsOffProposal": "Tämä ehdotus ei nimeä työtilan tilaa, jota agentti seuraisi.",
+      "badWatchComputer": "Valitsemasi tietokone ei voi käynnistää agenttia työtilasta. Valitse toinen tietokone tai toinen vaihtoehto kohdasta ”Milloin se tekee työtä”.",
+      "badWatchPlace": "Valitse työtila, jota agentti seuraa.",
+      "badWatchSpaces": "Valitse työtilasta vähintään yksi tila, jota agentti seuraa."
+    },
+    "agentWatch": {
+      "placeLabel": "Mitä työtilaa se seuraa?",
+      "placePick": "Valitse työtila",
+      "inOrganism": "Organismissa {organism}",
+      "spacesLabel": "Mitä tiloja se seuraa?",
+      "spacesHint": "Se saa yhden tehtävän jokaisesta tietueesta, joka julkaistaan tilaan sen käynnistämisen jälkeen. Tilassa jo olevat tietueet jäävät ennalleen.",
+      "spacesNone": "Tässä työtilassa ei ole tilaa, jonka uusi tietue voisi käynnistää agentin. Julkaistu tietue käynnistää agentin, rivi ja dokumenttisivu eivät.",
+      "spacesFailed": "Tämän työtilan tiloja ei voitu lukea. Valitse työtila uudelleen.",
+      "retire": "Voit myöhemmin poistaa agentin käytöstä tässä työtilassa: avaa agentin asetukset ja välilehti Sopimukset. Sen jälkeen agentti ei enää tee työtä tässä työtilassa.",
+      "watches": "Mitä se seuraa"
     },
     "agentPage": {
       "signInTitle": "Agenttisi",

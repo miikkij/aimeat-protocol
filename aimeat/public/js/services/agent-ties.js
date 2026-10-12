@@ -18,10 +18,12 @@
  *   THE BUILD PROMPT comes in two lengths. An AI connected to this AIMEAT reads the agent section
  *   and the build specification itself, so it gets a short request that names both. An AI that
  *   cannot connect gets the whole text, because it has no way to ask for more.
- * @structure tieApp · untieApp · setWorkplace · clearWorkplace · readTieChoices ·
+ * @structure tieApp · untieApp · setWorkplace · clearWorkplace · readTieChoices · readWatchableSpaces ·
  *   draftAppOptions · plainOption · buildRequest · readFullBuildPrompt · WHO
  * @usage import { draftAppOptions, buildRequest } from '/js/services/agent-ties.js';
  * @version-history
+ *   v1.2.0 — 2026-10-12 — readWatchableSpaces(organismId, workspaceId), for an agent that works
+ *     when a record is published in a workspace.
  *   v1.1.0 — 2026-10-12 — readTieChoices({ tools: true }) asks for each app's tools as well.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
@@ -69,6 +71,16 @@ export async function readTieChoices({ tools = false } = {}) {
   return { places: resp?.data?.places ?? [], apps: resp?.data?.apps ?? [] };
 }
 
+/**
+ * The spaces of one workspace an agent can watch: its record spaces, each { name, namespace,
+ * description } (GET /v1/home/agents/choices/spaces). A published record in one of them gives a
+ * watching agent a task; rows and document pages do not.
+ */
+export async function readWatchableSpaces(organismId, workspaceId) {
+  const resp = await apiGet(`/v1/home/agents/choices/spaces?organism_id=${enc(organismId)}&workspace_id=${enc(workspaceId)}`);
+  return resp?.data?.spaces ?? [];
+}
+
 /** Who may open the app, as the request says it to the builder. English: an AI reads it. */
 export const WHO = {
   me: 'Only me. Keep it private.',
@@ -79,7 +91,7 @@ export const WHO = {
 const draftPrompt = (worker) => `You propose small web apps that show the work of one AI agent to its owner.
 
 The agent is called "${worker.display_name || worker.name}". What it is for: ${worker.description || 'not stated'}.
-It works ${worker.when === 'clock' ? 'on a schedule' : worker.when === 'talk' ? 'when someone writes to it' : worker.when === 'always' ? 'all the time' : 'when its owner asks'}.
+It works ${worker.when === 'clock' ? 'on a schedule' : worker.when === 'talk' ? 'when someone writes to it' : worker.when === 'always' ? 'all the time' : worker.when === 'records' ? 'each time a record is published in a workspace it watches' : 'when its owner asks'}.
 
 The owner says what they want to see. Propose exactly three different apps for that, each a different way of showing the agent's work (for example: the newest result first, a list over time, one item at a time to share). Write in the language of the owner's sentence.
 

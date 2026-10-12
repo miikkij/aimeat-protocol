@@ -10,11 +10,15 @@
  *   another one.
  * @usage pnpm test -- agent-draft-known
  * @version-history
+ *   v1.1.0 — 2026-10-12 — An agent that works on a workspace's records: the prompt text, the
+ *     workspace a draft names, and the definition's `record_spaces`
+ *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.0.0 — 2026-10-12 — Initial (wish-kodin-agenttiluonnos-tuntee-ty-kalujen-kuvaukset-omistajan-s).
  */
 import { describe, it, expect } from 'vitest';
 import {
     DEFAULT_TOOL_MENU, clipLine, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
+    RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, recordSpacesOf,
 } from '../../public/js/services/agent-draft-known.js';
 
 const MENU = [
@@ -258,5 +262,76 @@ describe('reach', () => {
         expect(extraScopes(def('{{ctx.prompt}}', ['app_tools']))).toEqual(['ext:invoke']);
         expect(extraScopes(def('{{ctx.prompt}}', ['workspace', 'app_tools']))).toEqual(['organism:read', 'ext:invoke']);
         expect(extraScopes(def('{{ctx.prompt}}', ['web', 'memory']))).toEqual([]);
+    });
+});
+
+describe('an agent that works when a record is published in a workspace', () => {
+    const WATCH = { organism_id: 'org-1', workspace_id: 'ws-mail', spaces: ['shared.requests', 'shared.orders'] };
+
+    it('the prompt offers the kind only for a runtime that names the feature and a person with a workspace', () => {
+        const text = recordsBlock(KNOWN, [RECORDS_FEATURE]);
+        expect(text).toContain('"kind": "records"');
+        expect(text).toContain('"workspace"');
+        expect(recordsBlock(KNOWN, [])).toBe('');
+        expect(recordsBlock(KNOWN, undefined)).toBe('');
+        expect(recordsBlock({ apps: [], places: [] }, [RECORDS_FEATURE])).toBe('');
+    });
+    it('the prompt says what a task without a record is, because the first task of a new agent has none', () => {
+        expect(recordsBlock(KNOWN, [RECORDS_FEATURE])).toMatch(/no record/i);
+    });
+    it('the workspace a draft names is one the person has, found by its id', () => {
+        expect(watchedPlace({ kind: 'records', workspace: 'ws-mail' }, KNOWN)).toEqual({ organism_id: 'org-1', workspace_id: 'ws-mail' });
+        expect(watchedPlace({ kind: 'records', workspace: 'ws-nowhere' }, KNOWN)).toBeNull();
+        expect(watchedPlace({ kind: 'records', workspace: 'Mail &amp; drafts' }, KNOWN)).toBeNull();
+        expect(watchedPlace({ kind: 'records' }, KNOWN)).toBeNull();
+        expect(watchedPlace({ kind: 'clock', workspace: 'ws-mail' }, KNOWN)).toBeNull();
+    });
+    it('an id two organisms share needs the organism beside it', () => {
+        expect(watchedPlace({ kind: 'records', workspace: 'ws-same' }, KNOWN)).toBeNull();
+        expect(watchedPlace({ kind: 'records', workspace: 'ws-same', organism: 'org-3' }, KNOWN)).toEqual({ organism_id: 'org-3', workspace_id: 'ws-same' });
+        expect(watchedPlace({ kind: 'records', workspace: 'ws-same', organism: 'org-1' }, KNOWN)).toBeNull();
+    });
+    it('the definition gets the spaces as the runtime reads them, and listens for tasks and records', () => {
+        const out = withRecordSpaces({ ...def('{{ctx.prompt}}'), listen_for: ['messages'] }, WATCH);
+        expect(out.record_spaces).toEqual([
+            { organism_id: 'org-1', ws: 'ws-mail', space: 'shared.requests' },
+            { organism_id: 'org-1', ws: 'ws-mail', space: 'shared.orders' },
+        ]);
+        expect(out.listen_for).toEqual(['messages', 'tasks', 'records']);
+        expect(withRecordSpaces(def('{{ctx.prompt}}'), WATCH).listen_for).toEqual(['tasks', 'records']);
+    });
+    it('a space is written once, an empty one never, and at most twenty', () => {
+        const many = Array.from({ length: 30 }, (_, i) => `shared.s${i}`);
+        const out = withRecordSpaces(def('{{ctx.prompt}}'), { ...WATCH, spaces: ['a.b', 'a.b', '', '  ', ...many] });
+        expect(out.record_spaces.length).toBe(20);
+        expect(out.record_spaces[0].space).toBe('a.b');
+        expect(out.record_spaces[1].space).toBe('shared.s0');
+    });
+    it('with nothing to watch, the definition neither names a space nor listens for records', () => {
+        const written = { ...def('{{ctx.prompt}}'), listen_for: ['tasks', 'records'], record_spaces: [{ organism_id: 'o', ws: 'w', space: 's' }] };
+        for (const watch of [null, undefined, { ...WATCH, spaces: [] }, { organism_id: '', workspace_id: 'ws-mail', spaces: ['a.b'] }]) {
+            const out = withRecordSpaces(written, watch as any);
+            expect('record_spaces' in out).toBe(false);
+            expect(out.listen_for).toEqual(['tasks']);
+        }
+        // "records" was the only kind: an agent that listens for nothing would never be given work.
+        expect(withRecordSpaces({ ...def('{{ctx.prompt}}'), listen_for: ['records'] }, null).listen_for).toEqual(['tasks']);
+    });
+    it('a definition that never mentioned records is returned as it was', () => {
+        const plain = { ...def('{{ctx.prompt}}'), listen_for: ['tasks', 'dms'] };
+        expect(withRecordSpaces(plain, null)).toBe(plain);
+        const bare = def('{{ctx.prompt}}');
+        expect(withRecordSpaces(bare, null)).toBe(bare);
+    });
+    it('reads back the spaces a definition names, and only whole ones', () => {
+        const good = { organism_id: 'o', ws: 'w', space: 's' };
+        expect(recordSpacesOf({ listen_for: ['tasks', 'records'], record_spaces: [good, { organism_id: 'o', ws: 'w' }, null, 'x', { organism_id: 'o', ws: 'w', space: 7 }] })).toEqual([good]);
+        expect(recordSpacesOf({ listen_for: ['tasks'], record_spaces: [good] })).toEqual([]);
+        expect(recordSpacesOf({ listen_for: ['tasks', 'records'] })).toEqual([]);
+        expect(recordSpacesOf(null)).toEqual([]);
+    });
+    it('watching a workspace asks for the word the node checks before it sends a record', () => {
+        expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['web']), WATCH))).toEqual(['organism:read']);
+        expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['workspace_write']), WATCH))).toEqual(['organism:read']);
     });
 });

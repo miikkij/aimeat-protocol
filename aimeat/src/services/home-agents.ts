@@ -18,12 +18,16 @@
  *   chat agent is left out for the same reason.
  *
  *   WHEN AN AGENT WORKS, in one word, decided in this order: `always` when its run mode is resident,
- *   `clock` when an enabled schedule of kind agent_task names it, `talk` when its crew definition
- *   listens for messages or DMs, else `ask`. The crew definition is read only for the agents that are
- *   listed, because it is one memory read each.
- * @structure HomeWorker · HomeAgentsView · readHomeAgents(deps, owner, limit, only?)
+ *   `clock` when an enabled schedule of kind agent_task names it, `records` when its crew definition
+ *   names workspace spaces it watches, `talk` when the definition listens for messages or DMs, else
+ *   `ask`. The crew definition is read only for the agents that are listed, because it is one memory
+ *   read each.
+ * @structure HomeWorker · WatchedSpace · HomeAgentsView · readHomeAgents(deps, owner, limit, only?)
  * @usage const view = await readHomeAgents({ config, storage }, owner, 5);
  * @version-history
+ *   v1.4.0 — 2026-10-12 — `when` can be `records`, and a worker carries `watches`: the workspace
+ *     spaces its definition names in `record_spaces`
+ *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.3.0 — 2026-10-11 — `apps` and `work_goes_to` on a worker: the apps that show its work and
  *     the workspace the work is shared with, read for all workers at once (services/agent-ties.ts).
  *   v1.2.0 — 2026-10-11 — `stopped` and `stopped_at` on a worker.
@@ -39,13 +43,21 @@ import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { nodeTimeZone } from './display-prefs.js';
 import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent-ties.js';
 
-export type WorksWhen = 'ask' | 'clock' | 'talk' | 'always';
+export type WorksWhen = 'ask' | 'clock' | 'talk' | 'always' | 'records';
+
+/** One workspace space a crew definition names in `record_spaces`; `space` is the namespace. */
+export interface WatchedSpace { organism_id: string; ws: string; space: string }
 
 export interface HomeWorker {
   name: string;
   display_name: string;
   description: string;
   when: WorksWhen;
+  /**
+   * The workspace spaces whose published records give it work, as its crew definition names them.
+   * Empty when it names none; null when the definition was not read (as for `hears_messages`).
+   */
+  watches: WatchedSpace[] | null;
   /**
    * Whether its crew definition wakes on a message or a DM: true or false when the definition was
    * read, null when it was not read (the list skips it for a clock or resident agent) or the agent
@@ -96,6 +108,25 @@ function listensToPeople(doc: Record<string, unknown> | undefined): boolean {
 }
 
 /**
+ * The spaces a crew definition watches: `record_spaces`, when the definition also listens for
+ * records. The crew runtime subscribes exactly these, so "records" in `listen_for` with no space
+ * named gives the agent no work, and a space named without "records" is refused by the runtime.
+ */
+function watchedSpaces(doc: Record<string, unknown> | undefined): WatchedSpace[] {
+  const hears = doc?.listen_for;
+  const list = doc?.record_spaces;
+  if (!Array.isArray(hears) || !hears.includes('records') || !Array.isArray(list)) return [];
+  const out: WatchedSpace[] = [];
+  for (const item of list) {
+    const s = (item ?? {}) as Record<string, unknown>;
+    if (typeof s.organism_id === 'string' && s.organism_id && typeof s.ws === 'string' && s.ws && typeof s.space === 'string' && s.space) {
+      out.push({ organism_id: s.organism_id, ws: s.ws, space: s.space });
+    }
+  }
+  return out;
+}
+
+/**
  * `only` names one agent: `workers` then holds that agent alone (or nothing when the person has no
  * such worker), which is what the page of one agent reads.
  */
@@ -138,12 +169,15 @@ export async function readHomeAgents(
     // The definition is one memory read per agent, so the list reads it only where `when` turns
     // on it; the page of one agent reads it always, to know whether a message would be heard.
     let hears: boolean | null = null;
+    let watches: WatchedSpace[] | null = null;
     if (only || (a.runMode !== 'resident' && !job)) {
       const doc = (await readCrewState(storage, a)).published?.doc;
       hears = doc ? listensToPeople(doc) : null;
+      watches = doc ? watchedSpaces(doc) : null;
     }
     if (a.runMode === 'resident') when = 'always';
     else if (job) when = 'clock';
+    else if (watches?.length) when = 'records';
     else if (hears) when = 'talk';
     const c = counts[a.gaii];
     workers.push({
@@ -151,6 +185,7 @@ export async function readHomeAgents(
       display_name: a.displayName ?? a.name,
       description: a.description ?? '',
       when,
+      watches,
       hears_messages: hears,
       schedule: job ? { id: job.id, cron: job.cron, timezone: job.timezone || zone, next_run_at: job.nextRunAt ?? null } : null,
       connector: connectorOf(a.name),

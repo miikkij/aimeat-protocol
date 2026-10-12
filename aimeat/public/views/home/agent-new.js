@@ -22,6 +22,13 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.4.0 — 2026-10-12 — A fifth answer to "When it works": when something new arrives in a
+ *     workspace. The person chooses the workspace and the spaces in it (agent-watch-parts.js); the
+ *     definition then names them in `record_spaces` and listens for records, and the agent is
+ *     stated on that workspace when it is approved. Offered only when a connected agent on the
+ *     chosen computer says its agent program does this (`features` of GET /crew/menu). A stored
+ *     proposal whose definition names such spaces shows them and is stated on its workspaces the
+ *     same way (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.3.0 — 2026-10-12 — Before the person approves, two rows say which of their apps' tools the
  *     agent uses and which of their workspaces it reads or writes: the ones the definition names,
  *     by a tool's sku and a workspace's id (services/agent-draft-known.js). The draft is written
@@ -62,12 +69,14 @@ import { SubHeading } from '/components/SubHeading.js';
 import { CREW_TEMPLATES } from '/views/profile/agents/crew-templates.js';
 import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
-  draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeToolMenu, readHomeAgents, offerShown, scopesFor,
+  draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeMenu, readHomeAgents, offerShown, scopesFor,
 } from '/js/services/agent-draft.js';
-import { namedIn } from '/js/services/agent-draft-known.js';
+import { namedIn, recordSpacesOf, RECORDS_FEATURE } from '/js/services/agent-draft-known.js';
 import { decodeEntities } from '/js/utils.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
+import { activateEngagement } from '/js/services/organisms.js';
 import { WorkplaceChoice } from '/views/home/agent-ties-parts.js';
+import { WatchChoice, WatchedFacts } from '/views/home/agent-watch-parts.js';
 import { machineName } from '/views/home/agents-band.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -79,6 +88,7 @@ const HOME = '/v1/home';
 /** When a stored proposal's agent would work, read from what it carries. A schedule is not part of one. */
 function whenOfProposal(p) {
   if (p?.run_mode === 'resident') return 'always';
+  if (recordSpacesOf(p?.crew_def).length > 0) return 'records';
   const hears = p?.crew_def?.listen_for;
   return Array.isArray(hears) && hears.some((x) => x === 'messages' || x === 'dms') ? 'talk' : 'ask';
 }
@@ -113,6 +123,14 @@ export default function AgentNewView({ navigate }) {
   // draft, and read against the definition for the two rows that name what the agent uses.
   const [known, setKnown] = useState({ apps: [], places: [] });
   const knownRead = useRef(null);
+  // What the chosen computer's agent program offers: its tools, and what it says it honours beyond
+  // them. Asked from a connected agent on that computer; nobody to ask means no feature.
+  const [features, setFeatures] = useState([]);
+  const menuRead = useRef(null);
+  // For an agent that works when something new arrives in a workspace: the workspace it watches
+  // ('<organism id>/<workspace id>') and the namespaces of the spaces the person ticked.
+  const [watchPlace, setWatchPlace] = useState('');
+  const [watched, setWatched] = useState([]);
 
   const goHome = useCallback((e) => { e?.preventDefault?.(); navigate(HOME); }, [navigate]);
 
@@ -146,9 +164,28 @@ export default function AgentNewView({ navigate }) {
     }).catch((err) => { setProblem(err?.message || String(err)); setPhase('gone'); });
   }, [session, proposalId]);
 
+  // The runtime's menu, read again when the person chooses another computer: an agent on the
+  // chosen computer answers first, because that computer's agent program is the one that will run
+  // the new agent. With no connected agent there, any connected agent of the person gives the tool
+  // list, and no feature is taken from it.
+  useEffect(() => {
+    if (!home) return;
+    const online = (home.workers ?? []).filter((x) => x.has_key && x.connector?.online);
+    const here = online.filter((x) => x.connector?.id === machine).map((x) => x.name);
+    const names = here.length ? here : online.map((x) => x.name);
+    let live = true;
+    menuRead.current = runtimeMenu(names).then((menu) => {
+      const offered = here.length ? menu.features : [];
+      if (live) setFeatures(offered);
+      return { tools: menu.tools, features: offered };
+    });
+    return () => { live = false; };
+  }, [home, machine]);
+
   const takeDraft = useCallback((d) => {
     setDraft(d);
     setWhen(d.when || 'ask');
+    if (d.watch) setWatchPlace(`${d.watch.organism_id}/${d.watch.workspace_id}`);
     const at = timeOfCron(d.cron);
     if (at) setClock(at);
     if (d.cron) setDays(/\s1-5$/.test(d.cron) ? 'weekdays' : 'daily');
@@ -161,9 +198,8 @@ export default function AgentNewView({ navigate }) {
     setProblem('');
     setPhase('drafting');
     try {
-      const online = (home?.workers ?? []).filter((w) => w.has_key && w.connector?.online).map((w) => w.name);
-      const [tools, about] = await Promise.all([runtimeToolMenu(online), knownRead.current ?? Promise.resolve(undefined)]);
-      takeDraft(await draftAgent(wanted, { tools, known: about }));
+      const [menu, about] = await Promise.all([menuRead.current ?? runtimeMenu([]), knownRead.current ?? Promise.resolve(undefined)]);
+      takeDraft(await draftAgent(wanted, { tools: menu.tools, known: about, features: menu.features }));
     } catch (err) {
       // The model answered with something that is not an agent: the person can say it another way.
       if (err?.code === 'NO_JSON' || err?.code === 'BAD_DRAFT') {
@@ -176,7 +212,7 @@ export default function AgentNewView({ navigate }) {
         setPhase('ownAi');
       }
     }
-  }, [home, takeDraft]);
+  }, [takeDraft]);
 
   // Arriving with a sentence: write the draft once the machines are known (the tool list is read
   // from one of the person's connected agents).
@@ -190,6 +226,11 @@ export default function AgentNewView({ navigate }) {
   const machines = home?.connectors ?? [];
   const chosen = machines.find((c) => c.id === machine) ?? null;
   const residentHere = !!chosen && (chosen.run_modes ?? []).includes('resident');
+  // A workspace's records can start the new agent when the chosen computer's agent program says
+  // so. A stored proposal is approved as written: it works on records when its definition names
+  // the spaces, and the page cannot add them to it.
+  const proposalWatches = recordSpacesOf(proposal?.crew_def);
+  const canWatch = proposal ? proposalWatches.length > 0 : features.includes(RECORDS_FEATURE) && places.length > 0;
   const set = (key) => (value) => setDraft((d) => ({ ...d, [key]: value }));
 
   const start = async () => {
@@ -199,10 +240,19 @@ export default function AgentNewView({ navigate }) {
     if (String(draft.purpose || '').trim().length < 10) { setProblem(n('badPurpose', 'Say in one sentence what the agent is for.')); return; }
     const cron = when === 'clock' ? cronFor(days, clock) : '';
     if (when === 'clock' && !cron) { setProblem(n('badTime', 'Give the time as hours and minutes, for example 07:00.')); return; }
+    // What an agent that works on a workspace's records watches. A proposal names it in its own
+    // definition; for a draft it is the workspace and the spaces the person chose here.
+    const slashAt = watchPlace.indexOf('/');
+    const watch = when === 'records' && !proposal
+      ? { organism_id: watchPlace.slice(0, Math.max(slashAt, 0)), workspace_id: watchPlace.slice(slashAt + 1), spaces: watched }
+      : null;
+    if (watch && !canWatch) { setProblem(n('badWatchComputer', 'The computer you chose cannot start an agent from a workspace. Choose another computer, or another time for it to work.')); return; }
+    if (watch && (!watch.organism_id || !watch.workspace_id)) { setProblem(n('badWatchPlace', 'Choose the workspace the agent watches.')); return; }
+    if (watch && watch.spaces.length === 0) { setProblem(n('badWatchSpaces', 'Choose at least one space of the workspace for the agent to watch.')); return; }
     setProblem('');
     setBusy(true);
     try {
-      const choice = { when, cron, connector: machine || undefined };
+      const choice = { when, cron, connector: machine || undefined, watch };
       const made = { ...draft, name, purpose: draft.purpose.trim(), displayName: String(draft.displayName || '').trim() || name };
       const out = proposal
         ? await approveProposal(proposal.id, name, made, choice)
@@ -214,6 +264,22 @@ export default function AgentNewView({ navigate }) {
         const slash = place.indexOf('/');
         await setWorkplace(name, place.slice(0, slash), place.slice(slash + 1))
           .catch((err) => swallowed('agent-new: workplace', err));
+      }
+      // An agent that works on a workspace's records is stated on that workspace, once per
+      // workspace: it then shows among the workspace's agents and on its own Contracts tab, where
+      // it can be taken off. The agent is made either way, and its runtime works on a workspace
+      // that has no such statement, so one that could not be saved is logged.
+      if (when === 'records') {
+        const spaces = watch
+          ? [{ organism_id: watch.organism_id, ws: watch.workspace_id }]
+          : recordSpacesOf(proposal?.crew_def);
+        const seen = new Set();
+        for (const s of spaces) {
+          const key = `${s.organism_id}/${s.ws}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          await activateEngagement(s.organism_id, s.ws, name).catch((err) => swallowed('agent-new: engagement', err));
+        }
       }
       navigate(`${HOME}?agent=${encodeURIComponent(name)}&started=${state}${out?.schedule_problem ? '&schedule=failed' : ''}`);
     } catch (err) {
@@ -303,7 +369,7 @@ export default function AgentNewView({ navigate }) {
   }
 
   // ── The form: the agent, and the person's four choices ──
-  const scopes = proposal ? (proposal.scopes ?? []) : scopesFor(draft);
+  const scopes = proposal ? (proposal.scopes ?? []) : scopesFor(draft, { when });
   // The offer in the definition: the draft's own, or the one the proposer wrote.
   const offered = offerShown(draft.crewDef ?? proposal?.crew_def);
   // The person's apps and workspaces the definition names, for a draft and a proposal alike.
@@ -320,6 +386,18 @@ export default function AgentNewView({ navigate }) {
       hint: residentHere
         ? n('whenAlwaysHint', 'It stays running the whole time. For an agent that follows something without a break.')
         : n('whenAlwaysOff', 'This computer starts an agent when work arrives and does not keep one running.'),
+    },
+    {
+      value: 'records', label: tr('home.agents.when.records', 'When something new arrives in a workspace'), disabled: !canWatch,
+      hint: canWatch
+        ? (proposal
+          ? n('whenRecordsHintProposal', 'It gets a task each time a record is published in the workspace spaces that the proposal names.')
+          : n('whenRecordsHint', 'It gets a task each time a record is published in the spaces of a workspace that you choose.'))
+        : proposal
+          ? n('whenRecordsOffProposal', 'This proposal names no workspace space to watch.')
+          : places.length === 0
+            ? n('whenRecordsOffPlaces', 'You are not in an organism that has a workspace yet.')
+            : n('whenRecordsOff', 'The agent program on this computer does not do this yet, or no agent on this computer is connected to say that it does.'),
     },
   ];
   // A proposal's schedule is not part of the proposal, so its time cannot be read; every other
@@ -353,6 +431,10 @@ export default function AgentNewView({ navigate }) {
           <${Choice} label=${n('days', 'Which days')} value=${days} onChange=${setDays}
             options=${[['weekdays', n('weekdays', 'Weekdays')], ['daily', n('daily', 'Every day')]]} />
           <${TextField} type="time" label=${n('time', 'At what time')} value=${clock} onInput=${setClock} />`}
+        ${when === 'records' && !proposal && canWatch && html`
+          <${WatchChoice} places=${places} place=${watchPlace} onPlace=${setWatchPlace} watched=${watched} onWatched=${setWatched} />`}
+        ${when === 'records' && proposal && proposalWatches.length > 0 && html`
+          <${WatchedFacts} spaces=${proposalWatches} places=${places} />`}
 
         ${proposal
           ? html`<${Facts} wide rows=${[{ k: n('reach', 'What it reaches'), v: areaLine(scopes, t) }]} />`

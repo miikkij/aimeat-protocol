@@ -12,6 +12,9 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.3.0 -- 2026-10-12 -- Step 1.2: an agent whose work arrives in a workspace names the spaces
+ *     it watches in `record_spaces` and listens for "records", when the runtime's menu lists the
+ *     feature (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.2.0 -- 2026-10-12 -- An agent that hands work to the owner's other agents asks agent:read.
  *   v1.1.0 -- 2026-10-12 -- Step 0: before a new tool is proposed, look at the tools the person's
  *     apps publish; the rule is in skill aimeat-agent-capability
@@ -88,6 +91,21 @@ examples: email, a calendar, meeting notes from a recording.
    \`{{ctx.prompt}}\`, which is where the incoming work lands. \`listen_for\` says what wakes the
    crew: it defaults to \`["tasks"]\`, and that is wrong for an agent whose work arrives as a
    message or a DM. The full shape is in the \`doc\` parameter of \`aimeat_crew_publish\`.
+   **An agent whose work arrives in a workspace.** When the agent is to act on what is published
+   in a workspace (a new request, an order, a filled form), the definition names the spaces it
+   watches: \`"listen_for": ["tasks", "records"]\` and \`"record_spaces": [{ "organism_id", "ws",
+   "space" }]\`, one to twenty of them. \`space\` is the space's namespace, which
+   \`aimeat_workspace_read\` without ids gives in the manifest's \`objectTypes\`. Only a record
+   space whose records are memory entries counts: a row appended to a row space and a document
+   page start no agent. Write it only when \`aimeat_crew_menu\` lists \`record_spaces\` in
+   \`features\`; a runtime that does not list it ignores the field. Each published record then
+   reaches the agent as one task whose text is the record itself, with its workspace, space and
+   id, so write the first task for that. The agent also gets a task with no record in it when it
+   is made: say in the task description that it then tells in one sentence what it does when a
+   record arrives, and writes nothing. Ask \`organism:read\` for it, and \`organism:write\` with
+   \`memory:write\` when it writes back into the workspace. The owner sees the spaces on the
+   approval page, and approving there states the agent on the workspace, where the owner or the
+   workspace's creator can retire it.
 3. **Propose it.** \`aimeat_agent_propose\` with \`name\`, a \`purpose\` the owner can decide from
    (it is the sentence they read, so name their data in it: "reads the open deals in your Sales
    workspace each morning and lists what to act on"), \`scopes\`, \`mode\`, \`run_mode\` and the

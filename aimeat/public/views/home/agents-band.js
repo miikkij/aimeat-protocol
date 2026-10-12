@@ -13,7 +13,7 @@
  *   A ROW WITH NOTHING TO SAY IS NOT DRAWN, as everywhere on the home. A person with no agents sees
  *   the field and, when they have no machine either, the line that says an agent needs one.
  *
- *   THE WORDS FOR WHEN AN AGENT WORKS are the four the proposal page offers (whenWords), so a row
+ *   THE WORDS FOR WHEN AN AGENT WORKS are the five the proposal page offers (whenWords), so a row
  *   here and a choice there cannot name one thing two ways.
  *
  *   Composed from library components only (Band, NamedRow, LineList, TextField, Action, Mark, Note);
@@ -21,6 +21,8 @@
  * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · stateWords(worker)
  * @usage html`<${AgentsBand} data=${homeAgents} navigate=${ctx.navigate} />`
  * @version-history
+ *   2026-10-12 — whenWords says "When something new arrives in a workspace" for an agent whose
+ *     definition names the workspace spaces it watches.
  *   2026-10-11 — A stopped agent's row says "stopped", and how many tasks wait for it.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
@@ -54,6 +56,7 @@ export function whenWords(worker) {
       .replace('{words}', cronWordsIn(worker.schedule.cron, worker.schedule.timezone));
   }
   if (worker.when === 'always') return tr('home.agents.when.always', 'Always on');
+  if (worker.when === 'records') return tr('home.agents.when.records', 'When something new arrives in a workspace');
   if (worker.when === 'talk') return tr('home.agents.when.talk', 'When someone writes to it');
   if (worker.when === 'clock') return tr('home.agents.when.clock', 'By the clock');
   return tr('home.agents.when.ask', 'When I ask');
