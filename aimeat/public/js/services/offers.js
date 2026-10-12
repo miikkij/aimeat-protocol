@@ -9,6 +9,8 @@
  * @structure listOffers / getAgentOffers / publishOffers · ask(agentEntry, offer, inputs) · buildAskPrompt
  * @usage import * as offers from '/js/services/offers.js';
  * @version-history
+ *   v1.2.1 -- 2026-10-12 -- aiAvailable() asks GET /v1/ai/available: node 4.0.0 removes GET
+ *     /v1/openrouter/settings, which it read.
  *   v1.2.0 -- 2026-10-11 -- An offer's two values (ruling "morseli on tahdistus, ei hinta"): setOfferBilling
  *     takes tollMorsels (the pacing amount) and priceMoney, not a morsel price; publishOffers drops the
  *     deprecated price mirror a GET returns, so a save does not add it to the pacing a second time.
@@ -90,11 +92,11 @@ export async function listOfferRuns({ agent, offerId, limit = 5 }) {
 // /v1/ai/complete endpoint (spend-safe, consent-gated) — runs ONLY on explicit submit, never on every
 // keystroke. When nothing fits, it returns noMatch + a one-line brief for crew-forge (close the loop).
 
-/** True when the owner has an OpenRouter key configured (gates the "find by need" button). */
+/** True when the node can run an AI call for the owner now (gates the "find by need" button). */
 export async function aiAvailable() {
   try {
-    const r = await apiGet('/v1/openrouter/settings');
-    return !!(r?.ok && r.data && (r.data.hasApiKey || r.data.has_api_key));
+    const r = await apiGet('/v1/ai/available');
+    return !!(r?.ok && r.data && r.data.available === true);
   } catch (err) { swallowed('offers: aiAvailable', err); return false; }
 }
 

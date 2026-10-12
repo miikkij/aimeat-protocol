@@ -274,13 +274,13 @@
       "digest": "sha256:3db4af88bd2d22715808c1bb"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-12",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:80e835c7e48a8d8b2cf7f9c0"
+      "digest": "sha256:ee6ddf9e2f6ea7dae56485dd"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -377,7 +377,7 @@
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
-      "reviewedOn": "2026-10-11",
+      "reviewedOn": "2026-10-12",
       "watches": [
         "aimeat/src/services/ai/capabilities.ts",
         "aimeat/src/services/ai-embed.ts",
@@ -385,7 +385,7 @@
         "aimeat/src/static/sdk-libs/ai/index.js",
         "aimeat/src/services/ai-jobs/ext-capability.ts"
       ],
-      "digest": "sha256:de0f93161d65d46bbf48f9aa"
+      "digest": "sha256:d69beca32c17c758bd59892c"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-10-12",
@@ -609,7 +609,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "8b4a9f4755ebe511",
+      "aimeat/src/routes/ai.ts": "71e8bca97955ccd0",
       "aimeat/src/routes/ai-providers.ts": "7bcbba098542ad10",
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
@@ -680,7 +680,7 @@
       "aimeat/src/services/ai/capabilities.ts": "c2bd2ada0b90307e",
       "aimeat/src/services/ai-embed.ts": "1f5aa10952622806",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
-      "aimeat/src/static/sdk-libs/ai/index.js": "aca920503717cbca",
+      "aimeat/src/static/sdk-libs/ai/index.js": "09556928446b7c7b",
       "aimeat/src/services/ai-jobs/ext-capability.ts": "7899a2526e2df8ba"
     },
     "node:aimeat-refinery": {

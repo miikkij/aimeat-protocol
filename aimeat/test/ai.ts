@@ -11,6 +11,8 @@
  *     aimeat-ai.js lib probes it.
  *   v1.2.0 — 2026-07-05 — Assert per-app quota default is null (= the daily budget) and that a
  *     per-app quota round-trips through /v1/ai/settings.
+ *   v1.3.0 — 2026-10-12 — GET /v1/ai/settings answers limits.voice_msg_max_seconds and no Deprecation
+ *     header; the suite runs at 3.x and as node 4.0.0 (AIMEAT_TEST_SOFTWARE_VERSION=4.0.0).
  */
 // Run: cd aimeat && pnpm exec tsx test/ai.ts
 // Requires: server running on port 40251 with AIMEAT_ENCRYPTION_KEY set
@@ -157,6 +159,17 @@ await test('GET /v1/ai/settings shows defaults for a fresh user', async () => {
   assert(d?.app_allowlist === null, 'app_allowlist null by default');
   // v1.4.0: an app defaults to the whole daily budget — no separate hidden per-app cap.
   assert(d?.defaults?.per_app_daily_usd === null, `expected per_app_daily_usd default null, got ${d?.defaults?.per_app_daily_usd}`);
+});
+
+// The budget routes stay on node 4.0.0, which removes /v1/openrouter/settings: the inbox's voice
+// recorder reads its limit here now. Run with AIMEAT_TEST_SOFTWARE_VERSION=4.0.0 to prove it there.
+await test('GET /v1/ai/settings answers limits.voice_msg_max_seconds and no Deprecation header', async () => {
+  const res = await fetch(`${BASE}/v1/ai/settings`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(res.status === 200, `expected 200, got ${res.status}`);
+  assert(res.headers.get('deprecation') === null, `expected no Deprecation header, got ${res.headers.get('deprecation')}`);
+  const body = await res.json() as { data?: { limits?: { voice_msg_max_seconds?: unknown } } };
+  const n = body.data?.limits?.voice_msg_max_seconds;
+  assert(typeof n === 'number' && n > 0, `expected a positive voice_msg_max_seconds, got ${JSON.stringify(body.data?.limits)}`);
 });
 
 await test('POST /v1/ai/settings updates daily budget', async () => {

@@ -17521,7 +17521,7 @@ paths:
         A credential record (`openrouter.apikey`, `decide.apikey`, `commerce.psp`,
         the `ai.apikey.*` keys and the per-agent keys) is not removed here, by
         anyone, the owner included: 403 SECRET_RECORD, naming the record's own
-        route (for example DELETE /v1/openrouter/settings).
+        route (for example DELETE /v1/ai/providers/{id}).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -67543,12 +67543,13 @@ paths:
   /v1/ai/settings:
     get:
       operationId: getAiSettings
-      deprecated: true
       tags: [OpenRouter]
-      summary: Get the owner's AI (OpenRouter) budget settings
+      summary: Get the owner's AI budget settings
       description: |
-        Return the owner's OpenRouter spend controls: daily budget, per-app quotas, an optional
-        app allowlist, and the node defaults. Requires the `owner` role.
+        Return the owner's AI spend controls: daily budget, per-app quotas, an optional app
+        allowlist, the node defaults, and the node's limits (`voice_msg_max_seconds`, the longest
+        voice message the recorder takes). Requires the `owner` role. Not removed in node 4.0.0:
+        the budget, the quotas and the allowlist have no successor under /v1/ai/providers.
       security:
         - BearerAuth: []
       responses:
@@ -67571,13 +67572,18 @@ paths:
                             nullable: true
                             items: { type: string }
                           defaults: { type: object }
+                          limits:
+                            type: object
+                            properties:
+                              voice_msg_max_seconds:
+                                type: integer
+                                description: The longest voice message this node takes, in seconds (AIMEAT_VOICE_MSG_MAX_SECONDS).
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
       operationId: updateAiSettings
-      deprecated: true
       tags: [OpenRouter]
-      summary: Update the owner's AI (OpenRouter) budget settings
+      summary: Update the owner's AI budget settings
       description: |
         Update the daily budget, per-app quotas, and/or app allowlist. Requires the `owner` role.
         `daily_budget_usd` must be between 0 and 1000.

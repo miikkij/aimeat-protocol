@@ -29,6 +29,9 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.2.1 — 2026-10-12 — aiProvidersView reads which providers have a key AFTER the migration, so the
+ *     first read after the legacy setting gained a key says has_key (the AI page reads the connection
+ *     from this view since node 4.0.0 removed GET /v1/openrouter/settings).
  *   v1.0.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  *   v1.1.0 — 2026-09-28 — catalogCheck and model_status from the model catalogue (V4); an extension
@@ -433,9 +436,12 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
   routing: { defaults: RoutingDefaults; rules: RoutingRules; agent_defaults?: RoutingDefaults };
   limits: { max_owner_providers: number };
 }> {
-  const [{ node, owner }, keys, routing] = await Promise.all([
-    providersForOwner(storage, config, ownerGhii), ownerKeyIds(storage, ownerGhii), readRouting(storage, ownerGhii, agent),
+  const [{ node, owner }, routing] = await Promise.all([
+    providersForOwner(storage, config, ownerGhii), readRouting(storage, ownerGhii, agent),
   ]);
+  // After the migration, which may have just written the migrated provider's key copy: read in
+  // parallel, the first read after the legacy setting gained a key said it had none.
+  const keys = await ownerKeyIds(storage, ownerGhii);
   // Each capability's model with its catalogue status, so an owner sees a model that is retiring or
   // retired where it is used (plan 06, section 6). A model the catalogue does not know says nothing.
   const withStatus = (p: AiProvider): Record<string, unknown> => {

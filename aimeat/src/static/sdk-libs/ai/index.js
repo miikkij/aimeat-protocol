@@ -13,6 +13,9 @@
  *   const caps = await AIMEAT.ai.capabilities({ app_id });
  *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.8.1 - 2026-10-12 - isAvailable() drops its fallback to GET /v1/openrouter/settings: node 4.0.0
+ *     removes that route, and every node that serves this lib answers GET /v1/ai/available (since
+ *     2026-06-25), so the fallback could only ever be reached by a refusal.
  *   v1.8.0 - 2026-10-02 - The capability that is off and the refused call both carry the person's
  *     sentence (`fix`) and `settingsUrl`; the docs say to show both (call.js aiError lifts them).
  *   v1.7.0 - 2026-09-28 - AI roles: complete(), stream(), image(), speak(), transcribe(), embed() and
@@ -138,24 +141,18 @@ const ai = {
   capabilities,
 
   /**
-   * Returns true if the user has AI configured (an OpenRouter key, or a keyless
-   * self-hosted provider). Cached 60 seconds. Apps should call this before showing
-   * "Use AI" buttons. Uses GET /v1/ai/available, which an app-grant token (a sandboxed
-   * app on the isolated app origin) can call with the ai:use scope — unlike the
-   * owner-only /v1/openrouter/settings. Falls back to that settings probe on older nodes.
+   * Returns true if a text call would find a provider for the user now (their own key, a keyless
+   * self-hosted provider, or the node's when it pays for them). Cached 60 seconds. Apps should
+   * call this before showing "Use AI" buttons. Uses GET /v1/ai/available, which an app-grant token
+   * (a sandboxed app on the isolated app origin) can call with the ai:use scope. The node that
+   * serves this lib answers that route, so there is no fallback.
    */
   async isAvailable() {
     const now = Date.now();
     if (_availCache && (now - _availCache.t) < 60_000) return _availCache.v;
     try {
       const r = await authFetch('/v1/ai/available');
-      if (r && r.ok && r.data && typeof r.data.available === 'boolean') {
-        _availCache = { v: r.data.available, t: now };
-        return r.data.available;
-      }
-      // Older node without /v1/ai/available: fall back to the owner-only settings probe.
-      const s = await authFetch('/v1/openrouter/settings');
-      const v = !!(s && s.ok && s.data && (s.data.hasApiKey || s.data.has_api_key));
+      const v = !!(r && r.ok && r.data && r.data.available === true);
       _availCache = { v, t: now };
       return v;
     } catch { return false; }

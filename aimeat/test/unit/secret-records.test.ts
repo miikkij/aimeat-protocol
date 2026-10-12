@@ -6,6 +6,8 @@
  *   (services/secret-records.ts). Written with the per-agent AI keys, and for the hole found on the
  *   way: `decide.apikey` was not on the list, so the generic memory doors returned its ciphertext.
  * @version-history
+ *   v1.0.1 — 2026-10-12 — The refusal for `openrouter.apikey` names PUT /v1/ai/providers/{id}/key, not
+ *     the /v1/openrouter/settings route node 4.0.0 removes.
  *   v1.0.0 — 2026-09-20 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -42,6 +44,7 @@ describe('secret records', () => {
   it('the write refusal names the door that does write it', () => {
     expect(secretRecordWriteRefusal('decide.apikey').message).toMatch(/\/v1\/ai\/decide\/settings/);
     expect(secretRecordWriteRefusal('decide.apikey.agent.bot').message).toMatch(/\/v1\/agents\/\{name\}\/ai-keys/);
-    expect(secretRecordWriteRefusal('openrouter.apikey').message).toMatch(/\/v1\/openrouter\/settings/);
+    // Node 4.0.0 removes /v1/openrouter/settings; the AI key is written on the provider routes.
+    expect(secretRecordWriteRefusal('openrouter.apikey').message).toMatch(/\/v1\/ai\/providers\/\{id\}\/key/);
   });
 });

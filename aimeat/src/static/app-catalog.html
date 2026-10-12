@@ -11667,10 +11667,10 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       return;
     }
     var url = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(url + "/v1/openrouter/settings", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+    fetch(url + "/v1/ai/available", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
       return r.json();
     }).then(function(j) {
-      detailAiAvailable = !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key));
+      detailAiAvailable = !!(j && j.data && j.data.available === true);
       if (detailAppId) renderDetailView();
     }).catch(function() {
       detailAiAvailable = false;

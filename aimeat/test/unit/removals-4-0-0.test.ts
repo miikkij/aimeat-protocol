@@ -15,8 +15,12 @@
  *   Covered: the owner-key sign-in (and its single-use signature), `?token=` on a WebSocket upgrade,
  *   the federation format without the audience proof, the optional relay claim, the legacy AI
  *   settings routes, the static TURN pair, costCapMorsels, and the config rows that kept each alive.
+ *   GET and POST /v1/ai/settings are NOT removed (the daily budget, the per-app caps and the app
+ *   allowlist have no other REST route), and are tested to answer at 4.0.0.
  * @usage cd aimeat && pnpm exec vitest run test/unit/removals-4-0-0.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-12 — The real AI routers: the three /v1/openrouter routes answer 410 at 4.0.0, and
+ *     GET and POST /v1/ai/settings answer there, GET with limits.voice_msg_max_seconds.
  *   v1.0.0 — 2026-10-12 — Initial (wish-4-0-0-n-poistot-koodiin-versioporttina-ei-kommenttina).
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -45,7 +49,8 @@ import { authenticateUpgrade } from '../../src/auth/ws-upgrade.js';
 import { audienceRefusal, deliveryRefusal } from '../../src/services/signed-node-request.js';
 import { effectiveRelayClaim, parsePeerRelayClaim } from '../../src/services/relay-claim-policy.js';
 import { relayGate } from '../../src/middleware/relay-gate.js';
-import { legacyAiSettingsRoute } from '../../src/routes/openrouter.js';
+import { legacyAiSettingsRoute, openrouterRouter } from '../../src/routes/openrouter.js';
+import { aiRouter } from '../../src/routes/ai.js';
 import { turnEntryFor } from '../../src/services/turn-credentials.js';
 import { saveWorkflow } from '../../src/services/workflow/store.js';
 import { CONFIG_FIELDS } from '../../src/services/config-schema.js';
@@ -82,6 +87,14 @@ async function get(path: string, headers: Record<string, string> = {}): Promise<
     return { status: res.status, body: parsed, headers: res.headers };
 }
 
+/** An owner session token, as the password sign-in mints one. */
+async function ownerJwt(): Promise<string> {
+    const sessionId = `sess-${Math.random().toString(36).slice(2)}`;
+    const now = new Date();
+    await storage.createSession({ sessionId, gaii: OWNER, owner: OWNER, issuedAt: now.toISOString(), expiresAt: new Date(now.getTime() + 600_000).toISOString() });
+    return issueJWT({ sub: OWNER, owner: OWNER, node: NODE_ID, roles: ['owner'] }, 600, sessionId);
+}
+
 /** A fresh owner-key sign-in body: the owner signs owner + node id + timestamp. */
 async function ownerKeyBody(): Promise<Record<string, string>> {
     const timestamp = new Date().toISOString();
@@ -112,6 +125,9 @@ beforeAll(async () => {
     app.use(relayGate(live, storage, new Map()));
     app.use(authRouter(live, storage));
     app.get('/legacy-ai', legacyAiSettingsRoute(live), (_req, res) => { res.json({ ok: true }); });
+    // The real AI routers, mounted as routes-loader-ai.ts mounts them.
+    app.use(openrouterRouter(live, storage));
+    app.use(aiRouter(live, storage));
     app.get('/relayed', (_req, res) => { res.json({ ok: true }); });
     app.get('/turn', (_req, res) => {
         const entry = turnEntryFor({ turnServer: 'turn:turn.test:3478', turnUsername: 'u', turnCredential: 'c', turnSecret: null, turnTtlSeconds: 3600 },
@@ -259,6 +275,44 @@ describe('the AI settings routes from before providers', () => {
         const r = await get('/legacy-ai');
         expect(r.status).toBe(410);
         expect(r.body.error.code).toBe('GONE');
+    });
+
+    it('4.0.0 answers 410 GONE on each of the three /v1/openrouter routes', async () => {
+        v.version = NEW;
+        const auth = { Authorization: `Bearer ${await ownerJwt()}` };
+        const calls: Array<[string, string]> = [
+            ['GET', '/v1/openrouter/settings'], ['PUT', '/v1/openrouter/settings'], ['DELETE', '/v1/openrouter/settings'],
+            ['GET', '/v1/openrouter/models'], ['POST', '/v1/openrouter/test'],
+        ];
+        for (const [method, path] of calls) {
+            const res = await fetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json', ...auth }, ...(method === 'GET' || method === 'DELETE' ? {} : { body: '{}' }) });
+            const body = await res.json() as { error?: { code?: string } };
+            expect(res.status, `${method} ${path}`).toBe(410);
+            expect(body.error?.code, `${method} ${path}`).toBe('GONE');
+        }
+    });
+
+    it('4.0.0 keeps GET and POST /v1/ai/settings: the budget, the per-app caps and the voice limit', async () => {
+        v.version = NEW;
+        const auth = { Authorization: `Bearer ${await ownerJwt()}` };
+        const saved = await post('/v1/ai/settings', { daily_budget_usd: 3, app_quotas: { drop: { daily_usd: 0.5 } } }, auth);
+        expect(saved.status).toBe(200);
+        expect(saved.body.data.saved).toBe(true);
+        const r = await get('/v1/ai/settings', auth);
+        expect(r.status).toBe(200);
+        expect(r.headers.get('deprecation')).toBeNull();
+        expect(r.body.data.daily_budget_usd).toBe(3);
+        expect(r.body.data.app_quotas.drop.daily_usd).toBe(0.5);
+        expect(r.body.data.limits.voice_msg_max_seconds).toBe(config.voiceMsgMaxSeconds);
+    });
+
+    it('3.26.1 answers /v1/ai/settings without the Deprecation headers: it is not a removed route', async () => {
+        v.version = OLD;
+        const before = deprecatedCount('ai_legacy_settings_routes');
+        const r = await get('/v1/ai/settings', { Authorization: `Bearer ${await ownerJwt()}` });
+        expect(r.status).toBe(200);
+        expect(r.headers.get('deprecation')).toBeNull();
+        expect(deprecatedCount('ai_legacy_settings_routes')).toBe(before);
     });
 
     it('3.26.1 still answers, with the Deprecation headers, and counts the use', async () => {
