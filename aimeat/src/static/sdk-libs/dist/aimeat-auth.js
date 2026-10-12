@@ -2967,6 +2967,12 @@
       focusRefreshInFlight = null;
     });
   }
+  function generatedPassword() {
+    const bytes = crypto.getRandomValues(new Uint8Array(18));
+    let random = "";
+    for (const b of bytes) random += String.fromCharCode(b);
+    return "Aa1-" + btoa(random).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
   async function sessionFromLogin(data) {
     const d = data.data;
     let ownerCryptoKey = null;
@@ -3023,10 +3029,23 @@
     nodeId: NODE_ID,
     /**
      * Register a new human identity (GHII) and get an authenticated session.
-     * @returns {Promise<object>} Session object with .fetch(), .refresh(), .jwt, .ghii
+     *
+     * The account signs in with a password, always: the session comes from POST /v1/ghii/login and
+     * renews with the httpOnly refresh cookie. A call without `opts.password` used to sign in with the
+     * account key (POST /v1/auth/token), which node 4.0.0 removes (OWNER_KEY_LOGIN_REMOVED_IN). Such a
+     * call now gets a strong random password, made here and sent only to this node; the returned
+     * session carries it once as `generatedPassword` (never stored), so the caller can show it to the
+     * person, who needs it to sign in again on another device or after the session ends.
+     * @param {string} username
+     * @param {string} displayName
+     * @param {{ password?: string, bio?: string, avatar?: string, locale?: string }} [opts]
+     * @returns {Promise<object>} Session object with .fetch(), .refresh(), .jwt, .ghii (and
+     *   .generatedPassword when the caller gave no password)
      */
     async register(username, displayName, opts = {}) {
-      const regData = await api("/v1/ghii", {
+      const generated = opts.password ? "" : generatedPassword();
+      const password = opts.password || generated;
+      await api("/v1/ghii", {
         method: "POST",
         credentials: "include",
         body: JSON.stringify({
@@ -3035,53 +3054,11 @@
           bio: opts.bio,
           avatar: opts.avatar,
           locale: opts.locale,
-          password: opts.password || void 0
+          password
         })
       });
-      if (opts.password) {
-        return this.loginWithPassword(username, opts.password);
-      }
-      const ownerName = regData.data.owner.name;
-      const ghii = regData.data.ghii.ghii;
-      const serverPrivateKey = regData.data.private_key || regData.data.owner_private_key;
-      const serverPublicKey = regData.data.public_key || regData.data.owner_public_key || "";
-      if (!serverPrivateKey) {
-        throw new Error("Server did not return an owner signing key. Please try signing in again.");
-      }
-      let ownerToken = regData.data.token || null;
-      if (!ownerToken) {
-        const ownerTimestamp = (/* @__PURE__ */ new Date()).toISOString();
-        const ownerMessage = ownerName + NODE_ID + ownerTimestamp;
-        const ownerSig = await sign(serverPrivateKey, ownerMessage);
-        const ownerTokenData = await api("/v1/auth/token", {
-          method: "POST",
-          body: JSON.stringify({ owner: ownerName, timestamp: ownerTimestamp, signature: ownerSig })
-        });
-        ownerToken = ownerTokenData.data.token;
-      }
-      const ownerCryptoKey = await importEd25519Key(serverPrivateKey);
-      await storeKey("owner_key", ownerCryptoKey);
-      const session = createSession({
-        ghii,
-        owner: ownerName,
-        gaii: null,
-        jwt: ownerToken,
-        _cryptoKey: ownerCryptoKey,
-        publicKey: serverPublicKey,
-        displayName: regData.data.ghii.display_name || ""
-      });
-      save("session", {
-        owner: ownerName,
-        gaii: null,
-        ghii,
-        jwt: session.jwt,
-        publicKey: serverPublicKey,
-        roles: session.roles,
-        displayName: session.displayName || ""
-      });
-      currentSession = session;
-      scheduleAutoRefresh(session);
-      emit("login", session, { restored: false });
+      const session = await this.loginWithPassword(username, password);
+      if (generated) session.generatedPassword = generated;
       return session;
     },
     /**

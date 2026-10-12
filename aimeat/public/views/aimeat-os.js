@@ -249,7 +249,7 @@ function generateMarkdown(nodeUrl) {
   md += `### AIMEAT.auth\n${SS}javascript\n`;
   md += `AIMEAT.auth.mountLoginButton('#el', { onLogin, onLogout }) // login bar\n`;
   md += `await AIMEAT.auth.login()           // restore session (null if not logged in)\n`;
-  md += `await AIMEAT.auth.register(name, pw) // register new account\n`;
+  md += `await AIMEAT.auth.register(name, displayName, { password }) // register new account\n`;
   md += `await AIMEAT.auth.loginWithPassword(name, pw)\n`;
   md += `AIMEAT.auth.logout()\n`;
   md += `AIMEAT.auth.getSession()            // current session (sync)\n`;

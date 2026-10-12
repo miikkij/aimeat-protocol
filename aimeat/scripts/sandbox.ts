@@ -48,6 +48,10 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.6.0 — 2026-10-12 — Owners are registered with POST /v1/ghii and a password and signed in with
+ *     POST /v1/ghii/login, on the first run and on every refresh. The owner-key sign-in this used is
+ *     removed in node 4.0.0 (OWNER_KEY_LOGIN_REMOVED_IN), and the password sign-in's access token
+ *     lasts a day here (AIMEAT_ACCESS_TTL). The agent still signs in with its own key.
  *   v1.5.0 — 2026-10-10 — A stand-in store address (https://store.example/), so the controls that
  *     lead to the store are drawn in the sandbox.
  *   v1.4.0 — 2026-10-10 — The connector tunnel is on, so `pnpm sandbox:machines` can stand machines
@@ -154,6 +158,9 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         // in the morning is enough.
         AIMEAT_LOGIN_TARPIT_STEP_MS: '0',
         AIMEAT_JWT_TTL: '86400',
+        // An owner signs in with the password (POST /v1/ghii/login), whose token is a session's
+        // access token: fifteen minutes on a shipped node, a working day here.
+        AIMEAT_ACCESS_TTL: '86400',
         AIMEAT_RL_GLOBAL: '100000',
         AIMEAT_RL_AUTH: '10000',
         AIMEAT_RL_WORK: '10000',
@@ -307,32 +314,24 @@ async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(sig).toString('base64');
 }
 
-/** A fresh JWT for an owner or an agent, from the key the sandbox stored when it created them. */
-async function mintToken(nameOrGaii: string, privateKey: string, isAgent: boolean): Promise<string> {
+/** A fresh JWT for the agent, from the key the sandbox stored when it created it (the agent sign-in). */
+async function agentToken(gaii: string, privateKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? nameOrGaii + timestamp : nameOrGaii + NODE_ID + timestamp;
-    const signature = await sign(privateKey, message);
-    const payload = isAgent ? { gaii: nameOrGaii, timestamp, signature } : { owner: nameOrGaii, timestamp, signature };
-    const { body } = await api<{ token: string }>('/v1/auth/token', { method: 'POST', body: payload });
-    if (body.ok !== true || !body.data) throw new Error(`token for ${nameOrGaii}: ${JSON.stringify(body.error)}`);
+    const signature = await sign(privateKey, gaii + timestamp);
+    const { body } = await api<{ token: string }>('/v1/auth/token', { method: 'POST', body: { gaii, timestamp, signature } });
+    if (body.ok !== true || !body.data) throw new Error(`token for ${gaii}: ${JSON.stringify(body.error)}`);
     return body.data.token;
 }
 
 /**
- * A fresh JWT for an owner the sandbox already has. A browser sign-in from a browser that holds no
- * owner key replaces the account's key on the node, and the stored key then no longer signs; the
- * password still does, so a refused key falls back to the password sign-in. That token is a
- * browser session's and lasts fifteen minutes where the key's lasts a day; `pnpm sandbox` again
- * gives a new one.
+ * A fresh JWT for an owner: the password sign-in (POST /v1/ghii/login), the way a person signs in.
+ * The owner-key sign-in this used before is removed in node 4.0.0 (OWNER_KEY_LOGIN_REMOVED_IN), and a
+ * browser sign-in replaced the stored key anyway. The token lasts a day here (AIMEAT_ACCESS_TTL above).
  */
-async function refreshOwnerToken(o: Account): Promise<string> {
-    try {
-        return await mintToken(o.name, o.privateKey, false);
-    } catch (keyErr) {
-        const { body } = await api<{ token: string }>('/v1/ghii/login', { method: 'POST', body: { username: o.name, password: o.password } });
-        if (body.ok !== true || !body.data) throw keyErr;
-        return body.data.token;
-    }
+async function refreshOwnerToken(o: { name: string; password: string }): Promise<string> {
+    const { status, body } = await api<{ token: string }>('/v1/ghii/login', { method: 'POST', body: { username: o.name, password: o.password } });
+    if (body.ok !== true || !body.data) throw new Error(`sign-in for ${o.name}: ${status} ${JSON.stringify(body.error ?? body)}`);
+    return body.data.token;
 }
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -432,13 +431,12 @@ const APP_HTML = (title: string, body: string): string =>
     + `<body><h1>${title}</h1><p>${body}</p></body>\n</html>\n`;
 
 async function createOwner(name: string, role: string): Promise<Account> {
-    const reg = await api<{ private_key: string }>('/v1/owners', { method: 'POST', body: { name, public_key: 'placeholder' } });
+    // Registered with the password and signed in with it, as a person is. The account's key pair is
+    // still returned and kept, for a look that signs something with it.
+    const reg = await api<{ private_key: string }>('/v1/ghii', { method: 'POST', body: { username: name, display_name: name, password: PASSWORD } });
     if (reg.status !== 201 || !reg.body.data) throw new Error(`register ${name}: ${reg.status} ${JSON.stringify(reg.body.error ?? reg.body)}`);
     const privateKey = reg.body.data.private_key;
-    const token = await mintToken(name, privateKey, false);
-    // A password as well as a key: a person signs in through the browser, an agent signs with the key.
-    const pw = await api('/v1/ghii/password/change', { method: 'POST', token, body: { new_password: PASSWORD } });
-    if (pw.status !== 200) throw new Error(`password for ${name}: ${pw.status} ${JSON.stringify(pw.body.error ?? pw.body)}`);
+    const token = await refreshOwnerToken({ name, password: PASSWORD });
     return { name, role, ghii: `${name}@${NODE_ID}`, privateKey, password: PASSWORD, token };
 }
 
@@ -459,7 +457,7 @@ async function seed(): Promise<{ owners: Account[]; agent: AgentAccount | null; 
     if (ag.status === 201 && ag.body.data) {
         const gaii = ag.body.data.agent.gaii;
         const privateKey = ag.body.data.private_key;
-        agent = { name: 'bot', gaii, privateKey, token: await mintToken(gaii, privateKey, true) };
+        agent = { name: 'bot', gaii, privateKey, token: await agentToken(gaii, privateKey) };
     } else {
         console.warn(`  ⚠ agent not created (${ag.status}): ${JSON.stringify(ag.body.error ?? ag.body)}`);
     }
@@ -556,7 +554,7 @@ async function up(reset: boolean): Promise<void> {
         BASE = s.baseUrl;
         // The node is up and already seeded; the tokens are the only thing that goes stale.
         for (const o of s.owners) o.token = await refreshOwnerToken(o);
-        if (s.agent) s.agent.token = await mintToken(s.agent.gaii, s.agent.privateKey, true);
+        if (s.agent) s.agent.token = await agentToken(s.agent.gaii, s.agent.privateKey);
         s = await ensureMailbox(s);
         writeState(s);
         console.log(`  the sandbox on ${s.baseUrl} is already up; tokens refreshed.`);
@@ -578,7 +576,7 @@ async function up(reset: boolean): Promise<void> {
     const existing = s?.owners?.length ? s : null;
     if (existing) {
         for (const o of existing.owners) o.token = await refreshOwnerToken(o);
-        if (existing.agent) existing.agent.token = await mintToken(existing.agent.gaii, existing.agent.privateKey, true);
+        if (existing.agent) existing.agent.token = await agentToken(existing.agent.gaii, existing.agent.privateKey);
         const next: SandboxState = await ensureMailbox({ ...existing, pid, baseUrl, port, dbPath });
         writeState(next);
         console.log('  the node is back up on its own data; tokens refreshed.');
@@ -621,7 +619,7 @@ async function main(): Promise<void> {
         if (!await isUp(s.baseUrl)) { console.log(`  the sandbox on :${s.port} is down. \`pnpm sandbox\` brings it back.`); return; }
         BASE = s.baseUrl;
         for (const o of s.owners) o.token = await refreshOwnerToken(o);
-        if (s.agent) s.agent.token = await mintToken(s.agent.gaii, s.agent.privateKey, true);
+        if (s.agent) s.agent.token = await agentToken(s.agent.gaii, s.agent.privateKey);
         writeState(s);
         report(s);
         return;
