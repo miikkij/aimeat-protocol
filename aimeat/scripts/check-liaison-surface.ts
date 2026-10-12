@@ -26,8 +26,12 @@
  * @usage
  *   cd aimeat && pnpm check:liaison-surface            # report
  *   cd aimeat && pnpm check:liaison-surface --strict   # the hook/CI gate
- *   cd aimeat && pnpm check:liaison-surface --record   # after publishing, write the new baseline
+ *   cd aimeat && pnpm check:liaison-surface --record   # after publishing BOTH, write the new baseline
+ *   cd aimeat && pnpm check:liaison-surface --record pypi   # after publishing one (pypi or npm)
  * @version-history
+ *   v1.4.0 — 2026-10-12 — `--record pypi` and `--record npm` record the one package that was
+ *     published. `--record` alone wrote both, so recording after a PyPI release also stated an npm
+ *     release that had not happened.
  *   v1.3.0 — 2026-10-12 — The connector's tools are read from its registration and the CLI dispatch
  *     table. The source scan under src/cli/connect counted 1 tool once the last handlers there ran
  *     their dispatch definition, so a change to what connect serve offers moved no fingerprint.
@@ -138,8 +142,23 @@ function main(): void {
     };
 
     if (record) {
-        writeFileSync(BASELINE, JSON.stringify(now, null, 2) + '\n');
-        console.log('recorded:', JSON.stringify(now, null, 2));
+        // `--record pypi` or `--record npm` records the ONE package that was published and keeps the
+        // other half of the baseline as it is. The two are released separately, and a baseline that
+        // names a version nobody published says the package on the registry carries tools it does
+        // not, which also stops the line that says a release is waiting.
+        const only = process.argv[process.argv.indexOf('--record') + 1];
+        if (only !== undefined && only !== 'npm' && only !== 'pypi') {
+            console.error(`--record takes "npm", "pypi" or nothing (both); got "${only}".`);
+            process.exit(2);
+        }
+        const previous: Baseline | null = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf-8')) as Baseline : null;
+        if (only && !previous) {
+            console.error(`No baseline to keep the other package from. Run --record once with no package name.`);
+            process.exit(2);
+        }
+        const next: Baseline = only && previous ? { ...previous, [only]: now[only] } : now;
+        writeFileSync(BASELINE, JSON.stringify(next, null, 2) + '\n');
+        console.log(`recorded${only ? ` (${only} only)` : ''}:`, JSON.stringify(next, null, 2));
         return;
     }
 
@@ -163,13 +182,13 @@ function main(): void {
                 `The connector tool surface changed (${base.npm.toolCount} → ${now.npm.toolCount} tools) but `
                 + `the npm package is still ${now.npm.version}. \`aimeat connect serve\` proxies this surface `
                 + 'through the tunnel, so the published package is stale: bump the version, publish, then '
-                + 'run `pnpm check:liaison-surface --record`.');
+                + 'run `pnpm check:liaison-surface --record npm`.');
         }
         if (base.pypi.fingerprint !== now.pypi.fingerprint && base.pypi.version === now.pypi.version) {
             problems.push(
                 `The liaison tool surface changed (${base.pypi.toolCount} → ${now.pypi.toolCount} tools) but `
                 + `aimeat-crewai is still ${now.pypi.version}. Bump the version in pyproject.toml, publish to `
-                + 'PyPI, then run `pnpm check:liaison-surface --record`.');
+                + 'PyPI, then run `pnpm check:liaison-surface --record pypi`.');
         }
     }
 
@@ -202,7 +221,7 @@ function main(): void {
                 + `${base.pypi.toolCount} → ${now.pypi.toolCount} tools)`);
         }
     }
-    for (const p of pending) console.log(`  ⏳ ${p} — publish it, then \`pnpm check:liaison-surface --record\``);
+    for (const p of pending) console.log(`  ⏳ ${p} — publish it, then \`pnpm check:liaison-surface --record ${p.startsWith('npm') ? 'npm' : 'pypi'}\``);
     if (pending.length) console.log('');
 
     if (!problems.length) {
