@@ -6,6 +6,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-disputes
  * @version-history
+ *   v1.2.1 — 2026-10-12 — The dispute action is published with its pacing amount as
+ *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), which left
+ *     nothing in escrow, and the new field means the same on 3.x.
  *   v1.2.0 — 2026-10-08 — aiprov D8: the delivered output names its provenance record, and the
  *     requester reads the record on the work item while /v1/provenance/:id stays 404 for it.
  *   v1.0.0 — 2026-08-14 — Header added; file pre-dates header standard.
@@ -100,7 +103,7 @@ async function createDeliveredWork(): Promise<string> {
             description: 'Action for dispute testing',
             input_schema: { type: 'object', properties: { text: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 10 },
+            pricing: { toll_morsels: 10 },
         }),
     });
 

@@ -5,6 +5,9 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.13.4 — 2026-10-12 — The work-test action is published with its pacing amount as
+ *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the
+ *     new field means the same on 3.x.
  *   v1.13.3 — 2026-10-11 — fmtUnit shows an amount in morsels as pacing ("pacing 10 morsels"); three
  *     assertions read the old price wording.
  *   v1.13.2 — 2026-10-03 — Atelier's boundary also names /v1/themes/fonts.css, exactly once: the
@@ -591,7 +594,7 @@ await test('Publish action for work test', async () => {
             category: 'utility',
             input_schema: { type: 'object', properties: { prompt: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 1 },
+            pricing: { toll_morsels: 1 },
         }),
     });
     assert(data.ok === true, `Publish failed: ${data.error?.message}`);
@@ -654,7 +657,7 @@ await test('work.deliver — the REQUESTER cannot deliver on the provider\'s beh
 });
 
 await test('work.deliver — deliver output, and the escrow settles to the PROVIDER', async () => {
-    // The action was published at base_morsels 1, so real money is in flight. The requester was
+    // The action was published at toll_morsels 1, so real morsels are in flight. The requester was
     // debited at request time (escrow); delivery is when the provider is paid.
     const providerBefore = await walletBalance(agent2Jwt);
     const data = await authApi(`/v1/work/${trackingCode}/deliver`, agent2Jwt, {

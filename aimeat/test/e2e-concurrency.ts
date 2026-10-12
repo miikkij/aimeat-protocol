@@ -1,5 +1,15 @@
-// T-9: Concurrent Access / Stress Tests
-// Run: cd aimeat && pnpm exec tsx test/e2e-concurrency.ts
+/**
+ * @file e2e-concurrency.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description T-9: concurrent access and stress tests. Parallel work requests against one escrow,
+ *   parallel settlement, and the wallet balances after each round, asserted exactly.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-concurrency
+ * @version-history
+ *   v1.0.1 — 2026-10-12 — The two actions are published with their pacing amount as
+ *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the
+ *     new field means the same on 3.x. Every balance assertion is unchanged.
+ */
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -175,7 +185,7 @@ await test('0b. Publish test action (cost=40 morsels)', async () => {
             description: 'Action for concurrency testing',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
-            pricing: { base_morsels: 40 },
+            pricing: { toll_morsels: 40 },
         }),
     });
     assert(status === 201, `action: ${status} ${JSON.stringify(body)}`);
@@ -498,7 +508,7 @@ await test('21. Publish cheap action (1 morsel)', async () => {
             description: 'Low-cost action for parallel work tests',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
-            pricing: { base_morsels: 1 },
+            pricing: { toll_morsels: 1 },
         }),
     });
     assert(status === 201, `create cheap action: ${status}`);
@@ -534,7 +544,7 @@ await test('23. Accept all in parallel', async () => {
 
 // Test 25 asserts the balance is a non-negative number, which is true of every wrong answer too —
 // including the one this whole suite exists to catch, a lost update under concurrent settlement.
-// The numbers are captured rather than hardcoded: five items at base_morsels 1 each, and the
+// The numbers are captured rather than hardcoded: five items at toll_morsels 1 each, and the
 // requester was already charged at request time, so the delivery round moves only the provider.
 const walletBalance = async (token: string) => {
     const { body } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${token}` } });

@@ -13,9 +13,15 @@
  *   was given, which is the one row it draws in coral and the only sign an operator gets that the
  *   hourly expiry sweep is not running.
  * @version-history
+ *   v1.0.1 -- 2026-10-12 -- The probe action is published with pricing.toll_morsels, which node 4.0.0
+ *            takes in place of the refused pricing.base_morsels (MORSEL_PRICE_REMOVED) and 3.x reads
+ *            the same. The cost object carries `toll`; the `base_price` mirror of it is asserted on
+ *            3.x and asserted absent from 4.0.0 (MORSEL_PRICE_FIELDS_REMOVED_IN, presentWorkCost).
  *   v1.0.0 -- 2026-09-12 -- Initial (the Work page in the poster face).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-work-page
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -102,7 +108,7 @@ await test('Setup: an operator, a requester agent with morsels, and a provider w
             id: ACTION, display_name: 'Work page probe', description: 'Used to prove the admin work listing carries a row',
             input_schema: { type: 'object', properties: { text: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 10 },
+            pricing: { toll_morsels: 10 },
         }),
     });
     assert(publish.status === 201, `publish action: ${publish.status} ${short(publish.body)}`);
@@ -159,12 +165,19 @@ await test('Every row carries the field set the page folds its figures from', as
     assert(row.action_id === ACTION, `action_id: ${row.action_id}`);
 });
 
-await test('The cost is an object, and the escrow inside it is what "morsels held" sums', async () => {
+await test('The cost is an object, and the escrow inside it is what "morsels held" sums; the base_price mirror is there on 3.x and gone from 4.0.0', async () => {
     const row = (await adminWork(opToken)).work.find((w: any) => w.tracking_code === trackingCode);
     assert(row.cost !== null && typeof row.cost === 'object',
         `cost must be an object, not ${typeof row.cost}: a number formatter would print [object Object]`);
-    for (const field of ['base_price', 'network_fee', 'total', 'in_escrow']) {
+    for (const field of ['toll', 'network_fee', 'total', 'in_escrow']) {
         assert(field in row.cost, `cost has no ${field}`);
+    }
+    // `toll` is the pacing amount. The 3.x name of the same number, `base_price`, is a deprecated
+    // mirror until MORSEL_PRICE_FIELDS_REMOVED_IN (presentWorkCost, services/morsel.ts).
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(!('base_price' in row.cost), `4.0.0 carries no base_price mirror: ${short(row.cost)}`);
+    } else {
+        assert(row.cost.base_price === row.cost.toll, `3.x mirrors toll as base_price: ${short(row.cost)}`);
     }
     assert(row.cost.total > 0, `total should carry the price: ${row.cost.total}`);
     assert(row.cost.in_escrow === row.cost.total,

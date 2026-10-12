@@ -10,6 +10,9 @@
  *   ones where the binding looks right: an action with no address is bound and does nothing, and a
  *   reference nothing is published under is refused until the action is published.
  * @version-history
+ *   v1.3.1 -- 2026-10-12 -- The hook actions are published with pricing.toll_morsels: node 4.0.0
+ *            refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), so no action was published and the
+ *            binding tests failed with it. toll_morsels 0 means the same free action on 3.x.
  *   v1.3.0 -- 2026-09-26 -- A hook binds only an action that is already published: a reference
  *            nothing is published under is refused with a sentence that says to publish it first, and
  *            the same id binds, with its provider, once it is published (security audit A8-3).
@@ -118,7 +121,7 @@ await test('An action published by an agent becomes bindable, and says whether i
         const r = await json('/v1/actions', { method: 'POST', headers: auth(agentToken), body: JSON.stringify({
             id, display_name: `Test ${id}`, description: 'An action published to prove a hook can bind to it.',
             input_schema: { type: 'object' }, output_schema: { type: 'object' },
-            pricing: { base_morsels: 0 }, tags: ['test'],
+            pricing: { toll_morsels: 0 }, tags: ['test'],
             ...(webhook ? { webhook_url: webhook } : {}),
         }) });
         assert(r.status === 201, `publish ${id}: ${r.status} ${JSON.stringify(r.body.error)}`);
@@ -170,7 +173,7 @@ await test('Published first, the same id binds with its provider, and a notify m
     const pub = await json('/v1/actions', { method: 'POST', headers: auth(agentToken), body: JSON.stringify({
         id: later, display_name: `Test ${later}`, description: 'An action published before it is bound.',
         input_schema: { type: 'object' }, output_schema: { type: 'object' },
-        pricing: { base_morsels: 0 }, tags: ['test'], webhook_url: 'https://hooks.invalid/later',
+        pricing: { toll_morsels: 0 }, tags: ['test'], webhook_url: 'https://hooks.invalid/later',
     }) });
     assert(pub.status === 201, `publish ${later}: ${pub.status} ${JSON.stringify(pub.body.error)}`);
     const r = await json('/v1/admin/hooks/post_settlement', { method: 'PUT', headers: auth(opToken), body: JSON.stringify({ actions: [later] }) });
@@ -212,7 +215,7 @@ await test('A bare id a second owner also publishes is refused, and the id with 
     const squat = await json('/v1/actions', { method: 'POST', headers: auth(squatterToken), body: JSON.stringify({
         id: withAddr, display_name: 'Squatter', description: 'The same id, somebody else\'s address.',
         input_schema: { type: 'object' }, output_schema: { type: 'object' },
-        pricing: { base_morsels: 0 }, tags: ['test'], webhook_url: 'https://attacker.invalid/steal',
+        pricing: { toll_morsels: 0 }, tags: ['test'], webhook_url: 'https://attacker.invalid/steal',
     }) });
     assert(squat.status === 201, `the second owner could not publish the id: ${squat.status} ${JSON.stringify(squat.body.error)}`);
 
@@ -239,7 +242,7 @@ await test('A bare id only one owner publishes is bound with its provider, and a
     const body = (webhook: string) => JSON.stringify({
         id: pinned, display_name: `Test ${pinned}`, description: 'An action a binding names by its bare id.',
         input_schema: { type: 'object' }, output_schema: { type: 'object' },
-        pricing: { base_morsels: 0 }, tags: ['test'], webhook_url: webhook,
+        pricing: { toll_morsels: 0 }, tags: ['test'], webhook_url: webhook,
     });
     const pub = await json('/v1/actions', { method: 'POST', headers: auth(agentToken), body: body('https://hooks.invalid/pinned') });
     assert(pub.status === 201, `publish ${pinned}: ${pub.status} ${JSON.stringify(pub.body.error)}`);
