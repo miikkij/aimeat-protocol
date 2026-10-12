@@ -7,6 +7,9 @@
  *
  *   Node: 40277 aimeat-test-001-nodeinfo.
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- Test 3's ping carries the audience proof (audienceProof). Node 4.0.0 refuses
+ *     a ping without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the proof is not this
+ *     suite's subject; tests 4 and 5 had failed only because test 3 stamped nothing.
  *   v1.0.0 — 2026-06-19 — Initial node-info / version-visibility tests.
  */
 
@@ -16,6 +19,7 @@ import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -81,7 +85,9 @@ await test('2. add a peer + activate', async () => {
 await test('3. a ping advertising software_version stamps the peer record', async () => {
   const pingPayload = { node_id: PEER, timestamp: new Date().toISOString(), version: 'v1', software_version: '9.9.9', stats: { agents_active: 0 } };
   const pingSig = Buffer.from(await ed.signAsync(new TextEncoder().encode(JSON.stringify(pingPayload)), peerPrivBytes)).toString('base64');
-  const ping = await json('/v1/federation/ping', { method: 'POST', body: JSON.stringify({ ...pingPayload, signature: pingSig }) });
+  // The audience proof names this node, as the heartbeat client sends it (required from 4.0.0).
+  const proof = await audienceProof(Buffer.from(peerPrivBytes).toString('base64'), JSON.stringify(pingPayload), NODE_ID);
+  const ping = await json('/v1/federation/ping', { method: 'POST', body: JSON.stringify({ ...pingPayload, signature: pingSig, ...proof }) });
   assert(ping.body.ok === true || ping.body.data?.pong, `ping: ${JSON.stringify(ping.body)}`);
   const peers = await json('/v1/federation/peers', { headers: auth(ownerToken) });
   const p = peers.body.data.peers.find((x: any) => x.node_id === PEER);

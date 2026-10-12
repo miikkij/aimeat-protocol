@@ -4,6 +4,13 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   v1.5.0 -- 2026-10-12 -- Node 4.0.0 refuses a federation message without the audience or delivery
+ *     proof (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN). The direct peer's heartbeat (11),
+ *     replicate (12) and catalogue syncs (13, 14, 14b) carry the proof a node of this version sends,
+ *     so it is pinned from test 11 rather than 12e. 12h, whose subject is the older peer, asks the
+ *     node its release: before 4.0.0 the older peer is heard as before; from 4.0.0 it is refused 401
+ *     AUDIENCE_REQUIRED and its peer row does not move. 12h also covers replicate and catalogue sync,
+ *     the older-peer side test 12 used to carry, with the replica read back on both releases.
  *   v1.4.0 — 2026-10-10 — Phase 3d: the pin covers the ping, heartbeat, presence push, memory-list
  *     request, sign-in verification and introduction; a peer that never sent a proof is still heard
  *     on each (secaudit 2026-10-10 I21).
@@ -57,7 +64,9 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import { deliveryProof } from '../src/services/signed-node-request.js';
+import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
+import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config-federation.js';
+import { removedOn } from './helpers/node-release.js';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
@@ -359,9 +368,11 @@ await test('11. Heartbeat (signed: audit H-14 refuses an unsigned one)', async (
             timestamp: hbTimestamp,
             status: 'healthy',
             signature: hbSig,
+            // The audience proof a node of this version sends (required from 4.0.0).
+            ...await audienceProof(directPeerPrivKeyB64, hbMessage, NODE_ID),
         }),
     });
-    assert(body.ok === true, 'ok');
+    assert(body.ok === true, `ok: ${JSON.stringify(body.error ?? '')}`);
     assert(body.data.node_id === NODE_ID, `node_id: ${body.data.node_id}`);
     assert(body.data.status === 'healthy', `status: ${body.data.status}`);
 });
@@ -394,7 +405,7 @@ await test('12. Replicate memory entry', async () => {
     const replicateSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(replicatePayload));
     const { body } = await json('/v1/federation/replicate', {
         method: 'POST',
-        body: JSON.stringify({ ...replicatePayload, signature: replicateSig }),
+        body: JSON.stringify({ ...replicatePayload, signature: replicateSig, ...await deliveryProof(directPeerPrivKeyB64, JSON.stringify(replicatePayload), NODE_ID) }),
     });
     assert(body.ok === true, `replicate: ${JSON.stringify(body.error)}`);
     assert(body.data.replicated === true, 'replicated flag');
@@ -428,7 +439,7 @@ await test('13. Catalogue sync (full)', async () => {
     const catSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(catPayload));
     const { body } = await json('/v1/federation/catalogue-sync', {
         method: 'POST',
-        body: JSON.stringify({ ...catPayload, signature: catSig }),
+        body: JSON.stringify({ ...catPayload, signature: catSig, ...await deliveryProof(directPeerPrivKeyB64, JSON.stringify(catPayload), NODE_ID) }),
     });
     assert(body.ok === true, `sync: ${JSON.stringify(body.error)}`);
     assert(body.data.synced === 2, `synced: ${body.data.synced}`);
@@ -454,7 +465,7 @@ await test('14. Catalogue sync (incremental)', async () => {
     const incSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(incPayload));
     const { body } = await json('/v1/federation/catalogue-sync', {
         method: 'POST',
-        body: JSON.stringify({ ...incPayload, signature: incSig }),
+        body: JSON.stringify({ ...incPayload, signature: incSig, ...await deliveryProof(directPeerPrivKeyB64, JSON.stringify(incPayload), NODE_ID) }),
     });
     assert(body.ok === true, `incremental sync: ${JSON.stringify(body.error)}`);
     assert(body.data.synced === 1, `synced: ${body.data.synced}`);
@@ -477,7 +488,7 @@ await test('14b. Catalogue sync (update existing)', async () => {
     const updSig = await signMsg(directPeerPrivKeyB64, JSON.stringify(updPayload));
     const { body } = await json('/v1/federation/catalogue-sync', {
         method: 'POST',
-        body: JSON.stringify({ ...updPayload, signature: updSig }),
+        body: JSON.stringify({ ...updPayload, signature: updSig, ...await deliveryProof(directPeerPrivKeyB64, JSON.stringify(updPayload), NODE_ID) }),
     });
     assert(body.ok === true, `update sync: ${JSON.stringify(body.error)}`);
     assert(body.data.updated === 1, `updated: ${body.data.updated}`);
@@ -573,8 +584,9 @@ await test('14c. Catalogue sync from an active peer is refused unsigned and tamp
 // A replicate signs the record's own update time, so a send time and the node it is for travel in a
 // second signature (the delivery proof). With AIMEAT_FEDERATION_AUDIENCE_REQUIRED off, a replicate
 // without the proof still passed, so a captured one could be sent again with the proof stripped and
-// bring a deleted record back. The peer's first verified proof now pins it to sending one. Test 12
-// above is the compatibility side: this peer had sent no proof then, and its replicate was stored.
+// bring a deleted record back. The peer's first verified proof now pins it to sending one. The direct
+// peer has sent the proof since test 11, as a node of this version does; the compatibility side, a
+// replicate from a peer that has never sent one, is the older peer's replicate in 12h.
 console.log('\nPhase 3c — A peer that has sent the delivery proof is held to it');
 
 const replicateBody = (key: string) => ({
@@ -669,6 +681,16 @@ const unproven: Record<string, (s: Sender) => Promise<{ status: number; body: an
         const signature = await signMsg(s.priv, `${s.nodeId}${url}${timestamp}`);
         return json('/v1/federation/peer/introduce', { method: 'POST', body: JSON.stringify({ node_id: s.nodeId, node_url: url, public_key: s.pub, role: 'contributor', timestamp, signature }) });
     },
+    // The two delivery-proof messages, so the older peer's side of replicate and catalogue sync is
+    // asserted here (test 12 carried it until the direct peer started sending the proof).
+    replicate: async (s) => {
+        const payload = { ...replicateBody(`older-${s.nodeId}`), source_node: s.nodeId };
+        return json('/v1/federation/replicate', { method: 'POST', body: JSON.stringify({ ...payload, signature: await signMsg(s.priv, JSON.stringify(payload)) }) });
+    },
+    'catalogue sync': async (s) => {
+        const payload = { source_node: s.nodeId, actions: [], since_timestamp: null, catalogue_hash: null };
+        return json('/v1/federation/catalogue-sync', { method: 'POST', body: JSON.stringify({ ...payload, signature: await signMsg(s.priv, JSON.stringify(payload)) }) });
+    },
 };
 
 await test('Setup: a peer that never sends the proof (an older node)', async () => {
@@ -688,17 +710,39 @@ await test('Setup: a peer that never sends the proof (an older node)', async () 
 const heardAs: Record<string, { status: number; code?: string }> = {
     ping: { status: 200 }, heartbeat: { status: 200 }, presence: { status: 200 }, 'memory list': { status: 200 },
     'sign-in verification': { status: 401, code: 'FEDERATION_AUTH_FAILED' }, introduction: { status: 409, code: 'CONFLICT' },
+    replicate: { status: 200 }, 'catalogue sync': { status: 200 },
 };
 
+/** The older peer's row, for showing that a refused message moved nothing on it. */
+async function olderPeerRow(): Promise<any> {
+    const r = await json('/v1/federation/peers', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    return (r.body.data.peers as any[]).find(p => p.node_id === legacyPeerNodeId);
+}
+const olderReplicaExists = async () => (await json(`/v1/memory/${encodeURIComponent(`replica:${legacyPeerNodeId}:older-${legacyPeerNodeId}`)}`, {
+    headers: { Authorization: `Bearer ${agentToken}` },
+})).body.ok === true;
+
 for (const [kind, send] of Object.entries(unproven)) {
-    await test(`12h. ${kind}: refused from the pinned peer without the proof (401 AUDIENCE_REQUIRED), heard from the older peer`, async () => {
+    await test(`12h. ${kind}: refused from the pinned peer without the proof (401 AUDIENCE_REQUIRED); from the older peer heard before ${UNPROVEN_FORMAT_REMOVED_IN} and refused from it`, async () => {
         const pinned = await send(pinnedSender);
         assert(pinned.status === 401 && pinned.body.error?.code === 'AUDIENCE_REQUIRED',
             `pinned peer: expected 401 AUDIENCE_REQUIRED, got ${pinned.status} ${JSON.stringify(pinned.body.error ?? pinned.body.data)}`);
+        const before = await olderPeerRow();
         const older = await send(olderSender);
-        const want = heardAs[kind]!;
-        assert(older.status === want.status && (older.body.error?.code ?? undefined) === want.code,
-            `older peer: expected ${want.status} ${want.code ?? ''}, got ${older.status} ${JSON.stringify(older.body.error ?? older.body.data)}`);
+        if (await removedOn(BASE, UNPROVEN_FORMAT_REMOVED_IN)) {
+            // From 4.0.0 a message without the proof is no format at all, from any peer.
+            assert(older.status === 401 && older.body.error?.code === 'AUDIENCE_REQUIRED',
+                `older peer: expected 401 AUDIENCE_REQUIRED from ${UNPROVEN_FORMAT_REMOVED_IN}, got ${older.status} ${JSON.stringify(older.body.error ?? older.body.data)}`);
+            const after = await olderPeerRow();
+            assert(after?.last_seen === before?.last_seen && after?.status === before?.status,
+                `a refused message must not move the peer: ${JSON.stringify({ before: before?.last_seen, after: after?.last_seen })}`);
+            if (kind === 'replicate') assert(!(await olderReplicaExists()), 'a refused replicate must write nothing');
+        } else {
+            const want = heardAs[kind]!;
+            assert(older.status === want.status && (older.body.error?.code ?? undefined) === want.code,
+                `older peer: expected ${want.status} ${want.code ?? ''}, got ${older.status} ${JSON.stringify(older.body.error ?? older.body.data)}`);
+            if (kind === 'replicate') assert(await olderReplicaExists(), 'the older peer\'s replicate is stored');
+        }
     });
 }
 

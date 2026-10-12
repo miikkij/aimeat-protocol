@@ -18,6 +18,12 @@
  *
  *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
+ *   v1.5.0 -- 2026-10-12 -- Node 4.0.0 removes the relay-claim setting `optional`
+ *     (RELAY_CLAIM_OPTIONAL_REMOVED_IN). The four tests whose subject is `optional` ask the node its
+ *     release: before 4.0.0 they assert what they asserted; from 4.0.0 the node and the peer setting
+ *     answer 400 INVALID_INPUT, nothing is written (the overview still reads required), and the
+ *     unclaimed relay is refused 403 RELAY_CLAIM_REQUIRED. The not-a-peer case of the stray-word test
+ *     sends `required`, so its 404 answers the node id on every release.
  *   v1.4.0 — 2026-09-29 — The shipped setting is `required` (3.20.0): an unclaimed relay from a peer
  *     that has never signed is refused on it, and let through once `optional` is set explicitly.
  *   v1.3.0 — 2026-09-25 — One peer on its own setting, both ways round; the words the setting takes;
@@ -38,6 +44,8 @@ import { existsSync, rmSync } from 'node:fs';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
+import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config-federation.js';
+import { removedOn } from './helpers/node-release.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -348,16 +356,27 @@ await test('on the shipped setting (required from 3.20.0), an unclaimed relay fr
     assert(((await res.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
 });
 
-await test('on optional, set explicitly, a peer that has NEVER signed a claim still relays through', async () => {
+await test('on optional, set explicitly, a peer that has NEVER signed a claim still relays through before 4.0.0; from 4.0.0 the node refuses the setting and the relay', async () => {
     // This is the migration position: an old peer sends no claim, and the operator who is not ready
     // to refuse it sets `optional` until 4.0.0. It is not protection, and the setting's own text says so.
     const off = await json('/v1/admin/config', {
         method: 'PUT', headers: auth(),
         body: JSON.stringify({ changes: [{ path: 'federation.relay_claim', value: 'optional' }] }),
     });
-    assert(off.status === 200, `set optional: ${off.status} ${JSON.stringify(off.body)}`);
     const res = await fetch(`${BASE}/v1/health`, { headers: { 'X-Forwarded-From': DEMOTED_NODE } });
-    assert(res.status === 200, `unclaimed relay from a never-signed peer on optional: ${res.status}`);
+    if (await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN)) {
+        // From 4.0.0 `optional` is no setting: the write is refused and the node stays on required.
+        assert(off.status === 400 && off.body.error?.code === 'INVALID_INPUT'
+            && (off.body.error?.details?.errors ?? []).some((e: any) => e.path === 'federation.relay_claim'),
+            `from ${RELAY_CLAIM_OPTIONAL_REMOVED_IN} optional is refused: expected 400 INVALID_INPUT on federation.relay_claim, got ${off.status} ${JSON.stringify(off.body)}`);
+        assert(res.status === 403, `the refused setting changed nothing, the unclaimed relay is still refused: ${res.status}`);
+        assert(((await res.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
+        const ov = await json('/v1/admin/federation/overview', { headers: auth() });
+        assert(ov.body.data.relay_claims.node_setting === 'required', `the node's setting did not move: ${ov.body.data.relay_claims.node_setting}`);
+    } else {
+        assert(off.status === 200, `set optional: ${off.status} ${JSON.stringify(off.body)}`);
+        assert(res.status === 200, `unclaimed relay from a never-signed peer on optional: ${res.status}`);
+    }
 });
 
 await test('a peer that HAS signed a claim may not go back to sending none', async () => {
@@ -391,11 +410,14 @@ await test('on the strict setting, an unclaimed relay from ANY peer is refused',
     const plain = await json('/v1/health');
     assert(plain.status === 200, `plain request under required: ${plain.status}`);
 
-    const off = await json('/v1/admin/config', {
-        method: 'PUT', headers: auth(),
-        body: JSON.stringify({ changes: [{ path: 'federation.relay_claim', value: 'optional' }] }),
-    });
-    assert(off.status === 200, `back to optional: ${off.status}`);
+    // Back to optional for the tests below, on a release that still has it (4.0.0 stays on required).
+    if (!await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN)) {
+        const off = await json('/v1/admin/config', {
+            method: 'PUT', headers: auth(),
+            body: JSON.stringify({ changes: [{ path: 'federation.relay_claim', value: 'optional' }] }),
+        });
+        assert(off.status === 200, `back to optional: ${off.status}`);
+    }
 });
 
 // ── One peer on its own setting ──────────────────────────────────────────────
@@ -412,9 +434,22 @@ const setPeer = (nodeId: string, relay_claim: unknown) => json(`/v1/federation/p
 });
 const unclaimedFrom = (nodeId: string) => fetch(`${BASE}/v1/health`, { headers: { 'X-Forwarded-From': nodeId } });
 
-await test('the node on required and one peer kept on optional: an unclaimed relay naming that peer passes, others are refused', async () => {
+await test('the node on required and one peer kept on optional: an unclaimed relay naming that peer passes, others are refused (before 4.0.0); from 4.0.0 the peer setting optional is refused and the peer stays on required', async () => {
     assert((await setNode('required')).status === 200, 'node set to required');
     const kept = await setPeer(DEMOTED_NODE, 'optional');
+    if (await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN)) {
+        assert(kept.status === 400 && kept.body.error?.code === 'INVALID_INPUT'
+            && kept.body.error.message.includes(`removed in ${RELAY_CLAIM_OPTIONAL_REMOVED_IN}`),
+            `from ${RELAY_CLAIM_OPTIONAL_REMOVED_IN} a peer cannot be kept on optional: expected 400 INVALID_INPUT, got ${kept.status} ${JSON.stringify(kept.body)}`);
+        const ov = await json('/v1/admin/federation/overview', { headers: auth() });
+        const row = ov.body.data.roster.find((r: any) => r.node_id === DEMOTED_NODE);
+        assert(row.relay_claim.setting === null && row.relay_claim.effective === 'required',
+            `nothing was written, the peer follows the node on required: ${JSON.stringify(row.relay_claim)}`);
+        const refused = await unclaimedFrom(DEMOTED_NODE);
+        assert(refused.status === 403, `the peer's unclaimed relay is refused: ${refused.status}`);
+        assert(((await refused.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
+        return;
+    }
     assert(kept.status === 200, `keep the peer on optional: ${kept.status} ${JSON.stringify(kept.body)}`);
     assert(kept.body.data.relay_claim.setting === 'optional' && kept.body.data.relay_claim.effective === 'optional',
         `the answer says what now applies: ${JSON.stringify(kept.body.data)}`);
@@ -432,7 +467,7 @@ await test('the node on required and one peer kept on optional: an unclaimed rel
     assert((await setNode('optional')).status === 200, 'node back to optional');
 });
 
-await test('the node on optional and one peer kept on required: an unclaimed relay naming that peer is refused', async () => {
+await test('the node on optional and one peer kept on required: an unclaimed relay naming that peer is refused, and another peer follows the node (optional before 4.0.0, required from it)', async () => {
     const keys = await generateKeyPair();
     const add = await json('/v1/federation/peers', {
         method: 'POST', headers: auth(),
@@ -449,7 +484,13 @@ await test('the node on optional and one peer kept on required: an unclaimed rel
     assert(refused.status === 403, `required for this peer alone: ${refused.status}`);
     assert(((await refused.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
     const others = await unclaimedFrom(DEMOTED_NODE);
-    assert(others.status === 200, `another peer still follows the node's optional: ${others.status}`);
+    if (await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN)) {
+        // From 4.0.0 the node has no optional to follow: every peer's unclaimed relay is refused.
+        assert(others.status === 403, `from ${RELAY_CLAIM_OPTIONAL_REMOVED_IN} another peer follows the node's required: ${others.status}`);
+        assert(((await others.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
+    } else {
+        assert(others.status === 200, `another peer still follows the node's optional: ${others.status}`);
+    }
 });
 
 await test('a setting that is not one of the three words is refused, and nothing changes', async () => {
@@ -464,7 +505,8 @@ await test('a setting that is not one of the three words is refused, and nothing
     const ov = await json('/v1/admin/federation/overview', { headers: auth() });
     const row = ov.body.data.roster.find((r: any) => r.node_id === THIRD_NODE);
     assert(row.relay_claim.setting === 'required', `still required: ${JSON.stringify(row.relay_claim)}`);
-    const unknown = await setPeer('aimeat-test-001-notapeer', 'optional');
+    // A word every release takes, so the 404 answers the node id and not the word.
+    const unknown = await setPeer('aimeat-test-001-notapeer', 'required');
     assert(unknown.status === 404, `a node that is not a peer: ${unknown.status}`);
 });
 
@@ -484,7 +526,9 @@ await test('the federation answer says which peers relay with a claim, which wit
         `not ready names the right peer: ${JSON.stringify(d.relay_claims)}`);
     assert(d.relay_claims.ready.includes(OK_NODE), `ready names the signer: ${JSON.stringify(d.relay_claims.ready)}`);
     assert(d.relay_claims.kept_required.includes(THIRD_NODE), `and the kept one: ${JSON.stringify(d.relay_claims)}`);
-    assert(d.relay_claims.node_setting === 'optional', `the node's own answer: ${d.relay_claims.node_setting}`);
+    // The node was left on optional above; from 4.0.0 it has no optional and stays on required.
+    const nodeSetting = await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN) ? 'required' : 'optional';
+    assert(d.relay_claims.node_setting === nodeSetting, `the node's own answer: expected ${nodeSetting}, got ${d.relay_claims.node_setting}`);
     assert(d.relay_claims.default_becomes_required_in === '3.20.0' && d.relay_claims.optional_removed_in === '4.0.0',
         `the two versions are named: ${JSON.stringify(d.relay_claims)}`);
 });

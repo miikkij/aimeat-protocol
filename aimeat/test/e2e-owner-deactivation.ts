@@ -16,6 +16,9 @@
  *   every REST route — including the session-resume branch, which asked nothing at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-deactivation
  * @version-history
+ *   v1.0.3 -- 2026-10-12 -- The federation attestation request carries the audience proof for this
+ *     node. Node 4.0.0 refuses one without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), so
+ *     the test failed there on the proof and not on the deactivation it is about.
  *   v1.0.2 — 2026-10-05 — The federation attestation test asks as an active peer, signs as it would,
  *     and the victim's auth consent for that peer is set up before deactivation (secaudit 2026-10,
  *     D1). Green after the change because the old setup no longer matched the route, which had
@@ -45,6 +48,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -274,11 +278,14 @@ async function run() {
     });
     await test('the federation attestation refuses: deactivation holds on other nodes', async () => {
         const timestamp = new Date().toISOString();
-        const signature = await sign(Buffer.from(fedSecret).toString('base64'),
-            JSON.stringify({ purpose: 'federation-auth-verify', username: victim.owner, requesting_node: fedPeerId, timestamp }));
+        const signed = JSON.stringify({ purpose: 'federation-auth-verify', username: victim.owner, requesting_node: fedPeerId, timestamp });
+        const signature = await sign(Buffer.from(fedSecret).toString('base64'), signed);
+        // The audience proof a peer of this version sends (required from 4.0.0), so the refusal comes
+        // from the deactivation and not from a missing proof.
+        const proof = await audienceProof(Buffer.from(fedSecret).toString('base64'), signed, NODE_ID);
         const r = await json('/v1/federation/auth/verify', {
             method: 'POST',
-            body: JSON.stringify({ username: victim.owner, password: PASSWORD, requesting_node: fedPeerId, timestamp, signature }),
+            body: JSON.stringify({ username: victim.owner, password: PASSWORD, requesting_node: fedPeerId, timestamp, signature, ...proof }),
         });
         assert(r.status === 403 && r.body.error?.code === 'ACCOUNT_DISABLED', `expected 403 ACCOUNT_DISABLED, got ${r.status} ${r.body.error?.code}`);
     });

@@ -24,6 +24,11 @@
  *     account signs in on Node A, which signs the request, and B verifies it), and B refuses Node C,
  *     which is not its peer. The old tests posted unsigned requests naming C, which B took on the
  *     body's word; their setup no longer matches the route.
+ *   v1.5.0 -- 2026-10-12 -- Fixtures move to the 4.0.0 form, neither of them this suite's subject:
+ *     Node C's federated action is published with pricing.toll_morsels (4.0.0 refuses
+ *     pricing.base_morsels, 400 MORSEL_PRICE_REMOVED), and signedPingBody names the receiving node
+ *     and adds the audience proof (4.0.0 refuses a ping without it, 401 AUDIENCE_REQUIRED). The
+ *     unsigned and wrong-key pings still fail on their signature (401 UNAUTHORIZED).
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-multinode.ts
@@ -34,6 +39,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { audienceProof } from '../src/services/signed-node-request.js';
 
 // ─── Ed25519 setup ───
 ed.hashes.sha512 = (m: Uint8Array) =>
@@ -168,6 +174,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
  */
 async function signedPingBody(
     from: NodeState,
+    to: NodeState,
     idField: 'node_id' | 'from_node',
     privateKey = from.nodeKey.privateKey,
 ): Promise<string> {
@@ -189,6 +196,9 @@ async function signedPingBody(
         software_version: softwareVersion,
         stats,
         signature,
+        // The audience proof names the receiving node, as the heartbeat client sends it (required
+        // from 4.0.0). Signed with the same key, so a wrong-key ping still fails on its signature.
+        ...await audienceProof(privateKey, signedBytes, to.config.nodeId),
     };
     wire[idField] = from.config.nodeId;
     return JSON.stringify(wire);
@@ -383,7 +393,7 @@ await test('Publish federated action on Node C', async () => {
             category: 'utility',
             input_schema: {},
             output_schema: {},
-            pricing: { base_morsels: 5 },
+            pricing: { toll_morsels: 5 },
             federate: true,
         }),
     });
@@ -877,7 +887,7 @@ console.log('\nAdditional: Cross-node connectivity');
 await test('Node C can ping Node A', async () => {
     const { status, body } = await nodeA!.json('/v1/federation/ping', {
         method: 'POST',
-        body: await signedPingBody(nodeC!, 'from_node'),
+        body: await signedPingBody(nodeC!, nodeA!, 'from_node'),
     });
     assert(status === 200, `ping: ${status}: ${JSON.stringify(body)}`);
     assert(body.data.pong === true, 'pong is true');
@@ -887,7 +897,7 @@ await test('Node C can ping Node A', async () => {
 await test('Node B can ping Node A', async () => {
     const { status, body } = await nodeA!.json('/v1/federation/ping', {
         method: 'POST',
-        body: await signedPingBody(nodeB!, 'node_id'),
+        body: await signedPingBody(nodeB!, nodeA!, 'node_id'),
     });
     assert(status === 200, `ping: ${status}: ${JSON.stringify(body)}`);
     assert(body.data.pong === true, 'pong');
@@ -911,7 +921,7 @@ await test('A ping signed by the wrong key is refused', async () => {
     const impostor = await generateKeyPair();
     const { status, body } = await nodeA!.json('/v1/federation/ping', {
         method: 'POST',
-        body: await signedPingBody(nodeB!, 'node_id', impostor.privateKey),
+        body: await signedPingBody(nodeB!, nodeA!, 'node_id', impostor.privateKey),
     });
     assert(status === 401, `wrong-key ping must be 401, got ${status}: ${JSON.stringify(body)}`);
     assert(body.error?.code === 'UNAUTHORIZED', `error code: ${JSON.stringify(body.error)}`);

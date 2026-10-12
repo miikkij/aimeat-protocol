@@ -44,6 +44,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   v1.7.0 -- 2026-10-12 -- The positive memory-inventory request carries the audience proof for B.
+ *     Node 4.0.0 refuses one without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the
+ *     proof is not this test's subject.
  *   v1.6.0 — 2026-09-26 — The routing fee is taken only for a route that is made, on the three endpoints
  *     that route: nothing for a refused address, back again for an unreachable node or an error
  *     response, and no route at all for a person whose balance cannot cover it.
@@ -63,6 +66,7 @@ import * as ed from '@noble/ed25519';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import { buildHopSigningMessage } from '../src/types/route-manifest.js';
 import type { RouteHop } from '../src/types/route-manifest.js';
 import type { PeerInfo } from '../src/services/federation.js';
@@ -843,9 +847,12 @@ async function run(): Promise<void> {
 
     await test('…and hands the inventory to a peer that signs for it', async () => {
         const timestamp = new Date().toISOString();
-        const signature = await sign(A.nodeKey.privateKey, JSON.stringify({ requesting_node: A_ID, gaii: B.ownerGhii, timestamp }));
+        const signed = JSON.stringify({ requesting_node: A_ID, gaii: B.ownerGhii, timestamp });
+        const signature = await sign(A.nodeKey.privateKey, signed);
+        // The audience proof names B, as A's own client sends it (required from 4.0.0).
+        const proof = await audienceProof(A.nodeKey.privateKey, signed, B_ID);
         const { status, body } = await B.json('/v1/federation/memory/list', {
-            method: 'POST', body: JSON.stringify({ requesting_node: A_ID, gaii: B.ownerGhii, timestamp, signature }),
+            method: 'POST', body: JSON.stringify({ requesting_node: A_ID, gaii: B.ownerGhii, timestamp, signature, ...proof }),
         });
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
         const keys = body.data.entries.map((e: any) => e.key);

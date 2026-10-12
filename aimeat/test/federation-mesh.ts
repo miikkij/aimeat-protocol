@@ -4,6 +4,11 @@
  *   federate flag, policy update persistence, and network directory (service summary,
  *   ping hash, cross-catalogue filtering).
  * @version-history
+ *   v1.7.0 -- 2026-10-12 -- Fixtures move to the 4.0.0 form, none of them this suite's subject: the two
+ *     actions are published with pricing.toll_morsels (4.0.0 refuses pricing.base_morsels, 400
+ *     MORSEL_PRICE_REMOVED); the signed ping and every signed auth/verify request carry the audience
+ *     proof for this node, signed with the same key as the message (4.0.0 refuses one without it, 401
+ *     AUDIENCE_REQUIRED). The unsigned and other-key verify requests still fail on their signature.
  *   v1.0.0 — 2026-05-20 — Initial federation mesh E2E tests
  *   v1.1.0 — 2026-05-20 — Add network directory tests (Phase 2 Task 6)
  *   v1.2.0 — 2026-05-21 — Add federated login E2E tests (Phase 3 Task 6)
@@ -33,6 +38,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 
 // ─── Boot embedded server ───
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40253', 10);
@@ -92,6 +98,14 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     const privKey = Buffer.from(privateKeyB64, 'base64');
     const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
     return Buffer.from(sig).toString('base64');
+}
+
+/** The node under test's id, which every answer names in its envelope: the audience a peer signs for. */
+let nodeIdCache = '';
+async function thisNodeId(): Promise<string> {
+    if (!nodeIdCache) nodeIdCache = String((await json('/v1/health')).body.node ?? '');
+    if (!nodeIdCache) throw new Error('the node under test named no node id');
+    return nodeIdCache;
 }
 
 // ─── State ───
@@ -344,7 +358,7 @@ await test('POST /v1/actions -- create action with federate=true', async () => {
             category: 'utility',
             input_schema: {},
             output_schema: {},
-            pricing: { base_morsels: 5 },
+            pricing: { toll_morsels: 5 },
             federate: true,
         }),
     });
@@ -365,7 +379,7 @@ await test('POST /v1/actions -- create action without federate (default false)',
             category: 'utility',
             input_schema: {},
             output_schema: {},
-            pricing: { base_morsels: 3 },
+            pricing: { toll_morsels: 3 },
         }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -635,9 +649,11 @@ await test('POST /v1/federation/ping -- signed ping pongs, unsigned is refused',
         stats: { agents_active: 0, actions_published: 0, uptime_hours: 0, catalogue_hash: 'mesh-test' },
     };
     const signature = await signMsg(fakePeerPrivKey, JSON.stringify(pingPayload));
+    // The audience proof the heartbeat client sends (required from 4.0.0).
+    const proof = await audienceProof(fakePeerPrivKey, JSON.stringify(pingPayload), await thisNodeId());
     const { status, body } = await json('/v1/federation/ping', {
         method: 'POST',
-        body: JSON.stringify({ ...pingPayload, signature }),
+        body: JSON.stringify({ ...pingPayload, signature, ...proof }),
     });
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
@@ -713,9 +729,13 @@ async function verifyAuth(fields: Record<string, unknown>, opts: { signWith?: st
     const body: Record<string, unknown> = { requesting_node: fakePeerNodeId, timestamp: new Date().toISOString(), ...fields };
     const key = opts.signWith === undefined ? fakePeerPrivKey : opts.signWith;
     if (key) {
-        body.signature = await signMsg(key, JSON.stringify({
+        const signed = JSON.stringify({
             purpose: 'federation-auth-verify', username: body.username, requesting_node: body.requesting_node, timestamp: body.timestamp,
-        }));
+        });
+        body.signature = await signMsg(key, signed);
+        // The audience proof a peer of this version sends (required from 4.0.0), signed with the same
+        // key, so a request signed by another key still fails on its signature.
+        Object.assign(body, await audienceProof(key, signed, await thisNodeId()));
     }
     return json('/v1/federation/auth/verify', { method: 'POST', body: JSON.stringify(body) });
 }
