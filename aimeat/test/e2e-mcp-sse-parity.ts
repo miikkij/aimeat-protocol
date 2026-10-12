@@ -17,6 +17,8 @@
  *   deliberately different and checks the unrelated domain does NOT arrive.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-sse-parity
  * @version-history
+ *   v1.3.0 — 2026-10-12 — Across owners: a second owner's open stream does not hear the first
+ *     owner's private write, with the first owner's stream as the positive control.
  *   v1.2.0 — 2026-10-12 — The MCP OAuth sign-in sends PKCE and resource (helpers/mcp-oauth-pkce.ts), and
  *     the suite's refusal case: a stream ticket opens one stream, and a used or unknown one is refused.
  *   v1.1.0 — 2026-09-29 — aimeat_classification (set, with the person's words) reaches 'classification'.
@@ -287,6 +289,30 @@ async function run() {
             assert(!stream.domains().includes('boards'),
                 `the bus is broadcasting: a memory write delivered [${[...new Set(stream.domains())].join(', ')}]`);
         } finally { stream.close(); }
+    });
+
+    // ── Across owners ───────────────────────────────────────────────────────────────────────────
+    // A change to a record only its owner reads reaches that owner's streams and no one else's: an
+    // event that crossed owners would tell another person, by its timing alone, that somebody is
+    // working and roughly on what. Owner A's own stream is the positive control, so a stream that
+    // hears nothing at all cannot pass this.
+    await test("a second owner's open stream does not hear the first owner's private write", async () => {
+        const B = await setup();
+        const streamA = await openStream(A.ownerToken);
+        const streamB = await openStream(B.ownerToken);
+        try {
+            const r = await callTool(A.session, 'aimeat_memory_write', { key: `sse.private.${stamp}`, value: { mine: true }, visibility: 'private' });
+            assert(!r.isError, `memory write failed: ${r.text.slice(0, 250)}`);
+            await streamA.waitFor('memory', 6_000);
+            // Past the stream's one-second coalescing window, twice over, so a late frame would land.
+            await new Promise(res => setTimeout(res, 2_500));
+            assert(!streamB.domains().includes('memory'),
+                `owner B's stream heard owner A's private write: [${[...new Set(streamB.domains())].join(', ')}]`);
+        } finally {
+            streamA.close();
+            streamB.close();
+            await json(`/v1/owners/${B.owner}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
+        }
     });
 
     // ── The refusal: a stream ticket opens one stream ──────────────────────────────────────────
