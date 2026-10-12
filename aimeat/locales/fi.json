@@ -12937,6 +12937,7 @@
       "spacesLabel": "Mitä tiloja se seuraa?",
       "spacesHint": "Se saa yhden tehtävän jokaisesta tietueesta, joka julkaistaan tilaan sen käynnistämisen jälkeen.",
       "leftAsIs": "Tilassa jo olevat tietueet jäävät ennalleen.",
+      "joins": "Se lisätään tämän työtilan organismin agentteihin, ja organismin jäsenet näkevät sen siellä.",
       "backfill": "Käsittele myös tilassa jo olevat tietueet",
       "backfillHint": "Tietueita on nyt: {n}. Jokaisesta tulee tehtävä ja yksi mallin ajo, kymmenen kerrallaan. Agentin pysäyttäminen pysäyttää käsittelyn.",
       "backfillNone": "Rastittamissasi tiloissa ei ole nyt yhtään julkaistua tietuetta.",
