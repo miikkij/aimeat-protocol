@@ -5,6 +5,10 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_organism_owner_add, _owner_remove and the three email-invitation tools declare all
+ *     three interfaces (agentEverywhere): each has a CLI dispatch definition
+ *     (tool-dispatch/tool-call-defs-organism-owners.ts) and the connector MCP registers it.
+ *     aimeat_organism_invitations_email asks organism:invite, the word its REST route asks.
  *   2026-10-12 — aimeat_workspace_object_delete says what it does: the keys go to the 7-day bin, where
  *     aimeat_memory_restore brings each back (it said permanent and irreversible). aimeat_organism_leave
  *     says the leaver's agents and workspace roles in the organism end too
@@ -188,7 +192,7 @@ export const organismsWorkspacesAppsTools = [
         name: 'aimeat_organism_owner_add',
         description: 'Make an existing active member a co-owner of an organism you own. ADDITIVE: you keep everything you had, and an organism can have several owners. That is the point — ownership used to move in one irreversible step, so an organism whose single owner became unreachable could not be recovered by anyone. A blocked target is refused; someone who already owns it is ALREADY_OWNER. To hand it over and step back in one call instead, use the transfer route.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: true, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Add Organism Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'organism:invite',
         surfaces: ['appdev', 'agent', 'service'],
@@ -201,7 +205,7 @@ export const organismsWorkspacesAppsTools = [
         name: 'aimeat_organism_owner_remove',
         description: 'Take an owner off an organism you own; they stay on as an admin. Any owner may remove any other. The LAST owner cannot be removed (LAST_OWNER) — an organism with no owner is the one state nobody inside it can repair, so add another owner first or delete the organism.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: true, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Remove Organism Owner', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         scope: 'organism:invite',
         surfaces: ['appdev', 'agent', 'service'],
@@ -262,11 +266,11 @@ export const organismsWorkspacesAppsTools = [
         },
     },
     {
-        // Server-only: an owner/admin inviting people not yet on the node by email. Not on the connector/CLI surface.
+        // An owner or admin inviting people not yet on the node by email.
         name: 'aimeat_organism_invite_email',
         description: 'Invite a person who is NOT yet on this node into an organism by EMAIL. Creator/admin only. Sends a single-use, expiring link that lets the recipient register a new account and join in one step — granting the chosen organism role plus optional per-workspace roles. Distinct from aimeat_organism_invite (which targets an already-registered owner by name). Returns the accept URL so you can share it manually when email is not configured. Cancel a pending one with aimeat_organism_invitation_email_cancel.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Invite to Organism by Email', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'organism:invite',
         surfaces: ['appdev', 'agent', 'service'],
@@ -285,8 +289,12 @@ export const organismsWorkspacesAppsTools = [
         name: 'aimeat_organism_invitations_email',
         description: 'List the PENDING email invitations for an organism (creator/admin only) — each invitee email, organism role, workspace grants, and expiry. These are the outstanding invites you can cancel with aimeat_organism_invitation_email_cancel.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'List Email Invitations', readOnlyHint: true },
+        // The word GET /v1/organisms/:id/invitations/email asks, and the word the two tools beside
+        // it ask. The list holds the invitees' email addresses. Until 2026-10-12 the entry named no
+        // word, so the node MCP offered the list to an agent the route refuses.
+        scope: 'organism:invite',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
@@ -296,7 +304,7 @@ export const organismsWorkspacesAppsTools = [
         name: 'aimeat_organism_invitation_email_cancel',
         description: 'Cancel a PENDING email invitation before it is used (creator/admin only). Invalidates the link so it can no longer be accepted.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Cancel Email Invitation', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         scope: 'organism:invite',
         surfaces: ['appdev', 'agent', 'service'],

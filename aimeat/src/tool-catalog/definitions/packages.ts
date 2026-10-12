@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-10-12 — aimeat_package_versions, _delete and _publish declare connectorOnly: they are on both
+ *     connector interfaces and not on the node MCP (V2_EXCLUDED), and they declared the node MCP.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.15.0 -- 2026-10-04 -- aimeat_package_install takes `grant_apps` (GRANT_APPS_PARAM).
@@ -49,7 +51,7 @@
  */
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
-import { agentEverywhere } from './types.js';
+import { agentEverywhere, connectorOnly } from './types.js';
 
 /** What `config` on aimeat_package_install is, on every interface. */
 /** The `grant_apps` input of aimeat_package_install, shared by its three surfaces. */
@@ -96,7 +98,7 @@ export const packagesTools = [
         name: 'aimeat_package_versions',
         description: "List one component package's version history.",
         caller: 'agent',
-        visibility: agentEverywhere,
+        visibility: connectorOnly,
         annotations: { title: 'List Package Versions', readOnlyHint: true },
         input: { group_id: { type: 'string', required: true, description: 'Package group identifier.' } },
     },
@@ -104,7 +106,7 @@ export const packagesTools = [
         name: 'aimeat_package_delete',
         description: 'Archive one version of a component package.',
         caller: 'agent',
-        visibility: agentEverywhere,
+        visibility: connectorOnly,
         annotations: { title: 'Delete Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         scope: 'app:manage',
         input: {
@@ -116,7 +118,7 @@ export const packagesTools = [
         name: 'aimeat_package_publish',
         description: 'Publish a component package: one or more components (app, extension, cortex, translation) that install together.',
         caller: 'agent',
-        visibility: agentEverywhere,
+        visibility: connectorOnly,
         annotations: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // The words POST /v1/packages asks (secaudit 2026-10 follow-up, A4).
         scope: 'packages:write',

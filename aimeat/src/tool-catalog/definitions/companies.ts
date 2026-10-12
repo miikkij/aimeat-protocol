@@ -15,6 +15,9 @@
  * @structure companyTools: AimeatToolDefinition[]
  * @usage import { companyTools } from './definitions/companies.js';
  * @version-history
+ *   2026-10-12 — The six tools declare all three interfaces (agentEverywhere): each has a CLI dispatch
+ *     definition (tool-dispatch/tool-call-defs-companies.ts) and the connector MCP registers it. They
+ *     declared connectorMcp: false while the connector registered every one of them.
  *   2026-10-05 — aimeat_company_create and aimeat_company_update take ai_provenance and ai_provenance_id for
  *     the description (secaudit 2026-10, M3 follow-up; the developer's decision).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -23,6 +26,7 @@
  *   v1.0.0 — 2026-08-08 — Initial: list/get/create/update/front_page/portfolio_publish.
  */
 import type { AimeatToolDefinition } from './types.js';
+import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 /**
@@ -52,7 +56,7 @@ export const companyTools = [
         name: 'aimeat_company_list',
         description: "The owner's registered companies, each with its id, slug, public address ({slug}.co.<apex>), front-page setting, and legal-identity fields. Start here: every other company tool takes the id from this list. An empty list means the owner has not registered a company yet — aimeat_company_create is the first step.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'List Companies', readOnlyHint: true },
         // Contacts (address book) — the owner's messaging graph, so the messaging scopes gate it:
         // reading the list / resolving an email rides messages:read; editing the book (save/remove)
@@ -71,7 +75,7 @@ export const companyTools = [
         name: 'aimeat_company_create',
         description: "Register a company, which immediately reserves its public address {slug}.co.<apex> — the same way publishing an app reserves an apps subdomain. The slug is derived from the name unless given; a taken name answers SLUG_TAKEN and a reserved infrastructure label answers SLUG_RESERVED, so pick another and retry rather than treating it as a failure. Supplying the legal-identity fields here saves a follow-up aimeat_company_update, and they are what every later invoice prefills its seller party from." + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Register Company', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'company:write',
         surfaces: ['agent'],
@@ -87,7 +91,7 @@ export const companyTools = [
         name: 'aimeat_company_update',
         description: "Fill in or correct a company's details. Every field is optional and only the ones passed are written, so this is safe to call repeatedly as a conversation gathers information — ask the owner for what is missing, then write just that. Passing an empty string clears a field. These values become the seller party on every invoice and the supplier block in the Finvoice e-invoice, so they must be the real registered details rather than plausible-looking ones: leave a field out when the owner has not stated it." + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Update Company Details', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'company:write',
         surfaces: ['agent'],
@@ -103,7 +107,7 @@ export const companyTools = [
         name: 'aimeat_company_front_page',
         description: "Choose what the company's address serves: 'app' serves one of the OWNER'S OWN published apps (target \"owner/file.html\"; someone else's answers FRONT_PAGE_NOT_YOURS), 'portfolio' serves the page published with aimeat_company_portfolio_publish, 'redirect' sends visitors to an absolute http(s) URL, and 'none' keeps the address reserved while serving nothing. Choosing 'portfolio' before a page exists answers NO_PORTFOLIO — publish first.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Set Company Front Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'company:write',
         surfaces: ['agent'],
@@ -117,7 +121,7 @@ export const companyTools = [
         name: 'aimeat_company_portfolio_publish',
         description: "Publish a standalone HTML page as the company's public front page and point the address at it in one act. Send the WHOLE document (doctype through </html>) — it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode, and keep it under the node's portfolio size limit (512KB by default). Re-publishing replaces the previous page.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Publish Company Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'company:write',
         surfaces: ['agent'],
@@ -130,7 +134,7 @@ export const companyTools = [
         name: 'aimeat_portfolio_publish',
         description: "Publish this person's own welcome page — the page at their address, which is also their portfolio. Use it when they ask you to make their page, improve it, or change what it says: you write the HTML and publish it, they never copy or paste anything. Send the WHOLE document (doctype through </html>); it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode. Re-publishing replaces the previous page, so read what is there first if they asked for a change rather than a rewrite. This is the person's page; the company equivalent is aimeat_company_portfolio_publish.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Publish Your Welcome Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // Stores a file, or takes one back — the same permission over the same namespace.
         scope: 'storage:write',

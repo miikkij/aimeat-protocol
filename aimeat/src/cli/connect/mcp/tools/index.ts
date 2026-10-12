@@ -8,6 +8,10 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   2026-10-12 — contacts.ts, companies.ts, portfolio.ts, commerce.ts, exchange.ts, organisms.ts,
+ *     dm-messages.ts and agent-telemetry.ts are gone: their 30 tools got a CLI dispatch definition
+ *     and run it, so /local/call serves them too. knowledge.ts is the one module left with a handler
+ *     of its own (security/connector-own-handlers.json).
  *   2026-10-06 — themes.ts, apps.ts, agent-management.ts, data-map.ts, designbook.ts, app-manage.ts,
  *     boards.ts, decide.ts, mcp-proxy.ts, ai-voice.ts, surface-layout.ts, compliance.ts, install-sets.ts, core.ts, agent-tasks.ts, schedules.ts, workflows.ts, agent-caps.ts, handbook.ts, agent-messages.ts, appdev.ts, capabilities.ts, flags.ts, operator.ts, skills.ts and workspaces.ts are gone, and organisms.ts keeps the tools that have no dispatch definition: their
  *     tools run their dispatch definition (secaudit 2026-10 follow-up, Part B).
@@ -32,15 +36,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AgentRegistry } from '../../agent-registry.js';
 
-import { registerDmMessagesTools } from './dm-messages.js';
-import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerKnowledgeTools } from './knowledge.js';
-import { registerOrganismsTools } from './organisms.js';
-import { registerCommerceTools } from './commerce.js';
-import { registerExchangeTools } from './exchange.js';
-import { registerContactTools } from './contacts.js';
-import { registerCompanyTools } from './companies.js';
-import { registerPortfolioTools } from './portfolio.js';
 import { registerDispatchTools } from './dispatch-tools.js';
 
 export function registerAllTools(server: McpServer, registry: AgentRegistry): void {
@@ -56,14 +52,6 @@ export function registerAllTools(server: McpServer, registry: AgentRegistry): vo
       return typeof value === 'function' ? value.bind(target) : value;
     },
   });
-  registerDmMessagesTools(mcp, registry);
-  registerAgentTelemetryTools(mcp, registry);
   registerKnowledgeTools(mcp, registry);
-  registerOrganismsTools(mcp, registry);
-  registerCommerceTools(mcp, registry);
-  registerExchangeTools(mcp, registry);
-  registerContactTools(mcp, registry);
-  registerCompanyTools(mcp, registry);
-  registerPortfolioTools(mcp, registry);
   registerDispatchTools(server, registry, registered);
 }
