@@ -2147,12 +2147,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The watched value passes leave (external, to the peer) before it goes into a reply; the contract records are the node's own."
     },
-    "src/services/usage-summary.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence."
-    },
     "src/services/visibility/behaviour-counter.ts": {
       "reads": {
         "getMemory": 1
