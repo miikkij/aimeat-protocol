@@ -1,0 +1,229 @@
+/**
+ * @file src/data/builtin-skills.agent-capability.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The `aimeat-agent-capability` built-in skill: how an agent gets a capability on
+ *   this node. The capability is built as an app that publishes a tool, and the agent calls the
+ *   tool. The agent's runtime gets a new tool only for work that needs the computer itself.
+ *
+ *   WHY A NODE SKILL. In October 2026 a list of 58 kinds of agent was sorted by what this node
+ *   and the crew runtime can do. The first sorting proposed six new runtime tools (mail, a
+ *   calendar, transcription, outside systems), because nothing an agent designer reads said that
+ *   an app gives an agent its capability. Fourteen of the kinds moved to "possible now" once the
+ *   rule was applied (Jouni, 2026-10-12: "applikaatio voi tehdä app-toolsin jonka kautta se voi
+ *   hyödyntää aimeat:n kaikkia kyvykkyyksiä [...] ilman että paisutetaan crewaimeat:ia"). The
+ *   same mistake repeats in every session until the rule is where a designer reads it.
+ *
+ *   WHAT IT MUST AGREE WITH. models/app-tool-schemas.ts (a tool's fields and its two ways of
+ *   running), commerce/app-tool-catalog.ts and routes/webmcp.ts (which tools an owner's own agent
+ *   calls free, and that a tool with no action answers TOOL_NOT_INVOKABLE to a direct call),
+ *   commerce/sellable-resolvers.ts (a tool with no action becomes a task through a checkout only;
+ *   the first text of this skill said "a call creates a task", which a reviewer checked against
+ *   the route and found false on 2026-10-12), services/extension-ctx-contract.ts (what an extension's action is given),
+ *   services/connect-tunnel-push.ts onMemoryWrite (a published record wakes a subscribed agent;
+ *   services/workspace-rows/row-service.ts does not call it, so a row wakes nobody),
+ *   services/refinery/pipeline.ts (mail arrives as rows), data/library-packs/ (the libraries
+ *   named), routes/outbound.ts with services/connections/ (mail sent through a connected
+ *   account), and crewaimeat's crew_def.py TOOL_REGISTRY (the tool ids `workspace`,
+ *   `workspace_write`, `app_tools`, `exchange`, `delegate`) with workspace_tools.py, whose four
+ *   tools list workspaces, read an index or records, write a record and append rows: none of
+ *   them reads rows (read 2026-10-12, crewfive d0b0591).
+ * @structure AGENT_CAPABILITY_SKILL_ENTRY
+ * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
+ * @version-history
+ *   v1.0.0 — 2026-10-12 — Initial (wish-noden-skilli-agentin-kyvykkyys-suunnitellaan-sovelluksena-ja).
+ */
+/** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
+ *  with builtin-skills.ts, which imports it; the compiler checks the two agree where it is listed. */
+type BuiltinSkillEntry = { name: string; skillMd: string; visibility?: 'members' | 'public' };
+
+export const AGENT_CAPABILITY_SKILL_ENTRY: BuiltinSkillEntry = {
+  name: 'aimeat-agent-capability',
+  visibility: 'public',
+  skillMd: `---
+name: aimeat-agent-capability
+description: How an agent gets a capability on AIMEAT. Build the capability as an app that publishes a tool, and let the agent call the tool, instead of asking for a new tool in the agent's runtime. Covers the three ways an agent gets a capability today (a workspace, an app tool, another agent's offer), what an app tool and the extension behind it can do, how information comes in and what wakes an agent, where a person approves what goes out, the ten questions to answer before building, and three worked examples (email, a calendar, meeting notes from a recording). Use before you design a new agent, before you propose a new tool for an agent, and when a person asks for an agent that needs mail, a calendar, an outside system, speech, or anything the agent's own tool list does not name.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# An app gives an agent its capability
+
+## The rule
+
+An agent does not need a tool of its own for every job. Build the capability on AIMEAT as an **app**,
+and let the app give it to the agent as a **tool**. The same app serves a person on a screen and an
+agent through the tool, and the tool can be offered to other owners on the Exchange.
+
+The agent's runtime gets a new tool for one reason: the work needs the computer the agent runs on.
+A browser, ffmpeg and a local file are such work. Mail, a calendar, transcription and an outside
+system's API are not: an app reaches each of them.
+
+## Look at what exists first
+
+Before you design anything, read what the person already has:
+
+1. \`aimeat_crew_menu\` on a connected agent of theirs: the tool ids its runtime resolves.
+2. \`aimeat_app_list\`, then \`aimeat_app_tools_get\` for an app that looks right: the tools it
+   publishes, each with its input fields. \`GET /v1/commerce/tools?include=own\` lists the owner's
+   free callable tools in one read.
+3. \`aimeat_organism_list\` and \`aimeat_workspace_list\`: the information they keep, by workspace.
+4. \`aimeat_skill_list\` with \`binding: "app:{owner}/{filename}"\`: the app's own operating guide.
+
+When one of their apps already publishes the tool, the agent uses it. When the information is
+already in a workspace, the agent reads it there.
+
+## Three ways an agent gets a capability today
+
+| Where the capability is | The agent's tool id | What it gives |
+|---|---|---|
+| The information is in a workspace | \`workspace\`, \`workspace_write\` | The agent reads a workspace's index and its records, and with \`workspace_write\` writes records and appends rows. It does not read rows: an app tool does that for it. |
+| An app publishes a tool | \`app_tools\` | The agent lists the tools apps publish and calls one by its sku, \`app-tool:<owner>/<app>:<tool>\`. Its own owner's tools cost it nothing, priced or not. |
+| Another agent or another owner offers it | \`exchange\`, \`delegate\` | The agent uses another agent's work or another owner's app tool, under a contract and metered. |
+
+A definition names a workspace by its id and a tool by its sku, so the runtime finds exactly that
+one.
+
+## What an app tool is
+
+An app publishes a tool manifest (\`aimeat_app_tools_publish\`, stored as \`apps.<filename>.tools\`).
+Each tool has a name, a description, the shape of its input and its result, and one of two ways of
+running:
+
+- **An extension's action** (\`action_id: "ext:<extension>:<action>"\`). The node runs it in a
+  sandbox and answers with the result.
+- **A task** (no \`action_id\`). The node has nothing to run for it. It is fulfilled as a task, for
+  the agent the tool names or else for the app's owner, and only when it is bought through a
+  checkout. A direct call answers \`TOOL_NOT_INVOKABLE\`, for the owner's own agent too. So an
+  agent's definition names a tool that has an action.
+
+A tool may carry a money price and a pacing amount, and it can be listed on the Exchange. A tool
+with an action and no price is the owner's own: their agents call it directly.
+
+## What the extension behind a tool can do
+
+This is what an agent reaches through an app tool. The extension's manifest declares each one
+(skill \`aimeat-extension-builder\` has the build path and every rule):
+
+| The extension's \`ctx\` | What it does |
+|---|---|
+| \`ctx.fetch\` | Calls an outside service, at the hosts the manifest names. Its credential is a secret the node keeps encrypted, never text in the code. |
+| \`ctx.workspace\` | Reads and writes workspace records, and reads and appends the rows of a row space that names the extension. |
+| \`ctx.memory\` | Keeps the extension's own data and reads public records. |
+| \`ctx.files\` | Reads and writes files in the node's storage. |
+| \`ctx.ai\` | Starts a model call that runs in the background: text, a picture, or the transcription of a stored audio file. The extension's owner pays for it. |
+| \`ctx.email\`, \`ctx.notify\` | Sends an email through the node's mail service, or a notice to the owner. |
+| \`ctx.buy\` | Buys one call of another app's tool, under a contract the extension's owner holds. |
+| A schedule | Runs an action on a clock, for example to fetch from an outside system and write rows. |
+
+The served libraries give an app the rest in the person's browser: \`aimeat-ai\` (text, pictures,
+speech, **transcription**, embeddings on the person's own AI providers), \`aimeat-connect\` (the
+person's own accounts at outside services, Gmail and Outlook among them), \`aimeat-refinery\` (mail
+sorted into workspace rows), \`aimeat-intake\` (a form a visitor without an account sends into a
+workspace), \`aimeat-webhook\`, \`aimeat-calendar\` (recurring events, time zones, ICS in and out,
+free time) and \`aimeat-workflows\` (a run with a step that waits for a person).
+
+## How information comes in, and what wakes the agent
+
+| Source | How it reaches AIMEAT | What wakes the agent |
+|---|---|---|
+| Email | The mail refinery reads a connected mailbox on a clock and writes each message as a workspace row (skill \`aimeat-refinery\`) | A clock, set a few minutes after the refinery's. A new row wakes nobody. |
+| A visitor on the web | An intake form writes a record into a workspace | The new record, for an agent that holds a workspace contract |
+| An outside system | An extension fetches on a clock and writes rows | A clock or a workflow. A new row wakes nobody. |
+| A person in an app | The app writes into a workspace, or gives the agent a task | The task or the record |
+| Sound | The app transcribes it (\`aimeat-ai\` in the browser, or the extension's \`ctx.ai\` for a stored file) and writes the text into a workspace | The task or the record |
+| Another agent | An offer, a workflow step, or an app tool bought through a checkout and fulfilled as a task | The task |
+| Time | A schedule of kind \`agent_task\` | The scheduled task |
+
+An agent is woken by a task, a message, a schedule and a **published workspace record**. An agent
+that reads named spaces of a workspace and is woken by their records is a contract agent, and that
+way exists: skill \`aimeat-workspace-contracts\`. Use it, and build no second way for an agent to
+follow a workspace.
+
+"Where its work goes" is a different choice. It decides who reads the agent's finished result (its
+owner only, or the members of one workspace). It gives the agent nothing to read and wakes it for
+nothing.
+
+## How information goes out, and where a person approves
+
+The agent writes a draft into a workspace. The app shows it. The person presses. The app holds the
+permission to send, so the agent needs none.
+
+| Out | How |
+|---|---|
+| A reply from the person's own mailbox | The app sends through their connected Gmail or Outlook account when they approve (\`POST /v1/outbound/send\`; the send permission is a separate connection from the read permission) |
+| A notice, a reminder, a newsletter | The extension's \`ctx.email\`, within what the owner consented to |
+| A post to social media | The connected accounts, through a publishing workflow with an approval step |
+| An outside system | The extension's \`ctx.fetch\` to a declared host, or \`aimeat-webhook\` |
+| A calendar | The app's own calendar in a workspace; ICS export |
+
+Sending, paying and deleting are approved by a person on a screen. An instruction in the agent's
+definition is not that approval.
+
+## Ten questions, in this order, before anything is built
+
+1. **What gets taken care of for the person?** One sentence, in their words.
+2. **Where does the information come from?** Mail, a form, an outside system, a person, sound,
+   another agent.
+3. **Which workspace holds it, and in what shape?** Records or rows, and their fields.
+4. **What wakes the agent?** A new record (a contract agent), a task, a message or a clock. A row
+   does not.
+5. **What do plain rules settle before a model reads anything?** Rules drop the noise first; the
+   model reads what is left.
+6. **What does the agent decide, and what does it only prepare?**
+7. **What does a person approve, and on which screen?**
+8. **Which tools does the app publish**, so that this agent and others can do what a person does
+   on the screen?
+9. **Can it be offered to others?** An offer, workflow signals, the Exchange.
+10. **Does the work need the computer itself?** Only a yes here is a reason to change the agent's
+    runtime.
+
+## Three examples
+
+### Email
+
+- **In:** the mail refinery runs on a clock. Each message is a workspace row with its class and the
+  fields read from it.
+- **The tools:** the mail app publishes "new messages" and "one message". The extension behind them
+  reads the rows (\`ctx.workspace.readRows\`), because the agent's own \`workspace\` tool reads records
+  and not rows.
+- **The agent:** runs on a clock after the refinery, calls those tools (\`app_tools\`), and writes a
+  reply draft and its own classification back (\`workspace_write\`).
+- **The person:** reads the drafts in the app and presses Send. The app sends through the connected
+  account.
+- **The runtime gets no mail tool.**
+
+### A calendar
+
+- **The information:** events are records in a workspace. An outside calendar comes in as an ICS
+  file, or an extension fetches an ICS feed on a clock.
+- **The tools:** the app publishes "events between two dates", "free time" and "propose a booking".
+  An extension that uses the calendar library's code is behind them.
+- **The agent:** calls those tools (\`app_tools\`) and proposes times.
+- **The person:** approves the booking in the app.
+- **The runtime gets no calendar tool.**
+
+### Meeting notes from a recording
+
+- **In:** a person puts the recording into the app. The app transcribes it (\`aimeat-ai\`) and writes
+  the text into a workspace.
+- **The agent:** gets a task, reads the text, and writes the decisions, the tasks and who owns each
+  as records.
+- **The runtime gets no transcription tool,** because the app does that part.
+
+## What is outside an extension's reach
+
+- \`ctx.email\` sends through the node's mail service. A reply inside the person's own mail thread
+  goes from the app through their connected account.
+- An extension reads no mailbox. Mail reaches a workspace through the refinery.
+- \`ctx.ai\` is a background call. Live speech and a live conversation do not go through it.
+- A browser and other work on the agent's computer. That is the case where the runtime grows.
+
+## When you propose the agent
+
+Skill \`add-a-crew-agent\` has the steps. Give each member only the tool ids its role needs, name
+the workspace by its id and each app tool by its sku in the task description, and say in the
+purpose which of the person's workspaces and apps the agent works on, in the names they use.
+`,
+};

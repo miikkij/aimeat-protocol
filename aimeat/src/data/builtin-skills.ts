@@ -11,6 +11,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.30.0 -- 2026-10-12 -- aimeat-agent-capability (builtin-skills.agent-capability.ts): an agent's
+ *     capability is built as an app that publishes a tool. add-a-crew-agent, step 0, looks at the
+ *     owner's apps and their tools before a new tool is proposed.
  *   v1.29.0 -- 2026-10-12 -- use-app-bound-skills: aimeat_skill_list and GET /v1/skills ask memory:read
  *     (the REST scope gates of 4.0.0, auth/rest-scope-gate.ts).
  *   v1.28.0 -- 2026-10-12 -- Four skills ship with every node (docs audit phase 5a): aimeat-data-ownership,
@@ -193,6 +196,7 @@ import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
 import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
 import { WORKFLOW_DECISIONS_SKILL_ENTRY } from './builtin-skills.workflow-decisions.js';
 import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
+import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -437,6 +441,7 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   MCP_SERVERS_SKILL_ENTRY,
   WORKFLOW_DECISIONS_SKILL_ENTRY,
   BOOKKEEPING_SKILL_ENTRY,
+  AGENT_CAPABILITY_SKILL_ENTRY,
   {
     name: 'use-app-bound-skills',
     skillMd: `---
