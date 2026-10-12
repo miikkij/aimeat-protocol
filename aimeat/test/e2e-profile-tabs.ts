@@ -8,6 +8,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=profile-tabs
  * @version-history
+ *   v1.2.1 — 2026-10-12 — The two catalogue services are published with toll_morsels, which node 4.0.0
+ *     takes in place of the refused price_morsels (MORSEL_PRICE_REMOVED) and 3.x reads the same, so
+ *     the work lifecycle tests no longer cascade. The agent's standard scopes include agent:read,
+ *     which GET /v1/agents asks from 4.0.0 (SCOPE_DENIED without it).
  *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit, five findings in this file, all of the same
  *     family: a status range or an echo accepted as proof. The work lifecycle asserted `status < 500`
  *     on all four transitions and read nothing back — the rating call had been answering 400 since
@@ -261,7 +265,7 @@ await test('POST /v1/catalogue — publish service', async () => {
             display_name: 'E2E Test Service',
             description: 'A test service',
             category: 'utility',
-            price_morsels: 5,
+            toll_morsels: 5,
             unit: 'call',
         }),
     });
@@ -357,7 +361,7 @@ await test('POST /v1/catalogue — publish service (agent2 as provider)', async 
             display_name: 'E2E Work Service',
             description: 'Service for work lifecycle test',
             category: 'utility',
-            price_morsels: 1,
+            toll_morsels: 1,
             unit: 'call',
         }),
     });
@@ -738,8 +742,10 @@ const READONLY_SCOPES = ['memory:read', 'wallet:read', 'work:read'];
  * is one the rest of the suite no longer has. app:write, app:manage and social:write are here
  * because the app and board tests below need them -- not to make anything pass, but because
  * `standard` has to mean an agent that can still do what this suite goes on to ask of it.
+ * agent:read is here for the same reason: the Chat Sessions tab lists agents as this agent, and
+ * GET /v1/agents asks that word from 4.0.0 (x-aimeat-scope, REST_SCOPE_GATES_ENFORCED_IN).
  */
-const STANDARD_SCOPES = ['memory:read', 'memory:write', 'memory:delete', 'wallet:read', 'work:read', 'work:request', 'work:accept', 'consent:manage', 'app:write', 'app:manage', 'social:read', 'social:write', 'catalogue:read', 'storage:write'];
+const STANDARD_SCOPES = ['memory:read', 'memory:write', 'memory:delete', 'wallet:read', 'work:read', 'work:request', 'work:accept', 'consent:manage', 'app:write', 'app:manage', 'social:read', 'social:write', 'catalogue:read', 'storage:write', 'agent:read'];
 
 /** A FRESH agent JWT — scopes are copied from the record at mint time, so an old token proves nothing. */
 async function mintProfileAgentToken(): Promise<string> {

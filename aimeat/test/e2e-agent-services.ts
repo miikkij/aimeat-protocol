@@ -2,6 +2,8 @@
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-services.ts
 //
 // @version-history
+//   v1.1.1 — 2026-10-12 — The two actions are published with pricing.toll_morsels; node 4.0.0 refuses
+//     pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
 //   v1.1.0 — 2026-08-17 — E2E quality, agent-services:257. The three agents in this file never crossed:
 //     four hundred lines with no 401 and no 403 anywhere. Accepting a work item is taking on the job
 //     and the payment attached to it, so who may accept is the whole of it. Test 3b creates a work
@@ -221,7 +223,7 @@ await test('2. Provider publishes action', async () => {
             description: 'Scrapes a URL and returns its content',
             input_schema: { type: 'object', properties: { url: { type: 'string' } } },
             output_schema: { type: 'object', properties: { content: { type: 'string' } } },
-            pricing: { base_morsels: 10 },
+            pricing: { toll_morsels: 10 },
             tags: ['test', 'scraping'],
         }),
     });
@@ -379,7 +381,7 @@ await test('7. No-directives agent publishes action', async () => {
             description: 'Translates text between languages',
             input_schema: { type: 'object', properties: { text: { type: 'string' }, lang: { type: 'string' } } },
             output_schema: { type: 'object', properties: { translated: { type: 'string' } } },
-            pricing: { base_morsels: 5 },
+            pricing: { toll_morsels: 5 },
             tags: ['test'],
         }),
     });

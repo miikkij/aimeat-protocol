@@ -18,6 +18,9 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.6.1 — 2026-10-12 — The probe action of "the visitor's sent work is their own" is published with
+ *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the
+ *     new field means the same on 3.x.
  *   v1.6.0 — 2026-09-26 — The GET sweep leaves out the two figures GET /v1/health moves on its own
  *     (uptime_seconds, memory_mb). The three asks run at once, and when they straddled a second the
  *     sweep read the tick as the visitor getting the namesake's answer: one run in six failed so,
@@ -509,7 +512,7 @@ async function run() {
                 id: action, display_name: 'Federated namesake probe', description: 'Gives /v1/work/sent a row to find',
                 input_schema: { type: 'object', properties: { text: { type: 'string' } } },
                 output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-                pricing: { base_morsels: 1 },
+                pricing: { toll_morsels: 1 },
             }),
         }));
         assert(pub.status === 201, `publish action: ${pub.status} ${JSON.stringify(pub.body?.error)}`);

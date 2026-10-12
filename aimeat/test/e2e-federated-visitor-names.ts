@@ -19,6 +19,11 @@
  *   peer door before the visitors sign in.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-visitor-names
  * @version-history
+ *   v1.2.1 — 2026-10-12 — The priced extension action carries its pacing amount as the action's own
+ *     tollMorsels; node 4.0.0 refuses commercial.payMorsels in a manifest (MORSEL_PRICE_REMOVED), so
+ *     the install failed and the test with it. 3.x charges tollMorsels the same way. The peer's visitor
+ *     scopes include ext:invoke, which POST /v1/ext/:name/:action asks from 4.0.0, so each visitor
+ *     is charged for the name and not refused for a missing scope (SCOPE_DENIED).
  *   v1.2.0 — 2026-09-26 — The code behind the doors: an owner-visibility read, the learned pitfalls, an
  *     organism write, an app found by its owner segment, a priced extension and its toll. The visitor
  *     named like the owner gets what the control gets (secaudit 2026-09, F-1 as a class).
@@ -79,6 +84,8 @@ const homeNodeId = `aimeat-fake-home-vn-${stamp}`;
 const VISITOR_SCOPES = [
     'memory:read', 'memory:write', 'catalogue:read', 'social:read', 'work:request', 'boards:read', 'social:write', 'boards:write',
     'mcp:read', 'mcp:manage', 'workflow:read', 'workflow:write', 'app:write',
+    // POST /v1/ext/:name/:action asks ext:invoke from 4.0.0 (REST_SCOPE_GATES_ENFORCED_IN).
+    'ext:invoke',
 ];
 
 let homeKeys = { publicKey: '', privateKey: '' };
@@ -157,7 +164,7 @@ async function run() {
         const c = claims(visitorToken);
         assert(c.federated === true && c.owner === `${namesake}@${homeNodeId}` && JSON.stringify(c.roles) === '["federated"]',
             `the session this suite is about: ${JSON.stringify({ federated: c.federated, owner: c.owner, roles: c.roles })}`);
-        for (const scope of ['memory:write', 'mcp:manage', 'workflow:write', 'app:write']) {
+        for (const scope of ['memory:write', 'mcp:manage', 'workflow:write', 'app:write', 'ext:invoke']) {
             assert((c.scopes ?? []).includes(scope), `the visitor needs ${scope} for the cases below: ${JSON.stringify(c.scopes)}`);
         }
 
@@ -293,7 +300,7 @@ async function run() {
         const manifest = JSON.stringify({
             metadata: { name: ext, version: '1.0.0', description: 'visitor names e2e', author: 'e2e' },
             actions: [
-                { id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', commercial: { payMorsels: 5 } },
+                { id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', tollMorsels: 5 },
                 { id: 'tollcall', method: 'POST', path: '/tollcall', script: 'echo', tollMorsels: 2 },
             ],
             config: { public_access: { default: true } },
