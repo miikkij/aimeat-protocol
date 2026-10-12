@@ -5,6 +5,9 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_agents_list and aimeat_agent_basics_get name agent:read, the word their REST twins
+ *     GET /v1/agents and GET /v1/agents/v2/basic-agents ask; enforced from 4.0.0 (scopeEnforcedFrom),
+ *     counted before it (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11).
  *   2026-10-12 — aimeat_usage_report, aimeat_notify and the five aimeat_contact_* tools declare all three
  *     interfaces (agentEverywhere): each has a CLI dispatch definition and the connector MCP registers it.
  *     aimeat_agent_statistics declares the connector MCP too (connectorOnly), which registers it.
@@ -63,6 +66,7 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere, connectorOnly } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { agentV2Tools } from './agent-v2.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 
 export const agentMessagingTools = [
     {
@@ -298,6 +302,9 @@ export const agentMessagingTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Basic Agents: What and Whether', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // The word GET /v1/agents/v2/basic-agents asks from 4.0.0, the fleet list's word.
+        scope: 'agent:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         // On `admin`: What the one-press basic agents would give this account, and a proposal for a new one.
         // On `agent` too, because their usual caller is one of the owner's own agents telling the
         // person where to press; here for the owner-side agent management this surface carries.
@@ -698,6 +705,10 @@ export const agentMessagingTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List My Agents', readOnlyHint: true },
+        // The word GET /v1/agents asks from 4.0.0 (auth/rest-scope-gate.ts). New on 2026-10-12, in the
+        // default agent scopes, and given once to every existing agent (services/rest-scope-gates-migration.ts).
+        scope: 'agent:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         // On `chat`: Their agents, a new one, and work for them. A schedule is found when it is needed.
         surfaces: ['agent', 'service', 'chat'],
         input: {},

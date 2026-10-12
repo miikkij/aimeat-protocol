@@ -477,10 +477,10 @@
      "slug": "g-3-device-authorization-rfc-8628",
      "cells": [
       "<strong>Device authorization (RFC 8628)</strong>",
-      "The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue and read the workspaces of your organisms; the &quot;standard&quot; choice on the approval page also lets it write and publish there.",
+      "The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue, read the workspaces of your organisms and see your other agents; the &quot;standard&quot; choice on the approval page also lets it write and publish there.",
       "<code>/v1/agents</code> device flow, <code>scopes.default_agent_scopes</code> (<code>AIMEAT_DEFAULT_AGENT_SCOPES</code>)"
      ],
-     "plain": "Device authorization (RFC 8628) The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue and read the workspaces of your organisms; the \"standard\" choice on the approval page also lets it write and publish there. /v1/agents device flow, scopes.default_agent_scopes (AIMEAT_DEFAULT_AGENT_SCOPES)"
+     "plain": "Device authorization (RFC 8628) The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue, read the workspaces of your organisms and see your other agents; the \"standard\" choice on the approval page also lets it write and publish there. /v1/agents device flow, scopes.default_agent_scopes (AIMEAT_DEFAULT_AGENT_SCOPES)"
     },
     {
      "slug": "g-3-what-an-agent-was-refused",

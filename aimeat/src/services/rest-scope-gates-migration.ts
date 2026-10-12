@@ -31,10 +31,14 @@
  *   ONCE PER NODE, recorded under `system@<nodeId>` (REST_SCOPE_GATES_KEY) after the principals, so a
  *   boot that stops half way runs it again, and an owner who later takes the word away keeps it away.
  *   A principal made after the run chose from a screen that lists the word.
- * @structure REST_SCOPE_GATES_KEY · REST_SCOPE_NEW_WORDS · missingNewWords(held) ·
- *   migrateRestScopeGatesOnce(storage, nodeId)
- * @usage migrateRestScopeGatesOnce(storage, config.nodeId).catch(err => logger.error(…));
+ * @structure REST_SCOPE_GATES_KEY · REST_SCOPE_NEW_WORDS · AGENT_READ_GRANT_KEY · AGENT_READ_WORDS ·
+ *   missingNewWords(held, words?) · migrateRestScopeGatesOnce(storage, nodeId) ·
+ *   migrateAgentReadGrantOnce(storage, nodeId)
+ * @usage migrateRestScopeGatesOnce(storage, config.nodeId).then(() => migrateAgentReadGrantOnce(storage, config.nodeId))
  * @version-history
+ *   v1.1.0 — 2026-10-12 — A second step, migrateAgentReadGrantOnce: agent:read, the word of the owner's
+ *     agent list from 4.0.0, once, under its own record so a node that ran the first step runs it too
+ *     (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11).
  *   v1.0.0 — 2026-10-12 — Initial (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  */
 import type { Storage } from '../storage/interface.js';
@@ -52,9 +56,27 @@ export const REST_SCOPE_NEW_WORDS: ReadonlyArray<{ word: string; opens: string }
   },
 ];
 
+/**
+ * The second step, with its own record (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-
+ * mukaan, item 11): `agent:read`, the word the owner's agent list asks from 4.0.0. A step of its own so
+ * that a node which already ran the first step (and wrote REST_SCOPE_GATES_KEY) still runs this one,
+ * once. The same rule as the first step: GET /v1/agents asked nothing but a session before, so every
+ * agent and approved ecosystem app with a recorded list could reach it, and the word opens nothing
+ * else. It is also in the node's default agent scopes (config.ts SHIPPED_DEFAULT_AGENT_SCOPES).
+ */
+export const AGENT_READ_GRANT_KEY = 'migrations.rest-scope-gates-4-0-0.agent-read';
+
+/** The word the second step grants, and what it opens. */
+export const AGENT_READ_WORDS: ReadonlyArray<{ word: string; opens: string }> = [
+  {
+    word: 'agent:read',
+    opens: 'GET /v1/agents, GET /v1/agents/v2/basic-agents, GET /v1/agents/v2/migrate, aimeat_agents_list and aimeat_agent_basics_get',
+  },
+];
+
 /** The new words a principal holding `held` lacks; none for a wildcard or a domain wildcard that covers them. */
-export function missingNewWords(held: readonly string[]): string[] {
-  return REST_SCOPE_NEW_WORDS.map(w => w.word).filter(w => !scopeIsCovered(held, w));
+export function missingNewWords(held: readonly string[], words: ReadonlyArray<{ word: string }> = REST_SCOPE_NEW_WORDS): string[] {
+  return words.map(w => w.word).filter(w => !scopeIsCovered(held, w));
 }
 
 export interface RestScopeGatesMigrationResult {
@@ -63,18 +85,30 @@ export interface RestScopeGatesMigrationResult {
   ecosystemApps: string[];
 }
 
-/** Give the new words to every existing principal that could reach their routes, unless this node has run it. */
+/** Give the new words (packages:read) to every existing principal that could reach their routes, unless this node has run it. */
 export async function migrateRestScopeGatesOnce(storage: Storage, nodeId: string): Promise<RestScopeGatesMigrationResult> {
+  return grantWordsOnce(storage, nodeId, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS);
+}
+
+/** Give agent:read to every existing principal that could reach the agent list, unless this node has run it. */
+export async function migrateAgentReadGrantOnce(storage: Storage, nodeId: string): Promise<RestScopeGatesMigrationResult> {
+  return grantWordsOnce(storage, nodeId, AGENT_READ_GRANT_KEY, AGENT_READ_WORDS);
+}
+
+/** One step: the words to every agent and approved ecosystem app with a recorded list, recorded under `key`. */
+async function grantWordsOnce(
+  storage: Storage, nodeId: string, key: string, words: ReadonlyArray<{ word: string; opens: string }>,
+): Promise<RestScopeGatesMigrationResult> {
   const system = `system@${nodeId}`;
   const result: RestScopeGatesMigrationResult = { ran: false, agents: [], ecosystemApps: [] };
-  if (await storage.getMemory(system, REST_SCOPE_GATES_KEY)) return result;
+  if (await storage.getMemory(system, key)) return result;
 
   for (const agent of await storage.listAgents()) {
     const held = agent.defaultScopes;
     // No recorded list: the agent is minted from config.defaultAgentScopes, and writing a list here
     // would replace that fallback rather than extend it (services/scope-vocabulary-migration.ts).
     if (!Array.isArray(held)) continue;
-    const missing = missingNewWords(held);
+    const missing = missingNewWords(held, words);
     if (!missing.length) continue;
     await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...missing] });
     result.agents.push(agent.gaii);
@@ -85,7 +119,7 @@ export async function migrateRestScopeGatesOnce(storage: Storage, nodeId: string
       if (app.status !== 'approved' && app.status !== 'active') continue;
       const held = app.scopes;
       if (!Array.isArray(held)) continue;
-      const missing = missingNewWords(held);
+      const missing = missingNewWords(held, words);
       if (!missing.length) continue;
       await storage.updateEcosystemApp(app.geai, { scopes: [...held, ...missing] });
       result.ecosystemApps.push(app.geai);
@@ -94,11 +128,11 @@ export async function migrateRestScopeGatesOnce(storage: Storage, nodeId: string
 
   const now = new Date().toISOString();
   await storage.setMemory({
-    key: REST_SCOPE_GATES_KEY,
+    key,
     ownerGaii: system,
     value: {
       at: now,
-      words: REST_SCOPE_NEW_WORDS.map(w => w.word),
+      words: words.map(w => w.word),
       agents: result.agents,
       ecosystemApps: result.ecosystemApps,
     },
@@ -112,9 +146,9 @@ export async function migrateRestScopeGatesOnce(storage: Storage, nodeId: string
   });
   result.ran = true;
   if (result.agents.length + result.ecosystemApps.length > 0) {
-    logger.info(`REST scope gates: gave ${REST_SCOPE_NEW_WORDS.map(w => w.word).join(', ')} to ${result.agents.length} agent(s) `
+    logger.info(`REST scope gates: gave ${words.map(w => w.word).join(', ')} to ${result.agents.length} agent(s) `
       + `and ${result.ecosystemApps.length} ecosystem app(s) that could already reach `
-      + `${REST_SCOPE_NEW_WORDS.map(w => w.opens).join('; ')}`, { agents: result.agents, ecosystemApps: result.ecosystemApps });
+      + `${words.map(w => w.opens).join('; ')}`, { agents: result.agents, ecosystemApps: result.ecosystemApps });
   }
   return result;
 }

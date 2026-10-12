@@ -7729,6 +7729,7 @@
   "accesspage.scope.generator.read": "lukee generaattoriprojektejasi",
   "accesspage.scope.generator.write": "muuttaa generaattoriprojektejasi",
   "accesspage.scope.generator.execute": "ajaa generaattoria nimissäsi",
+  "accesspage.scope.agent.read": "näkee agenttisi ja niiden asetukset",
   "accesspage.scope.agent.write": "asettaa muita agenttejasi",
   "accesspage.scope.app.write": "julkaisee sovelluksia nimissäsi",
   "accesspage.scope.app.manage": "poistaa ja haaroittaa sovelluksia",
@@ -10767,7 +10768,7 @@
     "cfgDesc_metrics_access": "Mittaripäätteen näkyvyys: public, authenticated tai operator.",
     "cfgDesc_mcp_session_idle_minutes": "Sulje MCP-sessio, kun pyyntöjä ei ole tullut näin moneen minuuttiin (murto-osat sallittu; suljettu asiakas alustaa itsensä uudelleen).",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
-    "cfgDesc_scopes_default_agent_scopes": "Oikeudet, jotka agentti saa, kun kukaan ei valitse niitä. Yksi oikeus rivillä. Valmiiksi agentti saa lukea ja kirjoittaa omistajansa muistia, lukea katalogia ja lukea omistajansa organismien työtiloja.",
+    "cfgDesc_scopes_default_agent_scopes": "Oikeudet, jotka agentti saa, kun kukaan ei valitse niitä. Yksi oikeus rivillä. Valmiiksi agentti saa lukea ja kirjoittaa omistajansa muistia, lukea katalogia, lukea omistajansa organismien työtiloja ja nähdä omistajansa muut agentit.",
     "cfgDesc_scopes_max_agent_scopes": "Oikeudet, joita agentille voi enintään antaa, yksi rivillä (* = kaikki).",
     "cfgDesc_sso_enabled": "Organisaatiokirjautumisen (SAML) ja provisioinnin (SCIM) ovet käytössä.",
     "cfgDesc_sso_connections_locked": "Jäädytä SSO-yhteyksien hallinta (jokainen hallintakirjoitus vastaa 403).",
@@ -16612,6 +16613,7 @@
             "write": "Luo, muuta ja aja automaatioitasi."
           },
           "agent": {
+            "read": "Katso agenttiesi lista: niiden nimet, asetukset ja oikeudet sekä se, pääseekö kukin kirjautumaan.",
             "write": "Muuta muiden agenttiesi asetuksia: missä tilassa ne toimivat ja millä tunnisteilla.",
             "permissions": "Muuta mitä muut agenttisi saavat tehdä. Eri asia kuin niiden asetukset: tämä on itse lupalista.",
             "delete": "Poista itse luomansa agentit, eikä muita. Ajoympäristölle joka rakentaa sinulle agentteja ja joutuu myös siivoamaan ne pois."

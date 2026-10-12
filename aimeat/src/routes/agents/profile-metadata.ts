@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 — 2026-10-12 — GET /v1/agents asks agent:read from 4.0.0 (requireRestScope; counted with a
+ *     Deprecation header before it). Ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan,
+ *     item 11 replaces the decision recorded in v1.7.0 below that an agent listing its owner's fleet
+ *     needs no word.
  *   v1.16.0 — 2026-10-11 — `stopped`, `stopped_at` and `stopped_by` on the agent list.
  *   v1.15.0 — 2026-10-11 — `install_id` on the agent list: the connector that holds the agent, or
  *     the one it waits for. A fleet runtime read the agent list and the connector list every 30 s
@@ -31,8 +35,9 @@
  *     principal does. The bypass this closes sat inside one feature: ?include=stats returns the
  *     active task ids and titles that GET /v1/agents/:name/tasks had just refused the same grant for
  *     want of task:read, so the data was one query string away from the refusal meant to protect it.
- *     A conditional refusal rather than a requireScope, matching the sibling door — task:read is not
- *     in defaultAgentScopes and an agent listing its owner's fleet is ordinary.
+ *     A conditional refusal rather than a requireScope, matching the sibling route — task:read is not
+ *     in defaultAgentScopes. (Its second reason, that an agent listing its owner's fleet needs no
+ *     word, was replaced by the agent:read ruling of 2026-10-12, v1.17.0.)
  *   v1.6.0 — 2026-08-31 — Agent v2 on the read side: `run_mode`, `identity_version`, `card_enrolled`
  *     and `enrolled_at` on the agent list, plus PATCH /v1/agents/:name/run-mode. Stored and shown,
  *     never enforced — the runtime is what honours a run mode, as it is for max-concurrent-tasks.
@@ -58,6 +63,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { requireScopeUnlessSelf } from '../../auth/self-or-scope.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -159,14 +165,18 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // ?include=stats attaches a per-agent `stats` projection (task/message counts + latest
   // timestamps + active-task list + onboarding) computed in a few grouped queries, so a
   // fleet dashboard gets everything in ONE request instead of N+1 per-agent round trips.
-  router.get('/v1/agents', requireAuth(), async (req, res) => {
-    // An APP principal needs task:read here, and only an app principal does — the same conditional
-    // refusal, on the same word, as GET /v1/agents/:name/tasks (agent-tasks/create-read.ts:163).
-    // The bypass this closes is inside one feature: ?include=stats returns the active task ids and
-    // titles that the tasks door had just refused the same grant for want of task:read, so the data
-    // was one query string away from the refusal that was supposed to protect it. A blanket
-    // requireScope would be the wrong instrument — task:read is not in defaultAgentScopes, and an
-    // agent listing its owner's fleet is ordinary.
+  //
+  // agent:read, from 4.0.0 (auth/rest-scope-gate.ts: before it a caller without the word is let
+  // through with the Deprecation headers and counted). Ruling
+  // decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11, which reverses the
+  // earlier decision that an agent listing its owner's fleet is ordinary and needs no word. The word
+  // is in defaultAgentScopes, and every agent and ecosystem app that existed was given it once
+  // (services/rest-scope-gates-migration.ts migrateAgentReadGrantOnce).
+  router.get('/v1/agents', requireAuth(), requireRestScope('agent:read'), async (req, res) => {
+    // An APP principal also needs task:read here, and only an app principal does: the same
+    // conditional refusal, on the same word, as GET /v1/agents/:name/tasks (agent-tasks/create-read.ts).
+    // ?include=stats returns the active task ids and titles that the tasks route refuses the same
+    // grant for want of task:read, so the data was one query string away from that refusal.
     if (req.auth!.roles.includes('app') && !scopeIsCovered(req.auth!.scopes, 'task:read')) {
       res.status(403).json(refuseNeedsPermission(config, { want: 'see what your agents are working on', scope: 'task:read' }));
       return;

@@ -7730,6 +7730,7 @@
   "accesspage.scope.generator.read": "reads your generator projects",
   "accesspage.scope.generator.write": "changes your generator projects",
   "accesspage.scope.generator.execute": "runs the generator in your name",
+  "accesspage.scope.agent.read": "sees your agents and how each one is set up",
   "accesspage.scope.agent.write": "sets up your other agents",
   "accesspage.scope.app.write": "publishes apps in your name",
   "accesspage.scope.app.manage": "deletes and forks apps",
@@ -10768,7 +10769,7 @@
     "cfgDesc_metrics_access": "Metrics endpoint visibility: public, authenticated, or operator",
     "cfgDesc_mcp_session_idle_minutes": "Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
-    "cfgDesc_scopes_default_agent_scopes": "The permissions an agent gets when nobody chooses any, one per line. Out of the box it may read and write its owner's memory, read the catalogue and read the workspaces of its owner's organisms.",
+    "cfgDesc_scopes_default_agent_scopes": "The permissions an agent gets when nobody chooses any, one per line. Out of the box it may read and write its owner's memory, read the catalogue, read the workspaces of its owner's organisms and see its owner's other agents.",
     "cfgDesc_scopes_max_agent_scopes": "The most permissions an agent can be given, one per line (* = all).",
     "cfgDesc_sso_enabled": "Enable organisation sign-in (SAML) and provisioning (SCIM) doors",
     "cfgDesc_sso_connections_locked": "Freeze SSO connection management (every admin write answers 403)",
@@ -16613,6 +16614,7 @@
             "write": "Create, change and run your automations."
           },
           "agent": {
+            "read": "See the list of your agents: their names, settings and permissions, and whether each one can sign in.",
             "write": "Change the settings of your OTHER agents: what mode they run in and how they are tagged.",
             "permissions": "Change what your OTHER agents are allowed to do. Separate from their settings, because this is the permission list itself.",
             "delete": "Delete agents it created itself, and only those. For a runtime that builds agents for you and has to clear them away again."
