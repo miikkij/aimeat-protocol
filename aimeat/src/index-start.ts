@@ -19,6 +19,8 @@
  *     has no owner it goes to a 0600 file, admin-setup-secret in the data directory, and the log
  *     names only the file; once the node has an owner a file left from an earlier boot is deleted
  *     (services/admin-setup-secret.ts; secrets audit 2026-10-09, 1.4).
+ *   v1.8.0 — 2026-10-12 — The connect tunnel upgrade reads X-AIMEAT-Features, what the connector's
+ *     crew runtime honours beyond its tools, and hands it to the tunnel manager.
  *   v1.7.0 — 2026-10-09 — One boot warning when the deprecated static TURN pair is set: it names
  *     AIMEAT_TURN_SECRET as the replacement (services/turn-credentials.ts).
  *   v1.6.1 — 2026-10-05 — The anonymous chat connection limit counts with services/rate-buckets.ts
@@ -342,8 +344,12 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           // set one), URI-encoded. Unsigned as well: the owner reads it and nothing decides on it.
           const nameHeader = request.headers['x-aimeat-install-name'];
           const installName = Array.isArray(nameHeader) ? nameHeader[0] : nameHeader;
+          // What the connector's crew runtime honours beyond its tools, comma-separated names.
+          // Unsigned too: it decides only what a page offers the connector's own owner.
+          const featuresHeader = request.headers['x-aimeat-features'];
+          const features = Array.isArray(featuresHeader) ? featuresHeader[0] : featuresHeader;
           connectWss.handleUpgrade(request, socket, head, (ws) => {
-            connectTunnelManager.handleConnection(ws, payload, token, installId ?? null, runModes ?? null, installName ?? null);
+            connectTunnelManager.handleConnection(ws, payload, token, installId ?? null, runModes ?? null, installName ?? null, features ?? null);
           });
         } catch (err) {
           logger.warn('index-start: suppressed failure, continuing', { error: String(err) });

@@ -551,6 +551,23 @@ console.log('\n=== Agent ties: apps, the workplace, the first run, the build ins
         assert(bare.status === 400 && bare.body.error?.code === 'INVALID_INPUT', `no workspace named: ${bare.status} ${bare.body.error?.code}`);
         const agentToken = await json(q(orgId, support), { headers: auth(writer.token) });
         assert(agentToken.status === 403, `an agent token: ${agentToken.status}`);
+
+        // ?include=counts adds how many published records each space holds now: the number a person
+        // reads before they let an agent work on the records that are already there. A draft is not
+        // published, and a row is not a record.
+        const key = (suffix: string) => `organism.${orgId}.w.${support}.shared.support-requests.${suffix}`;
+        for (const suffix of ['r1', 'r2', 'r3.draft']) {
+            const w = await json('/v1/memory', { method: 'POST', headers: authA, body: JSON.stringify({ key: key(suffix), value: { id: suffix.split('.')[0], title: suffix }, visibility: 'private' }) });
+            assert(w.status === 201, `record ${suffix}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        }
+        const counted = await json(`${q(orgId, support)}&include=counts`, { headers: authA });
+        assert(counted.status === 200, `counts ${counted.status}: ${JSON.stringify(counted.body?.error)}`);
+        assert(JSON.stringify(counted.body.data.spaces) === JSON.stringify([{ name: 'request', namespace: 'shared.support-requests', description: 'What a customer asks.', records: 2 }]),
+            `two published records and one draft: ${JSON.stringify(counted.body.data.spaces)}`);
+        const plain = await json(q(orgId, support), { headers: authA });
+        assert(!('records' in plain.body.data.spaces[0]), `no count unless asked: ${JSON.stringify(plain.body.data.spaces)}`);
+        const theirCount = await json(`${q(orgId, support)}&include=counts`, { headers: authB });
+        assert(theirCount.status === 404, `another account, with counts: ${theirCount.status}`);
     });
 
     await test('MCP: an agent of the owner says where a sibling\'s work goes, and takes it back', async () => {

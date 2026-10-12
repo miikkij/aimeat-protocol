@@ -12,13 +12,16 @@
  *   the value ends on the owner's page. AIMEAT_INSTALL_NAME wins over the host name. A run-mode
  *   declaration that names no known mode is `spawn`, never an empty list.
  * @version-history
+ *   v1.1.0 — 2026-10-12 — The features a runtime declares (cli/connect/runtime-features.ts,
+ *     parseRuntimeFeatures): no declaration sends no header, and no header reads as "did not say".
  *   v1.0.0 — 2026-10-10 — Initial, with the connector registry.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { hostname } from 'node:os';
 import { getInstallName } from '../../src/cli/connect/install-id.js';
-import { readRunModes } from '../../src/cli/connect/run-modes.js';
-import { parseInstallName, parseRunModes, INSTALL_NAME_MAX } from '../../src/services/connect-tunnel-roster.js';
+import { readRunModes, runtimeHeaders } from '../../src/cli/connect/run-modes.js';
+import { readRuntimeFeatures, featureHeaders } from '../../src/cli/connect/runtime-features.js';
+import { parseInstallName, parseRunModes, parseRuntimeFeatures, INSTALL_NAME_MAX } from '../../src/services/connect-tunnel-roster.js';
 
 const savedName = process.env.AIMEAT_INSTALL_NAME;
 afterEach(() => {
@@ -84,5 +87,30 @@ describe('the run modes a runtime declares', () => {
 
   it('are read by the node as the same list', () => {
     expect(parseRunModes(readRunModes('spawn,resident').join(','))).toEqual(['spawn', 'resident']);
+  });
+});
+
+describe('the features a runtime declares', () => {
+  it('are none when nothing is declared, and then no header is sent at all', () => {
+    expect(readRuntimeFeatures(undefined)).toEqual([]);
+    expect(readRuntimeFeatures('')).toEqual([]);
+    expect(featureHeaders([])).toEqual({});
+  });
+
+  it('are the well-formed names, lower-cased, once each, in the order written', () => {
+    expect(readRuntimeFeatures('record_spaces, RECORD_BACKFILL,not a name!,record_spaces,')).toEqual(['record_spaces', 'record_backfill']);
+    expect(featureHeaders(['record_spaces', 'record_backfill'])).toEqual({ 'X-AIMEAT-Features': 'record_spaces,record_backfill' });
+  });
+
+  it('are read by the node as the same list, and no header reads as "did not say"', () => {
+    expect(parseRuntimeFeatures(featureHeaders(readRuntimeFeatures('record_spaces,record_backfill'))['X-AIMEAT-Features'])).toEqual(['record_spaces', 'record_backfill']);
+    // Null is not an empty list: the page then asks one of the computer's agents.
+    expect(parseRuntimeFeatures(undefined)).toBeNull();
+    expect(parseRuntimeFeatures(null)).toBeNull();
+    expect(parseRuntimeFeatures('   ,!!')).toBeNull();
+  });
+
+  it('travel beside the run modes in the headers the tunnel upgrade carries', () => {
+    expect(runtimeHeaders()['X-AIMEAT-Run-Modes']).toBe(readRunModes(process.env.AIMEAT_RUN_MODES).join(','));
   });
 });

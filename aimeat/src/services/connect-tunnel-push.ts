@@ -17,6 +17,8 @@
  * @structure PushContext · sendBacklog() · pushTaskCancellations() · onMemoryWrite()
  * @usage import { sendBacklog, pushTaskCancellations } from './connect-tunnel-push.js';
  * @version-history
+ *   v1.2.0 — 2026-10-12 — A record is not sent to an agent whose engagements in that workspace
+ *     are all retired (services/workspace-engagements.ts retiredFromWorkspace).
  *   v1.1.0 — 2026-10-11 — A stopped agent (./agent-stop-rules.ts): the backlog carries only its active
  *     tasks, and a record of a space it watches does not wake it.
  *   v1.0.0 — 2026-09-03 — Extracted from connect-tunnel.ts (max-file-lines).
@@ -29,6 +31,7 @@ import { logger } from '../utils/logger.js';
 import type { MemoryWriteEvent } from './event-bus.js';
 import { parseWorkspaceRecordKey, spaceKeyOf } from './connect-tunnel-wire.js';
 import { isStopped } from './agent-stop-rules.js';
+import { retiredFromWorkspace, type WorkspaceEngagement } from './workspace-engagements.js';
 
 /**
  * Just enough of a connection for a push: whose it is, whether its socket is still open, and whether
@@ -152,6 +155,8 @@ export interface RecordPushContext {
   spaceSubscribers: Map<string, Set<string>>;
   sendTo: (conn: PushConn, frame: ConnectFrame) => void;
   canPrincipalReadSpace: (conn: PushConn, organismId: string, ws: string) => Promise<boolean>;
+  /** Every engagement stated on one workspace, active and retired (services/workspace-engagements.ts). */
+  workspaceEngagements: (organismId: string, ws: string) => Promise<WorkspaceEngagement[]>;
   clearSubscriptionFor: (principal: string, sk: string) => void;
   pushTaskCancellations: (ownerGaii: string, key: string) => Promise<void>;
 }
@@ -164,6 +169,13 @@ export interface RecordPushContext {
  * read for content. Access is RE-validated here so a mid-session consent revocation stops delivery
  * immediately (a stale subscription is dropped on the spot). The deliver `id` is unique per write so
  * each update is its own wake (never suppressed by the in-session ack dedup).
+ *
+ * An agent that was taken off the workspace is not sent its records: every engagement it has there
+ * is retired (retiredFromWorkspace). Its subscription stays, so the push is back the moment an
+ * engagement is active again. The crew runtime skips a retired workspace on its own as well; before
+ * 2026-10-12 the node still sent the wake, and a connector started a worker for each record only
+ * for that worker to skip it. The engagements are read once per write, and only when the write has
+ * a subscriber to send to.
  */
 export async function onMemoryWrite(ctx: RecordPushContext, evt: MemoryWriteEvent): Promise<void> {
   // P3: a cancel marker write (`agents.cancel.task.<id>` / `agents.cancel.run.<run>`, value = task
@@ -179,6 +191,11 @@ export async function onMemoryWrite(ctx: RecordPushContext, evt: MemoryWriteEven
   // The space (namespace) can be multi-segment, so match by prefix against each subscription in
   // this (organism, ws) rather than positional split. Subscriptions are few, so this stays cheap.
   const wsPrefix = `${spaceKeyOf(parsed.organismId, parsed.ws, '')}`;  // "orgId|ws|"
+  let engagements: Promise<WorkspaceEngagement[]> | null = null;
+  const takenOff = async (principal: string): Promise<boolean> => {
+    engagements ??= ctx.workspaceEngagements(parsed.organismId, parsed.ws);
+    return retiredFromWorkspace(await engagements, principal);
+  };
   for (const [sk, subs] of ctx.spaceSubscribers) {
     if (!sk.startsWith(wsPrefix) || subs.size === 0) continue;
     const namespace = sk.slice(wsPrefix.length);
@@ -195,6 +212,7 @@ export async function onMemoryWrite(ctx: RecordPushContext, evt: MemoryWriteEven
       if (conn.stopped) continue;  // a stopped agent is not woken by a record; it re-reads the space when it is started
       const allowed = await ctx.canPrincipalReadSpace(conn, parsed.organismId, parsed.ws);
       if (!allowed) { ctx.clearSubscriptionFor(principal, sk); continue; }
+      if (await takenOff(principal)) continue;  // retired from this workspace: not woken, and the subscription is kept
       ctx.stats.deliveriesTotal++;
       ctx.sendTo(conn, {
         type: 'deliver',

@@ -9,11 +9,14 @@
  *   the workspace. Memory-backed (no new table — per docs/coding-guidelines/memory-contracts.md);
  *   the record is the source of truth an agent's processing loop obeys, making Retire a real
  *   off-switch even for a same-owner agent (which has no access grant to revoke).
- * @structure engagementKey / wsPrefix / readEngagement / listByWorkspace / listByAgent /
- *   activateEngagement / retireEngagement
+ * @structure engagementKey / wsPrefix / readEngagement / listByWorkspace / retiredFromWorkspace /
+ *   listByAgent / activateEngagement / retireEngagement
  * @usage import { listByWorkspace, activateEngagement, retireEngagement } from '../services/workspace-engagements.js';
  * @version-history
  *   v1.0.0 — 2026-07-03 — Initial engagement object: activate/retire lifecycle + by-workspace/by-agent reads.
+ *   v1.1.0 — 2026-10-12 — retiredFromWorkspace(): the one statement of when an agent is off a
+ *     workspace, for the record push (Jouni, 2026-10-12, on a retired agent whose worker still
+ *     started for every record).
  *   v1.0.1 — 2026-09-26 — The agent's owner comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { Storage } from '../storage/interface.js';
@@ -73,6 +76,19 @@ export async function readEngagement(
 export async function listByWorkspace(storage: Storage, orgId: string, ws: string): Promise<WorkspaceEngagement[]> {
   const { items } = await storage.listAllMemory({ prefix: wsPrefix(orgId, ws), limit: 2000 });
   return items.map(r => r.value as WorkspaceEngagement).filter(v => v && v.agent);
+}
+
+/**
+ * Whether an agent has been taken off a workspace: it has at least one engagement there and every
+ * one of them is retired. An agent with no engagement there was never stated on the workspace and
+ * is not retired from it, and one active contract beside a retired one keeps it at work. The same
+ * rule as the crew runtime's own gate (aimeat-crewai `_engagement_gate`), decided here for what
+ * the node sends: a retired agent is not sent that workspace's records
+ * (services/connect-tunnel-push.ts).
+ */
+export function retiredFromWorkspace(engagements: readonly WorkspaceEngagement[], agentGaii: string): boolean {
+  const mine = engagements.filter(e => e.agent === agentGaii);
+  return mine.length > 0 && mine.every(e => e.state === 'retired');
 }
 
 /** Every engagement of one agent, across all organisms/workspaces (by-agent index is a filtered scan —

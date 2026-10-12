@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.3.1 -- 2026-10-12 -- Step 1.2: `backfill: true` on a `record_spaces` item, for the records
+ *     that are already in the space, when the menu lists `record_backfill`.
  *   v1.3.0 -- 2026-10-12 -- Step 1.2: an agent whose work arrives in a workspace names the spaces
  *     it watches in `record_spaces` and listens for "records", when the runtime's menu lists the
  *     feature (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
@@ -102,7 +104,13 @@ examples: email, a calendar, meeting notes from a recording.
    reaches the agent as one task whose text is the record itself, with its workspace, space and
    id, so write the first task for that. The agent also gets a task with no record in it when it
    is made: say in the task description that it then tells in one sentence what it does when a
-   record arrives, and writes nothing. Ask \`organism:read\` for it, and \`organism:write\` with
+   record arrives, and writes nothing. The agent works on what is published after it has started.
+   When the owner wants the records that are already in a space worked on as well, add
+   \`"backfill": true\` to that item, and only when \`features\` lists \`record_backfill\`; say
+   to the owner how many records that is first (\`aimeat_workspace_read\` without ids lists each
+   space's records, with \`published\` on each), because each published one becomes a task and a
+   run of their model, ten at a time. It acts the first time the agent looks at the space and
+   never after. Ask \`organism:read\` for it, and \`organism:write\` with
    \`memory:write\` when it writes back into the workspace. The owner sees the spaces on the
    approval page, and approving there states the agent on the workspace, where the owner or the
    workspace's creator can retire it.

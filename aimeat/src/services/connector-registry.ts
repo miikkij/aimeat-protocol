@@ -35,6 +35,9 @@
  *   const rows = await listConnectors({ config, storage }, owner);
  *   const hit = await findConnector({ config, storage }, owner, 'Kotikone');
  * @version-history
+ *   v1.1.0 — 2026-10-12 — A connector's row keeps what its crew runtime honours beyond its tools
+ *     (`features`, from X-AIMEAT-Features), as it keeps the run modes
+ *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import type { AimeatConfig } from '../config.js';
@@ -64,6 +67,11 @@ export interface StoredConnector {
   last_seen: string;
   /** The run modes it presented at its last connect; null from a connector that did not say. */
   run_modes: string[] | null;
+  /**
+   * What it said its crew runtime honours beyond its tools, the last time it said so
+   * (X-AIMEAT-Features); null or absent from a connector that never said.
+   */
+  features?: string[] | null;
   /** Agent names last seen on it. */
   agents: string[];
 }
@@ -84,6 +92,12 @@ export interface ConnectorView {
   first_seen: string;
   last_seen: string;
   run_modes: string[] | null;
+  /**
+   * What its crew runtime honours beyond its tools, by name (`record_spaces`, `record_backfill`).
+   * Null when the connector never said: that is not "nothing", and a caller then asks one of its
+   * agents with GET /v1/agents/:name/crew/menu.
+   */
+  features: string[] | null;
   /** The owner's agents that live on it. */
   agents: string[];
   /** Agents ordered to it that have no key yet. */
@@ -156,7 +170,7 @@ function agentNamesOf(ctx: RegistryContext, owner: string, principals: readonly 
 function liveConnectors(ctx: RegistryContext, owner: string) {
   return connectedDaemons(owner)
     .filter(d => !!d.installId)
-    .map(d => ({ id: d.installId as string, name: d.name, runModes: d.runModes, agents: agentNamesOf(ctx, owner, d.principals) }));
+    .map(d => ({ id: d.installId as string, name: d.name, runModes: d.runModes, features: d.features, agents: agentNamesOf(ctx, owner, d.principals) }));
 }
 
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -184,6 +198,7 @@ export function syncConnectors(ctx: RegistryContext, owner: string, closedId?: s
       rec.agents = agents;
       rec.reported_name = reported;
       rec.run_modes = modes;
+      rec.features = d.features ?? rec.features ?? null;
       rec.last_seen = now;
       write = true;
       for (const other of reg.connectors) {
@@ -228,6 +243,7 @@ export async function listConnectors(ctx: RegistryContext, owner: string): Promi
       first_seen: rec?.first_seen ?? now,
       last_seen: d ? now : (rec?.last_seen ?? now),
       run_modes: d?.runModes ?? rec?.run_modes ?? null,
+      features: d?.features ?? rec?.features ?? null,
       // An agent seen live on another connector has moved there; a deleted agent is no longer anybody's.
       agents: [...held].filter(n => exists.has(n) && (liveNames.get(n) ?? id) === id).sort(),
       waiting: Object.entries(reg.wanted).filter(([n, want]) => want === id && keyless.has(n)).map(([n]) => n).sort(),

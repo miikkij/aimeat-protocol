@@ -25,6 +25,7 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v2.7.0 -- 2026-10-12 -- A connection carries what its connector's crew runtime honours (X-AIMEAT-Features), and a record is not sent to an agent retired from the workspace (connect-tunnel-push.ts).
  *   v2.6.0 -- 2026-10-11 -- A stopped agent: wake deliveries are held, setStopped() and stoppedOf() (agent-stop-rules.ts).
  *   v2.5.0 -- 2026-10-10 -- A connection carries the name its connector reported (X-AIMEAT-Install-Name),
  *     and a socket closing is announced to connect-tunnel-hooks.ts listeners.
@@ -114,8 +115,9 @@ import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
   daemonsForOwner as rosterDaemonsForOwner,
-  parseRunModes, parseInstallName, type ConnectedDaemonEntry,
+  parseRunModes, parseInstallName, parseRuntimeFeatures, type ConnectedDaemonEntry,
 } from './connect-tunnel-roster.js';
+import { listByWorkspace as listEngagementsByWorkspace } from './workspace-engagements.js';
 import {
   onDeliveryEvent, offDeliveryEvent, type DeliveryEvent,
   onMemoryWrittenEvent, offMemoryWrittenEvent, type MemoryWriteEvent,
@@ -241,7 +243,7 @@ export class ConnectTunnelManager {
    * connection for the same principal replaces the first — enforcing the
    * single-socket-per-principal invariant.
    */
-  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null, runModes?: string | null, installName?: string | null): void {
+  handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string, installId?: string | null, runModes?: string | null, installName?: string | null, features?: string | null): void {
     const principal = identity.sub;
     const socketId = this.sockets.open(ws, principal);
     this.replaceIdentity(principal);
@@ -249,7 +251,7 @@ export class ConnectTunnelManager {
     const conn: ConnectConnection = {
       principal, ws, socketId, identity, rawToken, lastHeartbeat: Date.now(),
       installId: installId && installId.trim() !== '' ? installId.trim().slice(0, 64) : null,
-      runModes: parseRunModes(runModes), installName: parseInstallName(installName),
+      runModes: parseRunModes(runModes), installName: parseInstallName(installName), features: parseRuntimeFeatures(features),
     };
     this.connections.set(principal, conn);
     this.stats.connectionsTotal++;
@@ -407,7 +409,7 @@ export class ConnectTunnelManager {
         // upgrade declared. It answers "which of this owner's machines", and the machine is the
         // same machine for every identity on one socket.
         installId: this.connections.get(rec.primary)?.installId ?? null,
-        runModes: this.connections.get(rec.primary)?.runModes ?? null, installName: this.connections.get(rec.primary)?.installName ?? null,
+        runModes: this.connections.get(rec.primary)?.runModes ?? null, installName: this.connections.get(rec.primary)?.installName ?? null, features: this.connections.get(rec.primary)?.features ?? null,
       };
       this.connections.set(payload.sub, conn);
       this.stats.activeConnections = this.connections.size;
@@ -650,6 +652,7 @@ export class ConnectTunnelManager {
       stats: this.stats, connections: this.connections, spaceSubscribers: this.spaceSubscribers,
       sendTo: (c, f) => this.sendTo(c as ConnectConnection, f),
       canPrincipalReadSpace: (c, o, w) => this.canPrincipalReadSpace(c as ConnectConnection, o, w),
+      workspaceEngagements: (o, w) => listEngagementsByWorkspace(this.storage, o, w),
       clearSubscriptionFor: (pr, sk) => this.clearSubscriptionFor(pr, sk),
       pushTaskCancellations: (o, k) => this.pushTaskCancellations(o, k),
     }, evt);

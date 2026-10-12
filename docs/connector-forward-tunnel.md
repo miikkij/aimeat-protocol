@@ -105,6 +105,7 @@ is a credential: the token still authenticates, and these only tell one owner's 
 | `X-AIMEAT-Install` | a UUID the connector minted once, kept in `<AIMEAT_HOME>/install-id` | groups the owner's sockets into connectors, so an enrolment offer can name one machine |
 | `X-AIMEAT-Install-Name` | the host name, or `AIMEAT_INSTALL_NAME` when set, URI-encoded, at most 60 characters | shows it to the owner as the connector's name until they give it one of their own |
 | `X-AIMEAT-Run-Modes` | `spawn` unless the runtime behind the connector declared more by starting it with `AIMEAT_RUN_MODES` (`spawn,resident`) | corrects a proposed run mode the connector could not run, and shows the owner what each machine can run |
+| `X-AIMEAT-Features` | sent only when the runtime behind the connector declared features by starting it with `AIMEAT_RUNTIME_FEATURES` (comma-separated names, for example `record_spaces,record_backfill`) | keeps them on the connector's row (`features`), also while it is away, so the owner's new-agent page can offer what that computer's runtime honours even when no agent is on it yet. A connector that sends none reads as "did not say", and the page asks one of its agents (`GET /v1/agents/:name/crew/menu`) |
 
 The node records each connector for its owner when it connects and keeps it after it disconnects:
 `GET /v1/agents/v2/connectors` lists them with their names, whether each is connected, when it was

@@ -17,6 +17,8 @@
  * @structure registerHomeAgentsRoutes(router, ctx)
  * @usage registerHomeAgentsRoutes(router, ctx);
  * @version-history
+ *   v1.4.0 — 2026-10-12 — GET /v1/home/agents/choices/spaces?include=counts: how many published
+ *     records each watchable space holds now.
  *   v1.3.0 — 2026-10-12 — GET /v1/home/agents/choices/spaces: the record spaces of one workspace
  *     an agent can watch.
  *   v1.2.0 — 2026-10-12 — GET /v1/home/agents/choices?include=tools: each app with the tools an
@@ -33,6 +35,8 @@ import { emitChange } from '../../services/event-bus.js';
 import { readHomeAgents } from '../../services/home-agents.js';
 import { setWorkplace, clearWorkplace, workplaceView, type WorkplaceCaller } from '../../services/agent-workplace.js';
 import { readTieChoices, readWatchableSpaces } from '../../services/agent-ties.js';
+import { readWorkspaceOp, workspaceCallerOf } from '../../services/workspace-tool-ops.js';
+import { readerFor } from '../../services/classification/reader.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
 /** How many workers one read lists unless the page asks, and the most it may ask for. */
@@ -75,7 +79,26 @@ export function registerHomeAgentsRoutes(router: Router, ctx: HomeRouteCtx): voi
         }
         const spaces = await readWatchableSpaces({ config, storage }, req.auth!.owner, organismId, workspaceId);
         if (!spaces) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such workspace.')); return; }
-        res.json(success(config.nodeId, { organism_id: organismId, workspace_id: workspaceId, spaces }));
+        // ?include=counts adds `records` to each space: how many published records it holds now,
+        // which is what an agent that also works on the records already there is given as tasks.
+        // Counted from the workspace index, the read an agent makes of the same workspace, so the
+        // number is the one the agent's runtime will find. It materialises the workspace's
+        // content, so the page asks for it only when the person can make that choice.
+        const include = typeof req.query.include === 'string' ? req.query.include.split(',') : [];
+        if (!include.includes('counts')) {
+            res.json(success(config.nodeId, { organism_id: organismId, workspace_id: workspaceId, spaces }));
+            return;
+        }
+        const who = callerOf(req, config.nodeId, storage);
+        const index = await readWorkspaceOp({ config, storage },
+            workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles], scopes: who.scopes }, config),
+            { organismId, ws: workspaceId, reader: readerFor({ storage, config }, req.auth) });
+        if (!index.ok) { res.status(index.status).json(error(config.nodeId, index.code, index.message)); return; }
+        const listed = (index.data.index ?? {}) as Record<string, Array<{ published?: boolean }>>;
+        res.json(success(config.nodeId, {
+            organism_id: organismId, workspace_id: workspaceId,
+            spaces: spaces.map(s => ({ ...s, records: (listed[s.name] ?? []).filter(e => e.published === true).length })),
+        }));
     });
 
     /** Who is asking, in the terms services/agent-workplace.ts takes. */

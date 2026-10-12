@@ -30,6 +30,7 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.15.0 -- 2026-10-12 -- The upgrade carries X-AIMEAT-Features when the crew runtime declared any (./run-modes.ts runtimeHeaders).
  *   v1.14.0 -- 2026-10-11 -- auth_revoked hands its `reason` to onAuthFailure, for a moved agent (./tunnel-client-types.ts).
  *   v1.13.0 -- 2026-10-10 -- The upgrade carries X-AIMEAT-Install-Name beside the id (./install-id.ts installHeaders).
  *   v1.12.0 -- 2026-10-07 -- A forwarded 401 detaches an identity only when its code says the CALLER'S
@@ -97,7 +98,7 @@ import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../utils/logger.js';
 import { installHeaders } from './install-id.js';
-import { CONNECTOR_RUN_MODES } from './run-modes.js';
+import { runtimeHeaders } from './run-modes.js';
 import { onScopesChanged } from './tunnel-scopes-changed.js';
 import { TunnelTraffic, type TrafficSnapshot } from './tunnel-traffic.js';
 
@@ -455,8 +456,7 @@ export class ConnectTunnelClient {
           headers: {
             Authorization: `Bearer ${token}`,
             ...installHeaders(),
-            // How this connector runs agents, so the node corrects a proposal it could not run.
-            'X-AIMEAT-Run-Modes': CONNECTOR_RUN_MODES.join(','),
+            ...runtimeHeaders(),  // how this connector runs agents, so the node corrects a proposal it could not run, and what its runtime honours
           },
         });
       } catch {

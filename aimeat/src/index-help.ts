@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.11 — 2026-10-12 — The serve help names AIMEAT_RUNTIME_FEATURES.
  *   v1.1.10 — 2026-10-11 — The task-runner paragraph names the runner block's fields instead of
  *     docs/integrations/crewai.md, a repository file an installed CLI cannot open and which never
  *     described the block.
@@ -172,6 +173,11 @@ USAGE
       The daemon also says how its runtime runs agents. It says "spawn" (a
       worker per piece of work). A runtime that keeps agents running sets
       AIMEAT_RUN_MODES=spawn,resident when it starts the daemon.
+
+      A runtime also names what it can do beyond running tools, with
+      AIMEAT_RUNTIME_FEATURES (for example record_spaces: it starts an agent
+      when a record is published in a workspace the agent watches). The owner's
+      pages offer such an agent only for a computer that says so.
 
   aimeat connect tui [--once] [--interval <ms>] [--no-color]
       Watch the running serve daemon in the terminal: how long it has run,

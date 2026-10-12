@@ -16,13 +16,17 @@
  *
  *   A value that names no known mode is the default, not an empty list: a connector that presented
  *   nothing would be read by the node as one that did not say, and given the benefit of the doubt.
- * @structure KNOWN_RUN_MODES · readRunModes(value) · CONNECTOR_RUN_MODES
- * @usage headers: { 'X-AIMEAT-Run-Modes': CONNECTOR_RUN_MODES.join(',') }
+ * @structure KNOWN_RUN_MODES · readRunModes(value) · CONNECTOR_RUN_MODES · runtimeHeaders()
+ * @usage headers: { ...runtimeHeaders() }
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- runtimeHeaders(): the run modes and, when the runtime declared any, its
+ *     features (./runtime-features.ts), as the headers the tunnel upgrade carries.
  *   v1.1.0 -- 2026-10-10 -- AIMEAT_RUN_MODES: a runtime that keeps agents resident declares it at
  *     the connector's start. Without it the connector presents `spawn`, as before.
  *   v1.0.0 -- 2026-10-02 -- Initial.
  */
+
+import { featureHeaders } from './runtime-features.js';
 
 /** The run modes the node's agent card knows (models/agent-card.ts RUN_MODES). */
 export const KNOWN_RUN_MODES: readonly string[] = ['spawn', 'resident'];
@@ -38,3 +42,11 @@ export function readRunModes(value: string | undefined | null): readonly string[
 
 /** What this connector presents: the runtime's declaration, else `spawn`. */
 export const CONNECTOR_RUN_MODES: readonly string[] = readRunModes(process.env.AIMEAT_RUN_MODES);
+
+/**
+ * The upgrade headers that describe this connector's crew runtime: how it runs agents, and what
+ * it honours beyond its tools when it declared any (./runtime-features.ts).
+ */
+export function runtimeHeaders(): Record<string, string> {
+  return { 'X-AIMEAT-Run-Modes': CONNECTOR_RUN_MODES.join(','), ...featureHeaders() };
+}
