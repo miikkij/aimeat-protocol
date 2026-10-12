@@ -48,6 +48,9 @@
  * @structure BASIC_AGENTS · BasicAgentTemplate · basicAgentByName
  * @usage import { BASIC_AGENTS } from '../data/basic-agents.js';
  * @version-history
+ *   v2.5.0 — 2026-10-12 — Both basic agents hold agent:read: they route work to the owner's other agents,
+ *     and the agent list asks the word from 4.0.0. A basic agent created before this gets it once from
+ *     services/rest-scope-gates-migration.ts migrateAgentReadGrantOnce.
  *   v2.4.0 — 2026-10-02 — Both basic agents hold ai:use, so their crews can think through the node's
  *     /v1/llm with their own token and the owner's own key pays before the node's. An agent created
  *     before this keeps its scopes until the owner grants the word (Development note doc-muqrcqbt1fzx).
@@ -187,6 +190,9 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'task:read', 'task:write',
       'organism:read',
       'catalogue:read',
+      // It hands what it cannot answer to whoever should have it, so it reads the owner's agent list
+      // (agent:read from 4.0.0).
+      'agent:read',
       // Its crew thinks through the node's /v1/llm with this agent's own token, so the owner's own
       // key pays before the node's (crew choice {kind:'node'}, 2026-10-02).
       'ai:use',
@@ -275,6 +281,8 @@ export const BASIC_AGENTS: readonly BasicAgentTemplate[] = [
       'work:request', 'work:read',
       'messages:read', 'messages:send',
       'catalogue:read',
+      // It orders work from the owner's other agents, so it reads their list (agent:read from 4.0.0).
+      'agent:read',
       // Its crew thinks through the node's /v1/llm with this agent's own token, so the owner's own
       // key pays before the node's (crew choice {kind:'node'}, 2026-10-02).
       'ai:use',

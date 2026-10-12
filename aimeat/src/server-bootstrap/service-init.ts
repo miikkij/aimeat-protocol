@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   v1.21.0 — 2026-10-12 — migrateAgentReadGrantOnce(), chained after migrateRestScopeGatesOnce: once per
+ *     node, agent:read goes to every existing agent and approved ecosystem app.
  *   v1.20.0 — 2026-10-12 — migrateRestScopeGatesOnce(), chained after migrateToolScopeWordsOnce: once per
  *     node, the new word of the REST scope gates (packages:read) goes to every existing agent and
  *     approved ecosystem app (services/rest-scope-gates-migration.ts).
@@ -110,7 +112,7 @@ import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { migrateToolScopeWordsOnce } from '../services/tool-scope-words-migration.js';
-import { migrateRestScopeGatesOnce } from '../services/rest-scope-gates-migration.js';
+import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../services/rest-scope-gates-migration.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -358,6 +360,8 @@ export async function initializeServices(
     // word goes to every agent and approved ecosystem app that could reach its routes. Chained after
     // the line above because both rewrite an agent's whole scope list.
     .then(() => migrateRestScopeGatesOnce(storage, config.nodeId))
+    // agent:read, the word of the owner's agent list from 4.0.0: the second step, once, under its own record.
+    .then(() => migrateAgentReadGrantOnce(storage, config.nodeId))
     .catch(err => logger.error('Failed to give the REST scope gate words to existing principals; the next boot tries again', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.

@@ -31,6 +31,7 @@
  * @structure registerAgentV2MigrateRoutes(router, config, storage)
  * @usage registerAgentV2MigrateRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The GET asks agent:read from 4.0.0, the word of the fleet list.
  *   v1.1.0 — 2026-10-02 — The offer carries the node's public key, as the basic-agents offer does.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 4).
  */
@@ -39,6 +40,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { success, error } from '../../middleware/envelope.js';
 import { credentialHealthForOwner } from '../../services/agent-credential-health.js';
 import { connectedDaemons } from '../../services/basic-agents.js';
@@ -130,9 +132,10 @@ async function candidates(
 }
 
 export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
-  // ── GET — what would happen. requireAuth() only, like the basic-agents preview: reading which
-  //    of your own agents are stuck is already visible on GET /v1/agents?include=credentials.
-  router.get('/v1/agents/v2/migrate', requireAuth(), async (req, res) => {
+  // ── GET — what would happen. agent:read from 4.0.0, like the basic-agents preview: which of your
+  //    own agents are stuck is what GET /v1/agents?include=credentials answers under the same word
+  //    (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11).
+  router.get('/v1/agents/v2/migrate', requireAuth(), requireRestScope('agent:read'), async (req, res) => {
     const owner = req.auth!.owner;
     const roles = req.auth!.roles ?? [];
     if (roles.includes('app') || roles.includes('ecosystem')) {

@@ -36,6 +36,7 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   v1.5.0 — 2026-10-12 — The GET asks agent:read from 4.0.0, the word of the fleet list.
  *   v1.4.0 — 2026-10-02 — A created basic agent carries its template's `taskStart`.
  *   v1.3.0 — 2026-09-08 — The grant, the offer and the read-back move to
  *     services/agent-enrolment-offer.ts. They lived here, so the one other path that creates an
@@ -52,6 +53,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { BASIC_AGENTS } from '../../data/basic-agents.js';
@@ -70,15 +72,16 @@ export { ENROL_CAPABILITY, ENROL_INVOKE_TIMEOUT_MS } from '../../services/agent-
 export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── GET — what the set is, and whether it can be created right now ──
   //
-  // requireAuth() and nothing more, deliberately, where the POST below is requireOwnerPrincipal().
-  // READING is not the act this feature guards: everything in the answer is already visible to a
-  // principal acting for this owner — the template is static, and which of the owner's agents exist
-  // and hold a tunnel comes back from GET /v1/agents. What an agent must not do is PRESS the button,
-  // and that gate is untouched. The relaxation is what lets a chat say "open this page and press
-  // it", which is the whole point of the tool surface over this.
+  // agent:read, the word of the fleet list GET /v1/agents, from 4.0.0 (requireRestScope: counted with
+  // a Deprecation header before it; ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-
+  // mukaan, item 11). Not requireOwnerPrincipal() as the POST below: READING is not the act this
+  // feature guards. Which of the owner's agents exist and hold a tunnel is what GET /v1/agents
+  // answers under the same word. What an agent must not do is PRESS the button, and that gate is
+  // untouched. Reading is what lets a chat say "open this page and press it", which is the whole
+  // point of the tool surface over this.
   //
   // Scoped to req.auth.owner throughout, so no principal can read another account's state.
-  router.get('/v1/agents/v2/basic-agents', requireAuth(), async (req, res) => {
+  router.get('/v1/agents/v2/basic-agents', requireAuth(), requireRestScope('agent:read'), async (req, res) => {
     // An app grant is consent to USE this account, and an ecosystem app is a different principal
     // class with its own onboarding. Neither has any business reading how this account's own agents
     // are set up, and refusing them here is what keeps this door narrower than the fleet listing.

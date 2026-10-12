@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.18.0 — 2026-10-12 — agent:read, inside the wildcard: seeing the owner's agents, the word the agent
+ *     list asks from 4.0.0; the standard preset carries it.
  *   v1.17.0 — 2026-10-12 — packages:read, inside the wildcard: seeing the packages installed for the owner,
  *     the word the install reads ask from 4.0.0 (auth/rest-scope-gate.ts).
  *   v1.16.1 — 2026-10-06 — The standard preset carries organism:read and organism:write, the words the
@@ -296,12 +298,17 @@ export const SCOPE_DOMAINS = [
   //               how this account offers work to others, so writing one speaks in the owner's name.
   // agent:permissions — rewrite what another of the owner's agents is allowed to do. Separate
   //   from agent:write, which is its mode and its tags: this one changes the permission set itself.
+  // agent:read — see the owner's agents: the list (GET /v1/agents, aimeat_agents_list), the basic
+  //   agents preview and which agents cannot sign in. Asked from 4.0.0 (auth/rest-scope-gate.ts); in
+  //   the node's default agent scopes, and every agent that existed on 2026-10-12 was given it once
+  //   (services/rest-scope-gates-migration.ts). Ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-
+  //   suositusten-mukaan, item 11.
   // agent:delete — end another of the owner's agents for good. Its own word rather than part of
   //   agent:write, because reconfiguring a sibling and ending it are different sizes of act, and
   //   because the caller that needs it is a fleet concierge cleaning up what it created. The route
   //   adds a second condition the box cannot express: an agent may only delete an agent whose
   //   registration it authorized itself.
-  { key: 'agent',      permissions: ['write', 'permissions', 'delete'] },
+  { key: 'agent',      permissions: ['read', 'write', 'permissions', 'delete'] },
   { key: 'app',        permissions: ['write', 'manage'] },
   { key: 'capability', permissions: ['write'] },
 
@@ -349,7 +356,8 @@ export const SCOPE_TEMPLATES = {
   readonly:  ['memory:read', 'storage:read', 'catalogue:read', 'social:read'],
   // organism:read and organism:write: the workspace tools ask them since 2026-10-06, so an agent
   // approved with this preset reads and publishes in its owner's workspaces (Jouni 2026-10-06, D4).
-  standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'work:request', 'work:read', 'organism:read', 'organism:write'],
+  // agent:read: the owner's agent list, which the node's default scopes carry too (2026-10-12).
+  standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'work:request', 'work:read', 'organism:read', 'organism:write', 'agent:read'],
   full:      ['*'],
 };
 

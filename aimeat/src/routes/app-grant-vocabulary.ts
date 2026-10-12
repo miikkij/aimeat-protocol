@@ -9,6 +9,7 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   v1.9.0 -- 2026-10-12 -- agent:read, the word the agent list asks from 4.0.0 (auth/rest-scope-gate.ts).
  *   v1.8.0 -- 2026-10-12 -- packages:read, the word the install reads ask from 4.0.0 (auth/rest-scope-gate.ts).
  *   v1.7.0 -- 2026-10-09 -- ext:invoke, running an installed extension's action, askable by an app: an
  *     automation step that calls an extension costs it, and an app could not otherwise save one.
@@ -60,6 +61,9 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // An app that reads installs declares it; a grant follows its app's declaration, so the one-time grant
   // (services/rest-scope-gates-migration.ts) writes it onto agents only.
   'packages:read': 'See which packages are installed for you and which version each one runs',
+  // The agent list (GET /v1/agents) asks it from 4.0.0 (auth/rest-scope-gate.ts). An app that lists the
+  // owner's agents declares it, beside task:read for the list's task figures.
+  'agent:read': 'See your agents and how each one is set up',
   // The app-grantable half of a two-hand rule (2026-08-29). A row space on an organism workspace
   // names the apps it is open to (manifest objectTypes[].apps); this scope is the person's half.
   // Only both together let the app append to and read that one space, and only while the person

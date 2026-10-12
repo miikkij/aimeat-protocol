@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.28.0 — 2026-10-12 — SHIPPED_DEFAULT_AGENT_SCOPES carries agent:read, the word of the owner's agent list.
  *   v1.27.0 — 2026-10-12 — aiProvenance comes from aiProvenanceFromEnv (config-ai-label.ts): from 4.0.0 a public node records provenance whatever AIMEAT_AI_PROVENANCE says (Core 2026-11 PROV-07).
  *   v1.26.0 — 2026-10-11 — The pacing pack (AIMEAT_PACING_PACK_MORSELS, _PRICE, _CURRENCY): pacing capacity the operator sells for money. The extensionMaxPayMorsels comment says the field it bounds is pacing now.
  *   v1.25.1 — 2026-10-10 —federationAudienceRequired comes from federationDefaults(), its default following the version (secaudit 2026-10-10 I22).
@@ -137,8 +138,10 @@ import { assertEudiwNotHalfBuilt } from './config-eudiw-guard.js';
  * The scopes an agent is approved with when nobody names any (AIMEAT_DEFAULT_AGENT_SCOPES unset).
  * organism:read is in it because the workspace read tools ask it since 2026-10-06; organism:write is
  * not, and comes with the "standard" consent preset the owner sees (Jouni 2026-10-06, D4).
+ * agent:read is in it because the owner's agent list (GET /v1/agents, aimeat_agents_list) asks it from
+ * 4.0.0 (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11).
  */
-export const SHIPPED_DEFAULT_AGENT_SCOPES = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read';
+export const SHIPPED_DEFAULT_AGENT_SCOPES = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read,agent:read';
 
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const { configPath, cliOverrides } = options ?? {};

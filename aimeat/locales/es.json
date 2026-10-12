@@ -6644,6 +6644,7 @@
   "accesspage.scope.generator.read": "lee tus proyectos del generador",
   "accesspage.scope.generator.write": "cambia tus proyectos del generador",
   "accesspage.scope.generator.execute": "ejecuta el generador en tu nombre",
+  "accesspage.scope.agent.read": "ve tus agentes y cómo está configurado cada uno",
   "accesspage.scope.agent.write": "configura tus otros agentes",
   "accesspage.scope.app.write": "publica aplicaciones en tu nombre",
   "accesspage.scope.app.manage": "borra y bifurca aplicaciones",
@@ -9311,7 +9312,7 @@
     "cfgDesc_metrics_access": "Visibilidad de las métricas: public, authenticated u operator.",
     "cfgDesc_mcp_session_idle_minutes": "Cerrar una sesión MCP tras estos minutos sin solicitudes (se admiten fracciones; un cliente cerrado se reinicializa).",
     "cfgDesc_registration_mode": "Quién puede tener cuenta nueva: open (todos), oauth (primer inicio por un proveedor de identidad, o invitación — sin registro por contraseña), invite (solo invitaciones de miembros), closed (nadie). Las cuentas existentes siempre entran.",
-    "cfgDesc_scopes_default_agent_scopes": "Los permisos que recibe un agente cuando nadie elige ninguno, uno por línea. De serie puede leer y escribir la memoria de su dueño, leer el catálogo y leer los espacios de trabajo de los organismos de su dueño.",
+    "cfgDesc_scopes_default_agent_scopes": "Los permisos que recibe un agente cuando nadie elige ninguno, uno por línea. De serie puede leer y escribir la memoria de su dueño, leer el catálogo, leer los espacios de trabajo de los organismos de su dueño y ver los demás agentes de su dueño.",
     "cfgDesc_scopes_max_agent_scopes": "Los permisos que como máximo puede recibir un agente, uno por línea (* = todos).",
     "cfgDesc_sso_enabled": "Puertas de inicio de sesión de organización (SAML) y aprovisionamiento (SCIM) activadas.",
     "cfgDesc_sso_connections_locked": "Congelar la gestión de conexiones SSO (toda escritura administrativa responde 403).",
@@ -14843,6 +14844,7 @@
             "write": "Crear, cambiar y ejecutar tus automatizaciones."
           },
           "agent": {
+            "read": "Ver la lista de tus agentes: sus nombres, ajustes y permisos, y si cada uno puede iniciar sesión.",
             "write": "Cambiar los ajustes de tus OTROS agentes: en qué modo corren y cómo están etiquetados.",
             "permissions": "Cambiar lo que pueden hacer tus OTROS agentes. Va aparte de sus ajustes, porque esto es la lista de permisos en sí.",
             "delete": "Borrar los agentes que ha creado él mismo, y ninguno más. Para un entorno que te construye agentes y luego tiene que retirarlos."

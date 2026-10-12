@@ -9085,6 +9085,7 @@ paths:
 
   /v1/agents/v2/basic-agents:
     get:
+      x-aimeat-scope: { word: 'agent:read', enforcedIn: '4.0.0' }
       operationId: basicAgentsPreview
       summary: What the basic agents are, and whether a connector is there to run them
       description: |
@@ -9935,6 +9936,7 @@ paths:
 
   /v1/agents/v2/migrate:
     get:
+      x-aimeat-scope: { word: 'agent:read', enforcedIn: '4.0.0' }
       operationId: previewAgentMigration
       summary: Which existing agents would move to a key and a card
       description: |
@@ -12062,9 +12064,14 @@ paths:
 
   /v1/agents:
     get:
+      x-aimeat-scope: { word: 'agent:read', enforcedIn: '4.0.0' }
       operationId: listAgents
       summary: List own agents
       description: |
+        An agent, an app grant or an ecosystem app needs `agent:read` (refused from 4.0.0; before it
+        allowed with a Deprecation header and counted). It is in the node's default agent scopes. An
+        app grant also needs `task:read`, because `include=stats` carries the agents' task titles.
+
         List all agents owned by the authenticated owner. Pass `include=stats` to attach a
         per-agent `stats` projection (task/message counts, latest-activity timestamps, the
         active-task list, and onboarding) computed in a few grouped queries — so a fleet
