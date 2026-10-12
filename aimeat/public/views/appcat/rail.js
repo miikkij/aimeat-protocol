@@ -9,6 +9,7 @@
  * @structure CatRail(props)
  * @usage html`<${CatRail} view=${view} onView=${setView} … />`
  * @version-history
+ *   v1.3.0 — 2026-10-12 — The state rows are model.js STATES: Listed, Community, Unlisted, Draft.
  *   v1.2.0 — 2026-10-04 — Building for others among the views, only when the person builds somebody
  *     else's app (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.1.0 — 2026-09-27 — "Something missing" is a second word inside the state group
@@ -19,7 +20,7 @@ import { h } from 'preact';
 import htm from 'htm';
 import { SideMenu, SideMenuTitle, SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuLabel, SideMenuMore } from '/components/SideMenu.js';
 import { x } from '/views/appcat/i18n.js';
-import { KUNTO_KEYS, tagCounts } from '/views/appcat/model.js';
+import { KUNTO_KEYS, STATES, tagCounts } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
 const TAGS_FOLDED = 8;
@@ -27,7 +28,7 @@ const TAGS_FOLDED = 8;
 /**
  * @param {{ view: string, onView: (v: string) => void, loaded: boolean,
  *   counts: { library: number, community: number, favorites: number, building: number },
- *   states: { listed: number, unlisted: number, draft: number, kunto: Record<string, number> } | null,
+ *   states: { listed: number, community: number, unlisted: number, draft: number, kunto: Record<string, number> } | null,
  *   stateFilter: string|null, onState: (s: string) => void,
  *   tagRows: any[], tag: string|null, onTag: (t: string|null) => void, tagsOpen: boolean, onTagsOpen: () => void }} p
  */
@@ -55,7 +56,7 @@ export function CatRail(p) {
       <//>
       ${p.states ? html`
         <${SideMenuGroup} title=${x('rail.state')}>
-          ${['listed', 'unlisted', 'draft'].map((s) => html`<${SideMenuItem} key=${s} tally active=${p.stateFilter === s}
+          ${STATES.map((s) => html`<${SideMenuItem} key=${s} tally active=${p.stateFilter === s}
             count=${p.states[s]} onClick=${() => p.onState(s)}>${x('state.' + s)}<//>`)}
           ${kuntoRows.length ? html`<${SideMenuLabel}>${x('rail.kunto')}<//>` : null}
           ${kuntoRows.map((k) => html`<${SideMenuItem} key=${k} tally active=${p.stateFilter === k}

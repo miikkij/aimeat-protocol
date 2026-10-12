@@ -11,6 +11,8 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-12 — aimeat_app_list and aimeat_app_get carry `listing` (listed, community, unlisted), and
+ *     aimeat_app_list returns the apps other owners listed to the node's members.
  *   2026-10-11 — aimeat_app_get carries the deprecated `priceMorsels` mirror of the pacing amount, as the
  *     REST read does (services/app-pacing.ts presentAppManifest).
  *   2026-10-06 —aimeat_app_publish and aimeat_app_draft_save register the catalog's schema: publish
@@ -103,6 +105,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { appListingOf } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
@@ -511,8 +514,10 @@ export function registerAppsTools(
                 limit: take,
                 offset: skip,
                 // Browsing the full catalogue still surfaces the caller's OWN parked apps
-                // (hidden from everyone else), so an owner's agent can act on them.
+                // (hidden from everyone else), so an owner's agent can act on them. The agent acts
+                // for a member of this node, so it sees the community apps the member sees too.
                 viewerGhii: ownerGhii,
+                includeCommunity: true,
                 ...(own ? { ownerGaii: ownerGhii } : {}),
             };
 
@@ -552,6 +557,7 @@ export function registerAppsTools(
                     tags: app.manifest.tags,
                     icon: app.manifest.icon,
                     size: app.size,
+                    listing: appListingOf(app),
                     parked: !!app.parked,
                     forkable: !!app.forkable,
                     downloads,
@@ -616,6 +622,7 @@ export function registerAppsTools(
                         size: app.size,
                         mime_type: app.mimeType,
                         protected: !!app.accessCode,
+                        listing: appListingOf(app),
                         parked: !!app.parked,
                         forkable: !!app.forkable,
                         forked_from: app.manifest.forkedFrom ?? null,

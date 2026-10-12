@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.6.3 — 2026-10-12 — A probe value for settings.listing (listed, community, unlisted).
  *   v1.6.2 — 2026-10-09 — A probe value for marks.aiUse, the third mark switch.
  *   v1.6.1 — 2026-10-05 — The shape compared is zodShapeFor('aimeat_app_manage'): src/mcp/app-manage-shape.ts
  *     is gone and both MCP surfaces register the catalog's schema (secaudit 2026-10, M3).
@@ -51,7 +52,7 @@ const VALUE: Record<string, unknown> = {
     filename: 'shop.html', owner: 'alice', index: true, title: 'zqxtitle', description: 'zqxdesc', keywords: ['zqxkw'],
     image: 'https://x/zqximg.png', lang: 'fi', badge: false, install: true, aiUse: false, kind: 'privacy', format: 'markdown',
     content: 'zqxcontent', remove: true, limit: 7, playtest: true, days: 9, on: true, geo: 'region', detail: ['zqxdetail'],
-    layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, parked: true,
+    layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, listing: 'unlisted', parked: true,
     forkable: true, access_code: 'zqxcode', protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
     subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, bundled_agent: 'zqxagent',
     runner_agent: 'zqxrunner', organism_id: 'zqxorg', values: { zqxfield: 'zqxvalue' },

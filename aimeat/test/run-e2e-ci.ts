@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-12 -- e2e-app-community.ts joins the list (not the guard tier): an app listed to the
+ *     community is seen by signed-in members and their agents, never by the anonymous catalogue.
  *   2026-10-11 -- e2e-bundled-extensions.ts joins the list (not the guard tier): the four extensions
  *     in docs/extensions installed and run action by action; the marketplace paces, never prices.
  *   2026-10-11 -- e2e-pacing-two-values.ts joins the list (not the guard tier): an offer has a money
@@ -367,6 +369,9 @@ const ALL_SUITES = [
     // the header the node actually built, which is the only way to prove the resolution at all.
     'test/e2e-secrets.ts',
     'test/e2e-apps.ts',
+    // An app listed to the community: signed-in members and their agents see it, the anonymous
+    // catalogue does not.
+    'test/e2e-app-community.ts',
     'test/e2e-app-agent-deploy.ts',
     'test/e2e-app-draft.ts',
     'test/e2e-app-draft-edit.ts',

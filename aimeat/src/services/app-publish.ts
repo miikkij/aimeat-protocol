@@ -604,7 +604,7 @@ export async function publishApp(
       size: data.length,
       data,
       accessCode,
-      parked,
+      parked, community: parked && !!live?.community,
       forkable,
       operatorHidden: !!live?.operatorHidden,
       operatorHiddenBy: live?.operatorHiddenBy,

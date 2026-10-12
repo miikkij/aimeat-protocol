@@ -9,11 +9,13 @@
  *   the reader's own format through /js/format.js, the site's rule). Pure functions over the
  *   store's rows, so every list and the rail read the same answers (the old render.js, rows.js and
  *   server-io.js rules, features.md F19–F20, F32–F33, F46, F73–F76, F156–F161).
- * @structure KUNTO_KEYS · STATES · appName · appIcon · appDesc · appTags · shipsAgents · kunto(sa, bound) ·
+ * @structure KUNTO_KEYS · STATES · LISTINGS · appName · appIcon · appDesc · appTags · shipsAgents · kunto(sa, bound) ·
  *   stateOf(sa) · tagCounts(rows) · filterRows(rows, f) · sortRows(rows, mode) · stateCounts(rows, bound) ·
  *   fmtKb(bytes) · fmtDate(iso) · fmtNum(n) · host()
  * @usage import { filterRows, sortRows } from '/views/appcat/model.js';
  * @version-history
+ *   v1.1.0 — 2026-10-12 — Three listings: listed, community (signed-in members of the node only) and
+ *     unlisted. stateOf reads the listing's `listing`, and the state rows count and filter all three.
  *   v1.0.1 — 2026-09-27 — The own list's search reads the manifest's description, as the old one did
  *     (appcat parity).
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell), from the old catalogue's rules.
@@ -24,7 +26,9 @@ import { num, date } from '/js/format.js';
 /** The condition rows, in the rail's order; the keys are the contract with the profile's Apps page (F161, F288). */
 export const KUNTO_KEYS = ['noMap', 'noAi', 'specOff', 'seoOff', 'stale60', 'noShot', 'noSkill'];
 /** The state rows (F160). */
-export const STATES = ['listed', 'unlisted', 'draft'];
+export const STATES = ['listed', 'community', 'unlisted', 'draft'];
+/** The three listings, in the order the Manage section offers them. */
+export const LISTINGS = ['listed', 'community', 'unlisted'];
 
 const man = (sa) => (sa && sa.manifest) || {};
 
@@ -60,14 +64,17 @@ export function kunto(sa, bound) {
   };
 }
 
-/** 'unlisted' (parked) or 'listed' (published, not parked). */
-export const stateOf = (sa) => (sa.parked ? 'unlisted' : 'listed');
+/**
+ * Where the app is listed: 'listed' (everywhere), 'community' (signed-in members of this node only)
+ * or 'unlisted' (its owner only). The listing's `listing`; a node before it answers `parked` alone.
+ */
+export const stateOf = (sa) => sa.listing || (sa.parked ? 'unlisted' : 'listed');
 
-/** The counts the rail and the band say for the own list: listed, unlisted, draft waiting, opens, and each condition. */
+/** The counts the rail and the band say for the own list: each listing, draft waiting, opens, and each condition. */
 export function stateCounts(rows, bound) {
-  const c = { listed: 0, unlisted: 0, draft: 0, opens: 0, kunto: Object.fromEntries(KUNTO_KEYS.map((k) => [k, 0])) };
+  const c = { listed: 0, community: 0, unlisted: 0, draft: 0, opens: 0, kunto: Object.fromEntries(KUNTO_KEYS.map((k) => [k, 0])) };
   for (const sa of rows) {
-    if (sa.parked) c.unlisted++; else c.listed++;
+    c[stateOf(sa)]++;
     if (sa.has_draft) c.draft++;
     c.opens += sa.downloads || 0;
     const k = kunto(sa, bound);
@@ -107,8 +114,7 @@ export function filterRows(rows, f) {
   let out = rows;
   if (f.tag) { const at = f.tag.toLowerCase(); out = out.filter((sa) => appTags(sa).some((tg) => String(tg).toLowerCase() === at)); }
   if (f.own && f.state) {
-    if (f.state === 'listed') out = out.filter((sa) => !sa.parked);
-    else if (f.state === 'unlisted') out = out.filter((sa) => !!sa.parked);
+    if (LISTINGS.includes(f.state)) out = out.filter((sa) => stateOf(sa) === f.state);
     else if (f.state === 'draft') out = out.filter((sa) => !!sa.has_draft);
     else if (KUNTO_KEYS.includes(f.state)) out = out.filter((sa) => kunto(sa, f.bound || new Set())[f.state]);
   }

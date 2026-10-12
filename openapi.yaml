@@ -4308,7 +4308,14 @@ components:
         size: { type: integer }
         mime_type: { type: string }
         protected: { type: boolean, description: True when an access code gates downloads }
-        parked: { type: boolean, description: True when the app is hidden from the public catalogue (visible only to its owner) }
+        listing:
+          type: string
+          enum: [listed, community, unlisted]
+          description: >-
+            Where the app is listed. `listed`: every catalogue, search and other nodes. `community`:
+            only in the catalogue listing of people signed in to this node, and nowhere public.
+            `unlisted`: only in its owner's own list. A link opens the app in all three.
+        parked: { type: boolean, description: True when the app is off every public surface (listing community or unlisted). Kept for older clients; read `listing`. }
         forkable: { type: boolean, description: True when other users are allowed to fork this app (the owner and their agents can always fork it) }
         has_draft: { type: boolean, description: True for a pending draft when the viewer owns the app or explicitly requests building=true and holds its development right. False for other viewers. }
         dev_level: { type: integer, enum: [0, 10, 20], description: Effective development right. Present only in building=true listings. }
@@ -30694,7 +30701,9 @@ paths:
         Returns the latest version of every published app, with search/filter/pagination.
         Authentication is optional: when the caller is authenticated, their OWN parked apps are
         included in the results (every app carries a `parked` flag); parked apps owned by anyone
-        else are hidden. Anonymous callers see only published (non-parked) apps.
+        else are hidden. Anonymous callers see only published (non-parked) apps. A member of this
+        node (signed in, not anonymous, not a visitor from another node) also sees the apps other
+        owners listed to the community (`listing: community`).
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -31494,9 +31503,17 @@ paths:
                   type: string
                   nullable: true
                   description: 4-64 chars to set protection; empty/null removes it
+                listing:
+                  type: string
+                  enum: [listed, community, unlisted]
+                  description: >-
+                    Where the app is listed: `listed` (everywhere), `community` (only to people signed
+                    in to this node, in the catalogue's community list) or `unlisted` (only you).
                 parked:
                   type: boolean
-                  description: true hides the app from the public catalogue; false republishes it
+                  description: >-
+                    The older two-state switch: true is `listing: unlisted`, false is `listing: listed`.
+                    Sent together with `listing`, the two must agree.
                 forkable:
                   type: boolean
                   description: true lets any user fork this app; false restricts forking to you and your agents
@@ -31605,6 +31622,7 @@ paths:
                           name: { type: string }
                           description: { type: string }
                           protected: { type: boolean }
+                          listing: { type: string, enum: [listed, community, unlisted] }
                           parked: { type: boolean }
                           forkable: { type: boolean }
                           protection: { type: object, nullable: true, description: The app's current copy-protection flags (null when none) }

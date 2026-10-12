@@ -17,6 +17,7 @@
  * @structure DetailHead({ d }) · DetailBand({ d }) · fmtSize(bytes)
  * @usage html`<${DetailHead} d=${d} /><${DetailBand} d=${d} />`
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The state chip says Community for an own app listed to signed-in members only.
  *   v1.1.0 — 2026-09-27 — Parity pass: the toolbar title and the back link moved to Overlay's options
  *     (DetailTitle goes); no category in the mono line; the chips without tones, as the old page
  *     showed them.
@@ -32,6 +33,7 @@ import { Note } from '/components/Note.js';
 import { NumberBand } from '/components/NumberBand.js';
 import { date } from '/js/format.js';
 import { x } from '/views/appcat/i18n.js';
+import { stateOf } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
 
@@ -58,8 +60,8 @@ export function DetailHead({ d }) {
   const favRef = d.owner && d.filename ? d.owner + '/' + d.filename : '';
   const missing = d.legal && d.legal.readiness && Array.isArray(d.legal.readiness.missing) ? d.legal.readiness.missing.length : 0;
   const marks = [
-    own && own.parked
-      ? { key: 'state', label: '■ ' + x('status.parked') }
+    own && stateOf(own) !== 'listed'
+      ? { key: 'state', label: '■ ' + x(stateOf(own) === 'community' ? 'status.community' : 'status.parked') }
       : { key: 'state', label: '■ ' + x('status.published') + (v ? ' · ' + v : '') },
     draftWaits ? { key: 'draft', label: '■ ' + x('detail.draftWaiting') } : null,
     favRef && d.isFavourite(favRef) ? { key: 'fav', label: '★ ' + x('detail.favBadge') } : null,

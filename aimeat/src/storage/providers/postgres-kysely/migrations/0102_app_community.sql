@@ -1,0 +1,17 @@
+-- 0102_app_community.sql
+--
+-- An app can be listed to the node's signed-in members only.
+--
+-- Until now an app was either listed (every catalogue, search, sitemap) or parked (only its owner
+-- sees it in a list). The developer asked for a third state between them (2026-10-12): the app is
+-- shown in the catalogue's community list to everyone signed in to this node, and nowhere public.
+--
+--   "App"."community"   true on a parked app that signed-in members see in the catalogue listing.
+--                       false on every existing row, so a parked app stays owner-only.
+--
+-- The state is stored as the pair ("parked", "community") and written together by setAppListing:
+-- listed = (false, false), community = (true, true), unlisted = (true, false). A community app is
+-- parked, so every public surface that skips parked apps skips it too without a change.
+--
+-- Mirrors the SQLite column added in schema.ts.
+ALTER TABLE "App" ADD COLUMN IF NOT EXISTS "community" BOOLEAN NOT NULL DEFAULT false;

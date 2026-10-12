@@ -902,6 +902,7 @@ export interface App {
   ownerGaii: string;
   ownerName: string;
   parked: Generated<boolean>;
+  community: Generated<boolean>;
   size: number;
   versionNumber: number;
 }

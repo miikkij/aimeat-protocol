@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-10-12 — GET /v1/apps carries `listing` (listed, community, unlisted), and a member
+ *     of this node (signed in, not anonymous, not a visitor from another node) also gets the apps
+ *     other owners listed to the community. GET /v1/admin/apps carries `listing` too.
  *   v1.15.1 — 2026-10-11 — `free_only` means no pacing amount (`tollMorsels`), and every listed manifest
  *     carries the deprecated `priceMorsels` mirror until 4.0.0 (services/app-pacing.ts).
  *   v1.15.0 — 2026-10-09 — The access code of a protected app goes to a caller who could set it: the
@@ -47,9 +50,10 @@
  */
 import type { Router } from 'express';
 import { listAppsBuiltFor, levelName } from '../../services/app-dev-grant.js';
-import { resolveIdentity, localAccountName } from '../../utils/gaii.js';
+import { resolveIdentity, localAccountName, isForeignPrincipal } from '../../utils/gaii.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
+import { appListingOf } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { requireAuth, optionalAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -114,6 +118,9 @@ export function registerCatalogueAdminRoutes(
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'building=true needs a signed-in caller'));
             return;
         }
+        // A member of this node (signed in, not the anonymous credential, not a visitor from another
+        // node) also sees the apps their owners listed to the community.
+        const isMember = !!viewerGhii && !req.auth?.anonymous && !isForeignPrincipal(req.auth);
         const opts = {
             category: req.query.category as string | undefined,
             q: req.query.q as string | undefined,
@@ -123,6 +130,7 @@ export function registerCatalogueAdminRoutes(
             offset: parseInt(req.query.offset as string) || 0,
             freeOnly: req.query.free_only === 'true',
             viewerGhii,
+            includeCommunity: isMember,
             ...(ownOnly ? { ownerGaii: viewerGhii } : {}),
         };
 
@@ -217,6 +225,9 @@ export function registerCatalogueAdminRoutes(
                 // the owner on their own protected app. Everyone else, the owner's other agents and
                 // apps included, keeps the boolean only.
                 ...(isOwn && mayReadCodes && app.accessCode ? { access_code: app.accessCode } : {}),
+                // listed | community | unlisted. `parked` stays for older clients: true for both
+                // community and unlisted, since neither is on a public surface.
+                listing: appListingOf(app),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
                 has_draft: buildingOnly ? !!sharedDrafts.get(app.ownerGaii)?.has(app.filename)
@@ -321,6 +332,7 @@ export function registerCatalogueAdminRoutes(
                 size: app.size,
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
+                listing: appListingOf(app),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
                 operator_hidden: !!app.operatorHidden,
