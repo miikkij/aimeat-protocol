@@ -16,14 +16,29 @@
  *   NOTHING IS CREATED BY A DRAFT. Starting is the two calls the Agents page already makes: propose
  *   (creates nothing) and approve (the owner's own press), with the machine the person chose, and
  *   then one schedule when the agent works on a clock.
- * @structure WHEN_KINDS · DEFAULT_TOOLS · draftPrompt(tools) · parseDraft(text) · draftAgent(sentence, opts) ·
- *   templateDraft(id) · ownAiRequest(sentence, connectorName) · cronFor(days, hhmm) · startAgent(draft, choice) ·
- *   approveProposal(id, name, draft, choice) · scheduleFor(name, draft, choice) · runtimeTools(agents) ·
- *   readHomeAgents(limit) · moveAgent(name, connectorId) · setAgentStopped(name, stop)
+ *
+ *   THE MODEL IS TOLD WHAT THE PERSON KEEPS HERE: what each tool is for, the tools the person's own
+ *   apps publish and the person's workspaces (services/agent-draft-known.js). A definition names
+ *   an app tool by its sku and a workspace by its id, and the page reads those back to show which
+ *   apps and workspaces the agent uses before the person approves.
+ * @structure WHEN_KINDS · DEFAULT_TOOLS · draftPrompt(tools, known) · parseDraft(text, opts) · draftAgent(sentence, opts) ·
+ *   scopesFor(draft) · templateDraft(id) · ownAiRequest(sentence, connectorName) · cronFor(days, hhmm) ·
+ *   startAgent(draft, choice) · approveProposal(id, name, draft, choice) · scheduleFor(name, draft, choice) ·
+ *   runtimeToolMenu(agents) · runtimeTools(agents) · readHomeAgents(limit) · moveAgent(name, connectorId) ·
+ *   setAgentStopped(name, stop)
  * @usage
- *   const draft = await draftAgent('Gather the industry news every weekday morning', { tools });
+ *   const tools = await runtimeToolMenu(online);
+ *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.4.0 — 2026-10-12 — The draft prompt gets one line per tool id, the tools the person's apps
+ *     publish and the person's workspaces. Additive to the prompt: the text of v1.3.1 is unchanged
+ *     and the new text follows it. The draft carries `named`, the apps and workspaces its
+ *     definition names. A definition that names one and gives no member the tool for it gets the
+ *     tool on its first member. An agent that reads only gets "workspace" in place of
+ *     "workspace_write", and an agent that reads a workspace is proposed with organism:read. The
+ *     tool list used when no runtime answers gains app_tools, workspace and workspace_write
+ *     (wish-kodin-agenttiluonnos-tuntee-ty-kalujen-kuvaukset-omistajan-s).
  *   v1.3.1 — 2026-10-11 — The offer's `example` is one real request and not an input with its
  *     result: the node gives it to the new agent as its first work. The offer's id follows the short
  *     name when the person changes it on the form.
@@ -41,21 +56,45 @@ import { api, apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { buildTemplate } from '/views/profile/agents/crew-templates.js';
 import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
+import {
+  DEFAULT_TOOL_MENU, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
+} from '/js/services/agent-draft-known.js';
 
 /** When an agent works, as the pages offer it. */
 export const WHEN_KINDS = ['ask', 'clock', 'talk', 'always'];
 
 /**
- * The tool names a definition may use when no runtime could be asked. Every one of them has been in
- * the crew runtime's registry since before 2026-09; a newer runtime offers more, and runtimeTools()
- * reads its own list when one of the person's agents is connected.
+ * The tool names a definition may use when no runtime could be asked (agent-draft-known.js
+ * DEFAULT_TOOL_MENU says since when the runtime has had each). A newer runtime offers more, and
+ * runtimeToolMenu() reads its own list when one of the person's agents is connected.
  */
-export const DEFAULT_TOOLS = ['web', 'article_fetch', 'memory', 'dm', 'image', 'schedule'];
+export const DEFAULT_TOOLS = DEFAULT_TOOL_MENU.map((x) => x.id);
 
 const NAME_SHAPE = /^[a-z][a-z0-9-]{1,38}[a-z0-9]$/;
 
-/** The system instructions for the one-shot draft. English: it is read by a model. */
-export function draftPrompt(tools) {
+/**
+ * What the draft is told about the person, as GET /v1/home/agents/choices?include=tools answers:
+ * their apps with the tools each publishes, and their workspaces.
+ * @typedef {{
+ *   apps?: Array<{ filename: string, name: string, tools?: Array<{ name: string, sku: string, description?: string }> }>,
+ *   places?: Array<{ organism_id: string, organism_name: string, workspace_id: string, workspace_name: string }>,
+ * }} Known
+ */
+
+/** A tool list as { id, purpose } rows: a list of ids is taken as tools with no description. */
+const menuOf = (tools) => (Array.isArray(tools) ? tools : []).map((x) => (typeof x === 'string' ? { id: x, purpose: '' } : x)).filter((x) => x && typeof x.id === 'string');
+
+/**
+ * The system instructions for the one-shot draft. English: it is read by a model. `tools` is the
+ * tools a definition may use, as ids or as { id, purpose }; `known` is the person's apps with
+ * their tools and the person's workspaces. What is known is added after the instructions.
+ */
+export function draftPrompt(tools, known) {
+  const menu = menuOf(tools);
+  return draftInstructions(menu.map((x) => x.id)) + knownBlock(menu, known);
+}
+
+function draftInstructions(tools) {
   return `You design one agent for a person's AIMEAT from one sentence the person wrote.
 Answer with one JSON object and nothing else, in this shape:
 {
@@ -97,10 +136,18 @@ const cronOf = (v) => (typeof v === 'string' && v.trim().split(/\s+/).length ===
  * A model's answer as a draft the pages can show, or a thrown Error whose message is a code:
  * NO_JSON, or BAD_DRAFT when the definition could not run. The checks are the ones the propose
  * route makes, so a draft that passes here is not refused there for its shape.
+ *
+ * With `known` (the person's apps and workspaces) the draft carries `named`, the ones its
+ * definition names, and a definition that names one has a member that can reach it; `offered` is
+ * the tool ids the runtime resolves.
+ * @param {string} text
+ * @param {{ known?: Known, offered?: Set<string> | string[] }} [opts]
  */
-export function parseDraft(text) {
+export function parseDraft(text, { known, offered } = {}) {
   const raw = firstObject(text);
-  const def = raw?.crew_def;
+  const written = raw?.crew_def;
+  const named = namedIn(written, known);
+  const def = withNeededTools(written, named, offered instanceof Set ? offered : new Set(offered ?? []));
   const agents = Array.isArray(def?.agents) ? def.agents : [];
   const tasks = Array.isArray(def?.tasks) ? def.tasks : [];
   const keys = new Set(agents.map((a) => a?.name || a?.role).filter(Boolean));
@@ -118,12 +165,27 @@ export function parseDraft(text) {
     does: (Array.isArray(raw.does) ? raw.does : []).map((s) => String(s).trim()).filter(Boolean).slice(0, 4),
     when: kind === 'clock' && !cron ? 'ask' : kind,
     cron,
-    reach: raw.reach === 'readonly' ? 'readonly' : 'standard',
+    // A definition that writes a workspace is not a reader, whatever the model answered for reach.
+    reach: raw.reach === 'readonly' && !writesWorkspace(def) ? 'readonly' : 'standard',
+    named,
     // The offer the model wrote goes into the definition, where the crew runtime publishes it from
     // when the agent starts. A draft without one is completed by the node at approval, from the
     // agent's name and purpose (src/services/agent-default-offer.ts).
     crewDef: { ...def, agent_name: name, ...(offerOf(raw.offer, name) ? { offers: [offerOf(raw.offer, name)] } : {}) },
   };
+}
+
+/** Whether a member of the definition has the tool that writes a workspace. */
+const writesWorkspace = (def) => (Array.isArray(def?.agents) ? def.agents : []).some((m) => Array.isArray(m?.tools) && m.tools.includes('workspace_write'));
+
+/**
+ * The permissions a draft's agent is proposed with: the reach the person chose, and what the
+ * definition's tools ask beyond it. The page shows the same list before the person approves.
+ */
+export function scopesFor(draft) {
+  const base = SCOPE_TEMPLATES[draft?.reach] ?? SCOPE_TEMPLATES.standard;
+  const def = draft?.reach === 'readonly' ? readOnlyTools(draft?.crewDef) : draft?.crewDef;
+  return [...new Set([...base, ...extraScopes(def)])];
 }
 
 /** The model's offer as one entry of a definition's `offers`, or null when it wrote none. */
@@ -143,17 +205,21 @@ export function offerShown(crewDef) {
 /**
  * Ask the person's own model for a draft. Throws an Error with `code`: NO_API_KEY when no model is
  * set here, the node's own code for a spent budget, or NO_JSON / BAD_DRAFT for an answer that
- * cannot be used.
+ * cannot be used. `tools` is the tools a definition may use (runtimeToolMenu), `known` the
+ * person's apps with their tools and the person's workspaces (readTieChoices with tools).
+ * @param {string} sentence
+ * @param {{ tools?: Array<string | { id: string, purpose: string }>, known?: Known }} [opts]
  */
-export async function draftAgent(sentence, { tools = DEFAULT_TOOLS } = {}) {
+export async function draftAgent(sentence, { tools = DEFAULT_TOOL_MENU, known } = {}) {
+  const menu = menuOf(tools);
   const resp = await api('/v1/ai/complete', {
     method: 'POST',
-    body: JSON.stringify({ prompt: sentence, systemPrompt: draftPrompt(tools), modelRole: 'execution', app_id: 'home-agents' }),
+    body: JSON.stringify({ prompt: sentence, systemPrompt: draftPrompt(menu, known), modelRole: 'execution', app_id: 'home-agents' }),
     timeoutMs: 300_000,
     retries: 0,
   });
   if (resp?.ok === false) { const e = new Error(resp?.error?.message || 'AI call failed'); e.code = resp?.error?.code; throw e; }
-  try { return parseDraft(resp?.data?.content); }
+  try { return parseDraft(resp?.data?.content, { known, offered: new Set(menu.map((x) => x.id)) }); }
   catch (err) { const e = new Error(err.message); e.code = err.message; throw e; }
 }
 
@@ -198,8 +264,10 @@ function offersUnder(crewDef, name) {
 
 /** The definition a draft starts with, shaped by when it works. */
 function definitionFor(draft, when) {
-  const def = draft.crewDef
-    ? { ...draft.crewDef, agent_name: draft.name, ...offersUnder(draft.crewDef, draft.name) }
+  // An agent the person lets read only is given the read tool for a workspace, never the write tool.
+  const written = draft.crewDef && draft.reach === 'readonly' ? readOnlyTools(draft.crewDef) : draft.crewDef;
+  const def = written
+    ? { ...written, agent_name: draft.name, ...offersUnder(written, draft.name) }
     : buildTemplate(draft.template || 'researcher', draft.name);
   const hears = new Set(Array.isArray(def.listen_for) && def.listen_for.length ? def.listen_for : ['tasks']);
   if (when === 'talk' || when === 'always') { hears.add('messages'); hears.add('dms'); }
@@ -254,7 +322,7 @@ export async function startAgent(draft, choice) {
     name: draft.name,
     display_name: draft.displayName || draft.name,
     purpose: draft.purpose,
-    scopes: SCOPE_TEMPLATES[draft.reach] ?? SCOPE_TEMPLATES.standard,
+    scopes: scopesFor(draft),
     // A task-runner's task starts without asking the owner each time, which is what an agent that
     // works on a clock or answers people needs.
     mode: 'task-runner',
@@ -268,19 +336,26 @@ export async function startAgent(draft, choice) {
 }
 
 /**
- * The tool names the person's runtime resolves, asked from the first connected agent of theirs.
- * Falls back to DEFAULT_TOOLS when nobody answers within a few seconds: a draft is worth more now
- * than a longer tool list later.
+ * The tools the person's runtime resolves, each with the runtime's own words for what it is for,
+ * asked from the first connected agent of theirs. Falls back to DEFAULT_TOOL_MENU when nobody
+ * answers within a few seconds: a draft is worth more now than a longer tool list later.
  */
-export async function runtimeTools(agentNames) {
+export async function runtimeToolMenu(agentNames) {
   for (const name of (agentNames ?? []).slice(0, 2)) {
     try {
       const resp = await api(`/v1/agents/${encodeURIComponent(name)}/crew/menu`, { timeoutMs: 8_000, retries: 0 });
-      const ids = (resp?.data?.tools ?? []).map((x) => x?.id).filter((x) => typeof x === 'string' && !x.includes(':') && !x.startsWith('exchange_'));
-      if (resp?.data?.source === 'runtime' && ids.length) return ids;
+      const rows = (resp?.data?.tools ?? [])
+        .filter((x) => typeof x?.id === 'string' && !x.id.includes(':') && !x.id.startsWith('exchange_'))
+        .map((x) => ({ id: x.id, purpose: typeof x.purpose === 'string' ? x.purpose : '' }));
+      if (resp?.data?.source === 'runtime' && rows.length) return rows;
     } catch (err) { swallowed('agent-draft: runtime tools', err); }
   }
-  return DEFAULT_TOOLS;
+  return DEFAULT_TOOL_MENU;
+}
+
+/** The ids of runtimeToolMenu(), for a caller that needs the names only. */
+export async function runtimeTools(agentNames) {
+  return (await runtimeToolMenu(agentNames)).map((x) => x.id);
 }
 
 /** The home's read of the person's agents: proposals, workers and machines (GET /v1/home/agents). */

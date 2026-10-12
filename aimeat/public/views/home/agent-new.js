@@ -22,6 +22,12 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.3.0 — 2026-10-12 — Before the person approves, two rows say which of their apps' tools the
+ *     agent uses and which of their workspaces it reads or writes: the ones the definition names,
+ *     by a tool's sku and a workspace's id (services/agent-draft-known.js). The draft is written
+ *     with the person's apps, their tools and their workspaces given to the model. The row "What
+ *     it reaches" lists the permissions the agent is proposed with (scopesFor)
+ *     (wish-kodin-agenttiluonnos-tuntee-ty-kalujen-kuvaukset-omistajan-s).
  *   v1.2.1 — 2026-10-11 — "Where does its work go?" is WorkplaceChoice (agent-ties-parts.js): a
  *     grouped drop-down on an account with many workspaces, and names decoded for display.
  *   v1.2.0 — 2026-10-11 — The row "What it offers": the offer the agent's definition carries, which
@@ -32,7 +38,7 @@
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -54,11 +60,12 @@ import { PromptCard } from '/components/PromptCard.js';
 import { Stack } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { CREW_TEMPLATES } from '/views/profile/agents/crew-templates.js';
-import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
 import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
-  draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeTools, readHomeAgents, offerShown,
+  draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeToolMenu, readHomeAgents, offerShown, scopesFor,
 } from '/js/services/agent-draft.js';
+import { namedIn } from '/js/services/agent-draft-known.js';
+import { decodeEntities } from '/js/utils.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
 import { WorkplaceChoice } from '/views/home/agent-ties-parts.js';
 import { machineName } from '/views/home/agents-band.js';
@@ -102,6 +109,10 @@ export default function AgentNewView({ navigate }) {
   const [places, setPlaces] = useState([]);
   const [place, setPlace] = useState('own');
   const [busy, setBusy] = useState(false);
+  // The person's apps with their tools, and their workspaces: given to the model that writes the
+  // draft, and read against the definition for the two rows that name what the agent uses.
+  const [known, setKnown] = useState({ apps: [], places: [] });
+  const knownRead = useRef(null);
 
   const goHome = useCallback((e) => { e?.preventDefault?.(); navigate(HOME); }, [navigate]);
 
@@ -114,8 +125,11 @@ export default function AgentNewView({ navigate }) {
       const list = data?.connectors ?? [];
       setMachine((cur) => cur || (list.length === 1 ? list[0].id : (list.find((c) => c.online)?.id ?? '')));
     }).catch((err) => { swallowed('agent-new: machines', err); setHome({ connectors: [], workers: [] }); });
-    // The workspaces the agent's work could be shared with. None read means the choice is not shown.
-    readTieChoices().then((c) => setPlaces(c.places ?? [])).catch((err) => swallowed('agent-new: places', err));
+    // The workspaces the agent's work could be shared with, and the person's apps with their
+    // tools. None read means the choice is not shown and the draft is written without them.
+    knownRead.current = readTieChoices({ tools: true })
+      .then((c) => { setPlaces(c.places ?? []); setKnown(c); return c; })
+      .catch((err) => { swallowed('agent-new: places and apps', err); return { apps: [], places: [] }; });
   }, [session]);
 
   // A proposal that waits: read it whole, because the home's list carries only its name and purpose.
@@ -148,7 +162,8 @@ export default function AgentNewView({ navigate }) {
     setPhase('drafting');
     try {
       const online = (home?.workers ?? []).filter((w) => w.has_key && w.connector?.online).map((w) => w.name);
-      takeDraft(await draftAgent(wanted, { tools: await runtimeTools(online) }));
+      const [tools, about] = await Promise.all([runtimeToolMenu(online), knownRead.current ?? Promise.resolve(undefined)]);
+      takeDraft(await draftAgent(wanted, { tools, known: about }));
     } catch (err) {
       // The model answered with something that is not an agent: the person can say it another way.
       if (err?.code === 'NO_JSON' || err?.code === 'BAD_DRAFT') {
@@ -288,9 +303,14 @@ export default function AgentNewView({ navigate }) {
   }
 
   // ── The form: the agent, and the person's four choices ──
-  const scopes = proposal ? (proposal.scopes ?? []) : (SCOPE_TEMPLATES[draft.reach] ?? SCOPE_TEMPLATES.standard);
+  const scopes = proposal ? (proposal.scopes ?? []) : scopesFor(draft);
   // The offer in the definition: the draft's own, or the one the proposer wrote.
   const offered = offerShown(draft.crewDef ?? proposal?.crew_def);
+  // The person's apps and workspaces the definition names, for a draft and a proposal alike.
+  const definition = draft.crewDef ?? proposal?.crew_def;
+  const named = namedIn(definition, known);
+  const writes = (proposal ? scopes.some((s) => s === '*' || s === 'organism:write' || s === 'organism:*') : draft.reach !== 'readonly')
+    && (definition?.agents ?? []).some((m) => Array.isArray(m?.tools) && m.tools.includes('workspace_write'));
   const whenOptions = [
     { value: 'ask', label: tr('home.agents.when.ask', 'When I ask'), hint: n('whenAskHint', 'You give it a task when you need one. Otherwise it does nothing.') },
     { value: 'clock', label: tr('home.agents.when.clock', 'By the clock'), hint: n('whenClockHint', 'It gets the same task at the times you set.') },
@@ -339,6 +359,24 @@ export default function AgentNewView({ navigate }) {
           : html`<${Choice} label=${n('reach', 'What it reaches')} hint=${areaLine(scopes, t)}
               value=${draft.reach} onChange=${set('reach')}
               options=${[['readonly', n('reachRead', 'Reads only')], ['standard', n('reachWrite', 'Reads and writes')]]} />`}
+
+        ${/* What of the person's own the agent's instructions name: an app by the sku of a tool, a
+             workspace by its id. Shown only when the definition names one. */''}
+        ${(named.apps.length > 0 || named.places.length > 0) && html`
+          <${Facts} wide rows=${[
+            named.apps.length > 0 && {
+              k: n('usesApps', 'Apps whose tools it uses'),
+              v: named.apps.map((a) => html`<${FactLine} key=${a.filename} sub=${a.tools.map((x) => x.name).join(', ')}>${decodeEntities(a.name)}<//>`),
+            },
+            named.places.length > 0 && {
+              k: writes ? n('writesPlaces', 'Workspaces it reads and writes') : n('readsPlaces', 'Workspaces it reads'),
+              v: named.places.map((pl) => html`
+                <${FactLine} key=${`${pl.organism_id}/${pl.workspace_id}`}
+                  sub=${n('inOrganism', 'In the organism {organism}').replace('{organism}', decodeEntities(pl.organism_name))}>
+                  ${decodeEntities(pl.workspace_name)}
+                <//>`),
+            },
+          ]} />`}
 
         ${machines.length > 1 && html`
           <${Choice} boxed cols=${2} label=${n('machine', 'On which computer')} value=${machine} onChange=${setMachine}

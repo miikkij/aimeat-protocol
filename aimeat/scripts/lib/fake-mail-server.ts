@@ -16,6 +16,8 @@
  * @structure startFakeMailServer(port) · decideAnswer · chatAnswer · the CLI entry (`tsx scripts/lib/fake-mail-server.ts <port>`)
  * @usage node --import tsx scripts/lib/fake-mail-server.ts 40703
  * @version-history
+ *   v1.3.0 — 2026-10-12 — The agent-draft stand-in names a workspace or an app tool the prompt
+ *     lists when the sentence says its name, so the rows for apps and workspaces show in the sandbox.
  *   v1.2.0 — 2026-10-10 — The completion stand-in also answers the home's agent-draft prompt, so
  *     "say one sentence, see the agent" runs in the sandbox with no paid key.
  *   v1.1.0 — 2026-09-29 — The decision and completion stand-ins, recording what each received; a
@@ -111,6 +113,20 @@ function agentDraft(body: Record<string, unknown>): string {
   const slug = words.join('-').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9-]/g, '').replace(/^[^a-z]+/, '').replace(/-+$/, '');
   const name = slug.length >= 3 ? slug.slice(0, 40).replace(/-+$/, '') : 'sandbox-agent';
   const clock = /\b(every|each|daily|hourly|weekly|joka|aamu|päivittäin|viikoittain|cada|diario)/i.test(sentence);
+  // The prompt lists the person's workspaces as "- Organism / Name [id]" and their apps as
+  // "Name [app-tool:owner/app:<tool>]" over "- tool: what it does" (agent-draft-known.js
+  // knownBlock). A sentence that says a listed name gets a draft that names it by its address, so
+  // the page's rows for apps and workspaces can be looked at with no paid key.
+  const system = promptText({ messages: msgs.filter((m) => m !== said) });
+  const says = (name: string) => name.length > 2 && sentence.toLowerCase().includes(name.toLowerCase());
+  const uses: string[] = [];
+  const tools: string[] = [];
+  for (const m of system.matchAll(/^- .+ \/ (.+) \[([^\]]+)\]$/gm)) {
+    if (says(m[1]!)) { uses.push(`Read the workspace "${m[1]}" (${m[2]}) and write what you find back into it.`); tools.push('workspace_write'); }
+  }
+  for (const m of system.matchAll(/^(.+) \[(app-tool:[^\]]+):<tool>\]\n- ([A-Za-z0-9._-]+)/gm)) {
+    if (says(m[1]!)) { uses.push(`Call the tool ${m[2]}:${m[3]} of the app "${m[1]}".`); tools.push('app_tools'); }
+  }
   return JSON.stringify({
     name,
     display_name: words.join(' '),
@@ -120,8 +136,8 @@ function agentDraft(body: Record<string, unknown>): string {
     reach: 'standard',
     crew_def: {
       agent_name: name, process: 'sequential', listen_for: ['tasks'],
-      agents: [{ name: 'worker', role: 'Worker', goal: sentence, backstory: 'A stand-in written by the sandbox model.', tools: [], allow_delegation: false }],
-      tasks: [{ id: 'work', description: `${sentence}\n\n{{ctx.prompt}}`, expected_output: 'The finished result in plain text.', agent: 'worker', context: [] }],
+      agents: [{ name: 'worker', role: 'Worker', goal: sentence, backstory: 'A stand-in written by the sandbox model.', tools: [...new Set(tools)], allow_delegation: false }],
+      tasks: [{ id: 'work', description: `${[sentence, ...uses].join('\n')}\n\n{{ctx.prompt}}`, expected_output: 'The finished result in plain text.', agent: 'worker', context: [] }],
     },
   });
 }

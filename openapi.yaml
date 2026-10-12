@@ -14869,11 +14869,24 @@ paths:
         the owner is an active member of (where an agent's finished work may be shared), and
         `apps`, the owner's own apps (which may be tied to an agent).
 
+        With `include=tools`, each app also carries `tools`: the tools an agent of the owner can
+        call on it, from the owner's public tool manifests. A tool is listed when it has something
+        to run (an `action_id`), priced or not: the owner's own agents run both free. A tool that
+        is fulfilled as a task is not listed, because a direct call cannot run it. The list is
+        empty for an app that publishes none. The page that drafts a new agent gives these to the model that
+        writes the draft. At most 500 tools are listed in one answer.
+
         Requires the account holder's own session.
       tags:
         - Portal
       security:
         - BearerAuth: []
+      parameters:
+        - name: include
+          in: query
+          required: false
+          schema: { type: string, enum: [tools] }
+          description: '`tools` adds each app''s callable tools to the answer.'
       responses:
         '200':
           description: Places and apps
@@ -14903,6 +14916,19 @@ paths:
                               properties:
                                 filename: { type: string }
                                 name: { type: string }
+                                tools:
+                                  type: array
+                                  description: Present only with `include=tools`.
+                                  items:
+                                    type: object
+                                    properties:
+                                      name: { type: string }
+                                      sku:
+                                        type: string
+                                        description: '"app-tool:<owner>/<appId>:<tool>", the address an agent calls the tool by.'
+                                      description:
+                                        type: string
+                                        description: The tool's own description, cut at 300 characters.
         '403': { description: Not the account holder in person }
 
   /v1/agents/{name}/workplace:

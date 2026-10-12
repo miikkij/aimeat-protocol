@@ -26,6 +26,9 @@
  *   placeNames · workplaceKey
  * @usage const ties = await readAgentTies({ config, storage }, owner);
  * @version-history
+ *   v1.1.0 — 2026-10-12 — readTieChoices takes `tools`: each of the person's apps then carries the
+ *     tools an agent of theirs can call on it, for the home's agent draft
+ *     (wish-kodin-agenttiluonnos-tuntee-ty-kalujen-kuvaukset-omistajan-s).
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a,
  *     decision "From an agent to an app").
  */
@@ -35,6 +38,7 @@ import type { MemoryRecord } from '../storage/types/commerce.js';
 import { isValidAgentName } from '../utils/gaii.js';
 import { resolveAppUrls } from './app-urls.js';
 import { listWorkspaces } from './structure-overview.js';
+import { listOwnerAppToolNames, type OwnerAppToolName } from '../commerce/app-tool-catalog.js';
 import { DATA_MAP_SPEC, type DataMap } from './data-map/data-map-types.js';
 
 /** One app that shows an agent's work. */
@@ -125,23 +129,29 @@ export async function placeNames(
 export interface TieChoices {
   /** The workspaces of the organisms the person is an active member of. */
   places: Array<{ organism_id: string; organism_name: string; workspace_id: string; workspace_name: string }>;
-  /** The person's own apps. */
-  apps: Array<{ filename: string; name: string }>;
+  /**
+   * The person's own apps. With `tools` asked for, each app carries the tools an agent of the
+   * person can call on it (commerce/app-tool-catalog.ts listOwnerAppToolNames), empty when it
+   * publishes none.
+   */
+  apps: Array<{ filename: string; name: string; tools?: OwnerAppToolName[] }>;
 }
 
 /**
  * The places and the apps a person may tie an agent to, for the two pickers on the agent's page.
  * Three reads whatever the person has: the memberships, the organisms' workspace registries in one
- * key-IN read, and the app list.
+ * key-IN read, and the app list. `tools` adds a fourth, the person's public tool manifests, for the
+ * page that drafts a new agent: its model has to be told which tools the person's apps publish.
  */
 export async function readTieChoices(
-  deps: { config: AimeatConfig; storage: Storage }, owner: string,
+  deps: { config: AimeatConfig; storage: Storage }, owner: string, opts: { tools?: boolean } = {},
 ): Promise<TieChoices> {
   const { config, storage } = deps;
   const ownerGhii = `${owner}@${config.nodeId}`;
-  const [memberships, listed] = await Promise.all([
+  const [memberships, listed, toolsByApp] = await Promise.all([
     storage.listMembershipsByGhii(owner),
     storage.listApps({ ownerGaii: ownerGhii, viewerGhii: ownerGhii, limit: 1000 }),
+    opts.tools ? listOwnerAppToolNames(storage, ownerGhii) : Promise.resolve(null),
   ]);
   const orgs = memberships.filter(m => m.status === 'active').map(m => ({ organism_id: m.organismId }));
   const names = await placeNames(storage, orgs);
@@ -153,8 +163,11 @@ export async function readTieChoices(
     places.push({ organism_id: organismId, organism_name: organismName, workspace_id: workspaceId, workspace_name: workspaceName });
   }
   places.sort((a, b) => a.organism_name.localeCompare(b.organism_name) || a.workspace_name.localeCompare(b.workspace_name));
+  // A manifest is keyed by the published filename. Older ones were written without the ".html"
+  // (apps.company-brief.tools on aimeat.io), so that spelling is read as well.
+  const toolsOf = (filename: string) => toolsByApp?.get(filename) ?? toolsByApp?.get(filename.replace(/\.html$/i, '')) ?? [];
   const apps = listed.apps
-    .map(a => ({ filename: a.filename, name: a.manifest?.name || a.filename }))
+    .map(a => ({ filename: a.filename, name: a.manifest?.name || a.filename, ...(toolsByApp ? { tools: toolsOf(a.filename) } : {}) }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return { places, apps };
 }

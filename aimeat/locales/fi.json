@@ -12914,7 +12914,11 @@
       "cancel": "Peru",
       "after": "Voit muuttaa agenttia tai poistaa sen milloin tahansa.",
       "offer": "Mitä se tarjoaa",
-      "offerHint": "Tämä näkyy sivullasi Pyydä agenteilta, kun agentti on käynnistynyt. Siinä ei ole hintaa, eikä se ole Exchangessa."
+      "offerHint": "Tämä näkyy sivullasi Pyydä agenteilta, kun agentti on käynnistynyt. Siinä ei ole hintaa, eikä se ole Exchangessa.",
+      "usesApps": "Sovellukset, joiden työkaluja se käyttää",
+      "readsPlaces": "Työtilat, joista se lukee",
+      "writesPlaces": "Työtilat, joista se lukee ja joihin se kirjoittaa",
+      "inOrganism": "Organismissa {organism}"
     },
     "agentPage": {
       "signInTitle": "Agenttisi",

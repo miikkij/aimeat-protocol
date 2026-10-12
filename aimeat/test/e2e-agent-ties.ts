@@ -478,6 +478,47 @@ console.log('\n=== Agent ties: apps, the workplace, the first run, the build ins
         assert(agentToken.status === 403, `an agent token: ${agentToken.status}`);
     });
 
+    // FAILED FIRST, on 2026-10-12: the read answered each app with its filename and name only, so the
+    // page that drafts an agent could not tell the model which tools the person's apps publish.
+    await test('include=tools adds the tools an agent of the owner can call: free and priced, never an unbound one, a private manifest or another account\'s', async () => {
+        const manifest = (o: Owner, file: string, visibility: string, tools: unknown[]) => json('/v1/memory', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ key: `apps.${file}.tools`, visibility, value: { version: 1, tools } }),
+        });
+        const LONG = `Returns a summary of the day. ${'It goes on. '.repeat(60)}`;
+        const mineOk = await manifest(a, 'digest.html', 'public', [
+            { name: 'summarise', description: LONG, action_id: 'ext:tienone:run' },
+            { name: 'sell', description: 'Sold to other accounts.', action_id: 'ext:tienone:run', priceMoney: { amount: 100000, currency: 'EUR' } },
+            { name: 'unbound', description: 'No price and nothing to run.' },
+            // FAILED FIRST, on 2026-10-12: a priced tool with nothing to run was listed as callable. It
+            // is fulfilled as a task through a checkout only; a direct call answers TOOL_NOT_INVOKABLE,
+            // for the owner too (routes/webmcp.ts).
+            { name: 'paidtask', description: 'Sold, and fulfilled as a task.', priceMoney: { amount: 100000, currency: 'EUR' } },
+        ]);
+        assert(mineOk.status === 201, `manifest ${mineOk.status}: ${JSON.stringify(mineOk.body?.error)}`);
+        await publish(a, 'hidden.html', 'Hidden');
+        const hiddenOk = await manifest(a, 'hidden.html', 'private', [{ name: 'secret', description: 'Not served.', action_id: 'ext:tienone:run' }]);
+        assert(hiddenOk.status === 201, `private manifest ${hiddenOk.status}`);
+        const theirsOk = await manifest(b, 'theirs.html', 'public', [{ name: 'foreign', description: 'Another account.', action_id: 'ext:tienone:run' }]);
+        assert(theirsOk.status === 201, `their manifest ${theirsOk.status}`);
+
+        const plain = await json('/v1/home/agents/choices', { headers: authA });
+        assert((plain.body.data.apps as any[]).every(x => x.tools === undefined), 'the plain read carries tools nobody asked for');
+
+        const withTools = await json('/v1/home/agents/choices?include=tools', { headers: authA });
+        assert(withTools.status === 200, `status ${withTools.status}`);
+        const apps = withTools.body.data.apps as any[];
+        const digest = apps.find(x => x.filename === 'digest.html');
+        assert(digest && Array.isArray(digest.tools), `digest: ${JSON.stringify(digest)}`);
+        assert(JSON.stringify(digest.tools.map((x: any) => x.name)) === JSON.stringify(['summarise', 'sell']), `tools: ${JSON.stringify(digest.tools.map((x: any) => x.name))}`);
+        assert(digest.tools[0].description.startsWith('Returns a summary of the day.') && digest.tools[0].description.length <= 300, `description length ${digest.tools[0].description.length}`);
+        assert(digest.tools[1].sku === `app-tool:${a.name}/digest.html:sell`, `sku: ${digest.tools[1].sku}`);
+        const hidden = apps.find(x => x.filename === 'hidden.html');
+        assert(hidden && hidden.tools.length === 0, `a private manifest was listed: ${JSON.stringify(hidden)}`);
+        assert(!JSON.stringify(apps).includes('foreign'), 'another account\'s tool was listed');
+        assert((withTools.body.data.places as any[]).length === 1, 'the places changed with include=tools');
+    });
+
     await test('MCP: an agent of the owner says where a sibling\'s work goes, and takes it back', async () => {
         const call = await mcpSession(writer.token);
         const set = await call('aimeat_agent_workplace_set', { target_agent_name: 'quiet', organism_id: orgId, workspace_id: WS });
