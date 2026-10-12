@@ -24,6 +24,9 @@
  *   tunnel and the realtime rooms, each reached through a real WebSocket.
  * @usage cd aimeat && pnpm exec vitest run test/unit/two-node-process.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-12 — The stub store answers getMailboxItem with an item of the connected node: the
+ *     mailbox_ack reads the item before it deletes it. The setup no longer matched production; the
+ *     assertions are unchanged.
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -84,8 +87,10 @@ const h = vi.hoisted(() => {
                     return { nodeId: 'personal-node-1', agentGaiis: [] };
                 },
                 // The personal tunnel: a mailbox_ack frame deletes the item, a closed socket marks the
-                // personal node offline.
-                deleteMailboxItem: async () => { state.record(node, 'a personal-tunnel frame'); },
+                // personal node offline. The ack reads the item first and deletes only the sending
+                // node's own (services/personal-tunnel.ts ackMailboxItems), so the item names that node.
+                getMailboxItem: async (id: string) => ({ id, personalNodeId: 'personal-node-1' }),
+                deleteMailboxItem: async () => { state.record(node, 'a personal-tunnel frame'); return true; },
                 updatePersonalNode: async (_id: string, patch: { status?: string }) => {
                     if (patch.status === 'offline') state.record(node, 'a personal-tunnel socket close');
                 },
