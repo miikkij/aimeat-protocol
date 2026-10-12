@@ -31,6 +31,9 @@
  * @structure registerAgentV2MigrateRoutes(router, config, storage)
  * @usage registerAgentV2MigrateRoutes(router, config, storage);
  * @version-history
+ *   v1.2.1 — 2026-10-13 — The move is forwarded by a daemon principal that holds agent:write when the
+ *     daemon has one (services/agent-enrolment-offer.ts enrolTarget), as POST /v1/agents/v2/enrol asks
+ *     that word from 4.0.0.
  *   v1.2.0 — 2026-10-12 — The GET asks agent:read from 4.0.0, the word of the fleet list.
  *   v1.1.0 — 2026-10-02 — The offer carries the node's public key, as the basic-agents offer does.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, post-audit item 4).
@@ -44,6 +47,7 @@ import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { success, error } from '../../middleware/envelope.js';
 import { credentialHealthForOwner } from '../../services/agent-credential-health.js';
 import { connectedDaemons } from '../../services/basic-agents.js';
+import { enrolTarget } from '../../services/agent-enrolment-offer.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ENROL_CAPABILITY } from './basic-agents.js';
@@ -281,7 +285,7 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
     let enrolResult: { ok: boolean; result: unknown };
     try {
       enrolResult = await getActiveConnectTunnelManager()!.invokeOnPrincipal(
-        chosen.target,
+        await enrolTarget(storage, chosen),
         { capability: ENROL_CAPABILITY, input: offer, caller: `${owner}@${config.nodeId}` },
         ENROL_INVOKE_TIMEOUT_MS,
       );
