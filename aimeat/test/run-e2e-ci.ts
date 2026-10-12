@@ -9,6 +9,8 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-12 -- e2e-rest-scope-gates.ts joins the list (not the guard tier): the REST routes that asked
+ *     no scope word, on a 3.x node, are allowed with the Deprecation headers and counted per word.
  *   2026-10-12 -- e2e-app-community.ts joins the list (not the guard tier): an app listed to the
  *     community is seen by signed-in members and their agents, never by the anonymous catalogue.
  *   2026-10-11 -- e2e-bundled-extensions.ts joins the list (not the guard tier): the four extensions
@@ -524,6 +526,10 @@ const ALL_SUITES = [
     // including the three recovered from what sits beside the status, and RUNS the race the
     // conditional update exists for: a worker completing while the caller cancels.
     'test/e2e-agent-v2-tasks.ts',
+    // The REST routes that asked no scope word until 4.0.0, on a 3.x node: a call without the word
+    // is allowed, carries the Deprecation headers and is counted per word; an agent's own record needs
+    // no word (auth/rest-scope-gate.ts). The 4.0.0 refusal is in test/unit/rest-scope-gates.test.ts.
+    'test/e2e-rest-scope-gates.ts',
     // Agent v2 V6a: this node's agents answering A2A. Speaks real JSON-RPC at the real door,
     // and asserts the crossings rather than the round trips — work made over A2A is in the V5
     // roster, work made over REST reads over A2A. Also measures the per-method scope gate the
