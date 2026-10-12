@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   v1.3.0 — 2026-10-12 — Says what owner_scope reaches on delete and restore: another agent's record
+ *     of the same person, and the person's own with memory:write-as-owner (services/memory-bin.ts v1.6.0).
  *   v1.2.0 — 2026-10-12 — The batch delete of workspace records goes to the bin and needs memory:delete,
  *     as aimeat_workspace_object_delete does; it is no longer in the list of deletes with no bin.
  *   v1.1.0 — 2026-10-12 — Leaving through aimeat_organism_leave removes the agents and workspace roles
@@ -121,6 +123,10 @@ What an export leaves out, and why:
   is final at once.
 - \`aimeat_memory_restore\` with the same \`key\` puts it back, while the window is open. It needs
   \`memory:write\`. \`NOT_RESTORABLE\` means it was never deleted, is not theirs, or the window closed.
+- Both act on your own records. With \`owner_scope: true\` they also reach a record another agent of
+  the same person wrote, and a record stored under the person's own identity when you hold
+  \`memory:write-as-owner\` (the permission a write with \`owner_scope\` needs). A \`NOT_FOUND\` that
+  names that permission means the person grants it on your card in Profile -> Agents.
 - \`GET /v1/memory/deleted\` lists everything waiting in the bin with its last day. No MCP tool reads it
   today.
 - An hourly sweep removes for good what has passed its window.
