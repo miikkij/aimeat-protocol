@@ -16,11 +16,14 @@
  *   - GET  /v1/ai/usage/history  — owner-only, per-day spend series + 24h/7d/30d rollups (charts)
  *   - GET  /v1/admin/ai-usage    — operator-only, cross-user AI-spend aggregate (admin dashboard)
  *   - POST /v1/ai/settings       — owner-only, update budget/quotas/allowlist
- *   - GET  /v1/ai/settings       — owner-only, read budget/quotas/allowlist
+ *   - GET  /v1/ai/settings       — owner-only, read budget/quotas/allowlist and the voice limit
  * @usage
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-10-12 — GET and POST /v1/ai/settings are no longer deprecated and stay in node 4.0.0:
+ *     the daily budget, the per-app caps and the app allowlist have no other REST route. GET answers
+ *     `limits.voice_msg_max_seconds`, which the inbox read from the removed /v1/openrouter/settings.
  *   v1.x — 2026-10-08 — /complete, /transcribe and /image answer a failure that is not a provider's as
  *     500 INTERNAL_ERROR (nodeFailureOf), not 502 PROVIDER_ERROR; a provider's refusal keeps its own
  *     status (422 PROVIDER_REJECTED, 429 with Retry-After). /image answers width and height,
@@ -112,7 +115,6 @@ import { generateDownloadToken } from '../services/download-token.js';
 const IMAGE_DOWNLOAD_TTL_SECONDS = 3600;
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { upsertPrivateRecord } from '../services/private-record.js';
-import { legacyAiSettingsRoute } from './openrouter.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { isOperatorCaller } from '../services/operator-override.js';
@@ -123,8 +125,6 @@ const INLINE_AUDIO_MAX_CHARS = 8_000_000;
 
 export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
-  // The deprecated settings routes below (routes/openrouter.ts legacyAiSettingsRoute).
-  const legacy = legacyAiSettingsRoute(config);
   registerVoiceRoutes(router, config, storage);
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
   // GET /v1/ai/available keeps the per-principal path limiter: it starts no AI call, so it does not
@@ -514,9 +514,11 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       res.json(success(config.nodeId, data));
     });
 
-  // ── GET /v1/ai/settings ──
+  // ── GET /v1/ai/settings ── the budget, the per-app caps, the allowlist, and the node's voice limit.
+  // Not removed in 4.0.0: nothing under /v1/ai/providers holds these. `limits` is the voice recorder's
+  // ceiling, which the inbox read from GET /v1/openrouter/settings until that route was removed.
   router.get('/v1/ai/settings',
-    requireAuth(), requireRole('owner'), legacy,
+    requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
@@ -531,12 +533,13 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           per_app_daily_usd: null,
           max_tokens_ceiling: null,
         },
+        limits: { voice_msg_max_seconds: config.voiceMsgMaxSeconds },
       }));
     });
 
-  // ── POST /v1/ai/settings ── update budget/quotas/allowlist
+  // ── POST /v1/ai/settings ── update budget/quotas/allowlist (not removed in 4.0.0, as GET above)
   router.post('/v1/ai/settings',
-    requireAuth(), requireRole('owner'), legacy,
+    requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const { daily_budget_usd, app_quotas, app_allowlist } = req.body as {

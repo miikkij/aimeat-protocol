@@ -14,6 +14,9 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.21.0 -- 2026-10-12 -- legacyAiSettingsRoute guards the three /v1/openrouter settings routes only:
+ *     GET and POST /v1/ai/settings stay in 4.0.0 (the budget has no other REST route), so the counted
+ *     notice no longer names them.
  *   v1.20.0 -- 2026-10-12 -- The legacy settings routes are a version gate: from
  *     AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN they answer 410 whatever the flag says; before it each use
  *     is counted and logged once a day (deprecated_use: ai_legacy_settings_routes; Core 2026-11 HTTP-07,
@@ -170,7 +173,8 @@ function routeFailure(e: unknown, where: string): { status: number; code: string
 }
 
 /**
- * The AI settings routes from before providers, DEPRECATED with a flag, a default and a removal version
+ * The AI settings routes from before providers (/v1/openrouter/settings, /models, /test; NOT
+ * /v1/ai/settings, which holds the budget and stays), DEPRECATED with a flag, a default and a removal version
  * (security-development-dna.md, "Deprecated is not removed"): AIMEAT_AI_LEGACY_SETTINGS_ROUTES, on by
  * default, removed in AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN (4.0.0), from which the flag has no effect.
  * Every answer says so in its headers; with the flag off, or from that release, the route answers
@@ -192,7 +196,7 @@ export function legacyAiSettingsRoute(config: AimeatConfig): RequestHandler {
     // Still on: the Deprecation headers on the answer, the use counted, the log once a day (HTTP-07).
     noteDeprecatedUse({
       kind: 'ai_legacy_settings_routes', removedIn: AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, successor: '/v1/ai/providers',
-      notice: 'An AI settings route from before providers was called (/v1/openrouter/settings, /models, /test or /v1/ai/settings).',
+      notice: 'An AI settings route from before providers was called (/v1/openrouter/settings, /models or /test).',
     });
     next();
   };

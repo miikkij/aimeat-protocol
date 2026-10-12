@@ -8,6 +8,9 @@
  * @structure useVoiceMessages(loadThread, activeConvRef) → { canTranscribe, voiceMaxSeconds, transcribeVoice }
  * @usage const { canTranscribe, voiceMaxSeconds, transcribeVoice } = useVoiceMessages(loadThread, activeConvRef);
  * @version-history
+ *   v1.1.0 — 2026-10-12 — Whether this owner can transcribe comes from GET /v1/ai/capabilities
+ *     (transcription.on), and the recorder's limit from GET /v1/ai/settings (limits): node 4.0.0
+ *     removes GET /v1/openrouter/settings, which answered both.
  *   v1.0.0 — 2026-08-01 — Extracted from inbox-tab.js (voice messages).
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -21,7 +24,7 @@ import { swallowed } from '/js/swallowed.js';
  * @param {{ current: any }} activeConvRef  the OPEN conversation, read at call time
  */
 export function useVoiceMessages(loadThread, activeConvRef) {
-  // canTranscribe answers "has this owner chosen a transcription model", which decides whether a
+  // canTranscribe answers "can this owner transcribe now", which decides whether a
   // voice bubble offers a Transcribe button or explains why it cannot. Read once per mount: an owner
   // does not change it mid-thread, and polling it would be a request per render for one boolean.
   const [canTranscribe, setCanTranscribe] = useState(null);
@@ -29,13 +32,17 @@ export function useVoiceMessages(loadThread, activeConvRef) {
   const [voiceMaxSeconds, setVoiceMaxSeconds] = useState(300);
 
   useEffect(() => {
-    apiGet('/v1/openrouter/settings')
+    // Whether a transcription would find a provider and a model now: the same gate the call runs.
+    apiGet('/v1/ai/capabilities')
+      .then((r) => setCanTranscribe(!!(r?.data?.capabilities?.transcription?.on)))
+      .catch((err) => { swallowed('inbox-tab: transcription capability', err); setCanTranscribe(false); });
+    // The node's ceiling comes with the owner's AI budget settings.
+    apiGet('/v1/ai/settings')
       .then((r) => {
-        setCanTranscribe(!!(r?.data?.sttModel));
         const n = Number(r?.data?.limits?.voice_msg_max_seconds);
         if (n > 0) setVoiceMaxSeconds(n);
       })
-      .catch((err) => { swallowed('inbox-tab: stt settings', err); setCanTranscribe(false); });
+      .catch((err) => swallowed('inbox-tab: voice limit', err));
   }, []);
 
   /** Transcribe one voice attachment on the caller's OWN copy, then reload the thread so the text

@@ -11,10 +11,20 @@
  *   stored it sat ten fields and an entire budget panel below, so "did that save?" had no answer
  *   where it was asked. PUT /v1/openrouter/settings is a partial update, so per-section saving needs
  *   no server change.
+ *
+ *   NODE 4.0.0 removes /v1/openrouter/settings, /models and /test. The panel reads the old route
+ *   first; its 410 GONE switches the panel onto the owner's provider (js/services/ai-connection.js):
+ *   the connection and key through /v1/ai/providers, the default, vision and transcription models,
+ *   the language and the fine-tuning into that provider's capabilities, the model lists from the
+ *   node's catalogue. A provider keeps no separate reasoning and execution models and no retry
+ *   setting, so on 4.0.0 those two controls are not shown.
  * @structure OpenRouterSettings (container + state) · SttTestPanel · ParamsSection ·
  *   components/ModelPicker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v3.22.0 -- 2026-10-12 -- On node 4.0.0 (the old route answers 410) the panel works on the owner's provider
+ *     through js/services/ai-connection.js; the reasoning and execution fold and the retry setting are not shown
+ *     there, because a provider keeps neither. On 3.x nothing changes.
  *   v3.21.0 -- 2026-10-02 -- The number of times an empty answer is asked again starts at 2, the server's own default (DEFAULT_EMPTY_RETRIES, src/services/ai/gateway.ts), on load, save and reset; it was 3.
  *   v3.20.0 -- 2026-10-02 -- The question marks that explain the fine-tuning fields: ai.max_retries, ai.temperature, ai.top_p,
  *     ai.max_tokens on their fields (components/HelpTip.js); the grey lines under temperature, top P and the longest answer
@@ -78,6 +88,9 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
+import {
+  readConnection, saveConnection, saveConnectionCapabilities, testConnection, removeConnection, listModels,
+} from '/js/services/ai-connection.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { swallowed } from '/js/swallowed.js';
 import { ModelPicker } from '/components/ModelPicker.js';
@@ -119,6 +132,9 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
   const [collapsed, setCollapsed] = useState(!startOpen);
   const [rolesOpen, setRolesOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // Node 4.0.0 answers the old routes 410: the panel then works on the owner's provider (current).
+  const [viaProviders, setViaProviders] = useState(false);
+  const [current, setCurrent] = useState(null);
 
   // connection
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -159,27 +175,44 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only load; the loaders use stable setters
   useEffect(() => { loadSettings(); }, []);
 
+  /** Put one settings answer into the fields: the old route's, or the connection's (settingsOf). */
+  function applySettings(data, via) {
+    setHasApiKey(!!data.hasApiKey);
+    setModel(data.model || '');
+    setReasoningModel(data.reasoningModel || '');
+    setExecutionModel(data.executionModel || '');
+    setVisionModel(data.visionModel || '');
+    setSttModel(data.sttModel || '');
+    setSttLanguage(data.sttLanguage || '');
+    setAutoRetry(!!data.autoRetry);
+    setMaxRetries(data.maxRetries || 2);
+    setProvider(data.provider || 'openrouter');
+    setBaseUrl(data.baseUrl || '');
+    setTemperature(data.temperature != null ? String(data.temperature) : '');
+    setTopP(data.top_p != null ? String(data.top_p) : '');
+    setMaxTokens(data.max_tokens != null ? String(data.max_tokens) : '');
+    if (data.hasApiKey) loadModels(via, data.provider || 'openrouter');
+  }
+
+  /** Node 4.0.0: the connection is the owner's provider, read through the provider routes. */
+  async function loadFromProviders() {
+    const r = await readConnection();
+    setViaProviders(true);
+    setCurrent(r.current);
+    applySettings(r.settings, true);
+    return r;
+  }
+
   async function loadSettings() {
     try {
       const resp = await apiGet('/v1/openrouter/settings');
-      if (resp.ok !== false && resp.data) {
-        setHasApiKey(!!resp.data.hasApiKey);
-        setModel(resp.data.model || '');
-        setReasoningModel(resp.data.reasoningModel || '');
-        setExecutionModel(resp.data.executionModel || '');
-        setVisionModel(resp.data.visionModel || '');
-        setSttModel(resp.data.sttModel || '');
-        setSttLanguage(resp.data.sttLanguage || '');
-        setAutoRetry(!!resp.data.autoRetry);
-        setMaxRetries(resp.data.maxRetries || 2);
-        setProvider(resp.data.provider || 'openrouter');
-        setBaseUrl(resp.data.baseUrl || '');
-        if (resp.data.temperature != null) setTemperature(String(resp.data.temperature));
-        if (resp.data.top_p != null) setTopP(String(resp.data.top_p));
-        if (resp.data.max_tokens != null) setMaxTokens(String(resp.data.max_tokens));
-        if (resp.data.hasApiKey) loadModels();
-      }
-    } catch (err) { swallowed('openrouter-settings: loadSettings', err); }
+      if (resp.ok !== false && resp.data) applySettings(resp.data, false);
+    } catch (err) {
+      // 410 GONE: node 4.0.0 removed the route, and the provider routes carry the connection.
+      if (err?.status === 410) {
+        await loadFromProviders().catch((e) => swallowed('openrouter-settings: loadFromProviders', e));
+      } else swallowed('openrouter-settings: loadSettings', err);
+    }
     setLoaded(true);
   }
 
@@ -195,12 +228,14 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
    * Two catalogues, not one filtered twice: OpenRouter's default /models contains no transcription
    * models at all, so the STT picker is empty unless its list is fetched with its own modality.
    */
-  async function loadModels() {
+  async function loadModels(via = viaProviders, prov = provider) {
     setModelsLoading(true);
     setModelsError(null);
+    // Node 4.0.0: the node's model catalogue, in the listing's shape (js/services/ai-connection.js).
+    const catalogue = (cap) => listModels({ provider: prov }, cap).then((models) => ({ ok: true, data: { models } }));
     const [chat, stt] = await Promise.all([
-      apiGet('/v1/openrouter/models').catch(e => ({ ok: false, error: { message: e?.message } })),
-      apiGet('/v1/openrouter/models?modality=transcription').catch(e => {
+      (via ? catalogue('text') : apiGet('/v1/openrouter/models')).catch(e => ({ ok: false, error: { message: e?.message } })),
+      (via ? catalogue('transcription') : apiGet('/v1/openrouter/models?modality=transcription')).catch(e => {
         // A provider with no transcription catalogue and a provider that failed to answer look the
         // same from here, so the failure is logged rather than silently read as "none available".
         swallowed('openrouter-settings: stt model list', e);
@@ -231,7 +266,12 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
     try {
       const body = { provider, baseUrl };
       if (apiKey) body.apiKey = apiKey;
-      const resp = await apiPut('/v1/openrouter/settings', body);
+      let resp;
+      if (viaProviders) {
+        await saveConnection(current, { provider, baseUrl, apiKey });
+        resp = { ok: true };
+        setCurrent((await readConnection()).current);
+      } else resp = await apiPut('/v1/openrouter/settings', body);
       if (resp.ok === false) {
         flash(setConnMsg, resp.error?.message || t('profile.openrouter.saveFailed'), true);
       } else {
@@ -248,10 +288,22 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
     setSavingKey(false);
   }
 
+  /** Node 4.0.0: the connection's capabilities take the change; with no connection there is nothing to save to. */
+  async function saveToConnection(patch) {
+    if (!current) throw new Error(t('profile.openrouter.saveFailed'));
+    await saveConnectionCapabilities(current, patch);
+    setCurrent((await readConnection()).current);
+    return { ok: true };
+  }
+
   async function saveModels() {
     setSavingModels(true);
     try {
-      const resp = await apiPut('/v1/openrouter/settings', {
+      const resp = viaProviders ? await saveToConnection({
+        text: { model: model || null },
+        vision: { model: visionModel || null },
+        transcription: { model: sttModel || null, language: sttLanguage || null },
+      }) : await apiPut('/v1/openrouter/settings', {
         model,
         reasoningModel,
         executionModel,
@@ -269,10 +321,19 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
     setSavingModels(false);
   }
 
+  /** The text capability's fine-tuning as the provider record keeps it, with what the panel does not show kept. */
+  function textParams() {
+    const num = (v, parse) => (v !== '' ? parse(v) : undefined);
+    const params = { ...(current?.capabilities?.text?.params || {}),
+      temperature: num(temperature, parseFloat), top_p: num(topP, parseFloat), max_tokens: num(maxTokens, (v) => parseInt(v)) };
+    for (const k of Object.keys(params)) if (params[k] === undefined || params[k] === null) delete params[k];
+    return Object.keys(params).length ? params : null;
+  }
+
   async function saveParams() {
     setSavingParams(true);
     try {
-      const resp = await apiPut('/v1/openrouter/settings', {
+      const resp = viaProviders ? await saveToConnection({ text: { params: textParams() } }) : await apiPut('/v1/openrouter/settings', {
         autoRetry,
         maxRetries: parseInt(maxRetries) || 2,
         temperature: temperature !== '' ? parseFloat(temperature) : null,
@@ -293,7 +354,9 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
     setTesting(true);
     const started = Date.now();
     try {
-      const resp = await apiPost('/v1/openrouter/test');
+      const resp = viaProviders
+        ? { ok: true, data: await testConnection(current) }
+        : await apiPost('/v1/openrouter/test');
       if (resp.ok === false) {
         // A refused test is not necessarily a broken connection: the completion chokepoint also
         // refuses when the daily budget is spent. Headlining that "Connection failed" sends someone
@@ -316,7 +379,8 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
   function handleDelete() {
     confirm(t('profile.openrouter.deleteConfirm'), async () => {
       try {
-        await apiDelete('/v1/openrouter/settings');
+        if (viaProviders) { await removeConnection(current); setCurrent(null); setProvider('openrouter'); setBaseUrl(''); }
+        else await apiDelete('/v1/openrouter/settings');
         setHasApiKey(false); setApiKey('');
         setModel(''); setReasoningModel(''); setExecutionModel('');
         setVisionModel(''); setSttModel(''); setSttLanguage('');
@@ -410,7 +474,8 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
                 <${ModelPicker} ...${pickerProps} label=${t('profile.openrouter.model.default')}
                   value=${model} onChange=${setModel} modality="chat" allowCustom=${!isOpenRouter} />
 
-                <${Stack}>
+                <!-- A provider keeps no separate reasoning and execution models: on node 4.0.0 the fold goes. -->
+                ${!viaProviders && html`<${Stack}>
                   <${Tab} tone="fold" on=${rolesOpen} expanded=${rolesOpen}
                     onClick=${() => setRolesOpen(o => !o)}>${t('profile.openrouter.model.rolesSummary')}<//>
                   ${rolesOpen && html`
@@ -424,7 +489,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
                         value=${executionModel} onChange=${setExecutionModel}
                         modality="chat" allowNone=${true} allowCustom=${!isOpenRouter} />
                     <//>`}
-                <//>
+                <//>`}
 
                 <${ModelPicker} ...${pickerProps} label=${t('profile.openrouter.model.vision')}
                   hint=${t('profile.openrouter.model.vision_hint')}
@@ -466,7 +531,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
             maxRetries=${maxRetries} setMaxRetries=${setMaxRetries}
             temperature=${temperature} setTemperature=${setTemperature}
             topP=${topP} setTopP=${setTopP}
-            maxTokens=${maxTokens} setMaxTokens=${setMaxTokens}
+            maxTokens=${maxTokens} setMaxTokens=${setMaxTokens} noRetry=${viaProviders}
             saving=${savingParams} onSave=${saveParams} message=${paramsMsg} />
 
           <!-- ── 4. Budget ───────────────────────────────────── -->
@@ -537,16 +602,17 @@ function SttTestPanel({ sttModel, sttLanguage }) {
  *  numeric fields sitting open is part of what pushed the save button off the screen before. */
 function ParamsSection({
   autoRetry, setAutoRetry, maxRetries, setMaxRetries, temperature, setTemperature,
-  topP, setTopP, maxTokens, setMaxTokens, saving, onSave, message,
+  topP, setTopP, maxTokens, setMaxTokens, saving, onSave, message, noRetry = false,
 }) {
   const [open, setOpen] = useState(false);
+  // noRetry: on node 4.0.0 the panel works on a provider, which keeps no retry setting of its own.
   return html`
     <${FoldSection} num="" title=${t('profile.openrouter.section.params')} open=${open} onToggle=${() => setOpen(o => !o)}>
 
       <${Fields}>
-        <${Check} checked=${autoRetry} onChange=${setAutoRetry}>${t('profile.openrouter.autoRetry')}<//>
+        ${!noRetry && html`<${Check} checked=${autoRetry} onChange=${setAutoRetry}>${t('profile.openrouter.autoRetry')}<//>`}
 
-        ${autoRetry && html`
+        ${!noRetry && autoRetry && html`
           <${TextField} type="number" size="short" label=${t('profile.openrouter.maxRetries')} help="ai.max_retries" min="1" max="10" value=${maxRetries}
             onInput=${v => setMaxRetries(Math.min(10, Math.max(1, parseInt(v) || 1)))} />`}
 

@@ -17,7 +17,8 @@
  *   THE WRITE HALF. A door that shows a redacted value must not accept one back: an owner saving the
  *   record from a generic editor would overwrite the key with `{ configured: true }`. The generic
  *   memory write doors refuse these two keys for every principal; the owner changes them through
- *   /v1/openrouter/settings and /v1/commerce/payout/stripe, and an agent through the commerce tools.
+ *   /v1/ai/providers/{id}/key (the AI key; /v1/openrouter/settings until node 4.0.0 removed it) and
+ *   /v1/commerce/payout/stripe, and an agent through the commerce tools.
  *
  *   A WORKSPACE SHARE RECORD (`organism.<id>.w.<ws>.meta.share`) is an ordinary record that carries
  *   one secret field: the scrypt hash of the share password. The share routes read it from storage
@@ -29,6 +30,8 @@
  *   secretRecordBinRefusal · secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.5.1 — 2026-10-12 — The refusals for `openrouter.apikey` name the provider routes: node 4.0.0
+ *     removes /v1/openrouter/settings, which they named.
  *   v1.5.0 — 2026-10-09 — secretRecordBinRefusal: the generic delete and restore refuse these keys for
  *     every principal and name the record's own route (secrets audit 2026-10-09, item 10).
  *   v1.4.0 — 2026-10-09 — The workspace share record's `passwordHash` is shown as `has_password`
@@ -120,7 +123,7 @@ export function secretRecordBinRefusal(key: string, act: 'delete' | 'restore'): 
     : AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
     ? 'DELETE /v1/agents/{name}/ai-keys/{model} (the agent\'s page)'
     : key === OPENROUTER_KEY_RECORD
-      ? 'DELETE /v1/openrouter/settings (the AI settings page)'
+      ? 'DELETE /v1/ai/providers/{id} on the provider this key became, openrouter, lmstudio or custom (the AI settings page, the owner in person)'
       : key === DECIDE_KEY_RECORD_KEY
         ? 'DELETE /v1/ai/decide/settings/key (the AI settings page, Decision model)'
         : 'DELETE /v1/commerce/payout/stripe (Wallet, Selling and payments)';
@@ -141,7 +144,7 @@ export function secretRecordWriteRefusal(key: string): { code: string; message: 
     : AGENT_KEY_PREFIXES.some(p => key.startsWith(p))
     ? 'PUT /v1/agents/{name}/ai-keys (the agent\'s page)'
     : key === OPENROUTER_KEY_RECORD
-      ? 'PUT /v1/openrouter/settings (the AI settings page)'
+      ? 'PUT /v1/ai/providers/{id}/key (the AI settings page, the owner in person)'
       : key === DECIDE_KEY_RECORD_KEY
         ? 'PUT /v1/ai/decide/settings (the AI settings page, Decision model)'
         : 'PUT /v1/commerce/payout/stripe (Wallet, Selling and payments) or aimeat_commerce_psp_set';

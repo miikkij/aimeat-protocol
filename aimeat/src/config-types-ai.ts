@@ -11,6 +11,7 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   v1.5.1 — 2026-10-12 — aiLegacySettingsRoutes no longer names /v1/ai/settings, which stays in 4.0.0.
  *   v1.5.0 — 2026-09-28 — modelDefaultTts, modelDefaultEmbed, ttsVoiceDefault (System 2 plan, V5).
  *   v1.4.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): aiCatalogRefresh, aiPriceOverrides,
  *     aiCatalogSources.
@@ -154,8 +155,8 @@ export interface AiCapabilityConfig extends DecideConfig {
   /**
    * DEPRECATED ROUTES, NAMED WITH THEIR FLAG, DEFAULT AND REMOVAL (security-development-dna.md,
    * "Deprecated is not removed"): the AI settings routes from before providers (/v1/openrouter/
-   * settings, /models, /test, /v1/ai/settings). True (the default) keeps them answering; false makes
-   * them 410 Gone naming /v1/ai/providers. They are removed in 4.0.0.
+   * settings, /models, /test). True (the default) keeps them answering; false makes them 410 Gone
+   * naming /v1/ai/providers. They are removed in 4.0.0. /v1/ai/settings (the budget) is not one of them.
    */
   aiLegacySettingsRoutes: boolean;
   /**

@@ -203,7 +203,7 @@ await test('13. The generic delete refuses a credential record and names its own
   const d = await json('/v1/memory/openrouter.apikey', { method: 'DELETE', headers: auth(tokA) });
   assert(d.status === 403, `expected 403 for a credential record, got ${d.status} ${JSON.stringify(d.body)}`);
   assert(d.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${d.body.error?.code}`);
-  assert(String(d.body.error?.message).includes('DELETE /v1/openrouter/settings'), `the refusal names the route: ${d.body.error?.message}`);
+  assert(String(d.body.error?.message).includes('DELETE /v1/ai/providers/{id}'), `the refusal names the route: ${d.body.error?.message}`);
   const still = await json('/v1/openrouter/settings', { headers: auth(tokA) });
   assert(still.body.data?.hasApiKey === true, `the key is still stored: ${JSON.stringify(still.body.data)}`);
 });
@@ -214,7 +214,7 @@ await test('14. The generic restore refuses a credential record the owner remove
   const r = await json('/v1/memory/openrouter.apikey/restore', { method: 'POST', headers: auth(tokA) });
   assert(r.status === 403, `expected 403 for a credential record, got ${r.status} ${JSON.stringify(r.body)}`);
   assert(r.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${r.body.error?.code}`);
-  assert(String(r.body.error?.message).includes('PUT /v1/openrouter/settings'), `the refusal names the route: ${r.body.error?.message}`);
+  assert(String(r.body.error?.message).includes('PUT /v1/ai/providers/{id}/key'), `the refusal names the route: ${r.body.error?.message}`);
   const after = await json('/v1/openrouter/settings', { headers: auth(tokA) });
   assert(after.body.data?.hasApiKey === false, `the removed key came back: ${JSON.stringify(after.body.data)}`);
 });

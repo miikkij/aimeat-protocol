@@ -1460,23 +1460,18 @@
      */
     capabilities,
     /**
-     * Returns true if the user has AI configured (an OpenRouter key, or a keyless
-     * self-hosted provider). Cached 60 seconds. Apps should call this before showing
-     * "Use AI" buttons. Uses GET /v1/ai/available, which an app-grant token (a sandboxed
-     * app on the isolated app origin) can call with the ai:use scope — unlike the
-     * owner-only /v1/openrouter/settings. Falls back to that settings probe on older nodes.
+     * Returns true if a text call would find a provider for the user now (their own key, a keyless
+     * self-hosted provider, or the node's when it pays for them). Cached 60 seconds. Apps should
+     * call this before showing "Use AI" buttons. Uses GET /v1/ai/available, which an app-grant token
+     * (a sandboxed app on the isolated app origin) can call with the ai:use scope. The node that
+     * serves this lib answers that route, so there is no fallback.
      */
     async isAvailable() {
       const now = Date.now();
       if (_availCache && now - _availCache.t < 6e4) return _availCache.v;
       try {
         const r = await authFetch5("/v1/ai/available");
-        if (r && r.ok && r.data && typeof r.data.available === "boolean") {
-          _availCache = { v: r.data.available, t: now };
-          return r.data.available;
-        }
-        const s = await authFetch5("/v1/openrouter/settings");
-        const v = !!(s && s.ok && s.data && (s.data.hasApiKey || s.data.has_api_key));
+        const v = !!(r && r.ok && r.data && r.data.available === true);
         _availCache = { v, t: now };
         return v;
       } catch {

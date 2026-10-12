@@ -15,6 +15,7 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   v1.6.1 — 2026-10-12 — /v1/ai/settings is not among the removed routes: it holds the budget.
  *   v1.6.0 — 2026-10-12 — AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN (4.0.0): from it the legacy AI settings
  *     routes are off whatever AIMEAT_AI_LEGACY_SETTINGS_ROUTES says (Core 2026-11 HTTP-08).
  *   v1.5.0 — 2026-10-05 — aiNodeKeyWhenSpent, aiNodeKeyAccountDailyUsd, aiNodeKeyNodeDailyUsd: what the
@@ -35,8 +36,9 @@ import { getSoftwareVersion, versionAtLeast } from './utils/version.js';
 
 /**
  * The release in which the AI settings routes from before providers (/v1/openrouter/settings,
- * /models, /test, /v1/ai/settings) are gone: from it they answer 410 whatever
- * AIMEAT_AI_LEGACY_SETTINGS_ROUTES says (routes/openrouter.ts legacyAiSettingsRoute).
+ * /models, /test) are gone: from it they answer 410 whatever AIMEAT_AI_LEGACY_SETTINGS_ROUTES says
+ * (routes/openrouter.ts legacyAiSettingsRoute). GET and POST /v1/ai/settings stay: the daily budget,
+ * the per-app caps and the app allowlist have no successor under /v1/ai/providers.
  */
 export const AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN = '4.0.0';
 

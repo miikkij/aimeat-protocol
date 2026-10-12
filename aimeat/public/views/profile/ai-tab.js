@@ -3,15 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Profile tab: which providers answer, as which roles, under which model policy and within
- *   what daily budget. The reads (the owner's legacy connection, the AI budget settings, today's usage,
- *   the 30-day history, and the chat's own word on who pays for it) and the handlers (save the legacy
+ *   what daily budget. The reads (the owner's connection, the AI budget settings, today's usage,
+ *   the 30-day history, and the chat's own word on who pays for it) and the handlers (save the
  *   connection and key, test it, remove the key; the daily budget; per-app caps written on the rows).
+ *   The connection is the owner's provider `openrouter`, `lmstudio` or `custom`, read and written
+ *   through the provider routes by js/services/ai-connection.js.
  *   The providers, the routing and the model policy are ai/use-providers.js; the roles and the app
  *   roles' bindings are ai/use-roles.js. The render is ai/page.js. The older collapsible panel
  *   (openrouter-settings.js) stays for the notebook, which embeds it inline.
  * @structure AiSettingsTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.4.0 — 2026-10-12 — The connection section reads and writes the owner's provider through
+ *     /v1/ai/providers (js/services/ai-connection.js): node 4.0.0 removes /v1/openrouter/settings and
+ *     /v1/openrouter/test, which it called. The same section, words and controls on 3.x and 4.0.0.
  *   v1.3.0 — 2026-09-28 — AI roles (wish-tekoalyn-roolit): the six fixed model roles and the fine-tuning
  *     leave this page. A capability's model and fine-tuning are set on its provider, which the owner
  *     orders in the routing; what a model is used for is a role (ai/use-roles.js). The catalogue of
@@ -31,7 +36,10 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
-import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
+import { apiGet, apiPost } from '/js/api.js';
+import {
+  readConnection, saveConnection as saveConnectionTo, testConnection as testConnectionOf, removeConnection,
+} from '/js/services/ai-connection.js';
 import { renderPage } from './ai/page.js';
 import { x, rollup } from './ai/frame.js';
 import { useProviders } from './ai/use-providers.js';
@@ -42,6 +50,7 @@ const flashFor = (setter) => (text, error = false) => { setter({ text, error });
 export default function AiSettingsTab({ navigate, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [settings, setSettings] = useState(null);
+  const [current, setCurrent] = useState(null);
   const [aiSettings, setAiSettings] = useState(null);
   const [usage, setUsage] = useState(null);
   const [history, setHistory] = useState(null);
@@ -79,11 +88,11 @@ export default function AiSettingsTab({ navigate, showToast }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await apiGet('/v1/openrouter/settings');
-      const s = r?.data || {};
-      setSettings(s);
-      setConnState({ provider: s.provider || 'openrouter', baseUrl: s.baseUrl || '', apiKey: '' });
-    } catch (e) { swallowed('ai: settings', e); setSettings({}); }
+      const r = await readConnection();
+      setCurrent(r.current);
+      setSettings(r.settings);
+      setConnState({ provider: r.settings.provider, baseUrl: r.settings.baseUrl, apiKey: '' });
+    } catch (e) { swallowed('ai: connection', e); setSettings({}); }
     loadUsage();
     // The chat's own word on who pays for it: best effort, and the node's answer rather than a guess.
     try { const c = await apiGet('/v1/chat/status'); if (c?.ok !== false && c?.data) setChat(c.data); } catch (e) { swallowed('ai: chat status', e); }
@@ -98,19 +107,15 @@ export default function AiSettingsTab({ navigate, showToast }) {
   const setConn = (patch) => setConnState((c) => ({ ...c, ...patch }));
   const setProvider = (p) => setConnState((c) => ({ ...c, provider: p, baseUrl: p === 'lmstudio' ? 'http://localhost:1234/v1' : p === 'openrouter' ? '' : c.baseUrl }));
 
-  /** Every PUT carries the provider and its address, since the route resets them to OpenRouter otherwise. */
-  const put = (fields) => apiPut('/v1/openrouter/settings', { provider: conn.provider, baseUrl: conn.baseUrl, ...fields });
-
+  /** The connection is the owner's provider `openrouter`, `lmstudio` or `custom` (js/services/ai-connection.js). */
   const saveConnection = async () => {
     setBusy('conn');
     const flash = flashFor(setConnMsg);
     try {
-      const body = {};
-      if (conn.apiKey) body.apiKey = conn.apiKey;
-      const r = await put(body);
-      if (r?.ok === false) throw r;
-      const next = { ...settings, provider: conn.provider, baseUrl: conn.baseUrl, hasApiKey: settings.hasApiKey || !!conn.apiKey };
-      setSettings(next);
+      await saveConnectionTo(current, { provider: conn.provider, baseUrl: conn.baseUrl, apiKey: conn.apiKey });
+      const r = await readConnection();
+      setCurrent(r.current);
+      setSettings(r.settings);
       setConnState((c) => ({ ...c, apiKey: '' }));
       flash(conn.apiKey ? x('keySaved') : x('providerSaved'));
       pv.load();
@@ -123,24 +128,26 @@ export default function AiSettingsTab({ navigate, showToast }) {
     const flash = flashFor(setConnMsg);
     const started = Date.now();
     try {
-      const r = await apiPost('/v1/openrouter/test');
-      if (r?.ok === false) {
-        const spent = r.error?.code === 'QUOTA_EXHAUSTED' || r.error?.code === 'APP_QUOTA_EXHAUSTED';
-        flash((spent ? x('testBudgetSpent') : x('testFail')) + (r.error?.message ? ': ' + r.error.message : ''), true);
-      } else {
-        flash(x('testOk', { model: r?.data?.model || '', ms: Date.now() - started }));
-        toast(x('testOk', { model: r?.data?.model || '', ms: Date.now() - started }));
-        loadUsage();
-      }
-    } catch (e) { flash(`${x('testFail')}: ${errText(e)}`, true); }
+      const r = await testConnectionOf(current);
+      flash(x('testOk', { model: r.model, ms: Date.now() - started }));
+      toast(x('testOk', { model: r.model, ms: Date.now() - started }));
+      loadUsage();
+      pv.load();
+    } catch (e) {
+      // A spent budget is not a broken connection, and the head says which it was.
+      const spent = e?.code === 'QUOTA_EXHAUSTED' || e?.code === 'APP_QUOTA_EXHAUSTED';
+      const why = e?.response?.error?.message || e?.message || '';
+      flash((spent ? x('testBudgetSpent') : x('testFail')) + (why ? ': ' + why : ''), true);
+    }
     setBusy(false);
   };
 
   const removeKey = () => {
     confirm(x('confirmRemove'), async () => {
       try {
-        await apiDelete('/v1/openrouter/settings');
-        setSettings({ hasApiKey: false, provider: 'openrouter', baseUrl: '', autoRetry: true, maxRetries: 3 });
+        await removeConnection(current);
+        setCurrent(null);
+        setSettings({ hasApiKey: false, provider: 'openrouter', baseUrl: '' });
         setConnState({ provider: 'openrouter', baseUrl: '', apiKey: '' });
         toast(x('removedToast'));
         pv.load();
