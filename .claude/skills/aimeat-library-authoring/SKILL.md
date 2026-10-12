@@ -112,7 +112,7 @@ guest receives is missing from that table, so change the table in the same commi
   the caller (a row records `ext:<name>`), and a repeated `rowId` replaces the row. Do not reach a
   workspace through `ctx.fetch` or `ctx.memory`: the first cannot reach the node and the second is
   fenced to `ext:`. Many records go through `publishRecords` (up to 1000, with `dryRun` and
-  `createOnly`) and come out through `deleteRecords` (up to 2000, needs `memory:purge` on a token),
+  `createOnly`) and come out through `deleteRecords` (up to 2000, into the bin, needs `memory:delete` on a token),
   ONE call each: a run has 500 calls and 5 seconds by default, and `write` + `publish` per record
   cannot finish 500 records. A space that only grows (closed claims, finished tickets) is kept
   small with `archiveRecords` (up to 500, undoable, the organism's creator or an admin, and

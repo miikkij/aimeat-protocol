@@ -1975,9 +1975,9 @@
     },
     "src/services/rest-scope-gates-migration.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-10-12, the node's own read: the run-once marker under the node's system identity that says the REST scope gate grant has run. No content is shown to anyone."
+      "why": "Reviewed 2026-10-12, the node's own reads: the two run-once markers under the node's system identity that say each REST scope gate grant (packages:read, then agent:read) has run. No content is shown to anyone."
     },
     "src/services/schedule-write.ts": {
       "reads": {

@@ -87,21 +87,23 @@ export interface RestScopeGatesMigrationResult {
 
 /** Give the new words (packages:read) to every existing principal that could reach their routes, unless this node has run it. */
 export async function migrateRestScopeGatesOnce(storage: Storage, nodeId: string): Promise<RestScopeGatesMigrationResult> {
-  return grantWordsOnce(storage, nodeId, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS);
+  const system = `system@${nodeId}`;
+  if (await storage.getMemory(system, REST_SCOPE_GATES_KEY)) return { ran: false, agents: [], ecosystemApps: [] };
+  return grantWords(storage, system, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS);
 }
 
 /** Give agent:read to every existing principal that could reach the agent list, unless this node has run it. */
 export async function migrateAgentReadGrantOnce(storage: Storage, nodeId: string): Promise<RestScopeGatesMigrationResult> {
-  return grantWordsOnce(storage, nodeId, AGENT_READ_GRANT_KEY, AGENT_READ_WORDS);
+  const system = `system@${nodeId}`;
+  if (await storage.getMemory(system, AGENT_READ_GRANT_KEY)) return { ran: false, agents: [], ecosystemApps: [] };
+  return grantWords(storage, system, AGENT_READ_GRANT_KEY, AGENT_READ_WORDS);
 }
 
-/** One step: the words to every agent and approved ecosystem app with a recorded list, recorded under `key`. */
-async function grantWordsOnce(
-  storage: Storage, nodeId: string, key: string, words: ReadonlyArray<{ word: string; opens: string }>,
+/** One step, not yet run: the words to every agent and approved ecosystem app with a recorded list, recorded under `key`. */
+async function grantWords(
+  storage: Storage, system: string, key: string, words: ReadonlyArray<{ word: string; opens: string }>,
 ): Promise<RestScopeGatesMigrationResult> {
-  const system = `system@${nodeId}`;
   const result: RestScopeGatesMigrationResult = { ran: false, agents: [], ecosystemApps: [] };
-  if (await storage.getMemory(system, key)) return result;
 
   for (const agent of await storage.listAgents()) {
     const held = agent.defaultScopes;
