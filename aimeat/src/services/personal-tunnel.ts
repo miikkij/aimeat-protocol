@@ -13,6 +13,9 @@
  *   - setNotificationService(): wires optional mailbox-notification delivery
  *
  * @version-history
+ *   v1.3.0 — 2026-10-12 — mailbox_ack deletes only the items of the node that sends it
+ *     (ackMailboxItems); an id of another node's item is left in place and logged
+ *     (wish-henkil-kohtaisen-noden-mailbox-ack-poistaa-vain-oman-nodensa).
  *   v1.2.0 — 2026-09-26 — The frame and close handlers of a socket run as this node (runAsNode,
  *     utils/gaii.ts), also in a process that serves more than one node. One node per process in
  *     production, so nothing there changes.
@@ -224,17 +227,9 @@ export class TunnelManager {
         // The payload contains an array of item IDs that were received
         if (msg.payload) {
           try {
-            const itemIds: string[] = JSON.parse(msg.payload);
-            for (const id of itemIds) {
-              this.storage.deleteMailboxItem(id).catch(err => { logger.warn('handleConnection: ignore', { error: String(err) }); });
-            }
-            const stats3 = getStats();
-            if (stats3) {
-              for (let i = 0; i < itemIds.length; i++) stats3.incrementMailbox('delivered_total');
-            }
-            const prom3 = getPromMetrics();
-            if (prom3) prom3.mailboxDeliveredTotal.inc(itemIds.length);
-            logger.info('Mailbox items acknowledged and deleted', { nodeId, count: itemIds.length });
+            const parsed: unknown = JSON.parse(msg.payload);
+            const itemIds = Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+            void this.ackMailboxItems(nodeId, itemIds);
           } catch (err) { logger.warn('handleConnection: ignore parse errors', { error: String(err) }); }
         }
         break;
@@ -273,6 +268,32 @@ export class TunnelManager {
           type: msg.type,
         });
     }
+  }
+
+  /**
+   * Delete the acknowledged mailbox items that belong to the node sending the ack, and only those.
+   * The ack used to delete every id it named, so a node that learned another node's item id could
+   * take that node's work out of its mailbox. An id of another node's item is skipped and logged.
+   */
+  private async ackMailboxItems(nodeId: string, itemIds: string[]): Promise<void> {
+    let deleted = 0;
+    let foreign = 0;
+    for (const id of itemIds) {
+      try {
+        const item = await this.storage.getMailboxItem(id);
+        if (!item) continue;
+        if (item.personalNodeId !== nodeId) { foreign++; continue; }
+        if (await this.storage.deleteMailboxItem(id)) deleted++;
+      } catch (err) { logger.warn('mailbox_ack: one item not deleted', { nodeId, error: String(err) }); }
+    }
+    const stats3 = getStats();
+    if (stats3) {
+      for (let i = 0; i < deleted; i++) stats3.incrementMailbox('delivered_total');
+    }
+    const prom3 = getPromMetrics();
+    if (prom3 && deleted > 0) prom3.mailboxDeliveredTotal.inc(deleted);
+    if (foreign > 0) logger.warn('mailbox_ack named items of another node; they were left in place', { nodeId, count: foreign });
+    logger.info('Mailbox items acknowledged and deleted', { nodeId, count: deleted });
   }
 
   private async sendMailboxSummary(nodeId: string, ws: WebSocket): Promise<void> {
