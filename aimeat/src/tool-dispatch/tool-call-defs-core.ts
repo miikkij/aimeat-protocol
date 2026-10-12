@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-12 — aimeat_consent_grant sends `scope` only when given, as the catalog now marks it
+ *     optional (the node's default reach, Core 2026-11 AUTHZ-18).
  *   2026-10-11 — aimeat_datamap_get and aimeat_datamap_set move unchanged to
  *     tool-call-defs-data-map.ts (max-file-lines), where the two tie tools join them.
  *   2026-10-08 — aimeat_memory_write sends the `ai_provenance` declaration in the POST /v1/memory body,
@@ -622,9 +624,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
         // and POST /v1/consent takes `recipient` + `data_pattern`. This door required `recipient`
         // and `keys` — a pair nothing declares — so no consent was ever granted through it.
         handler: ({ client }, input) => {
+            // `scope` (the reach) is optional since 2026-10-12: the node picks the default by version.
+            const scope = optionalString(input, 'scope');
             const body: JsonObject = {
                 recipient: requiredString(input, 'target_gaii'),
-                scope: requiredString(input, 'scope'),
+                ...(scope !== undefined ? { scope } : {}),
                 data_pattern: requiredString(input, 'data_pattern'),
                 purpose: requiredString(input, 'purpose'),
             };
