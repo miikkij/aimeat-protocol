@@ -21,6 +21,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-10-13 — GET /v1/ai/settings also answers `limits.stt_max_mb`, the other limit the
+ *     removed /v1/openrouter/settings served, so 4.0.0 serves both.
  *   v1.x — 2026-10-12 — GET and POST /v1/ai/settings are no longer deprecated and stay in node 4.0.0:
  *     the daily budget, the per-app caps and the app allowlist have no other REST route. GET answers
  *     `limits.voice_msg_max_seconds`, which the inbox read from the removed /v1/openrouter/settings.
@@ -533,7 +535,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           per_app_daily_usd: null,
           max_tokens_ceiling: null,
         },
-        limits: { voice_msg_max_seconds: config.voiceMsgMaxSeconds },
+        limits: { voice_msg_max_seconds: config.voiceMsgMaxSeconds, stt_max_mb: config.sttMaxMb },
       }));
     });
 

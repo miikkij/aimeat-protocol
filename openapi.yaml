@@ -67548,7 +67548,8 @@ paths:
       description: |
         Return the owner's AI spend controls: daily budget, per-app quotas, an optional app
         allowlist, the node defaults, and the node's limits (`voice_msg_max_seconds`, the longest
-        voice message the recorder takes). Requires the `owner` role. Not removed in node 4.0.0:
+        voice message the recorder takes, and `stt_max_mb`, the largest audio file transcription
+        takes). Requires the `owner` role. Not removed in node 4.0.0:
         the budget, the quotas and the allowlist have no successor under /v1/ai/providers.
       security:
         - BearerAuth: []
@@ -67578,6 +67579,9 @@ paths:
                               voice_msg_max_seconds:
                                 type: integer
                                 description: The longest voice message this node takes, in seconds (AIMEAT_VOICE_MSG_MAX_SECONDS).
+                              stt_max_mb:
+                                type: integer
+                                description: The largest audio file transcription takes, in megabytes (AIMEAT_STT_MAX_MB).
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
