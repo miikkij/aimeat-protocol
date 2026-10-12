@@ -21,16 +21,23 @@
  *   apps publish and the person's workspaces (services/agent-draft-known.js). A definition names
  *   an app tool by its sku and a workspace by its id, and the page reads those back to show which
  *   apps and workspaces the agent uses before the person approves.
- * @structure WHEN_KINDS · DEFAULT_TOOLS · draftPrompt(tools, known) · parseDraft(text, opts) · draftAgent(sentence, opts) ·
- *   scopesFor(draft) · templateDraft(id) · ownAiRequest(sentence, connectorName) · cronFor(days, hhmm) ·
- *   startAgent(draft, choice) · approveProposal(id, name, draft, choice) · scheduleFor(name, draft, choice) ·
- *   runtimeToolMenu(agents) · runtimeTools(agents) · readHomeAgents(limit) · moveAgent(name, connectorId) ·
- *   setAgentStopped(name, stop)
+ * @structure WHEN_KINDS · DEFAULT_TOOLS · draftPrompt(tools, known, features) · parseDraft(text, opts) · draftAgent(sentence, opts) ·
+ *   scopesFor(draft, choice) · templateDraft(id) · ownAiRequest(sentence, connectorName) · cronFor(days, hhmm) ·
+ *   definitionFor(draft, when, watch) · startAgent(draft, choice) · approveProposal(id, name, draft, choice) ·
+ *   scheduleFor(name, draft, choice) · runtimeMenu(agents) · runtimeToolMenu(agents) · runtimeTools(agents) ·
+ *   readHomeAgents(limit) · moveAgent(name, connectorId) · setAgentStopped(name, stop)
  * @usage
  *   const tools = await runtimeToolMenu(online);
  *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.5.0 — 2026-10-12 — An agent can work when a record is published in a workspace ("records").
+ *     runtimeMenu() reads the runtime's `features` beside its tools; the draft prompt describes the
+ *     kind only when the runtime names `record_spaces` (additive: the text follows what was there);
+ *     a draft carries `watch`, the workspace the model named; the definition gets `record_spaces`
+ *     and "records" in `listen_for` from what the person chose on the form, and loses both for any
+ *     other "when"; such an agent is proposed with organism:read
+ *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.4.0 — 2026-10-12 — The draft prompt gets one line per tool id, the tools the person's apps
  *     publish and the person's workspaces. Additive to the prompt: the text of v1.3.1 is unchanged
  *     and the new text follows it. The draft carries `named`, the apps and workspaces its
@@ -58,10 +65,11 @@ import { buildTemplate } from '/views/profile/agents/crew-templates.js';
 import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
 import {
   DEFAULT_TOOL_MENU, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
+  RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces,
 } from '/js/services/agent-draft-known.js';
 
 /** When an agent works, as the pages offer it. */
-export const WHEN_KINDS = ['ask', 'clock', 'talk', 'always'];
+export const WHEN_KINDS = ['ask', 'clock', 'talk', 'always', 'records'];
 
 /**
  * The tool names a definition may use when no runtime could be asked (agent-draft-known.js
@@ -88,10 +96,12 @@ const menuOf = (tools) => (Array.isArray(tools) ? tools : []).map((x) => (typeof
  * The system instructions for the one-shot draft. English: it is read by a model. `tools` is the
  * tools a definition may use, as ids or as { id, purpose }; `known` is the person's apps with
  * their tools and the person's workspaces. What is known is added after the instructions.
+ * `features` is what the runtime says it honours beyond its tools (runtimeMenu): the kind "records"
+ * is described only to a model whose answer the runtime can run.
  */
-export function draftPrompt(tools, known) {
+export function draftPrompt(tools, known, features) {
   const menu = menuOf(tools);
-  return draftInstructions(menu.map((x) => x.id)) + knownBlock(menu, known);
+  return draftInstructions(menu.map((x) => x.id)) + knownBlock(menu, known) + recordsBlock(known, features);
 }
 
 function draftInstructions(tools) {
@@ -139,11 +149,14 @@ const cronOf = (v) => (typeof v === 'string' && v.trim().split(/\s+/).length ===
  *
  * With `known` (the person's apps and workspaces) the draft carries `named`, the ones its
  * definition names, and a definition that names one has a member that can reach it; `offered` is
- * the tool ids the runtime resolves.
+ * the tool ids the runtime resolves. With `features` naming the runtime's record feature, a draft
+ * may work on records: its `watch` is then the workspace the model named, one of the person's own.
+ * A "records" answer that names no such workspace, or comes for a runtime without the feature, is
+ * a draft that works when asked.
  * @param {string} text
- * @param {{ known?: Known, offered?: Set<string> | string[] }} [opts]
+ * @param {{ known?: Known, offered?: Set<string> | string[], features?: string[] }} [opts]
  */
-export function parseDraft(text, { known, offered } = {}) {
+export function parseDraft(text, { known, offered, features } = {}) {
   const raw = firstObject(text);
   const written = raw?.crew_def;
   const named = namedIn(written, known);
@@ -156,7 +169,8 @@ export function parseDraft(text, { known, offered } = {}) {
     && tasks.every((x) => keys.has(x?.agent));
   const name = String(raw?.name || '').trim().toLowerCase();
   if (!runs || !NAME_SHAPE.test(name)) throw new Error('BAD_DRAFT');
-  const kind = ['ask', 'clock', 'talk'].includes(raw?.when?.kind) ? raw.when.kind : 'ask';
+  const watch = Array.isArray(features) && features.includes(RECORDS_FEATURE) ? watchedPlace(raw?.when, known) : null;
+  const kind = watch ? 'records' : ['ask', 'clock', 'talk'].includes(raw?.when?.kind) ? raw.when.kind : 'ask';
   const cron = cronOf(raw?.when?.cron);
   return {
     name,
@@ -165,6 +179,8 @@ export function parseDraft(text, { known, offered } = {}) {
     does: (Array.isArray(raw.does) ? raw.does : []).map((s) => String(s).trim()).filter(Boolean).slice(0, 4),
     when: kind === 'clock' && !cron ? 'ask' : kind,
     cron,
+    // The workspace a records draft watches. Its spaces are the person's choice on the page.
+    watch,
     // A definition that writes a workspace is not a reader, whatever the model answered for reach.
     reach: raw.reach === 'readonly' && !writesWorkspace(def) ? 'readonly' : 'standard',
     named,
@@ -181,11 +197,14 @@ const writesWorkspace = (def) => (Array.isArray(def?.agents) ? def.agents : []).
 /**
  * The permissions a draft's agent is proposed with: the reach the person chose, and what the
  * definition's tools ask beyond it. The page shows the same list before the person approves.
+ * `choice` is what the person chose on the form: an agent that works on a workspace's records
+ * (`when: 'records'`) reads that workspace, whatever its tools are, because the node sends a record
+ * only to an agent that may read the workspace it is in.
  */
-export function scopesFor(draft) {
+export function scopesFor(draft, choice) {
   const base = SCOPE_TEMPLATES[draft?.reach] ?? SCOPE_TEMPLATES.standard;
   const def = draft?.reach === 'readonly' ? readOnlyTools(draft?.crewDef) : draft?.crewDef;
-  return [...new Set([...base, ...extraScopes(def)])];
+  return [...new Set([...base, ...extraScopes(def), ...(choice?.when === 'records' ? ['organism:read'] : [])])];
 }
 
 /** The model's offer as one entry of a definition's `offers`, or null when it wrote none. */
@@ -205,21 +224,22 @@ export function offerShown(crewDef) {
 /**
  * Ask the person's own model for a draft. Throws an Error with `code`: NO_API_KEY when no model is
  * set here, the node's own code for a spent budget, or NO_JSON / BAD_DRAFT for an answer that
- * cannot be used. `tools` is the tools a definition may use (runtimeToolMenu), `known` the
- * person's apps with their tools and the person's workspaces (readTieChoices with tools).
+ * cannot be used. `tools` is the tools a definition may use and `features` what the runtime honours
+ * beyond them (runtimeMenu), `known` the person's apps with their tools and the person's
+ * workspaces (readTieChoices with tools).
  * @param {string} sentence
- * @param {{ tools?: Array<string | { id: string, purpose: string }>, known?: Known }} [opts]
+ * @param {{ tools?: Array<string | { id: string, purpose: string }>, known?: Known, features?: string[] }} [opts]
  */
-export async function draftAgent(sentence, { tools = DEFAULT_TOOL_MENU, known } = {}) {
+export async function draftAgent(sentence, { tools = DEFAULT_TOOL_MENU, known, features } = {}) {
   const menu = menuOf(tools);
   const resp = await api('/v1/ai/complete', {
     method: 'POST',
-    body: JSON.stringify({ prompt: sentence, systemPrompt: draftPrompt(menu, known), modelRole: 'execution', app_id: 'home-agents' }),
+    body: JSON.stringify({ prompt: sentence, systemPrompt: draftPrompt(menu, known, features), modelRole: 'execution', app_id: 'home-agents' }),
     timeoutMs: 300_000,
     retries: 0,
   });
   if (resp?.ok === false) { const e = new Error(resp?.error?.message || 'AI call failed'); e.code = resp?.error?.code; throw e; }
-  try { return parseDraft(resp?.data?.content, { known, offered: new Set(menu.map((x) => x.id)) }); }
+  try { return parseDraft(resp?.data?.content, { known, offered: new Set(menu.map((x) => x.id)), features }); }
   catch (err) { const e = new Error(err.message); e.code = err.message; throw e; }
 }
 
@@ -262,13 +282,18 @@ function offersUnder(crewDef, name) {
   return { offers: crewDef.offers.map((o) => (o && typeof o === 'object' && o.id === drafted ? { ...o, id: name } : o)) };
 }
 
-/** The definition a draft starts with, shaped by when it works. */
-function definitionFor(draft, when) {
+/**
+ * The definition a draft starts with, shaped by when it works. `watch` is what an agent that works
+ * on records watches: { organism_id, workspace_id, spaces }. For every other "when" the definition
+ * names no space and does not listen for records, whatever the model wrote.
+ */
+export function definitionFor(draft, when, watch) {
   // An agent the person lets read only is given the read tool for a workspace, never the write tool.
   const written = draft.crewDef && draft.reach === 'readonly' ? readOnlyTools(draft.crewDef) : draft.crewDef;
-  const def = written
+  const named = written
     ? { ...written, agent_name: draft.name, ...offersUnder(written, draft.name) }
     : buildTemplate(draft.template || 'researcher', draft.name);
+  const def = withRecordSpaces(named, when === 'records' ? watch : null);
   const hears = new Set(Array.isArray(def.listen_for) && def.listen_for.length ? def.listen_for : ['tasks']);
   if (when === 'talk' || when === 'always') { hears.add('messages'); hears.add('dms'); }
   // AN AGENT THAT HEARS A MESSAGE MUST BE ABLE TO ANSWER IT. The `dm` tool is what sends a reply, and
@@ -314,7 +339,8 @@ export function scheduleFor(name, draft, choice) {
 
 /**
  * Make the agent a draft describes: propose it, then approve it, as the person pressing.
- * `choice`: { when, cron, connector }.
+ * `choice`: { when, cron, connector, watch }, where `watch` is what an agent that works on records
+ * watches: { organism_id, workspace_id, spaces }.
  */
 export async function startAgent(draft, choice) {
   const always = choice.when === 'always';
@@ -322,12 +348,12 @@ export async function startAgent(draft, choice) {
     name: draft.name,
     display_name: draft.displayName || draft.name,
     purpose: draft.purpose,
-    scopes: scopesFor(draft),
+    scopes: scopesFor(draft, choice),
     // A task-runner's task starts without asking the owner each time, which is what an agent that
-    // works on a clock or answers people needs.
+    // works on a clock, answers people or works on records needs.
     mode: 'task-runner',
     run_mode: always ? 'resident' : 'spawn',
-    crew_def: definitionFor(draft, choice.when),
+    crew_def: definitionFor(draft, choice.when, choice.watch),
     ...(choice.connector ? { connector: choice.connector } : {}),
   });
   const id = proposed?.data?.proposal?.id;
@@ -336,21 +362,30 @@ export async function startAgent(draft, choice) {
 }
 
 /**
- * The tools the person's runtime resolves, each with the runtime's own words for what it is for,
- * asked from the first connected agent of theirs. Falls back to DEFAULT_TOOL_MENU when nobody
- * answers within a few seconds: a draft is worth more now than a longer tool list later.
+ * What the person's runtime offers, asked from the first connected agent of theirs that answers:
+ * `tools`, the tools it resolves with its own words for what each is for, and `features`, what it
+ * says it honours beyond them. Falls back to DEFAULT_TOOL_MENU and no feature when nobody answers
+ * within a few seconds: a draft is worth more now than a longer tool list later, and a feature
+ * nobody named is not offered.
  */
-export async function runtimeToolMenu(agentNames) {
+export async function runtimeMenu(agentNames) {
   for (const name of (agentNames ?? []).slice(0, 2)) {
     try {
       const resp = await api(`/v1/agents/${encodeURIComponent(name)}/crew/menu`, { timeoutMs: 8_000, retries: 0 });
       const rows = (resp?.data?.tools ?? [])
         .filter((x) => typeof x?.id === 'string' && !x.id.includes(':') && !x.id.startsWith('exchange_'))
         .map((x) => ({ id: x.id, purpose: typeof x.purpose === 'string' ? x.purpose : '' }));
-      if (resp?.data?.source === 'runtime' && rows.length) return rows;
-    } catch (err) { swallowed('agent-draft: runtime tools', err); }
+      if (resp?.data?.source === 'runtime' && rows.length) {
+        return { tools: rows, features: (resp.data.features ?? []).filter((f) => typeof f === 'string') };
+      }
+    } catch (err) { swallowed('agent-draft: runtime menu', err); }
   }
-  return DEFAULT_TOOL_MENU;
+  return { tools: DEFAULT_TOOL_MENU, features: [] };
+}
+
+/** The tools of runtimeMenu(), for a caller that asks nothing else. */
+export async function runtimeToolMenu(agentNames) {
+  return (await runtimeMenu(agentNames)).tools;
 }
 
 /** The ids of runtimeToolMenu(), for a caller that needs the names only. */

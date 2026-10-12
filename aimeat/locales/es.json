@@ -11157,7 +11157,8 @@
         "clock": "Según el reloj",
         "clockAt": "Según el reloj, {words}",
         "talk": "Cuando alguien le escribe",
-        "always": "Siempre encendido"
+        "always": "Siempre encendido",
+        "records": "Cuando llega algo nuevo a un espacio de trabajo"
       },
       "state": {
         "waits": "espera una computadora",
@@ -11227,7 +11228,26 @@
       "usesApps": "Aplicaciones cuyas herramientas usa",
       "readsPlaces": "Espacios de trabajo que lee",
       "writesPlaces": "Espacios de trabajo que lee y en los que escribe",
-      "inOrganism": "En el organismo {organism}"
+      "inOrganism": "En el organismo {organism}",
+      "whenRecordsHint": "Recibe una tarea cada vez que se publica un registro en los espacios que elijas de un espacio de trabajo.",
+      "whenRecordsHintProposal": "Recibe una tarea cada vez que se publica un registro en los espacios que nombra la propuesta.",
+      "whenRecordsOff": "El programa que ejecuta los agentes en esta computadora todavía no hace esto, o ninguno de sus agentes está conectado ahora.",
+      "whenRecordsOffPlaces": "Todavía no estás en un organismo que tenga un espacio de trabajo.",
+      "whenRecordsOffProposal": "Esta propuesta no nombra ningún espacio que el agente deba seguir.",
+      "badWatchComputer": "La computadora que elegiste no puede iniciar un agente desde un espacio de trabajo. Elige otra computadora u otra opción en «Cuándo trabaja».",
+      "badWatchPlace": "Elige el espacio de trabajo que sigue el agente.",
+      "badWatchSpaces": "Elige al menos un espacio del espacio de trabajo para que el agente lo siga."
+    },
+    "agentWatch": {
+      "placeLabel": "¿Qué espacio de trabajo sigue?",
+      "placePick": "Elige un espacio de trabajo",
+      "inOrganism": "En el organismo {organism}",
+      "spacesLabel": "¿Qué espacios sigue?",
+      "spacesHint": "Recibe una tarea por cada registro que se publique allí después de que el agente se inicie. Los registros que ya están allí quedan como están.",
+      "spacesNone": "Este espacio de trabajo no tiene ningún espacio cuyos registros nuevos puedan iniciar un agente. Un registro publicado inicia uno; una fila y una página de documento no.",
+      "spacesFailed": "No se pudieron leer los espacios de este espacio de trabajo. Elige el espacio de trabajo otra vez.",
+      "retire": "Más adelante puedes retirar el agente de este espacio de trabajo: abre su configuración y la pestaña Contratos. Desde entonces deja de trabajar en este espacio de trabajo.",
+      "watches": "Qué sigue"
     },
     "agentPage": {
       "signInTitle": "Tu agente",

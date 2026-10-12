@@ -8,6 +8,7 @@
  *   re-assembled in order by definitions.ts. The descriptions are the canonical text every surface
  *   shows (descriptionFor()).
  * @version-history
+ *   2026-10-12 — aimeat_crew_menu's description names `features` and what `record_spaces` in it means.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-10-02 — aimeat_crew_llm_set: the {kind:'node', role?} choice, and the rules a
@@ -97,7 +98,7 @@ export const crewTools = [
     },
     {
         name: 'aimeat_crew_menu',
-        description: "What an agent's RUNTIME actually offers, asked rather than guessed: the tool names its interpreter resolves, the model profiles the machine it runs on can reach, the models behind them, and which model is chosen for this agent right now. Read this before writing a definition's `tools` — the fixed list in aimeat_crew_publish's own description is this node's copy and has been two tools behind the runtime. `source` says who answered: 'runtime' (the agent, over the tunnel), 'catalog' (it is offline, this is what it published at its last start), 'none' (nobody has ever said). `choice.scope` is 'agent' when this agent has its own and 'default' when it is the owner's, and null means neither, so the machine's own configuration decides.",
+        description: "What an agent's RUNTIME actually offers, asked rather than guessed: the tool names its interpreter resolves, the model profiles the machine it runs on can reach, the models behind them, and which model is chosen for this agent right now. Read this before writing a definition's `tools` — the fixed list in aimeat_crew_publish's own description is this node's copy and has been two tools behind the runtime. `source` says who answered: 'runtime' (the agent, over the tunnel), 'catalog' (it is offline, this is what it published at its last start), 'none' (nobody has ever said). `choice.scope` is 'agent' when this agent has its own and 'default' when it is the owner's, and null means neither, so the machine's own configuration decides. `features` names what the runtime honours beyond its tools: `record_spaces` means a definition may name workspace spaces in `record_spaces`, and each record published in one becomes a task for the agent; a runtime that does not list it ignores that field.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: "Read the Runtime's Menu", readOnlyHint: true, openWorldHint: false },

@@ -519,6 +519,40 @@ console.log('\n=== Agent ties: apps, the workplace, the first run, the build ins
         assert((withTools.body.data.places as any[]).length === 1, 'the places changed with include=tools');
     });
 
+    // FAILED FIRST, on 2026-10-12: there was no such read (404 for the owner too). The page that makes
+    // an agent which is woken by a workspace's records has to offer the spaces whose records wake it.
+    await test('the spaces read lists the record spaces an agent can watch in one workspace: never a row space or a document space, and nothing to an account outside the organism', async () => {
+        const made = await json(`/v1/organisms/${orgId}/workspaces`, {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ name: 'Support', manifest: {
+                manifestVersion: '1.0', name: 'Support', kind: 'project', status: 'active',
+                objectTypes: [
+                    { name: 'request', description: 'What a customer asks.', schemaRef: 'schema:request@1', namespace: 'shared.support-requests', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: false, mode: 'records' },
+                    // A row space says mode "records" too. A row wakes nobody, so it is not offered.
+                    { name: 'event', schemaRef: 'schema:event@1', namespace: 'shared.events', backing: 'rows', writeRole: 'member', mode: 'records' },
+                    { name: 'notes', schemaRef: 'schema:notes@1', namespace: 'shared.notes', backing: 'memory', writeRole: 'member', mode: 'document' },
+                ],
+            } }),
+        });
+        assert(made.status === 201 && typeof made.body?.data?.ws === 'string', `workspace: ${made.status} ${JSON.stringify(made.body?.error)}`);
+        const support = made.body.data.ws as string;
+        const q = (org: string, w: string) => `/v1/home/agents/choices/spaces?organism_id=${encodeURIComponent(org)}&workspace_id=${encodeURIComponent(w)}`;
+
+        const mine = await json(q(orgId, support), { headers: authA });
+        assert(mine.status === 200, `status ${mine.status}: ${JSON.stringify(mine.body?.error)}`);
+        assert(JSON.stringify(mine.body.data.spaces) === JSON.stringify([{ name: 'request', namespace: 'shared.support-requests', description: 'What a customer asks.' }]),
+            `spaces: ${JSON.stringify(mine.body.data.spaces)}`);
+
+        const theirs = await json(q(orgId, support), { headers: authB });
+        assert(theirs.status === 404 && theirs.body.error?.code === 'NOT_FOUND', `another account: ${theirs.status} ${theirs.body.error?.code}`);
+        const unknown = await json(q(orgId, 'ws-no-such'), { headers: authA });
+        assert(unknown.status === 404 && unknown.body.error?.code === 'NOT_FOUND', `unknown workspace: ${unknown.status} ${unknown.body.error?.code}`);
+        const bare = await json('/v1/home/agents/choices/spaces', { headers: authA });
+        assert(bare.status === 400 && bare.body.error?.code === 'INVALID_INPUT', `no workspace named: ${bare.status} ${bare.body.error?.code}`);
+        const agentToken = await json(q(orgId, support), { headers: auth(writer.token) });
+        assert(agentToken.status === 403, `an agent token: ${agentToken.status}`);
+    });
+
     await test('MCP: an agent of the owner says where a sibling\'s work goes, and takes it back', async () => {
         const call = await mcpSession(writer.token);
         const set = await call('aimeat_agent_workplace_set', { target_agent_name: 'quiet', organism_id: orgId, workspace_id: WS });

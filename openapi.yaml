@@ -14800,7 +14800,24 @@ paths:
                                 name: { type: string }
                                 display_name: { type: string }
                                 description: { type: string }
-                                when: { type: string, enum: [ask, clock, talk, always] }
+                                when:
+                                  type: string
+                                  enum: [ask, clock, talk, always, records]
+                                  description: |
+                                    Decided in this order: `always` for a resident agent, `clock` when an
+                                    enabled schedule names it, `records` when its crew definition names
+                                    workspace spaces it watches, `talk` when the definition listens for
+                                    messages or DMs, else `ask`.
+                                watches:
+                                  type: array
+                                  nullable: true
+                                  description: The workspace spaces whose published records give the agent work, as its crew definition names them in `record_spaces`. Empty when it names none. Null when the definition was not read, as for `hears_messages`.
+                                  items:
+                                    type: object
+                                    properties:
+                                      organism_id: { type: string }
+                                      ws: { type: string }
+                                      space: { type: string, description: The space's namespace. }
                                 hears_messages:
                                   type: boolean
                                   nullable: true
@@ -14937,6 +14954,61 @@ paths:
                                         type: string
                                         description: The tool's own description, cut at 300 characters.
         '403': { description: Not the account holder in person }
+
+  /v1/home/agents/choices/spaces:
+    get:
+      operationId: getHomeAgentWatchableSpaces
+      summary: The spaces of one workspace an agent can watch
+      description: |
+        The record spaces of one workspace whose published records wake an agent that watches
+        them: each with its name, its namespace and its description. The namespace is what a crew
+        definition names in `record_spaces[].space`.
+
+        A row space is not listed, although its manifest also says `mode: records`: an appended
+        row wakes nobody. A document space is not listed either.
+
+        A workspace the caller may not read answers 404, like one that does not exist.
+
+        Requires the account holder's own session.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: organism_id
+          in: query
+          required: true
+          schema: { type: string }
+        - name: workspace_id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The watchable spaces
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          organism_id: { type: string }
+                          workspace_id: { type: string }
+                          spaces:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                namespace: { type: string }
+                                description: { type: string }
+        '400': { description: organism_id or workspace_id is missing }
+        '403': { description: Not the account holder in person }
+        '404': { description: No such workspace, or the caller may not read it }
 
   /v1/agents/{name}/workplace:
     put:
@@ -57495,6 +57567,15 @@ paths:
                                 purpose: { type: string }
                           profiles: { type: array, items: { type: string } }
                           models: { type: array, items: { type: object } }
+                          features:
+                            type: array
+                            items: { type: string }
+                            description: |
+                              What the runtime says it honours beyond its tools, by name.
+                              `record_spaces`: it subscribes the workspace spaces a definition names
+                              in `record_spaces` and makes a task of each record published there.
+                              Empty when the answer is not from a live runtime, or the runtime names
+                              none; a caller offers a definition field only when its name is here.
                           choice:
                             type: object
                             nullable: true

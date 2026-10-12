@@ -94,6 +94,9 @@ function runtimeReply(f: any): { ok: boolean; result: unknown } {
           profiles: ['content', 'coding'],
           models: [{ label: 'openrouter:m/one', type: 'openrouter', id: 'm/one', api_key_env: 'OPENROUTER_API_KEY' }],
         },
+        // What this runtime honours beyond its tools. Two entries that are not names, to see that
+        // only plain strings reach the page.
+        features: ['record_spaces', 7, ''],
       },
     };
   }
@@ -355,6 +358,10 @@ await test("22. The menu comes from the RUNTIME, not from this node's copy of it
   assert(ids.includes('taikasauva'), `the runtime's own names should come through: ${ids.join(',')}`);
   assert(r.body.data.profiles.includes('coding'), "the machine's profiles come with it");
   assert(r.body.data.choice === null, 'nothing is chosen yet');
+  // FAILED FIRST, on 2026-10-12: the menu was built field by field and dropped what the runtime
+  // said it honours, so a page could not tell a runtime that subscribes a definition's
+  // `record_spaces` from one that ignores the field.
+  assert(JSON.stringify(r.body.data.features) === '["record_spaces"]', `features: ${JSON.stringify(r.body.data.features)}`);
 });
 
 await test("23. A choice is stored, read back, and is the agent's own", async () => {
@@ -443,6 +450,9 @@ await test("28. The menu of an offline agent is that agent's own catalogue", asy
   assert(r.body.data.source === 'catalog', `expected the published catalogue, got ${r.body.data.source}`);
   assert(JSON.stringify(r.body.data.profiles) === '["from-the-agent"]', `profiles ${JSON.stringify(r.body.data.profiles)}`);
   assert(r.body.data.models[0]?.id === 'm/two', `models ${JSON.stringify(r.body.data.models)}`);
+  // A runtime that does not answer is read as honouring nothing: the catalogue it published says
+  // which models its computer reaches, not what its code does.
+  assert(JSON.stringify(r.body.data.features) === '[]', `features of an agent that is away: ${JSON.stringify(r.body.data.features)}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

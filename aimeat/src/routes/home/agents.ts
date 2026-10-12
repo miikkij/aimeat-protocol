@@ -17,6 +17,8 @@
  * @structure registerHomeAgentsRoutes(router, ctx)
  * @usage registerHomeAgentsRoutes(router, ctx);
  * @version-history
+ *   v1.3.0 — 2026-10-12 — GET /v1/home/agents/choices/spaces: the record spaces of one workspace
+ *     an agent can watch.
  *   v1.2.0 — 2026-10-12 — GET /v1/home/agents/choices?include=tools: each app with the tools an
  *     agent of the person can call on it.
  *   v1.1.0 — 2026-10-11 — PUT and DELETE /v1/agents/:name/workplace: where an agent's finished
@@ -30,7 +32,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { emitChange } from '../../services/event-bus.js';
 import { readHomeAgents } from '../../services/home-agents.js';
 import { setWorkplace, clearWorkplace, workplaceView, type WorkplaceCaller } from '../../services/agent-workplace.js';
-import { readTieChoices } from '../../services/agent-ties.js';
+import { readTieChoices, readWatchableSpaces } from '../../services/agent-ties.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
 /** How many workers one read lists unless the page asks, and the most it may ask for. */
@@ -58,6 +60,22 @@ export function registerHomeAgentsRoutes(router: Router, ctx: HomeRouteCtx): voi
     router.get('/v1/home/agents/choices', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
         const include = typeof req.query.include === 'string' ? req.query.include.split(',') : [];
         res.json(success(config.nodeId, await readTieChoices({ config, storage }, req.auth!.owner, { tools: include.includes('tools') })));
+    });
+
+    // GET /v1/home/agents/choices/spaces?organism_id=&workspace_id= — the spaces of one workspace an
+    // agent can watch: the record spaces whose published records wake it. A read of its own and not
+    // a part of the choices above, because the page asks it each time the person picks a workspace.
+    // A workspace the person cannot read answers like one that does not exist.
+    router.get('/v1/home/agents/choices/spaces', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
+        const organismId = typeof req.query.organism_id === 'string' ? req.query.organism_id.trim() : '';
+        const workspaceId = typeof req.query.workspace_id === 'string' ? req.query.workspace_id.trim() : '';
+        if (!organismId || !workspaceId) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name the workspace with organism_id and workspace_id.'));
+            return;
+        }
+        const spaces = await readWatchableSpaces({ config, storage }, req.auth!.owner, organismId, workspaceId);
+        if (!spaces) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such workspace.')); return; }
+        res.json(success(config.nodeId, { organism_id: organismId, workspace_id: workspaceId, spaces }));
     });
 
     /** Who is asking, in the terms services/agent-workplace.ts takes. */

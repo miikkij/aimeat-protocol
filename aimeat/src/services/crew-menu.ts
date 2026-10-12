@@ -37,6 +37,10 @@
  * @structure CrewMenu · crewMenu() · readLlmChoice() · ownerDefaultIsNode() · effectiveLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.6.0 — 2026-10-12 — The menu carries `features`, the names the runtime says it honours beyond
+ *     its tools (crewaimeat sends `record_spaces`). The home's new-agent page offers "when something
+ *     new arrives in a workspace" only for a runtime that names it
+ *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
  *   v1.5.0 — 2026-10-02 — ownerDefaultIsNode(): whether the owner's crews think through the node by
  *     default, read when an agent is proposed so the proposal carries ai:use.
  *   v1.4.0 — 2026-10-02 — effectiveLlmChoice(): thinking through the node is the default for an agent
@@ -82,6 +86,13 @@ export interface CrewMenu {
   tools: CrewMenuTool[];
   profiles: string[];
   models: Array<Record<string, unknown>>;
+  /**
+   * What the runtime says it honours beyond its tools, as plain names: `record_spaces` means it
+   * subscribes the spaces a definition names in `record_spaces` and makes a task of each record
+   * published there. Empty when the runtime did not answer or sent none: a field an older runtime
+   * ignores must not be offered as if it worked, so absence reads as "does not".
+   */
+  features: string[];
   /** What is chosen for this agent now, and whether it is the agent's own or the owner's default. */
   choice: { scope: 'agent' | 'default'; value: Record<string, unknown> } | null;
   /** What the runtime uses: the stored choice, this node's default, or the machine's (effectiveLlmChoice). */
@@ -100,6 +111,11 @@ export interface EffectiveLlmChoice {
 }
 
 interface Deps { config: AimeatConfig; storage: Storage }
+
+/** The most feature names a runtime's menu is read for, and the longest one. The names come from
+ *  the runtime, and the answer goes to a page. */
+const FEATURES_MAX = 32;
+const FEATURE_NAME_MAX = 64;
 
 /** The longest AI role id a `node` choice may name; /v1/llm refuses a longer one (readCallRole). */
 const ROLE_MAX_CHARS = 300;
@@ -324,7 +340,7 @@ export async function crewMenu(deps: Deps, caller: CrewCaller, identifier: strin
     deps.config, target.agent, 'crew.menu', {}, caller.principal, deps.config.connectTunnelRequestTimeoutMs,
   );
   if (asked.ok) {
-    const r = (asked.result ?? {}) as { tools?: unknown; llm?: { profiles?: unknown; models?: unknown } };
+    const r = (asked.result ?? {}) as { tools?: unknown; features?: unknown; llm?: { profiles?: unknown; models?: unknown } };
     const tools = Array.isArray(r.tools)
       ? r.tools.filter((t): t is CrewMenuTool => !!t && typeof (t as CrewMenuTool).id === 'string')
       : [];
@@ -336,6 +352,9 @@ export async function crewMenu(deps: Deps, caller: CrewCaller, identifier: strin
           tools,
           profiles: Array.isArray(r.llm?.profiles) ? r.llm!.profiles as string[] : [],
           models: Array.isArray(r.llm?.models) ? r.llm!.models as Array<Record<string, unknown>> : [],
+          features: Array.isArray(r.features)
+            ? r.features.filter((f): f is string => typeof f === 'string' && f.trim().length > 0 && f.length <= FEATURE_NAME_MAX).slice(0, FEATURES_MAX)
+            : [],
           choice,
           effective,
         },
@@ -354,6 +373,8 @@ export async function crewMenu(deps: Deps, caller: CrewCaller, identifier: strin
       tools: [],
       profiles: Array.isArray(cat?.profiles) ? cat!.profiles as string[] : [],
       models: Array.isArray(cat?.models) ? cat!.models as Array<Record<string, unknown>> : [],
+      // The catalogue says which models the computer reaches, not what the runtime's code does.
+      features: [],
       choice,
       effective,
     },

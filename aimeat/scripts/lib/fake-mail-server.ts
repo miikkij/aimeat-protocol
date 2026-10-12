@@ -16,6 +16,8 @@
  * @structure startFakeMailServer(port) · decideAnswer · chatAnswer · the CLI entry (`tsx scripts/lib/fake-mail-server.ts <port>`)
  * @usage node --import tsx scripts/lib/fake-mail-server.ts 40703
  * @version-history
+ *   v1.4.0 — 2026-10-12 — The agent-draft stand-in answers with the kind "records" when the prompt
+ *     describes it and the sentence says something arrives in a workspace the prompt lists.
  *   v1.3.0 — 2026-10-12 — The agent-draft stand-in names a workspace or an app tool the prompt
  *     lists when the sentence says its name, so the rows for apps and workspaces show in the sandbox.
  *   v1.2.0 — 2026-10-10 — The completion stand-in also answers the home's agent-draft prompt, so
@@ -121,9 +123,23 @@ function agentDraft(body: Record<string, unknown>): string {
   const says = (name: string) => name.length > 2 && sentence.toLowerCase().includes(name.toLowerCase());
   const uses: string[] = [];
   const tools: string[] = [];
+  let firstPlace = '';
   for (const m of system.matchAll(/^- .+ \/ (.+) \[([^\]]+)\]$/gm)) {
-    if (says(m[1]!)) { uses.push(`Read the workspace "${m[1]}" (${m[2]}) and write what you find back into it.`); tools.push('workspace_write'); }
+    if (says(m[1]!)) {
+      uses.push(`Read the workspace "${m[1]}" (${m[2]}) and write what you find back into it.`);
+      tools.push('workspace_write');
+      firstPlace ||= m[2]!;
+    }
   }
+  // The prompt describes the kind "records" only for a runtime that wakes an agent on a
+  // workspace's records (agent-draft-known.js recordsBlock). A sentence that names a listed
+  // workspace and says something arrives there then gets a draft that works on its records. An
+  // address two organisms share reads "<workspace id> in organism <organism id>".
+  const arrives = /\b(new|arrives?|incoming|uusi|uuden|uudet|saapuu|saapuva|tulee|nuevo|nueva|llega)/i.test(sentence);
+  const shared = / in organism /.test(firstPlace) ? firstPlace.split(' in organism ') : null;
+  const watch = arrives && firstPlace && system.includes('"kind": "records"')
+    ? { kind: 'records', workspace: shared ? shared[0] : firstPlace, ...(shared ? { organism: shared[1] } : {}) }
+    : null;
   for (const m of system.matchAll(/^(.+) \[(app-tool:[^\]]+):<tool>\]\n- ([A-Za-z0-9._-]+)/gm)) {
     if (says(m[1]!)) { uses.push(`Call the tool ${m[2]}:${m[3]} of the app "${m[1]}".`); tools.push('app_tools'); }
   }
@@ -132,10 +148,10 @@ function agentDraft(body: Record<string, unknown>): string {
     display_name: words.join(' '),
     purpose: sentence,
     does: ['Reads the work it is given.', 'Does what the sentence above says.', 'Writes the result where you can read it.'],
-    when: clock ? { kind: 'clock', cron: '0 7 * * 1-5' } : { kind: 'ask' },
+    when: watch ?? (clock ? { kind: 'clock', cron: '0 7 * * 1-5' } : { kind: 'ask' }),
     reach: 'standard',
     crew_def: {
-      agent_name: name, process: 'sequential', listen_for: ['tasks'],
+      agent_name: name, process: 'sequential', listen_for: watch ? ['tasks', 'records'] : ['tasks'],
       agents: [{ name: 'worker', role: 'Worker', goal: sentence, backstory: 'A stand-in written by the sandbox model.', tools: [...new Set(tools)], allow_delegation: false }],
       tasks: [{ id: 'work', description: `${[sentence, ...uses].join('\n')}\n\n{{ctx.prompt}}`, expected_output: 'The finished result in plain text.', agent: 'worker', context: [] }],
     },
