@@ -12,6 +12,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-ai-image
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- The image model is set and cleared on a provider of the owner's own
+ *     (PUT /v1/ai/providers/:id, read back from GET /v1/ai/providers) instead of PUT
+ *     /v1/openrouter/settings, which node 4.0.0 removes (the 4.0.0 sweep). The refusals asserted are
+ *     unchanged.
  *   v1.0.0 — 2026-08-16 — initial: auth, validation, the unset-model refusal, and the key refusal.
  */
 
@@ -54,6 +58,17 @@ const authed = (o: RequestInit = {}): RequestInit =>
 
 const generate = (body: unknown) => json('/v1/ai/image', authed({ method: 'POST', body: JSON.stringify(body) }));
 
+/** The owner's own provider that carries the image model. */
+const IMAGE_PROVIDER = 'img-own';
+/** Save it with `model` as its image model (in the pool, so a call that names no provider picks it), or with none. */
+const saveImageProvider = (model: string | undefined) => json(`/v1/ai/providers/${IMAGE_PROVIDER}`, authed({
+    method: 'PUT',
+    body: JSON.stringify({
+        title: 'My image provider', type: 'openrouter', auth: { type: 'key' },
+        capabilities: { image: model ? { enabled: true, model, pool: true } : { enabled: true } },
+    }),
+}));
+
 console.log('\n=== AI Image Generation E2E Tests ===\n');
 
 await test('Setup: register an owner', async () => {
@@ -88,13 +103,13 @@ await test('With no image model configured it refuses by name, not by falling ba
 });
 
 await test('Setting an image model moves the refusal on to the missing key', async () => {
-    const put = await json('/v1/openrouter/settings', authed({
-        method: 'PUT', body: JSON.stringify({ imageModel: 'some/image-model' }),
-    }));
+    // The image model is set on a provider of the owner's own (PUT /v1/ai/providers/:id), with no key.
+    const put = await saveImageProvider('some/image-model');
     assert(put.status === 200, `settings save status ${put.status}: ${JSON.stringify(put.body)}`);
 
-    const read = await json('/v1/openrouter/settings', authed());
-    assert(read.body.data?.imageModel === 'some/image-model', `imageModel round-trips, got ${read.body.data?.imageModel}`);
+    const read = await json('/v1/ai/providers', authed());
+    const own = (read.body.data?.providers ?? []).find((p: any) => p.id === IMAGE_PROVIDER);
+    assert(own?.capabilities?.image?.model === 'some/image-model', `imageModel round-trips, got ${JSON.stringify(own?.capabilities?.image)}`);
 
     // With a model but no key, the next gate in the same order is the key. Reaching it proves the
     // model gate passed rather than that nothing happened.
@@ -105,9 +120,7 @@ await test('Setting an image model moves the refusal on to the missing key', asy
 });
 
 await test('Clearing the image model puts the refusal back', async () => {
-    const put = await json('/v1/openrouter/settings', authed({
-        method: 'PUT', body: JSON.stringify({ imageModel: '' }),
-    }));
+    const put = await saveImageProvider(undefined);
     assert(put.status === 200, `clear status ${put.status}`);
     const { body } = await generate({ prompt: 'a red bicycle' });
     assert(body.error?.code === 'NO_IMAGE_MODEL', `cleared means unset, got ${body.error?.code}`);

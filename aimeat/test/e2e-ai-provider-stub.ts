@@ -39,6 +39,12 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   v1.7.0 -- 2026-10-12 -- Node 4.0.0 removes /v1/openrouter/settings and /v1/openrouter/models (the
+ *     4.0.0 sweep). 1d's owner key is a provider of the owner's own at the stub (PUT /v1/ai/providers/:id,
+ *     its key, one text test, the routing), and the agent's key is set for that provider; the key
+ *     order it proves is unchanged. 3b, 3b2 and 3c are about the legacy listing itself, so they ask
+ *     the node its release: on 3.x the same assertions, on 4.0.0 410 GONE naming /v1/ai/providers and
+ *     no request to the provider.
  *   v1.6.0 — 2026-10-08 — 2a: a whole proxy answer names its provenance record (X-AIMEAT-Provenance-Id,
  *     Link, AI-Disclosure). 2b: the streamed frames stay byte for byte and are followed by one SSE
  *     comment naming the record; the exact-equality assertion no longer matched what the node sends.
@@ -80,6 +86,8 @@ import {
     imageJson, providerStatus, type FakeAiProvider, type RecordedRequest,
 } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 // 40314/40315 are this suite's own pair. E2E_AI_STUB_PORT is already e2e-ai-provenance's variable,
 // so these carry their own names rather than quietly moving that suite's stub.
@@ -89,6 +97,8 @@ const STUB_PORT = parseInt(process.env.E2E_AI_PROVIDER_STUB_UPSTREAM_PORT ?? '40
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const MODEL = 'stub/test-model';
 const DEFAULT_ANSWER = 'The stub provider answered.';
+/** 1d's provider of the owner's own, with a key, at the stub. */
+const OWN_KEYED = 'stub-keyed';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -105,6 +115,13 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+
+/** Node 4.0.0's answer on a removed AI settings route: 410 GONE, naming /v1/ai/providers as its successor. */
+function assertLegacyGone(r: { status: number; body: any; headers: Headers }, what: string) {
+    assert(r.status === 410 && r.body?.error?.code === 'GONE', `${what}: expected 410 GONE, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert((r.headers.get('link') ?? '').includes('</v1/ai/providers>; rel="successor-version"'), `${what}: the successor is named, got Link ${r.headers.get('link')}`);
+    assert(r.headers.get('x-aimeat-removed-in') === AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, `${what}: X-AIMEAT-Removed-In ${r.headers.get('x-aimeat-removed-in')}`);
+}
 
 // ── the node under test ───────────────────────────────────────────────────────
 
@@ -226,6 +243,8 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
     // consumes a reply written for a named test. 'Stop condition:' is the living charter's judge.
     provider.setDefault('chat', (r) => r.body.includes('Stop condition:') ? chatJson('NO') : chatJson(DEFAULT_ANSWER));
     const server = await startServer();
+    // Node 4.0.0 removes GET /v1/openrouter/models (3b, 3b2, 3c): it answers 410 and asks the provider nothing.
+    const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
 
     const a = await setupOwner('a');
     const b = await setupOwner('b');
@@ -305,17 +324,27 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         const ask = (marker: string) => json('/v1/ai/complete', {
             method: 'POST', headers: auth(aiAgent), body: JSON.stringify({ prompt: marker, app_id: 'e2e-ai-stub' }),
         });
-        const putOwnerKey = await json('/v1/openrouter/settings', {
+        // The owner's provider with a key: a provider record of their own at the stub, its key, one
+        // text test (the smallest real call, which marks it tested) and the routing that puts it first.
+        const putOwnerProvider = await json(`/v1/ai/providers/${OWN_KEYED}`, {
             method: 'PUT', headers: auth(a.token),
-            body: JSON.stringify({ apiKey: 'sk-owner-key-e2e-0001', provider: 'custom', baseUrl: provider.baseUrl, model: MODEL }),
+            body: JSON.stringify({ title: 'Stub with a key', type: 'openai-compatible', baseUrl: provider.baseUrl, auth: { type: 'key' }, capabilities: { text: { enabled: true, model: MODEL } } }),
+        });
+        assert(putOwnerProvider.status === 200, `the owner added a provider, got ${putOwnerProvider.status}: ${JSON.stringify(putOwnerProvider.body?.error)}`);
+        const putOwnerKey = await json(`/v1/ai/providers/${OWN_KEYED}/key`, {
+            method: 'PUT', headers: auth(a.token), body: JSON.stringify({ api_key: 'sk-owner-key-e2e-0001' }),
         });
         assert(putOwnerKey.status === 200, `the owner saved a key, got ${putOwnerKey.status}: ${JSON.stringify(putOwnerKey.body?.error)}`);
+        const tested = await json(`/v1/ai/providers/${OWN_KEYED}/test`, { method: 'POST', headers: auth(a.token), body: JSON.stringify({ capability: 'text' }) });
+        assert(tested.status === 200 && tested.body.data?.ok === true, `the owner tested it, got ${tested.status}: ${JSON.stringify(tested.body?.error)}`);
+        const routed = await json('/v1/ai/routing', { method: 'PUT', headers: auth(a.token), body: JSON.stringify({ routing: { defaults: { text: [OWN_KEYED] } } }) });
+        assert(routed.status === 200, `the owner put it first for text, got ${routed.status}: ${JSON.stringify(routed.body?.error)}`);
         const first = await ask('MARK-ORDER-OWNER');
         assert(first.status === 200, `got ${first.status}: ${JSON.stringify(first.body?.error)}`);
         assert(keyOf('MARK-ORDER-OWNER') === 'Bearer sk-owner-key-e2e-0001', `the OWNER's key paid for the agent's call, the provider saw "${keyOf('MARK-ORDER-OWNER')}"`);
 
         const setAgentKey = await json(`/v1/agents/${aiAgentName}/ai-keys`, {
-            method: 'PUT', headers: auth(a.token), body: JSON.stringify({ openrouter: { api_key: 'sk-agent-key-e2e-0002' } }),
+            method: 'PUT', headers: auth(a.token), body: JSON.stringify({ providers: { [OWN_KEYED]: { api_key: 'sk-agent-key-e2e-0002' } } }),
         });
         assert(setAgentKey.status === 200, `the owner gave the agent a key, got ${setAgentKey.status}`);
         const second = await ask('MARK-ORDER-AGENT');
@@ -331,10 +360,11 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(provider.requestsFor('chat').length === before, 'a capped call never reaches the provider');
         // Left as it was found: the rest of the suite runs the agent without a key or a cap of its own.
         await json(`/v1/agents/${aiAgentName}/ai-keys`, { method: 'PUT', headers: auth(a.token), body: JSON.stringify({ daily_usd: null }) });
-        await json(`/v1/agents/${aiAgentName}/ai-keys/openrouter`, { method: 'DELETE', headers: auth(a.token) });
-        const forget = await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth(a.token) });
-        assert(forget.status === 200, `the owner's key and settings are removed again, got ${forget.status}`);
-        await pointAtStub(a, provider);
+        // Removing the provider removes its key and the agent's key for it (provider-store.ts).
+        const forget = await json(`/v1/ai/providers/${OWN_KEYED}`, { method: 'DELETE', headers: auth(a.token) });
+        assert(forget.status === 200, `the owner's provider and key are removed again, got ${forget.status}`);
+        // The settings record pointAtStub wrote was not touched, so the stub is still where it aims.
+        await json('/v1/ai/routing', { method: 'PUT', headers: auth(a.token), body: JSON.stringify({ routing: { defaults: { text: [] } } }) });
     });
 
     // ── 2. The chat proxy: the provider's own bytes ───────────────────────────
@@ -498,7 +528,13 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(!provider.lastRequest('models')!.query.has('output_modalities'), 'a chat listing sends no modality filter');
     });
 
-    await test('3b. A transcription listing asks for ?output_modalities=transcription, which is a different catalogue', async () => {
+    await test('3b. A transcription listing asks for ?output_modalities=transcription, which is a different catalogue; on 4.0.0 the legacy listing is 410 GONE and asks the provider nothing', async () => {
+        if (legacyGone) {
+            const before = provider.requestsFor('models').length;
+            assertLegacyGone(await json('/v1/openrouter/models?modality=transcription', { headers: auth(a.token) }), 'GET /v1/openrouter/models');
+            assert(provider.requestsFor('models').length === before, 'the provider was asked nothing');
+            return;
+        }
         // OpenRouter's default catalogue contains no whisper model at all, so this is not a
         // client-side filter dressed up as a parameter.
         provider.queue('models', modelsJson([
@@ -512,7 +548,13 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(seen.length === 1, `the stub saw the filter exactly once, got ${seen.length}`);
     });
 
-    await test('3b2. An image listing asks for ?output_modalities=image, so the picker can list image models', async () => {
+    await test('3b2. An image listing asks for ?output_modalities=image, so the picker can list image models; on 4.0.0 the legacy listing is 410 GONE and asks the provider nothing', async () => {
+        if (legacyGone) {
+            const before = provider.requestsFor('models').length;
+            assertLegacyGone(await json('/v1/openrouter/models?modality=image', { headers: auth(a.token) }), 'GET /v1/openrouter/models');
+            assert(provider.requestsFor('models').length === before, 'the provider was asked nothing');
+            return;
+        }
         // Asserted as a hole first, 2026-09-08: the route narrowed the word to transcription, speech
         // or chat, so ?modality=image answered with the chat catalogue and no filter reached the
         // provider. Fixed in routes/openrouter.ts v1.11.0.
@@ -526,7 +568,13 @@ const carries = (marker: string) => (r: RecordedRequest) => r.body.includes(mark
         assert(seen.length === 1, `the provider was asked for image models exactly once, got ${seen.length}`);
     });
 
-    await test('3c. A catalogue that answers badly is a named 502, and a rejected key is a 424', async () => {
+    await test('3c. A catalogue that answers badly is a named 502, and a rejected key is a 424; on 4.0.0 the legacy listing is 410 GONE and asks the provider nothing', async () => {
+        if (legacyGone) {
+            const before = provider.requestsFor('models').length;
+            assertLegacyGone(await json('/v1/openrouter/models?modality=speech', { headers: auth(a.token) }), 'GET /v1/openrouter/models');
+            assert(provider.requestsFor('models').length === before, 'the provider was asked nothing');
+            return;
+        }
         provider.queue('models', providerStatus(503, 'upstream down'), r => r.query.get('output_modalities') === 'speech');
         const bad = await json('/v1/openrouter/models?modality=speech', { headers: auth(a.token) });
         assert(bad.status === 502, `expected 502, got ${bad.status}: ${JSON.stringify(bad.body?.error)}`);

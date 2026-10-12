@@ -12,7 +12,8 @@
  *   suite is the net: a route added tomorrow is in it without anyone adding it, because the list of
  *   routes is read from the contract and the list of tools from the MCP server.
  *
- *   THE STORES, each with its own route: the owner's AI key (PUT /v1/openrouter/settings), the
+ *   THE STORES, each with its own route: the owner's AI key (PUT /v1/ai/providers/:id/key, and on a
+ *   node before 4.0.0 a second one through PUT /v1/openrouter/settings), the
  *   seller's Stripe key and webhook secret (PUT /v1/commerce/payout/stripe), a vault secret
  *   (PUT /v1/secrets/:name), an extension's secret config field (POST /v1/extensions), a personal
  *   access token (POST /v1/access/tokens), an agent's webhook signing secret
@@ -30,10 +31,15 @@
  *   counted, and the count is printed, so a shrinking sweep is visible.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-secret-canary-sweep
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- The owner's AI key is planted through PUT /v1/ai/providers/:id/key, the
+ *     route node 4.0.0 keeps; on 3.x a second key is planted through PUT /v1/openrouter/settings as
+ *     well, since an upgraded node still holds that record (the 4.0.0 sweep).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, wish "widen the canary suite").
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { readFileSync } from 'node:fs';
@@ -49,6 +55,7 @@ const STAMP = Date.now() % 1000000;
 // ── The planted values ──────────────────────────────────────────────────────────────────────────
 const C = {
     aiKey: `sk-or-sweep-${STAMP}-ai-9e1c`,
+    legacyAiKey: `sk-or-sweep-${STAMP}-legacy-3f60`,
     stripeKey: `sk_test_sweep_${STAMP}_5b7d`,
     stripeHook: `whsec_sweep_${STAMP}_2c8f`,
     vault: `sweep-vault-${STAMP}-41aa`,
@@ -229,9 +236,19 @@ async function main() {
     const extName = `swpext${STAMP}`;
     const appFile = `swpapp${STAMP}.html`;
 
+    // Node 4.0.0 removes PUT /v1/openrouter/settings; before it the legacy record is planted as well.
+    const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
+
     await test('setup: a value is planted in every secret store, each through its own route', async () => {
+        // The owner's AI key: a provider of their own, then its key (ai.apikey.provider.<id>).
+        const prov = await json('/v1/ai/providers/swp-openrouter', {
+            method: 'PUT', headers: auth(owner.token),
+            body: JSON.stringify({ title: 'Sweep OpenRouter', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openrouter/free' } } }),
+        });
+        assert(prov.status === 200, `AI provider: ${prov.status} ${JSON.stringify(prov.body?.error)}`);
         const steps: Array<[string, Promise<{ status: number; body: any }>]> = [
-            ['AI key', json('/v1/openrouter/settings', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ apiKey: C.aiKey }) })],
+            ['AI key', json('/v1/ai/providers/swp-openrouter/key', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ api_key: C.aiKey }) })],
+            ...(legacyGone ? [] : [['legacy AI key', json('/v1/openrouter/settings', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ apiKey: C.legacyAiKey }) })] as [string, Promise<{ status: number; body: any }>]]),
             ['Stripe', json('/v1/commerce/payout/stripe', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ secret_key: C.stripeKey, webhook_secret: C.stripeHook }) })],
             ['vault', json('/v1/secrets/SWEEP_TOKEN', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ value: C.vault }) })],
             ['extension', json('/v1/extensions', {

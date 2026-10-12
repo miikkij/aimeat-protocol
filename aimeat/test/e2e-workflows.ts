@@ -47,6 +47,12 @@
  *   v1.16.0 — 2026-09-26 — While an ai step's call is open, the watchdog's pass leaves the step to the
  *     answer although its result key already holds the run before's value, and the step takes its
  *     own call's answer (secaudit 2026-09, R4).
+ *   v1.17.0 -- 2026-10-12 -- The 4.0.0 sweep. The credential test plants the owner's AI key through
+ *     PUT /v1/ai/providers/:id/key and probes the record it lands in; on 3.x the legacy record
+ *     openrouter.apikey is probed as well. The cost tests forget the stub through
+ *     DELETE /v1/ai/providers/custom instead of DELETE /v1/openrouter/settings (410 on 4.0.0).
+ *     "costCapMorsels still saves" asks the node its release: on 3.x the warning as before, on 4.0.0
+ *     400 WORKFLOW_INVALID naming maxCostUsd on REST and an error over MCP, with nothing written.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -89,6 +95,9 @@ async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean):
 }
 
 import { startFakeAiProvider, chatJson } from './helpers/fake-ai-provider.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
+import { COST_CAP_MORSELS_REMOVED_IN } from '../src/services/workflow/store.js';
 
 function parseSSE(text: string): any[] {
   const out: any[] = [];
@@ -130,6 +139,16 @@ const ownerName = `wfowner${Date.now()}`;
 const agentName = 'wf-bot';
 let ownerToken = '';
 let auth = {};
+
+/**
+ * Forget the provider the cost tests aim at the stub: the owner's settings record becomes their
+ * provider `custom` on the first read, and removing that provider resets the record's address
+ * (DELETE /v1/ai/providers/:id, services/ai/provider-store.ts). It replaces DELETE
+ * /v1/openrouter/settings, which node 4.0.0 answers 410.
+ */
+async function forgetStubProvider(): Promise<void> {
+  await json('/v1/ai/providers/custom', { method: 'DELETE', headers: auth });
+}
 
 /** A fresh agent of this owner holding exactly `scopes`: a token's words are fixed when it is minted. */
 async function mintAgent(name: string, scopes: string[]): Promise<{ token: string; gaii: string; headers: Record<string, string> }> {
@@ -1252,17 +1271,32 @@ async function run() {
     const check = (id: string, headers: Record<string, string>) =>
       json(`/v1/workflows/${id}/run`, { method: 'POST', headers, body: JSON.stringify({ mode: 'signals-only' }) });
 
-    // A CREDENTIAL: every memory door shows openrouter.apikey as { configured: true }. A signal
-    // reading it, and a run showing what the signal saw, must show no more than that.
-    const key = await json('/v1/openrouter/settings', { method: 'PUT', headers: auth, body: JSON.stringify({ apiKey: 'sk-or-v1-wfsig-probe-0000000000000000' }) });
+    // A CREDENTIAL: every memory door shows a key record as { configured: true }. A signal reading
+    // it, and a run showing what the signal saw, must show no more than that. The owner's AI key is
+    // set on a provider of their own (ai.apikey.provider.<id>); node 4.0.0 removes
+    // PUT /v1/openrouter/settings, so the legacy record openrouter.apikey is probed on 3.x only.
+    const prov = await json('/v1/ai/providers/wf-probe', {
+      method: 'PUT', headers: auth,
+      body: JSON.stringify({ title: 'Probe', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openrouter/free' } } }),
+    });
+    assert(prov.status === 200, `add an AI provider: ${prov.status} ${JSON.stringify(prov.body.error)}`);
+    const key = await json('/v1/ai/providers/wf-probe/key', { method: 'PUT', headers: auth, body: JSON.stringify({ api_key: 'sk-or-v1-wfsig-probe-0000000000000000' }) });
     assert(key.status === 200, `store an AI key: ${key.status} ${JSON.stringify(key.body.error)}`);
-    assert((await put('sig-cred', auth, peek('openrouter.apikey', 'encrypted'))).status === 200, 'the owner saves the credential probe');
-    const credRun = await check('sig-cred', auth);
-    assert(credRun.status === 200, `the owner's check runs: ${credRun.status}`);
-    const served = await json(`/v1/workflows/sig-cred/runs/${credRun.body.data.runId}`, { headers: auth });
-    const seen = served.body.data?.steps?.peek?.outputObserved;
-    assert(seen && typeof seen.value !== 'string',
-      `the run must not carry the stored credential, got ${JSON.stringify(seen)}`);
+    const probes: Array<[string, string]> = [['sig-cred', 'ai.apikey.provider.wf-probe']];
+    if (!(await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN))) {
+      const legacy = await json('/v1/openrouter/settings', { method: 'PUT', headers: auth, body: JSON.stringify({ apiKey: 'sk-or-v1-wfsig-probe-1111111111111111' }) });
+      assert(legacy.status === 200, `store a legacy AI key: ${legacy.status} ${JSON.stringify(legacy.body.error)}`);
+      probes.push(['sig-cred-legacy', 'openrouter.apikey']);
+    }
+    for (const [probe, record] of probes) {
+      assert((await put(probe, auth, peek(record, 'encrypted'))).status === 200, `the owner saves the credential probe on ${record}`);
+      const credRun = await check(probe, auth);
+      assert(credRun.status === 200, `the owner's check on ${record} runs: ${credRun.status}`);
+      const served = await json(`/v1/workflows/${probe}/runs/${credRun.body.data.runId}`, { headers: auth });
+      const seen = served.body.data?.steps?.peek?.outputObserved;
+      assert(seen && typeof seen.value !== 'string',
+        `the run must not carry the stored credential ${record}, got ${JSON.stringify(seen)}`);
+    }
 
     // A run recorded before this change can still hold one: the run doors redact what they serve.
     const planted = {
@@ -1279,8 +1313,9 @@ async function run() {
     assert(list.status === 200 && !JSON.stringify(list.body.data).includes('CIPHERTEXT-PROBE'),
       `the run list must redact it too: ${JSON.stringify(list.body.data).slice(0, 300)}`);
 
-    await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
-    await json('/v1/workflows/sig-cred?withRuns=true', { method: 'DELETE', headers: auth });
+    await json('/v1/ai/providers/wf-probe', { method: 'DELETE', headers: auth });
+    if (probes.length > 1) await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+    for (const [probe] of probes) await json(`/v1/workflows/${probe}?withRuns=true`, { method: 'DELETE', headers: auth });
   });
 
   // ── the per-run cost cap is in US dollars (2026-09-25) ──
@@ -1288,13 +1323,30 @@ async function run() {
   // nothing ever read it. The cap is maxCostUsd, per run: the engine adds up what the run's own ai
   // steps' model calls cost, and before the next ai step starts it stops the run once the sum has
   // reached the cap.
-  await test('costCapMorsels still saves, and the answer says it did nothing and names maxCostUsd (REST and MCP)', async () => {
+  await test('costCapMorsels still saves, and the answer says it did nothing and names maxCostUsd (REST and MCP); on 4.0.0 the save is refused, names maxCostUsd and writes nothing', async () => {
     const wf = {
       title: { en_US: 'Morsel cap' }, description: { en_US: 'the old field' },
       trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', costCapMorsels: 5,
       steps: [{ id: 'ask', description: { en_US: 'Ask' }, required_to_function: 'none',
         action: { kind: 'human-input', question: { prompt: 'Go?', options: [{ id: 'go', label: 'Go' }] } } }],
     };
+    if (await removedOn(BASE, COST_CAP_MORSELS_REMOVED_IN)) {
+      // Node 4.0.0 removes the field: the save is refused before anything is written, on both doors.
+      const refused = await json('/v1/workflows/morsel-cap', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+      const said = JSON.stringify(refused.body.error ?? {});
+      assert(refused.status === 400 && refused.body.error?.code === 'WORKFLOW_INVALID',
+        `REST: expected 400 WORKFLOW_INVALID, got ${refused.status} ${said}`);
+      assert(said.includes('costCapMorsels') && said.includes('maxCostUsd'), `REST: the refusal names the field and maxCostUsd: ${said}`);
+      const none = await json('/v1/workflows/morsel-cap', { headers: auth });
+      assert(none.status === 404, `REST: nothing was written, got ${none.status}`);
+      const saver = await mintAgent('wf-mcp-saver', ['workflow:read', 'workflow:write']);
+      const out = await mcpCall(saver.token, 'aimeat_workflow_save', { id: 'morsel-cap-mcp', definition: wf });
+      assert(out.isError, `MCP: the save is refused: ${out.raw}`);
+      assert(out.raw.includes('costCapMorsels') && out.raw.includes('maxCostUsd'), `MCP: the refusal names the field and maxCostUsd: ${out.raw}`);
+      const noneMcp = await json('/v1/workflows/morsel-cap-mcp', { headers: auth });
+      assert(noneMcp.status === 404, `MCP: nothing was written, got ${noneMcp.status}`);
+      return;
+    }
     const saved = await json('/v1/workflows/morsel-cap', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
     assert(saved.status === 200, `the old field still saves: ${saved.status} ${JSON.stringify(saved.body.error)}`);
     const warned = JSON.stringify(saved.body.data?.warnings ?? []);
@@ -1356,7 +1408,7 @@ async function run() {
       assert(openRun.status === 'done', `a run with no cap is unchanged: ${openRun.status} ${JSON.stringify(openRun.steps)}`);
       assert(provider.requestsFor('chat').length === 2, `both steps asked the model: ${provider.requestsFor('chat').length}`);
     } finally {
-      await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+      await forgetStubProvider();
       for (const id of ['cost-capped', 'cost-open']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
       await provider.close();
     }
@@ -1408,7 +1460,7 @@ async function run() {
       assert(pastCap.steps.first.state === 'green', `the leaf the judge was not asked about passes: ${JSON.stringify(pastCap.steps.first)}`);
       assert(provider.requestsFor('chat').length === 1, `past the cap the judge is not asked: ${provider.requestsFor('chat').length}`);
     } finally {
-      await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+      await forgetStubProvider();
       for (const id of ['judge-counted', 'judge-past-cap']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
       await provider.close();
     }
@@ -1505,7 +1557,7 @@ async function run() {
         `the second step started once the first's real cost left room: ${waited.status} ${JSON.stringify(waited.steps)}`);
       assert(provider.requestsFor('chat').length === 2, `each step asked the model once: ${provider.requestsFor('chat').length}`);
     } finally {
-      await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+      await forgetStubProvider();
       await json('/v1/workflows/cost-parallel?withRuns=true', { method: 'DELETE', headers: auth });
       await provider.close();
     }
@@ -1584,7 +1636,7 @@ async function run() {
       const left = (await json('/v1/memory/wfheld.left', { headers: auth })).body?.data?.value;
       assert(left === 'the answer of this run', `left holds its own call's answer, not the run before's: ${JSON.stringify(left)}`);
     } finally {
-      await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth });
+      await forgetStubProvider();
       await json('/v1/workflows/cost-held?withRuns=true', { method: 'DELETE', headers: auth });
       for (const key of ['wfheld.left', 'wfheld.right']) await json(`/v1/memory/${key}`, { method: 'DELETE', headers: auth });
       await provider.close();

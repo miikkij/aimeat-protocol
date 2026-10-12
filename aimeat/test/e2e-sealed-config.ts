@@ -21,6 +21,10 @@
  *   suite's own server with the variable unset.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sealed-config.ts
  * @version-history
+ *   v1.4.0 -- 2026-10-12 -- 2c saves the address as a provider of the person's own
+ *     (PUT /v1/ai/providers/:id, the route node 4.0.0 keeps) and asserts the missing-key refusal in
+ *     place of the node's key; the legacy setting is still tried, through PUT /v1/openrouter/settings
+ *     on 3.x and as the stored row on 4.0.0, where that route answers 410 (the 4.0.0 sweep).
  *   v1.3.0 — 2026-10-09 — 2d: a secret set on the Config page is stored sealed in the node's own
  *     database, read raw from it (secrets audit 2026-10-09, S4b).
  *   v1.2.0 — 2026-09-24 — The operator's agent is created holding operator:admin beside '*'. Its
@@ -39,6 +43,8 @@ import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { registerOwner, ownerToken } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -291,18 +297,46 @@ async function main() {
         await test('2c. THE LEAK: the node\'s AI key is not sent to an address a person saved', async () => {
             // This node has a shared OpenRouter key and the person has none of their own, so the node
             // key pays. Before the fix the node sent that key to whatever baseUrl the person saved.
-            const saved = await json('/v1/openrouter/settings', {
+            // The address is saved as a provider of the person's own (PUT /v1/ai/providers/:id), the
+            // route node 4.0.0 keeps: with no key of their own set, the call is refused for the
+            // missing key and the node's key is not used in its place.
+            const own = await json('/v1/ai/providers/sealed-own', {
                 method: 'PUT', headers: auth(unsealedOp.token),
-                body: JSON.stringify({ provider: 'openrouter', baseUrl: 'https://attacker.invalid/api/v1' }),
+                body: JSON.stringify({ title: 'Saved address', type: 'openai-compatible', baseUrl: 'https://attacker.invalid/api/v1', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openrouter/free', pool: true } } }),
             });
-            assert(saved.status === 200, `settings save: ${saved.status}: ${JSON.stringify(saved.body)}`);
+            assert(own.status === 200, `provider save: ${own.status}: ${JSON.stringify(own.body)}`);
+            const viaProvider = await json('/v1/llm/models', { headers: auth(unsealedOp.token) });
+            assert(viaProvider.status === 400 && viaProvider.body.error?.code === 'NO_API_KEY',
+                `the saved provider: expected 400 NO_API_KEY, got ${viaProvider.status}: ${JSON.stringify(viaProvider.body)}`);
+            await json('/v1/ai/providers/sealed-own', { method: 'DELETE', headers: auth(unsealedOp.token) });
+
+            // The setting from before providers, which an upgraded node still holds: on 3.x saved
+            // through its own route, on 4.0.0 (which removes that route) present as the stored row.
+            const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
+            const saved = legacyGone
+                ? await json('/v1/memory', {
+                    method: 'POST', headers: auth(unsealedOp.token),
+                    body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'openrouter', baseUrl: 'https://attacker.invalid/api/v1' } }),
+                })
+                : await json('/v1/openrouter/settings', {
+                    method: 'PUT', headers: auth(unsealedOp.token),
+                    body: JSON.stringify({ provider: 'openrouter', baseUrl: 'https://attacker.invalid/api/v1' }),
+                });
+            assert(saved.status === (legacyGone ? 201 : 200), `settings save: ${saved.status}: ${JSON.stringify(saved.body)}`);
             const { status, body } = await json('/v1/llm/models', { headers: auth(unsealedOp.token) });
             assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
             assert(body.error?.code === 'NODE_KEY_HOST', `code: ${JSON.stringify(body.error)}`);
-            await json('/v1/openrouter/settings', {
-                method: 'PUT', headers: auth(unsealedOp.token),
-                body: JSON.stringify({ provider: 'openrouter', baseUrl: '' }),
-            });
+            if (legacyGone) {
+                await json('/v1/memory', {
+                    method: 'POST', headers: auth(unsealedOp.token),
+                    body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'openrouter', baseUrl: '' } }),
+                });
+            } else {
+                await json('/v1/openrouter/settings', {
+                    method: 'PUT', headers: auth(unsealedOp.token),
+                    body: JSON.stringify({ provider: 'openrouter', baseUrl: '' }),
+                });
+            }
         });
 
         // Phase 3 needs that write left in the database, so the seal has something to refuse at boot.

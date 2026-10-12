@@ -16,6 +16,9 @@
  *      refuses an unknown medium.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-ai-provenance-served
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- The setup aims the node at the loopback provider with a provider of the
+ *     owner's own (PUT /v1/ai/providers/:id and PUT /v1/ai/routing) instead of PUT
+ *     /v1/openrouter/settings, which node 4.0.0 removes (the 4.0.0 sweep). The assertions are unchanged.
  *   v1.0.0 — 2026-10-08 — Initial.
  */
 import { createServer } from 'node:http';
@@ -103,8 +106,20 @@ try {
   }
 
   await test('Setup: the owner points the node at the loopback provider', async () => {
-    const r = await call('/v1/openrouter/settings', { provider: 'custom', baseUrl: `http://127.0.0.1:${peerPort}`, model: 'reply', imageModel: 'img' }, alice.token, 'PUT');
+    // A provider of the owner's own at the peer (PUT /v1/ai/providers/:id), first for every
+    // capability. A test call would spend the peer's answers, so the owner's routing rule lets the
+    // node pick it untested (onlyTested false).
+    const r = await call('/v1/ai/providers/prov-peer', {
+      title: 'Loopback provider', type: 'openai-compatible', baseUrl: `http://127.0.0.1:${peerPort}`, auth: { type: 'none' },
+      capabilities: {
+        text: { enabled: true, model: 'reply', pool: true }, image: { enabled: true, model: 'img', pool: true }, speech: { enabled: true },
+      },
+    }, alice.token, 'PUT');
     assert(r.status === 200, r.text);
+    const routed = await call('/v1/ai/routing', {
+      routing: { defaults: { text: ['prov-peer'], image: ['prov-peer'], speech: ['prov-peer'] }, rules: { onlyTested: false } },
+    }, alice.token, 'PUT');
+    assert(routed.status === 200, routed.text);
   });
 
   let speechId = '';

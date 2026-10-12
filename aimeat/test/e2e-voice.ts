@@ -3,6 +3,9 @@
  * @description Real node, owner/app grants and local protocol peer: stream, speech, scope isolation,
  *   app attribution and concurrent accounting. No external provider calls or paid AI settings.
  * @version-history
+ *   v1.2.0 - 2026-10-12 - The owner aims the node at the peer with a provider of their own
+ *     (PUT /v1/ai/providers/:id and PUT /v1/ai/routing) instead of PUT /v1/openrouter/settings, which
+ *     node 4.0.0 removes (the 4.0.0 sweep). What the suite asserts is unchanged.
  *   v1.1.0 - 2026-10-08 - aiprov plan, workstream A: a provider's 400 is 422 PROVIDER_REJECTED with its
  *     reason (it asserted 502 until then, the hole the omnituinen report found), mp3 refused with a pcm
  *     hint on REST and MCP, 429 with the provider's Retry-After, a redacted reason, a moderation 403
@@ -87,8 +90,21 @@ const peerPort = (peer.address() as { port: number }).port;
 try {
   const alice = await owner('voicea'); const bob = await owner('voiceb'); const app = `${alice.name}/voice.html`;
   await test('Owner configures a local protocol peer', async () => {
-    const result = await call('/v1/openrouter/settings', { provider: 'custom', baseUrl: `http://127.0.0.1:${peerPort}`, model: 'reply', sttModel: 'stt' }, alice.token, 'PUT');
+    // A provider of the owner's own at the peer (PUT /v1/ai/providers/:id), first for every
+    // capability. A test call would spend the peer's answers, so the owner's routing rule lets the
+    // node pick it untested (onlyTested false).
+    const result = await call('/v1/ai/providers/voice-peer', {
+      title: 'Local protocol peer', type: 'openai-compatible', baseUrl: `http://127.0.0.1:${peerPort}`, auth: { type: 'none' },
+      capabilities: {
+        text: { enabled: true, model: 'reply', pool: true }, vision: { enabled: true, model: 'reply', pool: true },
+        speech: { enabled: true }, transcription: { enabled: true, model: 'stt', pool: true },
+      },
+    }, alice.token, 'PUT');
     assert(result.status === 200, result.text);
+    const routed = await call('/v1/ai/routing', {
+      routing: { defaults: { text: ['voice-peer'], vision: ['voice-peer'], speech: ['voice-peer'], transcription: ['voice-peer'] }, rules: { onlyTested: false } },
+    }, alice.token, 'PUT');
+    assert(routed.status === 200, routed.text);
   });
   const request = { app_id: app, messages: [{ role: 'user', content: 'hello' }], model: 'reply', temperature: 0.2, max_tokens: 128 };
   const speech = { app_id: app, model: 'speech', input: 'Hei maailma', voice: 'test', response_format: 'pcm' };

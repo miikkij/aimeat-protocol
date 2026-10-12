@@ -4,6 +4,12 @@
  *   Tests save/retrieve/delete of encrypted API key and preferences,
  *   auth enforcement (401 without token), and validation errors on /complete.
  * @version-history
+ *   v1.3.0 -- 2026-10-12 -- The subject is the settings, models and test routes, which node 4.0.0
+ *     removes, so each test asks the node its release (the 4.0.0 sweep): on 3.x the same assertions,
+ *     on 4.0.0 410 GONE with Deprecation, the successor Link and X-AIMEAT-Removed-In, and for a write
+ *     neither legacy record written. The two ?modality= tests had passed on 4.0.0 only because a 410
+ *     is neither 404 nor 422; they assert the 410 exactly. The node limits on 4.0.0 are read from
+ *     GET /v1/ai/settings. The /complete tests are unchanged: that route is not removed.
  *   v1.2.0 — 2026-10-02 — A key-only save names no model; a chosen free router stays; '' clears.
  *   v1.1.0 — 2026-08-01 — Phase 5: speech-to-text settings (sttModel/sttLanguage round-trip, empty
  *     clears rather than falling back), the node limits served with the settings, and the
@@ -15,6 +21,8 @@
 // Requires: server running on port 40251 with AIMEAT_ENCRYPTION_KEY set
 
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -44,6 +52,35 @@ async function json(path: string, opts: RequestInit = {}) {
   const ct = res.headers.get('content-type') ?? '';
   const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
   return { status: res.status, body, headers: res.headers };
+}
+
+// ─── Node 4.0.0 removes the settings, models and test routes (AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN) ───
+// Every test below whose subject is one of them asks the node its release: on 3.x the same
+// assertions, on 4.0.0 410 GONE naming /v1/ai/providers, and for a write, nothing written.
+const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
+
+function assertGone(r: { status: number; body: any; headers: Headers }, what: string) {
+  assert(r.status === 410 && r.body?.error?.code === 'GONE', `${what}: expected 410 GONE on 4.0.0, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+  assert(r.headers.get('deprecation') === 'true', `${what}: Deprecation ${r.headers.get('deprecation')}`);
+  assert((r.headers.get('link') ?? '').includes('</v1/ai/providers>; rel="successor-version"'), `${what}: successor Link ${r.headers.get('link')}`);
+  assert(r.headers.get('x-aimeat-removed-in') === AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, `${what}: X-AIMEAT-Removed-In ${r.headers.get('x-aimeat-removed-in')}`);
+}
+
+/** After a refused write on 4.0.0: neither legacy record exists. */
+async function assertNothingWritten(what: string) {
+  for (const key of ['openrouter.settings', 'openrouter.apikey']) {
+    const r = await json(`/v1/memory/${key}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(r.status === 404, `${what}: nothing was written, but ${key} answered ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+  }
+}
+
+/** One legacy call on 4.0.0: the route answers 410 GONE, and nothing was written. */
+async function goneAndUnwritten(path: string, method: string, body?: unknown) {
+  const r = await json(path, {
+    method, headers: { Authorization: `Bearer ${ownerToken}` }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+  assertGone(r, `${method} ${path}`);
+  await assertNothingWritten(`${method} ${path}`);
 }
 
 // ─── State ───
@@ -116,9 +153,14 @@ await test('POST /v1/openrouter/complete without auth → 401', async () => {
 // ─── Phase 2: Settings CRUD ───
 console.log('\nPhase 2 — Settings CRUD');
 
-await test('PUT /v1/openrouter/settings — a key on its own names NO model: the node default applies until one is chosen', async () => {
+await test('PUT /v1/openrouter/settings — a key on its own names NO model: the node default applies until one is chosen; 410 GONE on 4.0.0, nothing written', async () => {
   // Until 2026-10-02 this write created the record with model 'openrouter/free', which then came
   // before the node's default: an owner who saved their own key thought with a free model.
+  if (legacyGone) {
+    await goneAndUnwritten('/v1/openrouter/settings', 'PUT', { apiKey: 'sk-or-test-key-only' });
+    await goneAndUnwritten('/v1/openrouter/settings', 'PUT', { model: 'openrouter/free' });
+    return;
+  }
   const put = await json('/v1/openrouter/settings', {
     method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
     body: JSON.stringify({ apiKey: 'sk-or-test-key-only' }),
@@ -146,7 +188,11 @@ await test('PUT /v1/openrouter/settings — a key on its own names NO model: the
   assert(got3.body.data?.model === null, `'' clears the choice, got ${JSON.stringify(got3.body.data?.model)}`);
 });
 
-await test('PUT /v1/openrouter/settings — save API key and preferences', async () => {
+await test('PUT /v1/openrouter/settings — save API key and preferences; 410 GONE on 4.0.0, nothing written', async () => {
+  if (legacyGone) {
+    await goneAndUnwritten('/v1/openrouter/settings', 'PUT', { apiKey: 'sk-or-test-key-abc123', model: 'openai/gpt-4o-mini', autoRetry: true, maxRetries: 5 });
+    return;
+  }
   const { status, body } = await json('/v1/openrouter/settings', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -169,7 +215,8 @@ await test('PUT /v1/openrouter/settings — save API key and preferences', async
   assert(body.data?.saved === true, `data.saved: ${JSON.stringify(body.data)}`);
 });
 
-await test('GET /v1/openrouter/settings — returns hasApiKey: true, no raw key', async () => {
+await test('GET /v1/openrouter/settings — returns hasApiKey: true, no raw key; 410 GONE on 4.0.0', async () => {
+  if (legacyGone) { await goneAndUnwritten('/v1/openrouter/settings', 'GET'); return; }
   const { status, body } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
@@ -182,10 +229,16 @@ await test('GET /v1/openrouter/settings — returns hasApiKey: true, no raw key'
   assert(body.data?.maxRetries === 5, `maxRetries: ${body.data?.maxRetries}`);
 });
 
-await test('GET /v1/openrouter/settings — no apiKey or encrypted field in response', async () => {
-  const { status, body } = await json('/v1/openrouter/settings', {
+await test('GET /v1/openrouter/settings — no apiKey or encrypted field in response (on 4.0.0, in the 410 answer)', async () => {
+  const { status, body, headers } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
+  if (legacyGone) {
+    assertGone({ status, body, headers }, 'GET /v1/openrouter/settings');
+    const serialized = JSON.stringify(body);
+    assert(!serialized.includes('"encrypted"') && !serialized.includes('sk-or-test-key-abc123'), `the 410 answer carries no key: ${serialized.slice(0, 200)}`);
+    return;
+  }
   assert(status === 200, `expected 200, got ${status}`);
   // The raw API key must never appear in the response
   assert(!('apiKey' in (body.data ?? {})), `apiKey must not be in response: ${JSON.stringify(body.data)}`);
@@ -195,7 +248,11 @@ await test('GET /v1/openrouter/settings — no apiKey or encrypted field in resp
   assert(!serialized.includes('sk-or-test-key-abc123'), 'raw API key must not appear in response');
 });
 
-await test('PUT /v1/openrouter/settings — update preferences only (no apiKey)', async () => {
+await test('PUT /v1/openrouter/settings — update preferences only (no apiKey); 410 GONE on 4.0.0, nothing written', async () => {
+  if (legacyGone) {
+    await goneAndUnwritten('/v1/openrouter/settings', 'PUT', { model: 'anthropic/claude-3-haiku', maxRetries: 2 });
+    return;
+  }
   const { status, body } = await json('/v1/openrouter/settings', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -205,7 +262,8 @@ await test('PUT /v1/openrouter/settings — update preferences only (no apiKey)'
   assert(body.data?.saved === true, 'saved');
 });
 
-await test('GET /v1/openrouter/settings — preferences updated, hasApiKey still true', async () => {
+await test('GET /v1/openrouter/settings — preferences updated, hasApiKey still true; 410 GONE on 4.0.0', async () => {
+  if (legacyGone) { await goneAndUnwritten('/v1/openrouter/settings', 'GET'); return; }
   const { status, body } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
@@ -215,7 +273,11 @@ await test('GET /v1/openrouter/settings — preferences updated, hasApiKey still
   assert(body.data?.maxRetries === 2, `maxRetries updated: ${body.data?.maxRetries}`);
 });
 
-await test('PUT/GET /v1/openrouter/settings — visionModel persists and clears', async () => {
+await test('PUT/GET /v1/openrouter/settings — visionModel persists and clears; 410 GONE on 4.0.0, nothing written', async () => {
+  if (legacyGone) {
+    await goneAndUnwritten('/v1/openrouter/settings', 'PUT', { visionModel: 'qwen/qwen-2.5-vl-72b-instruct' });
+    return;
+  }
   // Set a vision-capable model (used for image inputs — the Secretary doc/image intake).
   const set = await json('/v1/openrouter/settings', {
     method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -234,7 +296,8 @@ await test('PUT/GET /v1/openrouter/settings — visionModel persists and clears'
   assert(got2.body.data?.visionModel === null, `visionModel cleared: ${JSON.stringify(got2.body.data?.visionModel)}`);
 });
 
-await test('DELETE /v1/openrouter/settings — removes key and settings', async () => {
+await test('DELETE /v1/openrouter/settings — removes key and settings; 410 GONE on 4.0.0', async () => {
+  if (legacyGone) { await goneAndUnwritten('/v1/openrouter/settings', 'DELETE'); return; }
   const { status, body } = await json('/v1/openrouter/settings', {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -243,7 +306,8 @@ await test('DELETE /v1/openrouter/settings — removes key and settings', async 
   assert(body.data?.deleted === true, `data.deleted: ${JSON.stringify(body.data)}`);
 });
 
-await test('GET /v1/openrouter/settings after delete — hasApiKey: false', async () => {
+await test('GET /v1/openrouter/settings after delete — hasApiKey: false; 410 GONE on 4.0.0', async () => {
+  if (legacyGone) { await goneAndUnwritten('/v1/openrouter/settings', 'GET'); return; }
   const { status, body } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
@@ -298,7 +362,11 @@ await test('POST /v1/openrouter/complete with non-existent project → 404', asy
 // ─── Phase 5: Speech-to-text settings ───
 console.log('\nPhase 5 — Speech-to-text settings');
 
-await test('PUT settings — sttModel + sttLanguage round-trip', async () => {
+await test('PUT settings — sttModel + sttLanguage round-trip; 410 GONE on 4.0.0, nothing written', async () => {
+  if (legacyGone) {
+    await goneAndUnwritten('/v1/openrouter/settings', 'PUT', { sttModel: 'openai/whisper-large-v3', sttLanguage: 'fi' });
+    return;
+  }
   const put = await json('/v1/openrouter/settings', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -311,7 +379,8 @@ await test('PUT settings — sttModel + sttLanguage round-trip', async () => {
   assert(get.body.data?.sttLanguage === 'fi', `sttLanguage: ${get.body.data?.sttLanguage}`);
 });
 
-await test('PUT settings — empty sttModel CLEARS it (transcription off, no silent fallback)', async () => {
+await test('PUT settings — empty sttModel CLEARS it (transcription off, no silent fallback); 410 GONE on 4.0.0, nothing written', async () => {
+  if (legacyGone) { await goneAndUnwritten('/v1/openrouter/settings', 'PUT', { sttModel: '' }); return; }
   await json('/v1/openrouter/settings', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -323,7 +392,15 @@ await test('PUT settings — empty sttModel CLEARS it (transcription off, no sil
   assert(get.body.data?.sttModel === null, `expected null, got ${JSON.stringify(get.body.data?.sttModel)}`);
 });
 
-await test('GET settings — node limits are served with the settings', async () => {
+await test('GET settings — node limits are served with the settings; on 4.0.0 the legacy route is 410 GONE and GET /v1/ai/settings serves the voice limit', async () => {
+  if (legacyGone) {
+    await goneAndUnwritten('/v1/openrouter/settings', 'GET');
+    const { status, body } = await json('/v1/ai/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `GET /v1/ai/settings: ${status} ${JSON.stringify(body?.error)}`);
+    const v = body.data?.limits?.voice_msg_max_seconds;
+    assert(typeof v === 'number' && v > 0, `voice_msg_max_seconds on GET /v1/ai/settings: ${JSON.stringify(body.data?.limits)}`);
+    return;
+  }
   const { body } = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
   const limits = body.data?.limits;
   assert(!!limits, 'limits present');
@@ -332,20 +409,23 @@ await test('GET settings — node limits are served with the settings', async ()
   assert(typeof limits.stt_max_mb === 'number' && limits.stt_max_mb > 0, `stt_max_mb: ${limits.stt_max_mb}`);
 });
 
-await test('GET /v1/openrouter/models?modality=transcription — accepted and echoed', async () => {
-  const { status, body } = await json('/v1/openrouter/models?modality=transcription', {
+await test('GET /v1/openrouter/models?modality=transcription — accepted and echoed; 410 GONE on 4.0.0', async () => {
+  const { status, body, headers } = await json('/v1/openrouter/models?modality=transcription', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
+  // On 4.0.0 this asserted nothing: a 410 is neither 404 nor 422. It names the refusal exactly now.
+  if (legacyGone) { assertGone({ status, body, headers }, 'GET /v1/openrouter/models'); return; }
   // Without a real provider key this is a 400/502; what matters here is that the parameter is
   // ACCEPTED rather than rejected as unknown, and that a success echoes which catalogue was read.
   assert(status !== 404 && status !== 422, `unexpected status ${status}: ${JSON.stringify(body)}`);
   if (status === 200) assert(body.data?.modality === 'transcription', `modality echo: ${body.data?.modality}`);
 });
 
-await test('GET /v1/openrouter/models?modality=bogus — falls back to chat, never errors', async () => {
-  const { status, body } = await json('/v1/openrouter/models?modality=bogus', {
+await test('GET /v1/openrouter/models?modality=bogus — falls back to chat, never errors; 410 GONE on 4.0.0', async () => {
+  const { status, body, headers } = await json('/v1/openrouter/models?modality=bogus', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
+  if (legacyGone) { assertGone({ status, body, headers }, 'GET /v1/openrouter/models'); return; }
   assert(status !== 500, `unexpected 500: ${JSON.stringify(body)}`);
   if (status === 200) assert(body.data?.modality === 'chat', `modality: ${body.data?.modality}`);
 });

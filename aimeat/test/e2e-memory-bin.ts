@@ -18,6 +18,12 @@
 // and this node has many: by key, the bulk list, full-text search, and the ARCHIVE search, which is
 // its own trap because archived and deleted are different states that share the exclusion
 // machinery. Each is asserted separately.
+//
+// Version history:
+//   2026-10-12 -- 13 and 14 plant the owner's AI key through PUT /v1/ai/providers/:id/key, the route
+//     node 4.0.0 keeps, and try the bin on the record it lands in (ai.apikey.provider.<id>); on 3.x
+//     the legacy record openrouter.apikey is tried as well, through PUT/DELETE /v1/openrouter/settings
+//     (the 4.0.0 sweep).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -37,6 +43,8 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
 }
 
 import { registerOwner } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 const ed = await import('@noble/ed25519');
 const { createHash } = await import('node:crypto');
@@ -195,28 +203,63 @@ console.log('\nA credential record is not removed or put back through the bin');
 // doors refuse it and name the record's own route; the generic delete and restore did not, so any
 // principal holding memory:delete could remove the owner's key, and memory:write could put an old,
 // replaced key back from the bin.
-await test('13. The generic delete refuses a credential record and names its own route', async () => {
-  const put = await json('/v1/openrouter/settings', {
-    method: 'PUT', headers: auth(tokA), body: JSON.stringify({ apiKey: 'sk-bin-probe-key-0001' }),
+// The owner's AI key lives in the record of a provider of their own (ai.apikey.provider.<id>), set
+// and removed through PUT/DELETE /v1/ai/providers/:id/key. Node 4.0.0 removes /v1/openrouter/settings;
+// before it, the legacy record openrouter.apikey is tried as well, since an upgraded node still has it.
+const BIN_PROVIDER = 'bin-probe';
+const binProviderKey = async (): Promise<boolean | undefined> => {
+  const r = await json('/v1/ai/providers', { headers: auth(tokA) });
+  return (r.body?.data?.providers ?? []).find((p: any) => p.id === BIN_PROVIDER)?.auth?.has_key;
+};
+const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
+
+await test('13. The generic delete refuses a credential record and names its own route (and the legacy record on 3.x)', async () => {
+  const prov = await json(`/v1/ai/providers/${BIN_PROVIDER}`, {
+    method: 'PUT', headers: auth(tokA),
+    body: JSON.stringify({ title: 'Bin probe', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openrouter/free' } } }),
+  });
+  assert(prov.status === 200, `the owner adds a provider: ${prov.status} ${JSON.stringify(prov.body?.error)}`);
+  const put = await json(`/v1/ai/providers/${BIN_PROVIDER}/key`, {
+    method: 'PUT', headers: auth(tokA), body: JSON.stringify({ api_key: 'sk-bin-probe-key-0001' }),
   });
   assert(put.status === 200, `the owner stores a key: ${put.status} ${JSON.stringify(put.body?.error)}`);
-  const d = await json('/v1/memory/openrouter.apikey', { method: 'DELETE', headers: auth(tokA) });
+  const d = await json(`/v1/memory/ai.apikey.provider.${BIN_PROVIDER}`, { method: 'DELETE', headers: auth(tokA) });
   assert(d.status === 403, `expected 403 for a credential record, got ${d.status} ${JSON.stringify(d.body)}`);
   assert(d.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${d.body.error?.code}`);
-  assert(String(d.body.error?.message).includes('DELETE /v1/ai/providers/{id}'), `the refusal names the route: ${d.body.error?.message}`);
+  assert(String(d.body.error?.message).includes('DELETE /v1/ai/providers/{id}/key'), `the refusal names the route: ${d.body.error?.message}`);
+  assert(await binProviderKey() === true, 'the key is still stored');
+
+  if (legacyGone) return;
+  const legacyPut = await json('/v1/openrouter/settings', {
+    method: 'PUT', headers: auth(tokA), body: JSON.stringify({ apiKey: 'sk-bin-probe-key-0002' }),
+  });
+  assert(legacyPut.status === 200, `the owner stores a legacy key: ${legacyPut.status} ${JSON.stringify(legacyPut.body?.error)}`);
+  const ld = await json('/v1/memory/openrouter.apikey', { method: 'DELETE', headers: auth(tokA) });
+  assert(ld.status === 403, `expected 403 for the legacy credential record, got ${ld.status} ${JSON.stringify(ld.body)}`);
+  assert(ld.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${ld.body.error?.code}`);
+  assert(String(ld.body.error?.message).includes('DELETE /v1/ai/providers/{id}'), `the refusal names the route: ${ld.body.error?.message}`);
   const still = await json('/v1/openrouter/settings', { headers: auth(tokA) });
-  assert(still.body.data?.hasApiKey === true, `the key is still stored: ${JSON.stringify(still.body.data)}`);
+  assert(still.body.data?.hasApiKey === true, `the legacy key is still stored: ${JSON.stringify(still.body.data)}`);
 });
 
-await test('14. The generic restore refuses a credential record the owner removed through its own route', async () => {
-  const del = await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth(tokA) });
+await test('14. The generic restore refuses a credential record the owner removed through its own route (and the legacy record on 3.x)', async () => {
+  const del = await json(`/v1/ai/providers/${BIN_PROVIDER}/key`, { method: 'DELETE', headers: auth(tokA) });
   assert(del.status === 200, `the owner removes the key on its own route: ${del.status} ${JSON.stringify(del.body?.error)}`);
-  const r = await json('/v1/memory/openrouter.apikey/restore', { method: 'POST', headers: auth(tokA) });
+  const r = await json(`/v1/memory/ai.apikey.provider.${BIN_PROVIDER}/restore`, { method: 'POST', headers: auth(tokA) });
   assert(r.status === 403, `expected 403 for a credential record, got ${r.status} ${JSON.stringify(r.body)}`);
   assert(r.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${r.body.error?.code}`);
   assert(String(r.body.error?.message).includes('PUT /v1/ai/providers/{id}/key'), `the refusal names the route: ${r.body.error?.message}`);
+  assert(await binProviderKey() === false, 'the removed key came back');
+
+  if (legacyGone) return;
+  const ldel = await json('/v1/openrouter/settings', { method: 'DELETE', headers: auth(tokA) });
+  assert(ldel.status === 200, `the owner removes the legacy key on its own route: ${ldel.status} ${JSON.stringify(ldel.body?.error)}`);
+  const lr = await json('/v1/memory/openrouter.apikey/restore', { method: 'POST', headers: auth(tokA) });
+  assert(lr.status === 403, `expected 403 for the legacy credential record, got ${lr.status} ${JSON.stringify(lr.body)}`);
+  assert(lr.body.error?.code === 'SECRET_RECORD', `expected SECRET_RECORD, got ${lr.body.error?.code}`);
+  assert(String(lr.body.error?.message).includes('PUT /v1/ai/providers/{id}/key'), `the refusal names the route: ${lr.body.error?.message}`);
   const after = await json('/v1/openrouter/settings', { headers: auth(tokA) });
-  assert(after.body.data?.hasApiKey === false, `the removed key came back: ${JSON.stringify(after.body.data)}`);
+  assert(after.body.data?.hasApiKey === false, `the removed legacy key came back: ${JSON.stringify(after.body.data)}`);
 });
 
 console.log('\nAn agent and a record stored under its owner\'s own identity');

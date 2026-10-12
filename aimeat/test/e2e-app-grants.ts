@@ -8,6 +8,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   v1.5.0 -- 2026-10-12 -- Phase 5b plants the owner's AI key through PUT /v1/ai/providers/:id/key,
+ *     the route node 4.0.0 keeps, and checks the record it lands in (ai.apikey.provider.<id>) on every
+ *     door; on 3.x a second key goes through PUT /v1/openrouter/settings as well, since an upgraded
+ *     node still holds openrouter.apikey (the 4.0.0 sweep).
  *   v1.4.1 — 2026-09-26 — The work-door comment says work:request is askable by an app now; the
  *     grant it tests holds no work word, so what it asserts is unchanged.
  *   v1.4.0 — 2026-09-16 — Phase 5b: openrouter.apikey and commerce.psp show no credential on any
@@ -25,6 +29,8 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -434,22 +440,39 @@ async function main() {
     // by every generic memory door, to an app grant with memory:read, to an agent with owner_scope
     // and to the operator. Those doors now show { configured: true } and a last-four hint.
     const AI_KEY = 'sk-or-e2e-owner-own-key-5d2b';
+    const LEGACY_AI_KEY = 'sk-or-e2e-owner-legacy-key-8a31';
     const STRIPE_KEY = 'sk_test_e2e_generic_doors_71e0';
     const HOOK = 'whsec_e2e_generic_doors_c4a9';
+    // The owner's AI key lives in the record of a provider of their own (ai.apikey.provider.<id>).
+    // Node 4.0.0 removes PUT /v1/openrouter/settings; before it the legacy record is planted as well.
+    const AI_PROVIDER = 'ag-openrouter';
+    const AI_KEY_RECORD = `ai.apikey.provider.${AI_PROVIDER}`;
+    const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
     let readToken = '';
     const noCredential = (door: string, body: unknown) => {
         const text = JSON.stringify(body);
-        for (const s of [AI_KEY, STRIPE_KEY, HOOK]) assert(!text.includes(s), `${door} returned a credential in the clear`);
+        for (const s of [AI_KEY, LEGACY_AI_KEY, STRIPE_KEY, HOOK]) assert(!text.includes(s), `${door} returned a credential in the clear`);
         assert(!text.includes('"encrypted"'), `${door} returned a credential's ciphertext: ${text.slice(0, 240)}`);
         // A snippet or an excerpt carries a stretch of the value without its field name, so the
         // ciphertext itself is looked for too: iv:authTag:ct in hex (services/encryption.ts).
         assert(!/[0-9a-f]{24}:[0-9a-f]{32}/.test(text), `${door} returned a stretch of a credential's ciphertext: ${text.slice(0, 240)}`);
     };
     await test('setup: the owner stores an AI key and Stripe secrets through their own routes', async () => {
-        const ai = await json('/v1/openrouter/settings', {
-            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ apiKey: AI_KEY }),
+        const prov = await json(`/v1/ai/providers/${AI_PROVIDER}`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ title: 'Own OpenRouter', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openrouter/free' } } }),
+        });
+        assert(prov.status === 200, `AI provider: ${prov.status} ${JSON.stringify(prov.body?.error)}`);
+        const ai = await json(`/v1/ai/providers/${AI_PROVIDER}/key`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ api_key: AI_KEY }),
         });
         assert(ai.status === 200, `AI key: ${ai.status} ${JSON.stringify(ai.body?.error)}`);
+        if (!legacyGone) {
+            const legacy = await json('/v1/openrouter/settings', {
+                method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ apiKey: LEGACY_AI_KEY }),
+            });
+            assert(legacy.status === 200, `legacy AI key: ${legacy.status} ${JSON.stringify(legacy.body?.error)}`);
+        }
         const st = await json('/v1/commerce/payout/stripe', {
             method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ secret_key: STRIPE_KEY, webhook_secret: HOOK }),
         });
@@ -459,6 +482,8 @@ async function main() {
     });
     const doors: Array<[string, string]> = [
         ['GET /v1/memory/openrouter.apikey', '/v1/memory/openrouter.apikey'],
+        [`GET /v1/memory/${AI_KEY_RECORD}`, `/v1/memory/${AI_KEY_RECORD}`],
+        ['GET /v1/memory?prefix=ai.', '/v1/memory?prefix=ai.'],
         ['GET /v1/memory/commerce.psp', '/v1/memory/commerce.psp'],
         ['GET /v1/memory/commerce.psp?owner_scope=true', '/v1/memory/commerce.psp?owner_scope=true'],
         ['GET /v1/memory', '/v1/memory?limit=500'],
@@ -482,8 +507,12 @@ async function main() {
         assert(r.status === 200, `read ${r.status}`);
         assert(r.body.data.value.secretKey?.configured === true && r.body.data.value.secretKey?.hint === '…71e0',
             `secretKey shows configured and a hint: ${JSON.stringify(r.body.data.value)}`);
-        const ai = await json('/v1/memory/openrouter.apikey', { headers: { Authorization: `Bearer ${ownerToken}` } });
-        assert(ai.body.data.value?.configured === true, `the AI key shows configured: ${JSON.stringify(ai.body.data.value)}`);
+        const ai = await json(`/v1/memory/${AI_KEY_RECORD}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(ai.body.data?.value?.configured === true, `the AI key shows configured: ${JSON.stringify(ai.body)}`);
+        if (!legacyGone) {
+            const legacy = await json('/v1/memory/openrouter.apikey', { headers: { Authorization: `Bearer ${ownerToken}` } });
+            assert(legacy.body.data?.value?.configured === true, `the legacy AI key shows configured: ${JSON.stringify(legacy.body)}`);
+        }
     });
     await test("the operator's memory screen shows no credential either", async () => {
         const ghii = encodeURIComponent(`${owner}@${NODE_ID}`);
@@ -516,8 +545,13 @@ async function main() {
         // …and the credentials are still in place, because nothing overwrote them.
         const payout = await json('/v1/commerce/payout', { headers: { Authorization: `Bearer ${ownerToken}` } });
         assert(payout.body.data.stripe?.configured === true, `Stripe still configured: ${JSON.stringify(payout.body.data.stripe)}`);
-        const settings = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
-        assert(JSON.stringify(settings.body).includes('"hasApiKey":true'), `AI key still set: ${JSON.stringify(settings.body).slice(0, 200)}`);
+        const providers = await json('/v1/ai/providers', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const own = (providers.body?.data?.providers ?? []).find((p: any) => p.id === AI_PROVIDER);
+        assert(own?.auth?.has_key === true, `AI key still set: ${JSON.stringify(own ?? providers.body).slice(0, 200)}`);
+        if (!legacyGone) {
+            const settings = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+            assert(JSON.stringify(settings.body).includes('"hasApiKey":true'), `legacy AI key still set: ${JSON.stringify(settings.body).slice(0, 200)}`);
+        }
     });
 
     /**
