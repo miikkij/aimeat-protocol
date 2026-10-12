@@ -25,6 +25,10 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.2.1 — 2026-10-13 — A grant on a source priced in the 4.0.0 form (one pacing amount, carried as
+ *     the morsel-rail list price with an explicit toll of 0) has the provider pay that pacing amount;
+ *     with only the toll it burned nothing, so a granted call of such a source was not paced at all.
+ *     A 3.x source with a separate toll is paced as before (the 4.0.0 sweep, e2e-money-audit).
  *   v1.2.0 — 2026-10-11 — The pacing toll is charged with chargePacing: part burns, the operator share follows the fee policy, and the rest is credited to the provider (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Under a grant the provider pays it and all of it burns.
  *   v1.1.2 — 2026-10-05 — The app's spend word is asked with scopeIsCovered (secaudit 2026-10, C3).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -337,7 +341,13 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
   //    Part of the pacing burns, the operator share goes where the fee policy sends it, and the rest
   //    is credited to the provider. A grant covers both halves of a price, so the provider pays the
   //    pacing, and with no one else to credit the whole amount burns.
-  const toll = resolvePacingToll(config, ent.tollMorsels);
+  //    A source priced in the 4.0.0 form has one pacing amount, carried as the morsel-rail per-call
+  //    amount with an explicit toll of 0 beside it (listingTerms, resolveExtActionPricing). On a grant
+  //    nothing else charges that amount (the grant's own pricePerCall is 0 and its list price is only
+  //    counted as carried), so the provider pays it here; with the toll alone a granted
+  //    call of such a source burned nothing and the brake was off.
+  const tollOnlyGrant = !!ent.grant && ent.unit === 'morsels' && ent.tollMorsels === 0 && ent.grant.listPricePerCall > 0;
+  const toll = tollOnlyGrant ? ent.grant!.listPricePerCall : resolvePacingToll(config, ent.tollMorsels);
   const paced = await chargePacing({
     config, storage, caller, label: product.label, amount: toll,
     payer: ent.grant ? ent.providerGhii : null,

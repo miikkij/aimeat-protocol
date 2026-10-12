@@ -13,6 +13,11 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   v1.3.2 — 2026-10-13 — "on a GRANT the burn comes out of the PROVIDER": the provider burns the paced
+ *     tool's whole pacing amount, 6. With the 4.0.0 form the amount is one number, and the node had
+ *     burned only a separate toll, which that form does not have, so a granted call was not paced
+ *     (services/metered-access.ts v1.2.1). "the member is billed NOTHING": the member still pays
+ *     nothing and the provider is credited nothing; the provider burns the solo tool's pacing, 8.
  *   v1.3.1 — 2026-10-12 — The tool manifests carry their morsel amounts as tollMorsels instead of
  *     price.morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED on POST /v1/memory; 57 tests
  *     had failed in a cascade from that one setup. The `paced` tool's 3.x `price.morsels: 4` plus
@@ -890,7 +895,10 @@ await test('GRANT · the provider approves the member, and the member is billed 
     const r = await rawInvoke(member.token, 'solo');
     assert(r.status === 200, `the approved member is served: ${r.status} ${JSON.stringify(r.body?.error)}`);
     assert(await balance(member.token) === mb, `the member pays nothing — ${mb - await balance(member.token)} morsels moved`);
-    assert(await balance(provider.token) === pb, 'and nothing is credited to the provider for their own gift');
+    // Nothing is credited to the provider for their own gift. The call is still paced: the provider
+    // carries the tool's pacing amount, 8, and it burns (the PACING · GRANT test below says why).
+    const moved = pb - await balance(provider.token);
+    assert(moved === 8, `and nothing is credited to the provider for their own gift; the provider burns the 8-morsel pacing amount, moved ${moved}`);
 });
 
 await test('GRANT · it works through every door a paid contract works through', async () => {
@@ -1113,7 +1121,9 @@ await test('PACING · on a GRANT the burn comes out of the PROVIDER, because the
     const r = await rawInvoke(guest.token, 'paced');
     assert(r.status === 200, `the carried call is served: ${r.status} ${JSON.stringify(r.body?.error)}`);
     assert(await balance(guest.token) === gb, `the guest pays neither half — ${gb - await balance(guest.token)} morsels moved`);
-    assert(pb - await balance(provider.token) === 2, `the provider burns the 2-morsel toll, moved ${pb - await balance(provider.token)}`);
+    // The paced tool has one pacing amount, 6 (the 4.0.0 form). The provider carries the call, so the
+    // provider pays all 6; with the 3.x split (4 + a 2-morsel toll) it paid the toll part only.
+    assert(pb - await balance(provider.token) === 6, `the provider burns the 6-morsel pacing amount, moved ${pb - await balance(provider.token)}`);
     // Under a grant the provider pays the pacing and, with nobody else to credit, all of it burns
     // (chargePacing with no provider). The row was `extension_toll` before the pacing ledger rows.
     const burns = (await txns(provider.token)).filter(t => t.type === 'pacing_burn'
