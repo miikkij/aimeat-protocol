@@ -13,6 +13,8 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.7.1 — 2026-10-13 — The offering detail and the ODPS document of an ext action state its toll
+ *     through extActionDeclaredToll, so a toll-only action reads toll_morsels 10, not 20.
  *   v1.7.0 — 2026-10-12 — Listing an extension action prices it with resolveExtActionPricing, so an
  *     action in the 4.0.0 form (its own tollMorsels, no payMorsels) lists instead of NOT_PRICED.
  *   v1.6.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
@@ -47,7 +49,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import {
   type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type OfferingPlan,
-  resolveActionPricing, resolveExtActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
+  resolveActionPricing, resolveExtActionPricing, extActionDeclaredToll, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings, filterOfferings,
   putNeed, getNeed, parseNeedSpec, listNeeds, putBid, listBids, getBid, acceptBid,
   offeringStats, offeringConsumers, enrichNeeds, presentOffering, offeringTollMorsels,
@@ -429,7 +431,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         note: 'Each call is metered + charged to your budget at the provider price; the provider’s own upstream keys stay server-side.',
         mcp: `aimeat_extension_invoke { "name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
       },
-      stats, tollMorsels: act?.tollMorsels ?? null,
+      stats, tollMorsels: act ? extActionDeclaredToll(act) : null,
     };
   }
 

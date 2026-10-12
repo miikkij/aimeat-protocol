@@ -10,10 +10,12 @@
  *   twice: the toll is the per-call pacing amount, and the contract carries no second toll beside it.
  * @usage cd aimeat && pnpm vitest run test/unit/exchange-ext-action-pricing.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-13 — extActionDeclaredToll: the offering detail, the ODPS document and
+ *     aimeat_exchange_offering_get stated a toll-only action's toll twice (toll_morsels 20 for 10).
  *   v1.0.0 — 2026-10-12 — Initial (the 4.0.0 sweep).
  */
 import { describe, it, expect } from 'vitest';
-import { resolveOfferingPricing, type Offering } from '../../src/services/exchange-market.js';
+import { resolveOfferingPricing, extActionDeclaredToll, type Offering } from '../../src/services/exchange-market.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 function storageWith(action: Record<string, unknown>): Storage {
@@ -60,6 +62,13 @@ describe('a contract on an extension action', () => {
     expect(r.unit).toBe('money');
     expect(r.pricePerCall).toBe(50000);
     expect(r.tollMorsels).toBe(3);
+  });
+
+  it('the toll a live detail states beside the per-call amount is the contract toll, not the toll twice', () => {
+    expect(extActionDeclaredToll({ tollMorsels: 10, commercial: { payMorsels: 0 } })).toBe(0);
+    expect(extActionDeclaredToll({ tollMorsels: 2, commercial: { payMorsels: 10 } })).toBe(2);
+    expect(extActionDeclaredToll({ tollMorsels: 3, commercial: { payMoney: { amount: 50000, currency: 'EUR' } } })).toBe(3);
+    expect(extActionDeclaredToll({ commercial: { payMorsels: 0 } })).toBe(null);
   });
 
   it('with neither a money price nor a pacing amount is NOT_PRICED', async () => {
