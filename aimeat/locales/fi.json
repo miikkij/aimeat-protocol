@@ -16206,7 +16206,7 @@
       "autoHowStep2": "AIMEAT huomaa datan ja antaa sen agentillesi.",
       "autoHowStep3": "Agenttisi tekee työn ja kirjoittaa oivalluksensa takaisin.",
       "autoHowStep4": "Saat valmiit oivallukset. Toimitettuna sovellukseen ja tavoitettavissa kaikkialta.",
-      "autoHowDoc": "Koko kuvaus on ulkoisten sovellusten oppaan Automation-luvussa: github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md",
+      "autoHowDoc": "Tämän sovelluksen omat asennusohjeet ovat kortin alussa kohdassa \"Näin asennat tämän\".",
       "autoStep1": "① Mitä tämä sovellus tuottaa",
       "autoStep2": "② Aja aikataulun mukaan",
       "autoStep3": "③ Käsittele agentilla/agenteilla",

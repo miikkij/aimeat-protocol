@@ -14437,7 +14437,7 @@
       "autoHowStep2": "AIMEAT ve esos datos y se los pasa a tu agente.",
       "autoHowStep3": "Tu agente hace el trabajo y escribe sus conclusiones de vuelta.",
       "autoHowStep4": "Recibes las conclusiones terminadas, entregadas a la aplicación y alcanzables desde cualquier sitio.",
-      "autoHowDoc": "La descripción completa está en la guía de aplicaciones externas, en la sección Automation: github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md",
+      "autoHowDoc": "Los pasos de instalación de esta aplicación están al principio de esta tarjeta, en \"Cómo montar esto\".",
       "autoStep1": "① Qué produce esta aplicación",
       "autoStep2": "② Ejecutar según un horario",
       "autoStep3": "③ Procesarlo con agentes",

@@ -16207,7 +16207,7 @@
       "autoHowStep2": "AIMEAT spots that data and hands it to your agent.",
       "autoHowStep3": "Your agent does the work and writes its insights back.",
       "autoHowStep4": "You get the finished insights. Delivered to the app and reachable everywhere.",
-      "autoHowDoc": "The full description is in the guide for outside apps, under Automation: github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md",
+      "autoHowDoc": "This app's own setup steps are at the top of this card, under \"How to set this up\".",
       "autoStep1": "① What this app produces",
       "autoStep2": "② Run on a schedule",
       "autoStep3": "③ Process with agent(s)",
