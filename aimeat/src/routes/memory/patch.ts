@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   v1.5.5 — 2026-10-12 — PATCH refuses a merged app tool manifest or offers document carrying the old
+ *     morsel price with 400 MORSEL_PRICE_REMOVED from 4.0.0 (services/legacy-pacing-write.ts).
  *   v1.5.4 — 2026-10-11 — An `agents.` key that carries an identity where the agent's name belongs
  *     is refused with 400 AGENT_KEY_NOT_A_NAME (utils/agent-key-address.ts).
  *   v1.5.3 — 2026-10-11 — The `memory` change goes to the owner's streams when the record is one
@@ -78,6 +80,7 @@ import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
+import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
 import { stampAgentWrite, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
@@ -257,6 +260,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // An EXCHANGE listing source whose changed text would break an ODPS length cap (2026-09-13).
       const odps = odpsWriteRefusal(key, merged, existing?.value);
       if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
+      const legacyPacing = legacyPacingWriteRefusal(key, merged);
+      if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
 
       // Provenance is stamped against the MERGED bytes, because those are the bytes that end up
       // stored. A statement about only the patch would be a statement about something nobody can read

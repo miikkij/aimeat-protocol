@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.7 — 2026-10-12 — PUT refuses an app tool manifest or offers document carrying the old morsel
+ *     price with 400 MORSEL_PRICE_REMOVED from 4.0.0 (services/legacy-pacing-write.ts).
  *   v1.11.6 — 2026-10-11 — PUT refuses an `agents.` key that carries an identity where the agent's
  *     name belongs: 400 AGENT_KEY_NOT_A_NAME (utils/agent-key-address.ts).
  *   v1.11.5 — 2026-10-11 — The `memory` change of a record only its owner reads goes to that owner's
@@ -64,6 +66,7 @@ import { MemoryUpdateSchema, validateBody } from '../../models/schemas.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
+import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
@@ -476,6 +479,8 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // An EXCHANGE listing source whose changed text would break an ODPS length cap (2026-09-13).
       const odps = odpsWriteRefusal(key, value, existing.value);
       if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
+      const legacyPacing = legacyPacingWriteRefusal(key, value);
+      if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
     }
 
     const now = new Date().toISOString();

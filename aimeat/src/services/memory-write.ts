@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.13.0 — 2026-10-12 — An app tool manifest or an agent's offers document carrying the old morsel
+ *     price is refused with 400 MORSEL_PRICE_REMOVED from 4.0.0 (services/legacy-pacing-write.ts), as
+ *     the dedicated routes already refused it.
  *   v1.12.0 — 2026-10-11 — AGENT_KEY_NOT_A_NAME (400): an `agents.` key whose name segment holds an
  *     identity is refused, because nothing reads a record stored there (utils/agent-key-address.ts).
  *   v1.11.4 — 2026-10-11 — The `memory` change of a record only its owner reads goes to that
@@ -108,6 +111,7 @@ import { misdirectedCrewKey } from './crew-def-store.js';
 import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
+import { legacyPacingWriteRefusal } from './legacy-pacing-write.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from './secret-records.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 import { agentKeyRefusal } from '../utils/agent-key-address.js';
@@ -233,7 +237,9 @@ export type MemoryWriteResult =
             // An `agents.` key that carries an identity where the agent's name belongs.
             | 'AGENT_KEY_NOT_A_NAME'
             // An EXCHANGE listing source whose changed text would break an ODPS length cap.
-            | 'ODPS_FIELD_TOO_LONG';
+            | 'ODPS_FIELD_TOO_LONG'
+            // The same source carrying the old morsel price on a node at 4.0.0 or later.
+            | 'MORSEL_PRICE_REMOVED';
         message: string;
         details?: unknown;
     };
@@ -398,6 +404,9 @@ export async function writeMemoryRecord(
     // stored keeps publishing. Any other key returns null at once.
     const odpsRefusal = odpsWriteRefusal(input.key, input.value, existing?.value);
     if (odpsRefusal) return odpsRefusal;
+    // The same two sources carrying the old morsel price, on a node at 4.0.0 or later.
+    const legacyPacing = legacyPacingWriteRefusal(input.key, input.value);
+    if (legacyPacing) return legacyPacing;
 
     // The three memory ceilings — value size, key count, byte budget — from the one place that
     // holds them (services/memory-ceilings.ts). A single write is a set of one; the workspace batch

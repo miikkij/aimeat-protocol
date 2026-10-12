@@ -11,6 +11,8 @@
 //   3. Every human registration door, not just one. Three doors bypassed provisionOwner and the
 //      onboarding track marker was missing from one of them for exactly that reason.
 //
+// v1.1.0 -- 2026-10-12 -- POST /v1/owners: the answer's next action is POST /v1/ghii/login, not the
+//   owner-key sign-in that node 4.0.0 removes (src/routes/owners.ts v1.8.0).
 // v1.0.0 -- 2026-08-07 -- Initial.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -59,6 +61,10 @@ async function registerViaOwners(name: string): Promise<{ token: string; ghii: s
         method: 'POST', body: JSON.stringify({ name, display_name: name, public_key: 'placeholder' }),
     });
     assert(status === 201, `register ${name}: ${status} ${JSON.stringify(body)}`);
+    // The answer's next action is the password sign-in, never the owner-key sign-in 4.0.0 removes.
+    const next = body.hints?.next_actions?.[0];
+    assert(next?.url === '/v1/ghii/login' && next?.method === 'POST', `next action: ${JSON.stringify(body.hints?.next_actions)}`);
+    assert(!JSON.stringify(body.hints ?? {}).includes('/v1/auth/token'), 'no next action names the owner-key sign-in');
     await seedPassword(name);
     return { token: await passwordToken(BASE, name), ghii: `${name}@${NODE_ID}` };
 }
