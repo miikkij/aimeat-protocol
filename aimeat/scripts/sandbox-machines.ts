@@ -28,6 +28,9 @@
  * @usage
  *   cd aimeat && pnpm sandbox && pnpm sandbox:machines     # leave it running; Ctrl+C stops the machine
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The stand-in computers name the features `record_spaces` and
+ *     `record_backfill`, in the answer to `crew.menu` and in the X-AIMEAT-Features header a
+ *     connector presents at connect.
  *   v1.1.0 — 2026-10-12 — A stand-in computer answers `crew.menu` with a tool list and the feature
  *     `record_spaces`. The agents enrolled on the first machine are attached to its socket with
  *     their own keys (kept in .sandbox-machines.json), because the node asks an agent only while
@@ -70,7 +73,7 @@ const MENU = {
     { id: 'workspace', purpose: 'read the person\'s organisms and workspaces. Read-only' },
     { id: 'workspace_write', purpose: 'everything "workspace" reads, and create or update a record and append rows' },
   ],
-  features: ['record_spaces'],
+  features: ['record_spaces', 'record_backfill'],
   llm: { profiles: [], models: [] },
 };
 
@@ -133,7 +136,9 @@ async function attachKept(ws: WebSocket, base: string, machine: { id: string }):
 function openMachine(base: string, token: string, owner: string, machine: { id: string; name: string }): Promise<WebSocket> {
   return new Promise((done, fail) => {
     const ws = new WebSocket(base.replace(/^http/, 'ws') + '/v1/connect/tunnel', {
-      headers: { Authorization: `Bearer ${token}`, 'X-AIMEAT-Install': machine.id, 'X-AIMEAT-Install-Name': encodeURIComponent(machine.name), 'X-AIMEAT-Run-Modes': 'spawn' },
+      // The features go out as a connector presents them (AIMEAT_RUNTIME_FEATURES): the node keeps
+      // them on the computer's row, so the new-agent page reads them without asking an agent.
+      headers: { Authorization: `Bearer ${token}`, 'X-AIMEAT-Install': machine.id, 'X-AIMEAT-Install-Name': encodeURIComponent(machine.name), 'X-AIMEAT-Run-Modes': 'spawn', 'X-AIMEAT-Features': MENU.features.join(',') },
     });
     const timer = setTimeout(() => fail(new Error(`${machine.name}: the tunnel did not answer. Is the sandbox started with this version (pnpm sandbox --stop, then pnpm sandbox)?`)), 10_000);
     ws.on('error', (err) => { clearTimeout(timer); fail(err); });

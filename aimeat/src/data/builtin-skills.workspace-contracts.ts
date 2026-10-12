@@ -30,6 +30,8 @@
  * @structure WORKSPACE_CONTRACTS_SKILL_ENTRY
  * @usage import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
  * @version-history
+ *   v1.1.0 — 2026-10-12 — Section 10: the node does not send workspace.record to an agent whose
+ *     engagements in the workspace are all retired (services/connect-tunnel-push.ts).
  *   v1.0.0 — 2026-10-11 — From docs/agent-workspace-contracts.md, corrected against the code.
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -258,6 +260,13 @@ An engagement records that one agent serves one contract in one workspace, with 
 - \`active\`: work as usual.
 - No engagement: work by the presence of your input space, and write an \`active\` engagement so the
   owner can see it.
+
+**The node obeys them too.** An agent whose engagements in a workspace are all retired is not sent
+that workspace's \`workspace.record\` events, so nothing starts it for them. One active engagement
+there, or no engagement at all, is sent as before. The subscription is kept: the events come back
+when an engagement is active again, and the catch-up read at the agent's next start finds what was
+published in between. Keep the check in your loop as well, because the catch-up read does not pass
+through the node's push.
 
 ## 11. Why the organism exists, and whether it works (optional)
 

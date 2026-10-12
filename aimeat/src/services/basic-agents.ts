@@ -22,6 +22,8 @@
  *   import { describeBasicAgents } from '../services/basic-agents.js';
  *   const view = await describeBasicAgents(config, storage, req.auth!.owner);
  * @version-history
+ *   v1.4.0 — 2026-10-12 — A connected daemon carries what its connector said the crew runtime
+ *     honours beyond its tools (`features`).
  *   v1.3.0 — 2026-10-10 — A connected daemon carries the name its connector reported, and
  *     residentRunnable() answers for one named connector when the caller names it.
  *   v1.2.0 — 2026-10-02 — A connected daemon carries the run modes its connector presented, and
@@ -82,6 +84,8 @@ export interface ConnectedDaemon {
   runModes: string[] | null;
   /** The name the connector reported for its installation; null when it reported none. */
   name: string | null;
+  /** What the connector said its crew runtime honours beyond its tools; null when it did not say. */
+  features: string[] | null;
 }
 
 /**
@@ -116,7 +120,7 @@ export function connectedDaemons(owner: string): ConnectedDaemon[] {
   return tunnels.daemonsForOwner(owner)
     .map(d => ({ ...d, principals: d.principals.filter(p => !p.startsWith('eco:')) }))
     .filter(d => d.principals.length > 0)
-    .map(d => ({ installId: d.installId, principals: d.principals, target: d.principals[0], runModes: d.runModes, name: d.name }));
+    .map(d => ({ installId: d.installId, principals: d.principals, target: d.principals[0], runModes: d.runModes, name: d.name, features: d.features }));
 }
 
 /**

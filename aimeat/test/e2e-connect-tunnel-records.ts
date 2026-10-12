@@ -3,6 +3,7 @@
 //
 // Covers: subscribe → record write → `deliver{workspace.record}` push (happy path, incl. the
 // multi-segment namespace `shared.tasks`); created-vs-updated op; drafts/version writes do NOT push;
+// a retired engagement stops the push and a member who owns neither side cannot retire it (403);
 // and the SECURITY invariant — an agent that cannot READ the workspace (member but no read grant on a
 // private workspace) is REJECTED at subscribe and receives NO record push (push == REST-read access).
 
@@ -154,12 +155,85 @@ await test('3. A record UPDATE pushes op:updated; a DRAFT write pushes nothing',
   await t.close();
 });
 
+// ─── A retired engagement: the node sends the agent no record of that workspace ───
+console.log('\nPhase 1b — A retired engagement stops the push');
+
+const engagement = (path: '' | '/retire', contract?: string) => json(`/v1/organisms/${orgId}/workspace/engagements${path}`, {
+  method: 'POST', headers: auth(A.token), body: JSON.stringify({ ws: WS, agent: aAgent.gaii, ...(contract ? { contract } : {}) }),
+});
+
+await test('3b. An agent whose only engagement in the workspace is retired gets no record push, and gets it again once the engagement is active', async () => {
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  t.subscribe([{ organism_id: orgId, ws: WS, space: SPACE }]);
+  assert((await t.waitForSubscribed(2000)) !== null, 'subscribed');
+
+  const active = await engagement('');
+  assert(active.status === 200 && active.body.data.engagement.state === 'active', `activate ${active.status}: ${JSON.stringify(active.body.error)}`);
+  const w0 = await writeRecord(A.token, 'eng0', { id: 'eng0', title: 'While active' });
+  assert(w0.status === 201, `write ${w0.status}`);
+  const sent = await t.waitForDeliver(2000);
+  assert(sent !== null && (sent!.payload as any)?.id === 'eng0', `an active engagement is sent the record, got ${JSON.stringify(sent?.payload)}`);
+
+  const retired = await engagement('/retire');
+  assert(retired.status === 200 && retired.body.data.engagement.state === 'retired', `retire ${retired.status}: ${JSON.stringify(retired.body.error)}`);
+  const w1 = await writeRecord(A.token, 'eng1', { id: 'eng1', title: 'While retired' });
+  assert(w1.status === 201, `write ${w1.status}`);
+  const none = await t.waitForDeliver(1000);
+  assert(none === null, `a retired engagement must get no record push, but got ${JSON.stringify(none?.payload)}`);
+
+  // The subscription was kept: nothing has to subscribe again for the push to come back.
+  const again = await engagement('');
+  assert(again.status === 200 && again.body.data.engagement.state === 'active', `re-activate ${again.status}`);
+  const w2 = await writeRecord(A.token, 'eng2', { id: 'eng2', title: 'Active again' });
+  assert(w2.status === 201, `write ${w2.status}`);
+  const back = await t.waitForDeliver(2000);
+  assert(back !== null && (back!.payload as any)?.id === 'eng2', `the push is back after re-activation, got ${JSON.stringify(back?.payload)}`);
+  await t.close();
+});
+
+await test('3c. One retired contract beside an active one in the same workspace is still sent the record', async () => {
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  t.subscribe([{ organism_id: orgId, ws: WS, space: SPACE }]);
+  assert((await t.waitForSubscribed(2000)) !== null, 'subscribed');
+  // The bare engagement is active from 3b; a second, named contract of the same agent is retired.
+  const other = await engagement('/retire', 'old-contract');
+  assert(other.status === 200 && other.body.data.engagement.state === 'retired', `retire the named contract ${other.status}`);
+  const w = await writeRecord(A.token, 'eng3', { id: 'eng3', title: 'One of two retired' });
+  assert(w.status === 201, `write ${w.status}`);
+  const d = await t.waitForDeliver(2000);
+  assert(d !== null && (d!.payload as any)?.id === 'eng3', `still sent while one engagement is active, got ${JSON.stringify(d?.payload)}`);
+  await t.close();
+});
+
 // ─── Security: B's agent is a member but cannot READ the private workspace ───
 console.log('\nPhase 2 — Read-consent parity (no read ⇒ no push)');
 
 await test('4. B joins the org (member, but no workspace read grant)', async () => {
   const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(B.token), body: '{}' });
   assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body)}`);
+});
+
+// Retiring an engagement switches the push off, so who may retire is who may silence an agent.
+await test("4b. B, a member who owns neither the agent nor the workspace, cannot retire or activate A's agent's engagement, and the push still arrives", async () => {
+  const asB = (path: '' | '/retire') => json(`/v1/organisms/${orgId}/workspace/engagements${path}`, {
+    method: 'POST', headers: auth(B.token), body: JSON.stringify({ ws: WS, agent: aAgent.gaii }),
+  });
+  const retire = await asB('/retire');
+  assert(retire.status === 403 && retire.body.error?.code === 'ACCESS_DENIED', `B retiring A's agent: ${retire.status} ${retire.body.error?.code}`);
+  const adopt = await asB('');
+  assert(adopt.status === 403 && adopt.body.error?.code === 'ACCESS_DENIED', `B activating for A's agent: ${adopt.status} ${adopt.body.error?.code}`);
+
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  t.subscribe([{ organism_id: orgId, ws: WS, space: SPACE }]);
+  assert((await t.waitForSubscribed(2000)) !== null, 'subscribed');
+  const w = await writeRecord(A.token, 'eng4', { id: 'eng4', title: 'After a refused retire' });
+  assert(w.status === 201, `write ${w.status}`);
+  const d = await t.waitForDeliver(2000);
+  assert(d !== null && (d!.payload as any)?.id === 'eng4', `the refused retire changed nothing, got ${JSON.stringify(d?.payload)}`);
+  await t.close();
 });
 
 await test("5. B's agent subscribe is REJECTED (access_denied) for the private workspace", async () => {

@@ -95,7 +95,7 @@ export interface HomeAgentsView {
   worker_total: number;
   connectors: Array<{
     id: string; name: string | null; online: boolean; last_seen: string;
-    run_modes: string[] | null; agents: number; waiting: number;
+    run_modes: string[] | null; features: string[] | null; agents: number; waiting: number;
   }>;
 }
 
@@ -211,7 +211,7 @@ export async function readHomeAgents(
     worker_total: all.length,
     connectors: connectors.map(c => ({
       id: c.id, name: c.name, online: c.online, last_seen: c.last_seen,
-      run_modes: c.run_modes, agents: c.agents.length, waiting: c.waiting.length,
+      run_modes: c.run_modes, features: c.features, agents: c.agents.length, waiting: c.waiting.length,
     })),
   };
 }

@@ -922,6 +922,17 @@ components:
           nullable: true
           items: { type: string, enum: [spawn, resident] }
           description: The run modes it presented at its last connect; null from a connector that did not say
+        features:
+          type: array
+          nullable: true
+          items: { type: string }
+          description: |
+            What its crew runtime honours beyond its tools, by name, as the connector presented it
+            at connect in the `X-AIMEAT-Features` header (the runtime sets `AIMEAT_RUNTIME_FEATURES`).
+            `record_spaces`: it wakes an agent on the records of the workspace spaces the agent's
+            definition names. `record_backfill`: such an item may say `backfill: true`. Kept while
+            the connector is away. Null from a connector that never said, which is not "none": ask
+            one of its agents with GET /v1/agents/{name}/crew/menu.
         agents:
           type: array
           items: { type: string }
@@ -14880,6 +14891,11 @@ paths:
                                   type: array
                                   nullable: true
                                   items: { type: string }
+                                features:
+                                  type: array
+                                  nullable: true
+                                  items: { type: string }
+                                  description: What the connector said its crew runtime honours beyond its tools (see AgentConnector). Null when it never said.
                                 agents: { type: integer, description: How many agents live on it }
                                 waiting: { type: integer, description: How many agents wait for it }
         '403': { description: Not the account holder in person }
@@ -14969,6 +14985,11 @@ paths:
 
         A workspace the caller may not read answers 404, like one that does not exist.
 
+        `include=counts` adds `records` to each space: how many published records it holds now.
+        It is what an agent whose `record_spaces` item says `backfill: true` is given as tasks.
+        The count is read from the workspace index, which materialises the workspace's content,
+        so ask for it only when the number is shown.
+
         Requires the account holder's own session.
       tags:
         - Portal
@@ -14983,6 +15004,11 @@ paths:
           in: query
           required: true
           schema: { type: string }
+        - name: include
+          in: query
+          required: false
+          schema: { type: string, enum: [counts] }
+          description: "`counts` adds the number of published records to each space."
       responses:
         '200':
           description: The watchable spaces
@@ -15006,6 +15032,7 @@ paths:
                                 name: { type: string }
                                 namespace: { type: string }
                                 description: { type: string }
+                                records: { type: integer, description: "With `include=counts`: how many published records the space holds now. A draft is not counted." }
         '400': { description: organism_id or workspace_id is missing }
         '403': { description: Not the account holder in person }
         '404': { description: No such workspace, or the caller may not read it }

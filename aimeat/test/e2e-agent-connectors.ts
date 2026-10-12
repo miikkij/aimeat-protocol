@@ -119,12 +119,13 @@ interface FakeDaemon {
 }
 
 /** `installName` is sent the way the connector sends it: URI-encoded, because a host name may not be ASCII. */
-function openDaemon(token: string, installId: string, installName?: string, runModes?: string): Promise<FakeDaemon> {
+function openDaemon(token: string, installId: string, installName?: string, runModes?: string, features?: string): Promise<FakeDaemon> {
     return new Promise((resolve, reject) => {
         const wsUrl = BASE.replace(/^http/, 'ws') + '/v1/connect/tunnel';
         const headers: Record<string, string> = { Authorization: `Bearer ${token}`, 'X-AIMEAT-Install': installId };
         if (installName) headers['X-AIMEAT-Install-Name'] = encodeURIComponent(installName);
         if (runModes) headers['X-AIMEAT-Run-Modes'] = runModes;
+        if (features) headers['X-AIMEAT-Features'] = features;
         const ws = new WebSocket(wsUrl, { headers });
         const daemon: FakeDaemon = { ws, onEnrol: null, revoked: [], attached: [], close: () => { try { ws.close(); } catch { /* already gone */ } } };
         const timer = setTimeout(() => reject(new Error('tunnel did not welcome in time')), 10_000);
@@ -674,6 +675,32 @@ async function run() {
         const back = await move(authA, 'stay-up', ALWAYS);
         assert(back.status === 200 && back.body.data.run_mode === 'spawn' && back.body.data.run_mode_corrected === null,
             `moving back changes nothing more: nobody asked for resident again, got ${JSON.stringify(back.body?.data)}`);
+    });
+
+    // ── 6c. What a connector's runtime honours, said by the connector itself ──
+    // A computer with no agent on it has nobody to ask (GET /crew/menu is asked of an agent), so
+    // the connector presents the runtime's features when it opens its socket, as it does run modes.
+    await test('a connector presents the features of its runtime, and the node keeps the names it can read', async () => {
+        const FEATURED = 'fff-features';
+        const seat = await addV1Agent(a.owner, a.ownerToken, 'seat-features');
+        const d = await openDaemon(seat.token, FEATURED, 'Ominaisuudet', 'spawn', 'record_spaces, RECORD_BACKFILL,not a name!,record_spaces,');
+        await until('the featured connector to be listed', async () => !!(await connectorOf(FEATURED)));
+        const row = await connectorOf(FEATURED);
+        assert(JSON.stringify(row.features) === '["record_spaces","record_backfill"]', `names in the order presented, lower-cased, once each, got ${JSON.stringify(row.features)}`);
+        const silent = await connectorOf(SPAWN_ONLY);
+        assert(silent.features === null, `a connector that presented none has null, which is not "none", got ${JSON.stringify(silent.features)}`);
+        const home = await homeAgents(authA);
+        const machines = home.body.data.connectors as any[];
+        assert(JSON.stringify(machines.find(c => c.id === FEATURED)?.features) === '["record_spaces","record_backfill"]',
+            `the home's read carries them, got ${JSON.stringify(machines.find(c => c.id === FEATURED))}`);
+        assert(machines.find(c => c.id === SPAWN_ONLY)?.features === null, 'and null for a connector that presented none');
+        // What it presented is remembered while it is away, as its run modes are: an agent can be
+        // ordered to a computer that is switched off. The node writes a connector's record two
+        // seconds after its first socket, so the socket stays open past that before it closes.
+        await new Promise(r => setTimeout(r, 2500));
+        d.close();
+        await until('the featured connector to read as away', async () => (await connectorOf(FEATURED))?.online === false);
+        assert(JSON.stringify((await connectorOf(FEATURED)).features) === '["record_spaces","record_backfill"]', 'the features stay on the connector\'s row while it is away');
     });
 
     await test('a definition that listens for direct messages with no reply tool is proposed with a warning, and one that can answer is not', async () => {

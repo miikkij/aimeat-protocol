@@ -42,6 +42,8 @@ export interface ConnectConnection {
   installName: string | null;
   /** The run modes the connector presented at upgrade (X-AIMEAT-Run-Modes), or null when it did not say. */
   runModes: string[] | null;
+  /** What the connector said its crew runtime honours beyond its tools (X-AIMEAT-Features), or null when it did not say. */
+  features?: string[] | null;
   /**
    * Whether the agent behind this identity is stopped (services/agent-stop-rules.ts). Read from its
    * record when the backlog is sent, at connect and at attach, and written by the stop and start
