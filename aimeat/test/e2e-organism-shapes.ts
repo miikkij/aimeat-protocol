@@ -21,6 +21,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -89,9 +90,10 @@ async function provision(tag: string) {
     const agentGaii = agent.body.data.agent.gaii;
     const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'Shape E2E', redirect_uris: [] }) });
     ts = new Date().toISOString();
-    const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii, signature: await signMsg(agent.body.data.private_key, agentGaii + NODE_ID + ts), timestamp: ts });
+    const pkce = mcpPkce(BASE);
+    const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii, signature: await signMsg(agent.body.data.private_key, agentGaii + NODE_ID + ts), timestamp: ts, ...authorizeParams(pkce) });
     const authz = await json(`/v1/mcp/authorize?${params}`);
-    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret, ...tokenParams(pkce) }) });
     assert(tok.status === 200, `mcp token ${tok.status}`);
     return { ownerName, ownerToken, mcpToken: tok.body.access_token as string };
 }

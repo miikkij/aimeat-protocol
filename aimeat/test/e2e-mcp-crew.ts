@@ -12,6 +12,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { TunnelClient } from './helpers/tunnel-harness.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -120,9 +121,10 @@ await test('Owner, agent, agent MCP session, agent on the tunnel as its own runt
 
     const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'mcp crew e2e', redirect_uris: [] }) });
     const ats = new Date().toISOString();
-    const params = new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii: agentGaii, signature: await sign(agentKey, agentGaii + NODE_ID + ats), timestamp: ats });
+    const pkce = mcpPkce(BASE);
+    const params = new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii: agentGaii, signature: await sign(agentKey, agentGaii + NODE_ID + ats), timestamp: ats, ...authorizeParams(pkce) });
     const auth = await json(`/v1/mcp/authorize?${params}`);
-    const token = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }) });
+    const token = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }) });
     assert(token.status === 200, `mcp token ${token.status}: ${JSON.stringify(token.body)}`);
     session = { token: token.body.access_token, sessionId: '', nextId: 1 };
     await rpc(session, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'mcp crew e2e', version: '1.0.0' } });
@@ -198,9 +200,10 @@ await test('9. aimeat_memory_write of crews.registry.<agent> from the chat princ
     const chatSession = await (async () => {
         const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'chat client', redirect_uris: [] }) });
         const ats = new Date().toISOString();
-        const params = new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii: chatGaii, signature: await sign(ag.body.data.private_key, chatGaii + NODE_ID + ats), timestamp: ats });
+        const pkce = mcpPkce(BASE);
+        const params = new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii: chatGaii, signature: await sign(ag.body.data.private_key, chatGaii + NODE_ID + ats), timestamp: ats, ...authorizeParams(pkce) });
         const auth = await json(`/v1/mcp/authorize?${params}`);
-        const token = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }) });
+        const token = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }) });
         const s: Session = { token: token.body.access_token, sessionId: '', nextId: 1 };
         await rpc(s, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'chat client', version: '1.0.0' } });
         return s;

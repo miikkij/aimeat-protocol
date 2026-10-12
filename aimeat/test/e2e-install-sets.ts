@@ -43,6 +43,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -483,15 +484,17 @@ await test('An agent of the operator holding operator:admin plans and lists the 
     const client = await C.json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'Install Sets E2E', redirect_uris: [] }) });
     assert(client.status === 201, `mcp register: ${client.status}`);
     const at = new Date().toISOString();
+    const pkce = mcpPkce(C.baseUrl);
     const params = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii, timestamp: at,
         signature: await sign(agent.body.data.private_key, gaii + C.nodeId + at),
+        ...authorizeParams(pkce),
     });
     const code = await C.json(`/v1/mcp/authorize?${params}`);
     assert(typeof code.body.code === 'string', `authorize: ${JSON.stringify(code.body)}`);
     const tok = await C.json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: code.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: code.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }),
     });
     assert(tok.status === 200, `mcp token: ${tok.status}`);
     let session = '';

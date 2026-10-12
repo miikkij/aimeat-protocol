@@ -41,6 +41,7 @@ async function json(path: string, opts: RequestInit = {}) {
 // Helper: sign a message with a base64 private key
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -167,12 +168,14 @@ await test('OAuth authorize + token exchange', async () => {
     const timestamp = new Date().toISOString();
     const message = agentGaii + NODE_ID + timestamp;
     const signature = await signMsg(agentPrivKey, message);
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
         gaii: agentGaii,
         signature,
         timestamp,
+        ...authorizeParams(pkce),
     });
     const { body: authBody } = await json(`/v1/mcp/authorize?${params}`);
     assert(typeof authBody.code === 'string', 'has auth code');
@@ -184,6 +187,7 @@ await test('OAuth authorize + token exchange', async () => {
             code: authBody.code,
             client_id: clientId,
             client_secret: clientSecret,
+            ...tokenParams(pkce),
         }),
     });
     assert(status === 200, `token status ${status}`);
@@ -297,10 +301,11 @@ await test('12. An agent WITHOUT wallet:read neither sees the tool nor can call 
     const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'narrow', redirect_uris: [] }) });
     const ts = new Date().toISOString();
     const sig = await signMsg(narrowKey, narrowGaii + NODE_ID + ts);
-    const authz = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii: narrowGaii, signature: sig, timestamp: ts })}`);
+    const pkce = mcpPkce(BASE);
+    const authz = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii: narrowGaii, signature: sig, timestamp: ts, ...authorizeParams(pkce) })}`);
     const tok = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }),
     });
     const narrowToken = tok.body.access_token as string;
     assert(typeof narrowToken === 'string', `narrow mcp token: ${JSON.stringify(tok.body)}`);

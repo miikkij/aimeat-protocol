@@ -5,6 +5,10 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.5.0 -- 2026-10-12 -- Every authorization request outside Phase 13 sends PKCE (S256) and the
+ *     resource, and every code redemption sends the verifier (helpers/mcp-oauth-pkce.ts), so each
+ *     refusal these tests assert is still the one reached when 4.0.0 refuses a request without them.
+ *     Phase 13 keeps its flows without PKCE on purpose: they assert what 3.x accepts and counts.
  *   v1.4.0 -- 2026-10-12 -- Phase 13: PKCE and the resource indicator on this 3.x node. A PKCE +
  *     resource flow gives a token whose audience is the MCP endpoint and the endpoint takes it; a
  *     wrong verifier is refused; a code without PKCE or with a foreign resource is still issued and
@@ -64,6 +68,7 @@ async function json(path: string, opts: RequestInit = {}) {
 // Helper: sign a message with a base64 private key
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams, type McpPkce } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -295,6 +300,9 @@ await test('3. Register without client_name → 400', async () => {
 // ─── Phase 2: OAuth Authorization Flow ───
 console.log('\nPhase 2 — OAuth Authorization');
 
+// The PKCE material of the code test 4 asks for and tests 9 and 10 redeem.
+const flowPkce = mcpPkce(BASE);
+
 await test('4. Request auth code with signature', async () => {
     const timestamp = new Date().toISOString();
     const message = agentGaii + NODE_ID + timestamp;
@@ -306,6 +314,7 @@ await test('4. Request auth code with signature', async () => {
         gaii: agentGaii,
         signature,
         timestamp,
+        ...authorizeParams(flowPkce),
     });
     const { status, body } = await json(`/v1/mcp/authorize?${params}`);
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -317,6 +326,7 @@ await test('5. Auth without signature → redirects to consent', async () => {
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
+        ...authorizeParams(mcpPkce(BASE)),
     });
     // Without gaii/signature, server redirects to browser consent flow (302)
     const res = await fetch(`${BASE}/v1/mcp/authorize?${params}`, {
@@ -336,6 +346,7 @@ await test('6. Auth with invalid signature → 401', async () => {
         gaii: agentGaii,
         signature: Buffer.from('badsignature').toString('base64'),
         timestamp,
+        ...authorizeParams(mcpPkce(BASE)),
     });
     const { status, body } = await json(`/v1/mcp/authorize?${params}`);
     assert(status === 401, `status ${status}: ${JSON.stringify(body)}`);
@@ -352,6 +363,7 @@ await test('7. Auth with unknown client_id → 400', async () => {
         gaii: agentGaii,
         signature,
         timestamp,
+        ...authorizeParams(mcpPkce(BASE)),
     });
     const { status, body } = await json(`/v1/mcp/authorize?${params}`);
     assert(status === 400, `status ${status}`);
@@ -379,6 +391,7 @@ await test('9. Exchange auth code for tokens', async () => {
             code: authCode,
             client_id: clientId,
             client_secret: clientSecret,
+            ...tokenParams(flowPkce),
         }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
@@ -397,6 +410,7 @@ await test('10. Code is single-use → 400', async () => {
             code: authCode,
             client_id: clientId,
             client_secret: clientSecret,
+            ...tokenParams(flowPkce),
         }),
     });
     assert(status === 400, `status ${status}`);
@@ -440,12 +454,14 @@ await test('13. Token revocation', async () => {
     const timestamp = new Date().toISOString();
     const message = agentGaii + NODE_ID + timestamp;
     const signature = await signMsg(agentPrivKey, message);
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
         gaii: agentGaii,
         signature,
         timestamp,
+        ...authorizeParams(pkce),
     });
     const { body: authBody } = await json(`/v1/mcp/authorize?${params}`);
     const { body: tokenBody } = await json('/v1/mcp/token', {
@@ -455,6 +471,7 @@ await test('13. Token revocation', async () => {
             code: authBody.code,
             client_id: clientId,
             client_secret: clientSecret,
+            ...tokenParams(pkce),
         }),
     });
     const tokenToRevoke = tokenBody.access_token;
@@ -930,7 +947,7 @@ await test('37. A client_id that is not https is refused, and never fetched', as
         'file:///etc/passwd',
         'https://client.test/doc.json#frag',
     ]) {
-        const r = await json(`/v1/mcp/authorize?response_type=code&client_id=${encodeURIComponent(bad)}&redirect_uri=${encodeURIComponent('https://x.test/cb')}`);
+        const r = await json(`/v1/mcp/authorize?response_type=code&client_id=${encodeURIComponent(bad)}&redirect_uri=${encodeURIComponent('https://x.test/cb')}&${new URLSearchParams(authorizeParams(mcpPkce(BASE)))}`);
         assert(r.status === 400 && r.body?.error === 'invalid_client',
             `${bad} must be refused as invalid_client, got ${r.status} ${JSON.stringify(r.body)}`);
     }
@@ -974,7 +991,7 @@ await test('38b. A scope refusal tells the CLIENT what to ask for, not only the 
 await test('38. An unknown client is told which of the two roads to take', async () => {
     // The refusal names the mechanism, because "Unknown client_id" alone leaves a client that could
     // have used a metadata document with no way to find out that it could.
-    const r = await json('/v1/mcp/authorize?response_type=code&client_id=never-registered&redirect_uri=https%3A%2F%2Fx.test%2Fcb');
+    const r = await json(`/v1/mcp/authorize?response_type=code&client_id=never-registered&redirect_uri=https%3A%2F%2Fx.test%2Fcb&${new URLSearchParams(authorizeParams(mcpPkce(BASE)))}`);
     assert(r.status === 400 && r.body?.error === 'invalid_client', `expected invalid_client, got ${r.status}`);
     assert(/metadata document/i.test(r.body?.error_description ?? ''),
         `the refusal should name the other road, got ${r.body?.error_description}`);
@@ -1090,7 +1107,7 @@ await test('An AGENT token cannot approve a consent, even for its own owner', as
     const clientId = await registerConsentClient('consent-probe');
     const r = await json('/v1/mcp/authorize-consent', {
         method: 'POST',
-        body: JSON.stringify({ client_id: clientId, gaii: agentGaii, owner_token: agentToken }),
+        body: JSON.stringify({ client_id: clientId, gaii: agentGaii, owner_token: agentToken, ...authorizeParams(mcpPkce(BASE)) }),
     });
     assert(r.status === 403, `an agent token must not approve a consent, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
     assert(!('code' in (r.body ?? {})), `no authorization code may be issued: ${JSON.stringify(r.body).slice(0, 200)}`);
@@ -1100,7 +1117,7 @@ await test('The OWNER session still approves — the fix costs the real path not
     const clientId = await registerConsentClient('consent-owner');
     const r = await json('/v1/mcp/authorize-consent', {
         method: 'POST',
-        body: JSON.stringify({ client_id: clientId, gaii: agentGaii, owner_token: ownerToken }),
+        body: JSON.stringify({ client_id: clientId, gaii: agentGaii, owner_token: ownerToken, ...authorizeParams(mcpPkce(BASE)) }),
     });
     assert(r.status === 200, `the owner must still be able to approve, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
 });
@@ -1108,10 +1125,10 @@ await test('The OWNER session still approves — the fix costs the real path not
 // ─── The signature in the query string, and the two allowlists an omission used to switch off ───
 console.log('\nPhase 12 — A signed GET is recent, single-use, and bounded by what was registered');
 
-/** A signed authorize request for this agent, ready to send more than once. */
-async function signedAuthorizeQuery(clientId: string, timestamp = new Date().toISOString()): Promise<string> {
+/** A signed authorize request for this agent, with PKCE and resource, ready to send more than once. */
+async function signedAuthorizeQuery(clientId: string, timestamp = new Date().toISOString(), pkce: McpPkce = mcpPkce(BASE)): Promise<string> {
     const signature = await signMsg(agentPrivKey, agentGaii + NODE_ID + timestamp);
-    return new URLSearchParams({ response_type: 'code', client_id: clientId, gaii: agentGaii, signature, timestamp }).toString();
+    return new URLSearchParams({ response_type: 'code', client_id: clientId, gaii: agentGaii, signature, timestamp, ...authorizeParams(pkce) }).toString();
 }
 
 await test('A signed authorize URL works ONCE — the second send of the same bytes is refused', async () => {
@@ -1190,10 +1207,11 @@ await test('Redeeming an authorization code without the client_secret is refused
 
     // The code survives the refusal only if it was never spent; either way, prove the honest path
     // still works with a fresh one.
-    const again = await json(`/v1/mcp/authorize?${await signedAuthorizeQuery(clientId)}`);
+    const againPkce = mcpPkce(BASE);
+    const again = await json(`/v1/mcp/authorize?${await signedAuthorizeQuery(clientId, undefined, againPkce)}`);
     const withSecret = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: again.body.code, client_id: clientId, client_secret: clientSecret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: again.body.code, client_id: clientId, client_secret: clientSecret, ...tokenParams(againPkce) }),
     });
     assert(withSecret.status === 200 && typeof withSecret.body.access_token === 'string',
         `the honest redemption must still work: ${withSecret.status} ${JSON.stringify(withSecret.body).slice(0, 200)}`);
@@ -1211,6 +1229,7 @@ await test('An unknown client_id cannot reach the consent door either', async ()
             gaii: agentGaii,
             owner_token: ownerToken,
             redirect_uri: 'https://attacker.test/collect',
+            ...authorizeParams(mcpPkce(BASE)),
         }),
     });
     assert(r.status === 400 && r.body.error === 'invalid_client',

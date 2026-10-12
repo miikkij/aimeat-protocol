@@ -25,6 +25,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -168,9 +169,11 @@ async function provision(base: string, stamp: number, tag: string) {
     });
     assert(reg.status === 201, `mcp register ${reg.status}`);
     ts = new Date().toISOString();
+    const pkce = mcpPkce(base);
     const params = new URLSearchParams({
         response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii,
         signature: await signMsg(agentPriv, agentGaii + NODE_ID + ts), timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const authz = await jsonAt(base, `/v1/mcp/authorize?${params}`);
     assert(typeof authz.body.code === 'string', 'has auth code');
@@ -179,6 +182,7 @@ async function provision(base: string, stamp: number, tag: string) {
         body: JSON.stringify({
             grant_type: 'authorization_code', code: authz.body.code,
             client_id: reg.body.client_id, client_secret: reg.body.client_secret,
+            ...tokenParams(pkce),
         }),
     });
     assert(tok.status === 200, `mcp token ${tok.status}`);

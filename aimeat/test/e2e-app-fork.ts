@@ -37,6 +37,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -441,14 +442,16 @@ await test('Setup: an MCP session for owner A\'s agent', async () => {
         method: 'POST', body: JSON.stringify({ client_name: 'fork e2e client', redirect_uris: [] }),
     });
     const ts = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code', client_id: reg.client_id, gaii: agentGaii,
         signature: await signMsg(agentPriv, agentGaii + NODE_ID + ts), timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const { body: auth } = await json(`/v1/mcp/authorize?${params}`);
     const { body: tok } = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret, ...tokenParams(pkce) }),
     });
     mcpToken = tok.access_token;
     assert(typeof mcpToken === 'string' && mcpToken.length > 10, `no MCP access token: ${JSON.stringify(tok).slice(0, 150)}`);

@@ -35,6 +35,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -204,7 +205,8 @@ async function main() {
             assert(reg.status === 201, `register status ${reg.status}`);
             const ts = new Date().toISOString();
             const sig = await signMsg(agentPrivKey, agentGaii + NODE_ID + ts);
-            const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii, signature: sig, timestamp: ts });
+            const pkce = mcpPkce(BASE);
+            const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii, signature: sig, timestamp: ts, ...authorizeParams(pkce) });
             const auth = await json(`/v1/mcp/authorize?${params}`);
             assert(typeof auth.body.code === 'string', 'has auth code');
             const tok = await json('/v1/mcp/token', {
@@ -212,6 +214,7 @@ async function main() {
                 body: JSON.stringify({
                     grant_type: 'authorization_code', code: auth.body.code,
                     client_id: reg.body.client_id, client_secret: reg.body.client_secret,
+                    ...tokenParams(pkce),
                 }),
             });
             assert(tok.status === 200, `token status ${tok.status}`);

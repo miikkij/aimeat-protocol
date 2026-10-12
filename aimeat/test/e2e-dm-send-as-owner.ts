@@ -31,6 +31,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -56,14 +57,15 @@ async function connectMcp(gaii: string, privKey: string): Promise<McpClient> {
 
     const timestamp = new Date().toISOString();
     const signature = await signMsg(privKey, gaii + NODE_ID + timestamp);
-    const authQs = new URLSearchParams({ response_type: 'code', client_id: clientId, gaii, signature, timestamp });
+    const pkce = mcpPkce(BASE);
+    const authQs = new URLSearchParams({ response_type: 'code', client_id: clientId, gaii, signature, timestamp, ...authorizeParams(pkce) });
     const auth = await json(`/v1/mcp/authorize?${authQs}`);
     const code = auth.body.code as string;
     assert(typeof code === 'string', `authorize returned code (${JSON.stringify(auth.body)})`);
 
     const tok = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: clientId, client_secret: clientSecret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: clientId, client_secret: clientSecret, ...tokenParams(pkce) }),
     });
     const token = tok.body.access_token as string;
     assert(typeof token === 'string', `token exchange (${JSON.stringify(tok.body)})`);

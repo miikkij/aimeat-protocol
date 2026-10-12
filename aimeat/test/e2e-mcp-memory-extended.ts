@@ -42,6 +42,7 @@ async function json(path: string, opts: RequestInit = {}) {
 // Helper: sign a message with a base64 private key
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -181,13 +182,14 @@ await test('OAuth for agent 1', async () => {
     const timestamp = new Date().toISOString();
     const message = agentGaii + NODE_ID + timestamp;
     const signature = await signMsg(agentPrivKey, message);
-    const params = new URLSearchParams({ response_type: 'code', client_id: clientId, gaii: agentGaii, signature, timestamp });
+    const pkce = mcpPkce(BASE);
+    const params = new URLSearchParams({ response_type: 'code', client_id: clientId, gaii: agentGaii, signature, timestamp, ...authorizeParams(pkce) });
     const { body: authBody } = await json(`/v1/mcp/authorize?${params}`);
     assert(typeof authBody.code === 'string', 'has auth code');
 
     const { status, body: tokenBody } = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: authBody.code, client_id: clientId, client_secret: clientSecret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: authBody.code, client_id: clientId, client_secret: clientSecret, ...tokenParams(pkce) }),
     });
     assert(status === 200, `token status ${status}`);
     mcpToken = tokenBody.access_token;
@@ -205,12 +207,13 @@ await test('OAuth for agent 2', async () => {
     const timestamp = new Date().toISOString();
     const message = agent2Gaii + NODE_ID + timestamp;
     const signature = await signMsg(agent2PrivKey, message);
-    const params = new URLSearchParams({ response_type: 'code', client_id: clientId2, gaii: agent2Gaii, signature, timestamp });
+    const pkce = mcpPkce(BASE);
+    const params = new URLSearchParams({ response_type: 'code', client_id: clientId2, gaii: agent2Gaii, signature, timestamp, ...authorizeParams(pkce) });
     const { body: authBody } = await json(`/v1/mcp/authorize?${params}`);
 
     const { status, body: tokenBody } = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: authBody.code, client_id: clientId2, client_secret: clientSecret2 }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: authBody.code, client_id: clientId2, client_secret: clientSecret2, ...tokenParams(pkce) }),
     });
     assert(status === 200, `token2 status ${status}`);
     mcpToken2 = tokenBody.access_token;

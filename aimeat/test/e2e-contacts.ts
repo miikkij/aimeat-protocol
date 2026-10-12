@@ -56,6 +56,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { markEmailVerified } from './helpers/verified-email.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
@@ -536,9 +537,10 @@ await test('27. The chat prompt is served with the owner\'s name; unauthenticate
 async function mcpCallAs(gaii: string, key: string, name: string, args: Record<string, unknown>) {
     const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'contacts-e2e' }) });
     const ts = new Date().toISOString();
-    const q = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await sign(key, gaii + NODE_ID + ts), timestamp: ts });
+    const pkce = mcpPkce(BASE);
+    const q = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await sign(key, gaii + NODE_ID + ts), timestamp: ts, ...authorizeParams(pkce) });
     const code = (await json(`/v1/mcp/authorize?${q}`)).body.code as string;
-    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret, ...tokenParams(pkce) }) });
     const token = tok.body.access_token as string;
     assert(typeof token === 'string', `mcp token: ${JSON.stringify(tok.body)}`);
     let session = '';

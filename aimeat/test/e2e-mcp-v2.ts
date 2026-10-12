@@ -39,6 +39,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -55,8 +56,9 @@ async function listToolsForRole(gaii: string, privKey: string, role: string): Pr
     const clientId = reg.body.client_id, clientSecret = reg.body.client_secret;
     const ts = new Date().toISOString();
     const signature = await signMsg(privKey, gaii + NODE_ID + ts);
-    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: clientId, gaii, signature, timestamp: ts })}`);
-    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: clientId, client_secret: clientSecret }) });
+    const pkce = mcpPkce(BASE);
+    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: clientId, gaii, signature, timestamp: ts, ...authorizeParams(pkce) })}`);
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: clientId, client_secret: clientSecret, ...tokenParams(pkce) }) });
     const token = tok.body.access_token as string;
 
     let sessionId = '';
@@ -166,8 +168,9 @@ await test("handbook_get surface:'agent' returns the agent surface handbook", as
     const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'v2-hb' }) });
     const ts = new Date().toISOString();
     const sig = await signMsg(agent.key, agent.gaii + NODE_ID + ts);
-    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agent.gaii, signature: sig, timestamp: ts })}`);
-    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+    const pkce = mcpPkce(BASE);
+    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agent.gaii, signature: sig, timestamp: ts, ...authorizeParams(pkce) })}`);
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret, ...tokenParams(pkce) }) });
     const token = tok.body.access_token as string;
     let sid = '';
     const call = async (method: string, params: Record<string, unknown>, id: number) => {
@@ -186,8 +189,9 @@ await test("handbook_get surface:'agent' returns the agent surface handbook", as
 async function openSession(gaii: string, privKey: string, role: string) {
     const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `v2-${role}-session` }) });
     const ts = new Date().toISOString();
-    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await signMsg(privKey, gaii + NODE_ID + ts), timestamp: ts })}`);
-    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+    const pkce = mcpPkce(BASE);
+    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await signMsg(privKey, gaii + NODE_ID + ts), timestamp: ts, ...authorizeParams(pkce) })}`);
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret, ...tokenParams(pkce) }) });
     const token = tok.body.access_token as string;
     let sid = '';
     let id = 1;
