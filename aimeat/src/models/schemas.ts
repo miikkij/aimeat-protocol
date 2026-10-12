@@ -15,6 +15,9 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Consent reach — 2026-10-12 — ConsentCreateSchema takes `local`, `federation`, `auth` and the
+ *     deprecated aliases `private` and `dmz`, with no default: the service decides it by version
+ *     (utils/consent-reach.ts, Core 2026-11 AUTHZ-18).
  *   Action pacing — 2026-10-11 — ActionPricingSchema takes toll_morsels, the pacing amount per use;
  *     base_morsels (the 3.x morsel price) is optional and read as pacing until 4.0.0, and pricing is
  *     optional on publish (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -37,6 +40,7 @@
  */
 import { z } from 'zod';
 import { annotationErrors } from '../utils/onto-context.js';
+import { CONSENT_REACH_INPUTS } from '../utils/consent-reach.js';
 import { AiProvenanceBodyFields } from '../tool-catalog/ai-provenance-schema.js';
 
 // ── Semantic Ontology (Phase 0.7b) ─────────────────────────
@@ -373,7 +377,8 @@ export const ConsentCreateSchema = z.object({
     data_pattern: z.string().min(1).max(256),
     recipient: z.string().min(1).max(256),
     purpose: z.string().min(1).max(512),
-    scope: z.enum(['private', 'dmz', 'federation', 'auth']).optional().default('federation'),
+    // The reach. Absent: the service picks the default for the running version (defaultConsentReach).
+    scope: z.enum(CONSENT_REACH_INPUTS).optional(),
     expires: z.string().datetime().nullable().optional().default(null),
     metadata: z.record(z.string(), z.unknown()).optional(),
 });

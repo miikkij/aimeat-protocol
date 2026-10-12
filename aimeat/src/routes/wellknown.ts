@@ -8,13 +8,18 @@
  *
  * @structure
  *   - wellknownRouter(config, storage): mounts the well-known GET endpoints
- *   - GET /.well-known/aimeat: node id/type, public key, capability set, federation settings, key endpoints
+ *   - GET /.well-known/aimeat: node id/type, protocol edition and profiles (from 4.0.0), payment
+ *     bindings, public key, capability set, federation settings, key endpoints
  *   - GET /.well-known/mcp.json: MCP Server Card (SEP-1649) describing the /v1/mcp server + the WebMCP bridge
  *   - GET /.well-known/api-catalog: RFC 9727 linkset (application/linkset+json) pointing at spec/docs/descriptors
  *   - GET /.well-known/ucp: UCP business profile (transports, checkout capability, payment handlers, signing keys)
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.11.0 — 2026-10-12 — /.well-known/aimeat states protocol_version "2026-11" and the claimed
+ *     profiles from node 4.0.0, and the accepted payment bindings and the MCP endpoint in every release
+ *     (services/core-discovery.ts, Core 2026-11 DISC-01, DISC-05). endpoints.auth names each current
+ *     way to get a token instead of /v1/auth/token alone, whose owner branch 4.0.0 removes.
  *   v1.10.0 — 2026-10-11 — The UCP 2026-04-08 profile lists only the payment handlers that settle
  *     money; the morsel ledger is no longer advertised as a payment handler (ruling D4).
  *   v1.9.0 — 2026-10-08 — GET /.well-known/ucp is the UCP 2026-08-25 business profile
@@ -53,6 +58,7 @@ import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { moneyPaymentHandlers } from '../commerce/protocol-money.js';
 import { businessProfile } from '../services/ucp/business-profile.js';
+import { coreDiscoveryFields } from '../services/core-discovery.js';
 import {
   getWebBotAuthState, signatureDirectoryBody, signDirectoryResponse, SIGNATURES_DIRECTORY_MEDIA_TYPE,
 } from '../services/web-bot-auth.js';
@@ -71,6 +77,20 @@ export function discoveryLinkHeaders(): RequestHandler {
     next();
   };
 }
+
+/**
+ * How a client gets a token, one entry per way in. Until 2026-10-12 discovery named only
+ * `/v1/auth/token`, whose owner branch is the owner-key sign-in that 4.0.0 removes; the agent's
+ * signed renewal on the same route stays, under its own name here.
+ */
+const SIGN_IN_ENDPOINTS = {
+  owner_password: '/v1/ghii/login',
+  owner_refresh: '/v1/auth/refresh',
+  agent_device_authorization: '/v1/agents/device-authorize',
+  agent_device_token: '/v1/agents/device-token',
+  agent_token_renewal: '/v1/auth/token',
+  mcp_oauth_metadata: '/.well-known/oauth-authorization-server',
+} as const;
 
 /** The UCP specification version this node's profile and checkout surface are written against. */
 const UCP_PROFILE_VERSION = '2026-04-08';
@@ -107,6 +127,8 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
       protocol: 'aimeat',
       version: 'v1',
       software_version: descriptor.software_version,
+      // protocol_version and profiles from 4.0.0, payment_bindings always (services/core-discovery.ts).
+      ...coreDiscoveryFields(config),
       public_key: nodeKey?.publicKey ?? null,
       capabilities: capsByType[config.nodeType],
       features_enabled: descriptor.capabilities,
@@ -115,7 +137,8 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         bootstrap: '/',
         spec: '/v1/spec',
         docs: '/v1/docs',
-        auth: '/v1/auth/token',
+        mcp: '/v1/mcp',
+        auth: SIGN_IN_ENDPOINTS,
         catalogue: '/v1/catalogue',
       },
     }, [

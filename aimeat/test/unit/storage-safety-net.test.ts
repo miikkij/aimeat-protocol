@@ -130,7 +130,9 @@ function makeConsent(ownerGaii: string, overrides?: Partial<ConsentRecord>): Con
     dataPattern: 'profile.*',
     recipient: '*',
     purpose: 'discovery',
-    scope: 'private',
+    // `local` since 2026-10-12 (Core 2026-11 AUTHZ-18): `private` is an older name for it, and a row
+    // stored as `private` is answered as `local` (test/unit/core-2026-11-from-4-0-0.test.ts).
+    scope: 'local',
     expires: null,
     status: 'active',
     grantedAt: now(),
@@ -699,7 +701,7 @@ describe('Consent', () => {
     expect(fetched!.dataPattern).toBe('profile.*');
     expect(fetched!.recipient).toBe('*');
     expect(fetched!.status).toBe('active');
-    expect(fetched!.scope).toBe('private');
+    expect(fetched!.scope).toBe('local');
   });
 
   it('returns null for non-existent consent', async () => {

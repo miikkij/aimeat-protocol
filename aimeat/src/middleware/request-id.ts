@@ -11,6 +11,8 @@
  *   - requestIdMiddleware(): sets/generates the id, echoes the header, opens the log context
  *
  * @version-history
+ *   v1.1.0 — 2026-10-12 — The context carries setHeader, so a service that accepts a deprecated form
+ *     names it on this response (services/deprecation.ts, Core 2026-11 HTTP-07).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -44,6 +46,12 @@ export function requestIdMiddleware() {
     const ctx: RequestContext = {
       requestId,
       gaii: req.auth?.sub,
+      // A Link header may already carry other relations (discoveryLinkHeaders), so Link is appended.
+      setHeader: (name, value) => {
+        if (res.headersSent) return;
+        if (name.toLowerCase() === 'link') res.append('Link', value);
+        else res.setHeader(name, value);
+      },
     };
 
     requestContext.run(ctx, () => next());

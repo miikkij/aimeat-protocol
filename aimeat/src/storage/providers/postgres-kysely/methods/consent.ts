@@ -7,6 +7,8 @@
  *   recipient/pattern matchers (services/consent + pattern-utils + gaii) so access decisions are
  *   identical across backends. Translated 1:1 from the Prisma implementation.
  * @version-history
+ *   v1.3.0 — 2026-10-12 — A consent's reach is read through consentReachOf: a row holding the older
+ *     `private` or `dmz` is answered as `local` (Core 2026-11 AUTHZ-18).
  *   v1.2.0 — 2026-08-23 — consentFacets(), the node-wide SQL roll-up the compliance report reads
  *     (BR-02). The day bucket casts to UTC because grantedAt is a timestamp here and an ISO string
  *     on SQLite; without it the two backends would bucket a near-midnight grant differently.
@@ -17,6 +19,7 @@ import { sql, type Selectable } from 'kysely';
 import type { ConsentAuditEntry, ConsentFacet, ConsentFacetQuery, ConsentRecord } from '../../../interface.js';
 import { matchesRecipient } from '../../../consent-recipient.js';
 import { parseGaiiLoose } from '../../../../utils/gaii.js';
+import { consentReachOf } from '../../../../utils/consent-reach.js';
 import { consentMatchPattern } from '../../../pattern-utils.js';
 import type { Consent } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -27,7 +30,7 @@ const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).
 
 function toConsent(r: Selectable<Consent>): ConsentRecord {
   return {
-    id: r.id, ownerGaii: r.ownerGaii, dataPattern: r.dataPattern, recipient: r.recipient, purpose: r.purpose, scope: r.scope as ConsentRecord['scope'],
+    id: r.id, ownerGaii: r.ownerGaii, dataPattern: r.dataPattern, recipient: r.recipient, purpose: r.purpose, scope: consentReachOf(r.scope),
     expires: isoOpt(r.expires), status: r.status as ConsentRecord['status'], grantedAt: iso(r.grantedAt),
     revokedAt: isoOpt(r.revokedAt), metadata: (r.metadata ?? undefined) as ConsentRecord['metadata'],
   };

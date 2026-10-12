@@ -29,13 +29,17 @@
  *   const turn = turnEntryFor(config, caller, Date.now());
  *   if (turn) iceServers.push(turn);
  * @version-history
+ *   v1.1.0 — 2026-10-12 — The static pair is a version gate: from TURN_STATIC_PAIR_REMOVED_IN a node
+ *     without AIMEAT_TURN_SECRET serves the TURN address without it; before it, serving the pair is counted and named
+ *     on the response (deprecated_use: turn_static_pair; Core 2026-11 HTTP-07, HTTP-08).
  *   v1.0.0 — 2026-10-09 — Initial: expiring TURN credentials from AIMEAT_TURN_SECRET; anonymous
  *     callers and visitors get no TURN entry; the static pair is deprecated, removed in 4.0.0.
  */
 import { createHmac } from 'node:crypto';
 import {
-  TURN_TTL_DEFAULT_SECONDS, TURN_TTL_MAX_SECONDS, TURN_TTL_MIN_SECONDS, type TurnConfig,
+  TURN_STATIC_PAIR_REMOVED_IN, TURN_TTL_DEFAULT_SECONDS, TURN_TTL_MAX_SECONDS, TURN_TTL_MIN_SECONDS, type TurnConfig,
 } from '../config-turn.js';
+import { noteDeprecatedUse, removedFrom } from './deprecation.js';
 
 /** One RTCIceServer entry as the route serves it. */
 export interface IceServer {
@@ -82,14 +86,24 @@ export function deriveTurnCredential(
  * The TURN entry for this caller, or null when there is none to give: no TURN server is set, or the
  * caller is anonymous (null caller included) or a visitor from another node.
  */
-export function turnEntryFor(settings: TurnSettings, caller: TurnCaller | null, nowMs: number): IceServer | null {
+export function turnEntryFor(settings: TurnSettings, caller: TurnCaller | null, nowMs: number, version?: string): IceServer | null {
   if (!settings.turnServer) return null;
   if (!caller || caller.kind === 'anonymous' || caller.visitor) return null;
   if (settings.turnSecret) {
     const { username, credential } = deriveTurnCredential(settings.turnSecret, caller.principal, settings.turnTtlSeconds, nowMs);
     return { urls: settings.turnServer, username, credential };
   }
-  // Deprecated static pair: still served, so a deployment without a secret keeps its relay.
+  // From TURN_STATIC_PAIR_REMOVED_IN the static pair is not served, whatever is set (Core 2026-11
+  // HTTP-08): the entry carries the relay's URL alone, as it did on a node that set no pair.
+  if (removedFrom(TURN_STATIC_PAIR_REMOVED_IN, version)) return { urls: settings.turnServer };
+  // Deprecated static pair: still served, so a deployment without a secret keeps its relay; the use
+  // is counted and named on the response (HTTP-07).
+  if (settings.turnUsername || settings.turnCredential) {
+    noteDeprecatedUse({
+      kind: 'turn_static_pair', removedIn: TURN_STATIC_PAIR_REMOVED_IN,
+      notice: 'GET /v1/realtime/ice-servers served the static TURN pair (AIMEAT_TURN_USERNAME / AIMEAT_TURN_CREDENTIAL). Set AIMEAT_TURN_SECRET.',
+    });
+  }
   return {
     urls: settings.turnServer,
     ...(settings.turnUsername ? { username: settings.turnUsername } : {}),
@@ -104,6 +118,10 @@ export function turnDeprecationWarning(settings: TurnSettings): string | null {
   if (settings.turnSecret) {
     return 'AIMEAT_TURN_USERNAME / AIMEAT_TURN_CREDENTIAL are ignored because AIMEAT_TURN_SECRET is set. Remove them.';
   }
-  return 'AIMEAT_TURN_USERNAME / AIMEAT_TURN_CREDENTIAL are deprecated and removed in 4.0.0: they give every caller the same TURN credential, and it does not expire. '
+  if (removedFrom(TURN_STATIC_PAIR_REMOVED_IN)) {
+    return `AIMEAT_TURN_USERNAME / AIMEAT_TURN_CREDENTIAL were removed in ${TURN_STATIC_PAIR_REMOVED_IN} and are not served: clients receive the TURN address without a credential until AIMEAT_TURN_SECRET is set. `
+      + 'Set it to the coturn static-auth-secret (coturn: use-auth-secret); each caller then receives a credential that expires.';
+  }
+  return `AIMEAT_TURN_USERNAME / AIMEAT_TURN_CREDENTIAL are deprecated and removed in ${TURN_STATIC_PAIR_REMOVED_IN}: they give every caller the same TURN credential, and it does not expire. `
     + 'Set AIMEAT_TURN_SECRET to the coturn static-auth-secret (coturn: use-auth-secret) instead; each caller then receives a credential that expires.';
 }

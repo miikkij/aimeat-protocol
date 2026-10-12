@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.7.0 — 2026-10-12 — GET / this_node carries what /.well-known/aimeat says about the protocol:
+ *     protocol_version and profiles from node 4.0.0, payment_bindings always (Core 2026-11 DISC-01).
  *   v1.6.0 — 2026-10-11 — GET /v1/health carries `build`: the commit the node runs and whether the
  *     build is behind its source.
  *   v1.5.0 — 2026-10-03 — GET /v1/help/prompt/person: the help prompt a person pastes into a consumer
@@ -93,6 +95,7 @@ import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';
 import { runningBuild } from '../utils/build-stamp.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { coreDiscoveryFields } from '../services/core-discovery.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -294,6 +297,8 @@ export function bootstrapRouter(
         type: config.nodeType,
         protocol: 'aimeat',
         version: 'v1',
+        // The same protocol_version, profiles and payment bindings as /.well-known/aimeat (DISC-01).
+        ...coreDiscoveryFields(config),
         portal: `${base}/v1/portal`,
         description: 'AIMEAT (AI Memory Exchange and Action Transfer): a place a person owns, where every AI they use keeps what it learns, works under permissions they grant and can withdraw, and shares with the people and AIs they choose',
         welcome: 'Welcome to AIMEAT ♥ Love what you build, share what you know. The network starts here.',
