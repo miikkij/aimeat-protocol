@@ -6,8 +6,8 @@
  *   Lists published apps with no screenshot, renders each headless, captures a JPEG, and uploads it
  *   via POST /v1/apps/:owner/:filename/screenshot. Uses `playwright-core` (no bundled browser
  *   download) and drives the machine's OWN Chrome/Edge via a channel, so it works on an npm/npx
- *   install with zero extra download on Windows/desktop; a headless server with no browser falls
- *   back to a `playwright install chromium` hint. Apps are opened ANONYMOUSLY (login-gated apps just
+ *   install with zero extra download on Windows/desktop; a headless server with no browser gets
+ *   the install command of its own playwright-core. Apps are opened ANONYMOUSLY (login-gated apps just
  *   yield a screenshot of their login screen — still a fine thumbnail). The node works fine without
  *   this; screenshots are an opt-in operator feature.
  * @structure runScreenshotWorker() entry; launchBrowser() channel fallback; runOnce() one scan.
@@ -18,6 +18,8 @@
  *   One-shot by default; --watch N loops every N seconds (a self-contained daemon). For unattended
  *   runs use a long-lived operator PAT (POST /v1/access/tokens, grant_operator) — not a login JWT.
  * @version-history
+ *   v1.1.1 — 2026-10-12 — The no-browser error prints the installer of the installed playwright-core
+ *     (browserInstallHint); `npx playwright install` could fetch another version's build.
  *   v1.1.0 — 2026-10-06 — The browser gets the node's network rule (services/headless-network.ts,
  *     7d3642551): a dead proxy, service workers blocked, and every request answered by
  *     headlessRequestHandlerFor, so an app it renders cannot reach the operator's private network or
@@ -30,6 +32,7 @@
 import { chromium, type Browser } from 'playwright-core';
 import { HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, headlessRequestHandlerFor } from '../services/headless-network.js';
 import { egressOriginsOf } from '../services/ai-provider-common.js';
+import { browserInstallHint } from '../services/headless-browser-install.js';
 
 function arg(name: string, def?: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -43,8 +46,8 @@ interface AppRow { owner: string; filename: string; has_screenshot?: boolean }
 /**
  * Launch a headless browser WITHOUT requiring a 300 MB Playwright browser download: prefer the
  * machine's installed Edge/Chrome via `channel`, then fall back to a Playwright-installed Chromium
- * (present on dev machines / after `npx playwright install chromium`). Errors with install guidance
- * if none is usable. A specific --channel skips the probing.
+ * (present on dev machines, or after the installer of the installed playwright-core has run). Errors
+ * with that installer's command if none is usable. A specific --channel skips the probing.
  */
 async function launchBrowser(): Promise<Browser> {
   const forced = arg('channel');
@@ -66,7 +69,7 @@ async function launchBrowser(): Promise<Browser> {
   }
   throw new Error(
     'No usable browser found (tried Edge, Chrome, and a Playwright-installed Chromium). '
-    + 'Install one with: npx playwright install chromium\n'
+    + `Install one with: ${browserInstallHint()}\n`
     + `Last error: ${(lastErr as Error).message}`,
   );
 }

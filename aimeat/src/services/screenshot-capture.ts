@@ -6,7 +6,9 @@
  *   no screenshot, renders each one headless (playwright-core, lazily imported, driving the machine's
  *   own Edge/Chrome via a channel — no browser download), and stores a JPEG thumbnail DIRECTLY in
  *   storage. No HTTP, no token, no operator action: it self-authenticates by virtue of running
- *   inside the node. Disables itself gracefully (one log line, no crash) if no browser is available.
+ *   inside the node. With no usable browser it goes off for an hour and tries again (no crash); at
+ *   start it downloads the Chromium build playwright-core names when that is what is missing, and
+ *   tells the operator on the Security page when the browser still does not start.
  *   Opt-in via config.screenshotAutoCapture so nodes without a browser never try.
  *
  *   It also serves ONE app on demand (captureAppScreenshot), which is a different job wearing the
@@ -14,10 +16,18 @@
  *   exists because an agent that has just published an app cannot otherwise see what it made. A
  *   hosted agent has no browser and no shell, so without this it ships blind and says "done" on the
  *   strength of a 200.
- * @structure startScreenshotAutoCapture() entry; launchBrowser() channel fallback;
- *   runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its own
- *   per-owner throttle; renderAndStore() the shared render both paths use.
+ * @structure startScreenshotAutoCapture() entry; ensureHeadlessBrowser() the check at start, which
+ *   installs a missing build; launchLadder() channel fallback, launchBrowser() the same with the
+ *   log line; runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its
+ *   own per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.8.0 — 2026-10-12 — ensureHeadlessBrowser(): a node with auto-capture on checks its browser at
+ *     start, downloads the Chromium build its playwright-core names when that is what is missing
+ *     (headless-browser-install.ts), and opens one incident on the Security page when the browser
+ *     still does not start. A failed launch switches capture off for an hour, not for the life of
+ *     the process, so a build installed by hand is found without a restart. Every message names the
+ *     installer of this installation; `npx playwright install` could fetch another version's build.
+ *     aimeat.io took no screenshot from 2026-10-10 to 2026-10-12 after playwright-core 1.63.0.
  *   v1.7.0 — 2026-10-05 — The browser has no network of its own: it starts with a proxy that leads
  *     nowhere and service workers blocked, and every context it hands out answers each request
  *     through headless-network.ts (the node's own origin from loopback, public addresses through
@@ -58,14 +68,22 @@ import { emitChange } from './event-bus.js';
 import {
   HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, guardHeadlessContext, serveDocumentOnce, type HeadlessRoutable,
 } from './headless-network.js';
+import {
+  isBrowserBuildMissing, installPinnedBrowser, browserInstallHint, reportBrowserFault, clearBrowserFault, type InstallResult,
+} from './headless-browser-install.js';
 
 const VIEWPORT = { width: 1200, height: 750 };
 const PAGE_TIMEOUT = 20_000;
 const FIRST_PASS_DELAY_MS = 30_000; // let the server settle (and be reachable at baseUrl) first
+/** How long a failed launch switches capture off before the next one is tried. */
+const RETRY_AFTER_MS = 3_600_000;
 
 let running = false;
-let disabled = false;
+/** Capture is off until this moment (0: on). Set by a failed launch, cleared by a browser that starts. */
+let offUntil = 0;
 let timer: NodeJS.Timeout | null = null;
+
+const captureOff = (): boolean => Date.now() < offUntil;
 
 /**
  * Owner GHII -> the moments they asked for an on-demand capture, newest last. In-process on purpose:
@@ -98,19 +116,23 @@ export function browserLaunchEnv(env: NodeJS.ProcessEnv): Record<string, string>
   return out;
 }
 
+interface HeadlessBrowser { close(): Promise<void>; newContext(o: unknown): Promise<unknown> }
+
+/** What one pass over the launch ladder gave: a browser, or the last error. No error and no browser: no playwright-core. */
+export interface LaunchOutcome { browser: HeadlessBrowser | null; error?: unknown }
+
 /**
- * Launch a headless browser WITHOUT a Playwright browser download: prefer the machine's installed
- * Edge/Chrome via `channel`, then a Playwright-installed Chromium. Returns null (and the caller
- * disables the job) if none is usable. playwright-core is imported lazily so a node that never runs
- * this never loads it.
+ * Launch a headless browser: prefer the machine's installed Edge/Chrome via `channel`, then a
+ * Playwright-installed Chromium. playwright-core is imported lazily so a node that never runs this
+ * never loads it.
  */
-async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: unknown): Promise<unknown> } | null> {
-  let chromium: { launch(o: unknown): Promise<{ close(): Promise<void>; newContext(o: unknown): Promise<unknown> }> };
+async function launchLadder(): Promise<LaunchOutcome> {
+  let chromium: { launch(o: unknown): Promise<HeadlessBrowser> };
   try {
     ({ chromium } = await import('playwright-core') as unknown as { chromium: typeof chromium });
   } catch {
     logger.info('Screenshot auto-capture: playwright-core not available — disabled.');
-    return null;
+    return { browser: null };
   }
   // Sandboxed first, relaxed only as the fallback: a root-run server chromium crashes its
   // targets under the sandbox ("Target crashed" — the first production bench found it), and a
@@ -125,7 +147,7 @@ async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: 
   ];
   let lastErr: unknown;
   for (const a of attempts) {
-    let browser: { close(): Promise<void>; newContext(o: unknown): Promise<unknown> } | null = null;
+    let browser: HeadlessBrowser | null = null;
     try {
       // No network of its own: every request is answered by the context's guard (headless-network.ts).
       browser = await chromium.launch({
@@ -140,18 +162,75 @@ async function launchBrowser(): Promise<{ close(): Promise<void>; newContext(o: 
       await page.close();
       await probe.close();
       logger.info(`Screenshot auto-capture: using ${a.label}.`);
-      return browser;
+      return { browser };
     } catch (e) {
       lastErr = e;
       // eslint-disable-next-line aimeat/no-silent-catch -- a browser that failed its probe may also fail to close; the attempt loop moves on either way
       if (browser) { try { await browser.close(); } catch { /* already gone */ } }
     }
   }
+  return { browser: null, error: lastErr };
+}
+
+const launchErrorText = (out: LaunchOutcome): string => (out.error as Error | undefined)?.message ?? 'unknown';
+
+/** The ladder, with the log line when nothing started. Returns null (and the caller switches capture off) if none is usable. */
+async function launchBrowser(): Promise<HeadlessBrowser | null> {
+  const out = await launchLadder();
   // Surface the real launch failure — a downloaded browser that can't start (missing Linux libs)
-  // looks identical to "not installed" otherwise. On Linux: `sudo npx playwright install-deps chromium`.
-  logger.info('Screenshot auto-capture: no usable browser — disabled. Install one with '
-    + '`npx playwright install --with-deps chromium`. Last error: ' + ((lastErr as Error)?.message ?? 'unknown'));
-  return null;
+  // looks identical to "not installed" otherwise.
+  if (!out.browser && out.error !== undefined) {
+    logger.info(`Screenshot auto-capture: no usable browser — off for an hour. Install one with: ${browserInstallHint()}. `
+      + `Last error: ${launchErrorText(out)}`);
+  }
+  return out.browser;
+}
+
+/**
+ * The check at start, for a node with auto-capture on: does the browser start? When the build this
+ * playwright-core names is what is missing, download it and try again. When the browser still does
+ * not start, capture goes off for an hour and the operator gets one incident on the Security page;
+ * when it starts, an incident left by an earlier start is closed.
+ *
+ * It runs at start and not at the first screenshot, because a missing build would otherwise wait
+ * for the next published app to be noticed. It installs nothing for an on-demand capture, a
+ * playtest or a bench: a request never waits for a download, and never causes one.
+ */
+export async function ensureHeadlessBrowser(
+  config: AimeatConfig, storage: Storage,
+  deps: { launch?: () => Promise<LaunchOutcome>; install?: () => Promise<InstallResult> } = {},
+): Promise<boolean> {
+  const launch = deps.launch ?? launchLadder;
+  const install = deps.install ?? (() => installPinnedBrowser(browserLaunchEnv(process.env)));
+  running = true; // the batch waits: a download can outlast its interval
+  try {
+    let out = await launch();
+    let installError: string | undefined;
+    if (!out.browser && isBrowserBuildMissing(out.error)) {
+      logger.info('Screenshot auto-capture: the Chromium build this playwright-core starts is not installed. Downloading it.');
+      const installed = await install();
+      if (installed.ok) {
+        logger.info(`Screenshot auto-capture: Chromium build installed${installed.ipv4Only ? ' (over IPv4 only)' : ''}.`);
+        out = await launch();
+      } else {
+        installError = installed.error;
+      }
+    }
+    if (out.browser) {
+      await out.browser.close();
+      offUntil = 0;
+      await clearBrowserFault(storage, config);
+      return true;
+    }
+    if (out.error === undefined) return false; // no playwright-core: launchLadder said so
+    offUntil = Date.now() + RETRY_AFTER_MS;
+    logger.warn(`Screenshot auto-capture: the browser does not start — off for an hour. Last error: ${launchErrorText(out)}`
+      + (installError !== undefined ? ` Download error: ${installError}` : ''));
+    await reportBrowserFault(storage, config, { launchError: launchErrorText(out), installError });
+    return false;
+  } finally {
+    running = false;
+  }
 }
 
 /** One app row as both paths address it. */
@@ -213,8 +292,8 @@ async function renderAndStore(
  * question and an operator reading two different wordings would go looking for two problems.
  */
 export const NO_HEADLESS_BROWSER =
-  'No headless browser on this node. Install one with `npx playwright install --with-deps chromium`, '
-  + 'or run this on a node that has Edge or Chrome.';
+  `No headless browser on this node. An operator installs one with: ${browserInstallHint()} `
+  + '(or run this on a node that has Edge or Chrome).';
 
 /**
  * The same headless browser, lent out: launch, hand over a context, always close, and answer null
@@ -248,8 +327,7 @@ async function guardedContext<C>(
 async function withBrowser<T>(config: AimeatConfig, fn: (ctx: RenderCtx) => Promise<T>): Promise<T | null> {
   const browser = await launchBrowser();
   if (!browser) {
-    disabled = true;
-    if (timer) { clearInterval(timer); timer = null; }
+    offUntil = Date.now() + RETRY_AFTER_MS;
     return null;
   }
   try {
@@ -264,7 +342,7 @@ async function withBrowser<T>(config: AimeatConfig, fn: (ctx: RenderCtx) => Prom
  * number captured. Exported so a manual trigger / test can run a single pass on demand.
  */
 export async function runScreenshotCapturePass(config: AimeatConfig, storage: Storage): Promise<number> {
-  if (running || disabled) return 0;
+  if (running || captureOff()) return 0;
   running = true;
   let captured = 0;
   try {
@@ -311,11 +389,11 @@ export async function runScreenshotCapturePass(config: AimeatConfig, storage: St
 export async function captureAppScreenshot(
   config: AimeatConfig, storage: Storage, app: { ownerName: string; filename: string },
 ): Promise<CaptureResult> {
-  if (disabled) {
+  if (captureOff()) {
     return {
       ok: false, status: 503, code: 'NO_BROWSER',
       message: 'This node has no usable browser, so it cannot render app screenshots. An operator can '
-        + 'install one with `npx playwright install --with-deps chromium`.',
+        + `install one with: ${browserInstallHint()}`,
     };
   }
 
@@ -369,7 +447,9 @@ export async function captureAppScreenshot(
 export function startScreenshotAutoCapture(config: AimeatConfig, storage: Storage): void {
   if (!config.screenshotAutoCapture) return;
   const minutes = Math.max(1, config.screenshotIntervalMin || 15);
-  setTimeout(() => { void runScreenshotCapturePass(config, storage); }, FIRST_PASS_DELAY_MS);
+  setTimeout(() => {
+    void ensureHeadlessBrowser(config, storage).then(() => runScreenshotCapturePass(config, storage));
+  }, FIRST_PASS_DELAY_MS);
   timer = setInterval(() => { void runScreenshotCapturePass(config, storage); }, minutes * 60 * 1000);
   if (timer.unref) timer.unref(); // don't keep the process alive for this alone
   logger.info(`Screenshot auto-capture: enabled (scanning every ${minutes} min, writes thumbnails directly to storage).`);

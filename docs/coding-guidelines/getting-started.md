@@ -163,9 +163,17 @@ procedure, the restore and its test: [backup and restore](../operations/backup-a
 
 `aimeat screenshot-worker` renders each published app and stores the thumbnail the app catalogue
 and the front page show; `--watch <seconds>` keeps it running. It drives the machine's installed
-Chrome or Edge through Playwright, so a desktop needs no browser download; a headless server runs
-`npx playwright install chromium` once. It signs in with a long-lived operator token, minted with
-`POST /v1/access/tokens` and `grant_operator: true`. A node runs without it.
+Chrome or Edge through Playwright, so a desktop needs no browser download; a headless server
+installs Chromium with the installer of its own `playwright-core`, which the worker's error message
+prints (`node node_modules/playwright-core/cli.js install chromium` in `aimeat/`). `npx playwright
+install` can fetch a newer Playwright, whose Chromium build the node does not start. It signs in
+with a long-lived operator token, minted with `POST /v1/access/tokens` and `grant_operator: true`.
+A node runs without it.
+
+A node started with `AIMEAT_SCREENSHOT_AUTO=true` takes the thumbnails itself and needs no worker.
+It checks its browser at start, downloads the Chromium build its `playwright-core` names when that
+build is missing (after every `playwright-core` update), and opens an incident on the admin Security
+page when the browser still does not start.
 
 [The deployment unit](../../aimeat/deploy/aimeat.service) records the Linux service
 settings, including memory settings and restart behaviour. Adapt it to the actual
