@@ -25,6 +25,9 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-storage-file-provenance
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- Each owner aims the node at the peer with a provider of their own
+ *     (PUT /v1/ai/providers/:id and PUT /v1/ai/routing) instead of PUT /v1/openrouter/settings, which
+ *     node 4.0.0 removes (the 4.0.0 sweep). The assertions are unchanged.
  *   v1.0.0 — 2026-10-08 — Initial (AI provenance for stored files, workstream B).
  */
 import { createServer } from 'node:http';
@@ -111,9 +114,21 @@ try {
   const bob = await owner('provfb');
   const app = `${alice.name}/voice.html`;
   const speech = { app_id: app, model: 'speech', input: 'Hei maailma', voice: 'test', response_format: 'mp3' };
+  // Each owner aims the node at the peer with a provider of their own (PUT /v1/ai/providers/:id),
+  // first for every capability. A test call would spend the peer's answers, so the owner's routing
+  // rule lets the node pick it untested (onlyTested false).
   for (const o of [alice, bob]) {
-    const set = await call('/v1/openrouter/settings', { provider: 'custom', baseUrl: `http://127.0.0.1:${peerPort}`, model: 'reply', imageModel: 'img' }, o.token, 'PUT');
+    const set = await call('/v1/ai/providers/provf-peer', {
+      title: 'Loopback provider', type: 'openai-compatible', baseUrl: `http://127.0.0.1:${peerPort}`, auth: { type: 'none' },
+      capabilities: {
+        text: { enabled: true, model: 'reply', pool: true }, image: { enabled: true, model: 'img', pool: true }, speech: { enabled: true },
+      },
+    }, o.token, 'PUT');
     assert(set.status === 200, set.text);
+    const routed = await call('/v1/ai/routing', {
+      routing: { defaults: { text: ['provf-peer'], image: ['provf-peer'], speech: ['provf-peer'] }, rules: { onlyTested: false } },
+    }, o.token, 'PUT');
+    assert(routed.status === 200, routed.text);
   }
 
   // The clip the reported flow starts from, and its bytes as a listener downloads them.

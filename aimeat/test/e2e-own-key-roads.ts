@@ -33,6 +33,11 @@
  *   cd aimeat && node --import tsx test/e2e-own-key-roads.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=own-key-roads
  * @version-history
+ *   v1.3.0 -- 2026-10-12 -- Node 4.0.0 removes /v1/openrouter/settings (the 4.0.0 sweep). 1b0 is about
+ *     the legacy key-only save, so on 4.0.0 it asserts 410 GONE and that nothing was stored. 1b and 1i
+ *     keep the legacy route on 3.x and on 4.0.0 save the key on a provider of the owner's own (its
+ *     key, one text test, the routing) and remove it with that provider. 2a saves the key that way on
+ *     both releases. The roads asserted are unchanged.
  *   v1.2.0 — 2026-10-02 — 1b0: a key saved on its own is served the node's default model
  *     (AIMEAT_MODEL_DEFAULT_CHAT) on the own key, and the free router only when chosen. 1g4: an
  *     agent with no runtime is not listed among the crews; one on its machine's key keeps them
@@ -54,6 +59,8 @@ import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, type FakeAiProvider, type RecordedRequest } from './helpers/fake-ai-provider.js';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -211,6 +218,28 @@ function keyOf(r: RecordedRequest): string {
 
 const gapParts = (ownKey: any): string[] => (ownKey?.not_covered ?? []).map((g: any) => g.part);
 
+/** The owner's own provider at the stand-in, which carries their key on node 4.0.0. */
+const OWN_PROVIDER = 'own-stub';
+
+/**
+ * Save the owner's key the way node 4.0.0 takes it: a provider of their own at the stand-in
+ * (PUT /v1/ai/providers/:id), its key, one text test (the smallest real call, which marks it tested)
+ * and the routing that puts it first for text. The same works on 3.x.
+ */
+async function saveOwnKeyOnProvider(owner: string): Promise<void> {
+    const p = await json(`/v1/ai/providers/${OWN_PROVIDER}`, owner, {
+        method: 'PUT',
+        body: JSON.stringify({ title: 'Own key', type: 'openai-compatible', baseUrl: stub!.baseUrl, auth: { type: 'key' }, capabilities: { text: { enabled: true, model: STUB_MODEL, pool: true } } }),
+    });
+    assert(p.status === 200, `provider ${p.status}: ${JSON.stringify(p.body?.error)}`);
+    const k = await json(`/v1/ai/providers/${OWN_PROVIDER}/key`, owner, { method: 'PUT', body: JSON.stringify({ api_key: OWN_KEY }) });
+    assert(k.status === 200, `save ${k.status}: ${JSON.stringify(k.body?.error)}`);
+    const t = await json(`/v1/ai/providers/${OWN_PROVIDER}/test`, owner, { method: 'POST', body: JSON.stringify({ capability: 'text' }) });
+    assert(t.status === 200 && t.body.data?.key_source === 'own', `test ${t.status}: ${JSON.stringify(t.body?.error ?? t.body?.data)}`);
+    const r = await json('/v1/ai/routing', owner, { method: 'PUT', body: JSON.stringify({ routing: { defaults: { text: [OWN_PROVIDER] } } }) });
+    assert(r.status === 200, `routing ${r.status}: ${JSON.stringify(r.body?.error)}`);
+}
+
 // ─── The run ──────────────────────────────────────────────────────────────────
 
 console.log('\n=== Which key paid, road by road ===\n');
@@ -223,6 +252,8 @@ async function nodeRoute(): Promise<void> {
     routed = await startNode(PORT, 'route', '');
     BASE = routed.base;
     peerLog = routed.peerLog;
+    // Node 4.0.0 removes /v1/openrouter/settings: 1b0, 1b and 1i ask which release this node runs.
+    const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
     const ownerName = `okr${Date.now() % 100000}`;
     let owner = '';
     let thread = '';
@@ -244,7 +275,7 @@ async function nodeRoute(): Promise<void> {
         assert(JSON.stringify(gapParts(s.own_key)) === '["agent_runtimes"]', `only the crews are out of reach, got ${JSON.stringify(s.own_key.not_covered)}`);
     });
 
-    await test('1b0. a key saved on its own is served the NODE\'s default model, on the own key; the free router only when chosen', async () => {
+    await test('1b0. a key saved on its own is served the NODE\'s default model, on the own key; the free router only when chosen; on 4.0.0 the legacy key-only save is 410 GONE and writes nothing', async () => {
         // Measured 2026-10-02 on a hosted place: a key-only PUT created the settings with model
         // 'openrouter/free', which came before the node's default, and one task answered in broken
         // Finnish with neither key spending anything. Ruled by Jouni: an own key uses the node's
@@ -252,6 +283,15 @@ async function nodeRoute(): Promise<void> {
         const r = await json('/v1/openrouter/settings', owner, {
             method: 'PUT', body: JSON.stringify({ apiKey: OWN_KEY, provider: 'custom', baseUrl: stub!.baseUrl }),
         });
+        if (legacyGone) {
+            // The key-only save is the legacy route's own form; a provider of the owner's names its model.
+            assert(r.status === 410 && r.body?.error?.code === 'GONE', `the legacy save on 4.0.0: expected 410 GONE, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+            const list: any[] = (await json('/v1/ai/providers', owner)).body.data?.providers ?? [];
+            assert(!list.some((p) => p.source === 'owner'), `nothing was written: ${JSON.stringify(list.filter((p) => p.source === 'owner'))}`);
+            const s = (await json('/v1/chat/status', owner)).body.data;
+            assert(s.has_own_key === false, `no key was stored, got ${s.has_own_key}`);
+            return;
+        }
         assert(r.status === 200, `save ${r.status}: ${JSON.stringify(r.body?.error)}`);
         const settings = (await json('/v1/openrouter/settings', owner)).body.data;
         assert(settings.model === null, `a key-only save names no model, got ${JSON.stringify(settings.model)}`);
@@ -274,12 +314,16 @@ async function nodeRoute(): Promise<void> {
         assert(del.status === 200, `delete ${del.status}`);
     });
 
-    await test('1b. the owner saves their own key the way the measurement did (PUT /v1/openrouter/settings); the node says it pays', async () => {
-        const r = await json('/v1/openrouter/settings', owner, {
-            method: 'PUT',
-            body: JSON.stringify({ apiKey: OWN_KEY, provider: 'custom', baseUrl: stub!.baseUrl, model: STUB_MODEL }),
-        });
-        assert(r.status === 200, `save ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    await test('1b. the owner saves their own key the way the measurement did (PUT /v1/openrouter/settings; on 4.0.0, which removes it, a provider of their own with its key); the node says it pays', async () => {
+        if (legacyGone) {
+            await saveOwnKeyOnProvider(owner);
+        } else {
+            const r = await json('/v1/openrouter/settings', owner, {
+                method: 'PUT',
+                body: JSON.stringify({ apiKey: OWN_KEY, provider: 'custom', baseUrl: stub!.baseUrl, model: STUB_MODEL }),
+            });
+            assert(r.status === 200, `save ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        }
         const s = (await json('/v1/chat/status', owner)).body.data;
         assert(s.has_own_key === true && s.own_key.set === true, `the key is set, got ${s.has_own_key} / ${JSON.stringify(s.own_key)}`);
         assert(s.pays === 'own', `the own key pays the chat, got ${JSON.stringify(s.pays)}`);
@@ -455,7 +499,10 @@ async function nodeRoute(): Promise<void> {
     });
 
     await test('1i. the key deleted: the node says so, and the place key is the payer again', async () => {
-        const del = await json('/v1/openrouter/settings', owner, { method: 'DELETE' });
+        // On 4.0.0 the key is removed with the provider that holds it (DELETE /v1/ai/providers/:id).
+        const del = legacyGone
+            ? await json(`/v1/ai/providers/${OWN_PROVIDER}`, owner, { method: 'DELETE' })
+            : await json('/v1/openrouter/settings', owner, { method: 'DELETE' });
         assert(del.status === 200, `delete ${del.status}`);
         const s = (await json('/v1/chat/status', owner)).body.data;
         assert(s.has_own_key === false && s.own_key.set === false, `no key any more, got ${s.has_own_key} / ${JSON.stringify(s.own_key)}`);
@@ -477,10 +524,7 @@ async function sharedChatKey(): Promise<void> {
     await test('2a. setup on the shared chat key: an owner saves their own key', async () => {
         owner = await registerOwner(ownerName);
         thread = (await json('/v1/chat/threads', owner, { method: 'POST', body: JSON.stringify({ title: 'shared' }) })).body.data.thread.id;
-        const r = await json('/v1/openrouter/settings', owner, {
-            method: 'PUT', body: JSON.stringify({ apiKey: OWN_KEY, provider: 'custom', baseUrl: stub!.baseUrl, model: STUB_MODEL }),
-        });
-        assert(r.status === 200, `save ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        await saveOwnKeyOnProvider(owner);
     });
 
     await test('2b. the status says both halves: a key is set, the shared key pays the chat, and the own key does not reach it', async () => {

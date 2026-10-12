@@ -8,6 +8,10 @@
  *   would reach OpenRouter stops at NO_API_KEY. A real transcription is verified by hand with a key
  *   before the feature is called done — stated here rather than left for someone to assume.
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- The budget test sets its transcription model and key on a provider of the
+ *     owner's own (PUT /v1/ai/providers/:id, its key, PUT /v1/ai/routing) instead of PUT
+ *     /v1/openrouter/settings, which node 4.0.0 removes (the 4.0.0 sweep). The budget itself stays on
+ *     POST /v1/ai/settings.
  *   v1.0.0 — 2026-08-01 — Initial version.
  */
 // 2026-08-16 (August 2026 test-quality audit, e2e-ai-transcribe:96): every call here was an owner
@@ -208,13 +212,28 @@ await test('Oversized inline audio → 400 AUDIO_TOO_LARGE (before any provider 
 });
 
 await test('Daily budget spent → 402, and the budget check precedes the provider', async () => {
-  const put = await json('/v1/openrouter/settings', {
+  // A transcription model and a key on a provider of the owner's own (PUT /v1/ai/providers/:id and
+  // its key). A test call would go to OpenRouter itself, so the owner's routing rule lets the node
+  // pick the untested provider (onlyTested false).
+  const prov = await json('/v1/ai/providers/stt-own', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${alice.token}` },
-    body: JSON.stringify({ sttModel: 'openai/whisper-large-v3', apiKey: 'sk-or-v1-fake-for-test' }),
+    body: JSON.stringify({ title: 'My OpenRouter', type: 'openrouter', auth: { type: 'key' }, capabilities: { transcription: { enabled: true, model: 'openai/whisper-large-v3', pool: true } } }),
+  });
+  assert(prov.status === 200, `provider PUT: ${prov.status} ${JSON.stringify(prov.body)}`);
+  const put = await json('/v1/ai/providers/stt-own/key', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${alice.token}` },
+    body: JSON.stringify({ api_key: 'sk-or-v1-fake-for-test' }),
   });
   if (put.status === 503) { console.log('    (Skipped — encryption not configured on this node)'); return; }
   assert(put.status === 200, `settings PUT: ${put.status} ${JSON.stringify(put.body)}`);
+  const routed = await json('/v1/ai/routing', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${alice.token}` },
+    body: JSON.stringify({ routing: { defaults: { transcription: ['stt-own'] }, rules: { onlyTested: false } } }),
+  });
+  assert(routed.status === 200, `routing PUT: ${routed.status} ${JSON.stringify(routed.body)}`);
 
   const budget = await json('/v1/ai/settings', {
     method: 'POST',

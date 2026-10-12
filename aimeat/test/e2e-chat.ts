@@ -13,6 +13,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-chat
  * @version-history
+ *   v1.6.0 -- 2026-10-12 -- "Status names WHO PAYS" stores the owner's key on a provider of their own
+ *     (PUT /v1/ai/providers/:id and /key, routed first for text) instead of PUT /v1/openrouter/settings,
+ *     which node 4.0.0 removes (the 4.0.0 sweep). What it asserts is unchanged.
  *   v1.5.0 — 2026-09-28 — System 2 plan, V5: this node has no shared chat key, so the chat runs on
  *     the node route and the status names the payer /v1/llm would pick: no payer with no key
  *     anywhere, the owner once they store their own key.
@@ -94,15 +97,27 @@ await test('Status names WHO PAYS for a turn, as the gate would decide it', asyn
     assert(body.data?.pays !== 'own', `an owner with no key of their own does not pay, got ${JSON.stringify(body.data?.pays)}`);
 
     // An owner who brings a key pays for their own chat, because the chat's calls reach the gate.
-    const put = await json('/v1/openrouter/settings', aAuthed({
-        method: 'PUT', body: JSON.stringify({ apiKey: 'sk-or-e2e-not-a-real-key', model: 'openrouter/free' }),
+    // The key goes on a provider of their own (PUT /v1/ai/providers/:id and its key). A test call
+    // would go to OpenRouter itself, which this suite does not reach, so the owner's routing rule
+    // lets the node pick their untested provider (onlyTested false) and puts it first for text.
+    const prov = await json('/v1/ai/providers/chat-own', aAuthed({
+        method: 'PUT', body: JSON.stringify({ title: 'My OpenRouter', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openrouter/free', pool: true } } }),
+    }));
+    assert(prov.status === 200, `add a provider: ${prov.status} ${JSON.stringify(prov.body?.error)}`);
+    const put = await json('/v1/ai/providers/chat-own/key', aAuthed({
+        method: 'PUT', body: JSON.stringify({ api_key: 'sk-or-e2e-not-a-real-key' }),
     }));
     assert(put.status === 200, `store a key: ${put.status} ${JSON.stringify(put.body?.error)}`);
+    const routed = await json('/v1/ai/routing', aAuthed({
+        method: 'PUT', body: JSON.stringify({ routing: { defaults: { text: ['chat-own'] }, rules: { onlyTested: false } } }),
+    }));
+    assert(routed.status === 200, `route text to it: ${routed.status} ${JSON.stringify(routed.body?.error)}`);
     const after = await json('/v1/chat/status', aAuthed());
     assert(after.body.data.has_own_key === true, 'the key is stored');
     assert(after.body.data.pays === 'own', `their own key pays for their chat, got ${after.body.data.pays}`);
     assert(after.body.data.model === 'openrouter/free', `on the model they chose, got ${after.body.data.model}`);
-    await json('/v1/openrouter/settings', aAuthed({ method: 'DELETE' }));
+    await json('/v1/ai/providers/chat-own', aAuthed({ method: 'DELETE' }));
+    await json('/v1/ai/routing', aAuthed({ method: 'PUT', body: JSON.stringify({ routing: { defaults: { text: [] }, rules: { onlyTested: true } } }) }));
 });
 
 await test('A turn carries attached files as KEYS, and drops what is not one', async () => {

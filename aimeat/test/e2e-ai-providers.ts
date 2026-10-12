@@ -22,6 +22,10 @@
  *   - R1-R3: the routing endpoint, the MCP tools and the deprecated routes
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-providers.ts
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- 8 and R3 are about the settings routes from before providers, which node
+ *     4.0.0 removes, so they ask the node its release (the 4.0.0 sweep): on 3.x the same assertions,
+ *     on 4.0.0 410 GONE with Deprecation, the successor Link and X-AIMEAT-Removed-In, and in 8 the
+ *     legacy record and the migrated provider's model unchanged.
  *   v1.1.0 — 2026-10-04 — 5b: both rounds of one /v1/llm conversation reach OpenRouter with one session_id;
  *     5c: a cached turn's ledger cost is what OpenRouter reports for it, which it reports only when asked.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
@@ -40,6 +44,8 @@ import {
   type FakeAiProvider, type RecordedRequest,
 } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 // Its own port, outside the 40251-up range sessions claim; the stub takes an ephemeral one.
 const PORT = process.env.E2E_AI_PROVIDERS_PORT ?? '40439';
@@ -63,6 +69,14 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body, headers: res.headers };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+
+/** Node 4.0.0's answer on a removed AI settings route: 410 GONE, naming /v1/ai/providers as its successor. */
+function assertLegacyGone(r: { status: number; body: any; headers: Headers }, what: string) {
+  assert(r.status === 410 && r.body?.error?.code === 'GONE', `${what}: expected 410 GONE, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+  assert(r.headers.get('deprecation') === 'true', `${what}: Deprecation ${r.headers.get('deprecation')}`);
+  assert((r.headers.get('link') ?? '').includes('</v1/ai/providers>; rel="successor-version"'), `${what}: the successor is named, got Link ${r.headers.get('link')}`);
+  assert(r.headers.get('x-aimeat-removed-in') === AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, `${what}: X-AIMEAT-Removed-In ${r.headers.get('x-aimeat-removed-in')}`);
+}
 
 // ── the node under test ───────────────────────────────────────────────────────
 
@@ -191,6 +205,8 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
   // Every provider answers with where it was reached, so a test reads which one answered.
   stub.setDefault('chat', (r) => chatJson(`answered at ${r.pathname} by ${String(r.json?.model)}`, { model: String(r.json?.model) }));
   const server = await startServer(stub);
+  // Node 4.0.0 removes the settings routes from before providers (8, R3): they answer 410 GONE.
+  const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
   const at = (prefix: string) => (r: RecordedRequest) => r.pathname.startsWith(`/v1/${prefix}/`);
   const count = (prefix: string) => stub.requests.filter(at(prefix)).length;
   const bearer = (r: RecordedRequest | undefined) => r?.headers.authorization ?? '';
@@ -379,7 +395,7 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
       assert(still.body.data.providers.some((p: any) => p.id === 'my-anthropic'), 'a\'s provider is still there');
     });
 
-    await test('8. the legacy setting becomes a provider record on the first read, the legacy record stays, and edits follow', async () => {
+    await test('8. the legacy setting becomes a provider record on the first read, the legacy record stays, and edits follow; on 4.0.0 the legacy edit route is 410 GONE and writes nothing', async () => {
       const m = await setupOwner('m');
       const s = await json('/v1/memory', {
         method: 'POST', headers: auth(m.token),
@@ -395,6 +411,14 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
       const r = await complete(m, {});
       assert(r.status === 200 && stub.requests.filter(at('legacy')).pop()?.json?.model === 'stub/legacy-one', `answered on the legacy setting: ${r.status} ${JSON.stringify(r.body?.error)}`);
       const edit = await json('/v1/openrouter/settings', { method: 'PUT', headers: auth(m.token), body: JSON.stringify({ provider: 'custom', baseUrl: `${stub.baseUrl}/legacy`, model: 'stub/legacy-two' }) });
+      if (legacyGone) {
+        assertLegacyGone(edit, 'PUT /v1/openrouter/settings');
+        const kept = await json('/v1/memory/openrouter.settings', { headers: auth(m.token) });
+        assert(kept.status === 200 && kept.body.data.value.model === 'stub/legacy-one', `nothing was written: ${JSON.stringify(kept.body.data?.value)}`);
+        const r2 = await complete(m, {});
+        assert(r2.status === 200 && stub.requests.filter(at('legacy')).pop()?.json?.model === 'stub/legacy-one', `the migrated provider still answers on the legacy record: ${r2.status} ${JSON.stringify(r2.body?.error)}`);
+        return;
+      }
       assert(edit.status === 200, `legacy edit ${edit.status}`);
       const r2 = await complete(m, {});
       assert(r2.status === 200 && stub.requests.filter(at('legacy')).pop()?.json?.model === 'stub/legacy-two', 'the migrated provider follows the legacy edit');
@@ -546,8 +570,15 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
       assert(JSON.stringify(after.body.data.routing.defaults.text) === JSON.stringify(['p-two']), `in force: ${JSON.stringify(after.body.data.routing.defaults)}`);
     });
 
-    await test('R3. the settings routes from before providers say they are deprecated, with their successor and removal', async () => {
+    await test('R3. the settings routes from before providers say they are deprecated, with their successor and removal; on 4.0.0 they answer 410 GONE naming the successor', async () => {
       const r = await json('/v1/openrouter/settings', { headers: auth(d.token) });
+      if (legacyGone) {
+        assertLegacyGone(r, 'GET /v1/openrouter/settings');
+        for (const [method, path] of [['GET', '/v1/openrouter/models'], ['POST', '/v1/openrouter/test']] as const) {
+          assertLegacyGone(await json(path, { method, headers: auth(d.token), ...(method === 'POST' ? { body: '{}' } : {}) }), `${method} ${path}`);
+        }
+        return;
+      }
       assert(r.status === 200, `still answers: ${r.status}`);
       assert(r.headers.get('deprecation') === 'true' && r.headers.get('x-aimeat-removed-in') === '4.0.0', `headers: ${r.headers.get('deprecation')} ${r.headers.get('x-aimeat-removed-in')}`);
       assert((r.headers.get('link') ?? '').includes('/v1/ai/providers'), `successor: ${r.headers.get('link')}`);

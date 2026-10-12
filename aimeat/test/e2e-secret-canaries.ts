@@ -24,17 +24,27 @@
  *   (ADMIN_SETUP_CLOSED_SUITES in run-e2e-server.ts), the production setting; this suite never calls it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-secret-canaries
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- The owner's AI key is planted through PUT /v1/ai/providers/:id/key, the
+ *     route node 4.0.0 keeps, and the read routes include the record it lands in
+ *     (ai.apikey.provider.<id>). On 3.x a second key is planted through PUT /v1/openrouter/settings as
+ *     well, since an upgraded node still holds that record (the 4.0.0 sweep).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09).
  */
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const STAMP = Date.now() % 1000000;
 
 const AI_KEY = `sk-or-canary-${STAMP}-owner-key-7f3e`;
+const LEGACY_AI_KEY = `sk-or-canary-${STAMP}-legacy-key-2d8a`;
 const STRIPE_KEY = `sk_test_canary_${STAMP}_c41d`;
 const STRIPE_HOOK = `whsec_canary_${STAMP}_9b2a`;
-const CANARIES = [AI_KEY, STRIPE_KEY, STRIPE_HOOK];
+const CANARIES = [AI_KEY, LEGACY_AI_KEY, STRIPE_KEY, STRIPE_HOOK];
+/** The owner's provider the AI key is set for, and the record the key lands in. */
+const PROVIDER_ID = 'can-openrouter';
+const PROVIDER_KEY_RECORD = `ai.apikey.provider.${PROVIDER_ID}`;
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -94,6 +104,7 @@ const READ_ROUTES: string[] = [
     '/v1/discover?scope=own&q=psp',
     '/v1/memory?limit=500',
     '/v1/memory/openrouter.apikey',
+    `/v1/memory/${PROVIDER_KEY_RECORD}`,
     '/v1/memory/commerce.psp',
     '/v1/memory/search?q=apikey',
     '/v1/memory/export',
@@ -103,11 +114,24 @@ const READ_ROUTES: string[] = [
 async function main() {
     console.log('\n=== Secret canaries (secrets audit 2026-10-09) ===\n');
     const owner = await setupOwner('o');
+    // Node 4.0.0 removes PUT /v1/openrouter/settings; before it the legacy record is planted as well.
+    const legacyGone = await removedOn(BASE, AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
     let agent = '';
 
     await test('setup: the owner stores an AI key and Stripe secrets through their own routes, and connects an agent', async () => {
-        const ai = await json('/v1/openrouter/settings', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ apiKey: AI_KEY }) });
+        const prov = await json(`/v1/ai/providers/${PROVIDER_ID}`, {
+            method: 'PUT', headers: auth(owner.token),
+            body: JSON.stringify({ title: 'Canary OpenRouter', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, model: 'openrouter/free' } } }),
+        });
+        assert(prov.status === 200, `AI provider: ${prov.status} ${JSON.stringify(prov.body?.error)}`);
+        const ai = await json(`/v1/ai/providers/${PROVIDER_ID}/key`, { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ api_key: AI_KEY }) });
         assert(ai.status === 200, `AI key: ${ai.status} ${JSON.stringify(ai.body?.error)}`);
+        const landed = await json(`/v1/memory/${PROVIDER_KEY_RECORD}`, { headers: auth(owner.token) });
+        assert(landed.status === 200, `the key record ${PROVIDER_KEY_RECORD} exists: ${landed.status} ${JSON.stringify(landed.body)}`);
+        if (!legacyGone) {
+            const legacy = await json('/v1/openrouter/settings', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ apiKey: LEGACY_AI_KEY }) });
+            assert(legacy.status === 200, `legacy AI key: ${legacy.status} ${JSON.stringify(legacy.body?.error)}`);
+        }
         const st = await json('/v1/commerce/payout/stripe', {
             method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ secret_key: STRIPE_KEY, webhook_secret: STRIPE_HOOK }),
         });
@@ -126,9 +150,11 @@ async function main() {
 
     await test('an agent without memory:read is refused the credential record, and gets no value', async () => {
         const outsider = await agentToken(owner, `cannoread${STAMP}`, ['social:read']);
-        const r = await json('/v1/memory/openrouter.apikey', { headers: auth(outsider) });
-        assert(r.status === 403 || r.status === 401, `expected a refusal, got ${r.status}`);
-        noCredential(`/v1/memory/openrouter.apikey (agent without memory:read, ${r.status})`, r.body);
+        for (const key of [PROVIDER_KEY_RECORD, 'openrouter.apikey']) {
+            const r = await json(`/v1/memory/${key}`, { headers: auth(outsider) });
+            assert(r.status === 403 || r.status === 401, `expected a refusal, got ${r.status}`);
+            noCredential(`/v1/memory/${key} (agent without memory:read, ${r.status})`, r.body);
+        }
     });
 
     await test('discover still lists the credential record, as configured', async () => {
