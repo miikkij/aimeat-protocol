@@ -723,6 +723,43 @@ def _extract_agent_name_from_params(mcp_server_params: Any) -> str | None:
 # Sentinel for the `skill_path` kwarg: lets us distinguish "user didn't pass
 # it -> auto-detect" from "user explicitly disabled with None -> use fallback
 # persona, no skill bundle".
+def select_liaison_tools(
+    all_tools: Iterable[Any],
+    tool_filter: Iterable[str] | None,
+    tool_filter_if_offered: Iterable[str] | None = None,
+) -> tuple[list[Any], list[str]]:
+    """
+    Pick the tools a liaison loads out of what the MCP server offers.
+
+    Returns `(tools, left_out)`. `left_out` holds the names from
+    `tool_filter_if_offered` that the server did not offer.
+
+    A name in `tool_filter` that the server does not offer raises
+    AimeatLiaisonError, because a filter the caller wrote names tools the crew
+    depends on. A name that is also in `tool_filter_if_offered` is left out
+    instead. That list exists for tools a server may rightly not offer to this
+    agent: a connector started with `--surface agent` has no `aimeat_invoke`, a
+    node's own MCP lists `aimeat_mcp_list` only to a session that holds
+    `mcp:read`, and a connector older than the tool does not have it at all.
+    """
+    offered = list(all_tools)
+    if tool_filter is None:
+        return offered, []
+    wanted = set(tool_filter)
+    lenient = set(tool_filter_if_offered or ())
+    offered_names = {getattr(t, "name", None) for t in offered}
+    missing = wanted - offered_names
+    required_missing = missing - lenient
+    if required_missing:
+        raise AimeatLiaisonError(
+            f"tool_filter requested tools that the MCP server did not "
+            f"expose: {sorted(required_missing)}. Available: "
+            f"{sorted(getattr(t, 'name', '?') for t in offered)}"
+        )
+    tools = [t for t in offered if getattr(t, "name", None) in wanted]
+    return tools, sorted(missing)
+
+
 _AUTO_DETECT = object()
 
 
@@ -737,6 +774,7 @@ def create_liaison_agent(
     goal: str = DEFAULT_GOAL,
     backstory: str | None = None,
     tool_filter: Iterable[str] | None = None,
+    tool_filter_if_offered: Iterable[str] | None = None,
     include_offers_tools: bool = True,
     verbose: bool = False,
     allow_delegation: bool = False,
@@ -766,7 +804,15 @@ def create_liaison_agent(
             "aimeat_memory_write"). If None (default), the liaison sees the
             full surface the AIMEAT node exposes. The local offers tools
             (see `include_offers_tools`) are NOT subject to this filter --
-            they are appended after filtering.
+            they are appended after filtering. A name the MCP server does
+            not offer raises AimeatLiaisonError.
+        tool_filter_if_offered: Names in `tool_filter` that are loaded when
+            the MCP server offers them and left out, with one printed line,
+            when it does not. Use it for tools a server may rightly not offer
+            to this agent: a connector started with `--surface agent`, a
+            node's own MCP when the agent lacks the permission the tool
+            needs, or a connector older than the tool. Every other name in
+            `tool_filter` still raises when it is missing.
         include_offers_tools: When True (default), append the two local
             CrewAI offers tools (`aimeat_offers_check` / `aimeat_offers_publish`)
             to the toolset so the liaison can self-validate and publish its
@@ -854,18 +900,12 @@ def create_liaison_agent(
                 "or hit the node's /v1/mcp endpoint directly to verify."
             )
 
-        if tool_filter is not None:
-            wanted = set(tool_filter)
-            tools = [t for t in all_tools if getattr(t, "name", None) in wanted]
-            missing = wanted - {getattr(t, "name", None) for t in all_tools}
-            if missing:
-                raise AimeatLiaisonError(
-                    f"tool_filter requested tools that the MCP server did not "
-                    f"expose: {sorted(missing)}. Available: "
-                    f"{sorted(getattr(t, 'name', '?') for t in all_tools)}"
-                )
-        else:
-            tools = list(all_tools)
+        tools, left_out = select_liaison_tools(all_tools, tool_filter, tool_filter_if_offered)
+        if left_out:
+            print(
+                f"[liaison:{agent_name or '?'}] this MCP server does not offer "
+                f"{left_out} to this agent; the liaison runs without them"
+            )
 
         # Strip None-valued kwargs from each tool's _run so the LLM's correctly-
         # omitted optionals don't leak through as JSON null and trip AIMEAT's
