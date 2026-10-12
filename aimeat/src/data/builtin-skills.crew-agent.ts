@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.3.2 -- 2026-10-12 -- Step 1.2: approving on the page adds the agent to the organism's agents,
+ *     and an organism that admits only listed agents needs that.
  *   v1.3.1 -- 2026-10-12 -- Step 1.2: `backfill: true` on a `record_spaces` item, for the records
  *     that are already in the space, when the menu lists `record_backfill`.
  *   v1.3.0 -- 2026-10-12 -- Step 1.2: an agent whose work arrives in a workspace names the spaces
@@ -113,7 +115,9 @@ examples: email, a calendar, meeting notes from a recording.
    never after. Ask \`organism:read\` for it, and \`organism:write\` with
    \`memory:write\` when it writes back into the workspace. The owner sees the spaces on the
    approval page, and approving there states the agent on the workspace, where the owner or the
-   workspace's creator can retire it.
+   workspace's creator can retire it, and adds it to the agents of the workspace's organism. An
+   organism that admits only its listed agents lets the agent in by that list alone, so an agent
+   approved another way has to be attached there by a person before it can read the workspace.
 3. **Propose it.** \`aimeat_agent_propose\` with \`name\`, a \`purpose\` the owner can decide from
    (it is the sentence they read, so name their data in it: "reads the open deals in your Sales
    workspace each morning and lists what to act on"), \`scopes\`, \`mode\`, \`run_mode\` and the

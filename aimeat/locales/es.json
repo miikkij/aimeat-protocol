@@ -11245,6 +11245,7 @@
       "spacesLabel": "¿Qué espacios sigue?",
       "spacesHint": "Recibe una tarea por cada registro que se publique allí después de que el agente se inicie.",
       "leftAsIs": "Los registros que ya están allí quedan como están.",
+      "joins": "Se agrega a los agentes del organismo de este espacio de trabajo, donde lo ven los miembros.",
       "backfill": "Trabajar también con los registros que ya están allí",
       "backfillHint": "Registros que hay ahora: {n}. Cada uno se convierte en una tarea y en una ejecución del modelo, de diez en diez. Si detienes el agente, se detiene.",
       "backfillNone": "Los espacios que marcaste no tienen ningún registro publicado ahora.",

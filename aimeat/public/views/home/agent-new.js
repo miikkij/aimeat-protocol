@@ -22,6 +22,12 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.6.0 — 2026-10-12 — An agent that works on a workspace's records is added to the agents of
+ *     that workspace's organism when it is approved (POST /v1/organisms/:id/agents), and the page
+ *     says so before the person approves. The organism's Agents section then lists it (Jouni,
+ *     2026-10-12: "laita sitten näkymään jos koet että sen pitäisi näkyä"), and an organism that
+ *     admits only listed agents lets it read the workspace, which it refused before without
+ *     anyone seeing why.
  *   v1.5.1 — 2026-10-12 — The names of the watched workspace's spaces go into the agent's tasks
  *     when it is made (services/agent-draft-known.js withSpaceNote). In the production run of
  *     2026-10-12 an agent wrote its answers into the space it watched, because its definition
@@ -84,7 +90,7 @@ import {
 import { namedIn, recordSpacesOf, RECORDS_FEATURE, BACKFILL_FEATURE } from '/js/services/agent-draft-known.js';
 import { decodeEntities } from '/js/utils.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
-import { activateEngagement } from '/js/services/organisms.js';
+import { activateEngagement, attachAgent } from '/js/services/organisms.js';
 import { WorkplaceChoice } from '/views/home/agent-ties-parts.js';
 import { WatchChoice, WatchedFacts } from '/views/home/agent-watch-parts.js';
 import { machineName } from '/views/home/agents-band.js';
@@ -304,6 +310,16 @@ export default function AgentNewView({ navigate }) {
           if (seen.has(key)) continue;
           seen.add(key);
           await activateEngagement(s.organism_id, s.ws, name).catch((err) => swallowed('agent-new: engagement', err));
+        }
+        // It also joins the agents of each organism it watches a workspace in. The organism's
+        // Agents section lists it there, with its contract mark, for every member to see. And an
+        // organism that admits only the agents on that list would refuse it otherwise: the node
+        // would then send it no record and say nothing, and the agent would never work. The
+        // person approving in person is who may add their own agent. One that is already there
+        // answers 409, which is the state wanted.
+        const gaii = out?.agent?.gaii;
+        for (const organismId of new Set(spaces.map((s) => s.organism_id))) {
+          if (gaii) await attachAgent(organismId, gaii).catch((err) => swallowed('agent-new: attach to the organism', err));
         }
       }
       navigate(`${HOME}?agent=${encodeURIComponent(name)}&started=${state}${out?.schedule_problem ? '&schedule=failed' : ''}`);
