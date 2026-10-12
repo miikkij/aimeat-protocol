@@ -14,6 +14,9 @@
  *   The refusals are measured: a second owner sees none of the first owner's counts, an agent
  *   holding the wrong scope is refused on REST and has no such tool on MCP, and no token is 401.
  * @version-history
+ *   v1.4.1 — 2026-10-12 — Test 8 publishes the proofread offer's morsel amount as tollMorsels instead
+ *     of price.morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; tests 9 to 11, 20 and 21
+ *     had failed only because the offer never existed.
  *   v1.4.0 — 2026-10-11 — A morsel price is pacing now (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa):
  *     the native checkout of tests 9 and 10 is in money and names its handler; the agent of phase 7 buys
  *     a free paced offer, and its failed checkout is a money purchase with no agent limit (PURCHASE_LIMIT_NOT_SET).
@@ -319,7 +322,7 @@ await test('8. the seller offers a priced job', async () => {
     // A money price as well: the UCP checkout in test 11 sells in money only (ruling D4, 2026-10-11).
     // `proofread-paced` is free with pacing only: the agent of phase 7 buys it without a money limit.
     body: JSON.stringify({ offers: [
-      { id: 'proofread', title: 'Proofread', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, price: { morsels: PRICE, unit: 'per-call' }, priceMoney: { amount: 1_000_000, currency: 'EUR' }, visibility: 'public' },
+      { id: 'proofread', title: 'Proofread', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, tollMorsels: PRICE, priceMoney: { amount: 1_000_000, currency: 'EUR' }, visibility: 'public' },
       { id: 'proofread-paced', title: 'Proofread, free', ask: 'Send text.', deliverable: { format: 'document', sample: 'untested' }, tollMorsels: 2, visibility: 'public' },
     ] }),
   });

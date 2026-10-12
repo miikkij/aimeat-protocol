@@ -8,6 +8,13 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.8.1 — 2026-10-12 — The seller's offers and the app-tool manifest carry their morsel amounts as
+ *     tollMorsels instead of price.morsels, which node 4.0.0 refuses on the offers route with
+ *     MORSEL_PRICE_REMOVED; 27 tests had failed in a cascade from that one setup. Tests 28, 31 and 32
+ *     read toll_morsels, and assert the deprecated `price` mirror on 3.x and its absence on 4.0.0,
+ *     which drops it (src/models/app-tool-schemas.ts presentToolPacing). Test 20 asserts 403
+ *     SCOPE_REQUIRED (the H-3 check) on 3.x and 403 SCOPE_DENIED on 4.0.0, where the complete route's
+ *     REST scope gate refuses an app without contract:spend before the session service is reached.
  *   v1.8.0 — 2026-10-11 — 2, 4, 5, 7, 9, 17, 18, 22 and 26 asserted the old model, where a morsel amount
  *     was a price settled by the morsel handler. A morsel amount is pacing now: a morsel-written offer or
  *     tool is free with that pacing, the receipt carries `pacing`, a short balance is INSUFFICIENT_MORSELS,
@@ -53,6 +60,9 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../src/utils/rest-scope-release.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function setupOwner(label: string) {
     const name = `com${label}${Date.now()}`;
@@ -85,12 +95,12 @@ const BASE_OFFERS = [
     {
         id: 'translate-doc', title: 'Translate a document', ask: 'Send a document; I translate it to Finnish.',
         deliverable: { format: 'document', sample: 'untested' },
-        price: { morsels: PRICE, unit: 'per-call' }, visibility: 'public',
+        tollMorsels: PRICE, visibility: 'public',
     },
     {
         id: 'secret-work', title: 'Private work', ask: 'Owner-only offer.',
         deliverable: { format: 'document', sample: 'untested' },
-        price: { morsels: 1 }, visibility: 'private',
+        tollMorsels: 1, visibility: 'private',
     },
     {
         id: 'free-listing', title: 'Listed but unpriced', ask: 'Public offer with no price.',
@@ -158,7 +168,7 @@ await test('2. Buyer opens a checkout session (quantity 2) → 201, priced from 
     assert(r.status === 201, `create ${r.status}: ${JSON.stringify(r.body.error)}`);
     const s = r.body.data.session;
     sessionId = s.id;
-    // translate-doc was written with the old `price: { morsels }`, which is its pacing amount now: the
+    // translate-doc carries only a pacing amount (tollMorsels; the 3.x `price: { morsels }`): the
     // session is free in money and carries the pacing (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
     assert(s.status === 'open' && s.total === 0 && s.currency !== 'morsel' && s.pacingMorsels === PRICE * 2, `session: ${JSON.stringify(s)}`);
     assert(s.sellerOwner === seller.name && s.buyerOwner === buyer.name, 'parties recorded');
@@ -423,12 +433,12 @@ limits:
     // The tool manifest: PUBLIC memory record apps.{appId}.tools under the seller GHII.
     const tools = {
         tools: [
-            { name: 'echo', description: 'Echo a message back (paid per call)', action_id: echoCapId, price: { morsels: 3, unit: 'per-call' } },
+            { name: 'echo', description: 'Echo a message back (paid per call)', action_id: echoCapId, tollMorsels: 3 },
             { name: 'unpriced-echo', description: 'Callable but free-listed', action_id: echoCapId },
             // Task-path tools (phase B): no action_id → fulfillment queues an agent TASK.
-            { name: 'concierge', description: 'Long-running white-glove run (task path)', price: { morsels: 5 }, agent: 'vendor' },
-            { name: 'no-binding', description: 'Priced, no binding and no agent (task to the owner)', price: { morsels: 1 } },
-            { name: 'broken', description: 'Priced, bound to a missing capability', action_id: 'ext:no-such-ext:nope', price: { morsels: 1 } },
+            { name: 'concierge', description: 'Long-running white-glove run (task path)', tollMorsels: 5, agent: 'vendor' },
+            { name: 'no-binding', description: 'Priced, no binding and no agent (task to the owner)', tollMorsels: 1 },
+            { name: 'broken', description: 'Priced, bound to a missing capability', action_id: 'ext:no-such-ext:nope', tollMorsels: 1 },
         ],
     };
     const write = await json('/v1/memory', {
@@ -568,10 +578,14 @@ await test('28. GET /v1/apps/:owner/:app/webmcp — public WebMCP-shaped tool li
     assert(body.library?.endsWith('/v1/libs/aimeat-webmcp.js'), `library: ${body.library}`);
     const echo = (body.tools || []).find((t: any) => t.name === 'echo');
     assert(!!echo && echo.inputSchema && echo.fulfillment === 'call', `echo tool: ${JSON.stringify(echo)}`);
-    // echo was written with the old `price: { morsels: 3 }`: it is free in money with 3 morsels of
-    // pacing, and the old field stays as a deprecated mirror until 4.0.0.
+    // echo carries tollMorsels: 3: it is free in money with 3 morsels of pacing. On 3.x the old
+    // `price` field answers as a deprecated mirror of it; 4.0.0 drops the mirror.
     assert(echo.payment?.required === false && echo.toll_morsels === 3 && echo.payment.toll_morsels === 3, `echo payment: ${JSON.stringify(echo.payment)}`);
-    assert(echo.payment.price?.morsels === 3 && typeof echo.payment.price?.deprecated === 'string', `deprecated mirror: ${JSON.stringify(echo.payment.price)}`);
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(echo.payment.price === undefined, `4.0.0 answers no deprecated price mirror: ${JSON.stringify(echo.payment)}`);
+    } else {
+        assert(echo.payment.price?.morsels === 3 && typeof echo.payment.price?.deprecated === 'string', `deprecated mirror: ${JSON.stringify(echo.payment.price)}`);
+    }
     const free = (body.tools || []).find((t: any) => t.name === 'unpriced-echo');
     assert(free?.payment?.required === false && free.toll_morsels === 0, `unpriced tool payment: ${JSON.stringify(free?.payment)}`);
     const task = (body.tools || []).find((t: any) => t.name === 'concierge');
@@ -623,11 +637,18 @@ await test('31. GET /v1/commerce/tools — normalized priced app-tool catalog', 
     const body = await r.json() as any;
     const echo = (body.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:echo`);
     assert(!!echo, `echo in catalog (${body.total} tools)`);
-    assert(echo.fulfillment === 'call' && echo.price?.morsels === 3, `echo entry: ${JSON.stringify(echo)}`);
+    assert(echo.fulfillment === 'call' && echo.toll_morsels === 3, `echo entry: ${JSON.stringify(echo)}`);
     assert(echo.checkout_item?.kind === 'app-tool' && echo.checkout_item.tool === 'echo', 'ready-made checkout item');
     assert(echo.webmcp?.invoke?.includes('/webmcp/tools/echo'), `webmcp invoke url: ${echo.webmcp?.invoke}`);
     const task = (body.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:concierge`);
-    assert(task?.fulfillment === 'task' && task.price?.morsels === 5, `task entry: ${JSON.stringify(task)}`);
+    assert(task?.fulfillment === 'task' && task.toll_morsels === 5, `task entry: ${JSON.stringify(task)}`);
+    // On 3.x an entry also answers the old `price` as a deprecated mirror of toll_morsels; 4.0.0 drops it.
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(echo.price === undefined && task.price === undefined, `4.0.0 answers no deprecated price mirror: ${JSON.stringify({ echo: echo.price, task: task.price })}`);
+    } else {
+        assert(echo.price?.morsels === 3 && typeof echo.price?.deprecated === 'string' && task.price?.morsels === 5,
+            `deprecated price mirror on 3.x: ${JSON.stringify({ echo: echo.price, task: task.price })}`);
+    }
     assert(!(body.tools || []).some((t: any) => t.name === 'unpriced-echo'), 'unpriced tools stay out');
     assert(body.checkout?.create?.url?.endsWith('/v1/commerce/checkout-sessions'), 'checkout pointer present');
 });
@@ -640,7 +661,13 @@ await test('32. MCP Server Card embeds the catalog inline (default mode) + keeps
     assert(ct?.mode === 'inline', `commerce_tools mode: ${JSON.stringify(ct?.mode)} (AIMEAT_MCP_CARD_COMMERCE_TOOLS default is inline)`);
     assert(ct.url?.endsWith('/v1/commerce/tools'), `pointer url kept in inline mode: ${ct.url}`);
     const echo = (ct.tools || []).find((t: any) => t.sku === `app-tool:${appRef}:echo`);
-    assert(!!echo && echo.inputSchema && echo.price?.morsels === 3, `echo inline on the card: ${JSON.stringify(echo)}`);
+    assert(!!echo && echo.inputSchema && echo.toll_morsels === 3, `echo inline on the card: ${JSON.stringify(echo)}`);
+    // The card's entry is the catalog's entry: the 3.x mirror on 3.x, none on 4.0.0.
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(echo.price === undefined, `4.0.0 answers no deprecated price mirror on the card: ${JSON.stringify(echo.price)}`);
+    } else {
+        assert(echo.price?.morsels === 3 && typeof echo.price?.deprecated === 'string', `deprecated price mirror on the card: ${JSON.stringify(echo.price)}`);
+    }
     assert(ct.total === ct.tools.length, 'total matches inline entries');
     // The feed and the card come from the SAME enumerator — sku sets must agree. The feed is the
     // money surface, so it carries the card's money-priced tools (ruling D4, 2026-10-11).
@@ -912,7 +939,12 @@ await test('33. Outbound UCP profile fetch carries a verifiable Web Bot Auth sig
         return r.body.data.session.id;
     }
 
-    await test('20. An app WITHOUT contract:spend cannot complete a checkout (H-3)', async () => {
+    // On 3.x the REST scope gate of the complete route lets the app through (counted, not refused),
+    // so the H-3 check in the session service answers 403 SCOPE_REQUIRED. From 4.0.0 that gate
+    // (REST_SCOPE_GATES_ENFORCED_IN) refuses first with 403 SCOPE_DENIED: an app grant can hold
+    // contract:spend but not commerce:buy, so an app without contract:spend never reaches the H-3
+    // check on this route. Either way the buyer is not charged.
+    await test('20. An app WITHOUT contract:spend cannot complete a checkout (H-3): 3.x answers SCOPE_REQUIRED from the session service, 4.0.0 SCOPE_DENIED from the REST scope gate', async () => {
         const narrow = await buyerAppToken('memory:read');
         const sid = await openSession(buyer.token);
         const before = await balance(buyer.token);
@@ -920,7 +952,8 @@ await test('33. Outbound UCP profile fetch carries a verifiable Web Bot Auth sig
             method: 'POST', headers: auth(narrow), body: JSON.stringify({}),
         });
         assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
-        assert(r.body.error?.code === 'SCOPE_REQUIRED', `code: ${JSON.stringify(r.body.error)}`);
+        const expected = await removedOn(BASE, REST_SCOPE_GATES_ENFORCED_IN) ? 'SCOPE_DENIED' : 'SCOPE_REQUIRED';
+        assert(r.body.error?.code === expected, `code: expected ${expected}, got ${JSON.stringify(r.body.error)}`);
         assert(await balance(buyer.token) === before, 'the buyer must not be charged by a refused app');
     });
 

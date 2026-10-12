@@ -14,6 +14,10 @@
  *   webhook need a real shared payment token at Stripe, so that path is the unit test
  *   test/unit/ucp-guest-checkout.test.ts, against a stand-in for Stripe.
  * @version-history
+ *   v1.1.1 — 2026-10-12 — The morsel-only offer carries its morsel amount as tollMorsels instead of
+ *     price.morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; every test after the offer
+ *     publish had failed only because no offer existed. The offer still has no money price, so the
+ *     feed still leaves it out with "no USD price".
  *   v1.1.0 — 2026-10-08 — Phase 2: the own UCP checkout.
  *   v1.0.0 — 2026-10-08 — Initial: the feeds.
  */
@@ -123,7 +127,7 @@ const usdSku = `offer:${vendor.gaii}:audit`;
 const offers = (usdAmount: number) => ({ offers: [
   { id: 'audit', title: 'Website accessibility audit', ask: 'Send a URL;\tI return a report.\nPlain text.', deliverable: { format: 'document', sample: 'untested' }, priceMoney: { amount: usdAmount, currency: 'USD' }, visibility: 'public' },
   { id: 'eur-only', title: 'Euro service', ask: 'EUR only.', deliverable: { format: 'document', sample: 'untested' }, priceMoney: { amount: 5_000_000, currency: 'EUR' }, visibility: 'public' },
-  { id: 'morsels', title: 'Morsel service', ask: 'Morsels only.', deliverable: { format: 'document', sample: 'untested' }, price: { morsels: 10, unit: 'per-call' }, visibility: 'public' },
+  { id: 'morsels', title: 'Morsel service', ask: 'Morsels only.', deliverable: { format: 'document', sample: 'untested' }, tollMorsels: 10, visibility: 'public' },
   { id: 'tiny', title: 'Sub-cent service', ask: 'Fractions of a cent.', deliverable: { format: 'document', sample: 'untested' }, priceMoney: { amount: 1_500, currency: 'USD' }, visibility: 'public' },
   { id: 'secret', title: 'Private service', ask: 'Not public.', deliverable: { format: 'document', sample: 'untested' }, priceMoney: { amount: 9_000_000, currency: 'USD' }, visibility: 'private' },
 ] });

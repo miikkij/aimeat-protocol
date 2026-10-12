@@ -19,6 +19,10 @@
  *   sale, while the books keep the amount, the date and the app.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-store-license
  * @version-history
+ *   v1.5.1 — 2026-10-12 — The four paid apps are published with toll_morsels instead of price_morsels,
+ *     which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; every test after the setup had failed only
+ *     because the paid app never existed. The purchase's deprecated price_morsels mirror is asserted
+ *     on 3.x and its absence on 4.0.0, which drops it.
  *   v1.5.0 — 2026-10-11 — A take is one pacing charge: the purchase answers `toll_morsels` and `pacing`
  *     with `price_morsels` as a deprecated mirror, the sales row is read by `toll_morsels`, and the two
  *     ledger lines are `pacing_earn` / `pacing_charge` under the charge's tracking code (they were
@@ -36,6 +40,8 @@
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner as registerPasswordOwner } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -88,7 +94,7 @@ await test('Setup: seller + buyer + buyer\'s agent, seller publishes a paid app'
     buyerTok = (await registerOwner(buyerName)).token;
     buyerAgent = await createAgent(buyerName, buyerTok, 'buyagent');
 
-    const pub = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: PAID, content: b64('<h1>licensed</h1>'), name: 'Licensed App', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 50, license_type: 'lifetime' }) });
+    const pub = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: PAID, content: b64('<h1>licensed</h1>'), name: 'Licensed App', description: 'costs morsels', category: 'utility', tags: [], toll_morsels: 50, license_type: 'lifetime' }) });
     assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
     await json(`/v1/apps/${PAID}`, { ...auth(sellerTok), method: 'PATCH', body: JSON.stringify({ forkable: true }) });
 });
@@ -102,8 +108,13 @@ await test('The buyer purchases the app AS THE OWNER in person', async () => {
     const d = buy.body.data;
     assert(d.toll_morsels === 50 && d.pacing?.morsels === 50 && typeof d.pacing?.trackingCode === 'string',
         `the take answers toll_morsels and the pacing receipt: ${JSON.stringify({ toll: d.toll_morsels, pacing: d.pacing })}`);
-    assert(d.price_morsels === 50 && typeof d.deprecated?.price_morsels === 'string',
-        `price_morsels mirrors the pacing amount and is marked deprecated: ${JSON.stringify({ p: d.price_morsels, dep: d.deprecated })}`);
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(d.price_morsels === undefined && d.deprecated === undefined,
+            `4.0.0 answers no price_morsels mirror: ${JSON.stringify({ p: d.price_morsels, dep: d.deprecated })}`);
+    } else {
+        assert(d.price_morsels === 50 && typeof d.deprecated?.price_morsels === 'string',
+            `price_morsels mirrors the pacing amount and is marked deprecated: ${JSON.stringify({ p: d.price_morsels, dep: d.deprecated })}`);
+    }
 });
 
 // A6-10. The receipt keeps a copy of the app's manifest, and the buyer reads it. The notes on a
@@ -222,7 +233,7 @@ await test('An APP GRANT without contract:spend cannot buy — and with it, can'
     // A second paid app: the buyer already holds a lifetime licence for the first, and that check
     // sits ahead of the spend check on purpose (nobody needs permission to spend nothing).
     const PAID2 = `spendgate-${Date.now()}.html`;
-    const pub = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: PAID2, content: b64('<h1>gated</h1>'), name: 'Spend Gate App', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 25, license_type: 'lifetime' }) });
+    const pub = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: PAID2, content: b64('<h1>gated</h1>'), name: 'Spend Gate App', description: 'costs morsels', category: 'utility', tags: [], toll_morsels: 25, license_type: 'lifetime' }) });
     assert(pub.status === 201, `publish second paid app: ${pub.status} ${JSON.stringify(pub.body)}`);
 
     // An app of the BUYER's, so the grant is theirs to consent to and the token acts in their name.
@@ -342,7 +353,7 @@ await test('A name registered again after the SELLER deleted their account inher
     const customer = `apercu${ts}`;
     const APP = 'erased-seller-app.html';
     const s1 = await registerOwner(shop);
-    const pub = await json('/v1/apps', { ...auth(s1.token), method: 'POST', body: JSON.stringify({ filename: APP, content: b64('<h1>bought before</h1>'), name: 'Bought Before', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 10, license_type: 'lifetime' }) });
+    const pub = await json('/v1/apps', { ...auth(s1.token), method: 'POST', body: JSON.stringify({ filename: APP, content: b64('<h1>bought before</h1>'), name: 'Bought Before', description: 'costs morsels', category: 'utility', tags: [], toll_morsels: 10, license_type: 'lifetime' }) });
     assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
     const c = await registerOwner(customer);
     const buy = await json('/v1/app-store/purchase', { ...auth(c.token), method: 'POST', body: JSON.stringify({ app_filename: APP, app_owner: shop }) });
@@ -378,7 +389,7 @@ await test('A name registered again after the SELLER deleted their account inher
         `the customer's ledger line names ${paid.counterparty_gaii}, not the receipt's pseudonym ${mine.body.data.seller_owner}`);
 
     // And the old licence does not open whatever the new account publishes under the same name.
-    const pub2 = await json('/v1/apps', { ...auth(s2.token), method: 'POST', body: JSON.stringify({ filename: APP, content: b64('<h1>somebody new</h1>'), name: 'Somebody New', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 10, license_type: 'lifetime' }) });
+    const pub2 = await json('/v1/apps', { ...auth(s2.token), method: 'POST', body: JSON.stringify({ filename: APP, content: b64('<h1>somebody new</h1>'), name: 'Somebody New', description: 'costs morsels', category: 'utility', tags: [], toll_morsels: 10, license_type: 'lifetime' }) });
     assert(pub2.status === 201, `publish under the reused name: ${pub2.status} ${JSON.stringify(pub2.body)}`);
     const lic = await json(`/v1/app-store/license-check?app_filename=${APP}&app_owner=${shop}`, auth(c.token));
     assert(lic.body.data?.has_license === false, `a licence bought from the erased seller opened the new account's app: ${JSON.stringify(lic.body.data)}`);

@@ -9,6 +9,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.3.3 — 2026-10-12 — Phase 5 publishes its offers with tollMorsels instead of price.morsels, which
+ *     node 4.0.0 refuses with MORSEL_PRICE_REMOVED; the secret offer's 999 becomes 99 (the pacing cap is
+ *     100, and 3.x clamped the old 999 to it). The deprecated `price` mirror is asserted on 3.x and its
+ *     absence (null) on 4.0.0, which drops it.
  *   v1.3.2 — 2026-10-11 — An instance's offer reads its pacing as `toll_morsels`, with the old `price` as a deprecated mirror.
  *   v1.3.1 — 2026-10-03 — The sibling's 32-character name is trimmed of a trailing hyphen; with a
  *     three-digit owner suffix the cut ended in one and the node refused it (1 run in about 100).
@@ -24,6 +28,8 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -399,12 +405,12 @@ async function main() {
             {
                 id: 'joke-daily', title: 'Daily joke', ask: 'Ask me for one excellent joke on your topic',
                 cost: 'cheap', deliverable: { format: 'document', location: { key: 'jokes.latest' } },
-                price: { morsels: 5, unit: 'per-call' }, ...(visibility ? { visibility } : {}),
+                tollMorsels: 5, ...(visibility ? { visibility } : {}),
             },
             {
                 id: 'joke-secret', title: 'Secret internal joke', ask: 'Owner-only tuning run',
                 deliverable: { format: 'document', location: { key: 'jokes.secret' } },
-                price: { morsels: 999 }, visibility: 'private',
+                tollMorsels: 99, visibility: 'private',
             },
         ],
     });
@@ -433,13 +439,17 @@ async function main() {
         assert(!!auth && auth.owner === owner1 && auth.name === 'demo-joker', `author instance: ${JSON.stringify(auth)}`);
     });
 
-    await test('instances carry ONLY public offers, with prices; private never leaks', async () => {
+    await test('instances carry ONLY public offers, with their pacing amount (on 3.x also the deprecated price mirror, on 4.0.0 none); private never leaks', async () => {
         const r = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/instances`);
         const dep = r.body.data.instances.find((x: any) => x.source === 'deployed');
         assert(dep.offers.length === 1 && dep.offers[0].id === 'joke-daily', `offers: ${JSON.stringify(dep.offers)}`);
         // The 3.x morsel price is the pacing amount now, with the old field as its deprecated mirror.
         assert(dep.offers[0].toll_morsels === 5, `pacing surfaced: ${JSON.stringify(dep.offers[0])}`);
-        assert(dep.offers[0].price?.morsels === 5 && dep.offers[0].price?.unit === 'per-call' && typeof dep.offers[0].price?.deprecated === 'string', 'deprecated mirror surfaced');
+        if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+            assert(dep.offers[0].price === null, `4.0.0 answers no deprecated price mirror: ${JSON.stringify(dep.offers[0])}`);
+        } else {
+            assert(dep.offers[0].price?.morsels === 5 && dep.offers[0].price?.unit === 'per-call' && typeof dep.offers[0].price?.deprecated === 'string', 'deprecated mirror surfaced');
+        }
         assert(!dep.offers.some((o: any) => o.id === 'joke-secret'), 'private offer never listed');
     });
 

@@ -5,6 +5,10 @@
  *   joins each agent's offers with its mode + online state. Covers the happy path + invalid-descriptor
  *   rejection + owner-scoping.
  * @version-history
+ *   v1.5.0 — 2026-10-12 — Test 11 publishes the summarize offer with tollMorsels: 25 instead of
+ *     price.morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED (the morsel amount is pacing,
+ *     not a price), and reads tollMorsels back. Tests 11c and 14 had failed only because that publish
+ *     never landed.
  *   v1.4.0 — 2026-10-11 — 14c and 14d asserted the old model, where a morsel amount was a price. 14c
  *     invokes a free offer with 25 morsels of pacing and reads the pacing rows back; 14d invokes a
  *     money-priced offer and is sent to the checkout (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -183,18 +187,18 @@ const v2Doc = { offers: [
     {
         id: 'summarize', title: 'Summarize a URL', ask: 'Give me a URL; I return a summary.',
         deliverable: { format: 'document', sample: 'untested' },
-        price: { morsels: 25, unit: 'per-call' }, visibility: 'public',
+        tollMorsels: 25, visibility: 'public',
         callable: { action_id: 'cap-missing-on-purpose' },
     },
 ] };
 
-await test('11. A v2 offer with price/visibility/callable round-trips through publish→read', async () => {
+await test('11. A v2 offer with its pacing amount, visibility and callable round-trips through publish→read', async () => {
     const pub = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify(v2Doc) });
     assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
     const r = await json(`/v1/agents/${agentName}/offers`, { headers: auth(A.token) });
     const o = (r.body.data.offers || []).find((x: any) => x.id === 'summarize');
     assert(!!o, 'v2 offer present');
-    assert(o.price?.morsels === 25 && o.visibility === 'public' && o.callable?.action_id === 'cap-missing-on-purpose', `v2 fields preserved: ${JSON.stringify(o)}`);
+    assert(o.tollMorsels === 25 && o.visibility === 'public' && o.callable?.action_id === 'cap-missing-on-purpose', `v2 fields preserved: ${JSON.stringify(o)}`);
 });
 
 await test('11b. An offer can declare deliverable.format "image" and round-trips', async () => {

@@ -16,7 +16,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-fork
  * @version-history
- *   2026-10-11 — The self-fork reads `tollMorsels` and the MCP refusal names "50 morsels of pacing" /
+ *   2026-10-12 — The two paid apps (Phase 3 and the MCP fork phase) are published with toll_morsels
+ *     instead of price_morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; the paywall tests
+ *     after each had failed only because the paid app never existed.
+ *   2026-10-11 —The self-fork reads `tollMorsels` and the MCP refusal names "50 morsels of pacing" /
  *     "Take it first": these asserted the old morsel price model ("costs 50 morsels", "Purchase it first").
  *   v1.0.0 — 2026-07-07 — initial: forkable flag, fork authorization gates,
  *     provenance, paid paywall, input failure modes.
@@ -259,7 +262,7 @@ const PAID_FILE = 'paid-fork-src.html';
 await test('Owner A publishes a PAID, forkable app', async () => {
     const pub = await json('/v1/apps', aAuthed({
         method: 'POST',
-        body: JSON.stringify({ filename: PAID_FILE, content: b64('<h1>paid app</h1>'), name: 'Paid App', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 50, license_type: 'single' }),
+        body: JSON.stringify({ filename: PAID_FILE, content: b64('<h1>paid app</h1>'), name: 'Paid App', description: 'costs morsels', category: 'utility', tags: [], toll_morsels: 50, license_type: 'single' }),
     }));
     assert(pub.status === 201, `paid publish status ${pub.status}`);
     const on = await json(`/v1/apps/${PAID_FILE}`, aAuthed({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
@@ -493,7 +496,7 @@ await test("Setup: owner B publishes a locked app and a paid one", async () => {
     assert(locked.status === 201, `B locked publish: ${locked.status} ${JSON.stringify(locked.body).slice(0, 160)}`);
     const paid = await json('/v1/apps', bAuthed({
         method: 'POST',
-        body: JSON.stringify({ filename: B_PAID, content: b64('<h1>b paid</h1>'), name: 'B Paid', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 50, license_type: 'single' }),
+        body: JSON.stringify({ filename: B_PAID, content: b64('<h1>b paid</h1>'), name: 'B Paid', description: 'costs morsels', category: 'utility', tags: [], toll_morsels: 50, license_type: 'single' }),
     }));
     assert(paid.status === 201, `B paid publish: ${paid.status} ${JSON.stringify(paid.body).slice(0, 160)}`);
     const on = await json(`/v1/apps/${B_PAID}`, bAuthed({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
