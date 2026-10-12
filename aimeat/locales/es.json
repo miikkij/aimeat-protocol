@@ -207,7 +207,8 @@
         "type": {
           "zip_import": "Importación ZIP rechazada",
           "held_account_names": "Registros que la actualización dejó como estaban",
-          "workspace_schema_closed": "Espacios de un espacio de trabajo que rechazan todos los registros"
+          "workspace_schema_closed": "Espacios de un espacio de trabajo que rechazan todos los registros",
+          "headless_browser": "El navegador propio del servidor no arranca"
         },
         "source": {
           "workspace_import": "importación de espacio de trabajo",

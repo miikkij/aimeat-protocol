@@ -1109,7 +1109,8 @@
         "type": {
           "zip_import": "ZIP-tuonti hylätty",
           "held_account_names": "Tietueet, jotka päivitys jätti ennalleen",
-          "workspace_schema_closed": "Työtilan tilat, jotka hylkäävät jokaisen tietueen"
+          "workspace_schema_closed": "Työtilan tilat, jotka hylkäävät jokaisen tietueen",
+          "headless_browser": "Palvelimen oma selain ei käynnisty"
         },
         "source": {
           "workspace_import": "työtilan tuonti",

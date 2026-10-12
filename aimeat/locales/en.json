@@ -1109,7 +1109,8 @@
         "type": {
           "zip_import": "ZIP import refused",
           "held_account_names": "Records the update left as they were",
-          "workspace_schema_closed": "Workspace spaces that refuse every record"
+          "workspace_schema_closed": "Workspace spaces that refuse every record",
+          "headless_browser": "The server's own browser does not start"
         },
         "source": {
           "workspace_import": "workspace import",
