@@ -4,6 +4,8 @@
  *   Tests save/retrieve/delete of encrypted API key and preferences,
  *   auth enforcement (401 without token), and validation errors on /complete.
  * @version-history
+ *   v1.3.1 -- 2026-10-13 -- On 4.0.0 GET /v1/ai/settings serves stt_max_mb too, the other limit the
+ *     legacy settings route served.
  *   v1.3.0 -- 2026-10-12 -- The subject is the settings, models and test routes, which node 4.0.0
  *     removes, so each test asks the node its release (the 4.0.0 sweep): on 3.x the same assertions,
  *     on 4.0.0 410 GONE with Deprecation, the successor Link and X-AIMEAT-Removed-In, and for a write
@@ -399,6 +401,8 @@ await test('GET settings — node limits are served with the settings; on 4.0.0 
     assert(status === 200, `GET /v1/ai/settings: ${status} ${JSON.stringify(body?.error)}`);
     const v = body.data?.limits?.voice_msg_max_seconds;
     assert(typeof v === 'number' && v > 0, `voice_msg_max_seconds on GET /v1/ai/settings: ${JSON.stringify(body.data?.limits)}`);
+    const mb = body.data?.limits?.stt_max_mb;
+    assert(typeof mb === 'number' && mb > 0, `stt_max_mb on GET /v1/ai/settings: ${JSON.stringify(body.data?.limits)}`);
     return;
   }
   const { body } = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
