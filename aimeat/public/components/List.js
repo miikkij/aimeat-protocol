@@ -50,7 +50,8 @@
  *   The Row: `open` draws it opened (and its `panel`, if given as a prop); `onToggle` makes the whole
  *   row open and close it (a click anywhere but inside the panel, and Enter on its name); `selected`
  *   marks the one the page is showing; `faded` a thing that is past (retired, archived, outdated);
- *   `fine` a condition that is met (its words turn green); `rail="warn"` a heavy line at its start
+ *   `members` a thing only the node's signed-in members see (the index tone draws its mark's edge
+ *   double); `fine` a condition that is met (its words turn green); `rail="warn"` a heavy line at its start
  *   for a draft or a request that waits; `colour` the colour a person gave the thing (red, orange,
  *   yellow, green, blue, purple, gray), the same heavy line in that colour; `picked` + `onPick` (and
  *   `pickLabel`) make it a pick row (the whole row is the check box's label); `draggable` + the drag
@@ -98,6 +99,8 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.17.0 — 2026-10-12 — Row `members`: a thing only the node's signed-in members see (appcat's
+ *     Community listing), class is-members. Additive.
  *   v1.16.0 — 2026-09-27 — List tone 'checkpoints': the old detail's working-copy history rows
  *     (.dtl-version-row with .wc-ckpt-when and .wc-ckpt-note), list-tones.css. Additive, appcat parity
  *     (sections-a).
@@ -273,7 +276,7 @@ export function List({ cols, keepCols, head, empty, loading, dense, under, small
 
 /* ── One row ──────────────────────────────────────────────────────────────────────────────────── */
 
-export function Row({ open, onToggle, selected, faded, fine, rail, colour, picked, onPick, pickLabel, draggable, dragOver,
+export function Row({ open, onToggle, selected, faded, members, fine, rail, colour, picked, onPick, pickLabel, draggable, dragOver,
   onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, grip, dragging, pickOff, hover, quietDoors, below, panel, panelDoors, id, order, children }) {
   const toggles = typeof onToggle === 'function';
   // order (added for appcat): the row's place in the list, which times its coming in (list.css .list--index).
@@ -285,7 +288,7 @@ export function Row({ open, onToggle, selected, faded, fine, rail, colour, picke
   // hover (added by the fix pass): the name turns coral while the pointer is on the row, as main's
   // .pf .mem-item:hover drew the Access rows (connections, MCP servers) that open nothing.
   const cls = cx('listing-row', open && 'is-open', toggles && 'list-row--toggle', hover && !toggles && 'list-row--hover', selected && 'is-selected',
-    faded && 'is-faded', fine && 'is-fine', rail === 'warn' && 'list-row--warn', rail === 'notice' && 'list-row--notice', hue && `list-row--colour list-colour--${hue}`,
+    faded && 'is-faded', members && 'is-members', fine && 'is-fine', rail === 'warn' && 'list-row--warn', rail === 'notice' && 'list-row--notice', hue && `list-row--colour list-colour--${hue}`,
     pick && !toggles && 'list-row--pick', draggable && 'list-row--drag', dragOver && 'is-drag-over',
     draggable && grip && 'list-row--grip', dragging && 'is-dragging', pick && pickOff && 'list-row--pick-off',
     quietDoors && 'list-row--quiet-doors');
