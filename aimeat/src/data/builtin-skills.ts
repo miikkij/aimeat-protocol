@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.30.1 -- 2026-10-13 -- diagnose-a-workflow, step 10: a workflow that starts on an event and did
+ *     not start (a live run, coalesce, who a workspace.rows trigger starts for, the event_* vars).
  *   v1.30.0 -- 2026-10-12 -- aimeat-agent-capability (builtin-skills.agent-capability.ts): an agent's
  *     capability is built as an app that publishes a tool. add-a-crew-agent, step 0, looks at the
  *     owner's apps and their tools before a new tool is proposed.
@@ -606,6 +608,14 @@ metadata:
    decision step waiting for an answer, not a stall. \`aimeat_workflow_pending_inputs\` shows the
    question and its deadline; tell the owner, and leave the answer to them (skill
    \`aimeat-workflow-decisions\`).
+10. **A workflow that starts on an event and did not start:** read the trigger. One run of a
+   workflow is live at a time, so an event that arrives while a run is live starts nothing, unless
+   the trigger says \`coalesce: true\`; then one more run starts when the live run ends, and its
+   \`event_folded\` variable says how many events it stands for. A \`workspace.rows\` trigger starts
+   only while the workflow's owner is a member who may read that row space, and only for the
+   organism, workspace and space its \`match\` names. A run an event started shows what arrived in
+   its \`vars\` (\`event_on\`, \`event_at\`, \`event_key\` or \`event_row_ids\`), so a run that handled
+   the wrong thing can be told from one that never started.
 
 ## Principles
 - Diagnose before touching: collect the evidence from steps 1-4 and present the likely cause.

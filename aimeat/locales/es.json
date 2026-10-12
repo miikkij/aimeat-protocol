@@ -18636,6 +18636,7 @@
   "profile.workflows.cover.step.pending": "Todavía no",
   "profile.workflows.cover.trigger.event": "cuando se escribe {what}",
   "profile.workflows.cover.trigger.app": "cuando {app} envía un evento",
+  "profile.workflows.cover.trigger.rows": "cuando se agregan filas a {space}",
   "profile.workflows.cover.trigger.manual": "a mano",
   "profile.workflows.cover.trigger.scheduleWord": "programado",
   "profile.workflows.cover.trigger.eventWord": "cuando se escribe en la memoria",

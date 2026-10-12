@@ -266,12 +266,12 @@
       "digest": "sha256:ff7b6de77912cdd20a89690a"
     },
     "node:set-up-content-pipeline": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-12",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/lifecycle.ts"
       ],
-      "digest": "sha256:fa25720b8336f6a783783826"
+      "digest": "sha256:3db4af88bd2d22715808c1bb"
     },
     "node:configure-routing": {
       "reviewedOn": "2026-10-08",
@@ -327,7 +327,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:7adff6cb32dec82470d7cd03"
+      "digest": "sha256:ae2d1ffe2657af6e5ef23c82"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-12",
@@ -356,14 +356,14 @@
       "digest": "sha256:5832c94c8606725b00121c02"
     },
     "node:aimeat-workflow-decisions": {
-      "reviewedOn": "2026-10-11",
+      "reviewedOn": "2026-10-12",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/engine-human.ts",
         "aimeat/src/services/workflow/lifecycle.ts",
         "aimeat/src/mcp/workflows.ts"
       ],
-      "digest": "sha256:e6c2d06870822e37c5504a28"
+      "digest": "sha256:90eb38e092de9210051a556a"
     },
     "node:aimeat-bookkeeping": {
       "reviewedOn": "2026-10-11",
@@ -402,14 +402,14 @@
       "digest": "sha256:cec4c74bb67ae7d2b7990016"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-11",
+      "reviewedOn": "2026-10-12",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:d981e8c3d2124722665e425d"
+      "digest": "sha256:0a97d020ae29855c184ea130"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -605,8 +605,8 @@
       "aimeat/src/data/basic-agents.ts": "24d901efdc265451"
     },
     "node:set-up-content-pipeline": {
-      "aimeat/src/models/workflow-schemas.ts": "cfb4eb65eeb0d772",
-      "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f"
+      "aimeat/src/models/workflow-schemas.ts": "8bbafc624ca1d4e4",
+      "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
       "aimeat/src/routes/ai.ts": "8b4a9f4755ebe511",
@@ -620,7 +620,7 @@
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
     },
     "node:diagnose-a-workflow": {
-      "aimeat/src/models/workflow-schemas.ts": "cfb4eb65eeb0d772",
+      "aimeat/src/models/workflow-schemas.ts": "8bbafc624ca1d4e4",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
       "aimeat/src/services/scheduler.ts": "a21ee931b11fae98",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
@@ -734,9 +734,9 @@
       "aimeat/src/mcp/mcp-proxy.ts": "8da033aa90ec71db"
     },
     "node:aimeat-workflow-decisions": {
-      "aimeat/src/models/workflow-schemas.ts": "cfb4eb65eeb0d772",
+      "aimeat/src/models/workflow-schemas.ts": "8bbafc624ca1d4e4",
       "aimeat/src/services/workflow/engine-human.ts": "cb667ffe9ef1cc65",
-      "aimeat/src/services/workflow/lifecycle.ts": "a6a052a36360f00f",
+      "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29",
       "aimeat/src/mcp/workflows.ts": "7a47bf49c4bebeb1"
     },
     "node:aimeat-bookkeeping": {
@@ -750,7 +750,7 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
       "aimeat/src/services/extension-ctx-contract.ts": "f98490dfeca8202c",
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
-      "aimeat/src/services/workspace-rows/row-service.ts": "e4bab00bc0194222",
+      "aimeat/src/services/workspace-rows/row-service.ts": "776902c9f46bddd8",
       "aimeat/src/services/refinery/pipeline.ts": "3d0c7d06c76b0e3d",
       "aimeat/src/routes/outbound.ts": "c778ece9fe93e8d1"
     }

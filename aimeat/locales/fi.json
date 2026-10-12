@@ -20706,6 +20706,7 @@
   "profile.workflows.cover.step.pending": "Ei vielä",
   "profile.workflows.cover.trigger.event": "kun {what} kirjoitetaan",
   "profile.workflows.cover.trigger.app": "kun {app} lähettää tapahtuman",
+  "profile.workflows.cover.trigger.rows": "kun rivitilaan {space} lisätään rivejä",
   "profile.workflows.cover.trigger.manual": "käsin",
   "profile.workflows.cover.trigger.scheduleWord": "ajastettuna",
   "profile.workflows.cover.trigger.eventWord": "kun muistiin kirjoitetaan",

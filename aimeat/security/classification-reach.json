@@ -2225,6 +2225,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Export-out and the data package step pass leave; the other reads are read-to-update and the fresh clear. 2026-10-08: the extension step's input_from read passes the system reader's show() before the value enters the owner's own extension, and the saver needs memory:read for it (step-authority.ts)."
     },
+    "src/services/workflow/engine-coalesce.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-13, the node's own read: the system index of events that wait for a workflow's live run to end (workflows.waitingevents). It holds ids, a count and row ids, never record content, and no caller is handed it."
+    },
     "src/services/workflow/engine.ts": {
       "reads": {
         "getMemory": 10

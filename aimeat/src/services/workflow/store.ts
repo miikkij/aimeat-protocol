@@ -71,6 +71,7 @@ import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
+import { triggerErrors, eventVarNames } from './workflow-event.js';
 import { missingStepScopes, stepScopeRefusal, saverFromCaller, WORKFLOW_AUTHORITY_VERSION, type WorkflowCaller } from './step-authority.js';
 import { shownRun } from './run-redaction.js';
 import { noteDeprecatedUse, removedFrom } from '../deprecation.js';
@@ -321,11 +322,14 @@ export async function validateWorkflow(
   if (input.parallel && input.fresh) {
     errors.push('parallel and fresh cannot both be set: fresh deletes the produced keys when a run starts, and with two runs in flight that is the other run\'s work');
   }
+  // 3c. What a trigger must say for its event to be able to arrive (workflow-event.ts).
+  errors.push(...triggerErrors(input.trigger, input.parallel));
 
   // 4. offer resolution (workflow-compatibility) + 5. declared-var coverage
   // Built-in run-scoping vars are always available to key templates without declaration (the engine
-  // fills them at run time): `{run}` = the run id, `{date}` = the run date.
-  const declaredVars = new Set([...input.vars.map(v => v.name), ...BUILTIN_VARS]);
+  // fills them at run time): `{run}` = the run id, `{date}` = the run date. A run an event starts
+  // also has that event's `event_*` variables (workflow-event.ts eventVarNames).
+  const declaredVars = new Set([...input.vars.map(v => v.name), ...BUILTIN_VARS, ...eventVarNames(input.trigger)]);
   const resolved: ResolvedStep[] = [];
   for (const step of input.steps) {
     // export-out / trigger-geai / human-input steps don't dispatch an agent offer. Ecosystem steps

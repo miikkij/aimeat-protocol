@@ -223,7 +223,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     const withRuns = req.query.withRuns === 'true';
     const ok = await deleteWorkflow(storage, ownerGhiiOf(req), id, { withRuns });
     if (!ok) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Workflow "${id}" not found`)); return; }
-    await removeWorkflowTriggers(storage, scheduler, config.nodeId, id);
+    await removeWorkflowTriggers(storage, scheduler, config.nodeId, id, ownerGhiiOf(req));
     // A workflow saved later under the same id starts with no refusal of its own.
     await clearRefusal(storage, config.nodeId, ownerGhiiOf(req), id);
     emitChange('workflows');

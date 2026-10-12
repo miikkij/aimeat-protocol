@@ -28,6 +28,8 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   v1.6.0 — 2026-10-13 — appendRows emits one `rowsAppended` event per call (event-bus.ts), which
+ *     a workflow's `workspace.rows` trigger starts from.
  *   v1.5.0 — 2026-10-08 — authorizeExtension + gate(): an extension caller (ctx.workspace.appendRows,
  *     readRows) reaches one row space by the two-hand rule (the space names the extension, the
  *     manifest declares workspace.rows, the installer holds an active membership), also when it
@@ -52,7 +54,7 @@ import type {
 } from '../../storage/interface.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
 import { readWorkspaceManifest, isRowBackedSpace } from '../workspace-meta.js';
-import { emitChange } from '../event-bus.js';
+import { emitChange, emitRowsAppended } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { rowTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
@@ -341,6 +343,12 @@ export async function appendRows(
   const pruned = await sweepRows(deps, organismId, wsId, space);
 
   emitChange('organisms', undefined);
+  // One event for the whole call, after the insert: a workflow that starts on new rows starts once
+  // for a batch of five hundred, and never for rows a gate above refused.
+  emitRowsAppended({
+    nodeId: config.nodeId, organismId, wsId, space: space.name, namespace: space.namespace,
+    rowIds: deduped.map(r => r.rowId), createdBy: caller.identity,
+  });
   return { written: deduped.length, rowIds: deduped.map(r => r.rowId), pruned };
 }
 

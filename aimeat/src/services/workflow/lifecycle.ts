@@ -15,24 +15,40 @@
  *   - EventTrigger type
  * @usage import { syncWorkflowTriggers, readEventTriggers } from './lifecycle.js';
  * @version-history
+ *   v1.1.0 — 2026-10-13 — A workflow's triggers belong to its owner AND its id. The backing schedule
+ *     was `wf-sched:<workflow id>` and the two event indexes were cleared by workflow id alone, so a
+ *     second owner who saved or deleted a workflow with the same id took over, or removed, the first
+ *     owner's schedule and event trigger. The schedule id now carries the owner (schedIdFor), a
+ *     schedule under the old id is taken along only when it is this owner's, and an index entry is
+ *     cleared only for its own owner. removeWorkflowTriggers takes the owner. An event trigger's
+ *     `on` may be `workspace.rows`, and a deleted workflow's waiting events go with it.
  *   v1.0.0 — 2026-06-13 — Phase 8: extracted backing-schedule sync + added the event-trigger index.
  */
+import { createHash } from 'node:crypto';
 import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
 import type { Scheduler } from '../scheduler.js';
 import type { WorkflowDef, WorkflowRun } from '../../models/workflow-schemas.js';
 import { getRun } from './store.js';
+import { dropWaitingEvents } from './engine-coalesce.js';
 
 const EVENT_INDEX_KEY = 'workflows.eventindex';
 const ECO_EVENT_INDEX_KEY = 'workflows.ecoeventindex';
 const ACTIVE_KEY = 'workflows.active';
-const schedIdFor = (workflowId: string): string => `wf-sched:${workflowId}`;
+/** The backing schedule's id before 2026-10-13: the workflow id alone, shared by every owner. */
+const legacySchedIdFor = (workflowId: string): string => `wf-sched:${workflowId}`;
+/**
+ * The backing schedule's id: the workflow id and a short hash of its owner. The hash, not the
+ * identity, because the id goes into a URL (/v1/schedules/:id) and names nobody there.
+ */
+export const schedIdFor = (workflowId: string, ownerGhii: string): string =>
+  `wf-sched:${workflowId}:${createHash('sha256').update(ownerGhii).digest('hex').slice(0, 12)}`;
 const systemGhiiFor = (nodeId: string): string => `system@${nodeId}`;
 const titleStr = (def: WorkflowDef): string => (typeof def.title === 'string' ? def.title : (def.title.en_US ?? def.id));
 
 export interface EventTrigger {
   ownerGhii: string;
   workflowId: string;
-  on: 'memory.write' | 'offer.ordered';
+  on: 'memory.write' | 'offer.ordered' | 'workspace.rows';
   match: Record<string, string>;
 }
 
@@ -96,10 +112,10 @@ async function writeEventTriggers(storage: Storage, nodeId: string, entries: Eve
   });
 }
 
-/** Drop every event-index entry for a workflow (used before re-adding, and on delete). */
-async function clearEventTrigger(storage: Storage, nodeId: string, workflowId: string): Promise<EventTrigger[]> {
+/** Drop this owner's event-index entries for a workflow (used before re-adding, and on delete). */
+async function clearEventTrigger(storage: Storage, nodeId: string, workflowId: string, ownerGhii: string): Promise<EventTrigger[]> {
   const entries = await readEventTriggers(storage, nodeId);
-  const next = entries.filter(e => e.workflowId !== workflowId);
+  const next = entries.filter(e => !(e.workflowId === workflowId && e.ownerGhii === ownerGhii));
   if (next.length !== entries.length) await writeEventTriggers(storage, nodeId, next);
   return next;
 }
@@ -123,9 +139,9 @@ async function writeEcosystemEventTriggers(storage: Storage, nodeId: string, ent
   });
 }
 
-async function clearEcosystemEventTrigger(storage: Storage, nodeId: string, workflowId: string): Promise<EcosystemEventTrigger[]> {
+async function clearEcosystemEventTrigger(storage: Storage, nodeId: string, workflowId: string, ownerGhii: string): Promise<EcosystemEventTrigger[]> {
   const entries = await readEcosystemEventTriggers(storage, nodeId);
-  const next = entries.filter(e => e.workflowId !== workflowId);
+  const next = entries.filter(e => !(e.workflowId === workflowId && e.ownerGhii === ownerGhii));
   if (next.length !== entries.length) await writeEcosystemEventTriggers(storage, nodeId, next);
   return next;
 }
@@ -134,7 +150,8 @@ async function clearEcosystemEventTrigger(storage: Storage, nodeId: string, work
 export async function syncWorkflowTriggers(
   storage: Storage, scheduler: Scheduler, nodeId: string, def: WorkflowDef, ownerGhii: string, createdBy: string,
 ): Promise<void> {
-  const schedId = schedIdFor(def.id);
+  await dropLegacySchedule(storage, scheduler, def.id, ownerGhii);
+  const schedId = schedIdFor(def.id, ownerGhii);
   const existingSched = await storage.getScheduledJob(schedId);
 
   // 1. Backing cron schedule (schedule trigger only).
@@ -156,14 +173,14 @@ export async function syncWorkflowTriggers(
   }
 
   // 2. Event-trigger index (event trigger only).
-  const entries = await clearEventTrigger(storage, nodeId, def.id);
+  const entries = await clearEventTrigger(storage, nodeId, def.id, ownerGhii);
   if (def.trigger.kind === 'event') {
     entries.push({ ownerGhii, workflowId: def.id, on: def.trigger.on, match: def.trigger.match });
     await writeEventTriggers(storage, nodeId, entries);
   }
 
   // 3. Ecosystem-event-trigger index (ecosystem.event trigger only).
-  const ecoEntries = await clearEcosystemEventTrigger(storage, nodeId, def.id);
+  const ecoEntries = await clearEcosystemEventTrigger(storage, nodeId, def.id, ownerGhii);
   if (def.trigger.kind === 'ecosystem.event') {
     ecoEntries.push({
       ownerGhii, workflowId: def.id,
@@ -174,14 +191,30 @@ export async function syncWorkflowTriggers(
 }
 
 // ── teardown on delete ─────────────────────────────────────────────────────────
-export async function removeWorkflowTriggers(storage: Storage, scheduler: Scheduler, nodeId: string, workflowId: string): Promise<void> {
-  const schedId = schedIdFor(workflowId);
+export async function removeWorkflowTriggers(storage: Storage, scheduler: Scheduler, nodeId: string, workflowId: string, ownerGhii: string): Promise<void> {
+  await dropLegacySchedule(storage, scheduler, workflowId, ownerGhii);
+  const schedId = schedIdFor(workflowId, ownerGhii);
   if (await storage.getScheduledJob(schedId)) {
     scheduler.removeJob(schedId);
     await storage.deleteScheduledJob(schedId);
   }
-  await clearEventTrigger(storage, nodeId, workflowId);
-  await clearEcosystemEventTrigger(storage, nodeId, workflowId);
+  await clearEventTrigger(storage, nodeId, workflowId, ownerGhii);
+  await clearEcosystemEventTrigger(storage, nodeId, workflowId, ownerGhii);
+  await dropWaitingEvents(storage, nodeId, ownerGhii, workflowId);
+}
+
+/**
+ * A schedule saved under the id every owner shared (before 2026-10-13) is removed when it is THIS
+ * owner's; the caller then writes it again under the owner's own id, or not at all. One that
+ * belongs to somebody else stays where it is and keeps running for them, until their own next save
+ * moves it.
+ */
+async function dropLegacySchedule(storage: Storage, scheduler: Scheduler, workflowId: string, ownerGhii: string): Promise<void> {
+  const legacyId = legacySchedIdFor(workflowId);
+  const legacy = await storage.getScheduledJob(legacyId);
+  if (!legacy || legacy.type !== 'workflow' || legacy.ownerScope !== ownerGhii) return;
+  scheduler.removeJob(legacyId);
+  await storage.deleteScheduledJob(legacyId);
 }
 
 /** One step waiting on a person, with everything either surface renders it from. */
