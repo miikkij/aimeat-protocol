@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description The value checks that several config-schema.ts rows share. A pure move out of
  *   config-schema.ts (max-file-lines); the rows import them from here and behave as before.
- * @structure isJsonObject · isEmptyOrHttpUrl · oneOf · numericRangeOf · withinStatedRange · rangeKindOf ·
- *   listFromText · isStringList · asList · isContactList
+ * @structure isJsonObject · isEmptyOrHttpUrl · oneOf · refusedFrom · relayClaimSetting · REMOVAL_SWITCHES ·
+ *   numericRangeOf · withinStatedRange · rangeKindOf · listFromText · isStringList · asList · isContactList
  * @version-history
+ *   v1.5.0 — 2026-10-12 — refusedFrom(), relayClaimSetting() and REMOVAL_SWITCHES: a live config change
+ *     refuses the value that kept a 4.0.0 removal alive, from that release (Core 2026-11 HTTP-08).
  *   v1.4.0 — 2026-10-11 — listFromText(), isStringList(), asList(): the value of a `list` row, as a
  *     list wherever it arrives as text.
  *   v1.3.0 — 2026-10-11 — rangeKindOf(): a number row's range is a limit or a recommendation, read
@@ -16,6 +18,10 @@
  *   v1.1.0 — 2026-09-29 — oneOf(): a fixed-set string row's check and its `choices` from one list.
  *   v1.0.0 — 2026-09-28 — Moved from config-schema.ts, unchanged.
  */
+import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
+import { RELAY_CLAIM_OPTIONAL_REMOVED_IN, UNPROVEN_FORMAT_REMOVED_IN } from '../config-federation.js';
+import { OWNER_KEY_LOGIN_REMOVED_IN, WS_QUERY_TOKEN_REMOVED_IN } from '../config-security.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../config-ai-models.js';
 
 /** A JSON text whose value is an object. Anything else is simply not a valid value: the answer is the report. */
 export function isJsonObject(v: string): boolean {
@@ -40,6 +46,36 @@ export function oneOf(...values: string[]): { validate: (v: unknown) => boolean;
   const set = new Set(values);
   return { validate: (v: unknown) => typeof v === 'string' && set.has(v), choices: Object.freeze([...values]) };
 }
+
+/**
+ * A live config change may not bring back what a release removed (Core 2026-11 HTTP-08): from
+ * `release` on, the row refuses `refused`, the value that kept the old form alive. The environment
+ * cannot either: the code path asks the version again (config-security.ts, config-federation.ts,
+ * config-ai-models.ts). Before the release the row's own check decides.
+ */
+export function refusedFrom(release: string, refused: unknown, validate: (v: unknown) => boolean): (v: unknown) => boolean {
+  return (v: unknown) => validate(v) && !(v === refused && versionAtLeast(getSoftwareVersion(), release));
+}
+
+/** federation.relay_claim: `optional` or `required`, and `required` alone from RELAY_CLAIM_OPTIONAL_REMOVED_IN. */
+export function relayClaimSetting(): { validate: (v: unknown) => boolean; choices: readonly string[] } {
+  const row = oneOf('optional', 'required');
+  return { ...row, validate: refusedFrom(RELAY_CLAIM_OPTIONAL_REMOVED_IN, 'optional', row.validate) };
+}
+
+const isBoolean = (v: unknown): boolean => typeof v === 'boolean';
+
+/** The boolean rows that kept a removed form alive, each refusing that value from its own release. */
+export const REMOVAL_SWITCHES = {
+  /** federation.audience_required: `false` let a message without the proof in. */
+  audienceRequired: refusedFrom(UNPROVEN_FORMAT_REMOVED_IN, false, isBoolean),
+  /** security.ws_query_token: `true` took a session token in a WebSocket URL. */
+  wsQueryToken: refusedFrom(WS_QUERY_TOKEN_REMOVED_IN, true, isBoolean),
+  /** security.owner_key_login: `true` signed an owner in with the account key. */
+  ownerKeyLogin: refusedFrom(OWNER_KEY_LOGIN_REMOVED_IN, true, isBoolean),
+  /** ai.legacy_settings_routes: `true` kept the AI settings routes from before providers. */
+  aiLegacySettingsRoutes: refusedFrom(AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, true, isBoolean),
+} as const;
 
 /** A `range` hint that is a plain numeric pair: '0-100000', '0.0-1.0'. Choice lists and formats do not match. */
 const NUMERIC_RANGE = /^\s*(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)\s*$/;

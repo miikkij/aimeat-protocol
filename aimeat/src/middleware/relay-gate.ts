@@ -27,11 +27,15 @@
  *   thing `optional` CAN promise honestly — a peer that has ever presented a valid claim is
  *   remembered as able to sign one, and an unclaimed relay from that peer is refused from then on.
  *   So the downgrade is closed for every peer that has updated, and only genuinely old peers pass.
- *   `optional` goes in 4.0.0; until then a peer can carry its own answer, read here before the
- *   node's (services/relay-claim-policy.ts).
+ *   `optional` goes in 4.0.0 (RELAY_CLAIM_OPTIONAL_REMOVED_IN): from that release effectiveRelayClaim
+ *   answers `required` whatever the node or the peer says. Until then a peer can carry its own answer,
+ *   read here before the node's (services/relay-claim-policy.ts), and an unclaimed relay let through
+ *   answers with the Deprecation headers (services/deprecation.ts).
  * @structure relayGate(config, storage, peers) -> express.RequestHandler
  * @usage app.use(relayGate(config, storage, services.peers));
  * @version-history
+ *   v1.3.0 — 2026-10-12 — An unclaimed relay let through by `optional` is counted and named on the
+ *     response (noteDeprecatedUse); from 4.0.0 it is refused whatever the setting (Core 2026-11 FED-10).
  *   v1.2.1 — 2026-09-29 — The header says `required` is the default from 3.20.0. No code change.
  *   v1.2.0 — 2026-09-25 — An unclaimed relay is judged by the named peer's own relay-claim setting
  *     when it has one, and both kinds of relay are written down on the peer they name.
@@ -51,7 +55,8 @@ import { logger } from '../utils/logger.js';
 import {
   RELAY_HEADERS, claimsToBeRelayed, hasRelayClaim, verifyRelayClaim,
 } from '../services/relay-claim.js';
-import { effectiveRelayClaim, noteRelay } from '../services/relay-claim-policy.js';
+import { effectiveRelayClaim, noteRelay, RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../services/relay-claim-policy.js';
+import { noteDeprecatedUse } from '../services/deprecation.js';
 
 /**
  * What this gate proved about a relayed request, for the one route that may act on it.
@@ -133,6 +138,11 @@ export function relayGate(
         from: fromNode || '(unnamed)', path: req.originalUrl,
         setting: named?.relayClaim === 'optional' ? 'peer relay_claim=optional' : 'federation.relay_claim=optional',
       });
+      // The removal named on the response and in the deprecation counter (Core 2026-11 HTTP-07).
+      noteDeprecatedUse({
+        kind: 'relay_claim_optional', removedIn: RELAY_CLAIM_OPTIONAL_REMOVED_IN,
+        notice: 'A relayed request without a signed relay claim was let through because relay_claim is optional.',
+      }, { from: fromNode || '(unnamed)' });
       next();
       return;
     }

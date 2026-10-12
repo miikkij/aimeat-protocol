@@ -28,6 +28,7 @@
  *   import { grantWorkspaceRole } from './workspace-roles.js';
  *   await grantWorkspaceRole(storage, config, { creatorGhii, orgId, ws, grantee, role, source, grantedBy });
  * @version-history
+ *   2026-10-12 -- The role consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   v1.0.0 -- 2026-07-11 -- Extract the creator-managed workspace-role logic (was duplicated in the REST
  *     routes + the MCP tools) into one service; add an explicit metadata.source stamp (grant|request|
  *     invite) + grantedBy for the members listing (TARGET-028).
@@ -84,7 +85,7 @@ export async function grantWorkspaceRole(
   await storage.createConsent({
     id: randomUUID(), ownerGaii: creatorGhii, dataPattern: pattern, recipient,
     purpose: role === 'contributor' ? 'workspace-contributor' : 'workspace-viewer',
-    scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null,
+    scope: 'local', expires: null, status: 'active', grantedAt: now, revokedAt: null,
     metadata: { source, grantedBy, wsRole: role },
   });
   return { recipient, role, owner: granteeOwner(grantee) };

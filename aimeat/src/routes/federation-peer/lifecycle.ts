@@ -5,6 +5,8 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-12 — A re-admission asks peerUrlRefusal for the address it admits: a public node
+ *     takes an https:// address only from 4.0.0 (Core 2026-11 FED-13).
  *   v1.8.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is refused a
  *     ping without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal; secaudit 2026-10-10 I21).
  *   v1.7.0 — 2026-10-06 — The ping names this node as its audience (audienceRefusal; secaudit 2026-10
@@ -40,6 +42,7 @@ import { LIVENESS_RECOVERABLE, OPERATOR_PARKED, type PeerInfo } from '../../serv
 import { verify } from '../../auth/keypair.js';
 import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
@@ -203,6 +206,9 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             // that really moved is re-introduced and approved again.
             const admittedUrl = approvedRequest?.fromNodeUrl || senderUrl;
             if (admittedUrl) {
+                // A public node takes an https:// peer address only (Core 2026-11 FED-13).
+                const schemeRefusal = peerUrlRefusal(config, admittedUrl);
+                if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
                 const urlCheck = await validateOutboundUrl(admittedUrl);
                 if (!urlCheck.valid) {
                     res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'The peer address is not allowed'));

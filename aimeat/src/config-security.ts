@@ -11,11 +11,22 @@
  *   Its own file rather than more lines in config.ts and config-types.ts, which were both one
  *   change away from the 800-line ceiling. Splitting by pure extraction keeps the diff to the thing
  *   being added instead of reflowing a file two sessions are working in.
- * @structure SecurityDoorConfig · securityDoorDefaults()
+ *
+ *   Two of the settings keep a deprecated sign-in alive, and each names the release that removes it
+ *   (OWNER_KEY_LOGIN_REMOVED_IN, WS_QUERY_TOKEN_REMOVED_IN). From that release the setting has no
+ *   effect: the default is off, and the code path that reads it asks the version again
+ *   (ownerKeyLoginAllowed, wsQueryTokenAllowed), so a live config change cannot turn it back on
+ *   (Core 2026-11 AUTH-05, AUTH-24, HTTP-08).
+ * @structure SecurityDoorConfig · securityDoorDefaults() · OWNER_KEY_LOGIN_REMOVED_IN ·
+ *   WS_QUERY_TOKEN_REMOVED_IN · ownerKeyLoginAllowed(config, version?) · wsQueryTokenAllowed(config, version?)
  * @usage
  *   interface AimeatConfig extends SecurityDoorConfig { … }
  *   return { ...securityDoorDefaults(), … };
+ *   if (!ownerKeyLoginAllowed(config)) refuse();
  * @version-history
+ *   v1.4.0 — 2026-10-12 — OWNER_KEY_LOGIN_REMOVED_IN and WS_QUERY_TOKEN_REMOVED_IN (4.0.0) with
+ *     ownerKeyLoginAllowed and wsQueryTokenAllowed: from that release both are off whatever the
+ *     environment or a live change says (wish-4-0-0-n-poistot-koodiin-versioporttina-ei-kommenttina).
  *   v1.3.0 — 2026-10-09 — wsQueryToken (AIMEAT_WS_QUERY_TOKEN, default true, deprecated, removed in
  *     4.0.0): a WebSocket upgrade still takes ?token=; off, it is refused (secrets audit 2026-10-09, d3).
  *   v1.2.0 — 2026-10-09 — ownerKeyLogin (AIMEAT_OWNER_KEY_LOGIN, default true, deprecated, removed in
@@ -26,6 +37,22 @@
  *     799 lines.
  *   v1.0.0 — 2026-08-17 — Initial: the refusal log and the credential-door tarpit.
  */
+import { getSoftwareVersion, versionAtLeast } from './utils/version.js';
+
+/** The release in which the owner-key sign-in on POST /v1/auth/token is gone (Core 2026-11 AUTH-05). */
+export const OWNER_KEY_LOGIN_REMOVED_IN = '4.0.0';
+/** The release in which a session token in a WebSocket upgrade URL (`?token=`) is gone (Core 2026-11 AUTH-24). */
+export const WS_QUERY_TOKEN_REMOVED_IN = '4.0.0';
+
+/** Whether this node signs an owner in with the account key: the setting, and only before the removal. */
+export function ownerKeyLoginAllowed(config: Pick<SecurityDoorConfig, 'ownerKeyLogin'>, version: string = getSoftwareVersion()): boolean {
+  return config.ownerKeyLogin && !versionAtLeast(version, OWNER_KEY_LOGIN_REMOVED_IN);
+}
+
+/** Whether a WebSocket upgrade may carry `?token=`: the setting, and only before the removal. */
+export function wsQueryTokenAllowed(config: Pick<SecurityDoorConfig, 'wsQueryToken'>, version: string = getSoftwareVersion()): boolean {
+  return config.wsQueryToken && !versionAtLeast(version, WS_QUERY_TOKEN_REMOVED_IN);
+}
 
 export interface SecurityDoorConfig {
   /**
@@ -106,7 +133,7 @@ export function securityDoorDefaults(): SecurityDoorConfig {
     loginTarpitWindowMs: parseInt(process.env.AIMEAT_LOGIN_TARPIT_WINDOW_MS ?? '900000', 10),
     loginTarpitMaxConcurrent: parseInt(process.env.AIMEAT_LOGIN_TARPIT_MAX_CONCURRENT ?? '50', 10),
     adminSetupOpenAfterFirstOperator: process.env.AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR === 'true',
-    ownerKeyLogin: process.env.AIMEAT_OWNER_KEY_LOGIN !== 'false',
-    wsQueryToken: process.env.AIMEAT_WS_QUERY_TOKEN !== 'false',
+    ownerKeyLogin: process.env.AIMEAT_OWNER_KEY_LOGIN !== 'false' && !versionAtLeast(getSoftwareVersion(), OWNER_KEY_LOGIN_REMOVED_IN),
+    wsQueryToken: process.env.AIMEAT_WS_QUERY_TOKEN !== 'false' && !versionAtLeast(getSoftwareVersion(), WS_QUERY_TOKEN_REMOVED_IN),
   };
 }

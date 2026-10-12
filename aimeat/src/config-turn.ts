@@ -9,15 +9,20 @@
  *
  *   Its own file because config.ts and config-types.ts are at the line ceiling. The three existing
  *   fields moved here unchanged; turnSecret and turnTtlSeconds are new.
- * @structure TurnConfig · TURN_TTL_* · turnTtlFrom(raw) · turnDefaults()
+ * @structure TurnConfig · TURN_TTL_* · TURN_STATIC_PAIR_REMOVED_IN · turnTtlFrom(raw) · turnDefaults()
  * @usage
  *   import { turnDefaults } from './config-turn.js';
  *   const config = { ...turnDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-10-12 — TURN_STATIC_PAIR_REMOVED_IN (4.0.0): from it the static pair is not served
+ *     whatever is set (services/turn-credentials.ts turnEntryFor; Core 2026-11 HTTP-08).
  *   v1.0.1 — 2026-10-10 — Comments: the static pair is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23).
  *   v1.0.0 — 2026-10-09 — Initial: turnServer, turnUsername and turnCredential moved from config.ts
  *     unchanged; turnSecret (AIMEAT_TURN_SECRET) and turnTtlSeconds (AIMEAT_TURN_TTL_SECONDS) added.
  */
+
+/** The release from which the static TURN username and credential are not served at all. */
+export const TURN_STATIC_PAIR_REMOVED_IN = '4.0.0';
 
 /** Default, lowest and highest lifetime of a derived TURN credential, in seconds. */
 export const TURN_TTL_DEFAULT_SECONDS = 3600;

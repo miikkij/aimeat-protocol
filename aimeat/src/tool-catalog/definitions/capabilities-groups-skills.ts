@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_consent_grant: `scope` is the reach local, federation or auth (private and dmz
+ *     kept as older names for local) and optional, the node picking the default (Core 2026-11 AUTHZ-18).
  *   2026-10-09 — aimeat_secret_set takes an optional `host`; aimeat_secret_list names the host binding
  *     and who made it (secrets audit 2026-10-09, item 10).
  *   2026-10-08 — aimeat_skill_publish takes ai_provenance and ai_provenance_id: SKILL.md is prose a
@@ -26,6 +28,7 @@
  */
 
 import { FLAG_REASONS, FLAG_TARGET_TYPES, OVERVIEW_SECTIONS } from '../../models/tool-input-vocabulary.js';
+import { CONSENT_REACH_INPUTS } from '../../utils/consent-reach.js';
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
@@ -175,7 +178,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_consent_grant',
-        description: 'Grant data-sharing consent: authorize a recipient (a GAII, "*", or a prefixed scope like organism:/domain:/node:) to access memory matching a glob data pattern, within a scope zone (private/dmz/federation) and optional expiry. Creates an auditable consent record owned by your GHII (max 100). Manage existing grants with aimeat_consent_list / aimeat_consent_revoke.',
+        description: 'Grant data-sharing consent: authorize a recipient (a GAII, "*", or a prefixed scope like organism:/domain:/node:) to access memory matching a glob data pattern, with a reach and optional expiry. The reach is local (read on this node), federation (as local, and matching public records may be replicated to peers) or auth (another node may sign the person in); private and dmz are older names for local and are stored as local. Without a reach the node picks federation before 4.0.0 and local from 4.0.0. Creates an auditable consent record owned by your GHII (max 100). Manage existing grants with aimeat_consent_list / aimeat_consent_revoke.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Grant Consent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -184,7 +187,7 @@ export const capabilitiesGroupsSkillsTools = [
         surfaces: ['admin'],
         input: {
             target_gaii: { type: 'string', required: true, description: 'Recipient GAII, "*", or prefixed identifier (organism.x, ghii:, domain:, node:).' },
-            scope: { type: 'string', required: true, description: 'Consent scope zone (private/dmz/federation).', zod: z.enum(['private', 'dmz', 'federation']) },
+            scope: { type: 'string', description: 'The reach: local, federation or auth (private and dmz are older names for local). Omit for the node default.', zod: z.enum(CONSENT_REACH_INPUTS) },
             data_pattern: { type: 'string', required: true, description: 'Glob pattern for data keys (e.g. "profile.*").' },
             purpose: { type: 'string', required: true, description: 'Human-readable purpose for this consent.' },
             ttl_hours: { type: 'number', description: 'Expiry in hours from now (omit for indefinite).' },

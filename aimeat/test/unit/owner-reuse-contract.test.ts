@@ -37,7 +37,7 @@ describe.each(names)('%s same-name recreation', provider => {
     await s.setMemory({ ownerGaii: ghii, key: 'private.reuse', value: { secret: 'old-data' },
       visibility: 'private', tags: [], version: 1, ttlHours: null, createdAt: now, updatedAt: now });
     await s.createConsent({ id: consent, ownerGaii: ghii, dataPattern: 'private.*', recipient: '*',
-      purpose: 'test', scope: 'dmz', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+      purpose: 'test', scope: 'local', expires: null, status: 'active', grantedAt: now, revokedAt: null });
     const server: McpServerRecord = { id: randomUUID(), slug: 'reuse-' + randomUUID().slice(0, 8),
       title: 'Private remote', description: '', ownership: 'owner', ownerGhii: ghii, organismId: null,
       ws: null, createdBy: ghii, transport: { kind: 'http', url: 'https://example.test/mcp' },

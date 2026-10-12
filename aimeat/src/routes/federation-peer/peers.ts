@@ -5,6 +5,8 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-12 — Adding a peer and changing its address ask peerUrlRefusal: a public node
+ *     takes an https:// address only from 4.0.0 (Core 2026-11 FED-13).
  *   v1.10.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is refused a
  *     heartbeat or presence push without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says
  *     (pinnedRefusal; secaudit 2026-10-10 I21).
@@ -60,6 +62,7 @@ import { parsePeerRelayClaim, setPeerRelayClaim, peerRelayClaimView } from '../.
 import { promotionMetrics } from './promotion.js';
 import { describePeerOrigins } from '../../services/peer-origin-view.js';
 import { pendingRegistrationView } from '../../services/peer-origin.js';
+import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 
 export function registerPeersRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/admin/peering/requests — list pending peering requests (operator)
@@ -395,6 +398,9 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id and url are required'));
             return;
         }
+        // A public node takes an https:// peer address only (Core 2026-11 FED-13, peer-url-policy.ts).
+        const schemeRefusal = peerUrlRefusal(config, url);
+        if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
 
         // A PEER RECORD WITH NO KEY MUST BE IMPOSSIBLE TO WRITE. `public_key ?? ''` used to let this
         // door create one in a single call, and an empty key is not a peer that is merely unusual —
@@ -457,6 +463,8 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         // rejected request had already changed what every gate reads from the live Map, and the
         // in-memory state diverged from the stored one until restart.
         const next: PeerInfo = { ...peer };
+        const schemeRefusal = url ? peerUrlRefusal(config, url) : null;
+        if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
         if (url) next.url = url;
         if (public_key) next.publicKey = public_key;
         if (status) next.status = status;

@@ -12,6 +12,8 @@
  *   - getNetworkStats: totals peers/organisms/owners/agents and derives networkReach
  *
  * @version-history
+ *   v1.2.0 — 2026-10-12 — requestPeering asks peerUrlRefusal: a public node takes an https:// genesis
+ *     address only from 4.0.0 (Core 2026-11 FED-13).
  *   v1.1.0 — 2026-09-08 — getCrossCatalogue removed: no caller, the route builds its own aggregate.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -19,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GenesisPeerRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { peerUrlRefusal } from './peer-url-policy.js';
 
 export interface GenesisPeeringService {
   requestPeering(genesisNodeId: string, genesisUrl: string, publicKey: string): Promise<GenesisPeerRecord>;
@@ -31,6 +34,10 @@ export interface GenesisPeeringService {
 export function createGenesisPeeringService(config: AimeatConfig, storage: Storage): GenesisPeeringService {
   return {
     async requestPeering(genesisNodeId, genesisUrl, publicKey) {
+      // Before anything is read or written: a public node takes an https:// peer address only
+      // (Core 2026-11 FED-13, peer-url-policy.ts). The route answers the thrown message.
+      const schemeRefusal = peerUrlRefusal(config, genesisUrl);
+      if (schemeRefusal) throw new Error(`${schemeRefusal.code}: ${schemeRefusal.message}`);
       const existing = await storage.getGenesisPeerByNodeId(genesisNodeId);
       if (existing) {
         throw new Error('Peering already exists with this node');

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-12 — The three WebSocket servers add the Deprecation headers to the 101 answer
+ *     of an upgrade let in on ?token= (upgradeDeprecationHeaderLines, Core 2026-11 HTTP-07).
  *   v1.9.1 — 2026-10-09 — The TOTP start-up warning says what a node without either key does now:
  *     it refuses to set the factor up, rather than store the secret in plain text.
  *   v1.9.0 — 2026-10-09 — The three upgrade code paths read their credential through
@@ -239,7 +241,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // WebSocket upgrade handling for personal node tunnels + realtime P2P + connector forward tunnel
   if (tunnelManager || realtimeManager || connectTunnelManager) {
     const { WebSocketServer } = await import('ws');
-    const { authenticateUpgrade, refuseUpgrade } = await import('./auth/ws-upgrade.js');
+    const { authenticateUpgrade, refuseUpgrade, upgradeDeprecationHeaderLines } = await import('./auth/ws-upgrade.js');
     const { isAnonymousMode, isOwnerPrincipal } = await import('./auth/middleware.js');
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
@@ -250,6 +252,10 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     // presigned URLs, not the tunnel.
     const connectMaxPayload = (config.jsonBodyLimitLargeMb + 1) * 1024 * 1024;
     const connectWss = connectTunnelManager ? new WebSocketServer({ noServer: true, maxPayload: connectMaxPayload }) : null;
+    // An upgrade let in on the deprecated ?token= says so in its 101 answer (Core 2026-11 HTTP-07).
+    for (const wss of [tunnelWss, realtimeWss, connectWss]) {
+      wss?.on('headers', (headers: string[], request: IncomingMessage) => { headers.push(...upgradeDeprecationHeaderLines(request)); });
+    }
 
     // Echat anonymous connection rate limiter (10 connections per IP per minute). The counting is
     // services/rate-buckets.ts, which every limiter shares: the hand copy here never pruned its map,

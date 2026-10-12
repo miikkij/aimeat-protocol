@@ -62,6 +62,9 @@
  *     read from the owner's memory and handed to extension code, which can send them out, so
  *     `input_from: { k: 'openrouter.apikey' }` gave the sandbox the key's ciphertext (secrets audit
  *     2026-10-09, finding 1.1).
+ *   v1.18.0 — 2026-10-12 — costCapMorsels is a version gate: from COST_CAP_MORSELS_REMOVED_IN (4.0.0) a
+ *     save that sets it is refused (400 WORKFLOW_INVALID on REST, "Validation failed" over MCP); before
+ *     it, the warning stays and the use is counted and named on the response (Core 2026-11 HTTP-07, HTTP-08).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
@@ -70,6 +73,7 @@ import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, 
 import { template } from './engine-util.js';
 import { missingStepScopes, stepScopeRefusal, saverFromCaller, WORKFLOW_AUTHORITY_VERSION, type WorkflowCaller } from './step-authority.js';
 import { shownRun } from './run-redaction.js';
+import { noteDeprecatedUse, removedFrom } from '../deprecation.js';
 import type { ContentReader } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
 import {
@@ -492,6 +496,9 @@ export interface SaveResult {
 export const COST_CAP_MORSELS_WARNING = 'costCapMorsels does nothing and was not saved, and it is removed in 4.0.0: a morsel paces what '
   + 'agents may store and is not money, so it cannot cap what a run spends. To cap what one run may spend on AI, set maxCostUsd (US dollars per run).';
 
+/** The release from which a save that sets costCapMorsels is refused rather than warned (Core 2026-11 HTTP-08). */
+export const COST_CAP_MORSELS_REMOVED_IN = '4.0.0';
+
 /**
  * Validate + persist a workflow definition under the owner GHII namespace. `createdBy` records the
  * author (owner GHII or agent GAII) for audit; createdAt is preserved across updates. `caller` is
@@ -508,6 +515,19 @@ export async function saveWorkflow(
     return { ok: false, errors: parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) };
   }
   const input = parsed.data;
+
+  // costCapMorsels: refused from its removal, before anything is read or written; before it, saved
+  // without the field, with a warning, and named on the response (HTTP-07, HTTP-08).
+  const setsCostCapMorsels = typeof input.costCapMorsels === 'number';
+  if (setsCostCapMorsels && removedFrom(COST_CAP_MORSELS_REMOVED_IN)) {
+    return { ok: false, errors: [`costCapMorsels: removed in ${COST_CAP_MORSELS_REMOVED_IN}. A morsel is not money and cannot cap what a run spends; set maxCostUsd (US dollars per run).`] };
+  }
+  if (setsCostCapMorsels) {
+    noteDeprecatedUse({
+      kind: 'workflow_cost_cap_morsels', removedIn: COST_CAP_MORSELS_REMOVED_IN, successor: 'maxCostUsd',
+      notice: 'A workflow save set costCapMorsels, which does nothing and was not saved.',
+    });
+  }
 
   // Each step costs the word its own door costs, and the saver answers for it before anything is
   // read or written (step-authority.ts). The owner in person passes. A save is held to the current
@@ -570,7 +590,7 @@ export async function saveWorkflow(
     updatedAt: now,
   });
 
-  return { ok: true, def, ...(typeof input.costCapMorsels === 'number' ? { warnings: [COST_CAP_MORSELS_WARNING] } : {}) };
+  return { ok: true, def, ...(setsCostCapMorsels ? { warnings: [COST_CAP_MORSELS_WARNING] } : {}) };
 }
 
 /** True if any leaf in the signal tree is an `llm` leaf. */

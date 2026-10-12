@@ -14,6 +14,10 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.20.0 -- 2026-10-12 -- The legacy settings routes are a version gate: from
+ *     AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN they answer 410 whatever the flag says; before it each use
+ *     is counted and logged once a day (deprecated_use: ai_legacy_settings_routes; Core 2026-11 HTTP-07,
+ *     HTTP-08).
  *   v1.19.0 -- 2026-10-08 -- The model list answers a provider's status through the one table
  *     (services/ai/errors.ts): a permanent 4xx is 422 PROVIDER_REJECTED, a 5xx OPENROUTER_ERROR 502,
  *     a refused key 424. /test and /complete answer a failure that is not the provider's as 500
@@ -105,6 +109,8 @@ import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
 import { holdsImplicitFreeModel } from '../services/ai-model-defaults.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { aiCallerOf } from './ai-policy.js';
+import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, aiLegacySettingsRoutesAllowed } from '../config-ai-models.js';
+import { noteDeprecatedUse } from '../services/deprecation.js';
 
 /**
  * OpenRouter's reasoning parameter as the owner's default: the four documented fields and nothing
@@ -166,21 +172,28 @@ function routeFailure(e: unknown, where: string): { status: number; code: string
 /**
  * The AI settings routes from before providers, DEPRECATED with a flag, a default and a removal version
  * (security-development-dna.md, "Deprecated is not removed"): AIMEAT_AI_LEGACY_SETTINGS_ROUTES, on by
- * default, removed in 4.0.0. Every answer says so in its headers; with the flag off the route answers
+ * default, removed in AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN (4.0.0), from which the flag has no effect.
+ * Every answer says so in its headers; with the flag off, or from that release, the route answers
  * 410 naming its successor. What they write still reaches every call: the owner's migrated provider
  * follows the legacy records (services/ai/provider-store.ts).
  */
 export function legacyAiSettingsRoute(config: AimeatConfig): RequestHandler {
   return (_req, res, next) => {
-    res.setHeader('Deprecation', 'true');
-    res.setHeader('Link', '</v1/ai/providers>; rel="successor-version"');
-    res.setHeader('X-AIMEAT-Removed-In', '4.0.0');
-    if (!config.aiLegacySettingsRoutes) {
+    // From AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN the answer is 410 whatever the setting says (HTTP-08).
+    if (!aiLegacySettingsRoutesAllowed(config)) {
+      res.setHeader('Deprecation', 'true');
+      res.setHeader('Link', '</v1/ai/providers>; rel="successor-version"');
+      res.setHeader('X-AIMEAT-Removed-In', AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN);
       res.status(410).json(error(config.nodeId, 'GONE',
         'This older way to change your AI settings is switched off on this server. Your AI providers have their own settings now.', 410,
         { successor: '/v1/ai/providers', next: { description: 'Your AI providers', method: 'GET', url: '/v1/ai/providers' } }));
       return;
     }
+    // Still on: the Deprecation headers on the answer, the use counted, the log once a day (HTTP-07).
+    noteDeprecatedUse({
+      kind: 'ai_legacy_settings_routes', removedIn: AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, successor: '/v1/ai/providers',
+      notice: 'An AI settings route from before providers was called (/v1/openrouter/settings, /models, /test or /v1/ai/settings).',
+    });
     next();
   };
 }

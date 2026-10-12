@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.7 — 2026-10-12 — Copy over the memory quota answers 413 QUOTA_EXCEEDED, as every other write does; it answered 429 (Core 2026-11 DATA-26).
  *   v1.11.6 — 2026-10-11 — Copy refuses an `agents.` key that carries an identity where the agent's name belongs (400 AGENT_KEY_NOT_A_NAME); bulk and import refuse it through batchKeyRefusal.
  *   v1.11.5 — 2026-10-11 — The four `memory` changes are scoped to the owner when every record written or deleted is one only its owner reads (event-bus.ts emitRecordChange).
  *   v1.11.4 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -619,7 +620,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const sourceBytes = Buffer.byteLength(JSON.stringify(sourceRecord.value), 'utf8');
     const quotaCheck = await checkMemoryQuota(config, storage, callerGaii, sourceBytes);
     if (!quotaCheck.allowed) {
-      res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
+      // 413, the status every other memory write answers for the same condition (DATA-26): 429 is a
+      // rate limit, which a client retries after a wait, and a full quota does not empty with time.
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
       return;
     }
 

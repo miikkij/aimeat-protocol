@@ -48,7 +48,22 @@ info:
     Clients must not automatically retry writes after timeouts, connection failures or 5xx:
     the first request may have done its work. Check the result before a deliberate retry.
     PATCH and DELETE are not covered by this header.
-  version: 1.2.0
+
+    ## Versions and removals
+    `info.version` is the node's software version. `x-aimeat-protocol` names the edition of AIMEAT
+    Core this contract is written to (docs/AIMEAT-Core-2026-11.md); a node states it in discovery as
+    `protocol_version` from node 4.0.0, when that edition becomes normative.
+    A form that a release removes is refused from that release whatever the node's configuration
+    says. Before it, each use is answered with `Deprecation: true`, `X-AIMEAT-Removed-In: <release>`
+    and, where one exists, `Link: <successor>; rel="successor-version"`, and is counted in
+    `GET /v1/stats` (`deprecated_use_by_type`). Removed in 4.0.0: the owner-key sign-in on
+    `POST /v1/auth/token`, `?token=` on a WebSocket upgrade, federation messages without the audience
+    proof, an optional relay claim, the morsel price fields, `costCapMorsels` on a workflow, the AI
+    settings routes from before providers and the static TURN pair. Also from 4.0.0: a consent made
+    without a reach is `local`, a public node takes only `https://` peer addresses, and a public node
+    records AI provenance whatever `AIMEAT_AI_PROVENANCE` says.
+  version: 3.26.1
+  x-aimeat-protocol: '2026-11'
   contact:
     name: Jouni Miikki
     email: jouni.miikki@overscalesolutions.com
@@ -3054,8 +3069,14 @@ components:
           maxLength: 512
         scope:
           type: string
-          enum: [private, dmz, federation]
-          default: federation
+          enum: [local, federation, auth, private, dmz]
+          description: >-
+            The reach (AIMEAT Core 2026-11 AUTHZ-18). `local`: the recipient reads matching records on
+            this node. `federation`: as local, and matching records that are also public may be
+            replicated to peers and listed in the directory. `auth`: another node may sign the person
+            in with the credentials this node holds. `private` and `dmz` are deprecated names for
+            `local`, stored and answered as `local` (the answer carries the Deprecation headers).
+            Absent: `federation` before node 4.0.0, `local` from it.
         expires:
           type: string
           format: date-time
@@ -6458,7 +6479,8 @@ components:
           description: >-
             Deprecated 2026-09-25 and removed in 4.0.0; nothing ever read it: a morsel paces what agents
             store and is not money, so it cannot cap a spend. Until 4.0.0 a save that sets it still
-            succeeds, does not keep it, and answers with `warnings` naming maxCostUsd.
+            succeeds, does not keep it, and answers with `warnings` naming maxCostUsd and with the
+            Deprecation headers. From node 4.0.0 a save that sets it is refused (400 WORKFLOW_INVALID).
     WorkflowDef:
       allOf:
         - $ref: '#/components/schemas/WorkflowDefInput'
@@ -8132,9 +8154,12 @@ paths:
         With `owner`, an owner logs in with an older Ed25519 key, signing
         `owner + node id + timestamp`. That form is the legacy owner-key login (RFC Core §9);
         password login at `POST /v1/ghii/login` is the one to use. DEPRECATED, removed in 4.0.0:
-        a node with `AIMEAT_OWNER_KEY_LOGIN=false` answers `410 OWNER_KEY_LOGIN_OFF`. An account
-        with two-step sign-in armed is always refused here with `401 SECOND_FACTOR_REQUIRED`, and
-        a password reset or change replaces the key.
+        from node 4.0.0 it answers `410 OWNER_KEY_LOGIN_OFF` whatever `AIMEAT_OWNER_KEY_LOGIN`
+        says, and before it a node with `AIMEAT_OWNER_KEY_LOGIN=false` answers the same. While it
+        is on, every answer carries `Deprecation: true`, `X-AIMEAT-Removed-In: 4.0.0` and
+        `Link: </v1/ghii/login>; rel="successor-version"`. Its signature works once, as the agent
+        renewal's does. An account with two-step sign-in armed is always refused here with
+        `401 SECOND_FACTOR_REQUIRED`, and a password reset or change replaces the key.
       tags: [Auth]
       security:
         - SignatureAuth: []
@@ -8185,7 +8210,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '410':
-          description: The owner-key login is switched off on this node (OWNER_KEY_LOGIN_OFF).
+          description: The owner-key login is switched off on this node, or removed (node 4.0.0 and later) (OWNER_KEY_LOGIN_OFF). `details.successor` names `/v1/ghii/login`.
         '429':
           $ref: '#/components/responses/RateLimited'
 
@@ -23272,6 +23297,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '404':
           $ref: '#/components/responses/AimeatError'
+        '413':
+          description: The copy would put the caller over its memory quota (QUOTA_EXCEEDED), the same answer every memory write gives.
         '422': { $ref: '#/components/responses/OdpsFieldTooLong' }
 
   /v1/memory/pull:
@@ -26263,7 +26290,18 @@ paths:
     get:
       operationId: nodeDiscovery
       summary: Node discovery endpoint
-      description: Standard well-known endpoint for AIMEAT node discovery.
+      description: |
+        Standard well-known endpoint for AIMEAT node discovery (AIMEAT Core 2026-11 DISC-01). No
+        authentication. `data` carries `node_id`, `type`, `protocol` (`aimeat`), `version` (the API
+        path version, `v1`), `software_version`, `public_key`, the capability set, the federation
+        settings and `endpoints`. From node 4.0.0 it also carries `protocol_version` (`2026-11`) and
+        `profiles` (the Core profiles the node claims); before 4.0.0 both are left out, because a
+        3.x node does not yet keep the edition's removals. `payment_bindings` lists the payment
+        bindings the node accepts (`stripe`, `invoice`, `ucp`, `acp`, `x402`), empty while commerce
+        is off. `endpoints.mcp` is the MCP endpoint and `endpoints.auth` names each way to get a
+        token: `owner_password`, `owner_refresh`, `agent_device_authorization`, `agent_device_token`,
+        `agent_token_renewal` and `mcp_oauth_metadata`. The bootstrap document (`GET /`) carries the
+        same `protocol_version`, `profiles` and `payment_bindings` in `this_node`.
       tags: [Catalogue]
       responses:
         '200':
@@ -35414,8 +35452,8 @@ paths:
           in: query
           schema:
             type: string
-            enum: [private, dmz, federation]
-          description: Filter by scope
+            enum: [local, federation, auth]
+          description: Filter by reach. A consent stored as `private` or `dmz` is answered as `local`.
       responses:
         '200':
           description: List of consent grants
@@ -47982,6 +48020,13 @@ paths:
         or leaving is replaced only by an admission (an invite, or open join under the same key); a
         pending request leaves it in place, and an open join under another key answers 409
         PEER_KEY_MISMATCH. A node id held under another key is recorded on the Security page.
+
+        HTTPS ON A PUBLIC NODE (AIMEAT Core 2026-11 FED-13). From node 4.0.0 a node whose security
+        profile is `public` refuses a `node_url` that is not `https://` with 400 PEER_HTTPS_REQUIRED;
+        before 4.0.0 it is taken with the Deprecation headers. A `local` node keeps plain http. The
+        same rule holds for POST /v1/federation/peer/request, POST /v1/federation/test, adding or
+        editing a peer (POST and PATCH /v1/federation/peers), a re-admission, a genesis peering and
+        the key exchange.
       tags: [Federation]
       requestBody:
         required: true
@@ -52608,7 +52653,7 @@ paths:
         (its ai steps and the judging of its llm signals), in US dollars, and an ai step starts only
         when what it is expected to cost fits in what is left; `costCapMorsels` does
         nothing, and a save that sets it answers with
-        `warnings`. The save records its principal as `savedBy`: a run the workflow's own trigger
+        `warnings` (refused with 400 from node 4.0.0). The save records its principal as `savedBy`: a run the workflow's own trigger
         starts answers to it, and is refused (status `refused`, one notification to the owner) when
         that principal is gone or no longer holds a permission the steps need. Every save records
         `authority: 2`, the rules it was checked under; a workflow saved before 2026-09-25 has none,
@@ -62044,7 +62089,9 @@ paths:
         base64(HMAC-SHA1(secret, username)). The expiry is now plus `AIMEAT_TURN_TTL_SECONDS`
         (default 3600); ask again before it passes. The opaque id is a keyed hash, never the
         caller's account name, and the secret itself is never returned. Without the secret, the
-        deprecated static `AIMEAT_TURN_USERNAME` / `AIMEAT_TURN_CREDENTIAL` pair is returned.
+        deprecated static `AIMEAT_TURN_USERNAME` / `AIMEAT_TURN_CREDENTIAL` pair is returned, with
+        the Deprecation headers; from node 4.0.0 the pair is not served and the TURN entry carries
+        the address alone.
         A visitor from another node gets no TURN entry, only STUN. The response is `Cache-Control: no-store`.
       security:
         - BearerAuth: []
@@ -67438,7 +67485,9 @@ paths:
 
         `?token=<jwt>` on these upgrades is deprecated: accepted while `AIMEAT_WS_QUERY_TOKEN` is on
         (the default in 3.x), refused with `X-AIMEAT-Error: WS_QUERY_TOKEN_DISABLED` when it is off,
-        and removed in 4.0.0. Each accepted use is counted in `ws_query_token` on `GET /v1/stats`.
+        and removed in 4.0.0: from that release it is refused whatever the setting says. Each
+        accepted use is counted in `ws_query_token` on `GET /v1/stats`, and its `101` answer carries
+        `Deprecation: true`, `X-AIMEAT-Removed-In: 4.0.0` and a successor `Link` to this endpoint.
         The ticket is minted from a session JWT; an access token (`aimeat_pat_…`) is refused here.
       security:
         - BearerAuth: []

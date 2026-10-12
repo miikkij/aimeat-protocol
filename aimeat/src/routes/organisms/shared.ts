@@ -8,6 +8,7 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.13.3 — 2026-10-12 — The member consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   v1.13.2 — 2026-10-09 — The password gate admits a share token only when its password version
  *     matches the share's current password (secrets audit 2026-10-09, S-6).
  *   v1.13.1 — 2026-10-09 — archiveHandler asks archiveRoleOf (services/archive.ts), the same rule
@@ -598,7 +599,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const existing = await storage.listConsents(ownerGaii, { status: 'active' });
     if (existing.some(c => c.dataPattern === dataPattern && c.recipient === recipient)) return;
     const now = new Date().toISOString();
-    await storage.createConsent({ id: uuidv4(), ownerGaii, dataPattern, recipient, purpose, scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+    await storage.createConsent({ id: uuidv4(), ownerGaii, dataPattern, recipient, purpose, scope: 'local', expires: null, status: 'active', grantedAt: now, revokedAt: null });
   };
 
   // Workspace member roles delegate to the ONE shared service (services/workspace-roles.ts) so the REST

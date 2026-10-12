@@ -5,6 +5,8 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-12 — The introduction, the outbound peering request and the readiness test ask
+ *     peerUrlRefusal: a public node takes an https:// address only from 4.0.0 (Core 2026-11 FED-13).
  *   v1.6.0 — 2026-10-10 — A peer held under the signing key that has once sent a verified audience or
  *     delivery proof is refused an introduction without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED
  *     says (pinnedRefusal; secaudit 2026-10-10 I21).
@@ -48,6 +50,7 @@ import { consumeLinkInvite } from '../../services/link-invites.js';
 import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-policy.js';
 import { logger } from '../../utils/logger.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
+import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 
 export function registerIntroduceRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/federation/directory — public peer directory (Tier 0)
@@ -141,6 +144,10 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'role must be "contributor" or "operator"'));
             return;
         }
+
+        // A public node takes an https:// peer address only (Core 2026-11 FED-13, peer-url-policy.ts).
+        const schemeRefusal = peerUrlRefusal(config, node_url);
+        if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
 
         // SECURITY: Require signature and timestamp
         if (!signature || !timestamp) {
@@ -355,6 +362,9 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
     router.post('/v1/federation/peer/request', requireAuth(), requireOperator(storage), validateBody(PeeringRequestSchema, config.nodeId), async (req, res) => {
         const { target_url, target_node_id, public_key, message } = req.body ?? {};
 
+        const schemeRefusal = peerUrlRefusal(config, target_url);
+        if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
+
         // Extension hook: pre_federation_peer
         const hookResult = await executeHooks(config, storage, 'pre_federation_peer', { target_url, target_node_id });
         if (!hookResult.allowed) {
@@ -423,6 +433,9 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_url is required'));
             return;
         }
+
+        const schemeRefusal = peerUrlRefusal(config, target_url);
+        if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
 
         // SSRF validation: block requests to private/reserved IPs
         const urlCheck = await validateOutboundUrl(target_url);

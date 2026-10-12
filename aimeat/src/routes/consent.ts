@@ -13,6 +13,8 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   v1.2.0 — 2026-10-12 — POST /v1/consent no longer defaults the reach to `federation` here: the
+ *     service decides it by version, and `private`/`dmz` are answered as `local` (Core 2026-11 AUTHZ-18).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -41,7 +43,8 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             data_pattern,
             recipient,
             purpose,
-            scope = 'federation',
+            // Absent: the service gives the running version's default reach (Core 2026-11 AUTHZ-18).
+            scope,
             expires = null,
             metadata,
         } = req.body ?? {};

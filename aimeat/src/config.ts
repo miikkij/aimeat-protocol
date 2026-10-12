@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.27.0 — 2026-10-12 — aiProvenance comes from aiProvenanceFromEnv (config-ai-label.ts): from 4.0.0 a public node records provenance whatever AIMEAT_AI_PROVENANCE says (Core 2026-11 PROV-07).
  *   v1.26.0 — 2026-10-11 — The pacing pack (AIMEAT_PACING_PACK_MORSELS, _PRICE, _CURRENCY): pacing capacity the operator sells for money. The extensionMaxPayMorsels comment says the field it bounds is pacing now.
  *   v1.25.1 — 2026-10-10 —federationAudienceRequired comes from federationDefaults(), its default following the version (secaudit 2026-10-10 I22).
  *   v1.25.0 — 2026-10-09 — docsignDefaults() (config-docsign.ts); the AI-label posture moved to config-ai-label.ts unchanged.
@@ -89,7 +90,7 @@ import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
 import { visibilityDefaults } from './config-visibility.js';
 import { turnDefaults } from './config-turn.js';
-import { aiLabelPublicFromEnv } from './config-ai-label.js';
+import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
 import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
 import { updateCheckDefaults } from './config-update-check.js';
@@ -242,8 +243,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const aiProviderAllowlist = (process.env.AIMEAT_AI_PROVIDER_ALLOWLIST ?? '')
     .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   // AI provenance (TARGET-058): ON unless explicitly switched off, and _DETAIL governs what is
-  // SERVED publicly, never what is stored. Rationale in config-types.ts + .env.example.
-  const aiProvenance = process.env.AIMEAT_AI_PROVENANCE !== 'false';
+  // SERVED publicly, never what is stored. From 4.0.0 a public node cannot switch it off (PROV-07).
+  const aiProvenance = aiProvenanceFromEnv(securityProfile);
   const aiProvenanceDetail: 'full' | 'minimal' = process.env.AIMEAT_AI_PROVENANCE_DETAIL === 'minimal' ? 'minimal' : 'full';
   // Visible-label posture: `off` is refused on a public node (config-ai-label.ts has the reasons).
   const aiLabelPublic = aiLabelPublicFromEnv(securityProfile);

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Auth, OAuth, device/eco authorization, consent, and identity-verification record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-10-12 — ConsentRecord.scope is the reach `local` | `federation` | `auth`
+ *     (utils/consent-reach.ts, Core 2026-11 AUTHZ-18); `private` and `dmz` are read as `local`.
  *   v1.2.0 — 2026-10-09 — VerificationNonceRecord type `login_second_factor`: the ticket an emailed
  *     sign-in link leaves when the account has two-step sign-in (routes/ghii/login-link-second-factor.ts).
  *   v1.1.0 — 2026-09-26 — AppGrantRecord.ownerAddedScopes: the words the owner added to a grant by
@@ -11,6 +13,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 import type { EcoDataAreaGrant } from './identity.js';
+import type { ConsentReach } from '../../utils/consent-reach.js';
 export interface OtkRecord {
   key: string;
   ownerGaii: string;
@@ -187,7 +190,8 @@ export interface ConsentRecord {
   dataPattern: string;        // Glob-pattern: "profile.*.interests", "iot.*"
   recipient: string;          // "*" | GAII | "organism.{id}"
   purpose: string;            // Free-form: "discovery", "marketplace", "research"
-  scope: 'private' | 'dmz' | 'federation' | 'auth';
+  /** The reach (Core 2026-11 AUTHZ-18). A row written before 2026-10-12 may hold `private` or `dmz`; both providers read it as `local`. */
+  scope: ConsentReach;
   expires: string | null;     // ISO 8601 or null (indefinite)
   status: 'active' | 'revoked' | 'expired';
   grantedAt: string;          // ISO timestamp
@@ -213,7 +217,7 @@ export interface ConsentFacetQuery {
 export interface ConsentFacet {
   /** `active` | `revoked` | `expired`. */
   status: string;
-  /** `private` | `dmz` | `federation` | `auth`. */
+  /** As stored: `local` | `federation` | `auth`, or `private` | `dmz` on a row written before 2026-10-12. */
   scope: string;
   /** `YYYY-MM-DD` of `grantedAt`. */
   day: string;
