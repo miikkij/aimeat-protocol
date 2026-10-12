@@ -35,6 +35,10 @@
  *   const out = await offerEnrolment({ config, storage }, owner, candidates, { installId });
  *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.4.0 — 2026-10-13 — enrolTarget: the offer goes to a daemon principal that holds agent:write when
+ *     the daemon has one. POST /v1/agents/v2/enrol asks that word from 4.0.0 and the basic agents hold
+ *     none, so a daemon whose first principal was a basic agent did not take on an approved proposal
+ *     (the 4.0.0 sweep, e2e-connect-enrol-loopback and e2e-basic-agents-first-task).
  *   v1.3.0 — 2026-10-10 — After an enrolment the connector registry records that the agents live on
  *     the connector that took them (services/connector-registry.ts recordPlacement). Kind 'move':
  *     an enrolled agent offered to another connector, read back by its key having changed.
@@ -50,6 +54,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { EnrolmentGrantKind } from '../storage/types/identity.js';
 import { connectedDaemons } from './basic-agents.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { recordPlacement } from './connector-registry.js';
 import { cardUri, jwksUri } from '../routes/agents-v2/card.js';
@@ -134,7 +139,7 @@ export async function offerEnrolment(
   const keys = agents.map(a => offeringKey(owner, a.name));
   for (const k of keys) offering.add(k);
   try {
-    return await offerOnDaemon(deps, owner, agents, chosen, opts.kind ?? 'create');
+    return await offerOnDaemon(deps, owner, agents, { ...chosen, target: await enrolTarget(deps.storage, chosen) }, opts.kind ?? 'create');
   } finally {
     for (const k of keys) offering.delete(k);
   }
@@ -147,6 +152,22 @@ const offeringKey = (owner: string, name: string) => `${owner}\n${name}`;
 /** Whether an offer naming this agent is under way in this process. */
 export function isBeingOffered(owner: string, name: string): boolean {
   return offering.has(offeringKey(owner, name));
+}
+
+/**
+ * Which of a daemon's principals forwards the enrolment to POST /v1/agents/v2/enrol. That route asks
+ * agent:write from node 4.0.0 (REST_SCOPE_GATES_ENFORCED_IN), and the basic agents deliberately hold
+ * none (data/basic-agents.ts), so the daemon's first principal could be a basic agent the route then
+ * refuses: on a 4.0.0 node an approved proposal was "not taken on" by a connector that also served
+ * the owner's own agent. A principal whose record covers agent:write is taken first; with none, the
+ * first principal stays, which a 3.x node lets through with the Deprecation headers.
+ */
+export async function enrolTarget(storage: Storage, daemon: { principals: string[]; target: string }): Promise<string> {
+  for (const principal of daemon.principals) {
+    const rec = await storage.getAgent(principal);
+    if (rec && scopeIsCovered(rec.defaultScopes ?? [], 'agent:write')) return principal;
+  }
+  return daemon.target;
 }
 
 /** The grant, the offer and the read-back, for a daemon already chosen. */
