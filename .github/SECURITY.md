@@ -12,7 +12,8 @@ Report it privately in one of two ways:
   repository's Security tab, or directly at
   <https://github.com/miikkij/aimeat-protocol/security/advisories/new>. The report is visible only
   to you and the maintainers.
-- **Email:** **jouni.miikki@overscalesolutions.com**
+- **Email:** **jouni.miikki@overscalesolutions.com** at Overscale Solutions Oy, which maintains the
+  project.
 
 Include:
 - Description of the vulnerability
@@ -22,15 +23,17 @@ Include:
 
 ## Response Timeline
 
-- **Acknowledgment:** within 48 hours
-- **Initial assessment:** within 1 week
-- **Fix or mitigation:** depends on severity, typically within 2 weeks for critical issues
+We aim to acknowledge a report within 48 hours, give an assessment within a week and ship a fix
+within two weeks.
 
 ## Scope
 
 This policy covers the code and the specification in this repository: the AIMEAT reference node
 (`aimeat/`, published to npm as `aimeat`), the CrewAI package (`python/aimeat-crewai/`, published to
 PyPI as `aimeat-crewai`), the desktop app (`aimeat-desktop/`), and the protocol specification.
+
+aimeat.io is the project's demo node. A vulnerability you find on that hosted service may be
+reported under this policy too.
 
 ## Supported Versions
 
