@@ -66,8 +66,8 @@ workspace records (all need the `memory:purge` permission, and an agent that hol
 task without the person's OK); stored files; apps; deleting an agent (every record and file under its identity goes with
 it); deleting an organism; erasing an account.
 
-**Limits today.** `aimeat_app_delete` describes itself as an archive and deletes;
-`aimeat_workspace_object_delete` describes itself as permanent and uses the bin.
+**Limits today.** `aimeat_workspace_object_delete` puts a workspace record in the bin, while its REST
+twin, `POST /v1/organisms/{id}/workspace/records/delete`, deletes at once.
 
 ## 4. Every record can say who wrote it
 
@@ -122,8 +122,10 @@ What stays, under a pseudonym (`erased:<hash>`), because it is someone else's re
 and disputes (the other party's evidence), other people's ledger lines and receipts, AI provenance
 records, and write counts inside other people's records. The username becomes free.
 
-**Limits today.** Leaving through the MCP tool `aimeat_organism_leave` ends the membership but leaves
-the agents and workspace roles behind; the route does both. Erasure has no MCP tool and no page; a
+The MCP tool `aimeat_organism_leave` does the same as the route (`leaveOrganism()` in
+`aimeat/src/services/organism-lifecycle.ts`).
+
+**Limits today.** Erasure has no MCP tool and no page; a
 person calls the route from their own signed-in session, or asks the operator, who can erase on their
 behalf (an operator acting on another person's account writes the operator-access trail,
 `aimeat/src/services/operator-access-audit.ts`).

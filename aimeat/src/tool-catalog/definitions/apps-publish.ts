@@ -8,6 +8,8 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   v1.2.0 — 2026-10-12 — aimeat_app_delete says it deletes, and that only an earlier app backup brings
+ *     the app back; it said archive (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
  *   v1.1.0 — 2026-10-06 — aimeat_app_publish and aimeat_app_draft_save are the one schema all three
  *     surfaces register: publish types its tags and crew-defs, and the draft takes content or
  *     content_base64 (both base64) and the category, tags and icon the surfaces already took
@@ -98,7 +100,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_delete',
-        description: 'Archive (soft-delete) an app. Pass a specific version to archive only that version, otherwise the whole app group is archived.',
+        description: 'Delete one of your own apps, or one version of it. Omit `version` to delete every version, the app\'s screenshot and its dependency record. This is not an archive: nothing restores a deleted app or version, except an app backup (GET /v1/apps/backup) taken before.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Delete App', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -107,8 +109,8 @@ export const appPublishTools = [
         scope: 'app:manage',
         surfaces: ['appdev'],
         input: {
-            filename: { type: 'string', required: true, description: "App filename to archive (your own owner's)." },
-            version: { type: 'number', description: 'A specific version number. Omit to archive all versions.' },
+            filename: { type: 'string', required: true, description: "App filename to delete (your own owner's)." },
+            version: { type: 'number', description: 'A specific version number. Omit to delete all versions.' },
         },
     },
     {

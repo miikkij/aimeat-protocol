@@ -4,6 +4,8 @@
  *   Tests organism listing, detail retrieval, joining, leaving, member listing,
  *   and the organism details resource.
  * @version-history
+ *   v1.1.0 — 2026-10-12 — 13a/13b: leaving over MCP takes the leaver's agents off the organism and
+ *     their workspace roles away, as REST leave does. 13b failed on the source.
  *   v1.0.0 — 2026-03-21 — Initial creation
  */
 
@@ -507,6 +509,26 @@ await test('12. List members of non-existent organism fails', async () => {
 // ─── Phase 6: Leave ───
 console.log('\nPhase 6 — Leave');
 
+// Leaving over MCP left two grants behind that REST leave removes: the leaver's agents stayed listed
+// on the organism, where every membership gate reads them as members, and the workspace roles granted
+// to the leaver stayed (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
+const LEAVE_WS = 'leavews';
+await test('13a. Before leaving: user 2\'s agent is listed on the organism and user 2 holds a workspace role', async () => {
+    const attach = await json(`/v1/organisms/${organismId}/agents`, {
+        method: 'POST', headers: { Authorization: `Bearer ${owner2Token}` }, body: JSON.stringify({ agent_gaii: agent2Gaii }),
+    });
+    assert(attach.status === 201, `attach agent 2: ${attach.status} ${JSON.stringify(attach.body?.error)}`);
+    const reg = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: `organism.${organismId}.meta.workspaces`, value: { workspaces: [{ id: LEAVE_WS, name: 'Leave', createdAt: new Date().toISOString(), createdBy: ownerName }] }, visibility: 'private' }),
+    });
+    assert(reg.status === 201 || reg.status === 200, `workspace registry: ${reg.status}`);
+    const grant = await json(`/v1/organisms/${organismId}/workspace-access/grant`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ ws: LEAVE_WS, grantee: owner2Name, role: 'viewer' }),
+    });
+    assert(grant.status === 200, `grant: ${grant.status} ${JSON.stringify(grant.body?.error)}`);
+});
+
 await test('13. User 2 leaves open organism', async () => {
     const { body } = await mcpRpc2('tools/call', {
         name: 'aimeat_organism_leave',
@@ -514,6 +536,16 @@ await test('13. User 2 leaves open organism', async () => {
     }, 110);
     const result = JSON.parse(body.result.content[0].text);
     assert(result.left === true, `left: ${result.left}`);
+});
+
+await test('13b. Leaving over MCP takes the agent off the organism and the workspace role away, as REST leave does', async () => {
+    const org = await json(`/v1/organisms/${organismId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const agents: string[] = org.body?.data?.organism?.agentGaiis ?? [];
+    assert(!agents.includes(agent2Gaii), `the leaver's agent is still listed: ${JSON.stringify(agents)}`);
+    const access = await json(`/v1/organisms/${organismId}/workspace-access?ws=${LEAVE_WS}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(access.status === 200, `workspace access: ${access.status} ${JSON.stringify(access.body?.error)}`);
+    const members: Array<{ owner: string }> = access.body.data.members ?? [];
+    assert(!members.some(m => m.owner === owner2Name), `the leaver still holds a workspace role: ${JSON.stringify(members)}`);
 });
 
 await test('14. Leaving again fails (not a member)', async () => {

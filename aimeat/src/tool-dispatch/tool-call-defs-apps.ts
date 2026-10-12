@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-12 -- aimeat_app_delete says it deletes, as the code does; it said archive.
  *   v1.11.0 -- 2026-10-09 -- aimeat_extension_config_set sends PATCH /v1/extensions/:name/config.
  *   v1.10.1 -- 2026-10-06 -- aimeat_appdev_overview takes sections as the list the catalog publishes
  *     and sends the route its comma-separated string; aimeat_appdev_pitfall_list reads
@@ -356,10 +357,10 @@ export const appTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_app_delete',
-        description: 'Archive one of your own apps, or a single version of it. Omit `version` to archive every version.',
+        description: 'Delete one of your own apps, or one version of it. Omit `version` to delete every version, the app\'s screenshot and its dependency record. This is not an archive: nothing restores a deleted app or version, except an app backup (GET /v1/apps/backup) taken before.',
         input: {
-            filename: { type: 'string', required: true, description: 'App filename to archive (your own owner\'s).' },
-            version: { type: 'number', description: 'A specific version number. Omit to archive all versions.' },
+            filename: { type: 'string', required: true, description: 'App filename to delete (your own owner\'s).' },
+            version: { type: 'number', description: 'A specific version number. Omit to delete all versions.' },
         },
         handler: ({ client }, input) => client.delete(`/v1/apps/${encodeURIComponent(requiredString(input, 'filename'))}${query({
             version: optionalNumber(input, 'version'),

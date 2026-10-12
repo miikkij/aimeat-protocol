@@ -23,11 +23,15 @@
  *   - createOrganismRecord() — board + organism + creator membership, feed and timeline side effects
  *   - updateOrganismRecord() — validated field updates + the README memory key
  *   - joinOrganism() — direct join or join request, with the approver notifications
- *   - leaveOrganism() — membership removal + roster/admin sync
+ *   - leaveOrganism() — membership removal + roster/admin sync + the departed member's agents and
+ *     workspace roles (revokeDepartedMemberAccess)
  * @usage
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-12 — leaveOrganism() takes the leaver's agents off the organism and their workspace roles
+ *     away (revokeDepartedMemberAccess), so aimeat_organism_leave does what POST /:id/leave did
+ *     (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
  *   2026-10-02 — resolveShape() answers { shape, error }; the refusal reads `error`.
  *   2026-10-01 — createOrganismRecord takes a starting `shape` (data/organism-shapes.ts) and its
  *     `lang`: the shape's type, policy and visibility unless given, and its workspaces afterwards
@@ -57,6 +61,7 @@ import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isOrganismOwner } from './organism-ownership.js';
 import { AGENT_ACCESS_VALUES, agentAccessOf, type AgentAccess } from './organism-agent-access.js';
+import { revokeDepartedMemberAccess } from './invitations.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -466,6 +471,12 @@ export async function leaveOrganism(
     updates.admins = organism.admins.filter(a => a !== leaverOwner);
   }
   await storage.updateOrganism(id, updates);
+  // Two grants outlive the membership row and both behave like membership: the leaver's agents stay
+  // listed on the organism, where every membership gate reads them as members in their own right,
+  // and the workspace-role consents granted to the leaver are owned by each workspace's creator.
+  // Someone who walked out keeps neither, whichever surface they left through. This call stood in the
+  // REST leave route only, so aimeat_organism_leave left both behind.
+  await revokeDepartedMemberAccess(storage, config, { organism, departing: leaverOwner });
   emitChange('organisms');
   // The leaver's own record only. Someone leaving is not something the organism's creator needs
   // interrupting for, and a feed that reports every departure on somebody else's account turns
