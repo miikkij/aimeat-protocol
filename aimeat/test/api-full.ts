@@ -5,6 +5,12 @@
  *   broad happy-path sweep across the core API surface.
  * @usage cd aimeat && pnpm exec tsx test/api-full.ts
  * @version-history
+ *   v1.3.0 — 2026-10-12 — The 4.0.0 forms: actions carry pricing.toll_morsels, each introduction
+ *     carries the audience proof `aimeat federation join` sends, and the maintenance test switches
+ *     maintenance off in a finally, so one failed assertion inside it no longer leaves the node down
+ *     for every later test (on the 4.0.0 sweep it turned 36 tests into 503). A tool manifest and an
+ *     offers document with the old morsel price, written through POST /v1/memory: stored on 3.x,
+ *     400 MORSEL_PRICE_REMOVED and nothing stored on 4.0.0.
  *   v1.2.0 — 2026-07-14 — Markdown for Agents tests: Accept: text/markdown negotiation on
  *     / + /v1/portal + /v1/connect (content-type, x-markdown-tokens, Vary), HTML/JSON unchanged
  *   v1.1.0 — 2026-07-13 — Add MCP Server Card, RFC 9727 api-catalog, and RFC 8288 Link-header tests
@@ -17,6 +23,9 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
+import { removedOn } from './helpers/node-release.js';
 
 // ─── Boot embedded server ───
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40251', 10);
@@ -414,6 +423,35 @@ await test('Memory CRUD', async () => {
     assert(entry, 'found entry');
 });
 
+// The old morsel price on the generic memory routes (services/legacy-pacing-write.ts): read as pacing
+// before 4.0.0, refused from 4.0.0 as the dedicated routes refuse it. Owner-written listing sources.
+const legacyPriceGone = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
+await test(legacyPriceGone
+    ? 'Memory — a tool manifest or offers document with the old morsel price is refused (400 MORSEL_PRICE_REMOVED) and not stored (4.0.0)'
+    : 'Memory — a tool manifest or offers document with the old morsel price is stored, read as pacing (3.x)', async () => {
+    const tools = {
+        key: 'apps.legacyprice.tools',
+        value: { tools: [{ name: 'echo', description: 'Echo', inputSchema: { type: 'object' }, outputSchema: { type: 'object' }, price: { morsels: 3 } }] },
+        visibility: 'private',
+    };
+    const offers = {
+        key: 'agents.legacyprice.offers',
+        value: { offers: [{ id: 'paced', ask: 'Ask', price: { morsels: 4 } }] },
+        visibility: 'private',
+    };
+    for (const doc of [tools, offers]) {
+        const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify(doc) });
+        const r = await json(`/v1/memory/${doc.key}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        if (legacyPriceGone) {
+            assert(w.status === 400 && w.body.error?.code === 'MORSEL_PRICE_REMOVED', `${doc.key}: expected 400 MORSEL_PRICE_REMOVED, got ${w.status} ${JSON.stringify(w.body.error)}`);
+            assert(r.status === 404, `${doc.key}: a refused write stores nothing, read answered ${r.status}`);
+        } else {
+            assert(w.body.ok === true, `${doc.key}: 3.x stores it: ${w.status} ${JSON.stringify(w.body.error)}`);
+            assert(r.status === 200, `${doc.key}: read back ${r.status}`);
+        }
+    }
+});
+
 // ─── Phase 2: Economy ───
 console.log('Phase 2 — Economy');
 
@@ -435,7 +473,7 @@ await test('Actions — publish', async () => {
             description: 'Summarize text',
             input_schema: { type: 'object', properties: { text: { type: 'string' } } },
             output_schema: { type: 'object', properties: { summary: { type: 'string' } } },
-            pricing: { base_morsels: 5 },
+            pricing: { toll_morsels: 5 },
         }),
     });
     assert(body.ok === true, `publish: ${JSON.stringify(body.error)}`);
@@ -992,6 +1030,9 @@ await test('Federation — introduce contributor (auto-approve)', async () => {
     // Server verifies: node_id + node_url + timestamp
     const introduceMsg = 'e2e-test-contributor' + 'http://localhost:19999' + introduceTs;
     const introduceSig = await signMsg(contribPrivKeyB64, introduceMsg);
+    // The node it is for, proved with a second signature, as `aimeat federation join` sends it
+    // (src/cli/federation-join.ts); node 4.0.0 refuses an introduction without it.
+    const proof = await audienceProof(contribPrivKeyB64, introduceMsg, NODE_ID);
     const { status, body } = await json('/v1/federation/peer/introduce', {
         method: 'POST',
         body: JSON.stringify({
@@ -1003,6 +1044,7 @@ await test('Federation — introduce contributor (auto-approve)', async () => {
             message: 'E2E test join',
             timestamp: introduceTs,
             signature: introduceSig,
+            ...proof,
         }),
     });
     // Server never auto-approves — always pending (202)
@@ -1023,6 +1065,7 @@ await test('Federation — introduce operator (pending)', async () => {
     // Server verifies: node_id + node_url + timestamp
     const introduceMsg = 'e2e-test-operator' + 'http://localhost:19998' + introduceTs;
     const introduceSig = await signMsg(opPrivKeyB64, introduceMsg);
+    const proof = await audienceProof(opPrivKeyB64, introduceMsg, NODE_ID);
     const { status, body } = await json('/v1/federation/peer/introduce', {
         method: 'POST',
         body: JSON.stringify({
@@ -1034,6 +1077,7 @@ await test('Federation — introduce operator (pending)', async () => {
             message: 'E2E test operator join',
             timestamp: introduceTs,
             signature: introduceSig,
+            ...proof,
         }),
     });
     assert(status === 202, `status ${status}: ${JSON.stringify(body.error)}`);
@@ -1117,6 +1161,7 @@ await test('Maintenance — toggle on and off', async () => {
     const maintTs = new Date().toISOString();
     const maintMsg = 'e2e-maint-test' + 'http://localhost:19997' + maintTs;
     const maintSig = await signMsg(maintPrivKeyB64, maintMsg);
+    const maintProof = await audienceProof(maintPrivKeyB64, maintMsg, NODE_ID);
     const { status: introStatus } = await json('/v1/federation/peer/introduce', {
         method: 'POST',
         body: JSON.stringify({
@@ -1127,6 +1172,7 @@ await test('Maintenance — toggle on and off', async () => {
             role: 'contributor',
             timestamp: maintTs,
             signature: maintSig,
+            ...maintProof,
         }),
     });
     assert(introStatus === 202, `introduce during maintenance should work, got ${introStatus}`);
@@ -1145,6 +1191,14 @@ await test('Maintenance — toggle on and off', async () => {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     assert(memStatus2 !== 503, `should not be 503 after disabling maintenance, got ${memStatus2}`);
+});
+
+// Whatever the test above asserted, the node leaves maintenance before the next test: a failure
+// inside it used to leave the node down for every test after it. Idempotent when already off.
+await json('/v1/admin/maintenance', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ enabled: false }),
 });
 
 // ─── Phase 7: Advanced Scenarios ───
@@ -1207,7 +1261,7 @@ await test('Action update (PUT)', async () => {
         headers: { Authorization: `Bearer ${agentToken}` },
         body: JSON.stringify({
             id: actionId, display_name: 'Test Action', description: 'Original description',
-            input_schema: {}, output_schema: {}, pricing: { base_morsels: 1 },
+            input_schema: {}, output_schema: {}, pricing: { toll_morsels: 1 },
         }),
     });
     assert(pubBody.ok === true, `publish: ${JSON.stringify(pubBody.error)}`);
@@ -1216,7 +1270,7 @@ await test('Action update (PUT)', async () => {
     const { body: updBody } = await json(`/v1/actions/${actionId}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${agentToken}` },
-        body: JSON.stringify({ description: 'Updated description', pricing: { base_morsels: 5 } }),
+        body: JSON.stringify({ description: 'Updated description', pricing: { toll_morsels: 5 } }),
     });
     assert(updBody.ok === true, `update: ${JSON.stringify(updBody.error)}`);
     assert(updBody.data?.description === 'Updated description' || updBody.data?.action?.description === 'Updated description', 'description updated');

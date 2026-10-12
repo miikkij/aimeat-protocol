@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.1 — 2026-10-12 — The bulk write, the batch and the copy refuse an app tool manifest or offers
+ *     document carrying the old morsel price from 4.0.0 (services/legacy-pacing-write.ts).
  *   v1.12.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/memory/discover. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.11.7 — 2026-10-12 — Copy over the memory quota answers 413 QUOTA_EXCEEDED, as every other write does; it answered 429 (Core 2026-11 DATA-26).
  *   v1.11.6 — 2026-10-11 — Copy refuses an `agents.` key that carries an identity where the agent's name belongs (400 AGENT_KEY_NOT_A_NAME); bulk and import refuse it through batchKeyRefusal.
@@ -67,6 +69,7 @@ import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
+import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
@@ -148,6 +151,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         const odps = odpsWriteRefusal(key, e.value, (await storage.getMemory(gaii, key))?.value);
         if (odps) { preFailed.push({ key, status: 'failed', reason: `${odps.code}: ${odps.message}` }); continue; }
       }
+      const legacyPacing = legacyPacingWriteRefusal(key, e.value);
+      if (legacyPacing) { preFailed.push({ key, status: 'failed', reason: `${legacyPacing.code}: ${legacyPacing.message}` }); continue; }
       // storage_ref integrity (parity with the single POST /v1/memory): a value pointing at a stored file
       // must name an existing one. The getStorageFile lookup runs ONLY for storage_ref entries, so a
       // normal bulk write (no storage_refs) pays nothing.
@@ -322,6 +327,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         const odps = odpsWriteRefusal(key, (entry as { value?: unknown }).value, (await storage.getMemory(gaii, key))?.value);
         if (odps) { failed.push({ key, reason: `${odps.code}: ${odps.message}` }); continue; }
       }
+      const legacyPacing = legacyPacingWriteRefusal(key, (entry as { value?: unknown }).value);
+      if (legacyPacing) { failed.push({ key, reason: `${legacyPacing.code}: ${legacyPacing.message}` }); continue; }
       const refRefusal = await storageReferenceRefusal(storage, gaii, entry.value);
       if (refRefusal) { failed.push({ key, reason: refRefusal }); continue; }
       survivors.push({ key, entry });
@@ -632,6 +639,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const existing = await storage.getMemory(callerGaii, key);
     const odps = odpsWriteRefusal(key, sourceRecord.value, existing?.value);
     if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
+    const legacyPacing = legacyPacingWriteRefusal(key, sourceRecord.value);
+    if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
     const newVersion = existing ? existing.version + 1 : 1;
 
     // The copy keeps its source's classification (never lower), set before the bytes land so the
