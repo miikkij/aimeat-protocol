@@ -47,6 +47,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -145,9 +146,10 @@ async function agent(o: Owner, name: string, scopes: string[]): Promise<Agent> {
   assert(tok.body.ok === true, `agent token ${name}: ${JSON.stringify(tok.body.error)}`);
   const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `classification ${name}`, redirect_uris: [] }) });
   const ats = new Date().toISOString();
-  const params = new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii, signature: await sign(key, gaii + NODE_ID + ats), timestamp: ats });
+  const pkce = mcpPkce(BASE);
+  const params = new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii, signature: await sign(key, gaii + NODE_ID + ats), timestamp: ats, ...authorizeParams(pkce) });
   const code = await json(`/v1/mcp/authorize?${params}`);
-  const mt = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: code.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }) });
+  const mt = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: code.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }) });
   assert(mt.status === 200, `mcp token ${name}: ${mt.status} ${JSON.stringify(mt.body)}`);
   const mcp: Session = { token: mt.body.access_token, sessionId: '', nextId: 1 };
   await rpc(mcp, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'classification e2e', version: '1.0.0' } });

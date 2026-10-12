@@ -48,6 +48,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
   return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -79,10 +80,11 @@ async function mcpSession(gaii: string, priv: string) {
   const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'Projection E2E', redirect_uris: [] }) });
   assert(reg.status === 201, `oauth register ${reg.status}`);
   const ts = new Date().toISOString();
-  const q = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await sign(priv, gaii + NODE_ID + ts), timestamp: ts });
+  const pkce = mcpPkce(BASE);
+  const q = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature: await sign(priv, gaii + NODE_ID + ts), timestamp: ts, ...authorizeParams(pkce) });
   const code = (await json(`/v1/mcp/authorize?${q}`)).body.code;
   assert(typeof code === 'string', 'authorize returned no code');
-  const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+  const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret, ...tokenParams(pkce) }) });
   assert(tok.status === 200, `token ${tok.status}`);
   let sessionId = ''; let id = 0;
   const rpc = async (method: string, params: Record<string, unknown> = {}, notify = false) => {

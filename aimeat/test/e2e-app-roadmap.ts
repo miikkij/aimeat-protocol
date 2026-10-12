@@ -18,6 +18,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { registerAllTools } from '../src/cli/connect/mcp/tools/index.js';
@@ -367,10 +368,12 @@ await test('node MCP publishes and promotes shared apps with the person behind t
     const timestamp = new Date().toISOString();
     const signature = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + NODE_ID + timestamp),
         Buffer.from(agent.body.data.private_key, 'base64'))).toString('base64');
-    const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, timestamp, signature });
+    const pkce = mcpPkce(BASE);
+    const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, timestamp, signature, ...authorizeParams(pkce) });
     const approval = await json(`/v1/mcp/authorize?${params}`);
     const token = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
         grant_type: 'authorization_code', code: approval.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret,
+        ...tokenParams(pkce),
     }) });
     assert(typeof token.body.access_token === 'string', 'MCP authorization succeeded');
     const client = new Client({ name: 'roadmap-audit', version: '1.0.0' });

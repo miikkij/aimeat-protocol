@@ -29,6 +29,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -442,12 +443,14 @@ async function callTool(s: McpSession, name: string, args: Record<string, unknow
 async function mcpSessionFor(agent: Agent): Promise<McpSession> {
   const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'agent stop e2e', redirect_uris: [] }) });
   const ts = new Date().toISOString();
+  const pkce = mcpPkce(BASE);
   const params = new URLSearchParams({
     response_type: 'code', client_id: client.body.client_id, gaii: agent.gaii,
     signature: await signMsg(agent.priv, agent.gaii + NODE_ID + ts), timestamp: ts,
+    ...authorizeParams(pkce),
   });
   const authz = await json(`/v1/mcp/authorize?${params}`);
-  const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }) });
+  const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }) });
   assert(tok.status === 200, `mcp token ${tok.status}: ${JSON.stringify(tok.body)}`);
   const s: McpSession = { token: tok.body.access_token, sessionId: '', nextId: 1 };
   await rpc(s, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'agent stop e2e', version: '1.0.0' } });

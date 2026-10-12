@@ -56,6 +56,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
@@ -278,12 +279,14 @@ await test("The operator's agent reads the same federation over MCP", async () =
     assert(client.status === 201, `mcp register: ${client.status}`);
 
     const ts = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: client.body.client_id,
         gaii,
         signature: await signMsg(agent.body.data.private_key, gaii + NODE_ID + ts),
         timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${params}`);
     assert(typeof auth.body.code === 'string', `authorize: ${JSON.stringify(auth.body)}`);
@@ -292,6 +295,7 @@ await test("The operator's agent reads the same federation over MCP", async () =
         body: JSON.stringify({
             grant_type: 'authorization_code', code: auth.body.code,
             client_id: client.body.client_id, client_secret: client.body.client_secret,
+            ...tokenParams(pkce),
         }),
     });
     assert(tok.status === 200, `mcp token: ${tok.status}`);

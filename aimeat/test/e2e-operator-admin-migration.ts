@@ -24,7 +24,7 @@
  *   v1.0.0 — 2026-09-25 — Initial.
  */
 import * as ed from '@noble/ed25519';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -33,6 +33,7 @@ import { join } from 'node:path';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 import { TOOL_SCOPES } from '../src/tool-catalog/scopes.js';
 
@@ -244,17 +245,16 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
     const agent: Agent = { name: 'claude', gaii: made.body.data.agent.gaii, key: made.body.data.private_key };
     const full = await json('/v1/agents/claude/scopes', { method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({ scopes: ['*'] }) });
     assert(full.status === 200, `"Full access" ${full.status}: ${JSON.stringify(full.body.error)}`);
-    const verifier = randomBytes(32).toString('base64url');
-    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const pkce = mcpPkce(BASE);
     const consent = await json('/v1/mcp/authorize-consent', {
         method: 'POST',
-        body: JSON.stringify({ client_id: clientId, client_name: 'Claude', redirect_uri: REDIRECT, state: 'e2e', gaii: agent.gaii, owner_token: owner.token, code_challenge: challenge }),
+        body: JSON.stringify({ client_id: clientId, client_name: 'Claude', redirect_uri: REDIRECT, state: 'e2e', gaii: agent.gaii, owner_token: owner.token, ...authorizeParams(pkce) }),
     });
     assert(typeof consent.body.redirect_url === 'string', `consent ${consent.status}: ${JSON.stringify(consent.body)}`);
     const code = new URL(consent.body.redirect_url).searchParams.get('code') ?? '';
     const tok = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: clientId, client_secret: clientSecret, redirect_uri: REDIRECT, code_verifier: verifier }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: clientId, client_secret: clientSecret, redirect_uri: REDIRECT, ...tokenParams(pkce) }),
     });
     assert(typeof tok.body.access_token === 'string' && typeof tok.body.refresh_token === 'string', `token exchange: ${JSON.stringify(tok.body)}`);
     return { agent, access: tok.body.access_token, refresh: tok.body.refresh_token, clientId, clientSecret };
