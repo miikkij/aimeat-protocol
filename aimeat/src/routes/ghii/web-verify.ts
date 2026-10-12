@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-12 — Both agent mints (verify-email, magic-link/verify) carry a session id and
+ *     write its session row (mintVerifiedAgentToken), so deleting the agent revokes the token
+ *     (Core 2026-11 ID-10).
  *   v1.13.0 — 2026-10-09 — GET /v1/ghii/magic-link/verify no longer re-keys the owner and no longer
  *     returns owner_private_key: that key signs in as the owner and operator, past two-step sign-in,
  *     which a clicked link must not grant (secrets audit 2026-10-09, S2).
@@ -54,7 +57,7 @@ import { logger } from '../../utils/logger.js';
 import { sendLoginLink, LOGIN_LINK_TTL_MS, redeemLoginLink } from '../../services/login-link.js';
 import { registerLoginLinkOpenRoute } from './login-link-open.js';
 import { validateOwnerName, buildGAII } from '../../utils/gaii.js';
-import { issueJWT } from '../../auth/jwt.js';
+import { generateSessionId, issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
@@ -62,6 +65,39 @@ import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invit
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { registrationRefusal, creditWelcomeBonus } from '../../services/owner-provisioning.js';
+
+/**
+ * The agent credential both mailbox proofs hand out (a verified e-mail code, a clicked sign-in link):
+ * the agent's own scopes (audit H-1), exactly the role 'agent' (audit H-2), and a session id with its
+ * session row. The row is what makes the token revocable: deleting the agent revokes its sessions by
+ * GAII (routes/agents/management.ts), and a token with no `jti` named no session, so it kept working
+ * until it expired (Core 2026-11 ID-10). Device authorization and POST /v1/auth/token write the same row.
+ */
+async function mintVerifiedAgentToken(
+    storage: Storage,
+    config: AimeatConfig,
+    agent: { gaii: string; defaultScopes?: string[] },
+    ownerName: string,
+): Promise<string> {
+    const sessionId = generateSessionId();
+    const issuedAt = new Date();
+    const roles = ['agent'];
+    const token = await issueJWT({
+        sub: agent.gaii,
+        owner: ownerName,
+        node: config.nodeId,
+        roles,
+        scopes: agent.defaultScopes ?? config.defaultAgentScopes,
+    }, config.jwtTtlSeconds, sessionId);
+    await storage.createSession({
+        sessionId,
+        gaii: agent.gaii,
+        owner: ownerName,
+        issuedAt: issuedAt.toISOString(),
+        expiresAt: new Date(issuedAt.getTime() + config.jwtTtlSeconds * 1000).toISOString(),
+    });
+    return token;
+}
 
 export function registerWebVerifyRoutes(
     router: Router,
@@ -410,16 +446,9 @@ export function registerWebVerifyRoutes(
         // 'owner' + 'operator' mints an unscoped operator PAT at POST /v1/access/tokens. Nothing reads
         // this token as an owner session either: the SDK auth modal discards it and runs a password
         // login (src/static/sdk-libs/auth/modal.js), and no SPA view fetches this route.
-        const roles = ['agent'];
         // BR-04 was asked above, before the first write. An emailed code must not resurrect a
         // credential in the name of an account the organisation has switched off.
-        const token = await issueJWT({
-            sub: agent.gaii,
-            owner: record.ownerName,
-            node: config.nodeId,
-            roles,
-            scopes: agent.defaultScopes ?? config.defaultAgentScopes,
-        }, config.jwtTtlSeconds);
+        const token = await mintVerifiedAgentToken(storage, config, agent, record.ownerName);
 
         // SECURITY: Prevent caching of response containing private key
         res.set('Cache-Control', 'no-store');
@@ -549,15 +578,8 @@ export function registerWebVerifyRoutes(
         // SECURITY (audit H-2): and the same again for the roles. A clicked link proves control of a
         // mailbox; it does not make the holder the account's owner or the node's operator, and those
         // are ROLES, which no scope list narrows.
-        const roles = ['agent'];
         // BR-04 was asked above, before the re-key. Same refusal as the verify-email mint.
-        const jwtToken = await issueJWT({
-            sub: agent.gaii,
-            owner: record.ownerName,
-            node: config.nodeId,
-            roles,
-            scopes: agent.defaultScopes ?? config.defaultAgentScopes,
-        }, config.jwtTtlSeconds);
+        const jwtToken = await mintVerifiedAgentToken(storage, config, agent, record.ownerName);
 
         // SECURITY: Prevent caching of response containing private keys
         res.set('Cache-Control', 'no-store');

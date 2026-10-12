@@ -15,10 +15,16 @@
  *
  *   The last test is the one that keeps the fix honest: revocation must reach exactly the deleted
  *   agent's sessions and not the sibling standing next to it.
+ *
+ *   Two more mint paths and one more replay (Core 2026-11): the agent token POST /v1/ghii/verify-email
+ *   hands out dies with the agent (ID-10), and one signature renews an agent token once (AUTH-11).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-token-revocation
  * @version-history
+ *   v1.1.0 — 2026-10-12 — A renewal signature works once (AUTH-11); the e-mail verification token dies
+ *     with its agent (ID-10).
  *   v1.0.0 — 2026-08-13 — Initial, with the fix.
  */
+import { seedEmailVerification } from './helpers/verified-email.js';
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
@@ -134,6 +140,37 @@ async function run() {
     await test('the sibling agent is untouched', async () => {
         const r = await stillWorks(bystander.token);
         assert(r.ok, `deleting one agent must not sign out another, got ${r.status}`);
+    });
+
+    // AUTH-11. The renewal checks the signature and its five-minute window; without spending it, the
+    // same signed body minted a fresh token for whoever replayed it inside that window.
+    await test('AUTH-11: a renewal signature mints one token — the second send of the same body is refused', async () => {
+        const ts = new Date().toISOString();
+        const body = JSON.stringify({ gaii: bystander.gaii, timestamp: ts, signature: await sign(bystander.privateKey, bystander.gaii + ts) });
+        const first = await json('/v1/auth/token', { method: 'POST', body });
+        assert(first.status === 200, `first renewal ${first.status}: ${JSON.stringify(first.body?.error)}`);
+        const second = await json('/v1/auth/token', { method: 'POST', body });
+        assert(second.status === 401, `the replayed signature must be refused, got ${second.status}: ${JSON.stringify(second.body?.data ?? second.body?.error)}`);
+    });
+
+    // ID-10. The e-mail verification door hands out a token for the account's "app" agent. It carried
+    // no session id and wrote no session row, so deleting that agent left the token working.
+    await test('ID-10: the token e-mail verification hands out dies when its agent is deleted', async () => {
+        const code = '482915';
+        const verificationId = await seedEmailVerification(o.owner, `${o.owner}@example.test`, code);
+        const v = await json('/v1/ghii/verify-email', { method: 'POST', body: JSON.stringify({ verification_id: verificationId, code }) });
+        assert(v.status === 200, `verify-email ${v.status}: ${JSON.stringify(v.body?.error)}`);
+        const verifyToken = v.body.data.token as string;
+        // GET /v1/ghii/me needs a credential and no permission word: the "app" agent this door creates
+        // holds no scopes of its own, so a memory read would be refused for that reason instead.
+        const probe = () => json('/v1/ghii/me', { headers: { Authorization: `Bearer ${verifyToken}` } });
+        const before = await probe();
+        assert(before.status === 200, `the verification token authenticates before the agent is deleted, got ${before.status} ${JSON.stringify(before.body?.error)}`);
+        const name = String(v.body.data.agent.gaii).split('#')[0];
+        const del = await json(`/v1/agents/${encodeURIComponent(name)}`, { method: 'DELETE', headers: auth });
+        assert(del.status === 200, `delete ${name}: ${del.status}`);
+        const after = await probe();
+        assert(after.status === 401, `a deleted agent's verification token must not authenticate, got ${after.status}`);
     });
 
     // A second owner for the two session-scope tests: the first one is about to sign itself out.

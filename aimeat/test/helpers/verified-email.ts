@@ -15,9 +15,14 @@
  *   import { markEmailVerified } from './helpers/verified-email.js';
  *   await markEmailVerified('alice', 'alice@example.test');
  *   await markEmailVerified('alice', 'alice@example.test', { sqlitePath });   // a suite's own node
+ *
+ *   seedEmailVerification() writes a pending verification with a code the suite knows, for a suite
+ *   whose subject is what POST /v1/ghii/verify-email hands out (e2e-agent-token-revocation).
  * @version-history
+ *   v1.1.0 — 2026-10-12 — seedEmailVerification() (Core 2026-11 ID-10).
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 follow-up, A1).
  */
+import { createHash, randomBytes } from 'node:crypto';
 import { createStorage, type StorageProvider } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { emailHashOf } from '../../src/services/owner-provisioning.js';
@@ -64,4 +69,26 @@ export async function markEmailVerified(username: string, email: string, opts: {
     // address-book entries naming it become this person, and app roster invitations to it apply.
     await promoteContactsForVerifiedEmail(storage, emailHashOf(clean), ghii);
     await applyAppInvitesForVerifiedEmail(storage, nodeId, emailHashOf(clean), ghii);
+}
+
+/**
+ * Write a pending registration verification for `username` with `code`, as POST /v1/ghii/register-web
+ * writes one before it mails the code. Returns the verification id POST /v1/ghii/verify-email takes.
+ */
+export async function seedEmailVerification(username: string, email: string, code: string, opts: { sqlitePath?: string } = {}): Promise<string> {
+    const storage = await storageFor(opts.sqlitePath);
+    const id = randomBytes(16).toString('hex');
+    await storage.createEmailVerification({
+        id,
+        ownerName: username,
+        emailHash: emailHashOf(email.trim().toLowerCase()),
+        code: createHash('sha256').update(code).digest('hex'),
+        purpose: 'registration',
+        status: 'pending',
+        attempts: 0,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+        verifiedAt: null,
+    });
+    return id;
 }

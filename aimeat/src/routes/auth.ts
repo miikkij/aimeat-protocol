@@ -10,6 +10,8 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.12.0 -- 2026-10-12 -- POST /v1/auth/token spends an agent's signature on first use
+ *     (spendSignature), so a replay inside the five-minute window answers 401 (Core 2026-11 AUTH-11).
  *   v1.11.0 -- 2026-10-09 -- POST /v1/auth/refresh renews an ecosystem app only with a fresh signature
  *     by the key pinned at hello ({ timestamp, signature } over `<geai><timestamp>`), and only within a
  *     year of the owner's approval (`auth_time`, carried across refreshes); the renewed token keeps
@@ -76,7 +78,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
-import { signatureTimestampFresh } from '../auth/signed-request.js';
+import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
@@ -207,6 +209,13 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // Freshness, from auth/signed-request.ts, which is where the window's one number lives.
       if (!signatureTimestampFresh(timestamp)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Timestamp too old or too far in the future'));
+        return;
+      }
+      // Spent on first use, as on the MCP OAuth signature path and the ecosystem refresh: within the
+      // window above, a captured request body minted a fresh token every time it was sent again
+      // (Core 2026-11 AUTH-11). After the freshness check, so a stale signature is not remembered.
+      if (!spendSignature(signature)) {
+        res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'That signature has already been used. Sign a new timestamp.'));
         return;
       }
 

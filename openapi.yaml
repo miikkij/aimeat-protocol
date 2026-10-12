@@ -8126,6 +8126,8 @@ paths:
         received from device authorization. This is the sanctioned renewal path (RFC Core §6.2,
         step 6). On every mint the node checks that the agent still exists and that its owner's
         account is active, and it issues the scopes as the owner has them set at that moment.
+        The signature works once: sending the same signed body again answers `401 AUTH_REQUIRED`,
+        so a renewal signs a new timestamp each time.
 
         With `owner`, an owner logs in with an older Ed25519 key, signing
         `owner + node id + timestamp`. That form is the legacy owner-key login (RFC Core §9);
