@@ -31,6 +31,10 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-connections and e2e-ai-jobs use to put a real counterparty on the machine.
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The two agents hold ext:invoke, the word node 4.0.0 asks on POST
+ *     /v1/ext/:name/:action (REST scope gates). There the route refused both agents with a
+ *     SCOPE_DENIED for ext:invoke in the HTTP error, so the extension's own memory:write refusal, the
+ *     agent send and the agent read were never reached.
  *   v1.1.0 — 2026-09-06 — The secret is resolved by the PLATFORM now (ctx.fetch reads the owner's
  *     vault first and this extension's `secrets` config second), so what this suite proves about
  *     the secret is unchanged and where the value comes from is not: the operator's shared map is
@@ -288,8 +292,10 @@ await test('a guest is refused at the door, before any script runs', async () =>
     assert(rr.status === 401, `expected 401 on read, got ${rr.status}`);
 });
 
-const readOnlyAgent = await mintAgentToken(owner, 'lh-reader', ['memory:read']);
-const writeAgent = await mintAgentToken(owner, 'lh-writer', ['memory:read', 'memory:write']);
+// Both hold ext:invoke, the word POST /v1/ext/:name/:action asks from 4.0.0, so the refusal below is
+// the extension's own memory:write check and never a refusal at the action route.
+const readOnlyAgent = await mintAgentToken(owner, 'lh-reader', ['memory:read', 'ext:invoke']);
+const writeAgent = await mintAgentToken(owner, 'lh-writer', ['memory:read', 'memory:write', 'ext:invoke']);
 
 await test('an agent without memory:write may not send, and the refusal says which word is missing', async () => {
     deliveries.length = 0;

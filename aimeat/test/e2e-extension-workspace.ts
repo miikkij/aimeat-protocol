@@ -21,6 +21,9 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.6.0 — 2026-10-12 — B's two agents also hold ext:invoke, the word node 4.0.0 asks on POST
+ *     /v1/ext/:name/:action (REST scope gates), so the happy path runs there and the memory:write
+ *     refusal is still the SCOPE_DENIED that names memory:write.
  *   v1.5.0 — 2026-10-09 — The surface lists archiveRecords (proved in e2e-extension-workspace-batch.ts).
  *     Went red on ad003ac26 until updated, as it is meant to.
  *   v1.4.0 — 2026-10-08 — The surface lists appendRows and readRows (proved in e2e-extension-rows.ts).
@@ -142,8 +145,8 @@ const manifest = (name: string, extra: Record<string, unknown>, limits: Record<s
 let A!: Awaited<ReturnType<typeof setupOwner>>;   // installs the extensions, creates the organism
 let B!: Awaited<ReturnType<typeof setupOwner>>;   // a member with a contributor grant; the CALLER
 let D!: Awaited<ReturnType<typeof setupOwner>>;   // a stranger
-let bAgentToken = '';      // B's agent, memory:write + organism:read
-let bReaderToken = '';     // B's agent, organism:read only
+let bAgentToken = '';      // B's agent, memory:write + organism:read (+ ext:invoke)
+let bReaderToken = '';     // B's agent, organism:read only (+ ext:invoke)
 const B_AGENT = 'wsagent';
 let orgId = '';
 const WS = 'wsclaims';
@@ -154,8 +157,10 @@ const invoke = (ext: string, action: string, token: string, input: Record<string
 
 await test('Setup: three owners, B\'s two agents (one may write, one may only read)', async () => {
     A = await setupOwner('a'); B = await setupOwner('b'); D = await setupOwner('d');
-    bAgentToken = await mintAgentToken(B, B_AGENT, ['memory:read', 'memory:write', 'organism:read']);
-    bReaderToken = await mintAgentToken(B, 'wsreader', ['memory:read', 'organism:read']);
+    // ext:invoke is the word POST /v1/ext/:name/:action asks from 4.0.0; both agents hold it, so each
+    // refusal below is the one its test names and never a refusal at the action route.
+    bAgentToken = await mintAgentToken(B, B_AGENT, ['memory:read', 'memory:write', 'organism:read', 'ext:invoke']);
+    bReaderToken = await mintAgentToken(B, 'wsreader', ['memory:read', 'organism:read', 'ext:invoke']);
 });
 
 await test('Setup: A\'s organism, a workspace with a locked claim schema, B joins and gets contributor', async () => {

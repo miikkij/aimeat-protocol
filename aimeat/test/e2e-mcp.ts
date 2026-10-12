@@ -5,6 +5,9 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.6.0 -- 2026-10-12 -- MCP-06 (a code without PKCE) and MCP-07 (a foreign resource) ask the node
+ *     which release it runs (helpers/node-release.ts): 3.x asserts the issued code and the counter as
+ *     before; 4.0.0 asserts 400 invalid_request / invalid_target, no code, and no counter move.
  *   v1.5.0 -- 2026-10-12 -- Every authorization request outside Phase 13 sends PKCE (S256) and the
  *     resource, and every code redemption sends the verifier (helpers/mcp-oauth-pkce.ts), so each
  *     refusal these tests assert is still the one reached when 4.0.0 refuses a request without them.
@@ -70,6 +73,8 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams, type McpPkce } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MCP_OAUTH_LAX_REMOVED_IN } from '../src/mcp/oauth-binding.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -1232,9 +1237,10 @@ await test('An unknown client_id cannot reach the consent door either', async ()
 });
 
 // ─── Phase 13: PKCE and the resource indicator (Core 2026-11 MCP-06, MCP-07) ───
-// This node runs 3.x, so a client without PKCE or a resource still gets a code, and each such code
-// is counted. Every access token names the MCP endpoint as its audience. The 4.0.0 refusals are
-// proved by test/unit/mcp-oauth-binding.test.ts, which runs the same routes with the version at 4.0.0.
+// On a 3.x node a client without PKCE or a resource still gets a code, and each such code is
+// counted. Every access token names the MCP endpoint as its audience. The 4.0.0 refusals are proved
+// by test/unit/mcp-oauth-binding.test.ts, which runs the same routes with the version at 4.0.0, and
+// here when the test node runs as 4.0.0 (AIMEAT_TEST_SOFTWARE_VERSION).
 console.log('\nPhase 13 — PKCE and the resource indicator');
 
 function pkce(): { verifier: string; challenge: string } {
@@ -1298,10 +1304,17 @@ await test('MCP-06: a token request with the wrong verifier is refused', async (
     assert(t.status === 400 && t.body.error === 'invalid_grant', `expected invalid_grant, got ${t.status} ${JSON.stringify(t.body)}`);
 });
 
-await test('MCP-06: on 3.x a code without PKCE is still issued, counted, and its token is still bound', async () => {
+await test('MCP-06: on 3.x a code without PKCE is still issued, counted, and its token is still bound; on 4.0.0 it is 400 invalid_request and nothing is counted', async () => {
     const before = await legacyUses('no_pkce');
     const noResource = await legacyUses('no_resource');
     const a = await signedAuthorize({});
+    if (await removedOn(BASE, MCP_OAUTH_LAX_REMOVED_IN)) {
+        assert(a.status === 400 && a.body.error === 'invalid_request', `4.0.0 authorize: ${a.status} ${JSON.stringify(a.body)}`);
+        assert(a.body.code === undefined, `4.0.0: a code was issued: ${JSON.stringify(a.body)}`);
+        assert(await legacyUses('no_pkce') === before, `4.0.0: no_pkce counter moved from ${before}`);
+        assert(await legacyUses('no_resource') === noResource, `4.0.0: no_resource counter moved from ${noResource}`);
+        return;
+    }
     assert(a.status === 200, `authorize: ${a.status} ${JSON.stringify(a.body)}`);
     const t = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
         grant_type: 'authorization_code', code: a.body.code, client_id: clientId, client_secret: clientSecret,
@@ -1312,10 +1325,16 @@ await test('MCP-06: on 3.x a code without PKCE is still issued, counted, and its
     assert(await legacyUses('no_resource') === noResource + 1, `no_resource counter did not move from ${noResource}`);
 });
 
-await test('MCP-07: on 3.x a resource that is not this node\'s MCP endpoint is counted, and the token names the MCP endpoint', async () => {
+await test('MCP-07: on 3.x a resource that is not this node\'s MCP endpoint is counted, and the token names the MCP endpoint; on 4.0.0 it is 400 invalid_target and nothing is counted', async () => {
     const before = await legacyUses('unknown_resource');
     const { verifier, challenge } = pkce();
     const a = await signedAuthorize({ code_challenge: challenge, code_challenge_method: 'S256', resource: 'https://other.example/v1/mcp' });
+    if (await removedOn(BASE, MCP_OAUTH_LAX_REMOVED_IN)) {
+        assert(a.status === 400 && a.body.error === 'invalid_target', `4.0.0 authorize: ${a.status} ${JSON.stringify(a.body)}`);
+        assert(a.body.code === undefined, `4.0.0: a code was issued: ${JSON.stringify(a.body)}`);
+        assert(await legacyUses('unknown_resource') === before, `4.0.0: unknown_resource counter moved from ${before}`);
+        return;
+    }
     assert(a.status === 200, `authorize: ${a.status} ${JSON.stringify(a.body)}`);
     const t = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
         grant_type: 'authorization_code', code: a.body.code, client_id: clientId, client_secret: clientSecret, code_verifier: verifier,

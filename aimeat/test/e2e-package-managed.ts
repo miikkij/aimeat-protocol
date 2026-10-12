@@ -18,6 +18,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-managed
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 1).
+ *   v1.1.0 — 2026-10-12 — The installer's agent also holds packages:read, the word node 4.0.0 asks
+ *     for aimeat_package_instances and GET /v1/instances (REST scope gates); without it the tool was
+ *     not on the agent's MCP surface there.
  */
 
 import * as ed from '@noble/ed25519';
@@ -172,7 +175,8 @@ await test('Three owners and an agent of the installer', async () => {
     author = await makeOwner('pmauthor');
     installer = await makeOwner('pminstall');
     stranger = await makeOwner('pmstranger');
-    const agent = await makeAgent(installer, ['packages:write', 'app:write', 'memory:read']);
+    // packages:read is the word aimeat_package_instances asks from 4.0.0 (REST scope gates).
+    const agent = await makeAgent(installer, ['packages:write', 'packages:read', 'app:write', 'memory:read']);
     agentSession = await openSession(agent.token);
     assert(!!agentSession.sessionId, 'the agent has an MCP session');
 });

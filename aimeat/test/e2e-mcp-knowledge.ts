@@ -7,6 +7,9 @@
  *   v1.0.0 — 2026-03-21 — Initial creation
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: the manifest index line is written once per
  *     entry and through the shared memory write, and the reserved-package refusal is covered.
+ *   v1.2.0 — 2026-10-12 — The REST imports and the link (tests 3 and 12) use the agent's own token
+ *     from POST /v1/auth/token; the MCP OAuth token stays on /v1/mcp, because node 4.0.0 refuses it
+ *     on a REST route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN).
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-knowledge.ts
@@ -109,6 +112,9 @@ async function mcpRpc(method: string, params: Record<string, any> = {}, id: numb
 let ownerToken = '';
 let agentPrivKey = '';
 let agentGaii = '';
+// The agent's own REST token. The MCP OAuth token stays on /v1/mcp: node 4.0.0 refuses it on a
+// REST route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN).
+let agentRestToken = '';
 const ownerName = `mcpkwl${Date.now()}`;
 const agentName = 'mcpkwlagent';
 
@@ -157,6 +163,17 @@ await test('Register agent', async () => {
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentGaii = body.data.agent.gaii;
     agentPrivKey = body.data.private_key;
+});
+
+await test('Agent REST token (gaii + signature over gaii + timestamp)', async () => {
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(agentPrivKey, agentGaii + timestamp);
+    const { status, body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: agentGaii, timestamp, signature }),
+    });
+    assert(status === 200 && body.ok === true, `agent token ${status}: ${JSON.stringify(body.error)}`);
+    agentRestToken = body.data.token;
 });
 
 await test('OAuth client registration', async () => {
@@ -249,7 +266,7 @@ await test('2. List returns empty array initially', async () => {
 await test('3. Import knowledge package via HTTP API (using agent token)', async () => {
     const { status, body } = await json('/v1/knowledge/import', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${mcpToken}` },
+        headers: { Authorization: `Bearer ${agentRestToken}` },
         body: JSON.stringify({
             package: {
                 type: 'knowledge-package',
@@ -422,7 +439,7 @@ await test('12. Create a link via HTTP API then read via MCP', async () => {
     // First import a second package to link to (use agent token so it stores under agent GAII)
     const { status: importStatus, body: importBody } = await json('/v1/knowledge/import', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${mcpToken}` },
+        headers: { Authorization: `Bearer ${agentRestToken}` },
         body: JSON.stringify({
             package: {
                 type: 'knowledge-package',
@@ -450,7 +467,7 @@ await test('12. Create a link via HTTP API then read via MCP', async () => {
     // Create link from first package to second
     const { status: linkStatus } = await json(`/v1/knowledge/${packageId}/link`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${mcpToken}` },
+        headers: { Authorization: `Bearer ${agentRestToken}` },
         body: JSON.stringify({
             target: `packages/${linkedPackageId}/manifest`,
             relation: 'related-to',

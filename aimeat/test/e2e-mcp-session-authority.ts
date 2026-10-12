@@ -6,6 +6,9 @@
  *   principal and honors scope removal without changing the existing E2E expectations.
  * @version-history
  *   v1.0.0 -- 2026-09-27 -- Added session bearer, cross-owner and live-scope regressions.
+ *   v1.1.0 -- 2026-10-12 -- The two REST writes (the setup record and the live-scope 403) use the
+ *     agent's own token from POST /v1/auth/token; node 4.0.0 refuses the MCP OAuth token on a REST
+ *     route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN), which hid the 403 the test names.
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -99,7 +102,14 @@ async function agent(account: Awaited<ReturnType<typeof owner>>, name: string) {
     ...tokenParams(pkce),
   });
   assert.equal(token.status, 200, 'agent credential');
-  return { name, gaii, token: token.body.access_token as string,
+  // The agent's own REST token: node 4.0.0 refuses the MCP OAuth token on a REST route (401
+  // INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN), so the MCP token stays on the MCP endpoints.
+  const restTime = new Date().toISOString();
+  const restLogin = await rest('/v1/auth/token', 'POST', undefined, {
+    gaii, timestamp: restTime, signature: await sign(registration.body.data.private_key, gaii + restTime),
+  });
+  assert.equal(restLogin.status, 200, 'agent REST credential');
+  return { name, gaii, token: token.body.access_token as string, restToken: restLogin.body.data.token as string,
     refresh: token.body.refresh_token as string, client: client.body };
 }
 
@@ -109,7 +119,7 @@ const actor = await agent(first, 'actor');
 const sibling = await agent(first, 'sibling');
 const foreign = await agent(second, 'actor');
 const key = 'session.authority.private';
-assert.equal((await rest('/v1/memory', 'POST', actor.token, { key, value: { marker: 'private' }, visibility: 'private' })).status, 201);
+assert.equal((await rest('/v1/memory', 'POST', actor.restToken, { key, value: { marker: 'private' }, visibility: 'private' })).status, 201);
 const call = { name: 'aimeat_memory_read', arguments: { key } };
 
 for (const path of ['/v1/mcp', '/v2/mcp/agent']) {
@@ -149,7 +159,7 @@ await test('An open session loses a removed scope, in discovery and execution', 
   const before = await rpc(session, 'tools/list');
   assert.ok(before.body.result.tools.some((tool: { name: string }) => tool.name === 'aimeat_memory_write'));
   assert.equal((await rest(`/v1/agents/${actor.name}/scopes`, 'PATCH', first.token, { scopes: ['catalogue:read'] })).status, 200);
-  assert.equal((await rest('/v1/memory', 'POST', actor.token, { key: key + '.rest', value: 'denied' })).status, 403);
+  assert.equal((await rest('/v1/memory', 'POST', actor.restToken, { key: key + '.rest', value: 'denied' })).status, 403);
   const after = await rpc(session, 'tools/list');
   assert.equal(after.status, 200, 'session remains usable after permission removal');
   assert.ok(!after.body.result.tools.some((tool: { name: string }) => tool.name === 'aimeat_memory_write'));

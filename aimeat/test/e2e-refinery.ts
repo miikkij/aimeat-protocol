@@ -29,6 +29,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-refinery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-refinery.ts
  * @version-history
+ *   v1.0.2 — 2026-10-12 — 6a: the two agents that create a refinery schedule hold task:write, the
+ *     word node 4.0.0 asks on POST /v1/schedules (REST scope gates), so the mailbox 404 and the
+ *     organism:rows refusal are still what the test proves there.
  *   v1.0.1 — 2026-10-09 — The mailbox round starts as the owner's browser does and finishes with its
  *     cookie (secrets audit 2026-10-09, chapter 2).
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
@@ -414,9 +417,12 @@ async function row(owner: Owner, org: string, ws: string, id: string): Promise<a
     assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `bad prefix ${bad.status} ${bad.body.error?.code}`);
     const none = await mk(A.token, { prefix: 'nothere' });
     assert(none.status === 404, `no definition ${none.status}`);
-    const byAgent = await mk(agentAll, { prefix: 'mt' });
+    // POST /v1/schedules asks task:write from 4.0.0 (REST scope gates). Both agents here hold it, so
+    // the refusals are the ones this test names: the owner's mailbox, and organism:rows.
+    const schedAll = await connectAgent(A, `refschedall${Date.now()}`, ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write', 'memory:read', 'task:write']);
+    const byAgent = await mk(schedAll, { prefix: 'mt' });
     assert(byAgent.status === 404 && byAgent.body.error?.code === 'NOT_FOUND', `an agent on its owner's mailbox ${byAgent.status}`);
-    const narrow = await connectAgent(A, `refschednarrow${Date.now()}`, ['connections:read-through', 'memory:write']);
+    const narrow = await connectAgent(A, `refschednarrow${Date.now()}`, ['connections:read-through', 'memory:write', 'task:write']);
     const scoped = await mk(narrow, { prefix: 'mt' });
     assert(scoped.status === 403 && scoped.body.error?.code === 'SCOPE_DENIED', `a narrow agent ${scoped.status}`);
     assert(String(scoped.body.error?.message).includes('organism:rows'), `the refusal names the missing word: ${scoped.body.error?.message}`);

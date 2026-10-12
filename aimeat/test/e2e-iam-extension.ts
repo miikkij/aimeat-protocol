@@ -16,6 +16,9 @@
  *   v1.3.0 — 2026-10-01 — Tests 12 and 13 (audit 2026-10-01, defect A): on an UNCLAIMED install a
  *            different owner and that owner's agent are refused claim and every admin op and do not
  *            become owner; the installer, or the installer's own agent, claims as before.
+ *   v1.4.0 — 2026-10-12 — The agents hold ext:invoke as well, the word node 4.0.0 asks on the
+ *            extension action route (REST scope gates): there the agent tests were refused at the
+ *            route, and the stranger-agent refusals of tests 8 and 12 passed on that refusal.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-extension
 
@@ -52,8 +55,12 @@ async function setupOwner(label: string) {
 }
 const authH = (t: string) => ({ Authorization: `Bearer ${t}` });
 
-/** Connect an agent for `ownerName` via device authorization and return its token + full GAII. */
-async function setupAgent(agentName: string, ownerName: string, ownerToken: string, scopes: string[] = ['memory:read', 'memory:write']) {
+/**
+ * Connect an agent for `ownerName` via device authorization and return its token + full GAII. It
+ * holds ext:invoke, the word POST /v1/ext/:name/:action asks from 4.0.0, so a refusal the tests
+ * assert comes from the extension's own role check and never from the action route.
+ */
+async function setupAgent(agentName: string, ownerName: string, ownerToken: string, scopes: string[] = ['memory:read', 'memory:write', 'ext:invoke']) {
     const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: ownerName }) });
     assert(da.status === 200, `device-authorize ${da.status}: ${JSON.stringify(da.body)}`);
     const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: ownerToken }) });

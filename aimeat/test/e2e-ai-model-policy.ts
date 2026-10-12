@@ -19,6 +19,9 @@
  *   - 1-11: the eleven cases of 09 section 2, in that order
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-model-policy.ts
  * @version-history
+ *   v1.2.0 — 2026-10-12 — Test 13: policy-grant.html declares task:write in its aimeat-scopes meta and
+ *     the grant that makes the schedule asks ai:use task:write, because node 4.0.0 asks task:write on
+ *     POST /v1/schedules (REST scope gates); the grants of tests 9-12 still ask ai:use alone.
  *   v1.1.0 — 2026-10-05 — 7b: a call that names its model on a spent allowance is refused too
  *     (secaudit 2026-10, AI-1).
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
@@ -135,8 +138,8 @@ async function connectAgent(owner: Owner, agentName: string, scopes: string[]): 
   return t.body.token as string;
 }
 
-async function publish(owner: Owner, filename: string, meta = ''): Promise<any> {
-  const html = `<!DOCTYPE html><html><head>${meta}<meta name="aimeat-scopes" content="ai:use"></head><body>policy</body></html>`;
+async function publish(owner: Owner, filename: string, meta = '', scopes = 'ai:use'): Promise<any> {
+  const html = `<!DOCTYPE html><html><head>${meta}<meta name="aimeat-scopes" content="${scopes}"></head><body>policy</body></html>`;
   const pub = await json('/v1/apps', {
     method: 'POST', headers: auth(owner.token),
     body: JSON.stringify({ filename, content: b64(html), name: `Policy ${filename}`, description: 'model policy e2e probe', category: 'utility' }),
@@ -145,11 +148,11 @@ async function publish(owner: Owner, filename: string, meta = ''): Promise<any> 
   return pub.body.data;
 }
 
-/** An app-grant token for an already published app, with ai:use: the app as the node identifies it. */
-async function appGrantToken(owner: Owner, filename: string): Promise<string> {
+/** An app-grant token for an already published app, with ai:use (or `scope`): the app as the node identifies it. */
+async function appGrantToken(owner: Owner, filename: string, scope = 'ai:use'): Promise<string> {
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
-  const q = new URLSearchParams({ app: `${owner.name}/${filename}`, response_type: 'code', scope: 'ai:use',
+  const q = new URLSearchParams({ app: `${owner.name}/${filename}`, response_type: 'code', scope,
     redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' });
   const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
   const m = /req=([^&]+)/.exec(res.headers.get('location') ?? '');
@@ -307,7 +310,9 @@ const toolJson = (r: any) => JSON.parse(r?.result?.content?.[0]?.text ?? '{}');
       assert(bp.status === 200 && bp.body.data.policy.mode === 'open', `b reads its own policy: ${JSON.stringify(bp.body.data?.policy)}`);
       const r = await complete(b, { model: 'openai/gpt-4o-mini' });
       assert(r.status === 200, `a's policy does not bind b: ${r.status}`);
-      await publish(a, 'policy-grant.html');
+      // The app declares task:write beside ai:use so test 13 can make a schedule as it (POST
+      // /v1/schedules asks task:write from 4.0.0); every grant before test 13 asks ai:use alone.
+      await publish(a, 'policy-grant.html', '', 'ai:use task:write');
       const appToken = await appGrantToken(a, 'policy-grant.html');
       const byApp = await json('/v1/ai/policy', { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ policy: { mode: 'open' } }) });
       // The scope middleware or the route's own owner test, whichever an app meets first: both refuse.
@@ -370,7 +375,7 @@ const toolJson = (r: any) => JSON.parse(r?.result?.content?.[0]?.text ?? '{}');
     await test('13. a schedule the app makes fires as that app, and not at all once the app is revoked (secaudit 2026-10, AI-2/AI-3)', async () => {
       // Until 2026-10-05 an app's schedule was stored as the owner's and fired with the owner's
       // whole authority, after a revoke too.
-      const appToken = await appGrantToken(a, 'policy-grant.html');
+      const appToken = await appGrantToken(a, 'policy-grant.html', 'ai:use task:write');
       const made = await json('/v1/schedules', { method: 'POST', headers: auth(appToken), body: JSON.stringify({
         kind: 'ai', cron: '0 3 * * *', display_name: 'policy app schedule',
         prompt: 'Say one word.', model: 'stub/good-model', input_keys: [], output_key: 'policy-sched.answer',

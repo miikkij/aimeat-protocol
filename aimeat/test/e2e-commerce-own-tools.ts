@@ -10,6 +10,9 @@
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-commerce-own-tools
  * @version-history
  *   v1.0.0 — 2026-10-07 — Initial (wish-commerce-tool-catalog-includes-the-caller-s-own-unpriced-cal).
+ *   v1.1.0 — 2026-10-12 — The 4.0.0 forms: the offered tools declare their pacing as tollMorsels and
+ *     B's tool is checked by its toll_morsels (the price.morsels mirror is gone from the 4.0.0
+ *     catalog); A's agent holds ext:invoke, the word the backing extension action asks from 4.0.0.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -110,7 +113,7 @@ await test('setup: A has a free tool on an installed extension, a priced tool an
         { name: 'free_task', description: 'no binding, nothing to run', inputSchema: schema },
     ]);
     await putManifest(a, A_SHOP, 'public', [
-        { name: 'paid_call', description: 'A sells this', action_id: actionId, inputSchema: schema, price: { morsels: 3 } },
+        { name: 'paid_call', description: 'A sells this', action_id: actionId, inputSchema: schema, tollMorsels: 3 },
     ]);
     await putManifest(a, A_PRIVATE, 'private', [
         { name: 'hidden_call', description: 'a private manifest', action_id: actionId, inputSchema: schema },
@@ -119,9 +122,10 @@ await test('setup: A has a free tool on an installed extension, a priced tool an
         { name: 'b_free_call', description: 'B runs this for free', action_id: actionId, inputSchema: schema },
     ]);
     await putManifest(b, B_SHOP, 'public', [
-        { name: 'b_paid_call', description: 'B sells this', action_id: actionId, inputSchema: schema, price: { morsels: 2 } },
+        { name: 'b_paid_call', description: 'B sells this', action_id: actionId, inputSchema: schema, tollMorsels: 2 },
     ]);
-    aAgent = await agentOf(a, ['exchange:write']);
+    // ext:invoke: the word the tool's backing extension action asks from 4.0.0 (REST scope gates).
+    aAgent = await agentOf(a, ['exchange:write', 'ext:invoke']);
 });
 
 let anonymous: any[] = [];
@@ -167,7 +171,7 @@ await test('A\'s agent with include=own sees A\'s free callable tool once, marke
     assert(!tools.some(t => t.name === 'free_task'), 'an unpriced task tool has nothing to run and is not listed');
     assert(!tools.some(t => t.name === 'hidden_call'), 'a private manifest is not listed');
     const bPaid = tools.find(t => t.name === 'b_paid_call');
-    assert(!!bPaid && bPaid.own === undefined && bPaid.price?.morsels === 2, `B's priced tool as before: ${JSON.stringify(bPaid)}`);
+    assert(!!bPaid && bPaid.own === undefined && bPaid.toll_morsels === 2, `B's priced tool as before: ${JSON.stringify(bPaid)}`);
 });
 
 await test('SECURITY: A\'s agent never sees B\'s unpriced tool, and B sees B\'s own and not A\'s', async () => {

@@ -10,14 +10,20 @@
  *   session signed in with it, count nothing (their loopback request carries the node's pass,
  *   src/auth/loopback-pass.ts), and still refuse a session without the scope the route asks for.
  *   The 4.0.0 refusal is proved by test/unit/mcp-token-on-rest.test.ts, which runs the same code as
- *   4.0.0; a running node is the version its package says.
+ *   4.0.0, and by this suite on a test node run as 4.0.0 (AIMEAT_TEST_SOFTWARE_VERSION), where the
+ *   first test asserts the 401 INVALID_TOKEN refusal instead of the 3.x acceptance.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-token-rest
  * @version-history
+ *   v1.1.0 — 2026-10-12 — The first test asks the node which release it runs (helpers/node-release.ts):
+ *     3.x asserts the acceptance with the Deprecation headers and the count, as before; 4.0.0 asserts
+ *     401 INVALID_TOKEN with the removal message and the invalid_token challenge, and no count.
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-tokeni-ei-kelpaa-rest-reiteill-4-0-0-sta-ensin-kolme-mcp).
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { mcpPkce, authorizeParams, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { removedOn } from './helpers/node-release.js';
+import { MCP_TOKEN_ON_REST_MESSAGE, MCP_TOKEN_ON_REST_REMOVED_IN } from '../src/auth/mcp-token-on-rest.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -142,9 +148,18 @@ try {
     body: JSON.stringify({ key: 'apps.' + FILE + '.tools', visibility: 'public', value: { version: 1, tools: [tool] } }) });
   assert(saved.status === 201, 'manifest ' + saved.status);
 
-  await test('a REST route accepts an MCP-bound token on 3.x, names its removal, and counts it', async () => {
+  await test('a REST route accepts an MCP-bound token on 3.x, names its removal, and counts it; on 4.0.0 it answers 401 INVALID_TOKEN and counts nothing', async () => {
     const before = await restUses();
     const r = await json('/v1/memory?limit=1', { headers: auth(actorMcp) });
+    if (await removedOn(BASE, MCP_TOKEN_ON_REST_REMOVED_IN)) {
+      assert(r.status === 401 && r.body.error?.code === 'INVALID_TOKEN', '4.0.0: status ' + r.status + ' ' + JSON.stringify(r.body.error));
+      assert(r.body.error?.message === MCP_TOKEN_ON_REST_MESSAGE, '4.0.0: message ' + r.body.error?.message);
+      assert(/error="invalid_token"/.test(r.headers.get('www-authenticate') ?? ''), '4.0.0: WWW-Authenticate ' + r.headers.get('www-authenticate'));
+      assert(r.headers.get('deprecation') === null, '4.0.0: a refusal carries no Deprecation header');
+      const after = await restUses();
+      assert(after === before, `4.0.0: a refusal is not counted as a use: ${before} -> ${after}`);
+      return;
+    }
     assert(r.status === 200, 'status ' + r.status + ' ' + JSON.stringify(r.body.error));
     assert(r.headers.get('deprecation') === 'true', 'Deprecation: ' + r.headers.get('deprecation'));
     assert(r.headers.get('x-aimeat-removed-in') === '4.0.0', 'X-AIMEAT-Removed-In: ' + r.headers.get('x-aimeat-removed-in'));

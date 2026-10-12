@@ -21,6 +21,9 @@
  *   script throws a TypeError and the route answers 500 EXTENSION_ERROR. Each assertion that asserts
  *   the new capability is marked `// HOLE:`.
  * @version-history
+ *   v1.3.0 — 2026-10-12 — Every agent also holds ext:invoke, the word node 4.0.0 asks on POST
+ *     /v1/ext/:name/:action (REST scope gates); without it each action was refused at the route and
+ *     the memory:delete, CONSENT_REQUIRED and organism:write refusals were never reached.
  *   v1.2.0 — 2026-10-12 — deleteRecords asks memory:delete (the records go to the bin), so the importer
  *     agent holds memory:delete instead of memory:purge.
  *   v1.1.0 — 2026-10-09 — ctx.workspace.archiveRecords: the creator's agent with organism:write
@@ -136,11 +139,13 @@ async function publishedCount(): Promise<number> {
 
 await test('Setup: three owners and their agents', async () => {
     A = await setupOwner('a'); B = await setupOwner('b'); C = await setupOwner('c');
-    bAgentToken = await mintAgentToken(B, B_AGENT, ['memory:read', 'memory:write', 'memory:delete', 'organism:read']);
-    bNoPurgeToken = await mintAgentToken(B, 'nopurge', ['memory:read', 'memory:write', 'organism:read']);
-    cAgentToken = await mintAgentToken(C, 'outsider', ['memory:read', 'memory:write', 'organism:read']);
-    aArchiveToken = await mintAgentToken(A, 'keeper', ['memory:read', 'organism:read', 'organism:write']);
-    aNoWriteToken = await mintAgentToken(A, 'reader', ['memory:read', 'organism:read']);
+    // Every agent holds ext:invoke, the word POST /v1/ext/:name/:action asks from 4.0.0, so each
+    // refusal below is the one its test names (memory:delete, CONSENT_REQUIRED, organism:write).
+    bAgentToken = await mintAgentToken(B, B_AGENT, ['memory:read', 'memory:write', 'memory:delete', 'organism:read', 'ext:invoke']);
+    bNoPurgeToken = await mintAgentToken(B, 'nopurge', ['memory:read', 'memory:write', 'organism:read', 'ext:invoke']);
+    cAgentToken = await mintAgentToken(C, 'outsider', ['memory:read', 'memory:write', 'organism:read', 'ext:invoke']);
+    aArchiveToken = await mintAgentToken(A, 'keeper', ['memory:read', 'organism:read', 'organism:write', 'ext:invoke']);
+    aNoWriteToken = await mintAgentToken(A, 'reader', ['memory:read', 'organism:read', 'ext:invoke']);
 });
 
 await test('Setup: A\'s organism, a workspace with a locked contact schema, B contributor, C plain member', async () => {

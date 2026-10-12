@@ -12,6 +12,9 @@
  *   WHAT IS NEW IS A DIFF. The stub's change log carries one entry this node already has (the newest
  *   of its own public/changelog.json) and one it does not; only the second may come back.
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The expected current release is AIMEAT_TEST_SOFTWARE_VERSION when the test
+ *     node runs as another release (the 4.0.0 sweep), else the package version; the stub's newer
+ *     release stays the next major after it, and GET /v1/build and /v1/health are held to the same.
  *   v1.1.0 — 2026-10-11 — GET /v1/build and GET /v1/health say which commit runs.
  *   v1.0.0 — 2026-09-30 — Initial.
  */
@@ -49,7 +52,11 @@ async function ownerToken(name: string): Promise<string> {
 
 // ── The stub registry ──
 
-const current = (JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { version: string }).version;
+// The release the node under test runs: a test node run as another release
+// (AIMEAT_TEST_SOFTWARE_VERSION, src/utils/version.ts testVersionOverride) reports that one, any
+// other node the package version. The stub's "newer" release is the next major after it.
+const packageVersion = (JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')) as { version: string }).version;
+const current = process.env.AIMEAT_TEST_SOFTWARE_VERSION?.trim() || packageVersion;
 const newer = `${Number(current.split('.')[0]) + 1}.0.0`;
 const RELEASED = '2026-10-01T09:30:00.000Z';
 const localNewest = (JSON.parse(readFileSync(join(ROOT, 'public', 'changelog.json'), 'utf-8')) as { entries: any[] }).entries[0];
@@ -103,7 +110,7 @@ await test('A newer version: the version, the date, only what is new, and the pr
     assert(r.status === 200, `status ${r.status}: ${short(r.body.error)}`);
     const d = r.body.data;
     assert(d.enabled === true, `enabled: ${d.enabled}`);
-    assert(d.current === current, `current ${d.current}, package.json says ${current}`);
+    assert(d.current === current, `current ${d.current}, the node under test runs ${current} (package.json ${packageVersion})`);
     assert(d.latest === newer && d.updateAvailable === true, `latest ${d.latest}, updateAvailable ${d.updateAvailable}`);
     assert(d.releasedAt === RELEASED, `releasedAt: ${d.releasedAt}`);
     assert(Array.isArray(d.whatsNew) && d.whatsNew.length === 1, `whatsNew should hold only the new entry: ${short(d.whatsNew)}`);

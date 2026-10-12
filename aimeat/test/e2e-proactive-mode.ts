@@ -17,6 +17,9 @@
  *     test/run-e2e-ci.ts --test=proactive-mode
  * @version-history
  *   v1.0.0 — 2026-08-22 — Initial.
+ *   v1.1.0 — 2026-10-12 — Test 10 calls the person-only route with the agent's own REST token (POST
+ *     /v1/auth/token). It sent the MCP OAuth token, which node 4.0.0 refuses on every REST route with
+ *     401 INVALID_TOKEN, so the 403 for an agent session the test names was never reached there.
  */
 import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -184,7 +187,16 @@ async function provision(base: string, stamp: number, tag: string) {
     });
     assert(tok.status === 200, `mcp token ${tok.status}`);
 
-    return { ownerName, ownerToken, agentGaii, mcpToken: tok.body.access_token as string };
+    // The agent's own REST token. Node 4.0.0 refuses the MCP OAuth token on a REST route (401
+    // INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN), so a REST test of the agent uses this one.
+    const restTs = new Date().toISOString();
+    const restTok = await jsonAt(base, '/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: agentGaii, timestamp: restTs, signature: await signMsg(agentPriv, agentGaii + restTs) }),
+    });
+    assert(restTok.status === 200, `agent token ${restTok.status}: ${JSON.stringify(restTok.body?.error)}`);
+
+    return { ownerName, ownerToken, agentGaii, mcpToken: tok.body.access_token as string, agentToken: restTok.body.data.token as string };
 }
 
 /** The instructions string a brand-new connection is served. */
@@ -205,8 +217,8 @@ async function main() {
         console.log('\n=== Proactive guidance E2E ===\n');
         console.log('Phase 0: setup');
 
-        let me = { ownerName: '', ownerToken: '', agentGaii: '', mcpToken: '' };
-        let other = { ownerName: '', ownerToken: '', agentGaii: '', mcpToken: '' };
+        let me = { ownerName: '', ownerToken: '', agentGaii: '', mcpToken: '', agentToken: '' };
+        let other = { ownerName: '', ownerToken: '', agentGaii: '', mcpToken: '', agentToken: '' };
 
         await test('register an owner with an agent, and a second owner', async () => {
             me = await provision(BASE, stamp, 'a');
@@ -310,7 +322,7 @@ async function main() {
         });
 
         await test('10. an agent cannot use the person-only route', async () => {
-            const r = await json('/v1/settings/proactive', auth(me.mcpToken));
+            const r = await json('/v1/settings/proactive', auth(me.agentToken));
             assert(r.status === 403, `an agent session must be refused here, got ${r.status}`);
         });
 

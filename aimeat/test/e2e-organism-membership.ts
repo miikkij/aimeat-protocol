@@ -15,6 +15,9 @@
  *   v1.3.0 — 2026-08-11 — Tests 29-34 (H-29): removing, banning and leaving detach the departing
  *     person's agents from organism.agentGaiis and revoke their workspace-role consents. The agent
  *     token is driven for real, because an ejected member kept the whole organism through it.
+ *   v1.4.0 — 2026-10-12 — The device-authorized agent of tests 29-34 is approved with organism:read
+ *     as well as memory:read: node 4.0.0 asks that word on the organism routes (REST scope gates), so
+ *     the baseline read was refused and the departed-member 403s passed on a scope refusal.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-membership
 
@@ -352,11 +355,16 @@ await test('28. Owner in 20+ organisms: /tab mine returns ALL of them (no 20-ite
 let org4 = '';
 const WS4 = 'ws-eject';
 
-/** Device-authorize an agent for `who` and return its GAII + bearer token (RFC 8628, three calls). */
+/**
+ * Device-authorize an agent for `who` and return its GAII + bearer token (RFC 8628, three calls).
+ * It is approved with organism:read, the word GET /v1/organisms/:id/workspaces asks from 4.0.0: with
+ * memory:read alone, node 4.0.0 answers 403 SCOPE_DENIED for the member too, and the 403 that tests
+ * 31-34 assert for a departed member would prove nothing.
+ */
 async function agentFor(who: { name: string; token: string }, agentName: string) {
     const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: who.name }) });
     assert(da.status === 200 || da.status === 201, `device-authorize ${da.status}: ${JSON.stringify(da.body.error)}`);
-    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: who.token }) });
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read', 'organism:read'], owner_token: who.token }) });
     assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body.error)}`);
     const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
     assert(!!t.body.token && !!t.body.gaii, `device-token ${t.status}: ${JSON.stringify(t.body)}`);

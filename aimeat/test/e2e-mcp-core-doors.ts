@@ -33,6 +33,11 @@
  *   - Phase 6: MCP resources — the memory mapper in resources/list, the storage blob in resources/read
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-core-doors
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The 4.0.0 forms: the requester holds agent:read, the word of the agent
+ *     roster from 4.0.0 (aimeat_agents_list was missing from its surface there), and the provider
+ *     publishes its action with pricing.toll_morsels (pricing.base_morsels is 400
+ *     MORSEL_PRICE_REMOVED there). Test 7 checks the base_morsels response mirror per release:
+ *     present on 3.x, absent from 4.0.0.
  *   v1.1.0 — 2026-09-26 — 8b: aimeat_action_execute refuses a provider named by a bare account name
  *     with INVALID_INPUT, and no work is stored under it.
  *   v1.0.0 — 2026-09-08 — Initial: the five uncalled core tools, five branches of the memory tools,
@@ -42,6 +47,8 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -213,7 +220,8 @@ await test('1. Two owners, three agents of the first and one of the second', asy
     requesterOwner = await makeOwner('cdreq');
     providerOwner = await makeOwner('cdprov');
     // The requester commissions work, reads it back over REST, and does the memory half of the suite.
-    requester = await makeAgent(requesterOwner, ['work:request', 'work:read', 'memory:read', 'memory:write', 'storage:write']);
+    // agent:read is the word of the owner's agent roster (aimeat_agents_list, GET /v1/agents) from 4.0.0.
+    requester = await makeAgent(requesterOwner, ['work:request', 'work:read', 'memory:read', 'memory:write', 'storage:write', 'agent:read']);
     // A second agent of the SAME owner, so the owner-scope read has a sibling namespace to find.
     sibling = await makeAgent(requesterOwner, ['memory:write']);
     provider = await makeAgent(providerOwner, ['work:read', 'work:accept', 'work:publish', 'memory:read']);
@@ -293,7 +301,7 @@ await test('6. The provider publishes an action over REST, with directives so th
             description: 'Scrapes a URL for the core-doors E2E',
             input_schema: { type: 'object', properties: { url: { type: 'string' } } },
             output_schema: { type: 'object', properties: { content: { type: 'string' } } },
-            pricing: { base_morsels: 10 },
+            pricing: { toll_morsels: 10 },
             tags: ['e2e', 'core-doors'],
         }),
     });
@@ -307,10 +315,15 @@ await test('7. aimeat_catalogue_search returns that row with its provider and it
     const mine = rows.find((a: any) => a.action_id === ACTION_ID);
     assert(mine !== undefined, `the published action is not in the answer: ${r.text.slice(0, 400)}`);
     assert(mine.provider_gaii === provider.gaii, `provider_gaii: ${mine.provider_gaii}`);
-    // The published base_morsels (3.x) is stored as the pacing amount and answered as toll_morsels, with
-    // the deprecated base_morsels mirror: a morsel is pacing, not a price.
-    assert(mine.pricing?.toll_morsels === 10 && mine.pricing?.base_morsels === 10,
+    // The published pacing amount is answered as toll_morsels. A 3.x node also answers the deprecated
+    // base_morsels mirror; from 4.0.0 the mirror is gone (a morsel is pacing, not a price).
+    assert(mine.pricing?.toll_morsels === 10,
         `the pacing amount did not survive the mapping: ${JSON.stringify(mine.pricing)}`);
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(mine.pricing?.base_morsels === undefined, `4.0.0 still answers the base_morsels mirror: ${JSON.stringify(mine.pricing)}`);
+    } else {
+        assert(mine.pricing?.base_morsels === 10, `3.x lost the base_morsels mirror: ${JSON.stringify(mine.pricing)}`);
+    }
 });
 
 console.log('\nPhase 4 — the work lifecycle, entirely over MCP');
