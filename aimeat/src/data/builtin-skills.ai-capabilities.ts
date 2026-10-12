@@ -18,9 +18,6 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
- *   v1.5.1 — 2026-10-12 — isAvailable() is described as it works: GET /v1/ai/available, whether a text
- *     call would find a provider now. It said the method read only the older OpenRouter key setup,
- *     which stopped being true in V5 and is gone with its fallback.
  *   v1.5.0 — 2026-10-11 — Sections 0, 2c, 2d and 2e and the extension paragraph of section 3, from
  *     docs/app-developer-ai-guide.md, which the Boards page and llms-full.txt pointed at and no route
  *     served (docs audit 2026-10-11, D7). Corrected against the code on the way: an app may ask for
@@ -185,8 +182,8 @@ Pass \`app_id\` on every call: the owner's usage shows spend per app, and a per-
 | \`job.start({ prompt, result_key })\`, \`job.waitFor(id)\` | Work that may take minutes: the answer waits at \`result_key\` even when the tab closed. |
 | \`disclose(r.provenance, { target })\`, \`declare(value, r.provenance)\`, \`chatNotice({ target })\` | The AI label a person sees, the record kept with stored content, and the notice a chat surface owes at its first message. Skill: ai-transparency. |
 
-\`isAvailable()\` says only whether a text call would find a provider now; for any other capability,
-and for the reason and the fix, check \`capabilities()\`. \`invalidateCache()\` clears the library's caches after the owner changed
+\`isAvailable()\` reads only the older OpenRouter key setup and can say no when text works; check
+\`capabilities()\` instead. \`invalidateCache()\` clears the library's caches after the owner changed
 their providers in another tab. \`session.notify(title, { body })\` (scope \`notifications:send\`) tells
 the signed-in owner that something finished, and opens the app when they press it.
 
