@@ -48,6 +48,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -127,14 +128,16 @@ async function setupOwnerAgentSession(ownerName: string, agentName: string): Pro
         body: JSON.stringify({ client_name: `${ownerName} template client`, redirect_uris: [] }),
     });
     const ts2 = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code', client_id: reg.client_id, gaii: ab.data.agent.gaii,
         signature: await signMsg(ab.data.private_key, ab.data.agent.gaii + NODE_ID + ts2), timestamp: ts2,
+        ...authorizeParams(pkce),
     });
     const { body: auth } = await json(`/v1/mcp/authorize?${params}`);
     const { body: tok } = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret, ...tokenParams(pkce) }),
     });
     const session = new McpSession();
     session.token = tok.access_token;

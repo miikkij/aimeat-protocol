@@ -19,8 +19,12 @@
  *   - parse with the `yaml` package (genuine syntax errors)
  *   - resolve every internal `$ref` (the break that stopped codegen)
  *   - flag unquoted flow-mapping scalars containing `?` (accepted here, rejected by YAML 1.1 parsers)
- * @usage  pnpm check:openapi   (exits non-zero on a parse error, a dangling $ref, or a portability trap)
+ *   - info.version equals the node's version in aimeat/package.json
+ * @usage  pnpm check:openapi   (exits non-zero on a parse error, a dangling $ref, a portability trap,
+ *   or an info.version that is not the node's)
  * @version-history
+ *   v1.1.0 — 2026-10-12 — info.version follows the node's version (Core 2026-11 ruling Q2); it had
+ *     stood at 1.2.0 while the node moved to 3.26.1.
  *   v1.0.0 — 2026-07-26 — Initial guard, after both failure modes were found live on main.
  */
 import { readFileSync } from 'node:fs';
@@ -128,6 +132,17 @@ if (portability.length) {
     console.error(`✗ ${portability.length} unquoted flow scalar(s) containing "?" — this file parses here but`);
     console.error('  fails in PyYAML-based OpenAPI tooling. Quote the value:');
     for (const p of portability) console.error(`  openapi.yaml:${p.line}  ${p.text.slice(0, 110)}`);
+}
+
+// ── 4. Does info.version follow the node? ───────────────────────────────────
+// The contract describes the node it ships with, so its version is the node's (aimeat/package.json).
+// The edition of Core it is written to is `x-aimeat-protocol`, which check:protocol-versions holds to
+// utils/protocol-version.ts (Core 2026-11 ruling Q2).
+const nodeVersion = (JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')) as { version?: string }).version;
+const specVersion = (doc as { info?: { version?: unknown } }).info?.version;
+if (String(specVersion) !== nodeVersion) {
+    failed = true;
+    console.error(`✗ openapi.yaml info.version is ${String(specVersion)}, the node is ${nodeVersion}. Set info.version to the node's version.`);
 }
 
 if (failed) process.exit(1);

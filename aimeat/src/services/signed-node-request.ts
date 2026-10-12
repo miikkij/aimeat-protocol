@@ -29,6 +29,10 @@
  *   const who = await checkNodeRequest(req.headers, { thisNodeId, fields, keyOf: (node) => ... });
  *   const refusal = signedMessageRefusal(source_node, timestamp, signature);   // an older format, after verify
  * @version-history
+ *   v1.5.0 — 2026-10-12 — The unproven format is a version gate: from UNPROVEN_FORMAT_REMOVED_IN
+ *     audienceRefusal and deliveryRefusal refuse a message without the proof whatever `required` says;
+ *     before it, a message let through is counted and named on the response (noteDeprecatedUse;
+ *     Core 2026-11 FED-09, HTTP-07, HTTP-08).
  *   v1.4.0 — 2026-10-10 — The pin: a peer's first verified audience or delivery proof is recorded on
  *     it (deliveryProofAt), and from then on a message from it without the proof is refused whatever
  *     AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal; secaudit 2026-10-10 I21). The refusal
@@ -53,7 +57,8 @@ import type { Storage, GenesisPeerRecord, FederationPeerRecord } from '../storag
 import { sign, verify } from '../auth/keypair.js';
 import { createHash } from 'node:crypto';
 import { newNonce, nonceAccepted, NONCE_WINDOW_MS } from './request-nonce.js';
-import { AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN } from '../config-federation.js';
+import { AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, unprovenFormatLive } from '../config-federation.js';
+import { noteDeprecatedUse } from './deprecation.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -62,6 +67,14 @@ import { logger } from '../utils/logger.js';
  * UNPROVEN_FORMAT_REMOVED_IN no node takes one (config-federation.ts; secaudit 2026-10-10 I22).
  */
 const UNPROVEN_NOTE = `Nodes refuse a message without the proof by default from ${AUDIENCE_REQUIRED_BY_DEFAULT_IN}, and none takes one from ${UNPROVEN_FORMAT_REMOVED_IN}.`;
+
+/** A message without the proof passed because the operator turned the requirement off: counted and named (HTTP-07). */
+function noteUnprovenAccepted(): void {
+  noteDeprecatedUse({
+    kind: 'federation_unproven_format', removedIn: UNPROVEN_FORMAT_REMOVED_IN,
+    notice: 'A message from another node without the audience or delivery proof was accepted because AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off.',
+  });
+}
 
 export type NodeRequestCheck =
   | { ok: true; nodeId: string }
@@ -166,14 +179,18 @@ export async function audienceRefusal(opts: {
   signed: string; audience: unknown; audienceSignature: unknown; publicKey: string; thisNodeId: string; required: boolean;
   /** The sending peer's pin (ProofPin.at): once set, a message without the proof is refused whatever `required` says. */
   provenSince?: string | null;
+  /** The running version; tests set it. From UNPROVEN_FORMAT_REMOVED_IN `required` is true whatever is passed. */
+  version?: string;
 }): Promise<Refusal | null> {
   const audience = typeof opts.audience === 'string' ? opts.audience : '';
   const proof = typeof opts.audienceSignature === 'string' ? opts.audienceSignature : '';
   if (!audience && !proof) {
     if (opts.provenSince) return downgradeRefusal(opts.provenSince);
-    return opts.required
-      ? { ok: false, status: 401, code: 'AUDIENCE_REQUIRED', message: `This node takes a signed message only when it names the node it is for (audience: ${opts.thisNodeId}). The sending node runs an older version. ${UNPROVEN_NOTE}` }
-      : null;
+    if (opts.required || !unprovenFormatLive(opts.version)) {
+      return { ok: false, status: 401, code: 'AUDIENCE_REQUIRED', message: `This node takes a signed message only when it names the node it is for (audience: ${opts.thisNodeId}). The sending node runs an older version. ${UNPROVEN_NOTE}` };
+    }
+    noteUnprovenAccepted();
+    return null;
   }
   if (audience !== opts.thisNodeId) {
     return { ok: false, status: 401, code: 'WRONG_AUDIENCE', message: `This message was signed for ${audience || 'another node'}, not for ${opts.thisNodeId}.` };
@@ -243,14 +260,18 @@ export async function deliveryRefusal(opts: {
   sourceNode: string; signed: string; body: Record<string, unknown>; publicKey: string; thisNodeId: string; required: boolean; now?: number;
   /** The sending peer's pin (ProofPin.at): once set, a delivery without the proof is refused whatever `required` says. */
   provenSince?: string | null;
+  /** The running version; tests set it. From UNPROVEN_FORMAT_REMOVED_IN `required` is true whatever is passed. */
+  version?: string;
 }): Promise<Refusal | null> {
   const field = (name: string): string => (typeof opts.body[name] === 'string' ? opts.body[name] as string : '');
   const audience = field('audience'), proof = field('audience_signature'), sentAt = field('sent_at');
   if (!audience && !proof && !sentAt) {
     if (opts.provenSince) return downgradeRefusal(opts.provenSince);
-    return opts.required
-      ? { ok: false, status: 401, code: 'AUDIENCE_REQUIRED', message: `This node takes a signed message only when it names the node it is for (audience: ${opts.thisNodeId}) and when it was sent (sent_at). The sending node runs an older version. ${UNPROVEN_NOTE}` }
-      : null;
+    if (opts.required || !unprovenFormatLive(opts.version)) {
+      return { ok: false, status: 401, code: 'AUDIENCE_REQUIRED', message: `This node takes a signed message only when it names the node it is for (audience: ${opts.thisNodeId}) and when it was sent (sent_at). The sending node runs an older version. ${UNPROVEN_NOTE}` };
+    }
+    noteUnprovenAccepted();
+    return null;
   }
   if (audience !== opts.thisNodeId) {
     return { ok: false, status: 401, code: 'WRONG_AUDIENCE', message: `This message was signed for ${audience || 'another node'}, not for ${opts.thisNodeId}.` };

@@ -21,6 +21,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ZipArchive } from 'archiver';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -117,9 +118,11 @@ async function setupParty(prefix: string): Promise<Party> {
     assert(client.status === 201, `mcp register: ${client.status}`);
 
     ts = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const q = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii: agentGaii,
         signature: await signMsg(agentPriv, agentGaii + NODE_ID + ts), timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${q}`);
     assert(typeof auth.body.code === 'string', `mcp authorize: ${JSON.stringify(auth.body)}`);
@@ -128,6 +131,7 @@ async function setupParty(prefix: string): Promise<Party> {
         body: JSON.stringify({
             grant_type: 'authorization_code', code: auth.body.code,
             client_id: client.body.client_id, client_secret: client.body.client_secret,
+            ...tokenParams(pkce),
         }),
     });
     assert(tok.status === 200, `mcp token: ${tok.status}`);

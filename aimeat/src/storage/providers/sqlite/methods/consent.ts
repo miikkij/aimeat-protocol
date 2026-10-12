@@ -15,12 +15,15 @@
  *   v1.1.0 — 2026-10-05 — Bound in ../index.ts directly: governance.ts, which spread consentMethods
  *     into its own group, is gone, its methods moved to the files that mirror postgres-kysely/methods
  *     (secaudit 2026-10, M8).
+ *   v1.2.0 — 2026-10-12 — A consent's reach is read through consentReachOf: a row holding the older
+ *     `private` or `dmz` is answered as `local` (Core 2026-11 AUTHZ-18).
  */
 import type { ConsentRecord, ConsentAuditEntry, ConsentFacet, ConsentFacetQuery } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { consentMatchPattern } from '../../../pattern-utils.js';
 import { matchesRecipient } from '../../../consent-recipient.js';
 import { parseGaiiLoose } from '../../../../utils/gaii.js';
+import { consentReachOf } from '../../../../utils/consent-reach.js';
 
 export const consentMethods = {
   // ── Consent Layer ──
@@ -209,7 +212,7 @@ export const consentMethods = {
       dataPattern: row.dataPattern as string,
       recipient: row.recipient as string,
       purpose: row.purpose as string,
-      scope: row.scope as ConsentRecord['scope'],
+      scope: consentReachOf(row.scope),
       expires: (row.expires as string) ?? null,
       status: row.status as ConsentRecord['status'],
       grantedAt: row.grantedAt as string,

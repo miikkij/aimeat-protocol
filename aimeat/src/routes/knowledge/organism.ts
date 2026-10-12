@@ -6,6 +6,7 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-12 — The contribution consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   2026-09-29 — TARGET-082 V4: GET /v1/knowledge/organism/:id passes the contributed manifests
  *     through the caller's classification reader (readerFor, reader.show) before they are listed.
  *   2026-09-28 — Both organism routes refuse an agent the organism does not admit (agentAccess 'listed').
@@ -81,7 +82,7 @@ export function registerOrganismRoutes(
       dataPattern: `packages/${packageId}/*`,
       recipient: `organism.${organism_id}`,
       purpose: `Knowledge package contributed to organism: ${organism.name || organism_id}`,
-      scope: 'private',
+      scope: 'local',
       expires: null,
       status: 'active',
       grantedAt: now,

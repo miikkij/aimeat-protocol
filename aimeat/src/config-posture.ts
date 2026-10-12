@@ -14,6 +14,8 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   v1.3.0 — 2026-10-12 — AIMEAT_AI_PROVENANCE=false on a public node is reported: refused from 4.0.0,
+ *     deprecated before it (Core 2026-11 PROV-07).
  *   v1.2.0 — 2026-10-11 — AIMEAT_TEST_MONEY_HANDLER is reported as refused on any node whose public
  *     URL is not a loopback address, whatever its profile (utils/test-money-guard.ts).
  *   v1.1.0 — 2026-09-28 — AIMEAT_AI_FIXED_BASEURL_OVERRIDES is reported as refused on a public node
@@ -22,6 +24,7 @@
  */
 import type { AimeatConfig } from './config-types.js';
 import { testMoneyHandlerRefused } from './utils/test-money-guard.js';
+import { PROVENANCE_SWITCH_LOCAL_ONLY_IN } from './config-ai-label.js';
 
 /**
  * Startup posture self-check. When the resolved security profile is `public`, return a list of
@@ -46,6 +49,13 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   // reports a coercion rather than a risk, so an operator who set it never believes it took effect.
   if (process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase() === 'off') {
     w.push('AIMEAT_AI_LABEL_PUBLIC=off was REFUSED and reset to `strict` — a publicly reachable node may not hide the visible AI label (EU AI Act Art. 50). Use `light` to label only what the law requires.');
+  }
+  // The same kind from 4.0.0, and a notice before it: a public node records provenance whatever
+  // AIMEAT_AI_PROVENANCE says (config-ai-label.ts aiProvenanceFromEnv, Core 2026-11 PROV-07).
+  if (process.env.AIMEAT_AI_PROVENANCE === 'false') {
+    w.push(config.aiProvenance
+      ? `AIMEAT_AI_PROVENANCE=false was REFUSED — from ${PROVENANCE_SWITCH_LOCAL_ONLY_IN} a publicly reachable node records how its AI-generated content was made. Only a local node may switch it off.`
+      : `AIMEAT_AI_PROVENANCE=false switches provenance recording off on a public node. This is deprecated: from ${PROVENANCE_SWITCH_LOCAL_ONLY_IN} a public node records it whatever the setting says.`);
   }
   // The same kind: a coercion. A fixed provider type's address is why a key sent to it cannot leak,
   // so a public node ignores the override (services/ai/providers.ts fixedBaseUrlOf).

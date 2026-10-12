@@ -17,6 +17,9 @@
  * Within one format the numbers compare as numbers; across formats a later format is the newer one.
  *
  * @version-history
+ *   v1.1.0 — 2026-10-12 — CORE_PROTOCOL_VERSION, the edition this node states in discovery from node
+ *     4.0.0 (services/core-discovery.ts, Core 2026-11 DISC-01). security/protocol-versions.json row
+ *     `aimeat-core` holds it to the openapi.yaml `x-aimeat-protocol`. Parsing is unchanged.
  *   v1.0.0 — 2026-10-11 — Federation compared protocol versions as strings, so "5.0" and "2026-11"
  *     sorted below "v1" and an auto-admit or promotion gate would refuse a newer node (docs audit
  *     2026-10-11, wish wish-federaation-protokollaversio-vertaillaan-numerona-ei-merkkij).
@@ -24,6 +27,9 @@
 
 /** What a peer that states no protocol version speaks: every node before the field existed. */
 export const DEFAULT_PROTOCOL_VERSION = 'v1';
+
+/** The AIMEAT Core edition this implementation is written to (docs/AIMEAT-Core-2026-11.md). */
+export const CORE_PROTOCOL_VERSION = '2026-11';
 
 const API_TAG = /^v(\d{1,4})$/i;
 const RFC_NUMBER = /^(\d{1,4})(?:\.(\d{1,4}))?(?:\.(\d{1,4}))?$/;

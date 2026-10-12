@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_task_request_changes declares connectorOnly: it is on both connector interfaces
+ *     and not on the node MCP (V2_EXCLUDED), and it declared the node MCP.
  *   2026-10-11 — aimeat_agent_workplace_set: where an agent's finished work goes.
  *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start, beside aimeat_agent_task_start_set.
  *   2026-10-06 — aimeat_memory_write carries the bounds the node's MCP wrote by hand (value, tags,
@@ -57,7 +59,7 @@ import { flexibleBoolean } from '../input-schemas.js';
 import { MEMORY_LIST_MAX_LIMIT } from '../../models/tool-input-vocabulary.js';
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
-import { agentEverywhere } from './types.js';
+import { agentEverywhere, connectorOnly } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 export const schedulesTasksMemoryTools = [
@@ -380,7 +382,7 @@ export const schedulesTasksMemoryTools = [
         name: 'aimeat_task_request_changes',
         description: "Owner-only: ask an agent to revise its proposed TODO plan for a queued task. Marks the existing todos as outdated, flips the task status to 'revision_requested', and pushes a linked message to the agent's inbox carrying the owner's free-text change request.",
         caller: 'owner',
-        visibility: agentEverywhere,
+        visibility: connectorOnly,
         annotations: { title: 'Request TODO Plan Changes', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier (must be a queued task with existing proposed todos).' },

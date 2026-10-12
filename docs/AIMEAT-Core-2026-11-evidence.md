@@ -12,7 +12,9 @@
   - **8 are the planned 4.0.0 changes**: the four removals (owner-key sign-in AUTH-05, `?token=` AUTH-24, the unproven federation format FED-09, the `optional` relay claim FED-10) and the rule that a removal holds whatever the configuration says (HTTP-08) are named in code but not enforced by version; discovery lacks `protocol_version` and `profiles` (DISC-01, DISC-02); and the consent reach default changes to `local` (AUTHZ-18).
   - **23 are defects or missing pieces**, listed in the table at the end with what is missing.
 
-Status words: **met** · **partial** (met, with a stated shortfall, or not verified on every path) · **gap** (not met) · **n/a** (a rule for readers or editors, no node behaviour to check).
+**Update 2026-10-12 (session cc-joumii-gates-4-0).** 14 of the 31 gaps are closed in code: the 8 planned 4.0.0 changes (AUTH-05, AUTH-24, FED-09, FED-10, HTTP-08, DISC-01, DISC-02, AUTHZ-18) and HTTP-07, FED-13, PROV-07, PACE-21, DISC-05 and DATA-26. Each removal and each 4.0.0 change is a version gate: its own constant, compared with the running version, refused or changed from 4.0.0 whatever the configuration says, and before 4.0.0 answered with the Deprecation headers (`aimeat/src/services/deprecation.ts`). Their rows below say **met (4.0.0)**. The tests run the node as 4.0.0 and as 3.26.1: `aimeat/test/unit/removals-4-0-0.test.ts`, `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts`. MCP-06, MCP-07, AUTH-11 and ID-10 were fixed earlier the same day (commits `a3194232c`, `9c7324cbe`) and are not re-read here, so their rows and the counts above still show the state of `9902b6287`.
+
+Status words: **met** · **met (4.0.0)** (met from the release the requirement is normative in; the code gates it by the running version, and 3.x keeps the old behaviour with the Deprecation headers) · **partial** (met, with a stated shortfall, or not verified on every path) · **gap** (not met) · **n/a** (a rule for readers or editors, no node behaviour to check).
 
 ## What changed since the reviewed draft
 
@@ -40,7 +42,8 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | The node states `version: 'v1'` and `software_version`, and no protocol version | `aimeat/src/routes/wellknown.ts:104-125`; `aimeat/src/routes/bootstrap.ts:291-303` |
 | A peer that states no protocol version reads as `v1` | `aimeat/src/routes/federation-peer/promotion.ts:35`; `aimeat/src/utils/protocol-version.ts:25-26` |
 | Protocol versions are compared as versions (`vN`, RFC numbers and dated names), not strings | `aimeat/src/utils/protocol-version.ts:28-71`; used at `aimeat/src/services/network-policy.ts:189,213` |
-| Only the morsel-price removal is gated by the running version; the other 4.0.0 removals are comments or settings | `aimeat/src/config-pacing.ts:20,39-41` (gated); `aimeat/src/config-security.ts:64-81,109-110` (settings, default on); `aimeat/src/config-federation.ts:76-83` (an environment value still wins at 4.0.0) |
+| Every 4.0.0 removal is gated by the running version (since 2026-10-12; before that only the morsel price fields were) | `*_REMOVED_IN` constants in `aimeat/src/config-security.ts`, `aimeat/src/config-federation.ts`, `aimeat/src/config-pacing.ts`, `aimeat/src/config-ai-models.ts`, `aimeat/src/config-turn.ts`, `aimeat/src/services/workflow/store.ts`, `aimeat/src/mcp/oauth-binding.ts`; `removedFrom` in `aimeat/src/services/deprecation.ts` |
+| Discovery states the protocol version from node 4.0.0, and the API description and the MCP server state the node's software version | `aimeat/src/services/core-discovery.ts`; `openapi.yaml` `info.version` (held by `pnpm check:openapi`) and `x-aimeat-protocol`; `aimeat/src/mcp/index.ts` (`serverInfo.version`) |
 | v4.0's own versioning rule ("within a version only backward-compatible additions") | `docs/AIMEAT-RFC-v4.0-Core-full.md:227` |
 
 ## 3. Principals and identity
@@ -68,7 +71,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | AUTH-02 | met | scrypt N=32768 r=8 p=1, `aimeat/src/services/password.ts:15` | |
 | AUTH-03 | met | Password `aimeat/src/routes/ghii/register-login.ts:612`; sign-in link gives a second-factor ticket `aimeat/src/routes/ghii/login-link-open.ts:58`; passkey is its own method `aimeat/src/routes/passkeys.ts:5-8` | OIDC and SAML sign-ins do not ask the node's second factor (`aimeat/src/services/external-login.ts`); Core allows that. |
 | AUTH-04 | met | `aimeat/src/services/owner-session.ts:34-71,117-158,189-195,234,242,263-283`; access token 900 s `aimeat/src/config.ts:309` | |
-| AUTH-05 | **gap (4.0.0)** | `aimeat/src/routes/auth.ts:290-375`; setting `aimeat/src/config-security.ts:64-71,109` (default on) | Still on by default in 3.26.1; the 4.0.0 removal is a comment, with no constant and no version gate. The challenge from `GET /v1/auth/challenge` is never read (`aimeat/src/routes/auth.ts:144-170`). |
+| AUTH-05 | met (4.0.0) | `OWNER_KEY_LOGIN_REMOVED_IN` and `ownerKeyLoginAllowed` in `aimeat/src/config-security.ts`; the owner branch of `POST /v1/auth/token` in `aimeat/src/routes/auth.ts` answers 410 `OWNER_KEY_LOGIN_OFF` from 4.0.0 whatever `AIMEAT_OWNER_KEY_LOGIN` says, and spends its signature on first use; test `aimeat/test/unit/removals-4-0-0.test.ts` | Before 4.0.0 it is still on by default, with the Deprecation headers. The challenge from `GET /v1/auth/challenge` is still issued and never read. |
 | AUTH-06 | **gap** | Unknown account and wrong password both answer 401 `AUTH_REQUIRED` (`aimeat/src/routes/ghii/register-login.ts:587`; `aimeat/src/services/password-check.ts:45`); tarpit `aimeat/src/middleware/login-tarpit.ts:149,159` | An account without a password answers 400 `NO_PASSWORD` (`aimeat/src/services/password-check.ts:53`), which tells a caller the account exists. |
 | AUTH-07 | met | `aimeat/src/auth/middleware.ts:311-321` (`credentialRevoked`: token, session, app grant, ecosystem app, account) | |
 | AUTH-08 | met | `aimeat/src/auth/effective-scopes.ts:57-113` | |
@@ -87,7 +90,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | AUTH-21 | met | `aimeat/src/routes/app-grants.ts:544-553`; `aimeat/src/auth/account-security.ts:94-98`; `aimeat/src/auth/middleware.ts:253-258` | |
 | AUTH-22 | met | `aimeat/src/routes/access-tokens.ts:56-173`; `aimeat/src/services/access-token.ts:25,40-69` | |
 | AUTH-23 | met | `aimeat/src/auth/ws-upgrade.ts:44,52,116-139`; `aimeat/src/routes/sse.ts:100-116` | |
-| AUTH-24 | **gap (4.0.0)** | `aimeat/src/auth/ws-upgrade.ts:16,91,128`; setting `aimeat/src/config-security.ts:73-81,110` (default on) | Still accepted by default; the 4.0.0 removal is a comment, with no version gate. |
+| AUTH-24 | met (4.0.0) | `WS_QUERY_TOKEN_REMOVED_IN` in `aimeat/src/config-security.ts`; `authenticateUpgrade` in `aimeat/src/auth/ws-upgrade.ts` refuses `?token=` with `WS_QUERY_TOKEN_DISABLED` from 4.0.0 whatever the setting says; test `aimeat/test/unit/removals-4-0-0.test.ts` | Before 4.0.0 still accepted by default; the 101 answer carries the Deprecation headers (`upgradeDeprecationHeaderLines`). |
 | AUTH-25 | met | `aimeat/src/utils/scope-coverage.ts:329-346`; `aimeat/src/routes/agents/device-auth.ts:337` | |
 | AUTH-26 | met | `aimeat/src/routes/agents/management.ts:381,395-441`; app grant revoke `aimeat/src/routes/app-grants-manage.ts:216` | |
 
@@ -109,7 +112,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | AUTHZ-12 | met | `aimeat/src/storage/providers/sqlite/methods/consent.ts:105-126` | |
 | AUTHZ-13 | met | `aimeat/src/routes/consent.ts:128-171`; `aimeat/src/services/consent.ts:158-160`; retention 365 days `aimeat/src/config-data-access.ts:46` | |
 | AUTHZ-14 | met | `aimeat/src/routes/consent.ts:38,90,97,128,174,209`; `aimeat/src/services/consent-write.ts:88-103` | `consent:manage` is inside the wildcard. |
-| AUTHZ-18 | **gap (4.0.0)** | `aimeat/src/models/schemas.ts:376` accepts `private`, `dmz`, `federation`, `auth`, default `federation`; type `aimeat/src/storage/types/auth.ts:190`; matching ignores the value (`aimeat/src/storage/providers/sqlite/methods/consent.ts:105-126`); `auth` read at `aimeat/src/routes/federation-auth.ts:135`; `federation` read at `aimeat/src/services/memory-replication.ts:79`, `aimeat/src/services/directory.ts:195` | `local` is refused, `private` and `dmz` are stored as sent, and a consent without a reach gets `federation`, so it can make a public record replicable. |
+| AUTHZ-18 | met (4.0.0) | `aimeat/src/utils/consent-reach.ts` (`CONSENT_REACH_LOCAL_DEFAULT_IN`, `consentReachOf`); `grantConsent` in `aimeat/src/services/consent-write.ts` takes `local`, `federation`, `auth`, stores `private` and `dmz` as `local` (with the Deprecation headers) and gives an absent reach `local` from 4.0.0; both providers read a stored `private` or `dmz` as `local`; test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | Before 4.0.0 an absent reach is still `federation`. The compliance roll-up (`consentFacets`) groups by the stored value. |
 | AUTHZ-15 | met | `aimeat/src/services/access-guard.ts:88-175`; `aimeat/src/services/consent.ts:48-151` | Boards and the organism key gate run their own consent checks (`aimeat/src/routes/boards.ts:452`, `aimeat/src/services/organism-namespace-access.ts:148-172`); both are stricter, not looser. |
 | AUTHZ-16 | partial | Provenance answers one 404 (`aimeat/src/routes/ai-provenance.ts:230-287`); memory read 404 | Not verified on every route. |
 | AUTHZ-17 | partial (SHOULD) | `aimeat/src/auth/deny.ts:87,104,151`; `aimeat/src/services/auth-audit.ts:22-25` | 462 places write `res.status(403)` directly and skip the refusal log. |
@@ -154,7 +157,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | DATA-23 | met | `aimeat/src/services/memory-bin.ts:145-154` | |
 | DATA-24 | met | `aimeat/src/storage/types/commerce.ts:55-63`; `aimeat/src/routes/memory/crud.ts:325` | |
 | DATA-25 | met | `aimeat/src/services/archive.ts:107,129` (`archivedRoot`) | |
-| DATA-26 | **gap** | 413 `QUOTA_EXCEEDED` at `aimeat/src/services/memory-ceilings.ts:81,103,114` | Memory copy answers 429 for the same condition (`aimeat/src/routes/memory/bulk.ts:622`). |
+| DATA-26 | met | 413 `QUOTA_EXCEEDED` at `aimeat/src/services/memory-ceilings.ts:81,103,114`, and at memory copy (`aimeat/src/routes/memory/bulk.ts`) since 2026-10-12 | Memory copy answered 429 until 2026-10-12. Not covered by a test that fills a quota. |
 | DATA-27 | partial | Deleted list uses the classification reader (`aimeat/src/routes/memory/key.ts:108-109`) | Not verified that search applies classification to every result. |
 | DATA-28 | met | `aimeat/src/services/event-bus.ts:47-81`; `aimeat/src/routes/sse.ts:83,119,189` | |
 
@@ -207,7 +210,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | PACE-18 | met | `aimeat/src/models/offer-schemas.ts:174-189` | |
 | PACE-19 | met | `aimeat/src/routes/commerce.ts:337`; `PaymentHandler` with collect, payout, refund `aimeat/src/commerce/types.ts:243` | |
 | PACE-20 | met | `aimeat/src/commerce/agent-purchase-limit.ts:43-151` | |
-| PACE-21 | **gap** | Binding documents exist: `/.well-known/x402.json` `aimeat/src/routes/agent-conventions.ts:250`; `/.well-known/acp.json` `aimeat/src/routes/commerce-acp.ts:157`; UCP profile `aimeat/src/routes/wellknown.ts:238-300` | `/.well-known/aimeat` does not list the accepted bindings. |
+| PACE-21 | met | `payment_bindings` in `/.well-known/aimeat` and in `GET /` `this_node`, from `paymentBindings` in `aimeat/src/services/core-discovery.ts` (`stripe`, `invoice`, `ucp`, `acp`, and `x402` when it is on; none while commerce is off). Binding documents: `/.well-known/x402.json` `aimeat/src/routes/agent-conventions.ts:250`; `/.well-known/acp.json` `aimeat/src/routes/commerce-acp.ts:157`; UCP profile in `aimeat/src/routes/wellknown.ts` | Listed in every release, not only from 4.0.0. |
 | Bindings | fact | Stripe `aimeat/src/commerce/stripe-handler.ts:5-12`; UCP `aimeat/src/routes/ucp-checkout.ts:129-184`; ACP `aimeat/src/routes/commerce-acp.ts:293-313`; x402 `aimeat/src/commerce/x402.ts:48-109`; registry `aimeat/src/commerce/payment-handlers.ts:29-39`, `aimeat/src/server-bootstrap/routes-loader.ts:419-438` | A `test.money` handler exists for end-to-end tests. It is registered only when its flag is set on a loopback node (`aimeat/src/utils/test-money-guard.ts:37-44`), and it is not a binding of Core §8.6. |
 
 ## 9. Federation
@@ -222,11 +225,11 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | FED-06 | **gap** | Hash and expiry `aimeat/src/services/link-invites.ts:51,65-66,83` | Single use is a read then a write, not an atomic step (`aimeat/src/services/link-invites.ts:133-163`); two concurrent introductions can both pass. |
 | FED-07 | met | `aimeat/src/routes/federation-peer/introduce.ts:315-333` | |
 | FED-08 | partial | `aimeat/src/services/signed-node-request.ts:73-136`; window `aimeat/src/services/request-nonce.ts:24` | The replay cache is an in-process map (`request-nonce.ts:27-49`); it holds for a single-process node only. |
-| FED-09 | **gap (4.0.0)** | `aimeat/src/config-federation.ts:42,44,72-81`; `aimeat/src/services/signed-node-request.ts:148-302` | Off by default before 3.27.0, and `AIMEAT_FEDERATION_AUDIENCE_REQUIRED=false` still turns it off at 4.0.0; the removal is not coded. |
-| FED-10 | **gap (4.0.0)** | `aimeat/src/services/relay-claim.ts:14-76`; `aimeat/src/middleware/relay-gate.ts:147`; `aimeat/src/services/relay-claim-policy.ts:50,52` | `AIMEAT_FEDERATION_RELAY_CLAIM=optional` is still read at 4.0.0 (`aimeat/src/config-federation.ts:80`). |
+| FED-09 | met (4.0.0) | `UNPROVEN_FORMAT_REMOVED_IN` and `unprovenFormatLive` in `aimeat/src/config-federation.ts`; `audienceRefusal` and `deliveryRefusal` in `aimeat/src/services/signed-node-request.ts` refuse a message without the proof from 4.0.0 whatever `required` says, and the environment cannot turn `federation.audience_required` off from then; test `aimeat/test/unit/removals-4-0-0.test.ts` | Before 4.0.0 `AIMEAT_FEDERATION_AUDIENCE_REQUIRED=false` still lets one in, counted (`deprecated_use: federation_unproven_format`) and with the Deprecation headers. |
+| FED-10 | met (4.0.0) | `RELAY_CLAIM_OPTIONAL_REMOVED_IN` in `aimeat/src/config-federation.ts` (re-exported by `aimeat/src/services/relay-claim-policy.ts`); `effectiveRelayClaim` answers `required` from 4.0.0 whatever the node or the peer says, `parsePeerRelayClaim` refuses `optional`, the environment's `optional` reads as `required`; `aimeat/src/middleware/relay-gate.ts`; test `aimeat/test/unit/removals-4-0-0.test.ts` | Before 4.0.0 an unclaimed relay let through on `optional` carries the Deprecation headers. |
 | FED-11 | met | `aimeat/src/services/signed-node-request.ts:296-341` (`pinnedRefusal`) | |
 | FED-12 | partial | `aimeat/src/utils/protocol-version.ts:28-71` | The introduction never passes the stated version to the check (`aimeat/src/routes/federation-peer/introduce.ts:244`), so every peer reads as `v1`. |
-| FED-13 | **gap** | | Peer URLs pass `validateOutboundUrl`, which accepts `http:` (`aimeat/src/utils/url-validator.ts:115`; `aimeat/src/routes/federation-peer/introduce.ts:232`). No federation code reads the security profile. The ruling of 2026-10-12 (Q16) keeps plain HTTP for a local node. |
+| FED-13 | met (4.0.0) | `PEER_HTTPS_REQUIRED_IN` and `peerUrlRefusal` in `aimeat/src/services/peer-url-policy.ts`, asked by the introduction, the peering request, the readiness test, adding and editing a peer, a re-admission, a genesis peering and the key exchange (`aimeat/src/services/federation-helpers.ts`); test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | A public node refuses a plain-http peer address from 4.0.0 (400 `PEER_HTTPS_REQUIRED`); a local node keeps plain http (ruling Q16). A peer row stored with an http address before 4.0.0 is not rewritten; the key exchange refuses it, and other outbound calls to such a row are not checked one by one. |
 | FED-14 | met | `aimeat/src/routes/federation-peer/peers.ts:159-228` (`KEY_ROTATION_DENIED`) | |
 | FED-15 | met | `aimeat/src/services/federation-peer-remove.ts:55-118` | |
 | FED-16 | **gap** | `aimeat/src/routes/federation-auth.ts:63-200` | The home node checks the tier ceiling for federated sign-in, not the peer's own permission word (`federation-auth.ts:101`). |
@@ -237,7 +240,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | FED-21 | met | `aimeat/src/routes/memory/shared.ts:63-73`; `aimeat/src/services/memory-replication.ts:229-230` | |
 | FED-22 | met | `aimeat/src/services/memory-replication.ts:158` | The SHOULD is not met: the reference is outside the signed payload (`:166-174`) and the receiver does not check it (`aimeat/src/routes/federation-sync/messaging.ts:132-217`). |
 | FED-23 | met | `aimeat/src/services/personal-tunnel.ts:131-132,278-315` | `sendRequest` (`:317`) has no caller: no live forwarding, as Core says. |
-| FED-24 | met | `aimeat/src/auth/ws-upgrade.ts:44` (personal and connect tunnels) | Accepts `?token=` until AUTH-24 is closed. |
+| FED-24 | met | `aimeat/src/auth/ws-upgrade.ts:44` (personal and connect tunnels) | Accepts `?token=` before node 4.0.0 (AUTH-24). |
 | FED-25 | met | `aimeat/src/services/connect-tunnel.ts:4-17,126`; `aimeat/src/services/connect-tunnel-forward.ts:6-13` | Opt-in, `aimeat/src/config.ts:427`. |
 | Heartbeat states | fact | `aimeat/src/services/federation.ts:256,410-434` (active, degraded after 3 misses, offline after 10) | v4.0 said `unreachable`; the code writes `offline`. |
 | Relay shares unpaid | fact | `docs/known_gaps.md:32-42` (GAP-001); `aimeat/src/services/morsel.ts:175-201` | |
@@ -253,7 +256,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | PROV-04 | met | `aimeat/src/models/ai-provenance-schemas.ts` (camelCase record) | The MCP wrapper says `record_url`, the envelope wrapper `recordUrl`; both are wrappers, as Core allows. |
 | PROV-05 | n/a | Editorial rule | |
 | PROV-06 | met | `aimeat/src/storage/repositories/ai-provenance.repository.ts:5-8,41-116` (no update, no delete) | |
-| PROV-07 | **gap** | `aimeat/src/config.ts:246` | `AIMEAT_AI_PROVENANCE=false` stops recording, also on a public node, with only a warning (`aimeat/src/utils/env-validator.ts:344-352`). The ruling of 2026-10-12 (Q17) keeps the switch for a local node only. |
+| PROV-07 | met (4.0.0) | `PROVENANCE_SWITCH_LOCAL_ONLY_IN` and `aiProvenanceFromEnv` in `aimeat/src/config-ai-label.ts`, read by `aimeat/src/config.ts`; the start-up check says the setting was refused (`aimeat/src/config-posture.ts`); test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | From 4.0.0 a public node records whatever `AIMEAT_AI_PROVENANCE` says; a local node keeps the switch (ruling Q17). Before 4.0.0 the switch still works on a public node, and the start-up check says it stops working in 4.0.0. |
 | PROV-08 | met | `aimeat/src/services/app-serve-marks-strip.ts:173`; `aimeat/src/services/app-publish.ts:284-293`; `aimeat/src/services/app-serve-marks.ts:240` | HTML only. |
 | PROV-09 | met | `aimeat/src/services/ai-provenance-marks.ts:618-647` | |
 | PROV-10 | met | `aimeat/src/routes/ai-provenance.ts:152,201-227` (60 a minute per address) | |
@@ -274,8 +277,8 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | HTTP-04 | met | `aimeat/src/middleware/envelope.ts:59-64` | |
 | HTTP-05 | met (SHOULD) | `aimeat/src/middleware/idempotency.ts:40-41,68-71,91,131-177` | The body of a reused key is not compared; the cache is in-process (10 000 entries, 24 hours). |
 | HTTP-06 | met | `aimeat/src/middleware/rate-limit.ts:96-101` (`Retry-After`, `X-RateLimit-*`) | |
-| HTTP-07 | **gap** | `aimeat/src/routes/openrouter.ts:172-185` (`Deprecation`, successor `Link`, removal header, 410 `GONE`) | The owner-key sign-in sends no `Deprecation` header while it is on (`aimeat/src/routes/auth.ts:290-296`). |
-| HTTP-08 | **gap (4.0.0)** | Gated by the running version: the morsel price fields only, `aimeat/src/config-pacing.ts:20,39-41` | The owner-key sign-in and `?token=` are settings, default on (`aimeat/src/config-security.ts:64-81,109-110`); the unproven federation format and the `optional` relay claim stay available through an environment value at 4.0.0 (`aimeat/src/config-federation.ts:76-83`). |
+| HTTP-07 | met | `noteDeprecatedUse` in `aimeat/src/services/deprecation.ts` sets `Deprecation: true`, `X-AIMEAT-Removed-In` and the successor `Link` on the response through the request context (`aimeat/src/middleware/request-id.ts`), counts the use (`deprecated_use_by_type` in `GET /v1/stats`) and logs it once a day; called by the owner-key sign-in, the legacy AI settings routes, an unclaimed relay, an unproven federation message, the static TURN pair, `costCapMorsels`, a consent reach alias and a plain-http peer address; the WebSocket upgrade adds the headers to its 101 answer; the 410 of the legacy AI settings routes names the successor | The MCP OAuth flow without PKCE (`aimeat/src/mcp/oauth-binding.ts`) keeps its own counter and log and sends no header on the OAuth answers. |
+| HTTP-08 | met (4.0.0) | Every 4.0.0 removal has its own `*_REMOVED_IN` constant and is refused from that release whatever the configuration says: `aimeat/src/config-security.ts`, `aimeat/src/config-federation.ts`, `aimeat/src/config-pacing.ts`, `aimeat/src/config-ai-models.ts`, `aimeat/src/config-turn.ts`, `aimeat/src/services/workflow/store.ts`, `aimeat/src/mcp/oauth-binding.ts`; the environment defaults read off and the Config page refuses the value that would keep one on (`aimeat/src/services/config-schema-validators.ts`); test `aimeat/test/unit/removals-4-0-0.test.ts` | |
 | MCP-01 | met | `aimeat/src/mcp/index.ts:613-697` | |
 | MCP-02 | met | `aimeat/src/tool-catalog/surfaces.ts:118`; `aimeat/src/mcp/index.ts:680-709`; listed in the bootstrap document `aimeat/src/routes/bootstrap.ts:553-559` | Eight surfaces: appdev, agent, service, admin, commerce, primitives, chat, full. |
 | MCP-03 | met | `aimeat/src/mcp/index.ts:188-201` | |
@@ -290,11 +293,11 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 | MCP-12 | partial (SHOULD) | `aimeat/src/mcp/tool-error.ts` | 333 older failures keep three text shapes. |
 | MCP-13 | met | `aimeat/src/mcp/ai-provenance-result.ts`; `aimeat/src/services/ai-provenance-marks.ts:245,262-266` | |
 | MCP-14 | met | `aimeat/src/services/mcp-client/hops.ts:39-85`; `aimeat/src/mcp/index.ts:392-401` | Answers a JSON-RPC error, not HTTP 508. |
-| DISC-01 | **gap (4.0.0)** | `aimeat/src/routes/wellknown.ts:92-125` | No `protocol_version`, no `profiles`, no MCP endpoint address; `endpoints.auth` points at the deprecated owner-key sign-in. The bootstrap document's description of the node (`aimeat/src/routes/bootstrap.ts:291-303`) carries none of the fields either. |
-| DISC-02 | **gap (4.0.0)** | | The field does not exist. |
+| DISC-01 | met (4.0.0) | `coreDiscoveryFields` in `aimeat/src/services/core-discovery.ts` (`CORE_PROTOCOL_FROM` 4.0.0), spread into `/.well-known/aimeat` (`aimeat/src/routes/wellknown.ts`) and `GET /` `this_node` (`aimeat/src/routes/bootstrap.ts`); `endpoints.mcp` names the MCP endpoint, `endpoints.auth` stays a string and names the owner sign-in `/v1/ghii/login`, and the additive `endpoints.sign_in` object names each current way to get a token (changes inside v1 are additive, §0.2); `CORE_PROTOCOL_VERSION` in `aimeat/src/utils/protocol-version.ts`, held to `x-aimeat-protocol` in `openapi.yaml` by `aimeat/security/protocol-versions.json` (`aimeat-core`); test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | From 4.0.0 both documents state `protocol_version: "2026-11"` and the claimed profiles; before it both fields are left out, because a 3.x node does not keep the edition's removals. |
+| DISC-02 | met (4.0.0) | `aimeat/src/services/core-discovery.ts` (header) | No earlier edition has a dated name and a 3.x peer states no protocol version, so a 4.0.0 node accepts no earlier edition it could name, and `protocol_versions_accepted` is left out until it does. |
 | DISC-03 | **gap** | `aimeat/src/services/did-document.ts:30-56`; `aimeat/src/server-bootstrap/routes-loader.ts:680-688` | The default id is `did:web:${nodeId}.aimeat.example` (`aimeat/src/services/vc-issuer.ts:46`), which does not match the host unless the operator sets it. |
 | DISC-04 | met | `aimeat/src/routes/wellknown.ts:130-165` | The card declares MCP `2025-06-18`; `aimeat/security/protocol-versions.json` records `2026-07-28` as current. |
-| DISC-05 | **gap** | Same as PACE-21 | |
+| DISC-05 | met | Same as PACE-21 | |
 
 ## 12. Security invariants
 
@@ -311,7 +314,7 @@ Status words: **met** · **partial** (met, with a stated shortfall, or not verif
 
 ## The 31 gaps in one list, with their wishes
 
-Every gap is work for node 4.0.0. The wish column names the record in the Lifecycle Central wish bucket that carries the fix.
+Every gap is work for node 4.0.0. The wish column names the record in the Lifecycle Central wish bucket that carries the fix. Items 1 to 8, 16, 20, 21, 23, 25 and 28 are closed in code since 2026-10-12 (see the update under "Answer first"); they stay in the list so the numbering holds.
 
 | # | ID | What is missing | Kind | Wish |
 |---|---|---|---|---|
@@ -359,4 +362,4 @@ Every gap is work for node 4.0.0. The wish column names the record in the Lifecy
 | The connectivity-key agent connect route still exists, although v4.0 said the flow was removed | `aimeat/src/routes/agents/registration.ts:51-119` |
 | The peer key cache has no periodic refresh; keys refresh on introduce, activate and recovery | `aimeat/src/services/federation-helpers.ts:138-151`; `aimeat/src/server-bootstrap/service-init.ts:571-590` |
 | `openapi.yaml` lists three record specifications; the node serves five | `openapi.yaml` `/v1/specs/{name}`; `aimeat/src/services/contract-docs.ts:30` |
-| MCP `serverInfo.version` is `1.2.0`, a fourth version number | `aimeat/src/mcp/index.ts:260` |
+| MCP `serverInfo.version` was `1.2.0`, a fourth version number. Fixed 2026-10-12: it is the node's software version, as `openapi.yaml` `info.version` is | `aimeat/src/mcp/index.ts` |

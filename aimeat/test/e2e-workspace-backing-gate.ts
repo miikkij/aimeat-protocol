@@ -29,6 +29,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
@@ -84,9 +85,10 @@ async function setupAgent(label: string) {
     const agentGaii = ag.body.data.agent.gaii, agentPriv = ag.body.data.private_key;
     const cl = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'WS Backing', redirect_uris: [] }) });
     const ts2 = new Date().toISOString();
-    const params = new URLSearchParams({ response_type: 'code', client_id: cl.body.client_id, gaii: agentGaii, signature: await signMsg(agentPriv, agentGaii + NODE_ID + ts2), timestamp: ts2 });
+    const pkce = mcpPkce(BASE);
+    const params = new URLSearchParams({ response_type: 'code', client_id: cl.body.client_id, gaii: agentGaii, signature: await signMsg(agentPriv, agentGaii + NODE_ID + ts2), timestamp: ts2, ...authorizeParams(pkce) });
     const auth = await json(`/v1/mcp/authorize?${params}`);
-    const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret }) });
+    const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret, ...tokenParams(pkce) }) });
     const client = mcpClient(); client.setToken(tk.body.access_token);
     await client.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'WS Backing', version: '1.0.0' } });
     return { ownerName, ownerToken, client };

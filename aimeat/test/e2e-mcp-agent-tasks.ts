@@ -59,6 +59,7 @@ async function json(path: string, opts: RequestInit = {}, base: string = BASE) {
 import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -145,9 +146,11 @@ async function setup(label: string, mode: string, base: string = BASE) {
         method: 'POST', body: JSON.stringify({ client_name: `mcp tasks ${label}`, redirect_uris: [] }),
     }, base);
     const ats = new Date().toISOString();
+    const pkce = mcpPkce(base);
     const params = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii: agentGaii,
         signature: await sign(agentKey, agentGaii + NODE_ID + ats), timestamp: ats,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${params}`, {}, base);
     const token = await json('/v1/mcp/token', {
@@ -155,6 +158,7 @@ async function setup(label: string, mode: string, base: string = BASE) {
         body: JSON.stringify({
             grant_type: 'authorization_code', code: auth.body.code,
             client_id: client.body.client_id, client_secret: client.body.client_secret,
+            ...tokenParams(pkce),
         }),
     }, base);
     assert(token.status === 200, `mcp token ${token.status}: ${JSON.stringify(token.body)}`);
@@ -192,9 +196,11 @@ async function siblingSession(base: Awaited<ReturnType<typeof setup>>, name: str
         method: 'POST', body: JSON.stringify({ client_name: `mcp sibling ${name}`, redirect_uris: [] }),
     }, base.base);
     const ts = new Date().toISOString();
+    const pkce = mcpPkce(base.base);
     const params = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii,
         signature: await sign(key, gaii + NODE_ID + ts), timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${params}`, {}, base.base);
     const token = await json('/v1/mcp/token', {
@@ -202,6 +208,7 @@ async function siblingSession(base: Awaited<ReturnType<typeof setup>>, name: str
         body: JSON.stringify({
             grant_type: 'authorization_code', code: auth.body.code,
             client_id: client.body.client_id, client_secret: client.body.client_secret,
+            ...tokenParams(pkce),
         }),
     }, base.base);
     assert(token.status === 200, `sibling token ${token.status}: ${JSON.stringify(token.body)}`);

@@ -5,6 +5,9 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_usage_report, aimeat_notify and the five aimeat_contact_* tools declare all three
+ *     interfaces (agentEverywhere): each has a CLI dispatch definition and the connector MCP registers it.
+ *     aimeat_agent_statistics declares the connector MCP too (connectorOnly), which registers it.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   2026-10-10 — aimeat_connector_list and aimeat_connector_rename, and `connector` on
  *     aimeat_agent_propose: an agent is ordered to one of the owner's machines by name.
@@ -57,7 +60,7 @@ import { CONVERSATION_ID, InboxRuleInputSchema } from '../../models/inbox-organi
 import { LinkSchema } from '../input-schemas.js';
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
-import { agentEverywhere } from './types.js';
+import { agentEverywhere, connectorOnly } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { agentV2Tools } from './agent-v2.js';
 
@@ -166,9 +169,7 @@ export const agentMessagingTools = [
         // reaches it too — both resolve to the same human account, which is the only account it can
         // report on.
         caller: 'agent',
-        // publicMcp + connectorMcp, no cliFallback: there is no `aimeat connect` handler for it, and
-        // claiming one would fail the parity gate rather than quietly not work.
-        visibility: { publicMcp: true, connectorMcp: true, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Usage Report', readOnlyHint: true },
         // Usage reports (GET /v1/usage/summary → wallet:read). The same word as the route it calls,
         // because the tool IS that door: a permission enforced on one surface and not the other is a
@@ -184,13 +185,14 @@ export const agentMessagingTools = [
         },
     },
     {
-        // Connector-CLI-only convenience (no MCP surface): the loopback serve daemon / a no-LLM crew
+        // Connector-only convenience (not on the node MCP): the loopback serve daemon / a no-LLM crew
         // reads its own rollups over `aimeat connect call` instead of a periodic node GET. Excluded
-        // from the v2 MCP surfaces (V2_EXCLUDED); cliFallback only.
+        // from the v2 MCP surfaces (V2_EXCLUDED). The connector MCP registers it too, as it does
+        // every tool on the CLI dispatch (dispatch-tools.ts, since 2026-10-05), so the flag says so.
         name: 'aimeat_agent_statistics',
         description: "Get this agent's own performance + per-context review rollups (recomputed from its tasks).",
         caller: 'agent',
-        visibility: { publicMcp: false, connectorMcp: false, cliFallback: true },
+        visibility: connectorOnly,
         annotations: { title: 'Get Agent Statistics', readOnlyHint: true },
         input: {},
     },
@@ -416,7 +418,7 @@ export const agentMessagingTools = [
         name: 'aimeat_notify',
         description: "Tell your OWN owner that something happened: a line in their header bell and, if they turned push on, a notification on their devices; a click opens `link`. Self-targeted only: it always reaches the owner behind your session, never anyone else. Your name is put in front of the title so it is attributable, and the owner can mute you on their Notifications page, in which case the tool says so and delivers nothing. Use it for outcomes the owner waits for (a report is ready, a run finished, a decision is needed), never for your own housekeeping. Requires the notifications:send scope.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Notify Your Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'notifications:send',
         surfaces: ['agent'],
@@ -618,11 +620,11 @@ export const agentMessagingTools = [
         },
     },
     {
-        // ── Contacts (address book) — server MCP only, like the email-invite tools. ──
+        // ── Contacts (address book): thin proxies over /v1/contacts on the connector. ──
         name: 'aimeat_contact_list',
         description: "The owner's address book: everyone they saved, everyone they have exchanged direct messages with, and every PERSON they wrote down who has no account on this node. Each entry carries kind (ghii = a person here, gaii = an agent, geai = an app, mail = a person with no account here), the name to show, their email when one is known, and origin ('saved' vs 'message'). Use it as the identity source when granting access — pair a ghii contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant. A 'mail' contact cannot be granted anything until they join; invite them with aimeat_organism_invite_email. It takes contacts:read, here and on GET /v1/contacts alike. The conversation columns (last message, who wrote it, when, how many, the conversation id) are empty unless you may also read the owner's mailbox (messages:read-as-owner), and include \"together\" is answered only with organism:read.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'List Contacts', readOnlyHint: true },
         // Listing the book has its own word since 2026-10-01: contacts:read, the word GET /v1/contacts
         // asks, which the tool calls. The conversation fields on each row stay empty unless the caller
@@ -639,7 +641,7 @@ export const agentMessagingTools = [
         name: 'aimeat_contact_invite',
         description: "Invite a person to join this AIMEAT with no organism behind it: they get an email in the owner's name with a link that opens an account here, and if the owner wrote them down as a contact, that entry becomes them when they arrive. Refused when the address already has an account (add them with aimeat_contact_add instead), when the owner's own invitation to it is still open, or when the owner has too many open. To invite someone INTO an organism, use aimeat_organism_invite_email. Send one only when the owner asks: it is an email in their name. It takes messages:send, here and on POST /v1/contacts/invite alike. An invitation counts as an address lookup: one account has 20 in 10 minutes, the owner and all their agents together, and past that the answer is RATE_LIMITED with the seconds to wait.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Invite a Person by Email', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         scope: 'messages:send',
         surfaces: ['agent'],
@@ -652,7 +654,7 @@ export const agentMessagingTools = [
         name: 'aimeat_contact_add',
         description: "Save someone to the owner's address book, in one of two ways. An IDENTITY on some node: pass contact_id (a bare local owner name, a GHII, a GAII or a GEAI); a local one that does not exist is refused. A PERSON who has no account here: pass name + email, plus anything else the owner knows (note, tags, links, relation) — that is how you record someone they follow, someone they mean to invite, or a plain email contact. If that address later belongs to a verified account here, the entry becomes that person automatically and nothing the owner wrote is lost. A blocked contact stays blocked (unblock via the Messages flow first). Saving a person by email counts as an address lookup: one account has 20 in 10 minutes, the owner and all their agents together, and past that the answer is RATE_LIMITED with the seconds to wait.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Add Contact', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'messages:send',
         surfaces: ['agent'],
@@ -670,7 +672,7 @@ export const agentMessagingTools = [
         name: 'aimeat_contact_remove',
         description: "Remove a contact from the owner's address book WITHOUT disturbing the direct-message first-contact gate: a contact with message history keeps its messaging state (only the 'saved' mark is dropped); a pure saved contact is deleted. Removing a saved person deletes what the owner wrote about them; anything already sent to them stays in the send log.",
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Remove Contact', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         scope: 'messages:send',
         surfaces: ['agent'],
@@ -682,7 +684,7 @@ export const agentMessagingTools = [
         name: 'aimeat_contact_resolve_email',
         description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email). The same endpoint as POST /v1/contacts/resolve, on the messages:read permission. One account has 20 lookups in 10 minutes, the owner and all their agents together, and saving a person by email with aimeat_contact_add counts as one; past that the answer is RATE_LIMITED with the seconds to wait.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         annotations: { title: 'Resolve Email to Owner', readOnlyHint: true },
         scope: 'messages:read',
         surfaces: ['agent'],

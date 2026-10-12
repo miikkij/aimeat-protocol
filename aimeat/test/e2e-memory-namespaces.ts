@@ -28,6 +28,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -103,14 +104,16 @@ async function rpc(method: string, params: Record<string, unknown> = {}, notify 
 async function openMcpSession(gaii: string, priv: string): Promise<void> {
     const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'ns-shadow e2e', redirect_uris: [] }) });
     const ts = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii,
         signature: await signMsg(priv, gaii + NODE_ID + ts), timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${params}`);
     const tok = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }),
     });
     assert(tok.status === 200, `mcp token ${tok.status}: ${JSON.stringify(tok.body)}`);
     mcpToken = tok.body.access_token;

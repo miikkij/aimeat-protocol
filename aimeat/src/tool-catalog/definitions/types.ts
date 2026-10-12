@@ -6,6 +6,8 @@
  *   ToolInputField, AimeatToolDefinition) plus the shared `agentEverywhere` visibility constant.
  *   Consumed by definitions.ts and every extracted definitions/*.ts tool-group module.
  * @version-history
+ *   v1.2.0 — 2026-10-12 — connectorOnly: the visibility of a tool on both connector interfaces and not
+ *     on the node MCP. Five such tools declared the node MCP, or declared the connector MCP off.
  *   v1.1.0 — 2026-10-05 — ToolInputField.zod: the exact schema of a field whose type the coarse
  *     metadata cannot state, read by zodShapeFor() (zod-shape.ts) for both MCP surfaces. A definition
  *     carries its `annotations`, `scope` and `surfaces`, which the three maps read (secaudit 2026-10, M3).
@@ -81,6 +83,17 @@ export interface AimeatToolDefinition {
 
 export const agentEverywhere: ToolVisibility = {
     publicMcp: true,
+    connectorMcp: true,
+    cliFallback: true,
+};
+
+/**
+ * On both `aimeat connect serve` interfaces and not on the node MCP (the tools in V2_EXCLUDED,
+ * ../surfaces.ts, which gives the reason for each). The three flags say what is registered, and
+ * `pnpm check:mcp-tools` holds them to it in both directions.
+ */
+export const connectorOnly: ToolVisibility = {
+    publicMcp: false,
     connectorMcp: true,
     cliFallback: true,
 };

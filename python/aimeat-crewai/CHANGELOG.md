@@ -3,6 +3,28 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.35.0 - 2026-10-12
+
+- **A default daemon agent reaches every capability of the node.** `DAEMON_DEFAULT_TOOL_FILTER` has
+  30 tools: the 25 it had, plus `aimeat_discover`, `aimeat_invoke`, `aimeat_mcp_list`,
+  `aimeat_mcp_tools` and `aimeat_mcp_call`. With `aimeat_discover` the agent finds what the node can
+  do, and with `aimeat_invoke` it runs any capability by its id, so it uses a tool that is not in
+  its list without loading every description. The three `aimeat_mcp_*` tools do the same for the
+  remote MCP servers the owner attached to the node. The call still needs the permission the tool
+  needs: `mcp:read` to list, `mcp:use` to call.
+- **The new tools cannot stop your daemon from starting.** A tool filter stops the start when it
+  names a tool the server did not expose. The five new names are loaded when the server offers
+  them and left out, with one printed line, when it does not (`DAEMON_TOOLS_IF_OFFERED`): a
+  connector started with `--surface agent`, an agent without the `mcp` permissions on a node's own
+  MCP, or a connector older than the tool. The 25 earlier names stay required.
+- `create_liaison_agent(tool_filter_if_offered=[...])` gives your own filter the same behaviour for
+  the names you choose, and `select_liaison_tools()` is the function that decides. A filter you
+  write is required in full, as before.
+- With `aimeat` 3.26.1 or older as the connector, 30 node tools answer over MCP and not through
+  `/local/call` (contacts, companies, beneficiary splits, exchange work and proposals, organism
+  owners and email invitations, `aimeat_notify`, `aimeat_usage_report`, `aimeat_app_tool_invoke`).
+  The `aimeat` release after 3.26.1 serves them on both.
+
 ## 0.34.0 - 2026-10-11
 
 - **An offer has two values: a money price and a pacing amount.** `build_offer()` takes
