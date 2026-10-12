@@ -31,6 +31,10 @@
  *   and AIMEAT_SHOT_PASSWORD are set; AIMEAT_SHOT_ENV names another env file.
  * @structure SETTINGS · ADMIN · SLOW_MS · arg · launchBrowser · readShow · loginFromEnvFile · main
  * @version-history
+ *   v1.5.0 — 2026-10-12 — Visibility, aimeat-design-lab and Themes & Styles join the menu pages, and
+ *     a show entry may name controls to press before the shutter (`click`, one Playwright selector
+ *     or a list pressed in order): the catalogue at /v1/appcat opens an app's own page from the
+ *     Details button of its opened row.
  *   v1.4.0 — 2026-09-15 — --only front takes the front page itself into public/img/frontdemo/
  *     front-page.png, the last frame of "ten seconds under the hood".
  *   v1.3.0 — 2026-09-15 — The sign-in falls back to scripts/.env, the file the repo's other
@@ -50,7 +54,7 @@ import { fileURLToPath } from 'node:url';
 /** The same ids views/landing-v2-projector.js lists; a tab added there is added here. */
 const SETTINGS = [
   'messages', 'contacts', 'discover', 'portfolio', 'fleet', 'agents', 'ecosystem', 'offers', 'scheduler',
-  'workflows', 'chatsessions', 'mcp', 'wallet', 'usage', 'pnl', 'companies', 'knowledge', 'skills',
+  'workflows', 'chatsessions', 'mcp', 'wallet', 'usage', 'visibility', 'pnl', 'companies', 'knowledge', 'skills',
   'organisms', 'memory', 'notebook', 'living', 'work', 'actions', 'boards', 'apps', 'appdev', 'extensions',
   'capabilities', 'federation', 'nodes', 'access', 'dataWallet', 'nodeStats', 'security', 'email',
   'notifications', 'ai', 'calibrator', 'packages', 'libraries',
@@ -65,6 +69,7 @@ const ADMIN = [
   'directory', 'extensions', 'cortex', 'csm', 'knowledge', 'skills', 'packages',
   'msm',
   'federation', 'genesis',
+  'design-lab', 'themes',
 ];
 
 /**
@@ -82,11 +87,16 @@ const SLOW_MS: Record<string, number> = {
   'admin:memory-admin': 12_000,
   'admin:subdomains': 12_000,
   'admin:skills': 12_000,
+  // The design lab draws each component in a frame of its own, and the frames fill one by one:
+  // at 10 s most were blank and at 45 s one still was (aimeat.io, 2026-10-12). Themes & Styles
+  // loads every theme first.
+  'admin:design-lab': 60_000,
+  'admin:themes': 8_000,
 };
 
 type Name = string | Record<string, string>;
-interface ShowEntry { id: string; name: Name; app?: string; url?: string; settle?: number; detailOf?: string; line?: Name }
-interface Target { where: 'settings' | 'admin' | 'apps' | 'front'; id: string; url: string; settle: number; detailOf?: string; file?: string }
+interface ShowEntry { id: string; name: Name; app?: string; url?: string; settle?: number; detailOf?: string; click?: string | string[]; line?: Name }
+interface Target { where: 'settings' | 'admin' | 'apps' | 'front'; id: string; url: string; settle: number; detailOf?: string; click?: string | string[]; file?: string }
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
@@ -175,7 +185,7 @@ async function main(): Promise<void> {
     ...show.filter((e) => keep('apps', e.id)).map((e) => ({
       where: 'apps' as const, id: e.id,
       url: e.url ? (e.url.startsWith('http') ? e.url : `${base}${e.url}`) : appUrl(e.app as string),
-      settle: Math.max(settle, Number(e.settle) || 0), detailOf: e.detailOf,
+      settle: Math.max(settle, Number(e.settle) || 0), detailOf: e.detailOf, click: e.click,
     })),
     // The front page itself, for the last frame of "ten seconds under the hood": one level up from
     // the projector's folder, because it is not a slide of the projector.
@@ -229,6 +239,12 @@ async function main(): Promise<void> {
             launcher?.openPublishedDetail?.(owner, filename, '', 0);
           }, [tgt.detailOf.slice(0, slash), tgt.detailOf.slice(slash + 1)]);
           await tab.waitForTimeout(Math.max(4_000, Math.floor(tgt.settle / 2)));
+        }
+        // A view with no address of its own on a page of the SPA: press the controls that open it,
+        // in order (a catalogue row first, then its Details button).
+        for (const sel of tgt.click ? [tgt.click].flat() : []) {
+          await tab.locator(sel).first().click({ timeout: 15_000 });
+          await tab.waitForTimeout(Math.max(3_000, Math.floor(tgt.settle / 3)));
         }
         const png = await tab.screenshot({ type: 'png' });
         const file = tgt.file || resolve(outDir, `${tgt.where}-${tgt.id}.png`);
