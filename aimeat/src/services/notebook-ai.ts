@@ -29,12 +29,17 @@
  *     notebook completion now mints provenance and is metered. `OwnerModel` carries the handle the
  *     chokepoint needs (storage, config, gaii) instead of a decrypted key, and takes an `appId` so
  *     each feature's spend is legible in the owner's usage breakdown rather than pooled.
+ *   v1.3.0 — 2026-10-13 — The early key check counts a key on one of the owner's providers
+ *     (own-key-coverage.ts hasOwnAiKey), not only the legacy openrouter.apikey record. From node 4.0.0
+ *     the providers are the only place a key is set, so AI sorting answered NO_OPENROUTER_KEY to every
+ *     owner who set one there (the 4.0.0 sweep).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { CompletionOptions } from './openrouter.js';
 import { completeForOwner, AiCompletionError, type CompleteForOwnerResult } from './ai/completion.js';
 import { getEncryptionKey } from './encryption.js';
+import { hasOwnAiKey } from './own-key-coverage.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
 
 /** Raised with a stable `code` so routes can map it to the right HTTP status + envelope. */
@@ -81,7 +86,9 @@ export async function resolveOwnerModel(
     if (!getEncryptionKey(config)) {
       throw new NotebookAiError('ENCRYPTION_NOT_CONFIGURED', 'Encryption key not configured on this node.', 503);
     }
-  } else if (provider === 'openrouter') {
+  } else if (provider === 'openrouter' && !(await hasOwnAiKey(storage, gaii))) {
+    // A key set on one of the owner's providers counts too: from node 4.0.0 that is the only place a
+    // key can be set (the legacy settings route is removed), so a legacy-only check refused everyone.
     throw new NotebookAiError('NO_OPENROUTER_KEY', 'No OpenRouter API key configured. Add one in the OpenRouter settings to use AI sorting.', 400);
   }
   const model = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'openrouter/free';
