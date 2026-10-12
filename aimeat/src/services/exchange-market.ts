@@ -19,6 +19,10 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.12.0 — 2026-10-12 — resolveExtActionPricing: an extension action priced in the 4.0.0 form (its
+ *     own tollMorsels, no commercial.payMorsels) is contracted at its toll as the per-call pacing, with
+ *     no second toll beside it; it answered NOT_PRICED on accept, bid accept and listing although the
+ *     projection listed it. The offering and bid-accept paths use it (the 4.0.0 sweep).
  *   v1.11.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): offeringTollMorsels + presentOffering. Responses carry `toll_morsels`; a
  *     morsel-rail offering is free and its `unit`/`basePrice` are deprecated mirrors until 4.0.0.
@@ -109,6 +113,29 @@ export function resolveActionPricing(
     }
   }
   return { ok: true, unit, pricePerCall: perCall, currency, pricing };
+}
+
+/**
+ * The contract terms of an extension ACTION: resolveActionPricing over its `commercial` block, and the
+ * pacing toll the contract carries beside the per-call amount. The 4.0.0 form of a morsel-rail action
+ * is its own `tollMorsels` with no `commercial.payMorsels` (the manifest refuses payMorsels from 4.0.0,
+ * services/extension-manifest.ts stores tollMorsels on the action). Such an action was NOT_PRICED here,
+ * so it could be listed by the projection but never contracted. Read as listingTerms reads it: with no
+ * money price and no 3.x payMorsels, the toll IS the per-call pacing amount and the toll beside it is
+ * 0, so a tollMorsels of 10 charges 10 per call, not 20. A 3.x record (payMorsels, with or without a
+ * separate toll) and a money-priced action price exactly as before.
+ */
+export function resolveExtActionPricing(
+  act: { commercial?: unknown; tollMorsels?: number | null }, planId: string | null,
+): (Extract<ReturnType<typeof resolveActionPricing>, { ok: true }> & { tollMorsels: number | null })
+  | Extract<ReturnType<typeof resolveActionPricing>, { ok: false }> {
+  const comm = act.commercial as ActionCommercial | undefined;
+  const priced = resolveActionPricing(comm, planId);
+  if (priced.ok) return { ...priced, tollMorsels: act.tollMorsels ?? null };
+  const toll = act.tollMorsels;
+  if (priced.code !== 'NOT_PRICED' || typeof toll !== 'number' || !Number.isInteger(toll) || toll <= 0) return priced;
+  const paced = resolveActionPricing({ ...(comm ?? {}), tollMorsels: toll }, planId);
+  return paced.ok ? { ...paced, tollMorsels: 0 } : paced;
 }
 
 /** A provider pricing plan surfaced on an offering (mirrors the action's commercial.plans). */
@@ -350,13 +377,13 @@ export async function resolveOfferingPricing(
   const extRec = await storage.getExtension(o.ext);
   const act = extRec?.actions.find(a => a.id === o.action);
   if (!extRec || !act) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Offering capability no longer exists' };
-  const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, planId);
+  const priced = resolveExtActionPricing(act, planId);
   if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
   return {
     ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
     providerGhii: o.providerGhii, ext: o.ext, action: o.action, capabilityLabel: `${o.ext}/${o.action}`, surface: null,
     // The action is the live source for a raw ext offering — its declared toll, not the listing's copy.
-    tollMorsels: act.tollMorsels ?? null,
+    tollMorsels: priced.tollMorsels,
   };
 }
 
@@ -732,7 +759,7 @@ export async function acceptBid(
     const act = extRec?.actions.find(a => a.id === bid.action);
     if (!extRec || !act) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Bid capability no longer exists' };
 
-    const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, bid.planId);
+    const priced = resolveExtActionPricing(act, bid.planId);
     if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
 
     const capUnits = input.capUnits ?? n.budgetCap;
@@ -750,8 +777,8 @@ export async function acceptBid(
         pricing: priced.pricing,
         capUnits,
         contractRef: `bid:${bid.bidId}`,
-        // The pacing toll the ACTION declares for itself.
-        tollMorsels: act.tollMorsels ?? null,
+        // The pacing toll the ACTION declares for itself (0 when that toll is the per-call amount).
+        tollMorsels: priced.tollMorsels,
         createdBy: input.owner,
         carrySpend: existing,
     });

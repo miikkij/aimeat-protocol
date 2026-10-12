@@ -13,6 +13,8 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.7.0 — 2026-10-12 — Listing an extension action prices it with resolveExtActionPricing, so an
+ *     action in the 4.0.0 form (its own tollMorsels, no payMorsels) lists instead of NOT_PRICED.
  *   v1.6.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). Every offering in a response carries `toll_morsels` (presentOffering);
  *     a morsel-rail offering is free, with `unit`/`basePrice` as deprecated mirrors until 4.0.0. An
@@ -45,7 +47,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import {
   type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type OfferingPlan,
-  resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
+  resolveActionPricing, resolveExtActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings, filterOfferings,
   putNeed, getNeed, parseNeedSpec, listNeeds, putBid, listBids, getBid, acceptBid,
   offeringStats, offeringConsumers, enrichNeeds, presentOffering, offeringTollMorsels,
@@ -314,7 +316,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     if (extRec.installedBy !== owner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the extension owner may list it'));
     const act = extRec.actions.find(a => a.id === action);
     if (!act) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${action}" not found on "${ext}"`));
-    const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, null);
+    const priced = resolveExtActionPricing(act, null);
     if (!priced.ok) return res.status(400).json(error(config.nodeId, priced.code, priced.message));
     // LEGIBILITY GATE: an offering must be integrable + governed to be listed. The action MUST publish an
     // input AND output schema (so a consumer/agent knows what to send and gets back), and the listing MUST
@@ -343,7 +345,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
       plans: (act.commercial as ActionCommercial | undefined)?.plans ?? [],
       // The action's own toll, so the listing states the pacing a contract on it will carry.
-      tollMorsels: act.tollMorsels ?? null,
+      tollMorsels: priced.tollMorsels,
       provenance: prov.value, odps: odps.value,
       usageTerms,
       tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
