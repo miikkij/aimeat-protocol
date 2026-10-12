@@ -51,6 +51,7 @@ async function json(path: string, opts: RequestInit = {}) {
 // Helper: sign a message with a base64 private key
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -180,12 +181,14 @@ await test('OAuth authorize + token exchange', async () => {
     const timestamp = new Date().toISOString();
     const message = agentGaii + NODE_ID + timestamp;
     const signature = await signMsg(agentPrivKey, message);
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
         gaii: agentGaii,
         signature,
         timestamp,
+        ...authorizeParams(pkce),
     });
     const { body: authBody } = await json(`/v1/mcp/authorize?${params}`);
     assert(typeof authBody.code === 'string', 'has auth code');
@@ -197,6 +200,7 @@ await test('OAuth authorize + token exchange', async () => {
             code: authBody.code,
             client_id: clientId,
             client_secret: clientSecret,
+            ...tokenParams(pkce),
         }),
     });
     assert(status === 200, `token status ${status}`);
@@ -335,10 +339,11 @@ await test('6b. A second owner\'s agent cannot read A\'s instance, and does not 
     const gaiiB = bAgent.body.data.agent.gaii as string;
     const ts = new Date().toISOString();
     const sig = await signMsg(bAgent.body.data.private_key, gaiiB + NODE_ID + ts);
-    const { body: auth } = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.client_id, gaii: gaiiB, signature: sig, timestamp: ts })}`);
+    const pkce = mcpPkce(BASE);
+    const { body: auth } = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.client_id, gaii: gaiiB, signature: sig, timestamp: ts, ...authorizeParams(pkce) })}`);
     const { body: tok } = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret, ...tokenParams(pkce) }),
     });
     let sid = '';
     const bRpc = async (method: string, params: Record<string, any>, id: number) => {

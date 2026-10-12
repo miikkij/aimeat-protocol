@@ -35,6 +35,10 @@
  * @usage
  *   const view = peerRelayClaimView(config, peer);
  * @version-history
+ *   v1.1.0 — 2026-10-12 — RELAY_CLAIM_OPTIONAL_REMOVED_IN is a version gate (Core 2026-11 FED-10,
+ *     HTTP-08): from it effectiveRelayClaim answers `required` whatever the node or the peer says, and
+ *     parsePeerRelayClaim refuses `optional`. The constant moved to config-federation.ts and is
+ *     re-exported here.
  *   v1.0.1 — 2026-09-29 — The header says `required` is the default from 3.20.0 (config-federation.ts
  *     applies it). No code change.
  *   v1.0.0 — 2026-09-25 — Initial: the peer's own setting, the two relay times, and the versions.
@@ -43,21 +47,28 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { logger } from '../utils/logger.js';
+import { RELAY_CLAIM_OPTIONAL_REMOVED_IN, relayClaimOptionalLive } from '../config-federation.js';
 
 export type RelayClaimSetting = 'optional' | 'required';
 
 /** The release in which the node-wide default becomes `required`. */
 export const RELAY_CLAIM_REQUIRED_BY_DEFAULT_IN = '3.20.0';
-/** The release in which `optional` stops being a setting, the node's and every peer's. */
-export const RELAY_CLAIM_OPTIONAL_REMOVED_IN = '4.0.0';
+/** The release in which `optional` stops being a setting, the node's and every peer's (declared in config-federation.ts). */
+export { RELAY_CLAIM_OPTIONAL_REMOVED_IN };
 /** At most one write of each relay time per peer in this window. */
 export const RELAY_SEEN_WRITE_INTERVAL_MS = 10 * 60_000;
 /** The word a door takes for "follow this node's setting". The REST door also takes null. */
 export const FOLLOW_NODE = 'node';
 
-export function parsePeerRelayClaim(raw: unknown):
+export function parsePeerRelayClaim(raw: unknown, version?: string):
   { ok: true; value: RelayClaimSetting | null } | { ok: false; message: string } {
   if (raw === null || raw === FOLLOW_NODE) return { ok: true, value: null };
+  if (raw === 'optional' && !relayClaimOptionalLive(version)) {
+    return {
+      ok: false,
+      message: `relay_claim 'optional' was removed in ${RELAY_CLAIM_OPTIONAL_REMOVED_IN}: a relayed request carries a signed relay claim. Set 'required' or '${FOLLOW_NODE}'.`,
+    };
+  }
   if (raw === 'optional' || raw === 'required') return { ok: true, value: raw };
   return {
     ok: false,
@@ -65,11 +76,17 @@ export function parsePeerRelayClaim(raw: unknown):
   };
 }
 
-/** What the gate applies to an unclaimed relay naming this peer: its own answer, else the node's. */
+/**
+ * What the gate applies to an unclaimed relay naming this peer: its own answer, else the node's.
+ * From RELAY_CLAIM_OPTIONAL_REMOVED_IN it is `required` whatever either says (Core 2026-11 FED-10,
+ * HTTP-08): a peer row or a live config change that still holds `optional` has no effect.
+ */
 export function effectiveRelayClaim(
   config: Pick<AimeatConfig, 'federationRelayClaim'>,
   peer?: Pick<PeerInfo, 'relayClaim'> | null,
+  version?: string,
 ): RelayClaimSetting {
+  if (!relayClaimOptionalLive(version)) return 'required';
   return peer?.relayClaim ?? config.federationRelayClaim;
 }
 

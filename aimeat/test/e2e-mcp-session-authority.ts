@@ -10,6 +10,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -88,13 +89,16 @@ async function agent(account: Awaited<ReturnType<typeof owner>>, name: string) {
   const gaii = registration.body.data.agent.gaii as string;
   const client = await rest('/v1/mcp/register', 'POST', undefined, { client_name: 'authority-test', redirect_uris: [] });
   const time = new Date().toISOString();
+  const pkce = mcpPkce(BASE);
   const authorization = await rest('/v1/mcp/authorize?' + new URLSearchParams({
     response_type: 'code', client_id: client.body.client_id, gaii, timestamp: time,
     signature: await sign(registration.body.data.private_key, gaii + NODE + time),
+    ...authorizeParams(pkce),
   }));
   const token = await rest('/v1/mcp/token', 'POST', undefined, {
     grant_type: 'authorization_code', code: authorization.body.code,
     client_id: client.body.client_id, client_secret: client.body.client_secret,
+    ...tokenParams(pkce),
   });
   assert.equal(token.status, 200, 'agent credential');
   return { name, gaii, token: token.body.access_token as string,

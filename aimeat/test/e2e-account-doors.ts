@@ -103,6 +103,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -1416,13 +1417,15 @@ await test('62. When an account is deleted, every credential it issued is refuse
     const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `Account deletion ${first.name}`, redirect_uris: [] }) });
     assert(client.status === 201, `mcp register ${client.status}`);
     const at = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const q = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii: agent.gaii,
         signature: await signMsg(agent.privateKey, agent.gaii + NODE_ID + at), timestamp: at,
+        ...authorizeParams(pkce),
     });
     const code = (await json(`/v1/mcp/authorize?${q}`)).body.code as string;
     const mcp = await json('/v1/mcp/token', {
-        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }),
     });
     assert(mcp.status === 200 && typeof mcp.body.access_token === 'string', `mcp token ${mcp.status}: ${JSON.stringify(mcp.body)}`);
     // An app the account granted memory:read: its access token, and the refresh token that mints more.

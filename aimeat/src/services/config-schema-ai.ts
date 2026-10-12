@@ -7,6 +7,7 @@
  *   CONFIG_FIELDS spreads these rows where they stood, so the Config tab lists them in the same order.
  * @structure SYSTEM2_AI_CONFIG_FIELDS
  * @version-history
+ *   v1.4.0 — 2026-10-12 — ai.legacy_settings_routes refuses `true` from 4.0.0, its removal (Core 2026-11 HTTP-08).
  *   v1.3.0 — 2026-10-05 — ai.node_key_when_spent, ai.node_key_account_daily_usd,
  *     ai.node_key_node_daily_usd: the operator decides what the node's key does once a person's
  *     allowance is spent (secaudit 2026-10, AI-1).
@@ -22,7 +23,7 @@
 import type { AiCapabilityConfig } from '../config-types-ai.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { parseRecommendedModels } from './ai/policy.js';
-import { isJsonObject, oneOf } from './config-schema-validators.js';
+import { isJsonObject, oneOf, REMOVAL_SWITCHES } from './config-schema-validators.js';
 
 export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig>[] = [
   // What the node's key does once a person's allowance is spent (services/ai-allowance.ts
@@ -42,7 +43,7 @@ export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig
   { key: 'aiProviderEgress', dotPath: 'ai.provider_egress', envVar: 'AIMEAT_AI_PROVIDER_EGRESS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'Exact addresses (scheme, host, port) of the operator\'s own local AI servers, comma separated. Only the node\'s own providers may reach them; an owner\'s provider never does', range: 'http://127.0.0.1:1234,http://ollama:11434' },
   { key: 'aiProviderTypes', dotPath: 'ai.provider_types', envVar: 'AIMEAT_AI_PROVIDER_TYPES', type: 'string', validate: v => typeof v === 'string' && /^[a-z,\s]*$/.test(v as string), immutable: false, description: 'Which fixed provider types this node allows, comma separated: openrouter, openai, anthropic, mistral, xai. Empty allows all five at their official addresses', range: 'openrouter,anthropic' },
   { key: 'aiFixedBaseUrlOverrides', dotPath: 'ai.fixed_baseurl_overrides', envVar: 'AIMEAT_AI_FIXED_BASEURL_OVERRIDES', type: 'string', validate: v => typeof v === 'string' && (!(v as string).trim() || isJsonObject(v as string)), immutable: true, description: 'Points a fixed provider type at another address, as JSON {"anthropic": "http://127.0.0.1:40699/v1"}, for a test stub. Refused on a public node' },
-  { key: 'aiLegacySettingsRoutes', dotPath: 'ai.legacy_settings_routes', envVar: 'AIMEAT_AI_LEGACY_SETTINGS_ROUTES', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'The AI settings routes from before providers (/v1/openrouter/settings, /models, /test, /v1/ai/settings) still answer. Deprecated: they are removed in 4.0.0; off, they answer 410 Gone naming /v1/ai/providers' },
+  { key: 'aiLegacySettingsRoutes', dotPath: 'ai.legacy_settings_routes', envVar: 'AIMEAT_AI_LEGACY_SETTINGS_ROUTES', type: 'boolean', validate: REMOVAL_SWITCHES.aiLegacySettingsRoutes, immutable: false, description: 'The AI settings routes from before providers (/v1/openrouter/settings, /models, /test, /v1/ai/settings) still answer. Deprecated: they are removed in 4.0.0, from which this is off whatever it is set to; off, they answer 410 Gone naming /v1/ai/providers' },
   { key: 'aiRecommendedModels', dotPath: 'ai.recommended_models', envVar: 'AIMEAT_AI_RECOMMENDED_MODELS', type: 'string', validate: v => typeof v === 'string' && parseRecommendedModels(v).problems.length === 0, immutable: false, description: 'The models this node recommends, per capability, as JSON: {"text": ["openrouter:anthropic/claude-opus-5.5"], "image": [...]}, in order. An owner who chooses the recommended models may use only these. Empty recommends nothing' },
   // The model catalogue (System 2 plan, V4; services/ai/catalog/).
   { key: 'aiCatalogRefresh', dotPath: 'ai.catalog_refresh', envVar: 'AIMEAT_AI_CATALOG_REFRESH', type: 'string', ...oneOf('weekly', 'daily', 'off'), immutable: false, description: 'How often the node refreshes its model catalogue (what each model can do and costs) from models.dev, OpenRouter and LiteLLM: weekly, daily or off. Off keeps the list the build shipped with', range: 'weekly|daily|off' },

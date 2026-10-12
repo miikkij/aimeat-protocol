@@ -23,6 +23,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,15 +97,17 @@ async function mcpSessionFor(ownerToken: string, owner: string, agentName: strin
     const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'Font manager E2E', redirect_uris: [] }) });
     assert(client.status === 201, `mcp register: ${client.status}`);
     const ts = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii,
         signature: await signMsg(agent.body.data.private_key, gaii + NODE_ID + ts), timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${params}`);
     assert(typeof auth.body.code === 'string', `authorize: ${JSON.stringify(auth.body)}`);
     const tok = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }),
     });
     assert(tok.status === 200, `mcp token: ${tok.status}`);
     const token = tok.body.access_token as string;

@@ -20,6 +20,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -193,15 +194,17 @@ await test('Over MCP, the tools answer what the route answers', async () => {
     const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'UI library E2E', redirect_uris: [] }) });
     assert(client.status === 201, `mcp register: ${client.status}`);
     const ts = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii,
         signature: await signMsg(agent.body.data.private_key, gaii + NODE_ID + ts), timestamp: ts,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${params}`);
     assert(typeof auth.body.code === 'string', `authorize: ${JSON.stringify(auth.body)}`);
     const tok = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }),
     });
     assert(tok.status === 200, `mcp token: ${tok.status}`);
     mcpToken = tok.body.access_token;

@@ -54,6 +54,7 @@ async function json(path: string, opts: RequestInit = {}) {
 // Helper: sign a message with a base64 private key
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -190,12 +191,14 @@ await test('OAuth authorize + token exchange', async () => {
     const timestamp = new Date().toISOString();
     const message = agentGaii + NODE_ID + timestamp;
     const signature = await signMsg(agentPrivKey, message);
+    const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
         gaii: agentGaii,
         signature,
         timestamp,
+        ...authorizeParams(pkce),
     });
     const { body: authBody } = await json(`/v1/mcp/authorize?${params}`);
     assert(typeof authBody.code === 'string', 'has auth code');
@@ -207,6 +210,7 @@ await test('OAuth authorize + token exchange', async () => {
             code: authBody.code,
             client_id: clientId,
             client_secret: clientSecret,
+            ...tokenParams(pkce),
         }),
     });
     assert(status === 200, `token status ${status}`);
@@ -430,14 +434,16 @@ await test('4h. Another owner\'s agent cannot set the rules of a board it does n
 
     const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'MCP Boards Other', redirect_uris: [] }) });
     const ts2 = new Date().toISOString();
+    const pkce = mcpPkce(BASE);
     const q = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii: otherGaii,
         signature: await signMsg(ag.body.data.private_key, otherGaii + NODE_ID + ts2), timestamp: ts2,
+        ...authorizeParams(pkce),
     });
     const auth = await json(`/v1/mcp/authorize?${q}`);
     const token = await json('/v1/mcp/token', {
         method: 'POST',
-        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret, ...tokenParams(pkce) }),
     });
     assert(token.status === 200, `other mcp token: ${token.status}`);
 

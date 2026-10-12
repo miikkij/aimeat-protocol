@@ -6,6 +6,7 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-12 — The organism-share consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — GET /:id public manifest lookup batches owners+agents (was O(owners+agents) scan)
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3: importing a package whose `synthesis.level` is not
@@ -248,7 +249,7 @@ export function registerPackagesCoreRoutes(
         dataPattern: `packages/${packageId}/*`,
         recipient: `organism.${overrides.organism_share}`,
         purpose: 'Knowledge package shared with organism',
-        scope: 'private',
+        scope: 'local',
         expires: null,
         status: 'active',
         grantedAt: now,

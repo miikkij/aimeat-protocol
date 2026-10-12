@@ -10,6 +10,11 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.13.0 -- 2026-10-12 -- The owner-key branch of POST /v1/auth/token is a version gate: from
+ *     OWNER_KEY_LOGIN_REMOVED_IN (4.0.0) it answers 410 OWNER_KEY_LOGIN_OFF whatever
+ *     AIMEAT_OWNER_KEY_LOGIN says; before it, every answer carries the Deprecation headers and each
+ *     use is counted (deprecated_use: owner_key_login). The branch spends its signature on first use
+ *     as the agent branch does (Core 2026-11 AUTH-05, AUTH-11, HTTP-07, HTTP-08).
  *   v1.12.0 -- 2026-10-12 -- POST /v1/auth/token spends an agent's signature on first use
  *     (spendSignature), so a replay inside the five-minute window answers 401 (Core 2026-11 AUTH-11).
  *   v1.11.0 -- 2026-10-09 -- POST /v1/auth/refresh renews an ecosystem app only with a fresh signature
@@ -79,6 +84,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
+import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config-security.js';
+import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
@@ -296,15 +303,24 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Owner auth (owner name provided instead of gaii). DEPRECATED (RFC v4.0), removed in 4.0.0, and
-    // off on a node that set AIMEAT_OWNER_KEY_LOGIN=false.
+    // Owner auth (owner name provided instead of gaii). DEPRECATED (RFC v4.0), removed in
+    // OWNER_KEY_LOGIN_REMOVED_IN whatever the setting says, and off before that on a node that set
+    // AIMEAT_OWNER_KEY_LOGIN=false (Core 2026-11 AUTH-05, HTTP-08).
     if (ownerName) {
-      if (!config.ownerKeyLogin) {
+      if (!ownerKeyLoginAllowed(config)) {
+        const removed = removedFrom(OWNER_KEY_LOGIN_REMOVED_IN);
         res.status(410).json(error(config.nodeId, 'OWNER_KEY_LOGIN_OFF',
-          'This service no longer signs you in with your account key. Sign in with your password instead.',
-          undefined, { sign_in: 'POST /v1/ghii/login' }));
+          removed
+            ? `Signing in with your account key was removed in ${OWNER_KEY_LOGIN_REMOVED_IN}. Sign in with your password instead.`
+            : 'This service no longer signs you in with your account key. Sign in with your password instead.',
+          undefined, { sign_in: 'POST /v1/ghii/login', successor: '/v1/ghii/login', ...(removed ? { removed_in: OWNER_KEY_LOGIN_REMOVED_IN } : {}) }));
         return;
       }
+      // Still on: every answer of this branch names the removal (Core 2026-11 HTTP-07).
+      noteDeprecatedUse({
+        kind: 'owner_key_login', removedIn: OWNER_KEY_LOGIN_REMOVED_IN, successor: '/v1/ghii/login',
+        notice: 'POST /v1/auth/token was called with an owner name and an account-key signature (the owner-key sign-in).',
+      });
       const ownerRecord = await storage.getOwner(ownerName);
       if (!ownerRecord) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${ownerName}`));
@@ -320,6 +336,12 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
 
       if (!signatureTimestampFresh(timestamp)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Timestamp too old or too far in the future'));
+        return;
+      }
+      // Spent on first use, as the agent branch above does (AUTH-11): within the window, a captured
+      // owner request body otherwise minted an owner session every time it was sent again.
+      if (!spendSignature(signature)) {
+        res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'That signature has already been used. Sign a new timestamp.'));
         return;
       }
 

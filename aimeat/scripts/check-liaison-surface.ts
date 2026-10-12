@@ -28,6 +28,9 @@
  *   cd aimeat && pnpm check:liaison-surface --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:liaison-surface --record   # after publishing, write the new baseline
  * @version-history
+ *   v1.3.0 — 2026-10-12 — The connector's tools are read from its registration and the CLI dispatch
+ *     table. The source scan under src/cli/connect counted 1 tool once the last handlers there ran
+ *     their dispatch definition, so a change to what connect serve offers moved no fingerprint.
  *   v1.2.0 — 2026-10-05 — The node's tools are read from TOOL_ANNOTATIONS itself, not from the text
  *     of src/mcp/annotations.ts: the entries move onto the catalog definitions (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-15 — Say when a release is STAGED but not out. A bumped version with a moved
@@ -39,6 +42,8 @@ import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from '
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { TOOL_ANNOTATIONS } from '../src/mcp/annotations.js';
+import { CONNECT_CLI_TOOLS } from '../src/cli/connect/tool-call.js';
+import { captureConnector } from './inventory/mcp-capture.js';
 
 const ROOT = process.cwd();
 const REPO = join(ROOT, '..');
@@ -61,15 +66,13 @@ function walk(dir: string, ext: string, out: string[] = []): string[] {
     return out;
 }
 
-/** Every tool name the connector bridge and the CLI fallback know. This is what `connect serve`
- *  proxies through the tunnel, so a change here changes what a tunnelled client can call. */
+/** Every tool `aimeat connect serve` offers: what the connector MCP registers and what has a handler
+ *  behind /local/call. A change here changes what a tunnelled client can call. Read from the
+ *  registration and the dispatch table themselves: until 2026-10-12 this scanned the source text
+ *  under src/cli/connect for tool names, the definitions had moved to src/tool-dispatch/ on
+ *  2026-09-27, and the scan was down to the one tool that still names itself there. */
 function connectorTools(): string[] {
-    const names = new Set<string>();
-    for (const file of walk(join(ROOT, 'src', 'cli', 'connect'), '.ts')) {
-        const src = readFileSync(file, 'utf-8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-        for (const m of src.matchAll(/['"`](aimeat_[a-z0-9_]+)['"`]/g)) names.add(m[1]);
-    }
-    return [...names].sort();
+    return [...new Set([...captureConnector().keys(), ...CONNECT_CLI_TOOLS.map(tool => tool.name)])].sort();
 }
 
 /**

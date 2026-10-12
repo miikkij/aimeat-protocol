@@ -9,6 +9,8 @@
  * @structure getSoftwareVersion(): string · versionAtLeast(version, floor): boolean
  * @usage import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
  * @version-history
+ *   v1.1.1 — 2026-10-12 — The only copy: config-pacing.ts and config-federation.ts import it, and every
+ *     4.0.0 gate asks it through services/deprecation.ts removedFrom().
  *   v1.1.0 — 2026-10-12 — versionAtLeast(), the comparison a *_REMOVED_IN gate makes, for the MCP
  *     OAuth gate (mcp/oauth-binding.ts). config-pacing.ts and config-federation.ts keep their own copy.
  *   v1.0.0 — 2026-06-19 — Initial runtime version resolver (federation version visibility).

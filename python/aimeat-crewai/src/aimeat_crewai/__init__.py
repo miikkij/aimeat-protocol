@@ -104,6 +104,7 @@ from .crew_llm import (
 )
 from .daemon import (
     DAEMON_DEFAULT_TOOL_FILTER,
+    DAEMON_TOOLS_IF_OFFERED,
     BuildCrewCallback,
     InvokeHandler,
     NodeRefusedDuringRun,
@@ -171,6 +172,7 @@ from .liaison import (
     AimeatLiaisonError,
     create_liaison_agent,
     liaison_tools,
+    select_liaison_tools,
 )
 from .mcp_client import (
     AimeatServeError,
@@ -233,12 +235,13 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.34.0"
+__version__ = "0.35.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
     "create_liaison_agent",
     "liaison_tools",
+    "select_liaison_tools",
     "AimeatLiaisonError",
     "AimeatServeError",
     "stdio_params",
@@ -251,6 +254,7 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "run_crew_daemon",
     "BuildCrewCallback",
     "DAEMON_DEFAULT_TOOL_FILTER",
+    "DAEMON_TOOLS_IF_OFFERED",
     # What `on_error` receives when the node refused a run's calls for a missing permission (0.31.0)
     "NodeRefusedDuringRun",
     # Server-initiated invokes — the Crew tab's Validate and Try (0.22.0)

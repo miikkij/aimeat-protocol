@@ -39,6 +39,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -71,9 +72,10 @@ async function connectAgent(owner: Person, label: string) {
     const gaii = ag.body.data.agent.gaii as string, priv = ag.body.data.private_key as string;
     const cl = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'WS MC', redirect_uris: [] }) });
     const ts = new Date().toISOString();
-    const params = new URLSearchParams({ response_type: 'code', client_id: cl.body.client_id, gaii, signature: await sign(priv, gaii + NODE_ID + ts), timestamp: ts });
+    const pkce = mcpPkce(BASE);
+    const params = new URLSearchParams({ response_type: 'code', client_id: cl.body.client_id, gaii, signature: await sign(priv, gaii + NODE_ID + ts), timestamp: ts, ...authorizeParams(pkce) });
     const authz = await json(`/v1/mcp/authorize?${params}`);
-    const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret }) });
+    const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret, ...tokenParams(pkce) }) });
     const token = tk.body.access_token as string;
     let session = '';
     const rpc = async (method: string, params: Record<string, any> = {}, id = 1) => {

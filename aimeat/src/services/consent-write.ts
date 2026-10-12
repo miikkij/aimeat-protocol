@@ -27,6 +27,9 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The reach is decided here for both surfaces (Core 2026-11 AUTHZ-18): `local`,
+ *     `federation` or `auth`; `private` and `dmz` are stored as `local`, counted and named on the
+ *     response; an absent reach is `federation` before 4.0.0 and `local` from it (utils/consent-reach.ts).
  *   v1.1.1 — 2026-10-05 — hasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.1.0 — 2026-08-11 — Security audit H-2: the owner/operator bypass in gate() now excludes agent
  *     and ecosystem sessions, matching requireScope. Agent tokens carried the owner's roles until
@@ -41,6 +44,10 @@ import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import {
+    CONSENT_REACH_ALIAS_REMOVED_IN, CONSENT_REACH_INPUTS, consentReachOf, defaultConsentReach, isConsentReachAlias,
+} from '../utils/consent-reach.js';
+import { noteDeprecatedUse, removedFrom } from './deprecation.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -70,7 +77,11 @@ export interface ConsentGrantInput {
     recipient: string;
     dataPattern: string;
     purpose: string;
-    scope: ConsentRecord['scope'];
+    /**
+     * The reach as the caller sent it: `local`, `federation`, `auth`, or the deprecated `private` and
+     * `dmz`, which are stored as `local`. Absent: defaultConsentReach() for the running version.
+     */
+    scope?: string;
     /** Absolute ISO expiry, or null for indefinite. */
     expires?: string | null;
     metadata?: Record<string, unknown>;
@@ -122,6 +133,22 @@ export async function grantConsent(
             message: 'recipient must be "*", a GAII, or prefixed with "organism.", "ghii:", "domain:", or "node:"',
         };
     }
+    // The reach (Core 2026-11 AUTHZ-18): one of three, the two older names stored as `local`, and the
+    // default decided by the running version, so a consent made without a reach never makes a record
+    // replicable from 4.0.0.
+    if (input.scope !== undefined && !(CONSENT_REACH_INPUTS as readonly string[]).includes(input.scope)) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'scope (the reach) is "local", "federation" or "auth".' };
+    }
+    if (isConsentReachAlias(input.scope) && removedFrom(CONSENT_REACH_ALIAS_REMOVED_IN)) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: `The reach "${input.scope}" was removed in ${CONSENT_REACH_ALIAS_REMOVED_IN}; send "local".` };
+    }
+    if (isConsentReachAlias(input.scope)) {
+        noteDeprecatedUse({
+            kind: 'consent_reach_alias', removedIn: CONSENT_REACH_ALIAS_REMOVED_IN, successor: 'local',
+            notice: `A consent was granted with the reach "${input.scope}", an older name for "local"; it is stored as "local".`,
+        });
+    }
+    const reach = input.scope === undefined ? defaultConsentReach() : consentReachOf(input.scope);
 
     const existing = await storage.listConsents(caller.ownerGaii);
     if (existing.length >= CONSENT_QUOTA) {
@@ -138,7 +165,7 @@ export async function grantConsent(
         dataPattern: input.dataPattern,
         recipient: input.recipient,
         purpose: input.purpose,
-        scope: input.scope,
+        scope: reach,
         expires: input.expires ?? null,
         status: 'active',
         grantedAt: now,

@@ -12,6 +12,14 @@
  *   pnpm audit:mcp-tools
  *   pnpm audit:mcp-tools -- --json
  * @version-history
+ *   v1.6.0 -- 2026-10-12 -- The connect-serve rule joins the --check list: a node MCP tool is on the
+ *     connector MCP and has a /local/call handler unless security/connect-serve-parity-exemptions.json
+ *     names it with a reason, and a catalog tool's three visibility flags say what is registered
+ *     (inventory/connect-serve-parity.ts). Until now a handler was asked for only where the catalog
+ *     declared cliFallback: true, and 30 agent tools that declared false had none. The node MCP's
+ *     names are read from the registration as well (captureServer): two tools registered in a loop
+ *     (aimeat_agent_stop, aimeat_agent_start) were missing from the source scan, which reported them
+ *     as connector-only.
  *   v1.0.0 -- 2026-05-28 -- Initial MCP surface audit script
  *   v1.1.0 -- 2026-05-28 -- Include shared catalog CLI fallback coverage
  *   v1.2.0 -- 2026-05-28 -- Report catalog drift against MCP surfaces and CLI handlers
@@ -29,7 +37,8 @@ import { CONNECT_CLI_TOOLS } from '../src/cli/connect/tool-call.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/tool-catalog/definitions.js';
 import { TOOL_ANNOTATIONS } from '../src/mcp/annotations.js';
 import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../src/tool-catalog/scopes.js';
-import { captureConnector } from './inventory/mcp-capture.js';
+import { captureConnector, captureServer } from './inventory/mcp-capture.js';
+import { connectServeParity, readExemptions, EXEMPTION_CEILING, type ParityReport } from './inventory/connect-serve-parity.js';
 
 interface SurfaceConfig {
     id: 'server' | 'connector';
@@ -64,6 +73,8 @@ interface AuditReport {
     overlap: string[];
     serverOnly: string[];
     connectorOnly: string[];
+    /** Every node MCP tool on both `aimeat connect serve` interfaces, and the flags that say so. */
+    connectServe: ParityReport & { exempt: string[]; ceiling: number };
 }
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -149,8 +160,21 @@ function buildReport(serverTools: ToolReference[], connectorTools: ToolReference
     const registeredNames = [...new Set([...serverNames, ...connectorNames])]
         .sort((first, second) => first.localeCompare(second));
     const registeredNameSet = new Set(registeredNames);
+    const exemptions = readExemptions();
 
     return {
+        connectServe: {
+            ...connectServeParity({
+                nodeMcp: serverNameSet,
+                connectorMcp: connectorNameSet,
+                localCall: cliHandlerNames,
+                catalog: CLI_FALLBACK_TOOL_DEFINITIONS,
+                exemptions,
+                ceiling: EXEMPTION_CEILING,
+            }),
+            exempt: Object.keys(exemptions).sort((first, second) => first.localeCompare(second)),
+            ceiling: EXEMPTION_CEILING,
+        },
         generatedAt: new Date().toISOString(),
         surfaces: { server: serverTools, connector: connectorTools },
         catalog: {
@@ -218,7 +242,14 @@ function printMarkdownReport(report: AuditReport): void {
     console.log(`Annotation entries: ${report.annotations.all.length}`);
     console.log(`Registered tools missing annotations: ${report.annotations.registeredWithoutAnnotation.length}`);
     console.log(`Annotation entries with no registered tool: ${report.annotations.annotationWithoutRegistration.length}`);
+    console.log(`Node MCP tools not on both connect-serve interfaces, unexempted: ${report.connectServe.notOnConnectServe.length}`);
+    console.log(`Connect-serve exemptions: ${report.connectServe.exempt.length} (ceiling ${report.connectServe.ceiling})`);
+    console.log(`Catalog tools whose visibility flags do not say what is registered: ${report.connectServe.flagMismatches.length}`);
 
+    printNameList('Node MCP Tools Not On Both Connect-Serve Interfaces (no exemption)', report.connectServe.notOnConnectServe);
+    printNameList('Connect-Serve Exemptions (security/connect-serve-parity-exemptions.json)', report.connectServe.exempt);
+    printNameList('Connect-Serve Exemption Problems', [...report.connectServe.exemptionProblems, ...report.connectServe.ceilingProblems]);
+    printNameList('Visibility Flags That Do Not Say What Is Registered', report.connectServe.flagMismatches);
     printNameList('Server-Only Tool Names', report.serverOnly);
     printNameList('Connector-Only Tool Names', report.connectorOnly);
     printNameList('CLI Fallback Names Missing From Public MCP', report.catalog.cliFallbackWithoutServerMcp);
@@ -239,6 +270,16 @@ function printMarkdownReport(report: AuditReport): void {
 }
 
 const serverTools = await collectTools(surfaces[0]);
+// The source scan reads `mcp.tool('name'`, so a tool registered from a variable has no line it can
+// find: aimeat_agent_stop and aimeat_agent_start are registered in one loop (src/mcp/agent-tasks.ts)
+// and were reported as connector-only for that reason. The registration itself names them.
+{
+    const named = new Set(serverTools.map(t => t.name));
+    for (const name of captureServer().keys()) {
+        if (!named.has(name)) serverTools.push({ surface: 'server', file: 'src/mcp (registered without a literal name)', line: 1, name });
+    }
+    serverTools.sort((first, second) => first.name.localeCompare(second.name) || first.file.localeCompare(second.file));
+}
 const connectorTools = await collectTools(surfaces[1]);
 // The connector tools with no handler of their own run their CLI dispatch definition and are
 // registered in a loop (dispatch-tools.ts), so no source line names them: the registration itself does.
@@ -274,10 +315,21 @@ function destructiveToolsWithoutScope(): string[] {
 if (process.argv.includes('--json')) {
     console.log(JSON.stringify(report, null, 2));
 } else if (process.argv.includes('--check')) {
-    // Gate mode (pre-commit + CI): fail on any drift signal that must stay empty.
+    // Gate mode (pnpm gate + CI): fail on any drift signal that must stay empty.
     // cliFallbackWithoutServerMcp is intentionally NOT gated — a handful of tools are
     // connector-only convenience with no server /v1/mcp surface (see surfaces.ts V2_EXCLUDED).
     const drift: Record<string, string[]> = {
+        // EVERY NODE MCP TOOL IS ON `aimeat connect serve`, ON BOTH OF ITS INTERFACES (Jouni,
+        // 2026-10-12). The two keys below this block ask for a handler only where the catalog
+        // declares cliFallback: true, so a tool that declared false was never asked about: 30 agent
+        // tools had no /local/call handler with this gate green. These four ask the registrations.
+        // A node MCP tool missing from the connector MCP or from /local/call needs an entry with a
+        // written reason in security/connect-serve-parity-exemptions.json; that list only shrinks;
+        // and each catalog flag says what is registered, in both directions.
+        nodeMcpNotOnConnectServe: report.connectServe.notOnConnectServe,
+        connectServeExemption: report.connectServe.exemptionProblems,
+        connectServeExemptionCeiling: report.connectServe.ceilingProblems,
+        visibilityFlagNotAsRegistered: report.connectServe.flagMismatches,
         cliFallbackWithoutHandler: report.catalog.cliFallbackWithoutHandler,
         cliFallbackWithoutConnectorMcp: report.catalog.cliFallbackWithoutConnectorMcp,
         serverMcpWithoutCatalog: report.catalog.serverMcpWithoutCatalog,
@@ -298,7 +350,19 @@ if (process.argv.includes('--json')) {
         console.log('[audit:mcp-tools] ✓ no MCP tool drift');
     } else {
         console.error('[audit:mcp-tools] ✗ MCP tool drift detected — wire the tools (surfaces + connector + CLI handler) or update the catalog/exclusions:');
-        for (const [key, names] of offenders) console.error(`  ${key} (${names.length}): ${names.join(', ')}`);
+        // The connect-serve keys carry a sentence per tool, so they print one to a line.
+        for (const [key, names] of offenders) {
+            if (names.some(name => name.includes(': '))) {
+                console.error(`  ${key} (${names.length}):`);
+                for (const name of names) console.error(`    ${name}`);
+            } else {
+                console.error(`  ${key} (${names.length}): ${names.join(', ')}`);
+            }
+        }
+        if (offenders.some(([key]) => key === 'nodeMcpNotOnConnectServe')) {
+            console.error('  A node MCP tool needs a CLI dispatch definition in src/tool-dispatch/tool-call-defs-*.ts (a thin proxy over its REST route),'
+                + '\n  which also registers it on the connector MCP. An exemption is the developer\'s decision: security/connect-serve-parity-exemptions.json.');
+        }
         console.error('Run `pnpm audit:mcp-tools` for the full parity report.');
         process.exit(1);
     }

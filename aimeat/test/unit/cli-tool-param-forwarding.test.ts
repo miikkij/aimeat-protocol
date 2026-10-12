@@ -26,6 +26,10 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-10-12 — The 30 tools that got a CLI dispatch definition are invoked here like every other one.
+ *     Four of them branch on a parameter (beneficiary earnings, splits and approve, proposal decide)
+ *     and get a PROBE_SETUP entry, and each of the six groups has one case that names the route it
+ *     must reach on both connector interfaces.
  *   2026-10-06 — aimeat_organism_search's archived is probed with `include`, the scope that reaches
  *     the wire as includeArchived (secaudit 2026-10 follow-up, Part B).
  *   2026-10-06 — aimeat_memory_write.expected_version is measured: POST /v1/memory reads it (secaudit
@@ -155,6 +159,19 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // the message read, which carries none of them. Held constant, every probe takes the attachment
     // branch; attachment_id itself is still probed on its own.
     aimeat_mail_read: { always: { attachment_id: 'zqxattachmentzqx' } },
+    // `role` picks which of two routes is read: 'provider' reads /obligations, anything else reads
+    // /earnings. A generic sentinel takes the same route as no role at all, so the probe sends the one
+    // value that changes the request.
+    aimeat_commerce_beneficiary_earnings: { shaped: { role: 'provider' } },
+    // Withdrawing a split needs remove_ext AND remove_action; one alone is refused before the wire.
+    // Both are held constant, so each is measured on the DELETE that carries the pair.
+    aimeat_commerce_beneficiary_splits: { always: { remove_ext: 'zqxremove_extzqx', remove_action: 'zqxremove_actionzqx' } },
+    // Without `state` the call is the read (GET), which carries only ghii. With one it is the
+    // decision (POST), the branch that carries method, subject and evidence.
+    aimeat_commerce_beneficiary_approve: { always: { state: 'approved' } },
+    // `decision` is one of three routes, and a value outside them is refused before the wire, so the
+    // required-field sentinel a probe of proposal_id would send beside it must be a real decision.
+    aimeat_exchange_proposal_decide: { always: { decision: 'accept' } },
 };
 
 /**
@@ -546,6 +563,45 @@ describe('the redeploy, source and board-rules parameters reach the route that r
         const refused = await tool.handler({ action: 'get', key: 'a', level: 'owner' });
         expect(refused.isError).toBe(true);
         expect(sent).toEqual([]);
+    });
+
+    // Until 2026-10-12 thirty agent tools had a handler on the connector MCP only, so /local/call
+    // answered UNKNOWN_TOOL for them. One tool from each of the six groups, with the route it must
+    // reach and the body it must carry, on the CLI dispatch and on the connector MCP.
+    it('one tool from each group that joined the CLI dispatch reaches its route on both connector interfaces', async () => {
+        const cases: [string, JsonObject, Sent][] = [
+            ['aimeat_contact_add', { name: 'Anna', email: 'anna@example.fi', tags: ['client'] },
+                { method: 'POST', path: '/v1/contacts', body: { name: 'Anna', email: 'anna@example.fi', tags: ['client'] } }],
+            ['aimeat_company_front_page', { company_id: 'co-1', kind: 'app', target: 'me/shop.html' },
+                { method: 'PUT', path: '/v1/companies/co-1/front-page', body: { kind: 'app', target: 'me/shop.html' } }],
+            ['aimeat_commerce_beneficiary_release', { tracking_code: 'trk-1', beneficiary: 'bob@node' },
+                { method: 'POST', path: '/v1/commerce/beneficiary/release', body: { tracking_code: 'trk-1', beneficiary: 'bob@node' } }],
+            ['aimeat_exchange_work', { offering_id: 'off-1', input: { q: 'x' }, note: 'n' },
+                { method: 'POST', path: '/v1/exchange/work', body: { offering_id: 'off-1', input: { q: 'x' }, note: 'n' } }],
+            ['aimeat_organism_invite_email', { organism_id: 'org-1', email: 'new@example.fi', org_role: 'admin', expires_in_days: 3 },
+                { method: 'POST', path: '/v1/organisms/org-1/invitations/email', body: { email: 'new@example.fi', orgRole: 'admin', expiresInDays: 3 } }],
+            ['aimeat_notify', { title: 'Done', body: 'The report is ready', link: '/profile' },
+                { method: 'POST', path: '/v1/notifications', body: { title: 'Done', body: 'The report is ready', link: '/profile' } }],
+        ];
+        const sent: Sent[] = [];
+        const tools = connectorTools('dispatch', sent);
+        // JSON, as the request leaves the process: a field given no value is not sent.
+        const onWire = (list: Sent[]) => JSON.parse(JSON.stringify(list)) as Sent[];
+        for (const [name, input, expected] of cases) {
+            const viaCli = await record(cli(name), input);
+            expect(viaCli.refused, `CLI ${name}`).toBe(false);
+            expect(onWire(viaCli.sent), `CLI ${name}`).toEqual([expected]);
+            const tool = tools.get(name);
+            expect(tool, `${name} is registered on the connector MCP`).toBeDefined();
+            sent.length = 0;
+            await tool!.handler(input);
+            expect(onWire(sent), `connector ${name}`).toEqual([expected]);
+        }
+
+        // A decision outside the three routes is refused before anything is sent.
+        const odd = await record(cli('aimeat_exchange_proposal_decide'), { proposal_id: 'p-1', decision: '../../admin' } as never);
+        expect(odd.refused).toBe(true);
+        expect(odd.sent).toEqual([]);
     });
 
     it('connector MCP aimeat_board_create declares rules, and aimeat_board_rules_set exists', async () => {

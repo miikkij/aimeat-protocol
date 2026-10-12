@@ -13,6 +13,9 @@
  *   Money is 6-decimal micro-units; morsels are whole units of pacing, never a price. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-10-12 — The six act-on-EXCHANGE tools declare all three interfaces (agentEverywhere) and have a
+ *     CLI dispatch definition. The 2026-09-03 decision to keep them off `/local/call` ended; the comment
+ *     above the tool list says why its ground did not hold.
  *   2026-10-11 — Texts call a morsel amount pacing, never a price (decision-morseli-on-tahdistus-ei-
  *     hinta-tarjouksen-kaksi-arvoa).
  *   2026-10-06 — App-tool invocation documents unpriced access and the remaining paid-action checks.
@@ -31,26 +34,25 @@
  *   v1.0.0 — 2026-07-20 — Initial EXCHANGE MCP tool definitions (10 tools)
  */
 import { z } from 'zod';
-import type { AimeatToolDefinition, ToolVisibility } from './types.js';
+import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
-/** The "act on EXCHANGE" tools (invoke/work/proposals) are on BOTH MCP surfaces so ANY agent can act: the
- *  PUBLIC /v1/mcp (hosted clients like Claude chat — the server tool threads the session token so app-tool
- *  invoke can run the backing capability) AND the CONNECTOR MCP (`aimeat connect serve` — tunnelled fleet
- *  agents get them as thin REST proxies over the same routes). Not a CLI fallback.
+/**
+ * The six "act on EXCHANGE" tools (app-tool invoke, work start/deliver/list, proposals and the
+ * decision on one) are on all three interfaces: the node MCP, the connector MCP and the CLI dispatch
+ * behind `/local/call/<tool>` (tool-dispatch/tool-call-defs-exchange-run.ts).
  *
- *  That last sentence is a DECISION, not an omission, and it has been read as a gap twice. These six
- *  are two-sided acts under a metered contract: they charge a budget, settle against a counterparty,
- *  or run a provider's backing capability with the provider's own keys. A fleet agent reaches them
- *  through the connector MCP tool above, which carries the agent's session. `/local/call/<tool>` is
- *  the shell's own dispatch and holds no such session, so a door there would be a second, weaker
- *  implementation of the metering — the one thing `check:mcp-tools` exists to prevent. If a runtime
- *  cannot find `aimeat_app_tool_invoke` on `/local/call/`, it is asking the wrong door: the tool is
- *  registered at src/cli/connect/mcp/tools/exchange.ts. Measured 2026-09-03: 267 of the 300 catalog
- *  entries carry cliFallback and all 267 have a handler; 33 do not, 24 of which are not on the
- *  connector at all, leaving these six plus three owner-account tools. */
-const agentMcp: ToolVisibility = { publicMcp: true, connectorMcp: true, cliFallback: false };
+ * From 2026-09-03 to 2026-10-12 they were kept off the CLI dispatch as a decision, on the ground that
+ * `/local/call` held no agent session and a handler there would be a second, weaker implementation
+ * of the metering. Read against the code on 2026-10-12, that ground does not hold: the connector MCP
+ * tool and `/local/call` both take the agent from the same registry (`registry.resolve()`,
+ * cli/connect/mcp/local-server.ts) and send through the same REST client, and the contract check,
+ * the metering and the charge are in the node routes (routes/webmcp.ts, routes/exchange-agent-work.ts,
+ * routes/exchange.ts), which the connector never reimplemented. The decision ended with the ruling
+ * that every node MCP tool is offered on both `aimeat connect serve` interfaces (Jouni, 2026-10-12;
+ * security/connect-serve-parity-exemptions.json holds the exceptions).
+ */
 
 export const exchangeTools = [
     {
@@ -217,7 +219,7 @@ export const exchangeTools = [
         name: 'aimeat_app_tool_invoke',
         description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Read inputSchema with aimeat_app_tools_get first: invalid input is refused before charging, with every missing field named.',
         caller: 'agent',
-        visibility: agentMcp,
+        visibility: agentEverywhere,
         annotations: { title: 'Invoke App Tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         scope: 'exchange:write',
         // On `service`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
@@ -234,7 +236,7 @@ export const exchangeTools = [
         name: 'aimeat_exchange_work',
         description: 'Start an async AGENT-WORK task under a contract you hold: the provider agent performs it out-of-band and DELIVERS later, and you are charged the per-task price ON DELIVERY (metered + rake). Requires an active contract for the agent-work offering (accept it first with aimeat_exchange_accept). Nothing is charged now. Track it with aimeat_exchange_work_list.',
         caller: 'agent',
-        visibility: agentMcp,
+        visibility: agentEverywhere,
         annotations: { title: 'Start Agent Work (async task)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'exchange:write',
         surfaces: ['agent', 'service'],
@@ -248,7 +250,7 @@ export const exchangeTools = [
         name: 'aimeat_exchange_work_deliver',
         description: 'As the PROVIDER of an agent-work task, deliver the result → settle ON DELIVERY: charge the consumer the per-task price, credit you, route the rake, decrement their budget. Only the work\'s own provider may. A budget/rate failure leaves the work open and unpaid (you are told why).' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
-        visibility: agentMcp,
+        visibility: agentEverywhere,
         annotations: { title: 'Deliver Agent Work (settle on delivery)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'exchange:write',
         surfaces: ['agent', 'service'],
@@ -263,7 +265,7 @@ export const exchangeTools = [
         name: 'aimeat_exchange_work_list',
         description: 'List your AGENT-WORK items — as the consumer (tasks you started, default) or the provider (`role:"provider"` — tasks to deliver + delivered), newest first, with input/output, state, and what was charged on delivery.',
         caller: 'agent',
-        visibility: agentMcp,
+        visibility: agentEverywhere,
         annotations: { title: 'List Agent Work Items', readOnlyHint: true },
         // Act-on-exchange (invoke/work/proposals): read = list; write = invoke/start/deliver/decide (spends or changes a contract).
         scope: 'exchange:read',
@@ -276,7 +278,7 @@ export const exchangeTools = [
         name: 'aimeat_exchange_proposals',
         description: 'List the contract-RENEGOTIATION proposals you are party to (incoming to accept/decline, and your own outgoing), with the proposed new price/cap, a snapshot of the current terms, who proposed it, and status. Decide one with aimeat_exchange_proposal_decide.',
         caller: 'agent',
-        visibility: agentMcp,
+        visibility: agentEverywhere,
         annotations: { title: 'List Renegotiation Proposals', readOnlyHint: true },
         scope: 'exchange:read',
         surfaces: ['agent', 'service'],
@@ -286,7 +288,7 @@ export const exchangeTools = [
         name: 'aimeat_exchange_proposal_decide',
         description: 'Decide a renegotiation proposal: `accept` (as the counterparty → supersede the live contract at the agreed terms; the old one is archived to history), `decline` (as the counterparty → no change), or `withdraw` (as the proposer → cancel your own pending proposal). Mutual consent is the authority — a proposed price only binds once the OTHER party accepts.',
         caller: 'agent',
-        visibility: agentMcp,
+        visibility: agentEverywhere,
         annotations: { title: 'Decide Renegotiation Proposal', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'exchange:write',
         surfaces: ['agent', 'service'],

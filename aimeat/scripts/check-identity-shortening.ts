@@ -292,7 +292,7 @@ export const ALLOWED: Record<string, Record<string, string>> = {
     '/#([^@]+)@/': 'The connector reads its own account name out of the GAII the node it signed in to just issued; it runs on the person\'s machine, where no visitor reaches it.',
     "cliOwner.split('@')[0]": 'The owner the person typed on the command line, as the last fallback for the same name; the connector runs on their machine, where no visitor reaches it.',
   },
-  'src/cli/connect/mcp/tools/exchange.ts': {
+  'src/tool-dispatch/tool-call-defs-exchange-run.ts': {
     "owner.split('@')[0]": 'The connector builds the app path of a provider the agent named; the node it calls looks that name up itself, with its own rules.',
   },
   'src/cli/connect/clients/index.ts': {

@@ -12,6 +12,8 @@
  *   - performKeyExchange(peerUrl, config, storage, expectNodeId): exchange and cache peer public keys
  *
  * @version-history
+ *   v1.2.0 — 2026-10-12 — performKeyExchange asks peerUrlRefusal first: a public node exchanges keys
+ *     only over https:// from 4.0.0 (Core 2026-11 FED-13).
  *   v1.1.0 — 2026-10-01 — performKeyExchange names the node it asks (`expectNodeId`). An answer that
  *     says it is another node is a failed exchange, and the key is cached under the node asked, never
  *     under the id the answer names: whatever answered at an address could place a key for any node id,
@@ -24,6 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { peerUrlRefusal } from './peer-url-policy.js';
 
 // ── E.4: Keyword matching helpers for cross-catalogue filtering ──
 
@@ -83,6 +86,10 @@ export async function performKeyExchange(
     expectNodeId: string,
 ): Promise<{ success: boolean; error?: string; peerPublicKey?: string }> {
     try {
+        // Every peering runs this exchange, so it is where a stored plain-http address on a public
+        // node stops being used (Core 2026-11 FED-13, peer-url-policy.ts).
+        const schemeRefusal = peerUrlRefusal(config, peerUrl);
+        if (schemeRefusal) return { success: false, error: `${schemeRefusal.code}: ${schemeRefusal.message}` };
         const nodeKey = await storage.getNodeKey();
         if (!nodeKey) {
             return { success: false, error: 'No node key available' };

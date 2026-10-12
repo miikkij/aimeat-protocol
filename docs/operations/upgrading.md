@@ -46,6 +46,13 @@ Each item below is deprecated in 3.x and still works there, so a node and its cl
 before 4.0.0. Most of them have a setting that turns the old way off now: turn it off on a test node
 first, watch the refusals, and fix the clients that hit them.
 
+From 4.0.0 each one is refused whatever the configuration says: a setting that kept it on has no
+effect, and the Config page refuses the value that would keep it on. Until then, every use answers
+with `Deprecation: true`, `X-AIMEAT-Removed-In: 4.0.0` and, where there is one, a `Link` to the way
+that replaces it (`rel="successor-version"`). `GET /v1/stats` counts each use under
+`deprecated_use_by_type` (`ws_query_token` and `mcp_oauth_legacy` keep their own counters), and the
+node log names each kind once a day. When a count stays at zero, nothing on that node still uses it.
+
 | What goes | Setting today | After it goes, a client gets | What to change first |
 |---|---|---|---|
 | **Owner-key sign-in**: `POST /v1/auth/token` with an owner name and a signature made with the account's private key | `AIMEAT_OWNER_KEY_LOGIN` (on by default in 3.x) | 410 `OWNER_KEY_LOGIN_OFF`, naming `POST /v1/ghii/login` | people sign in with a password or a passkey; scripts use a personal access token or device authorization. A client that registers people without a password must give them one |
@@ -53,15 +60,38 @@ first, watch the refusals, and fix the clients that hit them.
 | **Federation messages without a delivery proof** (no audience) | `AIMEAT_FEDERATION_AUDIENCE_REQUIRED` (required by default from 3.27.0; a peer that once sent a proof is always held to it) | 401 `AUDIENCE_REQUIRED` | every peer runs a version that sends the proof. `aimeat_admin_federation` names peers that are versions behind |
 | **An optional relay claim**: `AIMEAT_FEDERATION_RELAY_CLAIM=optional`, and a peer's own `relay_claim: optional` | `AIMEAT_FEDERATION_RELAY_CLAIM` (required by default since 3.20.0) | 403 `RELAY_CLAIM_REQUIRED` for a relayed request without a signed claim | relaying peers send `x-relay-claim` and `x-relay-signature`. The federation overview lists peers that are not ready; set each with `aimeat_admin_federation_relay_claim_set` once it signs |
 | **The old morsel price fields**: `price.morsels`, `price_morsels`, `base_morsels`, `payMorsels`, `priceMorsels`, `budget_unit: morsels`, `clear_morsels`, `pricing.base_morsels`, `commercial.payMorsels`. A morsel paces use; it is not a price | none: the node refuses them by itself when it runs 4.0.0 | 400 `MORSEL_PRICE_REMOVED`, naming `toll_morsels` | write the pacing amount as `toll_morsels` (`tollMorsels`, `clear_toll`, `pricing.toll_morsels`) and a money price as a money price. Responses in 3.x carry the old field as a mirror marked `deprecated`; stop reading it |
-| **`costCapMorsels` in a workflow definition** (accepted and ignored in 3.x, with a warning) | none | the field is gone | set `maxCostUsd` |
+| **`costCapMorsels` in a workflow definition** (accepted and ignored in 3.x, with a warning) | none | 400 `WORKFLOW_INVALID` on a save that sets it (over MCP: "Validation failed") | set `maxCostUsd` |
 | **The AI settings routes from before providers**: `/v1/openrouter/settings`, `/v1/openrouter/models`, `/v1/openrouter/test`, `/v1/ai/settings` | `AIMEAT_AI_LEGACY_SETTINGS_ROUTES` (on by default in 3.x) | 410, naming `/v1/ai/providers` | use `/v1/ai/providers` |
-| **A fixed TURN user name and password** for voice and video relay | `AIMEAT_TURN_USERNAME`, `AIMEAT_TURN_CREDENTIAL` (used only when `AIMEAT_TURN_SECRET` is not set) | the fixed pair is no longer served | set `AIMEAT_TURN_SECRET` (the coturn shared secret); the node then gives each client a credential that expires (`AIMEAT_TURN_TTL_SECONDS`) |
+| **A fixed TURN user name and password** for voice and video relay | `AIMEAT_TURN_USERNAME`, `AIMEAT_TURN_CREDENTIAL` (used only when `AIMEAT_TURN_SECRET` is not set) | the fixed pair is no longer served: the TURN entry carries the address alone | set `AIMEAT_TURN_SECRET` (the coturn shared secret); the node then gives each client a credential that expires (`AIMEAT_TURN_TTL_SECONDS`) |
+| **The MCP OAuth flow without PKCE or a resource** | none | 400 `invalid_request` or `invalid_target` | the AI client sends PKCE (S256) and `resource` naming the node's MCP endpoint, as current clients do |
 
-Three of these are named in the code as constants, and the version that removes each is read from
-there: `UNPROVEN_FORMAT_REMOVED_IN` (`aimeat/src/config-federation.ts`),
-`MORSEL_PRICE_FIELDS_REMOVED_IN` (`aimeat/src/config-pacing.ts`) and
-`RELAY_CLAIM_OPTIONAL_REMOVED_IN` (`aimeat/src/services/relay-claim-policy.ts`). The others name 4.0.0
-in their setting's description.
+Each removal is named in the code by its own constant, beside the code it gates, and the version
+that removes it is read from there:
+
+| Constant | File |
+|---|---|
+| `OWNER_KEY_LOGIN_REMOVED_IN`, `WS_QUERY_TOKEN_REMOVED_IN` | `aimeat/src/config-security.ts` |
+| `UNPROVEN_FORMAT_REMOVED_IN`, `RELAY_CLAIM_OPTIONAL_REMOVED_IN` | `aimeat/src/config-federation.ts` (the second re-exported by `services/relay-claim-policy.ts`) |
+| `MORSEL_PRICE_FIELDS_REMOVED_IN` | `aimeat/src/config-pacing.ts` |
+| `COST_CAP_MORSELS_REMOVED_IN` | `aimeat/src/services/workflow/store.ts` |
+| `AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN` | `aimeat/src/config-ai-models.ts` |
+| `TURN_STATIC_PAIR_REMOVED_IN` | `aimeat/src/config-turn.ts` |
+| `MCP_OAUTH_LAX_REMOVED_IN` | `aimeat/src/mcp/oauth-binding.ts` |
+
+## What else changes in 4.0.0
+
+These are not removals, but each takes effect when the node reports 4.0.0, and each has its own
+constant.
+
+| What changes | From 4.0.0 | Before 4.0.0 | Constant |
+|---|---|---|---|
+| **A consent made without a reach** | it is `local`: the recipient reads on this node, and nothing is replicated because of it | it is `federation`. `local` is accepted already, and `private` and `dmz` are stored and answered as `local` (with the Deprecation headers; they are accepted through 4.x) | `CONSENT_REACH_LOCAL_DEFAULT_IN` (`aimeat/src/utils/consent-reach.ts`) |
+| **A plain-http peer address on a public node** | refused with 400 `PEER_HTTPS_REQUIRED`; a local node keeps plain http | taken, with the Deprecation headers | `PEER_HTTPS_REQUIRED_IN` (`aimeat/src/services/peer-url-policy.ts`) |
+| **`AIMEAT_AI_PROVENANCE=false` on a public node** | has no effect; the start-up check says it was refused. A local node keeps the switch | switches recording off, and the start-up check says it stops working in 4.0.0 | `PROVENANCE_SWITCH_LOCAL_ONLY_IN` (`aimeat/src/config-ai-label.ts`) |
+| **Discovery** (`/.well-known/aimeat`, `GET /` `this_node`) | states `protocol_version: "2026-11"` and the Core profiles the node claims | leaves both out | `CORE_PROTOCOL_FROM` (`aimeat/src/services/core-discovery.ts`) |
+
+A peer row stored with a plain-http address before 4.0.0 is not rewritten: on a public node the key
+exchange refuses it from 4.0.0. Change its address to `https://` before the upgrade.
 
 Already removed before 4.0.0, and listed here because old guides still mention them: micro-memory
 routes, the one-time-key write routes, the Ed25519 owner key returned by registration as the way to
@@ -73,3 +103,8 @@ sign in (see the first row), MongoDB and Prisma storage. The
 The versions of outside protocols the node declares (MCP, A2A, OAuth metadata and others) are kept in
 `aimeat/security/protocol-versions.json`. A new node version can raise a declared version; a client
 that pins an older one should read that file in the release it upgrades to.
+
+AIMEAT Core itself is the `aimeat-core` row there: the edition the node is written to (`2026-11`),
+held to `x-aimeat-protocol` in `openapi.yaml`. The node states it in discovery as
+`protocol_version` from 4.0.0. `openapi.yaml` `info.version` and the MCP `serverInfo.version` are the
+node's own version.

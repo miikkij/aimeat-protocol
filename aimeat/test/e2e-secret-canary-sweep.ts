@@ -34,6 +34,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse as parseYaml } from 'yaml';
@@ -179,10 +180,11 @@ async function mcpToken(gaii: string, privKey: string): Promise<string> {
     const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'sweep-e2e' }) });
     const timestamp = new Date().toISOString();
     const signature = await signMsg(privKey, gaii + NODE_ID + timestamp);
-    const qs = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature, timestamp });
+    const pkce = mcpPkce(BASE);
+    const qs = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii, signature, timestamp, ...authorizeParams(pkce) });
     const code = (await json(`/v1/mcp/authorize?${qs}`)).body.code as string;
     const tok = await json('/v1/mcp/token', {
-        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }),
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret, ...tokenParams(pkce) }),
     });
     return tok.body.access_token as string;
 }

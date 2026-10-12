@@ -13,6 +13,8 @@
  *   - logger: the configured Winston logger (console transport, AIMEAT_LOG_LEVEL or LOG_LEVEL)
  *
  * @version-history
+ *   v1.3.0 — 2026-10-12 — RequestContext.setHeader: a service that accepts a deprecated form sets the
+ *     Deprecation headers on the response it runs under (services/deprecation.ts, Core 2026-11 HTTP-07).
  *   v1.2.0 — 2026-10-09 — Credential masking is case-insensitive, recursive (bounded, cycle-safe) and
  *     scrubs key-shaped text in every string, through utils/redact-credentials.ts (secrets audit d1).
  *   v1.1.0 — 2026-09-08 — AIMEAT_LOG_LEVEL is honoured, LOG_LEVEL kept as the fallback.
@@ -25,6 +27,12 @@ import { redactCredentialField } from './redact-credentials.js';
 export interface RequestContext {
   requestId?: string;
   gaii?: string;
+  /**
+   * Set a header on this request's HTTP response, while it has not been sent. Lets a service that
+   * accepts a deprecated form say so on the response without taking the Express response
+   * (services/deprecation.ts). Absent outside an HTTP request.
+   */
+  setHeader?: (name: string, value: string) => void;
 }
 
 export const requestContext = new AsyncLocalStorage<RequestContext>();

@@ -100,6 +100,20 @@
     { "id": "ard", "name": "Agentic Resource Discovery", "spec": "https://agenticresourcediscovery.org", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "NOT IMPLEMENTED. /.well-known/ai-catalog.json is 404 and no Agentmap directive, link tag or DNS record points anywhere. A decision, not an oversight: wish-ard-ai-catalog in the wish bucket carries the analysis and the two open questions." },
     { "id": "rfc9728", "name": "OAuth Protected Resource Metadata (RFC 9728)", "spec": "https://datatracker.ietf.org/doc/html/rfc9728", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Two documents served: the origin's at the bare well-known path and the MCP endpoint's at the path-suffixed one, fixed 2026-09-04 after a scanner found the apex naming a resource it was not. The RFC itself has not been re-read since." },
     { "id": "rfc8628", "name": "OAuth Device Authorization Grant (RFC 8628)", "spec": "https://datatracker.ietf.org/doc/html/rfc8628", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "How every agent gets an identity here. Stable RFC, but nobody has checked our flow against it since it was written." },
-    { "id": "agents-txt", "name": "agents.txt", "spec": "https://agentstxt.org", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /agents.txt. A young convention with no settled owner; nobody has checked whose version we follow." }
+    { "id": "agents-txt", "name": "agents.txt", "spec": "https://agentstxt.org", "weDeclare": null, "declaredIn": [], "current": null, "verifiedOn": null, "verdict": "untriaged", "note": "Served at /agents.txt. A young convention with no settled owner; nobody has checked whose version we follow." },
+    {
+      "id": "aimeat-core",
+      "name": "AIMEAT Core",
+      "spec": "docs/AIMEAT-Core-2026-11.md",
+      "weDeclare": "2026-11",
+      "declaredIn": [
+        { "file": "src/utils/protocol-version.ts", "template": "export const CORE_PROTOCOL_VERSION = '{version}';" },
+        { "file": "../openapi.yaml", "template": "x-aimeat-protocol: '{version}'" }
+      ],
+      "current": "2026-11",
+      "verifiedOn": "2026-10-12",
+      "verdict": "current",
+      "note": "Our own protocol, a Draft that becomes normative with node 4.0.0. Discovery (/.well-known/aimeat and GET / this_node) states protocol_version 2026-11 and the claimed profiles from node 4.0.0 and leaves both out before it (services/core-discovery.ts CORE_PROTOCOL_FROM), because a 3.x node does not yet keep the edition's removals. Ruling decision-core-2026-11-avoimet-kysymykset-ja-agenttien-automaattinen-l Q2. A new edition moves both declaration sites together; docs/AIMEAT-Core-2026-11-evidence.md says which requirements the node meets."
+    }
   ]
 }

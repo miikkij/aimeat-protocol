@@ -1014,6 +1014,9 @@ const ALL_SUITES = [
     'test/e2e-connect-tunnel-records.ts',
     'test/e2e-agent-crew.ts',
     'test/e2e-connect-serve-loopback.ts',
+    // The real daemon says why an agent left it: deleted on the node is recorded and survives a
+    // restart, a deactivated account is not, and a recreated agent is not reported.
+    'test/e2e-connect-departed.ts',
     // The real daemon on a loopback address that is not the node's base URL (a hosted node's crew):
     // the basic-agents button and an approved proposal both enrol through it.
     'test/e2e-connect-enrol-loopback.ts',

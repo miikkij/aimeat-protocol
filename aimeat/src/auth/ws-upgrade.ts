@@ -13,22 +13,27 @@
  *     WebSocket cannot set a header. The ticket names one socket kind and is spent on first use.
  *   - `?token=<jwt>`: DEPRECATED. A URL is written to every reverse proxy's access log, so this put a
  *     live session token in those logs (secrets audit 2026-10-09, d3). Controlled by
- *     AIMEAT_WS_QUERY_TOKEN (config.wsQueryToken): default on in 3.x, removed in 4.0.0. When off it is
- *     refused with WS_QUERY_TOKEN_DISABLED. Each accepted use is counted in the stats counter family
- *     `ws_query_token` (by socket kind, GET /v1/stats) and logged at most once a day, so the switch-off
- *     can be decided on data.
+ *     AIMEAT_WS_QUERY_TOKEN (config.wsQueryToken): default on in 3.x. From WS_QUERY_TOKEN_REMOVED_IN
+ *     (4.0.0, config-security.ts) it is refused whatever the setting says. When refused the answer is
+ *     WS_QUERY_TOKEN_DISABLED. Each accepted use is counted in the stats counter family
+ *     `ws_query_token` (by socket kind, GET /v1/stats), logged at most once a day, and its 101 answer
+ *     carries the Deprecation headers (upgradeDeprecationHeaderLines), so the switch-off can be
+ *     decided on data.
  *
  *   A refusal is written as a plain HTTP answer on the socket with the code in an `X-AIMEAT-Error`
  *   header and the AIMEAT error envelope as the body (refuseUpgrade). A browser does not expose either,
  *   but a server-side client and a test can read why.
  * @structure SOCKET_KINDS · isSocketKind · SOCKET_TICKET_TTL_SECONDS · mintSocketTicket ·
- *   authenticateUpgrade · refuseUpgrade
+ *   authenticateUpgrade · upgradeDeprecationHeaderLines · refuseUpgrade
  * @usage
  *   const auth = await authenticateUpgrade(request, url, 'personal-tunnel', config.wsQueryToken);
  *   if (auth.outcome === 'refused') { refuseUpgrade(socket, auth.status, auth.code, auth.message); return; }
  *   if (auth.outcome === 'none') { refuseUpgrade(socket, 401, 'AUTH_REQUIRED'); return; }
  *   const { payload, token } = auth;
  * @version-history
+ *   v1.1.0 — 2026-10-12 — `?token=` is a version gate: refused from WS_QUERY_TOKEN_REMOVED_IN whatever
+ *     the setting says, and the 101 answer of an upgrade let in on it carries the Deprecation headers
+ *     (Core 2026-11 AUTH-24, HTTP-07, HTTP-08).
  *   v1.0.0 — 2026-10-09 — Initial: the single-use socket ticket and the deprecated query token
  *     (secrets audit 2026-10-09, d3).
  */
@@ -39,6 +44,8 @@ import { credentialRevoked } from './middleware.js';
 import { createSingleUseTicketStore } from '../services/single-use-tickets.js';
 import { getStats } from '../services/stats.js';
 import { logger } from '../utils/logger.js';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../config-security.js';
+import { deprecationHeaders, removedFrom } from '../services/deprecation.js';
 
 /** The WebSocket endpoints a ticket can be minted for. One ticket opens one kind and no other. */
 export const SOCKET_KINDS = ['realtime', 'personal-tunnel', 'connect-tunnel'] as const;
@@ -88,7 +95,7 @@ function noteQueryTokenUse(socket: SocketKind): void {
   if (day === lastQueryTokenNoticeDay) return;
   lastQueryTokenNoticeDay = day;
   logger.warn(
-    'A WebSocket upgrade carried a session token in its URL (?token=). This is deprecated and removed in 4.0.0, '
+    `A WebSocket upgrade carried a session token in its URL (?token=). This is deprecated and removed in ${WS_QUERY_TOKEN_REMOVED_IN}, `
     + 'because reverse proxies log URLs. Clients should POST /v1/ws/ticket and connect with ?ticket=. '
     + 'GET /v1/stats counts the uses (ws_query_token); AIMEAT_WS_QUERY_TOKEN=false refuses them. Logged once a day.',
     { socket },
@@ -124,8 +131,11 @@ export async function authenticateUpgrade(
     ticketSub = t.sub;
     via = 'ticket';
   } else if (queryToken !== null) {
-    if (!queryTokenAllowed) {
-      return refused('WS_QUERY_TOKEN_DISABLED', 'This node does not take a session token in the URL. POST /v1/ws/ticket and connect with ?ticket=, or send an Authorization header.');
+    // From WS_QUERY_TOKEN_REMOVED_IN refused whatever the caller passed (Core 2026-11 AUTH-24, HTTP-08).
+    if (!queryTokenAllowed || removedFrom(WS_QUERY_TOKEN_REMOVED_IN)) {
+      return refused('WS_QUERY_TOKEN_DISABLED', removedFrom(WS_QUERY_TOKEN_REMOVED_IN)
+        ? `A session token in the URL was removed in ${WS_QUERY_TOKEN_REMOVED_IN}. POST /v1/ws/ticket and connect with ?ticket=, or send an Authorization header.`
+        : 'This node does not take a session token in the URL. POST /v1/ws/ticket and connect with ?ticket=, or send an Authorization header.');
     }
     token = queryToken;
     via = 'query';
@@ -137,8 +147,25 @@ export async function authenticateUpgrade(
   if (!payload || !payload.sub) return refused('INVALID_TOKEN', 'The token is invalid or expired.');
   if (await credentialRevoked(token, payload)) return refused('CREDENTIAL_REVOKED', 'The credential is no longer valid.');
   if (ticketSub !== null && payload.sub !== ticketSub) return refused('INVALID_TICKET', 'The ticket does not match its credential.');
-  if (via === 'query') noteQueryTokenUse(socket);
+  if (via === 'query') {
+    noteQueryTokenUse(socket);
+    queryTokenUpgrades.add(request);
+  }
   return { outcome: 'verified', token, payload, via };
+}
+
+/** Upgrades that were let in on `?token=`, so their 101 answer can name the removal. */
+const queryTokenUpgrades = new WeakSet<IncomingMessage>();
+
+/**
+ * The header lines a WebSocketServer adds to the 101 answer of this upgrade (its `headers` event):
+ * the Deprecation headers when the upgrade was let in on `?token=` (Core 2026-11 HTTP-07), none
+ * otherwise. A server-side client and a test can read them; a browser does not expose them.
+ */
+export function upgradeDeprecationHeaderLines(request: IncomingMessage): string[] {
+  if (!queryTokenUpgrades.has(request)) return [];
+  return Object.entries(deprecationHeaders({ removedIn: WS_QUERY_TOKEN_REMOVED_IN, successor: '/v1/ws/ticket' }))
+    .map(([name, value]) => `${name}: ${value}`);
 }
 
 /**

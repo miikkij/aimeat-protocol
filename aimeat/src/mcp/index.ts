@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-12 — The MCP serverInfo.version is the node's software version (getSoftwareVersion), where
+ *     it had been a fixed '1.2.0' (Core 2026-11 ruling Q2).
  *   2026-10-12 — authenticate() refuses a token whose audience names another resource, and from 4.0.0
  *     an MCP OAuth token that names none (mcp/oauth-binding.ts, Core 2026-11 MCP-07).
  *   2026-10-05 — Resources are registered through withResourceGate (mcp/resource-gate.ts): the scope
@@ -153,6 +155,7 @@ import { verifyJWT, type VerifiedToken } from '../auth/jwt.js';
 import { credentialRevoked } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { getSoftwareVersion } from '../utils/version.js';
 import { mcpRequestAuthority, sameMcpPrincipal, withRequestPermission } from './request-authority.js';
 
 // ── Resource change event bus ──
@@ -270,7 +273,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             })
             .catch(err => { logger.warn('mcp: support routing unread, instructions unchanged', { error: String(err) }); return null; });
         const mcp = new McpServer(
-            { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
+            // serverInfo.version is the node's software version (Core 2026-11 ruling Q2), not a number of its own.
+            { name: `AIMEAT Node ${config.nodeId}`, version: getSoftwareVersion() },
             {
                 // tools.listChanged is the half that was missing: the agent's scopes decide which
                 // tools this session registered, so a permission change makes the client's list
